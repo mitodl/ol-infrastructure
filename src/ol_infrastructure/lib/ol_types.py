@@ -48,7 +48,7 @@ class Environment(str, Enum):
 
 
 @unique
-class Apps(str, Enum):
+class Services(str, Enum):
     """Canonical source of truth for defining apps."""
 
     airbyte = "airbyte"
@@ -74,7 +74,7 @@ class K8sGlobalLabels(BaseModel):
     """Base class for Kubernetes resource labels."""
 
     ou: BusinessUnit
-    service: Apps
+    service: Services
     stack: str
 
     def model_dump(self, *args, **kwargs):

@@ -56,7 +56,12 @@ from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
 )
-from ol_infrastructure.lib.ol_types import Apps, AWSBase, BusinessUnit, K8sGlobalLabels
+from ol_infrastructure.lib.ol_types import (
+    AWSBase,
+    BusinessUnit,
+    K8sGlobalLabels,
+    Services,
+)
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 
@@ -92,7 +97,7 @@ consul_provider = get_consul_provider(stack_info)
 setup_vault_provider(stack_info)
 
 k8s_global_labels = K8sGlobalLabels(
-    ou=BusinessUnit.ecommerce, service=Apps.ecommerce, stack=stack_info.full_name
+    ou=BusinessUnit.ecommerce, service=Services.ecommerce, stack=stack_info.full_name
 ).model_dump()
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
@@ -647,7 +652,7 @@ secret_names = [db_creds_secret_name, redis_creds_secret_name, static_secrets_na
 ecommerce_k8s_config: OLApplicationK8sConfig = OLApplicationK8sConfig(
     project_root=Path(__file__).parent,
     application_config=ecommerce_config.require_object("env_vars"),
-    application_name=Apps.ecommerce,
+    application_name=Services.ecommerce,
     application_namespace=ecommerce_namespace,
     application_lb_service_name="ecommerce",
     application_lb_service_port_name="http",

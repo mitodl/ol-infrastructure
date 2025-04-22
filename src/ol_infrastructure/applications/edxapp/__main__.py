@@ -66,7 +66,7 @@ from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
 )
-from ol_infrastructure.lib.ol_types import Apps, AWSBase
+from ol_infrastructure.lib.ol_types import AWSBase, Services
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import mysql_role_statements, setup_vault_provider
@@ -115,7 +115,7 @@ aws_config = AWSBase(
     tags={
         "OU": edxapp_config.require("business_unit"),
         "Environment": env_name,
-        "Application": Apps.edxapp,
+        "Application": Services.edxapp,
         "Owner": "platform-engineering",
     }
 )

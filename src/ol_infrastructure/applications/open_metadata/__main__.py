@@ -36,7 +36,12 @@ from ol_infrastructure.lib.aws.eks_helper import (
 )
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.consul import get_consul_provider
-from ol_infrastructure.lib.ol_types import Apps, AWSBase, BusinessUnit, K8sGlobalLabels
+from ol_infrastructure.lib.ol_types import (
+    AWSBase,
+    BusinessUnit,
+    K8sGlobalLabels,
+    Services,
+)
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
@@ -70,7 +75,7 @@ consul_provider = get_consul_provider(stack_info)
 setup_vault_provider(stack_info)
 
 k8s_global_labels = K8sGlobalLabels(
-    service=Apps.open_metadata,
+    service=Services.open_metadata,
     ou=BusinessUnit.data,
     stack=stack_info.full_name,
 ).model_dump()

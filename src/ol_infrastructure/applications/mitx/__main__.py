@@ -6,7 +6,7 @@ from ol_infrastructure.components.aws.s3_cloudfront_site import (
     S3ServerlessSite,
     S3ServerlessSiteConfig,
 )
-from ol_infrastructure.lib.ol_types import Apps, AWSBase
+from ol_infrastructure.lib.ol_types import AWSBase, Services
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 fifteen_minutes = 60 * 15
@@ -17,7 +17,7 @@ aws_config = AWSBase(
     tags={
         "OU": "mitx",
         "Environment": mitx_environment,
-        "Application": Apps.mitx_edx.value,
+        "Application": Services.mitx_edx.value,
     }
 )
 
