@@ -72,12 +72,7 @@ from ol_infrastructure.lib.fastly import (
     get_fastly_provider,
 )
 from ol_infrastructure.lib.heroku import setup_heroku_provider
-from ol_infrastructure.lib.ol_types import (
-    Apps,
-    AWSBase,
-    BusinessUnit,
-    K8s8sGlobalLabels,
-)
+from ol_infrastructure.lib.ol_types import Apps, AWSBase, BusinessUnit, K8sGlobalLabels
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
@@ -127,10 +122,10 @@ app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
     stack_info.env_suffix
 ]
 
-k8s_global_labels = K8s8sGlobalLabels(
-    app=Apps.mit_learn,
+k8s_global_labels = K8sGlobalLabels(
+    service=Apps.mit_learn,
     ou=BusinessUnit.mit_learn,
-    stack_info=stack_info,
+    stack=stack_info.full_name,
 ).model_dump()
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
