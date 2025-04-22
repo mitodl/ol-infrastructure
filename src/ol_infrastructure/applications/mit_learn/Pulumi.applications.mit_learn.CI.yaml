@@ -39,7 +39,7 @@ config:
   mitlearn:learn_ai_syllabus_endpoint: "https://api.rc.learn.mit.edu/ai/http/syllabus_agent/"
   mitlearn:legacy_frontend_domain: "mitopen-ci.odl.mit.edu"
   mitlearn:nextjs_heroku_domain: "next.ci.learn.mit.edu"
-  mitlearn:posthog_proxy: ph.ci.learn.mit.edu
+  mitlearn:posthog_proxy: "ph.ol.mit.edu"
   #  heroku:user: "odl-devops"
   #heroku:app_id:
   #  secure: v1:eSvnqne7KQRkHJlu:wTyl9W3aivfxlANqBML2wy4GEHe85VuKll60R5HmGUu1hJTcQBEfzK1cJOyvjlbLgBtXLw==
