@@ -9,6 +9,8 @@ config:
   - "odl.mit.edu"
   - ".ol.mit.edu"
   - "ol.mit.edu"
+  - "mitxonline.mit.edu"
+  - ".mitxonline.mit.edu"
   eks:apisix_admin_key:
     secure: v1:sDse8RY8sLFEsPSE:8jqIrqb4BJHNipDXmbh4KXpVrAUUOmiLEV4aKjXqhIr2RvFqOks4pVz+km0wF1hh
   eks:apisix_ingress_enabled: "true"
@@ -18,6 +20,7 @@ config:
   - "api-pay-ci.ol.mit.edu"
   - "api-learn-ai-ci.ol.mit.edu"
   - "api.ci.learn.mit.edu"
+  - "ci.mitxonline.mit.edu"
   eks:developer_role_policy_name: "AmazonEKSAdminPolicy"
   eks:developer_role_kubernetes_groups: ["admin"]
   eks:ebs_csi_provisioner: "true"
@@ -27,6 +30,7 @@ config:
   - "ecommerce"
   - "learn-ai"
   - "mitlearn"
+  - "mitxonline"
   - "odl-video-service"
   eks:nodegroups:
     worker-xlarge:
