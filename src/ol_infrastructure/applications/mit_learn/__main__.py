@@ -51,7 +51,7 @@ from ol_infrastructure.components.services.k8s import (
     OLApisixSharedPluginsConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryWorkerConfig,
-    OLApplicationK8sConfiguration,
+    OLApplicationK8sConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -1718,7 +1718,7 @@ if mitlearn_config.get_bool("k8s_deploy"):
     # Configure and deploy the mitlearn application using OLApplicationK8s
 
     mitlearn_k8s_app = OLApplicationK8s(
-        ol_app_k8s_config=OLApplicationK8sConfiguration(
+        ol_app_k8s_config=OLApplicationK8sConfig(
             project_root=Path(__file__).parent,
             application_config=env_vars,
             application_name="mitlearn",

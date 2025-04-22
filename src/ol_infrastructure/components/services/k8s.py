@@ -1,4 +1,4 @@
-# ruff: noqa: ERA001, C416, E501, CPY001
+# ruff: noqa: ERA001, C416, E501, CPY001, D103, D101
 """
 This is a service components that replaces a number of "boilerplate" kubernetes
 calls we currently make into one convenient callable package.
@@ -75,8 +75,7 @@ class OLApplicationK8sCeleryWorkerConfig(BaseModel):
     ]
 
 
-# Refactor this to just be 'Config' rather than 'Configuration' - but not today
-class OLApplicationK8sConfiguration(BaseModel):
+class OLApplicationK8sConfig(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     project_root: Path
@@ -163,7 +162,7 @@ class OLApplicationK8s(ComponentResource):
     # Yes Ruff, this i s gross and needs fix :)
     def __init__(
         self,
-        ol_app_k8s_config: OLApplicationK8sConfiguration,
+        ol_app_k8s_config: OLApplicationK8sConfig,
         opts: ResourceOptions | None = None,
     ):
         """

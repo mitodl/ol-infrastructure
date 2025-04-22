@@ -34,7 +34,7 @@ from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisC
 from ol_infrastructure.components.services import appdb
 from ol_infrastructure.components.services.k8s import (
     OLApplicationK8s,
-    OLApplicationK8sConfiguration,
+    OLApplicationK8sConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SDynamicSecretConfig,
@@ -644,7 +644,7 @@ static_secrets = OLVaultK8SSecret(
 
 # k8s Component Resource
 secret_names = [db_creds_secret_name, redis_creds_secret_name, static_secrets_name]
-ecommerce_k8s_config: OLApplicationK8sConfiguration = OLApplicationK8sConfiguration(
+ecommerce_k8s_config: OLApplicationK8sConfig = OLApplicationK8sConfig(
     project_root=Path(__file__).parent,
     application_config=ecommerce_config.require_object("env_vars"),
     application_name=Apps.ecommerce,

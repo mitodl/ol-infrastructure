@@ -42,7 +42,7 @@ from ol_infrastructure.components.services.k8s import (
     OLApisixSharedPluginsConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryWorkerConfig,
-    OLApplicationK8sConfiguration,
+    OLApplicationK8sConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SDynamicSecretConfig,
@@ -722,7 +722,7 @@ learn_ai_nginx_configmap = kubernetes.core.v1.ConfigMap(
 
 # Instantiate the OLApplicationK8s component
 learn_ai_app_k8s = OLApplicationK8s(
-    ol_app_k8s_config=OLApplicationK8sConfiguration(
+    ol_app_k8s_config=OLApplicationK8sConfig(
         project_root=Path(__file__).parent,
         application_config=learn_ai_config.require_object("env_vars") or {},
         application_name="learn-ai",
