@@ -1117,7 +1117,7 @@ gh_workflow_s3_bucket_name_env_secret = github.ActionsVariable(
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 
-frontend_vars = learn_ai_config.require_object("env_vars")
+frontend_vars = learn_ai_config.require_object("frontend_vars")
 # Variables for frontend app build
 gh_workflow_api_base_env_var = github.ActionsVariable(
     f"learn-ai-gh-workflow-api-base-env-variablet-{stack_info.env_suffix}",
