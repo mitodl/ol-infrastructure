@@ -10,11 +10,9 @@ config:
   learn_ai:env_vars:
     AI_DEFAULT_SYLLABUS_MODEL: "bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0"
     CELERY_TASK_ALWAYS_EAGER: "false"
-    CSRF_ALLOWED_ORIGINS:
-      '["https://learn-ai.ol.mit.edu", "https://api-learn-ai.ol.mit.edu",
+    CSRF_ALLOWED_ORIGINS: '["https://learn-ai.ol.mit.edu", "https://api-learn-ai.ol.mit.edu",
       "https://learn.mit.edu", "https://api.learn.mit.edu"]'
-    CSRF_TRUSTED_ORIGINS:
-      '["https://learn-ai.ol.mit.edu", "https://api-learn-ai.ol.mit.edu",
+    CSRF_TRUSTED_ORIGINS: '["https://learn-ai.ol.mit.edu", "https://api-learn-ai.ol.mit.edu",
       "https://learn.mit.edu", "https://api.learn.mit.edu"]'
     DEBUG: "false"
     DEV_ENV: "false"
