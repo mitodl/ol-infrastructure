@@ -15,9 +15,11 @@ config:
     AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     CELERY_TASK_ALWAYS_EAGER: "false"
-    CSRF_ALLOWED_ORIGINS: '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qa.ol.mit.edu",
+    CSRF_ALLOWED_ORIGINS:
+      '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qa.ol.mit.edu",
       "https://rc.learn.mit.edu", "https://api.rc.learn.mit.edu"]'
-    CSRF_TRUSTED_ORIGINS: '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qa.ol.mit.edu",
+    CSRF_TRUSTED_ORIGINS:
+      '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qa.ol.mit.edu",
       "https://rc.learn.mit.edu", "https://api.rc.learn.mit.edu"]'
     DEBUG: "false"
     DEV_ENV: "false"
