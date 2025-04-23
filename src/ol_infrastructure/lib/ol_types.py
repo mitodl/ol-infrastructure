@@ -4,6 +4,7 @@ from enum import Enum, unique
 from pydantic import BaseModel, field_validator
 
 from ol_infrastructure.lib.aws.ec2_helper import aws_regions
+from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 REQUIRED_TAGS = {"OU", "Environment"}
 RECOMMENDED_TAGS = {"Application", "Owner"}
@@ -75,7 +76,7 @@ class K8sGlobalLabels(BaseModel):
 
     ou: BusinessUnit
     service: Services
-    stack: str
+    stack: StackInfo
 
     def model_dump(self, *args, **kwargs):
         kwargs["exclude_none"] = True
@@ -84,6 +85,9 @@ class K8sGlobalLabels(BaseModel):
         new_dict = {}
         for key in model_dict:
             new_dict[f"ol.mit.edu/{key}"] = model_dict[key]
+        new_dict["ol.mit.edu/stack"] = self.stack.full_name
+        new_dict["ol.mit.edu/environment"] = self.stack.env_suffix
+        new_dict["ol.mit.edu/application"] = self.stack.env_prefix
         return new_dict
 
 

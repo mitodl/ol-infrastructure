@@ -130,7 +130,7 @@ app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
 k8s_global_labels = K8sGlobalLabels(
     service=Services.mit_learn,
     ou=BusinessUnit.mit_learn,
-    stack=stack_info.full_name,
+    stack=stack_info,
 ).model_dump()
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))

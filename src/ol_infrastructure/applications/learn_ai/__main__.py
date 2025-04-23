@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ERA001, D100, CPY001
+# ruff: noqa: E501, ERA001
 import base64
 import json
 import mimetypes
@@ -105,7 +105,7 @@ github_provider = github.Provider(
 )
 
 k8s_global_labels = K8sGlobalLabels(
-    ou=BusinessUnit.mit_learn, service=Services.mit_learn, stack=stack_info.full_name
+    ou=BusinessUnit.mit_learn, service=Services.mit_learn, stack=stack_info
 ).model_dump()
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 

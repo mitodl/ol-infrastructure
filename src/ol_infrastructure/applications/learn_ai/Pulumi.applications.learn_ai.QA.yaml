@@ -21,7 +21,7 @@ config:
       "https://rc.learn.mit.edu", "https://api.rc.learn.mit.edu"]'
     DEBUG: "false"
     DEV_ENV: "false"
-    ENVIRONMENT: "production"
+    ENVIRONMENT: "rc"
     MITOL_APP_BASE_URL: "https://learn-ai-qa.ol.mit.edu"
     MITOL_COOKIE_DOMAIN: "ol.mit.edu"
     MITOL_COOKIE_NAME: "mitol"
