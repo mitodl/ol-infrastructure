@@ -181,17 +181,15 @@ def mfe_job(
         "learner-dashboard",
         "authoring",
     ]
-    if OpenEdxMicroFrontend[mfe_name].value in mfe_plugin_types:
-        mfe_setup_command = textwrap.dedent(
-            f"""\
-            cp -r {mfe_repo.name}/* {mfe_build_dir.name}
-            cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/Footer.jsx {mfe_build_dir.name}/Footer.jsx
-            cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/{slot_config_file}.env.jsx {mfe_build_dir.name}/env.config.jsx
-            {copy_common_config}
-            """  # noqa: E501
-        )
-    else:
-        mfe_setup_command = f"cp -r {mfe_repo.name}/* {mfe_build_dir.name}"
+
+    mfe_setup_command = textwrap.dedent(
+        f"""\
+        cp -r {mfe_repo.name}/* {mfe_build_dir.name}
+        cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/Footer.jsx {mfe_build_dir.name}/Footer.jsx
+        cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/{slot_config_file}.env.jsx {mfe_build_dir.name}/env.config.jsx
+        {copy_common_config}
+        """  # noqa: E501
+    )
 
     mfe_setup_plan += [
         clone_mfe_configs,
