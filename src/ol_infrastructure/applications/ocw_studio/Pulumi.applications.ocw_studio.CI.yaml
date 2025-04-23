@@ -30,6 +30,9 @@ config:
     SOCIAL_AUTH_SAML_SP_ENTITY_ID: 'https://ocw-studio-ci.odl.mit.edu/saml/metadata'
     STATIC_API_BASE_URL_TEST: 'https://test-qa.ocw.mit.edu/'
     YT_PROJECT_ID: 'ovs-youtube-qa'
+    POST_TRANSCODE_ACTIONS: 'videos.api.update_video_job'
+    VIDEO_S3_UPLOAD_PREFIX: 'gdrive_uploads'
+    TRANSCODE_JOB_TEMPLATE: './videos/config/mediaconvert.json'
   ocw_studio:app_domain: ocw-studio-ci.odl.mit.edu
   ocw_studio:db_password:
     secure: v1:PMhnJY0c/38fxcK/:HwHpoUXfP5YTzXq/3cyZUj4eRjCmNkdScLTGca863qCG/U1Py2BHwJXHiM8KPXx9NJufyVDzNtf79Ss7UTEcKOmM+M+8NXFE6I8UCapuui3yi52KFOWk7o6X
