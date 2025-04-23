@@ -1151,7 +1151,7 @@ gh_workflow_api_base_env_var = github.ActionsVariable(
     f"learn-ai-gh-workflow-mit-learn-app-base-url-variablet-{stack_info.env_suffix}",
     repository=gh_repo.name,
     variable_name=f"MIT_LEARN_APP_BASE_URL_{env_var_suffix}",  # pragma: allowlist secret
-    value=frontend_vars["MIT_LEARN_API_BASE_URL"],
+    value=frontend_vars["MIT_LEARN_APP_BASE_URL"],
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_api_base_env_var = github.ActionsVariable(

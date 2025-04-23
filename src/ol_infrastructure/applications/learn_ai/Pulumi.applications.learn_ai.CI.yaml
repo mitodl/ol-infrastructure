@@ -26,6 +26,10 @@ config:
     SENTRY_TRACES_SAMPLE_RATE: "0.1"
     SESSION_COOKIE_NAME: "session_learn_ai_ci"
     UWSGI_THREADS: "5"
+  learn_ai:frontend_vars:
+    MIT_LEARN_APP_BASE_URL: https://rc.learn.mit.edu/
+    OPENEDX_API_BASE_URL: https://courses-qa.mitxonline.mit.edu/
+    OPENEDX_LOGIN_URL: https://rc.mitxonline.mit.edu/signin/
   learn_ai:frontend_domain: "learn-ai-ci.ol.mit.edu"
   vault:address: "https://vault-ci.odl.mit.edu"
   vault_server:env_namespace: "operations.ci"
