@@ -10,9 +10,11 @@ config:
   learn_ai:env_vars:
     AI_DEFAULT_SYLLABUS_MODEL: "bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0"
     CELERY_TASK_ALWAYS_EAGER: "false"
-    CSRF_ALLOWED_ORIGINS: '["https://learn-ai.ol.mit.edu", "https://api-learn-ai.ol.mit.edu",
+    CSRF_ALLOWED_ORIGINS:
+      '["https://learn-ai.ol.mit.edu", "https://api-learn-ai.ol.mit.edu",
       "https://learn.mit.edu", "https://api.learn.mit.edu"]'
-    CSRF_TRUSTED_ORIGINS: '["https://learn-ai.ol.mit.edu", "https://api-learn-ai.ol.mit.edu",
+    CSRF_TRUSTED_ORIGINS:
+      '["https://learn-ai.ol.mit.edu", "https://api-learn-ai.ol.mit.edu",
       "https://learn.mit.edu", "https://api.learn.mit.edu"]'
     DEBUG: "false"
     DEV_ENV: "false"
@@ -34,6 +36,10 @@ config:
     SENTRY_TRACES_SAMPLE_RATE: "0.1"
     SESSION_COOKIE_NAME: "session_learn_ai_production"
     UWSGI_THREADS: "5"
+  learn_ai:frontend_vars:
+    MIT_LEARN_APP_BASE_URL: https://learn.mit.edu/
+    OPENEDX_API_BASE_URL: https://courses.mitxonline.mit.edu/
+    OPENEDX_LOGIN_URL: https://mitxonline.mit.edu/signin/
   learn_ai:frontend_domain: "learn-ai.ol.mit.edu"
   redis:password:
     secure: v1:txrMWRvWLuyLZ9jG:RANFRu7iGA96qnc47SdQjrwTOS5Lz96n4Vdt6CK9vyb6FreKon4+qyLlk7P+dBS+T0lN7H6bvC1F38zIOA==

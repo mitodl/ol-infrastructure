@@ -15,9 +15,11 @@ config:
     AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     CELERY_TASK_ALWAYS_EAGER: "false"
-    CSRF_ALLOWED_ORIGINS: '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qa.ol.mit.edu",
+    CSRF_ALLOWED_ORIGINS:
+      '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qa.ol.mit.edu",
       "https://rc.learn.mit.edu", "https://api.rc.learn.mit.edu"]'
-    CSRF_TRUSTED_ORIGINS: '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qa.ol.mit.edu",
+    CSRF_TRUSTED_ORIGINS:
+      '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qa.ol.mit.edu",
       "https://rc.learn.mit.edu", "https://api.rc.learn.mit.edu"]'
     DEBUG: "false"
     DEV_ENV: "false"
@@ -39,6 +41,11 @@ config:
     SENTRY_TRACES_SAMPLE_RATE: "0.1"
     SESSION_COOKIE_NAME: "session_learn_ai_rc"
     UWSGI_THREADS: "5"
+  learn_ai:frontend_vars:
+    MIT_LEARN_APP_BASE_URL: https://rc.learn.mit.edu/
+    OPENEDX_API_BASE_URL: https://courses-qa.mitxonline.mit.edu/
+    OPENEDX_LOGIN_URL: https://rc.mitxonline.mit.edu/signin/
+
   learn_ai:frontend_domain: "learn-ai-qa.ol.mit.edu"
   redis:password:
     secure: v1:j1q4KgePVUsaaySb:EhUqxWBezBKe6Ck1o/gqlX68GBnrZZQdmUCscl5aPok1j6jJWKSRO89XfV+6dWJaCMhqHA==

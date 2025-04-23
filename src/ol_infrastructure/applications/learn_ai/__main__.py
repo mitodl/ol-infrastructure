@@ -1112,11 +1112,55 @@ gh_workflow_s3_bucket_name_env_secret = github.ActionsVariable(
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 
+frontend_vars = learn_ai_config.require_object("env_vars")
+# Variables for frontend app build
 gh_workflow_api_base_env_var = github.ActionsVariable(
     f"learn-ai-gh-workflow-api-base-env-variablet-{stack_info.env_suffix}",
     repository=gh_repo.name,
     variable_name=f"API_BASE_{env_var_suffix}",  # pragma: allowlist secret
     value=f"https://{learn_api_domain}/ai",
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+gh_workflow_api_base_env_var = github.ActionsVariable(
+    f"learn-ai-gh-workflow-ai-csrf-cookie-name-env-variablet-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    variable_name=f"AI_CSRF_COOKIE_NAME_{env_var_suffix}",  # pragma: allowlist secret
+    value="csrftoken",
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+gh_workflow_api_base_env_var = github.ActionsVariable(
+    f"learn-ai-gh-workflow-learn-mit-ai-login-url-env-variablet-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    variable_name=f"MIT_LEARN_AI_LOGIN_URL_{env_var_suffix}",  # pragma: allowlist secret
+    value=f"https://{learn_api_domain}/ai/http/login/",
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+gh_workflow_api_base_env_var = github.ActionsVariable(
+    f"learn-ai-gh-workflow-mit-learn-api-base-url-variablet-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    variable_name=f"MIT_LEARN_API_BASE_URL_{env_var_suffix}",  # pragma: allowlist secret
+    value=f"https://{learn_api_domain}/learn/",
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+gh_workflow_api_base_env_var = github.ActionsVariable(
+    f"learn-ai-gh-workflow-mit-learn-app-base-url-variablet-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    variable_name=f"MIT_LEARN_APP_BASE_URL_{env_var_suffix}",  # pragma: allowlist secret
+    value=frontend_vars["MIT_LEARN_API_BASE_URL"],
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+gh_workflow_api_base_env_var = github.ActionsVariable(
+    f"learn-ai-gh-workflow-openedx-api-base-url-variablet-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    variable_name=f"OPENEDX_API_BASE_URL_{env_var_suffix}",  # pragma: allowlist secret
+    value=frontend_vars["OPENEDX_API_BASE_URL"],
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+gh_workflow_api_base_env_var = github.ActionsVariable(
+    f"learn-ai-gh-workflow-openedx-login-url-variablet-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    variable_name=f"OPENEDX_LOGIN_URL_{env_var_suffix}",  # pragma: allowlist secret
+    value=frontend_vars["OPENEDX_LOGIN_URL"],
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 
