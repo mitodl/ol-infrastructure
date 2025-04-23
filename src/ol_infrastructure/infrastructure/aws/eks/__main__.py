@@ -17,7 +17,7 @@ from pulumi import Config, Output, ResourceOptions, StackReference, export
 from bridge.lib.magic_numbers import (
     DEFAULT_EFS_PORT,
     GRAFANA_ALLOY_DEFAULT_LISTENER_PORT,
-    GRAFANA_ALLOY_OTEL_GRCP_PORT,
+    GRAFANA_ALLOY_OTEL_GRPC_PORT,
     GRAFANA_ALLOY_OTEL_HTTP_PORT,
     IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
 )
@@ -463,8 +463,8 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
             description="Allow Alloy OTEL gRPC traffic on TCP",
             security_group_id=ng.id,
             protocol=aws.ec2.ProtocolType.TCP,
-            from_port=GRAFANA_ALLOY_OTEL_GRCP_PORT,
-            to_port=GRAFANA_ALLOY_OTEL_GRCP_PORT,
+            from_port=GRAFANA_ALLOY_OTEL_GRPC_PORT,
+            to_port=GRAFANA_ALLOY_OTEL_GRPC_PORT,
             cidr_blocks=pod_ip_blocks,
         )
     )
