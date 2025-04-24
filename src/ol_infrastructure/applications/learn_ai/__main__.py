@@ -6,6 +6,7 @@ import os
 import textwrap
 from pathlib import Path
 
+import pulumi_consul as consul
 import pulumi_fastly as fastly
 import pulumi_github as github
 import pulumi_kubernetes as kubernetes
@@ -58,6 +59,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
@@ -338,6 +340,7 @@ vector_log_proxy_fqdn = vector_log_proxy_stack.require_output("vector_log_proxy"
     "fqdn"
 ]
 
+learn_ai_frontend_domain = learn_ai_config.require("frontend_domain")
 fastly_access_logging_bucket = monitoring_stack.require_output(
     "fastly_access_logging_bucket"
 )
@@ -393,7 +396,7 @@ learn_ai_fastly_service = fastly.ServiceVcl(
     domains=[
         fastly.ServiceVclDomainArgs(
             comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application",
-            name=learn_ai_config.require("frontend_domain"),
+            name=learn_ai_frontend_domain,
         ),
     ],
     request_settings=[
@@ -1169,6 +1172,23 @@ gh_workflow_api_base_env_var = github.ActionsVariable(
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 
+xpro_consul_opts = get_consul_provider(
+    stack_info=stack_info,
+    consul_address=f"https://consul-xpro-{stack_info.env_suffix}.odl.mit.edu",
+    provider_name=f"consul-provider-xpro-{stack_info.env_suffix}",
+)
+consul.Keys(
+    f"learn-api-domain-consul-key-for-xpro-openedx-{stack_info.env_suffix}",
+    keys=[
+        consul.KeysKeyArgs(
+            path="edxapp/learn-ai-frontend-domain",
+            delete=False,
+            value=learn_ai_frontend_domain,
+        )
+    ],
+    opts=xpro_consul_opts,
+)
+
 if stack_info.env_suffix != "ci":
     gh_workflow_posthog_project_api_key_env_secret = github.ActionsSecret(
         f"learn-ai-gh-workflow-posthog-project-api_key-{stack_info.env_suffix}",
@@ -1183,4 +1203,20 @@ if stack_info.env_suffix != "ci":
         secret_name=f"POSTHOG_PERSONAL_API_KEY_{env_var_suffix}",
         plaintext_value=mitlearn_posthog_secrets["personal_api_key"],
         opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+    )
+    mitxonline_consul_opts = get_consul_provider(
+        stack_info,
+        consul_address=f"https://consul-mitxonline-{stack_info.env_suffix}.odl.mit.edu",
+        provider_name=f"consul-provider-mitxonline-{stack_info.env_suffix}",
+    )
+    consul.Keys(
+        "learn-api-domain-consul-key-for-mitxonline-openedx",
+        keys=[
+            consul.KeysKeyArgs(
+                path="edxapp/learn-ai-frontend-domain",
+                delete=False,
+                value=learn_ai_frontend_domain,
+            )
+        ],
+        opts=mitxonline_consul_opts,
     )
