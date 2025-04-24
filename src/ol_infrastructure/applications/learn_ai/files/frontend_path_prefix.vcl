@@ -1,4 +1,6 @@
 {
+  declare local var.qs STRING;
+  set var.qs = req.url.qs;
   # If the request is for the root ("/"), rewrite it to "/frontend/index.html"
   if (req.url.path == "/" || req.url.path == "") {
     set req.url = "/frontend/index.html";
@@ -14,7 +16,7 @@
     set req.url = "/frontend" + req.url.path;
   }
   # Peserve the query string if it exists
-  if (req.url.qs != "") {
-    set req.url = req.url + "?" + req.url.qs;
+  if (var.qs != "") {
+    set req.url = req.url + "?" + var.qs;
   }
 }
