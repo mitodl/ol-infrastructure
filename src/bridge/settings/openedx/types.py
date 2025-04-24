@@ -146,7 +146,6 @@ class OpenEdxApplicationVersion(BaseModel):
     branch_override: Optional[str] = None
     origin_override: Optional[str] = None
     runtime_version_override: Optional[str] = None
-    branding_overrides: Optional[dict[str, str]] = None
     translation_overrides: Optional[list[str]] = None
 
     @property

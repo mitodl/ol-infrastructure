@@ -75,6 +75,7 @@ def mfe_params(
     learning_mfe_path = OpenEdxMicroFrontend.learn.path
     discussion_mfe_path = OpenEdxMicroFrontend.discussion.path
     return {
+        "APP_ID": mfe.application.value,
         "ABOUT_US_URL": open_edx.about_us_url,
         "ACCESSIBILITY_URL": open_edx.accessibility_url,
         "ACCESS_TOKEN_COOKIE_NAME": (
@@ -147,12 +148,17 @@ def mfe_job(
         trigger=previous_job is None and open_edx.environment_stage != "production",
     )
 
-    branding_overrides = "\n".join(
-        (
-            f"npm install {component}:{override}"
-            for component, override in (mfe.branding_overrides or {}).items()
-        )
-    )
+    translation_overrides = "\n".join(cmd for cmd in mfe.translation_overrides or [])
+    if previous_job and mfe_repo.name == previous_job.plan[0].get:
+        clone_mfe_repo.passed = [previous_job.name]
+        clone_mfe_configs.passed = [previous_job.name]
+
+    mfe_build_dir = Output(name=Identifier("mfe-build"))
+    mfe_setup_plan = [clone_mfe_repo]
+
+    slot_config_file = "common-mfe-config"
+    copy_common_config = ""
+    mfe_smoot_design_overrides = ""
 
     if (
         open_edx_deployment.deployment_name in ["mitxonline", "xpro"]
@@ -163,38 +169,17 @@ def mfe_job(
         tar -xvzf mitodl-smoot-design*.tgz
         mv package mitodl-smoot-design
         """
-        learning_mfe_slot_config_file = "learning-mfe-config"
-    else:
-        mfe_smoot_design_overrides = ""
-        learning_mfe_slot_config_file = "learning"
+        slot_config_file = "learning-mfe-config"
+        copy_common_config = f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx {mfe_build_dir.name}/common-mfe-config.env.jsx"  # noqa: E501
 
-    translation_overrides = "\n".join(cmd for cmd in mfe.translation_overrides or [])
-    if previous_job and mfe_repo.name == previous_job.plan[0].get:
-        clone_mfe_repo.passed = [previous_job.name]
-        clone_mfe_configs.passed = [previous_job.name]
-
-    mfe_build_dir = Output(name=Identifier("mfe-build"))
-    mfe_setup_plan = [clone_mfe_repo]
-
-    mfe_plugin_type_map = {
-        "learning": learning_mfe_slot_config_file,
-        "discussions": "learning",
-        "ora-grading": "learning",
-        "communications": "learning",
-        "gradebook": "simple",
-        "learner-dashboard": "simple",
-    }
-    if slot_config_file := mfe_plugin_type_map.get(
-        OpenEdxMicroFrontend[mfe_name].value
-    ):
-        mfe_setup_command = textwrap.dedent(
-            f"""\
-            cp -r {mfe_repo.name}/* {mfe_build_dir.name}
-            cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/{slot_config_file}.env.jsx {mfe_build_dir.name}/env.config.jsx
-            """  # noqa: E501
-        )
-    else:
-        mfe_setup_command = f"cp -r {mfe_repo.name}/* {mfe_build_dir.name}"
+    mfe_setup_command = textwrap.dedent(
+        f"""\
+        cp -r {mfe_repo.name}/* {mfe_build_dir.name}
+        cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/Footer.jsx {mfe_build_dir.name}/Footer.jsx
+        cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/{slot_config_file}.env.jsx {mfe_build_dir.name}/env.config.jsx
+        {copy_common_config}
+        """  # noqa: E501
+    )
 
     mfe_setup_plan += [
         clone_mfe_configs,
@@ -249,7 +234,6 @@ def mfe_job(
                                 apt-get install -q -y python3 python-is-python3 build-essential git
                                 npm install
                                 npm install -g @edx/openedx-atlas
-                                {branding_overrides}
                                 {translation_overrides}
                                 {mfe_smoot_design_overrides}
                                 npm install webpack
