@@ -418,40 +418,12 @@ learn_ai_fastly_service = fastly.ServiceVcl(
     snippets=[
         fastly.ServiceVclSnippetArgs(
             name="Add frontend to path",
-            content=textwrap.dedent(
-                r"""
-                {
-                # If the request is for the root ("/"), rewrite it to "/frontend/index.html"
-                if (req.url == "/" || req.url == "") {
-                    set req.url = "/frontend/index.html";
-                }
-
-                # If the request does NOT have an extension and is NOT a directory, append ".html"
-                if (req.url !~ "\.[a-zA-Z0-9]+$" && req.url !~ "/$") {
-                    set req.url = req.url + ".html";
-                }
-
-                # Prepend "/frontend" unless it's already prefixed
-                if (req.method == "GET" && req.url !~ "^/frontend/") {
-                    set req.url = "/frontend" + req.url;
-                }
-            }
-                """
-            ),
+            content=Path("files/frontend_path_prefix.vcl").read_text(),
             type="recv",
         ),
         fastly.ServiceVclSnippetArgs(
             name="Return custom 404 page",
-            content=textwrap.dedent(
-                r"""
-                {
-                if ((resp.status == 404 || resp.status == 403) && req.url !~ "^/frontend/404\.html$") {
-                    set req.url = "/frontend/404.html";
-                    restart;
-                }
-            }
-                """
-            ),
+            content=Path("files/custom_404.vcl").read_text(),
             type="deliver",
         ),
         fastly.ServiceVclSnippetArgs(
