@@ -6,6 +6,7 @@
 import base64
 import json
 import os
+import textwrap
 from pathlib import Path
 
 import pulumi_aws as aws
@@ -1063,6 +1064,9 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                 "controlPlane": {
                     "enabled": True,
                     "useDaemonSet": True,
+                    "pdb": {
+                        "create": False
+                    },  # No need for pod disruption budget with daemonset
                     "tolerations": operations_tolerations,
                     # Set admin/viewer tokens directly
                     "apiTokenAdmin": eks_config.require("apisix_admin_key"),
@@ -1074,6 +1078,34 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                             "role_traditional": {
                                 "config_provider": "etcd",  # Default, but explicit
                             },
+                        },
+                        "nginx_config": {
+                            "http": {
+                                "access_log_format": '"$time_local" client=$remote_addr '
+                                "body_bytes_sent=$body_bytes_sent "
+                                "referer=$http_referer "
+                                "request_length=$request_length "
+                                "request_id=$request_id "
+                                "request_time=$request_time "
+                                "status=$status bytes_sent=$bytes_sent "
+                                "upstream_addr=$upstream_addr "
+                                "upstream_connect_time=$upstream_connect_time "
+                                "upstream_header_time=$upstream_header_time "
+                                "upstream_response_time=$upstream_response_time "
+                                "upstream_status=$upstream_status "
+                                'method=$request_method request="$request"',
+                            },
+                            "http_configuration_snippet": textwrap.dedent(
+                                """\
+                                client_header_buffer_size 8k;
+                                large_client_header_buffers 4 32k;
+                                """
+                            ),
+                            "http_server_configuration_snippet": textwrap.dedent(
+                                """\
+                                set $session_compressor zlib;
+                                """
+                            ),
                         },
                     },
                     # Note: allow.ipList from original config doesn't map directly.
