@@ -77,6 +77,10 @@ path "aws-mitx/creds/mit-open-application-*" {
   capabilities = ["read", "list"]
 }
 
+path "aws-mitx/creds/ol-mitopen-application" {
+  capabilities = ["read", "list"]
+}
+
 path "aws-mitx/creds/mitxonline*" {
   capabilities = ["read", "list"]
 }
