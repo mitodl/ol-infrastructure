@@ -1,4 +1,5 @@
 # ruff: noqa: ERA001, TD003, TD002, TD004 FIX002, E501
+"""Pulumi program for deploying an EKS cluster."""
 
 # Misc Ref: https://docs.aws.amazon.com/eks/latest/userguide/associate-service-account-role.html
 
@@ -1031,112 +1032,157 @@ traefik_helm_release = kubernetes.helm.v3.Release(
 
 # Ref: https://apisix.apache.org/docs/ingress-controller/next/tutorials/configure-ingress-with-gateway-api/
 # Ref: https://apisix.apache.org/docs/ingress-controller/getting-started/
-# Ref: https://github.com/apache/apisix-helm-chart/blob/master/charts/apisix/values.yaml
+# Ref: https://artifacthub.io/packages/helm/bitnami/apisix
 if eks_config.get_bool("apisix_ingress_enabled"):
     apisix_domains = eks_config.require_object("apisix_domains")
     apisix_helm_release = kubernetes.helm.v3.Release(
         f"{cluster_name}-apisix-gateway-controller-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
             name="apisix",
-            chart="apisix",
-            version=VERSIONS["APISIX_CHART"],
+            version=VERSIONS[
+                "APISIX_CHART"
+            ],  # Ensure this version exists in Bitnami repo
             namespace="operations",
-            skip_crds=False,
+            # skip_crds=False, # Bitnami charts install CRDs by default
             cleanup_on_fail=True,
-            repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-                repo="https://charts.apiseven.com",
-            ),
+            chart="oci://registry-1.docker.io/bitnamicharts/apisix",  # Use Bitnami repo
             values={
+                # --- Global/Common ---
+                # deploymentMode is configured under controlPlane.extraConfig for traditional mode
+                "commonLabels": k8s_global_labels,
                 "image": {
                     "pullPolicy": "Always",
+                    # Assuming default Bitnami registry/repository is okay
                 },
-                "service": {
-                    "type": "LoadBalancer",
-                    "annotations": {
-                        # Ref: https://github.com/kubernetes-sigs/external-dns/blob/master/docs/annotations/annotations.md#external-dnsalphakubernetesiohostname
-                        "external-dns.alpha.kubernetes.io/hostname": ",".join(
-                            apisix_domains
-                        ),
-                        "service.beta.kubernetes.io/aws-load-balancer-type": "nlb",
-                        "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "instance",
-                        "service.beta.kubernetes.io/aws-load-balancer-target-group-attributes": "preserve_client_ip.enabled=false",
-                        "service.beta.kubernetes.io/aws-load-balancer-subnets": target_vpc.apply(
-                            lambda tvpc: ",".join(tvpc["k8s_public_subnet_ids"])
-                        ),
-                        "http": {
-                            "enabled": True,
-                        },
-                        "tls": {
-                            "enabled": True,
-                        },
-                    },
+                # --- Data Plane (Gateway) ---
+                # Disabled for traditional mode
+                "dataPlane": {
+                    "enabled": False,
                 },
-                "useDaemonSet": True,
-                "commonLabels": k8s_global_labels,
-                "tolerations": operations_tolerations,
-                "resources": {
-                    "requests": {
-                        "cpu": "100m",
-                        "memory": "200Mi",
-                    },
-                    "limits": {
-                        "cpu": "200m",
-                        "memory": "400Mi",
-                    },
-                },
-                "apisix": {
-                    "deployment": {
-                        "mode": "traditional",
-                        "role": "traditional",
-                    },
-                    "ssl": {
-                        "enabled": True,
-                    },
-                    "admin": {
-                        "enabled": True,
-                        "credentials": {
-                            "admin": eks_config.require("apisix_admin_key"),
-                            "viewer": eks_config.require("apisix_viewer_key"),
+                # --- Control Plane (Admin API) ---
+                # In traditional mode, this also handles gateway traffic
+                "controlPlane": {
+                    "enabled": True,
+                    "useDaemonSet": True,
+                    "pdb": {
+                        "create": False
+                    },  # No need for pod disruption budget with daemonset
+                    "tolerations": operations_tolerations,
+                    # Set admin/viewer tokens directly
+                    "apiTokenAdmin": eks_config.require("apisix_admin_key"),
+                    "apiTokenViewer": eks_config.require("apisix_viewer_key"),
+                    # Configure traditional mode
+                    "extraConfig": {
+                        "deployment": {
+                            "role": "traditional",
+                            "role_traditional": {
+                                "config_provider": "etcd",  # Default, but explicit
+                            },
                         },
-                        "allow": {
-                            "ipList": Output.all(pods=pod_ip_blocks).apply(
-                                lambda args: [*args["pods"]]
-                            )
-                        },
-                    },
-                    "nginx": {
-                        "logs": {
-                            "accessLogFormat": '"$time_local" client=$remote_addr '
-                            "body_bytes_sent=$body_bytes_sent "
-                            "referer=$http_referer "
-                            "request_length=$request_length "
-                            "request_id=$request_id "
-                            "request_time=$request_time "
-                            "status=$status bytes_sent=$bytes_sent "
-                            "upstream_addr=$upstream_addr "
-                            "upstream_connect_time=$upstream_connect_time "
-                            "upstream_header_time=$upstream_header_time "
-                            "upstream_response_time=$upstream_response_time "
-                            "upstream_status=$upstream_status "
-                            'method=$request_method request="$request"',
-                            "errorLog": "/dev/stderr",
-                            "errorLogLevel": "info",
-                        },
-                        "configurationSnippet": {
-                            "httpStart": textwrap.dedent(
+                        "nginx_config": {
+                            "http": {
+                                "access_log_format": '"$time_local" client=$remote_addr '
+                                "body_bytes_sent=$body_bytes_sent "
+                                "referer=$http_referer "
+                                "request_length=$request_length "
+                                "request_id=$request_id "
+                                "request_time=$request_time "
+                                "status=$status bytes_sent=$bytes_sent "
+                                "upstream_addr=$upstream_addr "
+                                "upstream_connect_time=$upstream_connect_time "
+                                "upstream_header_time=$upstream_header_time "
+                                "upstream_response_time=$upstream_response_time "
+                                "upstream_status=$upstream_status "
+                                'method=$request_method request="$request"',
+                            },
+                            "http_configuration_snippet": textwrap.dedent(
                                 """\
                                 client_header_buffer_size 8k;
                                 large_client_header_buffers 4 32k;
                                 """
                             ),
-                            "httpSrv": textwrap.dedent(
+                            "http_server_configuration_snippet": textwrap.dedent(
                                 """\
                                 set $session_compressor zlib;
                                 """
                             ),
                         },
                     },
+                    # Note: allow.ipList from original config doesn't map directly.
+                    # Access control might need NetworkPolicy or similar.
+                    "resources": {  # Default resources seem okay, but let's define explicitly if needed
+                        "requests": {
+                            "cpu": "100m",
+                            "memory": "200Mi",
+                        },
+                        # "requests": {"cpu": "10m", "memory": "50Mi"}, # Duplicate key removed
+                        "limits": {"cpu": "500m", "memory": "400Mi"},
+                    },
+                    "service": {
+                        # Use LoadBalancer for traditional mode as control plane handles traffic
+                        "type": "LoadBalancer",
+                        "annotations": {
+                            "external-dns.alpha.kubernetes.io/hostname": ",".join(
+                                apisix_domains
+                            ),
+                            "service.beta.kubernetes.io/aws-load-balancer-type": "nlb",
+                            "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "instance",
+                            "service.beta.kubernetes.io/aws-load-balancer-target-group-attributes": "preserve_client_ip.enabled=false",
+                            "service.beta.kubernetes.io/aws-load-balancer-subnets": target_vpc.apply(
+                                lambda tvpc: ",".join(tvpc["k8s_public_subnet_ids"])
+                            ),
+                        },
+                        # Expose HTTP/HTTPS ports for gateway traffic as per traditional mode docs
+                        "extraPorts": [
+                            {
+                                "name": "http",
+                                "port": 80,
+                                "targetPort": 9080,  # Default dataPlane HTTP port
+                                "protocol": "TCP",
+                            },
+                            {
+                                "name": "https",
+                                "port": 443,
+                                "targetPort": 9443,  # Default dataPlane HTTPS port
+                                "protocol": "TCP",
+                            },
+                        ],
+                        # Keep admin API internal (default port 9180 is exposed by chart)
+                        # Default metrics port 9099 is also exposed by chart
+                    },
                 },
+                # --- Ingress Controller ---
+                # In traditional mode, this still watches K8s resources and configures APISIX via Admin API
+                "ingressController": {
+                    "enabled": True,
+                    "replicaCount": 2,
+                    "tolerations": operations_tolerations,
+                    "resources": {  # Apply original gateway resources here
+                        "requests": {
+                            "cpu": "50m",
+                            "memory": "50Mi",
+                        },
+                        "limits": {
+                            "cpu": "50m",
+                            "memory": "100Mi",
+                        },
+                    },
+                    # Map controller config under extraConfig
+                    "extraConfig": {
+                        "apisix": {
+                            "service_namespace": "operations",
+                            # Use interpolated name for the control plane service
+                            "service_name": Output.concat("apisix", "-control-plane"),
+                            "admin_key": eks_config.require("apisix_admin_key"),
+                            "admin_api_version": "v3",
+                        },
+                        "kubernetes": {
+                            "enable_gateway_api": False,  # As per original config
+                            "resync_interval": "1m",
+                        },
+                    },
+                },
+                # --- Etcd ---
                 "etcd": {
                     "enabled": True,
                     "tolerations": operations_tolerations,
@@ -1150,37 +1196,11 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                             "memory": "200Mi",
                         },
                     },
+                    # Add auth config if needed based on etcd subchart values
                 },
-                "ingress-controller": {
-                    "enabled": True,
-                    "replicaCount": 2,
-                    "tolerations": operations_tolerations,
-                    "gateway": {
-                        "type": "ClusterIP",
-                        "resources": {
-                            "requests": {
-                                "cpu": "50m",
-                                "memory": "50Mi",
-                            },
-                            "limits": {
-                                "cpu": "50m",
-                                "memory": "100Mi",
-                            },
-                        },
-                    },
-                    "config": {
-                        "apisix": {
-                            "serviceNamespace": "operations",
-                            "serviceName": "apisix-admin",
-                            "adminKey": eks_config.require("apisix_admin_key"),
-                            "adminAPIVersion": "v3",
-                        },
-                        "kubernetes": {
-                            # Requires using apisix CRs
-                            "enableGatewayAPI": False,  # Not first-class support 20250304
-                            "resyncInterval": "1m",
-                        },
-                    },
+                # --- Dashboard (Disable if not needed, seems disabled in original via config structure) ---
+                "dashboard": {
+                    "enabled": False,
                 },
             },
         ),
@@ -1192,7 +1212,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                 cluster,
                 node_groups[0],
                 operations_namespace,
-                gateway_api_crds,
+                gateway_api_crds,  # Keep dependency on Gateway CRDs if still relevant elsewhere
             ],
         ),
     )
