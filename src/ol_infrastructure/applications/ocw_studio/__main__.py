@@ -151,7 +151,9 @@ ocw_studio_iam_policy = iam.Policy(
                         "s3:GetObject*",
                     ],
                     "Resource": [
+                        f"arn:aws:s3:::{ocw_to_hugo_bucket_name}",
                         f"arn:aws:s3:::{ocw_to_hugo_bucket_name}/*",
+                        "arn:*:s3:*:*:accesspoint/*",
                     ],
                 },
                 {
@@ -164,7 +166,9 @@ ocw_studio_iam_policy = iam.Policy(
                         "s3:DeleteObject*",
                     ],
                     "Resource": [
+                        f"arn:aws:s3:::{ocw_storage_bucket_name}",
                         f"arn:aws:s3:::{ocw_storage_bucket_name}/*",
+                        "arn:*:s3:*:*:accesspoint/*",
                     ],
                 },
                 {
@@ -185,7 +189,9 @@ ocw_studio_iam_policy = iam.Policy(
                         "s3:PutObjectTagging",
                     ],
                     "Resource": [
+                        f"arn:aws:s3:::ocw-content*{stack_info.env_suffix}",
                         f"arn:aws:s3:::ocw-content*{stack_info.env_suffix}/*",
+                        "arn:*:s3:*:*:accesspoint/*",
                     ],
                 },
                 # Include standard MediaConvert policy statements
