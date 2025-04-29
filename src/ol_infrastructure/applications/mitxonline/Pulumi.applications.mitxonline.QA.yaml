@@ -9,7 +9,8 @@ config:
   consul:scheme: https
   heroku:app_id:
     secure: v1:KIux67Zl3+hwHcoO:nHVugTj5RoBKpU1ZM2QHzRj1mKQqVz2dXhRKdJ51ZZTUA4/aK+iapqhEYVpKIFq8itMeMA==
-  heroku_app:vars:
+  mitxonline:domain: rc.mitxonline.mit.edu
+  mitxonline:vars:
     AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-qa"
     CRON_COURSE_CERTIFICATES_HOURS: "18"
     GA_TRACKING_ID: "UA-5145472-46"

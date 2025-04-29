@@ -1,3 +1,36 @@
 ---
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QGMy4yIannSd/lzkrjExmbaAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMRoeZfasDehG5AcrtAgEQgDvOsnwTDAZrd6xg7FQjOcT8onJyrpUcL9r4WsBRqifRGolaRMEVohz4EbNnqmE0kxybvS6CKoiC0f16EA==
+config:
+  aws:region: us-east-1
+  mitxonline:db_password:
+    secure: v1:fbLlJgSoQEy+xUJX:deHdkbyyMxQ214zdwkSRsLSLNlPJ0WIhLCKu406g+OjGltrUfH5K1db+2mY7tli56ltvdrjnCupkLxbEa7/aVDYqZG0eErU4X7HdriQHwQI=
+  mitxonline:domain: "ci.mitxonline.mit.edu"
+  mitxonline:k8s_deploy: "true"
+  mitxonline:vars:
+    AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-ci"
+    CRON_COURSE_CERTIFICATES_HOURS: "18"
+    GA_TRACKING_ID: "UA-5145472-46"
+    GTM_TRACKING_ID: "GTM-TW97MNR"
+    LOGOUT_REDIRECT_URL: "https://courses-qa.mitxonline.mit.edu/logout" # Points to RC
+    MAILGUN_FROM_EMAIL: "MITx Online <no-reply@mitxonline-rc-mail.mitxonline.mit.edu>"
+    MAILGUN_SENDER_DOMAIN: "mitxonline-rc-mail.mitxonline.mit.edu"
+    MITOL_GOOGLE_SHEETS_PROCESSOR_APP_NAME: "MITx Online (ci)"
+    MITOL_GOOGLE_SHEETS_REFUNDS_FIRST_ROW: "4"
+    MITOL_GOOGLE_SHEETS_REFUNDS_REQUEST_WORKSHEET_ID: "0"
+    MITOL_HUBSPOT_API_ID_PREFIX: "mitxonline-ci"
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE_REST_API_ENVIRONMENT: "apitest.cybersource.com"
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
+    MITX_ONLINE_BASE_URL: "https://ci.mitxonline.mit.edu"
+    MITX_ONLINE_ENVIRONMENT: "rc"
+    MITX_ONLINE_LOG_LEVEL: "INFO"
+    MITX_ONLINE_SECURE_SSL_HOST: "mitxonline-ci.mitxonline.mit.edu"
+    OPENEDX_API_BASE_URL: "https://courses-qa.mitxonline.mit.edu" # Points to RC
+    OPENEDX_OAUTH_PROVIDER: "ol-oauth2"
+    OPENEDX_SOCIAL_LOGIN_PATH: "/auth/login/ol-oauth2/?auth_entry=login"
+    SENTRY_LOG_LEVEL: "ERROR"
+    SESSION_COOKIE_NAME: "session_mitxonline_rc"
+  redis:password:
+    secure: v1:B9veLwDMAop9Sjdc:d2ejAJqJnIlBSlJ4OWqgzfPx9Zu+c3Bnkkj8WtSfVPRAUzalgyABVh//A909f9TRR+oU7HdYJ3ZxRzkCRu/UEZxHgRQFp8Y=
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
