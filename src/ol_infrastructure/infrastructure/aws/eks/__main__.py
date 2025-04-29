@@ -175,6 +175,7 @@ developer_role_policy_name = (
 developer_role_kubernetes_groups = eks_config.get_object(
     "developer_role_kubernetes_groups"
 ) or ["view"]
+developer_role_scope = eks_config.get("developer_role_scope") or "namespace"
 
 access_entries = {
     # This is the access entry for the assume role that devops uses with kubectl
@@ -190,8 +191,29 @@ access_entries = {
             ),
         },
         kubernetes_groups=["admin"],
-    ),
-    "developer": eks.AccessEntryArgs(
+    )
+}
+
+# Couple ways developers may be given access to the cluster via different scopes.
+# Cluster means we give access to the whole cluster and all namespaces
+# namespace means we give access only to sepecific resources in the cluster in specific
+# namespaces.
+if developer_role_scope == "cluster":
+    access_entries["developer"] = eks.AccessEntryArgs(
+        principal_arn=vault_auth_stack.require_output("eks_shared_developer_role_arn"),
+        access_policies={
+            "developer": eks.AccessPolicyAssociationArgs(
+                access_scope=aws.eks.AccessPolicyAssociationAccessScopeArgs(
+                    type="cluster"
+                ),
+                policy_arn=f"arn:aws:eks::aws:cluster-access-policy/{developer_role_policy_name}",
+            ),
+        },
+        kubernetes_groups=developer_role_kubernetes_groups,
+    )
+
+elif developer_role_scope == "namespace":
+    access_entries["developer"] = eks.AccessEntryArgs(
         principal_arn=vault_auth_stack.require_output("eks_shared_developer_role_arn"),
         access_policies={
             "developer": eks.AccessPolicyAssociationArgs(
@@ -203,8 +225,10 @@ access_entries = {
             ),
         },
         kubernetes_groups=developer_role_kubernetes_groups,
-    ),
-}
+    )
+else:
+    msg = f"developer_role_scope = {developer_role_scope} is not a valid value. Must be 'cluster' or 'namespace'."
+    raise ValueError(msg)
 
 # These are the access entries for devops users themselves, which allows the
 # EKS views in the aws console to work and be useful rather than just errors
