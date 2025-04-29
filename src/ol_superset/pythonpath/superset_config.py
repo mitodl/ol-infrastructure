@@ -1,3 +1,4 @@
+# ruff: noqa: ERA001
 import logging
 import os
 from ssl import CERT_OPTIONAL
@@ -47,7 +48,7 @@ APP_ICON = "/static/assets/images/ol-data-platform-logo.svg"
 # AUTH_DB : Is for database (username/password)
 # AUTH_LDAP : Is for LDAP
 # AUTH_REMOTE_USER : Is for using REMOTE_USER from web server
-# AUTH_TYPE = AUTH_OID  # noqa: ERA001
+# AUTH_TYPE = AUTH_OID
 oidc_creds = vault_client.secrets.kv.v1.read_secret(
     path="sso/superset", mount_point="secret-operations"
 )["data"]
@@ -220,6 +221,16 @@ QUERY_LOGGER = None
 
 # Maximum number of rows returned for any analytical database query
 SQL_MAX_ROW = 500000
+
+# SQLALCHEMY Settings
+# Values based on number of instances and DB type and connections
+# Formula is LEAST({DBInstanceClassMemory/9531392},5000)
+SQLALCHEMY_POOL_SIZE = 40  # Base pool size per process
+SQLALCHEMY_MAX_OVERFLOW = 20  # Additional connections allowed when pool is full
+SQLALCHEMY_POOL_TIMEOUT = 30  # Seconds to wait for a connection from the pool
+# Postgresql paramater group sets idle_in_transaction_session_timeout to 24 hours
+SQLALCHEMY_POOL_RECYCLE = 43200  # 12 hours
+SQLALCHEMY_POOL_PRE_PING = True  # Enable connection validation
 
 # Caching Settings
 cache_base = {
