@@ -707,6 +707,17 @@ consul_keys = {
     "ovs/s3_transcode_bucket_name": ovs_config.get("s3_transcode_bucket_name"),
     "ovs/s3_watch_bucket_name": ovs_config.get("s3_watch_bucket_name"),
     "ovs/use_shibboleth": "True" if use_shibboleth else "False",
+    "ovs/aws_role_name": ovs_mediaconvert.role.name,
+    "ovs/aws_account_id": aws_account.account_id,
+    "ovs/post_transcode_actions": "cloudsync.api.process_transcode_results",
+    "ovs/transcode_job_template": "./config/mediaconvert.json",
+    "ovs/video_s3_thumbnail_bucket": ovs_config.get("s3_thumbnail_bucket_name"),
+    "ovs/video_s3_transcode_bucket": ovs_config.get("s3_transcode_bucket_name"),
+    "ovs/video_s3_transcode_endpoint": secrets["transcode_endpoint"],
+    "ovs/video_s3_upload_prefix": "",
+    "ovs/video_s3_transcode_prefix": "transcoded",
+    "ovs/video_s3_thumbnail_prefix": "thumbnails",
+    "ovs/video_transcode_queue": ovs_mediaconvert.queue.name,
 }
 consul.Keys(
     "ovs-server-configuration-data",
