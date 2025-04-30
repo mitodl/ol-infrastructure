@@ -15,7 +15,7 @@ config:
   eks:apisix_viewer_key:
     secure: v1:j5+aTOfRBG8QiV+V:C6NTWitDBjV4DkOQGApae7GHK9w1wOFAlS7ACNu/s728A5q1zDWv9E13E2hs0IlAtMnP17KJR0HZjxDlg5fckv2nguEVgNA/d90j1XWlFY8=
   eks:ebs_csi_provisioner: "true"
-  eks:efs_csi_provisioner: "false"
+  eks:efs_csi_provisioner: "true"
   eks:gateway_release_channel: "experimental"
   eks:namespaces:
   - "open-metadata"   # Openmetadata testing

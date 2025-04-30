@@ -21,7 +21,7 @@ config:
   - "api-learn-ai.ol.mit.edu"
   - "api.learn.mit.edu"
   eks:ebs_csi_provisioner: "true"
-  eks:efs_csi_provisioner: "false"
+  eks:efs_csi_provisioner: "true"
   eks:gateway_release_channel: "experimental"
   eks:namespaces:
   - "ecommerce"
