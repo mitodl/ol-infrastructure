@@ -1622,15 +1622,15 @@ if not mitlearn_config.get_bool("k8s_cutover"):
             parent=mitlearn_vault_iam_role,
         ),
     )
-    sensitive_env_vars[
-        "AWS_ACCESS_KEY_ID"
-    ] = auth_aws_mitx_creds_ol_mitopen_application.data.apply(
-        lambda data: "{}".format(data["access_key"])
+    sensitive_env_vars["AWS_ACCESS_KEY_ID"] = (
+        auth_aws_mitx_creds_ol_mitopen_application.data.apply(
+            lambda data: "{}".format(data["access_key"])
+        )
     )
-    sensitive_env_vars[
-        "AWS_SECRET_ACCESS_KEY"
-    ] = auth_aws_mitx_creds_ol_mitopen_application.data.apply(
-        lambda data: "{}".format(data["secret_key"])
+    sensitive_env_vars["AWS_SECRET_ACCESS_KEY"] = (
+        auth_aws_mitx_creds_ol_mitopen_application.data.apply(
+            lambda data: "{}".format(data["secret_key"])
+        )
     )
 
     auth_postgres_mitopen_creds_app = vault.generic.get_secret_output(
