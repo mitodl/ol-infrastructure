@@ -967,6 +967,7 @@ env_vars = {
     "MITOL_AXIOS_BASE_PATH": f"https://{mitlearn_config.get('frontend_domain')}",
     "MITOL_DB_CONN_MAX_AGE": 0,
     "MITOL_DB_DISABLE_SSL": "True",
+    "QDRANT_ENABLE_INDEXING_PLUGIN_HOOKS": True,
     "MITOL_DEFAULT_SITE_KEY": "micromasters",
     "MITOL_EMAIL_PORT": 587,
     "MITOL_EMAIL_TLS": "True",
