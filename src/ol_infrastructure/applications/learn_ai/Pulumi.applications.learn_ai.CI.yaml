@@ -30,8 +30,8 @@ config:
     MIT_LEARN_APP_BASE_URL: https://rc.learn.mit.edu/
     OPENEDX_API_BASE_URL: https://courses-qa.mitxonline.mit.edu/
     OPENEDX_LOGIN_URL: https://courses-qa.mitxonline.mit.edu/auth/login/ol-oauth2/?auth_entry=login
-    NEXT_PUBLIC_MIT_SEARCH_ELASTIC_URL: https://api.learn.mit.edu/api/v1/learning_resources_search/
-    NEXT_PUBLIC_MIT_SEARCH_VECTOR_URL: https://api.learn.mit.edu/api/v0/vector_learning_resources_search/
+    MIT_SEARCH_ELASTIC_URL: https://api.learn.mit.edu/api/v1/learning_resources_search/
+    MIT_SEARCH_VECTOR_URL: https://api.learn.mit.edu/api/v0/vector_learning_resources_search/
   learn_ai:frontend_domain: "learn-ai-ci.ol.mit.edu"
   vault:address: "https://vault-ci.odl.mit.edu"
   vault_server:env_namespace: "operations.ci"

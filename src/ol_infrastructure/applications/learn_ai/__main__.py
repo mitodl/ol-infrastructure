@@ -1143,6 +1143,20 @@ gh_workflow_api_base_env_var = github.ActionsVariable(
     value=frontend_vars["OPENEDX_LOGIN_URL"],
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
+gh_workflow_api_base_env_var = github.ActionsVariable(
+    f"learn-ai-gh-workflow-ai-elasticsearch-url-variablet-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    variable_name=f"MIT_SEARCH_ELASTIC_URL_{env_var_suffix}",  # pragma: allowlist secret
+    value=frontend_vars["MIT_SEARCH_ELASTIC_URL"],
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+gh_workflow_api_base_env_var = github.ActionsVariable(
+    f"learn-ai-gh-workflow-ai-vectorsearch-url-variablet-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    variable_name=f"MIT_SEARCH_VECTOR_URL_{env_var_suffix}",  # pragma: allowlist secret
+    value=frontend_vars["MIT_SEARCH_VECTOR_URL"],
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
 
 xpro_consul_opts = get_consul_provider(
     stack_info=stack_info,
