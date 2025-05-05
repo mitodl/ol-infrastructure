@@ -52,7 +52,7 @@ install-deps:
     RUN pip uninstall --yes "edx-name-affirmation"
     # This is a hack to address issues with lxml and xmlsec compatibilities with libxml2 (2024-11-21 TMM)
   END
-  IF [ "$RELEASE_NAME" = "teak" || "$RELEASE_NAME" = "master" ]
+  IF [ "$RELEASE_NAME" != "sumac" ]
     RUN pip uninstall --yes lxml
     RUN pip uninstall --yes xmlsec
   END
