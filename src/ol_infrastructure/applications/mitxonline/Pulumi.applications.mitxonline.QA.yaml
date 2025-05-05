@@ -1,4 +1,3 @@
----
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QEsTzqLr3gfTn1G3A6pkrEbAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM1rdw6SA8KJIVsrqgAgEQgDtFgUTp7OitAkIB79LlqX1C9uN9VEph+bqsa1Q0VNT1TP0pqNpCo2rzs7zmr3iUcvpAMn/1Y4q9TNPmHg==
 config:
@@ -9,7 +8,10 @@ config:
   consul:scheme: https
   heroku:app_id:
     secure: v1:KIux67Zl3+hwHcoO:nHVugTj5RoBKpU1ZM2QHzRj1mKQqVz2dXhRKdJ51ZZTUA4/aK+iapqhEYVpKIFq8itMeMA==
-  mitxonline:domain: rc.mitxonline.mit.edu
+  mitxonline:db_password:
+    secure: v1:72AVczMFP7U0adTg:qiVKioH1VjNf38HfLkNIZsCdc8RqKs0bkaou+fU6SSRK9W4kbS1do2PwdD3JWYlc37eojd+sdAL8npp+tyEeQ66q5mHmWDQK3WlqgdWbf8G41fizyMwoy2AQdZmtZtJe40IoeqaSX3ntfJvhI0uP7YWmpge4G9e6KMNBmhZ0wl0T6qHU4z180aId1ZpjCM4=
+  mitxonline:domain: "api.rc.mitxonline.mit.edu"
+  mitxonline:k8s_deploy: "true"
   mitxonline:vars:
     AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-qa"
     CRON_COURSE_CERTIFICATES_HOURS: "18"
@@ -24,16 +26,16 @@ config:
     MITOL_HUBSPOT_API_ID_PREFIX: "mitxonline-rc"
     MITOL_PAYMENT_GATEWAY_CYBERSOURCE_REST_API_ENVIRONMENT: "apitest.cybersource.com"
     MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
+    MITX_ONLINE_BASE_URL: "https://rc.mitxonline.mit.edu"
     MITX_ONLINE_ENVIRONMENT: "rc"
     MITX_ONLINE_LOG_LEVEL: "INFO"
     MITX_ONLINE_SECURE_SSL_HOST: "mitxonline-rc.mitxonline.mit.edu"
-    MITX_ONLINE_BASE_URL: "https://rc.mitxonline.mit.edu"
     OPENEDX_API_BASE_URL: "https://courses-qa.mitxonline.mit.edu"
     OPENEDX_OAUTH_PROVIDER: "ol-oauth2"
     OPENEDX_SOCIAL_LOGIN_PATH: "/auth/login/ol-oauth2/?auth_entry=login"
     SENTRY_LOG_LEVEL: "ERROR"
     SESSION_COOKIE_NAME: "session_mitxonline_rc"
-  mitxonline:db_password:
-    secure: v1:72AVczMFP7U0adTg:qiVKioH1VjNf38HfLkNIZsCdc8RqKs0bkaou+fU6SSRK9W4kbS1do2PwdD3JWYlc37eojd+sdAL8npp+tyEeQ66q5mHmWDQK3WlqgdWbf8G41fizyMwoy2AQdZmtZtJe40IoeqaSX3ntfJvhI0uP7YWmpge4G9e6KMNBmhZ0wl0T6qHU4z180aId1ZpjCM4=
+  redis:password:
+    secure: v1:rFyMZ8hojMNVgkJb:YmQuqHaePqYVtbE4nJXFupDfowZvdjH6AXsKOPJpGgWCdXFrOy9zzNDu2zCiMFkXPVRc1iobr/au9viSl7GZX4f7lw==
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa

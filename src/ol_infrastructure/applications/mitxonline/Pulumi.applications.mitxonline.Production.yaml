@@ -9,6 +9,7 @@ config:
   consul:scheme: https
   heroku:app_id:
     secure: v1:pR0Rve/LoKSnrjSl:KTPyUma7Q6HO2ZEv/n7cqwwBtjXviC+xTEL2EYAGIxZ/72itycpuOKhemhvfpb83E0/O5w==
+  mitxonline:domain: "api.rc.mitxonline.mit.edu"
   mitxonline:vars:
     AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-production"
     CRON_COURSE_CERTIFICATES_HOURS: "18"

@@ -530,6 +530,7 @@ if mitxonline_config.get_bool("k8s_deploy"):
 
     mitxonline_vault_mount = vault.Mount(
         f"mitxonline-vault-mount-{stack_info.env_suffix}",
+        description="Static secrets storage for Open edX {stack_info.env_prefix} applications and services",
         path="secret-mitxonline",
         type="kv",
         opts=mount_opts,
@@ -628,7 +629,6 @@ if mitxonline_config.get_bool("k8s_deploy"):
         vault_k8s_resources=vault_k8s_resources,
         db_config=mitxonline_vault_backend,  # Pass the Vault DB backend config
         rds_endpoint=rds_endpoint,
-        env_name=env_name,
         openedx_environment=openedx_environment,
         redis_password=redis_config.require("password"),
         redis_cache=redis_cache,
@@ -652,7 +652,7 @@ if mitxonline_config.get_bool("k8s_deploy"):
             env_from_secret_names=secret_names,
             application_security_group_id=mitxonline_app_security_group.id,
             application_security_group_name=mitxonline_app_security_group.name,
-            application_image_repository="ardiea/mitxonline",  # Uncorrected repo
+            application_image_repository="mitodl/mitxonline-app",
             application_docker_tag=MITXONLINE_DOCKER_TAG,
             application_cmd_array=[
                 "uwsgi",

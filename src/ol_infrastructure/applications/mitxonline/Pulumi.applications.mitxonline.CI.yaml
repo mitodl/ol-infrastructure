@@ -5,7 +5,7 @@ config:
   aws:region: us-east-1
   mitxonline:db_password:
     secure: v1:fbLlJgSoQEy+xUJX:deHdkbyyMxQ214zdwkSRsLSLNlPJ0WIhLCKu406g+OjGltrUfH5K1db+2mY7tli56ltvdrjnCupkLxbEa7/aVDYqZG0eErU4X7HdriQHwQI=
-  mitxonline:domain: "ci.mitxonline.mit.edu"
+  mitxonline:domain: "api.ci.mitxonline.mit.edu"
   mitxonline:k8s_deploy: "true"
   mitxonline:vars:
     AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-ci"
