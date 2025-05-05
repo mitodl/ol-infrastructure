@@ -1,5 +1,7 @@
 import sys
-from typing import Any
+from typing import Any, Optional
+
+from pydantic import BaseModel
 
 from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.containers import container_build_task
@@ -26,6 +28,19 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resource_types import pulumi_provisioner_resource
 from ol_concourse.lib.resources import git_repo, pulumi_provisioner, registry_image
 from ol_concourse.pipelines.constants import PULUMI_WATCHED_PATHS
+
+
+class AppPipelineParams(BaseModel):
+    app_name: str
+    build_target: Optional[str] = None
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
+pipeline_params = {
+    "mitxonline": AppPipelineParams(app_name="mitxonline", build_target="production"),
+}
 
 
 def _define_git_resources(
@@ -117,6 +132,7 @@ def _build_image_job(
     branch_type: str,
     git_repo_resource: Resource,
     registry_image_resource: Resource,
+    build_target: Optional[str] = None,
 ) -> Job:
     """Generate an image build job for a specific branch type (main or rc)."""
     job_name = f"build-{app_name}-image-from-{branch_type}"
@@ -130,6 +146,11 @@ def _build_image_job(
 
     # Add version extraction steps only for release_candidate
     version_args = {}
+    additional_build_params = {}
+    if build_target:
+        additional_build_params = {
+            "TARGET": build_target,
+        }
     if branch_type == "release_candidate":
         plan.extend(
             [
@@ -174,6 +195,7 @@ def _build_image_job(
                     "CONTEXT": git_repo_resource.name,
                     "BUILD_ARG_GIT_REF": "((.:git_ref))",
                     **version_args,
+                    **additional_build_params,
                 },
                 build_args=[],
             ),
@@ -206,19 +228,26 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         app_name, ol_infra_repo.name
     )
 
-    # Define Build Jobs
+    # Retrieve any special configurations needed from mapping above,
+    # default to no special configuration if app name is not found in mapping
+    pipeline_parameters = pipeline_params.get(
+        app_name, AppPipelineParams(app_name=app_name)
+    )
 
+    # Define Build Jobs
     main_image_build_job = _build_image_job(
         app_name=app_name,
         branch_type="main",
         git_repo_resource=main_repo,
         registry_image_resource=app_ci_image,
+        build_target=pipeline_parameters.build_target,
     )
     rc_image_build_job = _build_image_job(
         app_name=app_name,
         branch_type="release_candidate",
         git_repo_resource=release_candidate_repo,
         registry_image_resource=app_rc_image,
+        build_target=pipeline_parameters.build_target,
     )
 
     # Define Deployment Jobs
