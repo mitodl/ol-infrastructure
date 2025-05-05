@@ -6,15 +6,15 @@ const configData = getConfig();
 const currentYear = new Date().getFullYear();
 
 let userMenu = [
-    {
-        url: `${process.env.MIT_LEARN_BASE_URL}/dashboard`,
-        title: 'Dashboard',
-    },
-    {
-        url: `${process.env.MIT_LEARN_API_BASE_URL}/learn/logout/`,
-        title: 'Sign Out',
-    },
-]
+  {
+    url: `${process.env.MIT_LEARN_BASE_URL}/dashboard`,
+    title: 'Dashboard',
+  },
+  {
+    url: `${process.env.MIT_LEARN_API_BASE_URL}/learn/logout/`,
+    title: 'Sign Out',
+  },
+];
 
 let footerLegalLinks = [
   {
@@ -37,51 +37,51 @@ let footerLegalLinks = [
     url: 'https://accessibility.mit.edu/',
     title: 'Accessibility',
   },
-]
+];
 
-let copyRightText = 'Massachusetts Institute of Technology'
-let logo = <Logo imageUrl={process.env.MIT_LEARN_LOGO} destinationUrl={process.env.MIT_LEARN_BASE_URL} />
+let copyRightText = 'Massachusetts Institute of Technology';
+let logo = <Logo imageUrl={process.env.MIT_LEARN_LOGO} destinationUrl={process.env.MIT_LEARN_BASE_URL} />;
 
 
 if (window.location.href.toLowerCase().includes("course-v1:mitxt")) {
   userMenu = [
     {
-        url: `${configData.MARKETING_SITE_BASE_URL}/dashboard`,
-        title: 'Dashboard',
+      url: `${configData.MARKETING_SITE_BASE_URL}/dashboard`,
+      title: 'Dashboard',
     },
     {
-        url: `${configData.MARKETING_SITE_BASE_URL}/profile/`,
-        title: 'Profile',
+      url: `${configData.MARKETING_SITE_BASE_URL}/profile/`,
+      title: 'Profile',
     },
     {
-        url: `${configData.MARKETING_SITE_BASE_URL}/account-settings/`,
-        title: 'Settings',
+      url: `${configData.MARKETING_SITE_BASE_URL}/account-settings/`,
+      title: 'Settings',
     },
     {
-        url: `${configData.LMS_BASE_URL}/logout`,
-        title: 'Sign Out',
+      url: `${configData.LMS_BASE_URL}/logout`,
+      title: 'Sign Out',
     },
   ];
   footerLegalLinks = [
     {
-        url: `${configData.MARKETING_SITE_BASE_URL}/about-us/`,
-        title: 'About Us',
+      url: `${configData.MARKETING_SITE_BASE_URL}/about-us/`,
+      title: 'About Us',
     },
     {
-        url: `${configData.MARKETING_SITE_BASE_URL}/privacy-policy/`,
-        title: 'Privacy Policy',
+      url: `${configData.MARKETING_SITE_BASE_URL}/privacy-policy/`,
+      title: 'Privacy Policy',
     },
     {
-        url: `${configData.MARKETING_SITE_BASE_URL}/honor-code/`,
-        title: 'Honor Code',
+      url: `${configData.MARKETING_SITE_BASE_URL}/honor-code/`,
+      title: 'Honor Code',
     },
     {
-        url: `${configData.MARKETING_SITE_BASE_URL}/terms-of-service/`,
-        title: 'Terms of Service',
+      url: `${configData.MARKETING_SITE_BASE_URL}/terms-of-service/`,
+      title: 'Terms of Service',
     },
     {
-        url: 'https://accessibility.mit.edu/',
-        title: 'Accessibility',
+      url: 'https://accessibility.mit.edu/',
+      title: 'Accessibility',
     },
   ];
   copyRightText = `${configData.SITE_NAME.replace(/\b(CI|QA|Staging)\b/g, "").trim()}. All rights reserved.`;
