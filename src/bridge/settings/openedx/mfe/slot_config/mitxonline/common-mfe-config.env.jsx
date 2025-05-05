@@ -5,74 +5,107 @@ import Footer, { Logo, MenuLinks, CopyrightNotice } from './Footer.jsx';
 const configData = getConfig();
 const currentYear = new Date().getFullYear();
 
-const userMenu = {
-    dashboard: {
-        url: `${configData.LMS_BASE_URL}/dashboard`,
+let userMenu = [
+    {
+        url: `${process.env.MIT_LEARN_BASE_URL}/dashboard`,
         title: 'Dashboard',
     },
-    profile: {
+    {
+        url: `${process.env.MIT_LEARN_API_BASE_URL}/learn/logout/`,
+        title: 'Sign Out',
+    },
+]
+
+let footerLegalLinks = [
+  {
+    url: `${process.env.MIT_LEARN_BASE_URL}/about`,
+    title: 'About Us',
+  },
+  {
+    url: `${process.env.MIT_LEARN_BASE_URL}/privacy`,
+    title: 'Privacy Policy',
+  },
+  {
+    url: `${process.env.MIT_LEARN_BASE_URL}/honor`,
+    title: 'Honor Code',
+  },
+  {
+    url: `${process.env.MIT_LEARN_BASE_URL}/terms-of-service`,
+    title: 'Terms of Service',
+  },
+  {
+    url: 'https://accessibility.mit.edu/',
+    title: 'Accessibility',
+  },
+]
+
+let copyRightText = 'Massachusetts Institute of Technology'
+let logo = <Logo imageUrl={process.env.MIT_LEARN_LOGO} destinationUrl={process.env.MIT_LEARN_BASE_URL} />
+
+
+if (window.location.href.toLowerCase().includes("course-v1:mitxt")) {
+  userMenu = [
+    {
+        url: `${configData.MARKETING_SITE_BASE_URL}/dashboard`,
+        title: 'Dashboard',
+    },
+    {
         url: `${configData.MARKETING_SITE_BASE_URL}/profile/`,
         title: 'Profile',
     },
-    settings: {
+    {
         url: `${configData.MARKETING_SITE_BASE_URL}/account-settings/`,
         title: 'Settings',
     },
-    logout: {
+    {
         url: `${configData.LMS_BASE_URL}/logout`,
         title: 'Sign Out',
     },
+  ];
+  footerLegalLinks = [
+    {
+        url: `${configData.MARKETING_SITE_BASE_URL}/about-us/`,
+        title: 'About Us',
+    },
+    {
+        url: `${configData.MARKETING_SITE_BASE_URL}/privacy-policy/`,
+        title: 'Privacy Policy',
+    },
+    {
+        url: `${configData.MARKETING_SITE_BASE_URL}/honor-code/`,
+        title: 'Honor Code',
+    },
+    {
+        url: `${configData.MARKETING_SITE_BASE_URL}/terms-of-service/`,
+        title: 'Terms of Service',
+    },
+    {
+        url: 'https://accessibility.mit.edu/',
+        title: 'Accessibility',
+    },
+  ];
+  copyRightText = `${configData.SITE_NAME.replace(/\b(CI|QA|Staging)\b/g, "").trim()}. All rights reserved.`;
+  logo = <Logo imageUrl={configData.LOGO_URL} destinationUrl={configData.MARKETING_SITE_BASE_URL} />;
 }
 
 const DesktopHeaderUserMenu = (widget) => {
   widget.content.menu = [
     {
-      items: [
-        {
-          type: 'item',
-          href: userMenu.dashboard.url,
-          content: userMenu.dashboard.title,
-        },
-        {
-          type: 'item',
-          href: userMenu.profile.url,
-          content: userMenu.profile.title,
-        },
-        {
-          type: 'item',
-          href: userMenu.settings.url,
-          content: userMenu.settings.title,
-        },
-        {
-          type: 'item',
-          href:  userMenu.logout.url,
-          content: userMenu.logout.title,
-        },
-      ],
+      items: userMenu.map((item) => ({
+        type: 'item',
+        href: item.url,
+        content: item.title,
+      })),
     },
   ];
   return widget;
 };
 
 const LearningHeaderUserMenu = (widget) => {
-  widget.content.items = [
-    {
-      href: userMenu.dashboard.url,
-      message: userMenu.dashboard.title,
-    },
-    {
-      href: userMenu.profile.url,
-      message: userMenu.profile.title,
-    },
-    {
-      href: userMenu.settings.url,
-      message: userMenu.settings.title,
-    },
-    {
-      href: userMenu.logout.url,
-      message: userMenu.logout.title,
-    },
-  ];
+  widget.content.items = userMenu.map((item) => ({
+    href: item.url,
+    message: item.title,
+  }))
   return widget;
 };
 
@@ -85,9 +118,7 @@ const footerSubSlotsConfig = {
         widget: {
           id: 'custom_logo',
           type: DIRECT_PLUGIN,
-          RenderWidget: () => (
-            <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={process.env.MIT_BASE_URL} logoStyle={{ height: '48px' }} />
-          ),
+          RenderWidget: () => logo,
         },
       },
     ],
@@ -101,7 +132,7 @@ const footerSubSlotsConfig = {
           id: 'custom_menu_links',
           type: DIRECT_PLUGIN,
           RenderWidget: () => (
-            <MenuLinks marketingSiteUrl={configData.MARKETING_SITE_BASE_URL} siteName={configData.SITE_NAME} />
+            <MenuLinks menuItems={footerLegalLinks} />
           ),
         },
       },
@@ -116,7 +147,7 @@ const footerSubSlotsConfig = {
           id: 'custom_legal_notice',
           type: DIRECT_PLUGIN,
           RenderWidget: () => (
-            <CopyrightNotice copyrightText={`© ${currentYear} ${configData.SITE_NAME.replace(/\b(CI|QA|Staging)\b/g, "").trim()}. All rights reserved.`} />
+            <CopyrightNotice copyrightText={`© ${currentYear} ${copyRightText}`} />
           ),
         },
       },
@@ -196,6 +227,28 @@ if (learningApps.includes(edxMfeAppName)) {
       },
     ],
   };
+}
+
+const modifyLogoHref = ( widget ) => {
+  widget.content.href = process.env.MIT_LEARN_BASE_URL;
+  widget.content.src = process.env.MIT_LEARN_LOGO;
+  return widget;
+};
+
+if (!window.location.href.toLowerCase().includes("course-v1:mitxt")) {
+  config.pluginSlots = {
+    ...config.pluginSlots,
+    logo_slot: {
+      keepDefault: true,
+      plugins: [
+        {
+          op: PLUGIN_OPERATIONS.Modify,
+          widgetId: 'default_contents',
+          fn: modifyLogoHref,
+        },
+      ]
+    },
+  }
 }
 
 export default config;
