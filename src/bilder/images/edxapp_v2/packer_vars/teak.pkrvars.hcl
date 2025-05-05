@@ -1,3 +1,3 @@
 build_environment    = "mitx-ci"
-edx_platform_version = "open-release/sumac.master"
+edx_platform_version = "release/teak.master"
 openedx_release      = "sumac"
