@@ -50,8 +50,9 @@ install-deps:
   RUN pip install --no-warn-script-location --user --no-cache-dir -r /root/pip_package_lists/edx_base.txt -r /root/pip_package_lists/edx_assets.txt -r /root/pip_package_lists/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
   IF [ "$DEPLOYMENT_NAME" = "mitxonline" ]
     RUN pip uninstall --yes "edx-name-affirmation"
-  IF [ "$RELEASE_NAME" = "teak" | "$RELEASE_NAME" = "master" ]
     # This is a hack to address issues with lxml and xmlsec compatibilities with libxml2 (2024-11-21 TMM)
+  END
+  IF [ "$RELEASE_NAME" = "teak" || "$RELEASE_NAME" = "master" ]
     RUN pip uninstall --yes lxml
     RUN pip uninstall --yes xmlsec
   END
