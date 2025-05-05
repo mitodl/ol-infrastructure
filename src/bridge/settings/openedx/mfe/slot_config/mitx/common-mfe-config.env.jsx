@@ -6,15 +6,15 @@ const configData = getConfig();
 const currentYear = new Date().getFullYear();
 
 const userMenu = [
-    {
-        url: `${configData.LMS_BASE_URL}/dashboard`,
-        title: 'Dashboard',
-    },
-    {
-        url: `${configData.LMS_BASE_URL}/logout`,
-        title: 'Sign Out',
-    },
-]
+  {
+    url: `${configData.LMS_BASE_URL}/dashboard`,
+    title: 'Dashboard',
+  },
+  {
+    url: `${configData.LMS_BASE_URL}/logout`,
+    title: 'Sign Out',
+  },
+];
 
 const DesktopHeaderUserMenu = (widget) => {
   widget.content.menu = [
@@ -38,16 +38,15 @@ const LearningHeaderUserMenu = (widget) => {
 };
 
 const footerLegalLinks = [
-    {
-        url: `${configData.MARKETING_SITE_BASE_URL}/tos/`,
-        title: 'Terms of Service',
-    },
-    {
-        url: 'https://accessibility.mit.edu/',
-        title: 'Accessibility',
-    },
+  {
+    url: `${configData.MARKETING_SITE_BASE_URL}/tos/`,
+    title: 'Terms of Service',
+  },
+  {
+    url: 'https://accessibility.mit.edu/',
+    title: 'Accessibility',
+  },
 ];
-
 
 const footerSubSlotsConfig = {
   "frontend.shell.footer.desktop.leftLinks.ui": {
