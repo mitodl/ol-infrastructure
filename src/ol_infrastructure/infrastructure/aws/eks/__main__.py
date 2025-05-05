@@ -441,6 +441,17 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
                 subnet_ids=target_vpc["k8s_pod_subnet_ids"],
                 vpc_id=target_vpc["id"],
             ),
+            launch_template_tag_specifications=[
+                aws.ec2.LaunchTemplateTagSpecificationArgs(
+                    resource_type="instance",
+                    tags=aws_config.tags,
+                ),
+                aws.ec2.LaunchTemplateTagSpecificationArgs(
+                    resource_type="volume",
+                    tags=aws_config.tags,
+                ),
+            ],
+            min_refresh_percentage=eks_config.get_int("min_refresh_interval") or 75,
             instance_type=ng_config["instance_type"],
             instance_profile=node_instance_profile,
             labels=ng_config["labels"] or {},
@@ -1077,6 +1088,15 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                 "image": {
                     "pullPolicy": "Always",
                     # Assuming default Bitnami registry/repository is okay
+                    "registry": "610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub",
+                },
+                "global": {
+                    "security": {"allowInsecureImages": True},
+                },
+                "volumePermissions": {
+                    "image": {
+                        "registry": "610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub",
+                    },
                 },
                 # --- Data Plane (Gateway) ---
                 # Disabled for traditional mode
@@ -1210,6 +1230,29 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                 "etcd": {
                     "enabled": True,
                     "tolerations": operations_tolerations,
+                    "image": {
+                        "registry": "610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub",
+                    },
+                    "persistence": {
+                        "enabled": True,
+                        "storageClass": "efs-sc",
+                    },
+                    "livenessProbe": {
+                        "enabled": True,
+                        "initialDelaySeconds": 30,
+                        "timeoutSeconds": 5,
+                        "periodSeconds": 10,
+                        "successThreshold": 1,
+                        "failureThreshold": 3,
+                    },
+                    "readinessProbe": {
+                        "enabled": True,
+                        "initialDelaySeconds": 30,
+                        "timeoutSeconds": 5,
+                        "periodSeconds": 10,
+                        "successThreshold": 1,
+                        "failureThreshold": 3,
+                    },
                     "resources": {
                         "requests": {
                             "cpu": "50m",

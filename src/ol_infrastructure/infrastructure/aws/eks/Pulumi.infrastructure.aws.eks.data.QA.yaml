@@ -17,7 +17,7 @@ config:
   eks:developer_role_kubernetes_groups: ["admin"]
   eks:developer_role_policy_name: "AmazonEKSAdminPolicy"
   eks:ebs_csi_provisioner: "true"
-  eks:efs_csi_provisioner: "false"
+  eks:efs_csi_provisioner: "true"
   eks:gateway_release_channel: "experimental"
   eks:namespaces:
   - "open-metadata"   # Openmetadata testing

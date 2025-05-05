@@ -743,6 +743,8 @@ learn_ai_app_k8s = OLApplicationK8s(
             OLApplicationK8sCeleryWorkerConfig(
                 worker_name="default",
                 queues=["default", "edx_content"],
+                resource_requests={"cpu": "500m", "memory": "1000Mi"},
+                resource_limits={"cpu": "1000m", "memory": "2000Mi"},
             )
         ],
     ),
