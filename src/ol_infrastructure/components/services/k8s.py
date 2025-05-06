@@ -96,6 +96,7 @@ class OLApplicationK8sConfig(BaseModel):
     application_docker_tag: str
     application_cmd_array: list[str] | None = None
     vault_k8s_resource_auth_name: str
+    use_pullthrough_cache: bool = True
     # You get CPU and memory autoscaling by default
     hpa_scaling_metrics: list[kubernetes.autoscaling.v2.MetricSpecArgs] = [
         kubernetes.autoscaling.v2.MetricSpecArgs(
@@ -198,6 +199,10 @@ class OLApplicationK8s(ComponentResource):
             app_image = f"{ol_app_k8s_config.application_image_repository}{ol_app_k8s_config.application_image_repository_suffix}:{ol_app_k8s_config.application_docker_tag}"
         else:
             app_image = f"{ol_app_k8s_config.application_image_repository}:{ol_app_k8s_config.application_docker_tag}"
+        if ol_app_k8s_config.use_pullthrough_cache:
+            app_image = (
+                f"610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/{app_image}"
+            )
 
         volumes = [
             kubernetes.core.v1.VolumeArgs(

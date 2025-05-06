@@ -9,7 +9,11 @@ config:
   consul:scheme: https
   heroku:app_id:
     secure: v1:pR0Rve/LoKSnrjSl:KTPyUma7Q6HO2ZEv/n7cqwwBtjXviC+xTEL2EYAGIxZ/72itycpuOKhemhvfpb83E0/O5w==
-  heroku_app:vars:
+  mitxonline:db_password:
+    secure: v1:1SGxkH66kKNXMVc0:P9FztYdyzfxIrapGHU3pD5gz9ZkW6Of/zTqhaZf4O+L+Y8yAbcissYxogKfyDMxSJYSSUxI12K0=
+  mitxonline:domain: "api.mitxonline.mit.edu"
+  mitxonline:k8s_deploy: "false"
+  mitxonline:vars:
     AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-production"
     CRON_COURSE_CERTIFICATES_HOURS: "18"
     GA_TRACKING_ID: "UA-5145472-48"
@@ -32,7 +36,7 @@ config:
     OPENEDX_SOCIAL_LOGIN_PATH: "/auth/login/ol-oauth2/?auth_entry=login"
     SENTRY_LOG_LEVEL: "ERROR"
     SESSION_COOKIE_NAME: "session_mitxonline"
-  mitxonline:db_password:
-    secure: v1:1SGxkH66kKNXMVc0:P9FztYdyzfxIrapGHU3pD5gz9ZkW6Of/zTqhaZf4O+L+Y8yAbcissYxogKfyDMxSJYSSUxI12K0=
+  redis:password:
+    secure: v1:yvRUeBECxXQn0EuQ:CzfHq2P7kQGgULkRI7EFThTAnZyxq4uLvCTAdCYWpgvKl6Hwir6Gfk6UgU//ceOEKXrLVw6mRf34oWU=
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

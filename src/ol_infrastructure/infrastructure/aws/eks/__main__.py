@@ -1402,7 +1402,7 @@ external_dns_release = (
                 "extraArgs": [
                     "--traefik-disable-legacy",
                 ],
-                # Limit the dns zones that exteranl dns knows about
+                # Limit the dns zones that external dns knows about
                 "domainFilters": eks_config.require_object("allowed_dns_zones"),
                 "resources": {
                     "requests": {
