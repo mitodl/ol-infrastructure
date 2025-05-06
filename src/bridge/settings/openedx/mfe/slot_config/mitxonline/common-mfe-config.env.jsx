@@ -1,5 +1,5 @@
 import { PLUGIN_OPERATIONS, DIRECT_PLUGIN } from '@openedx/frontend-plugin-framework';
-import { getConfig } from '@edx/frontend-platform';
+import { getConfig, mergeConfig } from '@edx/frontend-platform';
 import Footer, { Logo, MenuLinks, CopyrightNotice } from './Footer.jsx';
 
 const configData = getConfig();
@@ -44,6 +44,9 @@ let logo = <Logo imageUrl={process.env.MIT_LEARN_LOGO} destinationUrl={process.e
 
 
 if (window.location.href.toLowerCase().includes("course-v1:mitxt")) {
+  copyRightText = `${configData.SITE_NAME.replace(/\b(CI|QA|Staging)\b/g, "").trim()}. All rights reserved.`;
+  logo = <Logo imageUrl={configData.LOGO_URL} destinationUrl={configData.MARKETING_SITE_BASE_URL} />;
+
   userMenu = [
     {
       url: `${configData.MARKETING_SITE_BASE_URL}/dashboard`,
@@ -62,6 +65,7 @@ if (window.location.href.toLowerCase().includes("course-v1:mitxt")) {
       title: 'Sign Out',
     },
   ];
+
   footerLegalLinks = [
     {
       url: `${configData.MARKETING_SITE_BASE_URL}/about-us/`,
@@ -84,8 +88,6 @@ if (window.location.href.toLowerCase().includes("course-v1:mitxt")) {
       title: 'Accessibility',
     },
   ];
-  copyRightText = `${configData.SITE_NAME.replace(/\b(CI|QA|Staging)\b/g, "").trim()}. All rights reserved.`;
-  logo = <Logo imageUrl={configData.LOGO_URL} destinationUrl={configData.MARKETING_SITE_BASE_URL} />;
 }
 
 const DesktopHeaderUserMenu = (widget) => {
@@ -184,6 +186,9 @@ let config = {
 const edxMfeAppName = configData.APP_ID;
 
 if (edxMfeAppName === "authoring") {
+  if (!window.location.href.toLowerCase().includes("course-v1:mitxt")) {
+    mergeConfig({"LOGO_URL": process.env.MIT_LEARN_LOGO});
+  }
   config = {
     ...config,
     pluginSlots: {
