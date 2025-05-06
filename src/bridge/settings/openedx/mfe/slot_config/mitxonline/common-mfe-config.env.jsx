@@ -41,9 +41,9 @@ let footerLegalLinks = [
 
 let copyRightText = 'Massachusetts Institute of Technology';
 let logo = <Logo imageUrl={process.env.MIT_LEARN_LOGO} destinationUrl={process.env.MIT_LEARN_BASE_URL} />;
+const MITxTCourseKeyFormat = "course-v1:mitxt"
 
-
-if (window.location.href.toLowerCase().includes("course-v1:mitxt")) {
+if (window.location.href.toLowerCase().includes(MITxTCourseKeyFormat)) {
   copyRightText = `${configData.SITE_NAME.replace(/\b(CI|QA|Staging)\b/g, "").trim()}. All rights reserved.`;
   logo = <Logo imageUrl={configData.LOGO_URL} destinationUrl={configData.MARKETING_SITE_BASE_URL} />;
 
@@ -186,7 +186,7 @@ let config = {
 const edxMfeAppName = configData.APP_ID;
 
 if (edxMfeAppName === "authoring") {
-  if (!window.location.href.toLowerCase().includes("course-v1:mitxt")) {
+  if (!window.location.href.toLowerCase().includes(MITxTCourseKeyFormat)) {
     mergeConfig({"LOGO_URL": process.env.MIT_LEARN_LOGO});
   }
   config = {
@@ -240,7 +240,7 @@ const modifyLogoHref = ( widget ) => {
   return widget;
 };
 
-if (!window.location.href.toLowerCase().includes("course-v1:mitxt")) {
+if (!window.location.href.toLowerCase().includes(MITxTCourseKeyFormat)) {
   config.pluginSlots = {
     ...config.pluginSlots,
     logo_slot: {
