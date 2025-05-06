@@ -562,8 +562,9 @@ edxapp_mysql_role_statements["edxapp"] = {
         Template("""CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"""),
         Template(
             """
-            GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES,
-            CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp.* TO '{{name}}'@'%';
+            GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER,
+            REFERENCES, CREATE TEMPORARY TABLES, LOCK TABLES, CREATE VIEW, SHOW VIEW
+            ON edxapp.* TO '{{name}}'@'%';
             """
         ),
     ],
@@ -577,8 +578,9 @@ edxapp_mysql_role_statements["edxapp-csmh"] = {
         Template("""CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"""),
         Template(
             """
-            GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES,
-            CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh.* TO '{{name}}'@'%';
+            GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER,
+            REFERENCES, CREATE TEMPORARY TABLES, LOCK TABLES, CREATE VIEW, SHOW VIEW
+            ON edxapp_csmh.* TO '{{name}}'@'%';
             """
         ),
     ],
