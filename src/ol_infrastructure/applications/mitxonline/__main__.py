@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
-from pulumi import Config, InvokeOptions, ResourceOptions, StackReference, export
+from pulumi import Alias, Config, InvokeOptions, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, iam, s3
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT, DEFAULT_REDIS_PORT
@@ -192,6 +192,13 @@ mitxonline_iam_policy = iam.Policy(
             },
             "RESOURCE_MISMATCH": {},
         },
+    ),
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"yymitxonline-{stack_info.env_suffix}-policy",
+            )
+        ]
     ),
 )
 
@@ -712,7 +719,7 @@ if mitxonline_config.get_bool("k8s_deploy"):
         ),
     )
     mitxonline_apisix_route_prefix = OLApisixRoute(
-        name=f"mitxonline-vault-mount-{stack_info.env_suffix}",
+        name=f"mitxonline-apisix-route-{stack_info.env_suffix}",
         k8s_namespace=mitxonline_namespace,
         k8s_labels=k8s_global_labels,
         route_configs=[
