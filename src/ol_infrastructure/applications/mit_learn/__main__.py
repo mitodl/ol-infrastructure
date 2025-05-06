@@ -258,6 +258,7 @@ parliament_config = {
         "ignore_locations": [{"actions": ["s3:putobjectacl"]}]
     },
     "RESOURCE_EFFECTIVELY_STAR": {},
+    "RESOURCE_MISMATCH": {},
 }
 
 ################################
