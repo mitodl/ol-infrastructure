@@ -521,13 +521,16 @@ if mitxonline_config.get_bool("k8s_deploy"):
     # We will create and manage it in CI
     #
     # Once it is imported for the first time we can remove this logic
-    if stack_info.env_suffix == "ci":
+    if stack_info.env_suffix != "production":
         mount_opts = None
     else:
         mount_opts = ResourceOptions(
-            import_="secret-mitxonline",
+            import_="secret-mitxonline", ignore_changes=["options"]
         )
-
+    # TODO (TMM 2025-05-06): The vault mount is also # noqa: TD003, FIX002
+    # created/managed as part of the edxapp project. This needs to be factored out into
+    # a substructure project or referenced from one stack to the other via stack
+    # references. There is some ambiguity about the properl directionality of ownership.
     mitxonline_vault_mount = vault.Mount(
         f"mitxonline-vault-mount-{stack_info.env_suffix}",
         description="Static secrets storage for Open edX {stack_info.env_prefix} applications and services",
