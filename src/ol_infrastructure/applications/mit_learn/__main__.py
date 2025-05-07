@@ -1354,6 +1354,9 @@ mitlearn_app_security_group = ec2.SecurityGroup(
 # Redis / Elasticache
 # only for applications deployed in k8s
 redis_config = Config("redis")
+redis_defaults = defaults(stack_info)["redis"]
+instance_type = redis_config.get("instance_type") or redis_defaults["instance_type"]
+redis_defaults["instance_type"] = instance_type
 redis_cluster_security_group = ec2.SecurityGroup(
     f"ol-mitlearn-redis-cluster-security-group-{stack_info.env_suffix}",
     name_prefix=f"ol-mitlearn-redis-cluster-security-group-{stack_info.env_suffix}",
@@ -1384,7 +1387,7 @@ redis_cache_config = OLAmazonRedisConfig(
     subnet_group=apps_vpc["elasticache_subnet"],
     security_groups=[redis_cluster_security_group.id],
     tags=aws_config.tags,
-    **defaults(stack_info)["redis"],
+    **redis_defaults,
 )
 redis_cache = OLAmazonCache(redis_cache_config)
 
