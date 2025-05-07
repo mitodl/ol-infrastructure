@@ -21,17 +21,19 @@
     },
   ],
   pip_requirements: {
-    fileMatch: 'dockerfiles/openedx-edxapp/pip_package_lists/.*?/.*.txt',
+    managerFilePatterns: [
+      '/dockerfiles/openedx-edxapp/pip_package_lists/.*?/.*.txt/',
+    ],
   },
   customManagers: [
     {
       customType: 'regex',
-      fileMatch: [
-        '^src/bridge/lib/versions.py$',
-        '^dockerfiles/ocw/node-hugo/Dockerfile$',
+      managerFilePatterns: [
+        '/^src/bridge/lib/versions.py$/',
+        '/^dockerfiles/ocw/node-hugo/Dockerfile$/',
       ],
       matchStrings: [
-          '# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>.+?)(?: packageName=(?<packageName>.+?))?(?: registryUrl=(?<registryUrl>.+?))?(?: versioning=(?<versioning>[a-z-]+?))?\\s*.+\\s*=\\s*"(?<currentValue>.+?)(-eksbuild.\\d+)?"',
+        '# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>.+?)(?: packageName=(?<packageName>.+?))?(?: registryUrl=(?<registryUrl>.+?))?(?: versioning=(?<versioning>[a-z-]+?))?\\s*.+\\s*=\\s*"(?<currentValue>.+?)(-eksbuild.\\d+)?"',
       ],
     },
   ],
