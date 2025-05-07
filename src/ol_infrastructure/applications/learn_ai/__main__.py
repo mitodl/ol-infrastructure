@@ -537,6 +537,9 @@ learn_ai_db = appdb.OLAppDatabase(learn_ai_db_config)
 
 # Redis Cluster configuration and networking setup
 redis_config = Config("redis")
+redis_instance_type = (
+    redis_config.get("instance_type") or defaults(stack_info)["redis"]["instance_type"]
+)
 redis_cluster_security_group = ec2.SecurityGroup(
     f"learn-ai-redis-cluster-security-group-{stack_info.env_suffix}",
     name_prefix=f"learn-ai-redis-security-group-{stack_info.env_suffix}",
@@ -560,6 +563,7 @@ redis_cache_config = OLAmazonRedisConfig(
     cluster_mode_enabled=False,
     encrypted=True,
     engine_version="7.1",
+    instance_type=redis_instance_type,
     num_instances=3,
     shard_count=1,
     auto_upgrade=True,
@@ -568,7 +572,6 @@ redis_cache_config = OLAmazonRedisConfig(
     subnet_group=apps_vpc["elasticache_subnet"],
     security_groups=[redis_cluster_security_group.id],
     tags=aws_config.tags,
-    **defaults(stack_info)["redis"],
 )
 redis_cache = OLAmazonCache(redis_cache_config)
 
