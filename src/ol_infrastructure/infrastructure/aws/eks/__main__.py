@@ -426,6 +426,13 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
             value=taint_config["value"],
             effect=taint_config["effect"],
         )
+    node_group_sec_group = eks.NodeGroupSecurityGroup(
+        f"{cluster_name}-eks-nodegroup-{ng_name}-secgroup",
+        cluster_security_group=cluster.cluster_security_group,
+        eks_cluster=cluster.eks_cluster,
+        vpc_id=target_vpc["id"],
+        tags=aws_config.tags,
+    )
     node_groups.append(
         eks.NodeGroupV2(
             f"{cluster_name}-eks-nodegroup-{ng_name}",
@@ -455,6 +462,8 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
             instance_type=ng_config["instance_type"],
             instance_profile=node_instance_profile,
             labels=ng_config["labels"] or {},
+            node_security_group=node_group_sec_group.security_group,
+            cluster_ingress_rule=node_group_sec_group.security_group_rule,
             desired_capacity=ng_config["scaling"]["desired"] or 2,
             max_size=ng_config["scaling"]["max"] or 3,
             min_size=ng_config["scaling"]["min"] or 1,
@@ -462,7 +471,7 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
             opts=ResourceOptions(parent=cluster, depends_on=cluster),
         )
     )
-    export("node_group_security_group_id", node_groups[0].node_security_group.id)
+    export("node_group_security_group_id", node_group_sec_group.security_group.id)
     export("node_instance_profile", node_instance_profile.id)
 
     # There is a bug here when there is more than one node group defined.
