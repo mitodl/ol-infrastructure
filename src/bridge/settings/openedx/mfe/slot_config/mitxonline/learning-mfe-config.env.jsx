@@ -1,3 +1,4 @@
+import { getConfig } from '@edx/frontend-platform';
 import config from './common-mfe-config.env.jsx';
 
 import(
@@ -10,7 +11,7 @@ import(
   /* webpackIgnore: true */
  "/static/smoot-design/remoteTutorDrawer.es.js").then(module => {
    module.init({
-     messageOrigin: "http://local.openedx.io:8000",
+     messageOrigin: getConfig().LMS_BASE_URL,
      transformBody: messages => ({ message: messages[messages.length - 1].content }),
    })
 })
