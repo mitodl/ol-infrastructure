@@ -537,9 +537,9 @@ learn_ai_db = appdb.OLAppDatabase(learn_ai_db_config)
 
 # Redis Cluster configuration and networking setup
 redis_config = Config("redis")
-redis_instance_type = (
-    redis_config.get("instance_type") or defaults(stack_info)["redis"]["instance_type"]
-)
+redis_defaults = defaults(stack_info)["redis"]
+instance_type = redis_config.get("instance_type") or redis_defaults["instance_type"]
+redis_defaults["instance_type"] = instance_type
 redis_cluster_security_group = ec2.SecurityGroup(
     f"learn-ai-redis-cluster-security-group-{stack_info.env_suffix}",
     name_prefix=f"learn-ai-redis-security-group-{stack_info.env_suffix}",
