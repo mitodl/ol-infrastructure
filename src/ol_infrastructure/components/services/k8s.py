@@ -160,8 +160,7 @@ class OLApplicationK8s(ComponentResource):
     Main K8s component resource class
     """
 
-    # Yes Ruff, this i s gross and needs fix :)
-    def __init__(
+    def __init__(  # noqa: C901
         self,
         ol_app_k8s_config: OLApplicationK8sConfig,
         opts: ResourceOptions | None = None,
