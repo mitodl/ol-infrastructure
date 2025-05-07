@@ -2,16 +2,12 @@
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHiiGjYUolrtj8PCnScLM7oLAdMl8nJrLjQjnqyl1LykYgGq710cJf4taf7FUfw+iIGNAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM2JcEQu/tozu3tO8TAgEQgDvnl65jF/6aC66eb97jIrt3/CIL6a5XcVwv9E8EWgWlrX3cJadv9f2X0bcVLKiGPImjG4qTL6m5sDN7Ig==
 config:
-  heroku:app_id:
-    secure: v1:mdVwWs7IkyH7o5j7:49eMfOoVshilsOCouixsxdQSGehSeqRHF3DhPWp2UIiE1clEoyoKqOodkpBQ27rik/MIDg==
-  heroku:user: "odl-devops"
   mitlearn:api_domain: "api.learn.mit.edu"
   mitlearn:db_instance_size: db.m7g.2xlarge
   mitlearn:db_password:
     secure: v1:siGmu4+ZCOqekx7l:4Pdgv4fKZIjWJPAcZDBdpvZ0mUW10SUcX/9ZatsnZbR/euYoklo8dTTFu4i/5kTnJHHYot1QK3xS+gk++lHZfneBoC9qBR+l2qzlvvNBoN8=
   mitlearn:fastly_domain: "d.sni.global.fastly.net"
   mitlearn:frontend_domain: "learn.mit.edu"
-  mitlearn:heroku_domain: "computational-cherry-khbuwf9yvncf0kw3hbk5txff.herokudns.com"
   mitlearn:interpolation_vars:
     auth_allowed_redirect_hosts:
     - "draft.ocw.mit.edu"
