@@ -2,9 +2,6 @@
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHg42pDDDGBhpaX14TdtzcK1hbiMYTHsYRH4k5GL5RFpIwEi8MniqKSK7PJ7AIbp17REAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMbWm9PEFY6H+jKGYHAgEQgDtAZs04prjkVBGB8O8+C6kjqzMhazPYOAanmLoWdx4WArJXNKxZkv72c6my81/qnCg0xWYdmw6fJxV0dg==
 config:
-  heroku:app_id:
-    secure: v1:eSvnqne7KQRkHJlu:wTyl9W3aivfxlANqBML2wy4GEHe85VuKll60R5HmGUu1hJTcQBEfzK1cJOyvjlbLgBtXLw==
-  heroku:user: "odl-devops"
   mitlearn:api_domain: "api.rc.learn.mit.edu"
   mitlearn:db_instance_size: db.m7g.xlarge
   mitlearn:db_password:
@@ -12,7 +9,6 @@ config:
   mitlearn:fastly_anycast_ips: []
   mitlearn:fastly_domain: "d.sni.global.fastly.net"
   mitlearn:frontend_domain: "rc.learn.mit.edu"
-  mitlearn:heroku_domain: "shrouded-brook-krg88s8bvcdg6kgrdjrsrmbq.herokudns.com"
   mitlearn:interpolation_vars:
     auth_allowed_redirect_hosts:
     - "draft-qa.ocw.mit.edu"
