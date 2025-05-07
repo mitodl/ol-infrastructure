@@ -572,6 +572,7 @@ redis_cache_config = OLAmazonRedisConfig(
     subnet_group=apps_vpc["elasticache_subnet"],
     security_groups=[redis_cluster_security_group.id],
     tags=aws_config.tags,
+    **redis_defaults
 )
 redis_cache = OLAmazonCache(redis_cache_config)
 
