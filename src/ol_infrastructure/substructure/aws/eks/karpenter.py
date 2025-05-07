@@ -363,7 +363,7 @@ def setup_karpenter(  # noqa: PLR0913
             },
             "limits": {
                 "cpu": "64",
-                "memory": "128Gi",
+                "memory": "256Gi",
             },
         },
         opts=ResourceOptions(
