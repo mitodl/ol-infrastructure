@@ -49,5 +49,6 @@ config:
   learn_ai:frontend_domain: "learn-ai-qa.ol.mit.edu"
   redis:password:
     secure: v1:j1q4KgePVUsaaySb:EhUqxWBezBKe6Ck1o/gqlX68GBnrZZQdmUCscl5aPok1j6jJWKSRO89XfV+6dWJaCMhqHA==
+  redis:instance_type: "cache.t4g.medium"
   vault:address: "https://vault-qa.odl.mit.edu"
   vault_server:env_namespace: "operations.qa"
