@@ -18,14 +18,35 @@ config:
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
   - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
   - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
-  - ["notifications.enable_notifications", "--create", "--everyone"]
+  - ["legacy_studio.advanced_settings", "--create", "--everyone"]
+  - ["legacy_studio.certificates", "--create", "--everyone"]
+  - ["legacy_studio.configurations", "--create", "--everyone"]
+  - ["legacy_studio.course_outline", "--create", "--everyone"]
+  - ["legacy_studio.course_team", "--create", "--everyone"]
+  - ["legacy_studio.custom_pages", "--create", "--everyone"]
+  - ["legacy_studio.exam_settings", "--create", "--everyone"]
+  - ["legacy_studio.export", "--create", "--everyone"]
+  - ["legacy_studio.files_uploads", "--create", "--everyone"]
+  - ["legacy_studio.grading", "--create", "--everyone"]
+  - ["legacy_studio.home", "--create", "--everyone"]
+  - ["legacy_studio.import", "--create", "--everyone"]
+  - ["legacy_studio.logged_out_home", "--create", "--everyone"]
+  - ["legacy_studio.problem_editor", "--create", "--everyone"]
+  - ["legacy_studio.schedule_details", "--create", "--everyone"]
+  - ["legacy_studio.text_editor", "--create", "--everyone"]
+  - ["legacy_studio.textbooks", "--create", "--everyone"]
+  - ["legacy_studio.unit_editor", "--create", "--everyone"]
+  - ["legacy_studio.updates", "--create", "--everyone"]
+  - ["legacy_studio.video_editor", "--create", "--everyone"]
   - ["notifications.enable_email_notifications", "--create", "--everyone"]
+  - ["notifications.enable_notifications", "--create", "--everyone"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone",
     "--staff", "--authenticated"]
   - ["seo.enable_anonymous_courseware_access", "--create", "--superusers", "--staff",
     "--authenticated"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["teams.enable_teams_app", "--create", "--superusers", "--staff"]
+
   edxapp:business_unit: mitxonline
   edxapp:db_password:
     secure: v1:xHUw5WC3aN02zuAj:0BozwDxrtF0OA7wkYuv4R4CCnSHYdgXt+vi6/3eP9zwJgHgQO20+8sQfg7rXPC9SIUobEA==
