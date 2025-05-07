@@ -5,4 +5,3 @@ config:
   aws:region: us-east-1
   environment:business_unit: mitxonline
   environment:vpc_reference: mitxonline_vpc
-  consul:instance_type: burstable_nano

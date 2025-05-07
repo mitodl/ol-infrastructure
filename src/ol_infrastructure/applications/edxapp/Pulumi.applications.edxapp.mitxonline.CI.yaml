@@ -7,6 +7,45 @@ config:
   consul:http_auth:
     secure: v1:5RkLPQCwui+wYVI4:VXZQblCIWeAGOHWUe1e5pkyQ2R0pcDx1FrSoCUwpYSavVpJMU+zPKKdUIagw7xHRFvrFFMlwaC2tnXLeuqb428LyrFtoF9Xm/pBRGyo=
   consul:scheme: https
+  edxapp:waffle_flags:
+  - ["content_tagging.disabled", "--create", "--everyone"]
+  - ["course_experience.relative_dates", "--create", "--superusers", "--everyone",
+    "--staff", "--authenticated"]
+  - ["course_experience.relative_dates_disable_reset", "--create", "--everyone"]
+  - ["discussions.pages_and_resources_mfe", "--create", "--everyone"]
+  - ["grades.bulk_management", "--create", "--superusers", "--everyone", "--staff",
+    "--authenticated"]
+  - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
+  - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
+  - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
+  - ["legacy_studio.advanced_settings", "--create", "--everyone"]
+  - ["legacy_studio.certificates", "--create", "--everyone"]
+  - ["legacy_studio.configurations", "--create", "--everyone"]
+  - ["legacy_studio.course_outline", "--create", "--everyone"]
+  - ["legacy_studio.course_team", "--create", "--everyone"]
+  - ["legacy_studio.custom_pages", "--create", "--everyone"]
+  - ["legacy_studio.exam_settings", "--create", "--everyone"]
+  - ["legacy_studio.export", "--create", "--everyone"]
+  - ["legacy_studio.files_uploads", "--create", "--everyone"]
+  - ["legacy_studio.grading", "--create", "--everyone"]
+  - ["legacy_studio.home", "--create", "--everyone"]
+  - ["legacy_studio.import", "--create", "--everyone"]
+  - ["legacy_studio.logged_out_home", "--create", "--everyone"]
+  - ["legacy_studio.problem_editor", "--create", "--everyone"]
+  - ["legacy_studio.schedule_details", "--create", "--everyone"]
+  - ["legacy_studio.text_editor", "--create", "--everyone"]
+  - ["legacy_studio.textbooks", "--create", "--everyone"]
+  - ["legacy_studio.unit_editor", "--create", "--everyone"]
+  - ["legacy_studio.updates", "--create", "--everyone"]
+  - ["legacy_studio.video_editor", "--create", "--everyone"]
+  - ["notifications.enable_email_notifications", "--create", "--everyone"]
+  - ["notifications.enable_notifications", "--create", "--everyone"]
+  - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone",
+    "--staff", "--authenticated"]
+  - ["seo.enable_anonymous_courseware_access", "--create", "--superusers", "--staff",
+    "--authenticated"]
+  - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
+  - ["teams.enable_teams_app", "--create", "--superusers", "--staff"]
   edxapp:business_unit: mitxonline
   edxapp:db_password:
     secure: v1:nTKkM6zA0wbJaq3T:LyxTy566zTW65zkQLLKsFGmCIPmPRB1rkXcsAg37hI+EUTX07XfX5TkpfdyBBRdntiLJ7odzNss=
@@ -15,16 +54,27 @@ config:
     lms: courses-ci.mitxonline.mit.edu
     preview: preview-ci.mitxonline.mit.edu
     studio: studio-ci.mitxonline.mit.edu
+  edxapp:marketing_domain: ci.mitxonline.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:+8kgTH+x98kC+Lxc:bW03E5mk8wRB+FxZYtj06FPx/MEJuEiKO5ekaDTZKmqmfklisVhidp0fhX+So2Eygf/Aiyqp5L03RCzA8k7I4ZmlNss19//pdGgBDwa3HAbw
+  edxapp:enable_notes: "True"
+  edxapp:enabled_mfes:
+    communications: communications
+    authoring: authoring
+    discussions: discuss
+    gradebook: gradebook
+    learning: learn
+    ora_grading: ora-grading
   edxapp:elb_healthcheck_interval: '30'
   edxapp:mail_domain: edxapp-mail-ci.mitxonline.mit.edu
+  edxapp:proctortrack_url: https://preproduction.verificient.com
   edxapp:sender_email_address: mitxonline-support+ci@mit.edu
+  edxapp:bulk_email_default_from_email: no-reply@edxapp-mail-ci.mitxonline.mit.edu
   mongodb:admin_password:
     secure: v1:lC3eiftPkXDB9eI/:PxRgffKu9kJjB78ijeLeJgS3fSC0kT80n5GurGDVELGh80RHA31t/VW/4EgwSK00ZlAkCYVKyNSgsDNMwkMzbOP20YcRKvp46olDgdo0Yk2Krou4BzBax5/9
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
-  edxapp:min_web_nodes: '1'
-  edxapp:web_node_capacity: '1'
-  edxapp:min_worker_nodes: '1'
-  edxapp:worker_node_capacity: '1'
+  edxapp:framework: "earthly"
+  edxapp:web_node_capacity: "3"
+  edxapp:worker_node_capacity: "5"
+  mongodb:atlas_project_id:
