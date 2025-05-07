@@ -332,12 +332,12 @@ def setup_karpenter(  # noqa: PLR0913
                         {
                             "key": "karpenter.k8s.aws/instance-category",
                             "operator": "In",
-                            "values": ["m"],
+                            "values": ["m", "r", "c"],
                         },
                         {
                             "key": "karpenter.k8s.aws/instance-family",
                             "operator": "In",
-                            "values": ["m7a", "m7"],
+                            "values": ["m7a", "m7i", "r7a", "r7i", "c7a", "c7i"],
                         },
                         {
                             "key": "kubernetes.io/arch",
