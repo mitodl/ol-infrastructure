@@ -30,9 +30,6 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.k8s import (
-    OLApisixOIDCConfig,
-    OLApisixOIDCResources,
-    OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
     OLApplicationK8s,
@@ -690,22 +687,6 @@ if mitxonline_config.get_bool("k8s_deploy"):
         ),
     )
 
-    mitxonline_k8s_app_oidc_resources = OLApisixOIDCResources(
-        f"mitxonline-k8s-olapisixoidcreources-{stack_info.env_suffix}",
-        oidc_config=OLApisixOIDCConfig(
-            application_name="mitxonline",
-            k8s_labels=k8s_global_labels,
-            k8s_namespace=mitxonline_namespace,
-            oidc_logout_path="/logout",
-            oidc_post_logout_redirect_uri=f"https://{mitxonline_config.require('domain')}/logout",
-            oidc_session_cookie_lifetime=60 * 20160,
-            oidc_use_session_secret=True,
-            vault_mount="secret-operations",
-            vault_mount_type="kv-v1",
-            vault_path="sso/mitxonline",
-            vaultauth=vault_k8s_resources.auth_name,
-        ),
-    )
     frontend_tls_secret_name = "mitxonline-tls-pair"  # noqa: S105  # pragma: allowlist secret
     cert_manager_certificate = OLCertManagerCert(
         f"mitxonline-cert-manager-certificate-{stack_info.env_suffix}",
@@ -728,42 +709,7 @@ if mitxonline_config.get_bool("k8s_deploy"):
                 priority=10,
                 hosts=[mitxonline_config.require("domain")],
                 paths=["/*"],
-                plugins=[
-                    mitxonline_k8s_app_oidc_resources.get_full_oidc_plugin_config(
-                        unauth_action="pass"
-                    ),
-                ],
-                backend_service_name=mitxonline_k8s_app.application_lb_service_name,
-                backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
-            ),
-            OLApisixRouteConfig(
-                route_name="app-login",
-                priority=0,
-                hosts=[mitxonline_config.require("domain")],
-                paths=["/login*"],
-                plugins=[
-                    mitxonline_k8s_app_oidc_resources.get_full_oidc_plugin_config(
-                        unauth_action="auth"
-                    ),
-                    OLApisixPluginConfig(
-                        name="redirect",
-                        config={"uri": "/dashboard"},
-                    ),
-                ],
-                backend_service_name=mitxonline_k8s_app.application_lb_service_name,
-                backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
-            ),
-            OLApisixRouteConfig(
-                route_name="logout-redirect",
-                priority=10,
-                hosts=[mitxonline_config.require("domain")],
-                paths=["/logout/*"],
-                plugins=[
-                    OLApisixPluginConfig(
-                        name="redirect",
-                        config={"uri": "/logout"},
-                    ),
-                ],
+                plugins=[],
                 backend_service_name=mitxonline_k8s_app.application_lb_service_name,
                 backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
             ),
