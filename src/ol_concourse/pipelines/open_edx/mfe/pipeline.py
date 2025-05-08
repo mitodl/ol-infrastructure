@@ -165,9 +165,10 @@ def mfe_job(
         and OpenEdxMicroFrontend[mfe_name].value == OpenEdxMicroFrontend.learn.value
     ):
         mfe_smoot_design_overrides = """
-        npm pack @mitodl/smoot-design@6.2.2
+        npm pack @mitodl/smoot-design@^6.4.0
         tar -xvzf mitodl-smoot-design*.tgz
-        mv package mitodl-smoot-design
+        mkdir -p public/static/smoot-design
+        cp package/dist/bundles/* public/static/smoot-design
         """
         slot_config_file = "learning-mfe-config"
         copy_common_config = f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx {mfe_build_dir.name}/common-mfe-config.env.jsx"  # noqa: E501
