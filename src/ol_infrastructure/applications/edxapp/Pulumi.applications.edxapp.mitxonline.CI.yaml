@@ -78,4 +78,4 @@ config:
   edxapp:framework: "earthly"
   edxapp:web_node_capacity: "3"
   edxapp:worker_node_capacity: "5"
-  mongodb:atlas_project_id:
+  mongodb:atlas_project_id: 6196c37185012b5319a42e16
