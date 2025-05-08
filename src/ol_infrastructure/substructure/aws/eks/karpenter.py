@@ -351,7 +351,7 @@ def setup_karpenter(  # noqa: PLR0913
                         {
                             "key": "karpenter.sh/capacity-type",
                             "operator": "In",
-                            "values": ["spot", "on-demand"],
+                            "values": ["on-demand"],
                         },
                     ],
                 },

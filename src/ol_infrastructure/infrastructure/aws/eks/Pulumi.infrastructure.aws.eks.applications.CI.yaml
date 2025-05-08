@@ -43,7 +43,7 @@ config:
         ondemand: true
       node_group_options: {}
       scaling:
-        desired: 4
+        desired: 3
         max: 5
         min: 2
       tags: {}

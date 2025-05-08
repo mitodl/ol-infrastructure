@@ -464,9 +464,9 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
             labels=ng_config["labels"] or {},
             node_security_group=node_group_sec_group.security_group,
             cluster_ingress_rule=node_group_sec_group.security_group_rule,
-            desired_capacity=ng_config["scaling"]["desired"] or 2,
-            max_size=ng_config["scaling"]["max"] or 3,
-            min_size=ng_config["scaling"]["min"] or 1,
+            desired_capacity=ng_config["scaling"]["desired"] or 3,
+            max_size=ng_config["scaling"]["max"] or 5,
+            min_size=ng_config["scaling"]["min"] or 2,
             taints=taint_list,
             opts=ResourceOptions(parent=cluster, depends_on=cluster),
         )
