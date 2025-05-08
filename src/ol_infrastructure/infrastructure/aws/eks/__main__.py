@@ -474,65 +474,55 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
     export("node_group_security_group_id", node_group_sec_group.security_group.id)
     export("node_instance_profile", node_instance_profile.id)
 
-    allow_tcp_dns_ingress = node_group_sec_group.security_group.apply(
-        lambda ng: aws.ec2.SecurityGroupRule(
-            f"{cluster_name}-eks-nodegroup-{ng_name}-tcp-dns-ingress",  # noqa: B023
-            type="ingress",
-            description="Allow DNS traffic on TCP",
-            security_group_id=ng.id,
-            protocol=aws.ec2.ProtocolType.TCP,
-            from_port=53,
-            to_port=53,
-            cidr_blocks=pod_ip_blocks,
-        )
+    allow_tcp_dns_ingress = aws.ec2.SecurityGroupRule(
+        f"{cluster_name}-eks-nodegroup-{ng_name}-tcp-dns-ingress",
+        type="ingress",
+        description="Allow DNS traffic on TCP",
+        security_group_id=node_group_sec_group.security_group.id,
+        protocol=aws.ec2.ProtocolType.TCP,
+        from_port=53,
+        to_port=53,
+        cidr_blocks=pod_ip_blocks,
     )
-    allow_udp_dns_ingress = node_group_sec_group.security_group.apply(
-        lambda ng: aws.ec2.SecurityGroupRule(
-            f"{cluster_name}-eks-nodegroup-{ng_name}-udp-dns-ingress",  # noqa: B023
-            type="ingress",
-            description="Allow DNS traffic on UDP",
-            security_group_id=ng.id,
-            protocol=aws.ec2.ProtocolType.UDP,
-            from_port=53,
-            to_port=53,
-            cidr_blocks=pod_ip_blocks,
-        )
+    allow_udp_dns_ingress = aws.ec2.SecurityGroupRule(
+        f"{cluster_name}-eks-nodegroup-{ng_name}-udp-dns-ingress",
+        type="ingress",
+        description="Allow DNS traffic on UDP",
+        security_group_id=node_group_sec_group.security_group.id,
+        protocol=aws.ec2.ProtocolType.UDP,
+        from_port=53,
+        to_port=53,
+        cidr_blocks=pod_ip_blocks,
     )
-    allow_tcp_alloy_otel_grpc_ingress = node_group_sec_group.security_group.apply(
-        lambda ng: aws.ec2.SecurityGroupRule(
-            f"{cluster_name}-eks-nodegroup-{ng_name}-tcp-alloy-otel-grpc-ingress",  # noqa: B023
-            type="ingress",
-            description="Allow Alloy OTEL gRPC traffic on TCP",
-            security_group_id=ng.id,
-            protocol=aws.ec2.ProtocolType.TCP,
-            from_port=GRAFANA_ALLOY_OTEL_GRPC_PORT,
-            to_port=GRAFANA_ALLOY_OTEL_GRPC_PORT,
-            cidr_blocks=pod_ip_blocks,
-        )
+    allow_tcp_alloy_otel_grpc_ingress = aws.ec2.SecurityGroupRule(
+        f"{cluster_name}-eks-nodegroup-{ng_name}-tcp-alloy-otel-grpc-ingress",
+        type="ingress",
+        description="Allow Alloy OTEL gRPC traffic on TCP",
+        security_group_id=node_group_sec_group.security_group.id,
+        protocol=aws.ec2.ProtocolType.TCP,
+        from_port=GRAFANA_ALLOY_OTEL_GRPC_PORT,
+        to_port=GRAFANA_ALLOY_OTEL_GRPC_PORT,
+        cidr_blocks=pod_ip_blocks,
     )
-    allow_tcp_alloy_otel_http_ingress = node_group_sec_group.security_group.apply(
-        lambda ng: aws.ec2.SecurityGroupRule(
-            f"{cluster_name}-eks-nodegroup-{ng_name}-tcp-alloy-otel-http-ingress",  # noqa: B023
-            type="ingress",
-            description="Allow Alloy OTEL HTTP traffic on TCP",
-            security_group_id=ng.id,
-            protocol=aws.ec2.ProtocolType.TCP,
-            from_port=GRAFANA_ALLOY_OTEL_HTTP_PORT,
-            to_port=GRAFANA_ALLOY_OTEL_HTTP_PORT,
-            cidr_blocks=pod_ip_blocks,
-        )
+    allow_tcp_alloy_otel_http_ingress = aws.ec2.SecurityGroupRule(
+        f"{cluster_name}-eks-nodegroup-{ng_name}-tcp-alloy-otel-http-ingress",
+        type="ingress",
+        description="Allow Alloy OTEL HTTP traffic on TCP",
+        security_group_id=node_group_sec_group.security_group.id,
+        protocol=aws.ec2.ProtocolType.TCP,
+        from_port=GRAFANA_ALLOY_OTEL_HTTP_PORT,
+        to_port=GRAFANA_ALLOY_OTEL_HTTP_PORT,
+        cidr_blocks=pod_ip_blocks,
     )
-    allow_tcp_alloy_default_listener_ingress = node_group_sec_group.security_group.apply(
-        lambda ng: aws.ec2.SecurityGroupRule(
-            f"{cluster_name}-eks-nodegroup-{ng_name}-tcp-alloy-default-listener-ingress",  # noqa: B023
-            type="ingress",
-            description="Allow Alloy default listener traffic on TCP",
-            security_group_id=ng.id,
-            protocol=aws.ec2.ProtocolType.TCP,
-            from_port=GRAFANA_ALLOY_DEFAULT_LISTENER_PORT,
-            to_port=GRAFANA_ALLOY_DEFAULT_LISTENER_PORT,
-            cidr_blocks=pod_ip_blocks,
-        )
+    allow_tcp_alloy_default_listener_ingress = aws.ec2.SecurityGroupRule(
+        f"{cluster_name}-eks-nodegroup-{ng_name}-tcp-alloy-default-listener-ingress",
+        type="ingress",
+        description="Allow Alloy default listener traffic on TCP",
+        security_group_id=node_group_sec_group.security_group.id,
+        protocol=aws.ec2.ProtocolType.TCP,
+        from_port=GRAFANA_ALLOY_DEFAULT_LISTENER_PORT,
+        to_port=GRAFANA_ALLOY_DEFAULT_LISTENER_PORT,
+        cidr_blocks=pod_ip_blocks,
     )
 
 
