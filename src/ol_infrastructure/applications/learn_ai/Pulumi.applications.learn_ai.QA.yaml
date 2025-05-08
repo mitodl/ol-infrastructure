@@ -23,6 +23,8 @@ config:
     DEBUG: "false"
     DEV_ENV: "false"
     ENVIRONMENT: "rc"
+    LANGSMITH_PROJECT: "learn-ai-rc"
+    LANGSMITH_TRACING: "true"
     MITOL_APP_BASE_URL: "https://learn-ai-qa.ol.mit.edu"
     MITOL_COOKIE_DOMAIN: "ol.mit.edu"
     MITOL_COOKIE_NAME: "mitol"

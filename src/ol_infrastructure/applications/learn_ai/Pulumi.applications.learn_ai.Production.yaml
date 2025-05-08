@@ -18,6 +18,8 @@ config:
     DEBUG: "false"
     DEV_ENV: "false"
     ENVIRONMENT: "production"
+    LANGSMITH_PROJECT: "learn-ai-production"
+    LANGSMITH_TRACING: "true"
     MITOL_APP_BASE_URL: "https://learn-ai.ol.mit.edu"
     MITOL_COOKIE_DOMAIN: "ol.mit.edu"
     MITOL_COOKIE_NAME: "mitol"
