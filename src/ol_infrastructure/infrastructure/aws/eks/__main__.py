@@ -474,10 +474,7 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
     export("node_group_security_group_id", node_group_sec_group.security_group.id)
     export("node_instance_profile", node_instance_profile.id)
 
-    # There is a bug here when there is more than one node group defined.
-    # Don't have mental bandwidth to fix it right now.
-    # Ref: https://docs.astral.sh/ruff/rules/function-uses-loop-variable/
-    allow_tcp_dns_ingress = node_groups[-1].node_security_group.apply(
+    allow_tcp_dns_ingress = node_group_sec_group.apply(
         lambda ng: aws.ec2.SecurityGroupRule(
             f"{cluster_name}-eks-nodegroup-{ng_name}-tcp-dns-ingress",  # noqa: B023
             type="ingress",
@@ -489,7 +486,7 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
             cidr_blocks=pod_ip_blocks,
         )
     )
-    allow_udp_dns_ingress = node_groups[-1].node_security_group.apply(
+    allow_udp_dns_ingress = node_group_sec_group.apply(
         lambda ng: aws.ec2.SecurityGroupRule(
             f"{cluster_name}-eks-nodegroup-{ng_name}-udp-dns-ingress",  # noqa: B023
             type="ingress",
@@ -501,7 +498,7 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
             cidr_blocks=pod_ip_blocks,
         )
     )
-    allow_tcp_alloy_otel_grpc_ingress = node_groups[-1].node_security_group.apply(
+    allow_tcp_alloy_otel_grpc_ingress = node_group_sec_group.apply(
         lambda ng: aws.ec2.SecurityGroupRule(
             f"{cluster_name}-eks-nodegroup-{ng_name}-tcp-alloy-otel-grpc-ingress",  # noqa: B023
             type="ingress",
@@ -513,7 +510,7 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
             cidr_blocks=pod_ip_blocks,
         )
     )
-    allow_tcp_alloy_otel_http_ingress = node_groups[-1].node_security_group.apply(
+    allow_tcp_alloy_otel_http_ingress = node_group_sec_group.apply(
         lambda ng: aws.ec2.SecurityGroupRule(
             f"{cluster_name}-eks-nodegroup-{ng_name}-tcp-alloy-otel-http-ingress",  # noqa: B023
             type="ingress",
@@ -525,9 +522,7 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
             cidr_blocks=pod_ip_blocks,
         )
     )
-    allow_tcp_alloy_default_listener_ingress = node_groups[
-        -1
-    ].node_security_group.apply(
+    allow_tcp_alloy_default_listener_ingress = node_group_sec_group.apply(
         lambda ng: aws.ec2.SecurityGroupRule(
             f"{cluster_name}-eks-nodegroup-{ng_name}-tcp-alloy-default-listener-ingress",  # noqa: B023
             type="ingress",
