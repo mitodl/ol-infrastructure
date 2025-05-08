@@ -171,51 +171,90 @@ mongodb_cluster_uri = mongodb_atlas_stack.require_output("atlas_cluster")[
 # S3 Buckets #
 ##############
 
-mfe_bucket_name = f"{env_name}-edxapp-mfe"
-edxapp_mfe_bucket = s3.Bucket(
+edxapp_mfe_bucket_name = f"{env_name}-edxapp-mfe"
+edxapp_mfe_bucket = s3.BucketV2(
     "edxapp-mfe-s3-bucket",
-    bucket=mfe_bucket_name,
-    versioning=s3.BucketVersioningArgs(enabled=False),
+    bucket=edxapp_mfe_bucket_name,
     tags=aws_config.tags,
-    acl="public-read",
+)
+edxapp_mfe_bucket_ownership_controls = s3.BucketOwnershipControls(
+    "edxapp-mfe-ownership-controls",
+    bucket=edxapp_mfe_bucket.id,
+    rule=s3.BucketOwnershipControlsRuleArgs(
+        object_ownership="BucketOwnerPreferred",
+    ),
+)
+s3.BucketVersioningV2(
+    "edxapp-mfe-bucket-versioning",
+    bucket=edxapp_mfe_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Disabled"
+    ),
+)
+edxapp_mfe_bucket_public_access = s3.BucketPublicAccessBlock(
+    "edxapp-mfe-bucket-public-access-controls",
+    bucket=edxapp_mfe_bucket.id,
+    block_public_policy=False,
+)
+s3.BucketPolicy(
+    "edxapp-mfe-bucket-policy",
+    bucket=edxapp_mfe_bucket.id,
     policy=json.dumps(
         {
-            "Version": "2012-10-17",
+            "Version": "2008-10-17",
             "Statement": [
                 {
-                    "Sid": "PublicRead",
                     "Effect": "Allow",
-                    "Principal": "*",
-                    "Action": ["s3:GetObject"],
-                    "Resource": [f"arn:aws:s3:::{mfe_bucket_name}/*"],
+                    "Principal": {"AWS": "*"},
+                    "Action": "s3:GetObject",
+                    "Resource": [f"arn:aws:s3:::{edxapp_mfe_bucket_name}/*"],
                 }
             ],
         }
     ),
+    opts=ResourceOptions(
+        depends_on=[
+            edxapp_mfe_bucket_public_access,
+            edxapp_mfe_bucket_ownership_controls,
+        ]
+    ),
+)
+s3.BucketCorsConfigurationV2(
+    "edxapp-mfe-bucket-cors-rules",
+    bucket=edxapp_mfe_bucket.id,
     cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
 )
 
 
 storage_bucket_name = f"{env_name}-edxapp-storage"
-edxapp_storage_bucket = s3.Bucket(
+edxapp_storage_bucket = s3.BucketV2(
     "edxapp-storage-s3-bucket",
     bucket=storage_bucket_name,
-    versioning=s3.BucketVersioningArgs(enabled=True),
     tags=aws_config.tags,
-    cors_rules=[
-        s3.BucketCorsRuleArgs(
-            allowed_headers=["*"],
-            allowed_methods=[
-                "GET",
-                "PUT",
-                "POST",
-            ],
-            allowed_origins=[f"https://{domain}" for domain in edxapp_domains.values()],
-            expose_headers=["ETag"],
-            max_age_seconds=3000,
-        )
-    ],
-    policy=lint_iam_policy(
+)
+edxapp_storage_bucket_ownership_controls = s3.BucketOwnershipControls(
+    "edxapp-storage-ownership-controls",
+    bucket=edxapp_storage_bucket.id,
+    rule=s3.BucketOwnershipControlsRuleArgs(
+        object_ownership="BucketOwnerPreferred",
+    ),
+)
+s3.BucketVersioningV2(
+    "edxapp-storage-bucket-versioning",
+    bucket=edxapp_storage_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Enabled"
+    ),
+)
+edxapp_storage_bucket_public_access = s3.BucketPublicAccessBlock(
+    "edxapp-storage-bucket-public-access-controls",
+    bucket=edxapp_storage_bucket.id,
+    block_public_policy=False,
+)
+s3.BucketPolicy(
+    "edxapp-storage-bucket-policy",
+    bucket=edxapp_mfe_bucket.id,
+    policy=json.dumps(
         {
             "Version": "2012-10-17",
             "Statement": [
@@ -229,42 +268,98 @@ edxapp_storage_bucket = s3.Bucket(
                 }
             ],
         },
-        stringify=True,
     ),
+    opts=ResourceOptions(
+        depends_on=[
+            edxapp_storage_bucket_public_access,
+            edxapp_storage_bucket_ownership_controls,
+        ]
+    ),
+)
+s3.BucketCorsConfigurationV2(
+    "edxapp-storage-bucket-cors-rules",
+    bucket=edxapp_mfe_bucket.id,
+    cors_rules=[
+        s3.BucketCorsConfigurationV2CorsRuleArgs(
+            allowed_headers=["*"],
+            allowed_methods=[
+                "GET",
+                "PUT",
+                "POST",
+            ],
+            allowed_origins=[f"https://{domain}" for domain in edxapp_domains.values()],
+            expose_headers=["ETag"],
+            max_age_seconds=3000,
+        )
+    ],
 )
 
 course_bucket_name = f"{env_name}-edxapp-courses"
-edxapp_course_bucket = s3.Bucket(
+edxapp_course_bucket = s3.BucketV2(
     "edxapp-courses-s3-bucket",
     bucket=course_bucket_name,
-    versioning=s3.BucketVersioningArgs(enabled=False),
     tags=aws_config.tags,
+)
+s3.BucketVersioningV2(
+    "edxapp-course-bucket-versioning",
+    bucket=edxapp_course_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Disabled"
+    ),
 )
 
 grades_bucket_name = f"{env_name}-edxapp-grades"
-edxapp_storage_bucket = s3.Bucket(
+edxapp_grades_bucket = s3.BucketV2(
     "edxapp-grades-s3-bucket",
     bucket=grades_bucket_name,
-    versioning=s3.BucketVersioningArgs(enabled=True),
     tags=aws_config.tags,
 )
+s3.BucketVersioningV2(
+    "edxapp-grades-bucket-versioning",
+    bucket=edxapp_grades_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Enabled"
+    ),
+)
+
 
 tracking_bucket_name = f"{env_name}-edxapp-tracking"
-edxapp_tracking_bucket = s3.Bucket(
+edxapp_tracking_bucket = s3.BucketV2(
     "edxapp-tracking-logs-s3-bucket",
     bucket=tracking_bucket_name,
-    versioning=s3.BucketVersioningArgs(enabled=True),
-    acl="private",
-    server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
-        rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
+    tags=aws_config.tags,
+)
+edxapp_mfe_bucket_ownership_controls = s3.BucketOwnershipControls(
+    "edxapp-tracking-logs-bucket-ownership-controls",
+    bucket=edxapp_tracking_bucket.id,
+    rule=s3.BucketOwnershipControlsRuleArgs(
+        object_ownership="BucketOwnerPreferred",
+    ),
+)
+edxapp_tracking_bucket_public_access = s3.BucketPublicAccessBlock(
+    "edxapp-tracking-logs-bucket-public-access-controls",
+    bucket=edxapp_tracking_bucket.id,
+    block_public_policy=True,
+)
+edxapp_tracking_bucket_encryption = s3.BucketServerSideEncryptionConfigurationV2(
+    "edxapp-tracking-logs-s3-bucket-encryption",
+    bucket=edxapp_tracking_bucket.id,
+    rules=[
+        s3.BucketServerSideEncryptionConfigurationV2RuleArgs(
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationV2RuleApplyServerSideEncryptionByDefaultArgs(
                 sse_algorithm="aws:kms",
                 kms_master_key_id=kms_s3_key["id"],
             ),
             bucket_key_enabled=True,
-        )
+        ),
+    ],
+)
+s3.BucketVersioningV2(
+    "edxapp-tracking-logs-bucket-versioning",
+    bucket=edxapp_tracking_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Enabled"
     ),
-    tags=aws_config.tags,
 )
 s3.BucketPublicAccessBlock(
     "edxapp-tracking-bucket-prevent-public-access",
@@ -280,7 +375,8 @@ s3.BucketPublicAccessBlock(
 parliament_config = {
     "PERMISSIONS_MANAGEMENT_ACTIONS": {
         "ignore_locations": [{"actions": ["s3:putobjectacl"]}]
-    }
+    },
+    "RESOURCE_MISMATCH": {},
 }
 
 edxapp_policy_document = {
@@ -1681,7 +1777,7 @@ export(
         "mariadb": edxapp_db.db_instance.address,
         "redis": edxapp_redis_cache.address,
         "redis_token": edxapp_redis_cache.cache_cluster.auth_token,
-        "mfe_bucket": mfe_bucket_name,
+        "mfe_bucket": edxapp_mfe_bucket_name,
         "load_balancer": {"dns_name": web_lb.dns_name, "arn": web_lb.arn},
         "ses_configuration_set": edxapp_ses_configuration_set.name,
         "edx_notes_iam_role": edxapp_notes_iam_role.arn,
