@@ -97,6 +97,29 @@ mitx_staging = [
 
 mitxonline = [
     OpenEdxVars(
+        about_us_url="https://ci.mitxonline.mit.edu/about-us/",
+        accessibility_url="https://accessibility.mit.edu/",
+        account_settings_url="https://ci.mitxonline.mit.edu/account-settings",
+        contact_url="https://mitxonline.zendesk.com/hc/en-us/requests/new",
+        deployment_name="mitxonline",
+        display_feedback_widget="false",
+        environment="mitxonline-ci",
+        environment_stage="CI",
+        favicon_url="https://courses-ci.mitxonline.mit.edu/static/mitxonline/images/favicon.ico",
+        honor_code_url="https://ci.mitxonline.mit.edu/honor-code/",
+        lms_domain="courses-ci.mitxonline.mit.edu",
+        logo_url="https://courses-ci.mitxonline.mit.edu/static/mitxonline/images/logo.svg",
+        marketing_site_domain="ci.mitxonline.mit.edu",
+        privacy_policy_url="https://ci.mitxonline.mit.edu/privacy-policy/",
+        schedule_email_section="true",  # Because the communication MFE treats this boolean as string  # noqa: E501
+        site_name="MITx Online CI",
+        studio_domain="studio-ci.mitxonline.mit.edu",
+        support_url="mitxonline.zendesk.com/hc/",
+        terms_of_service_url="https://ci.mitxonline.mit.edu/terms-of-service/",
+        trademark_text="© MITx Online. All rights reserved except where noted.",
+        logo_trademark_url="https://courses-ci.mitxonline.mit.edu/static/mitxonline/images/mit-ol-logo.svg",
+    ),
+    OpenEdxVars(
         about_us_url="https://rc.mitxonline.mit.edu/about-us/",
         accessibility_url="https://accessibility.mit.edu/",
         account_settings_url="https://rc.mitxonline.mit.edu/account-settings",

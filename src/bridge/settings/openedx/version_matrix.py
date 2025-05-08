@@ -29,6 +29,7 @@ class OpenLearningOpenEdxDeployment(Enum):
     mitxonline = DeploymentEnvRelease(
         deployment_name="mitxonline",
         env_release_map=[
+            EnvRelease("CI", OpenEdxSupportedRelease["master"]),
             EnvRelease("QA", OpenEdxSupportedRelease["master"]),
             EnvRelease("Production", OpenEdxSupportedRelease["master"]),
         ],

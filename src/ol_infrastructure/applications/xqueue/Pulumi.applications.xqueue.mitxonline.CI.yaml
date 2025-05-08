@@ -1,0 +1,14 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAEACyB9zPfnZJXEwrtWwc7TAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMVxtxJJPswlnS+QsdAgEQgDtqIa92kzWDB9iHFdNvacvV8wwgpNF4OxIAkE+RmGdPDsKC+SsRc4xWRpWOk8DBsOCjzR88ps5wxrYYYQ==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-mitxonline-ci.odl.mit.edu
+  xqueue:auto_scale:
+    desired: 1
+    max: 2
+    min: 1
+  xqueue:business_unit: mitxonline
+  xqueue:target_vpc: mitxonline_vpc
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
