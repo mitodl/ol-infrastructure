@@ -157,8 +157,8 @@ xqueue_server_security_group = ec2.SecurityGroup(
             from_port=XQUEUE_SERVICE_PORT,
             to_port=XQUEUE_SERVICE_PORT,
             security_groups=[
-                edxapp_stack.get_output("edxapp_security_group"),
-                xqwatcher_stack.get_output("xqwatcher_security_group"),
+                edxapp_stack.require_output("edxapp_security_group"),
+                xqwatcher_stack.require_output("xqwatcher_security_group"),
             ],
             cidr_blocks=[target_vpc["cidr"]],
             description=(
