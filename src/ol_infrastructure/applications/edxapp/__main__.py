@@ -188,7 +188,7 @@ s3.BucketVersioningV2(
     "edxapp-mfe-bucket-versioning",
     bucket=edxapp_mfe_bucket.id,
     versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
-        status="Disabled"
+        status="Suspended"
     ),
 )
 edxapp_mfe_bucket_public_access = s3.BucketPublicAccessBlock(
@@ -304,7 +304,7 @@ s3.BucketVersioningV2(
     "edxapp-course-bucket-versioning",
     bucket=edxapp_course_bucket.id,
     versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
-        status="Disabled"
+        status="Suspended"
     ),
 )
 
