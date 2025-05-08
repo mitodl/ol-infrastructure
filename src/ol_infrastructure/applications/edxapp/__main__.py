@@ -207,7 +207,7 @@ s3.BucketPolicy(
                     "Effect": "Allow",
                     "Principal": {"AWS": "*"},
                     "Action": "s3:GetObject",
-                    "Resource": [f"arn:aws:s3:::{edxapp_mfe_bucket_name}/*"],
+                    "Resource": f"arn:aws:s3:::{edxapp_mfe_bucket_name}/*",
                 }
             ],
         }
