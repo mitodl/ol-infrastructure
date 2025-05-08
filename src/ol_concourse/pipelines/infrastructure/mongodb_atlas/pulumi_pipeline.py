@@ -18,10 +18,7 @@ for service in ["mitx", "mitx-staging", "mitxonline", "xpro"]:
         ],
     )
 
-    if service == "mitxonline":
-        stage_list = ["QA", "Production"]
-    else:
-        stage_list = ["CI", "QA", "Production"]
+    stage_list = ["CI", "QA", "Production"]
     simple_pulumi_chain = pulumi_jobs_chain(
         simple_pulumi_code,
         project_name=f"ol-infrastructure-mongodb_atlas-{service}",
