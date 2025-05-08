@@ -23,14 +23,14 @@ config:
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 500
-      instance_type: "m7a.4xlarge"
+      instance_type: "c7a.xlarge"
       labels:
-        node_size: m7a.4xlarge
+        node_size: c7a.xlarge
         ondemand: true
       node_group_options: {}
       scaling:
         desired: 3
-        max: 8
+        max: 5
         min: 2
       tags: {}
       taints: {}
