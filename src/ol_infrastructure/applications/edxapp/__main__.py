@@ -254,7 +254,7 @@ edxapp_storage_bucket_public_access = s3.BucketPublicAccessBlock(
 )
 s3.BucketPolicy(
     "edxapp-storage-bucket-policy",
-    bucket=edxapp_mfe_bucket.id,
+    bucket=edxapp_storage_bucket.id,
     policy=lint_iam_policy(
         {
             "Version": IAM_POLICY_VERSION,
