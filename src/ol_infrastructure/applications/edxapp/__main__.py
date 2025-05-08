@@ -199,9 +199,9 @@ edxapp_mfe_bucket_public_access = s3.BucketPublicAccessBlock(
 s3.BucketPolicy(
     "edxapp-mfe-bucket-policy",
     bucket=edxapp_mfe_bucket.id,
-    policy=json.dumps(
+    policy=lint_iam_policy(
         {
-            "Version": "2008-10-17",
+            "Version": IAM_POLICY_VERSION,
             "Statement": [
                 {
                     "Effect": "Allow",
@@ -210,7 +210,8 @@ s3.BucketPolicy(
                     "Resource": f"arn:aws:s3:::{edxapp_mfe_bucket_name}/*",
                 }
             ],
-        }
+        },
+        stringify=True,
     ),
     opts=ResourceOptions(
         depends_on=[
@@ -254,9 +255,9 @@ edxapp_storage_bucket_public_access = s3.BucketPublicAccessBlock(
 s3.BucketPolicy(
     "edxapp-storage-bucket-policy",
     bucket=edxapp_mfe_bucket.id,
-    policy=json.dumps(
+    policy=lint_iam_policy(
         {
-            "Version": "2012-10-17",
+            "Version": IAM_POLICY_VERSION,
             "Statement": [
                 {
                     "Effect": "Allow",
@@ -268,6 +269,7 @@ s3.BucketPolicy(
                 }
             ],
         },
+        stringify=True,
     ),
     opts=ResourceOptions(
         depends_on=[
