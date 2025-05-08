@@ -36,6 +36,8 @@ stack_info = parse_stack()
 cluster_stack = StackReference(
     f"infrastructure.aws.eks.{stack_info.env_prefix}.{stack_info.name}"
 )
+kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
+
 cluster_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
 aws_config = AWSBase(
@@ -678,6 +680,7 @@ alloy_release = kubernetes.helm.v3.Release(
 setup_karpenter(
     cluster_name=cluster_name,
     cluster_stack=cluster_stack,
+    kms_stack=kms_stack,
     aws_config=aws_config,
     k8s_provider=k8s_provider,
     aws_account=aws_account,
