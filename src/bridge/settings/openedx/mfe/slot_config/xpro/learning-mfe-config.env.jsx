@@ -9,7 +9,7 @@ import(
    * Add webpackIgnore to avoid bundling it again.
    */
   /* webpackIgnore: true */
- "/static/remoteTutorDrawer.es.js").then(module => {
+ "/learn/static/remoteTutorDrawer.es.js").then(module => {
    module.init({
       messageOrigin: getConfig().LMS_BASE_URL,
       transformBody: messages => ({ message: messages[messages.length - 1].content }),
