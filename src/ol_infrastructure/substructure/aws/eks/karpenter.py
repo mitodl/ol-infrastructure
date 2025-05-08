@@ -35,6 +35,7 @@ def extract_version(ami_name: str) -> str:
 def setup_karpenter(  # noqa: PLR0913
     cluster_name: str,
     cluster_stack: StackReference,
+    kms_stack: StackReference,
     aws_config: AWSBase,
     k8s_provider: kubernetes.Provider,
     aws_account: aws.GetCallerIdentityResult,
@@ -273,6 +274,9 @@ def setup_karpenter(  # noqa: PLR0913
     ami_alias = ami_version_string.apply(lambda version: f"al2023@{version}")
     # --- End AMI Alias Determination ---
 
+    # Get KMS key ARN for EBS encryption
+    kms_ebs_id = kms_stack.require_output("kms_ec2_ebs_key")["id"]
+
     kubernetes.apiextensions.CustomResource(
         f"{cluster_name}-karpenter-default-node-class",
         api_version="karpenter.k8s.aws/v1",  # Correct API version for EC2NodeClass
@@ -284,6 +288,20 @@ def setup_karpenter(  # noqa: PLR0913
         ),
         spec={
             "kubelet": {},
+            "blockDeviceMappings": [
+                {
+                    "deviceName": "/dev/xvda",
+                    "ebs": {
+                        "volumeSize": "100Gi",
+                        "volumeType": "gp3",
+                        "iops": 3000,
+                        "throughput": 125,
+                        "deleteOnTermination": True,
+                        "encrypted": True,
+                        "kmsKeyID": kms_ebs_id,
+                    },
+                }
+            ],
             "subnetSelectorTerms": cluster_stack.require_output("pod_subnet_ids").apply(
                 lambda ids: [{"id": subnet_id} for subnet_id in ids]
             ),
