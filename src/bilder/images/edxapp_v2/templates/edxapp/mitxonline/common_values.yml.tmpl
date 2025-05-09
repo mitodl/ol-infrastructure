@@ -403,7 +403,7 @@ LOGIN_REDIRECT_WHITELIST:  # MODIFIED
   - {{ key "edxapp/marketing-domain" }}
 LOG_DIR: /openedx/data/var/log/ed/openedx/data/var/log/edx
 LOGO_URL: https://{{ key "edxapp/lms-domain" }}/static/mitxonline/images/logo.svg
-LOGO_URL_PNG_FOR_EMAIL: https://{{ key "edxapp/lms-domain" }}/static/mitxonline/images/logo.png
+LOGO_URL_PNG_FOR_EMAIL: https://{{ key "edxapp/lms-domain" }}/static/mitxonline/images/logo.jpg
 LOGO_TRADEMARK_URL: https://{{ key "edxapp/lms-domain" }}/static/mitxonline/images/mit-ol-logo.svg
 MAINTENANCE_BANNER_TEXT: Sample banner message
 MARKETING_SITE_BASE_URL: https://{{ key "edxapp/marketing-domain" }}/ # ADDED - to support mitxonline-theme
@@ -424,12 +424,12 @@ MKTG_URL_LINK_MAP:
     HELP_CENTER: help-center
 MKTG_URL_OVERRIDES:
     COURSES: https://{{ key "edxapp/marketing-domain" }}/
-    PRIVACY: https://{{ key "edxapp/marketing-domain" }}/privacy-policy/
+    PRIVACY: https://{{ key "edxapp/marketing-domain" }}/privacy/
     TOS: https://{{ key "edxapp/marketing-domain" }}/terms-of-service/
-    ABOUT: https://{{ key "edxapp/marketing-domain" }}/about-us/
-    HONOR: https://{{ key "edxapp/marketing-domain" }}/honor-code/
+    ABOUT: https://{{ key "edxapp/marketing-domain" }}/about/
+    HONOR: https://{{ key "edxapp/marketing-domain" }}/honor/
     ACCESSIBILITY: https://accessibility.mit.edu/
-    CONTACT: https://mitxonline.zendesk.com/hc/en-us/requests/new/
+    CONTACT: mailto:mitlearn-support@mit.edu
     TOS_AND_HONOR: ''
 MOBILE_STORE_URLS: {}
 ########################################################################################
@@ -473,7 +473,7 @@ PLATFORM_FACEBOOK_ACCOUNT: http://www.facebook.com/YourPlatformFacebookAccount
 PLATFORM_NAME: MITx Online  # MODIFIED
 PLATFORM_TWITTER_ACCOUNT: '@YourPlatformTwitterAccount'
 POLICY_CHANGE_GRADES_ROUTING_KEY: edx.lms.core.default
-PRESS_EMAIL: support@mitxonline.mit.edu # MODIFIED
+PRESS_EMAIL: mitlearn-support@mit.edu # MODIFIED
 {{ with secret "secret-mitxonline/edxapp" }}
 PROCTORING_BACKENDS:
     DEFAULT: 'proctortrack'
@@ -541,7 +541,7 @@ STATIC_URL_BASE: /static/
 STATIC_ROOT_BASE: /openedx/staticfiles/
 STUDIO_NAME: Studio
 STUDIO_SHORT_NAME: Studio
-SUPPORT_SITE_LINK: https://mitxonline.zendesk.com/hc/
+SUPPORT_SITE_LINK: mailto:mitlearn-support@mit.edu
 SYSADMIN_DEFAULT_BRANCH: live
 SYSTEM_WIDE_ROLE_CLASSES: []
 TECH_SUPPORT_EMAIL: odl-devops@mit.edu  # MODIFIED
