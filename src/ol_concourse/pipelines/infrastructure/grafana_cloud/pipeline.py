@@ -359,6 +359,7 @@ for tool in ["loki", "cortex", "alertmanager"]:
             "SLACK_NOTIFICATIONS_OCW_MISC_API_URL": (
                 "((cortextool.slack-notifications-ocw-misc-api-url))"
             ),
+            "ROOTLY_BEARER_TOKEN": f"((cortextool.rootly-bearer-token-{stage}))",
             "ENVIRONMENT_NAME": stage.upper(),
             "RESOURCE_NAME": resource_name,
         }
