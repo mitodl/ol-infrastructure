@@ -76,6 +76,6 @@ config:
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
   edxapp:framework: "earthly"
-  edxapp:web_node_capacity: "3"
-  edxapp:worker_node_capacity: "5"
+  edxapp:web_node_capacity: "2"
+  edxapp:worker_node_capacity: "1"
   mongodb:atlas_project_id: 6196c37185012b5319a42e16
