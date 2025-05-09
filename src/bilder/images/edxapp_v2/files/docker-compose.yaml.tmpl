@@ -140,6 +140,8 @@ services:
     depends_on:
       cms-permissions:
         condition: service_completed_successfully
+      lms-migrations:
+        condition: service_completed_successfully
 
 
   waffle-flags:
@@ -160,6 +162,10 @@ services:
     command: ["python", "set_waffle_flags.py", "/openedx/config/waffle_flags.yaml"]
     depends_on:
       lms-permissions:
+        condition: service_completed_successfully
+      lms-migrations:
+        condition: service_completed_successfully
+      cms-migrations:
         condition: service_completed_successfully
   lms-worker:
     image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/${DOCKER_REPO_AND_DIGEST}
@@ -182,6 +188,8 @@ services:
     - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
     depends_on:
       lms-migrations:
+        condition: service_completed_successfully
+      cms-migrations:
         condition: service_completed_successfully
       waffle-flags:
         condition: service_started
