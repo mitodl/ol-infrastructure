@@ -15,10 +15,10 @@ config:
   eks:namespaces: []
   eks:nodegroups:
     worker-xlarge:
-      instance_type: "c7a.xlarge"
+      instance_type: "r7a.xlarge"
       labels:
         ondemand: true
-        node_size: c7a.xlarge
+        node_size: r7a.xlarge
       disk_size_gb: 500
       scaling:
         desired: 3
