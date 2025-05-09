@@ -152,6 +152,13 @@ keycloak_server_security_group = ec2.SecurityGroup(
                 " port 7800 udp for IPSN clustering."
             ),
         ),
+        ec2.SecurityGroupIngressArgs(
+            self=True,
+            from_port=57800,
+            to_port=57800,
+            protocol="tcp",
+            description=("Failure detection is provided by FD_SOCK2"),
+        ),
     ],
     egress=default_egress_args,
     vpc_id=target_vpc_id,
