@@ -1319,25 +1319,22 @@ consul.Keys(
 )
 
 
-if stack_info.env_suffix != "ci":
-    # MITx Online doesn't have a CI environment. Remove this once that ceases to be true.
-    # TODO(TMM 2025-04-04): Remove this hack once there is a CI deployment of Learn
-    mitxonline_consul_opts = get_consul_provider(
-        stack_info,
-        consul_address=f"https://consul-mitxonline-{stack_info.env_suffix}.odl.mit.edu",
-        provider_name=f"consul-provider-mitxonline-{stack_info.env_suffix}",
-    )
-    consul.Keys(
-        "learn-api-domain-consul-key-for-mitxonline-openedx",
-        keys=[
-            consul.KeysKeyArgs(
-                path="edxapp/learn-api-domain",
-                delete=False,
-                value=mitlearn_api_domain,
-            )
-        ],
-        opts=mitxonline_consul_opts,
-    )
+mitxonline_consul_opts = get_consul_provider(
+    stack_info,
+    consul_address=f"https://consul-mitxonline-{stack_info.env_suffix}.odl.mit.edu",
+    provider_name=f"consul-provider-mitxonline-{stack_info.env_suffix}",
+)
+consul.Keys(
+    "learn-api-domain-consul-key-for-mitxonline-openedx",
+    keys=[
+        consul.KeysKeyArgs(
+            path="edxapp/learn-api-domain",
+            delete=False,
+            value=mitlearn_api_domain,
+        )
+    ],
+    opts=mitxonline_consul_opts,
+)
 
 
 # Create a security group for the application pods
