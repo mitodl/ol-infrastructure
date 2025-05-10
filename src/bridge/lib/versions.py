@@ -20,7 +20,7 @@ VAULT_VERSION = "1.19.3"
 # renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/helm-charts
 AIRBYTE_CHART_VERSION = "1.6.1"
 # renovate: datasource=docker depName=apisix packageName=registry-1.docker.io/bitnamicharts/apisix
-APISIX_CHART_VERSION = "4.2.3"
+APISIX_CHART_VERSION = "4.2.4"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager
 CERT_MANAGER_CHART_VERSION = "v1.16.1"
 # renovate: datasource=aws-eks-addon depName=ebs-csi-driver
