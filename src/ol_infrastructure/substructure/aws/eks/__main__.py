@@ -423,6 +423,20 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
 
             prometheus.operator.servicemonitors "servicemonitors" {{
               forward_to = [prometheus.remote_write.publish_to_grafana.receiver]
+              // Drop metrics that start with go_
+              // These are usually metrics about the exporter itself rather than
+              // the application / service we are interested in.
+              rule {{
+                source_labels = ["__name__"]
+                regex         = "go_.*"
+                action        = "drop"
+              }}
+              // Add cluster label
+              rule {{
+                target_label = "cluster"
+                replacement  = "{cluster_name}"
+                action       = "replace"
+              }}
             }}
 
             // ----------------------------------------------------------
