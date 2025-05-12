@@ -15,17 +15,14 @@
 ~ See the License for the specific language governing permissions and
 ~ limitations under the License.
 -->
-<!--
-~ Sourced from: https://github.com/ivangfr/keycloak-clustered
--->
 
 <infinispan
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="urn:infinispan:config:11.0 http://www.infinispan.org/schemas/infinispan-config-11.0.xsd"
-  xmlns="urn:infinispan:config:11.0">
+  xsi:schemaLocation="urn:infinispan:config:15.0 http://www.infinispan.org/schemas/infinispan-config-15.0.xsd"
+  xmlns="urn:infinispan:config:15.0">
 <jgroups>
   <stack name="postgres-jdbc-ping-tcp" extends="tcp">
-    <TCP external_addr="${env.JGROUPS_DISCOVERY_EXTERNAL_IP:127.0.0.1}" />
+    <TCP external_addr="${env.JGROUPS_DISCOVERY_EXTERNAL_IP:127.0.0.1}" bind_port="7800"/>
     <JDBC_PING connection_driver="org.postgresql.Driver"
       connection_username="${env.KC_DB_USERNAME}" connection_password="${env.KC_DB_PASSWORD}"
       connection_url="jdbc:postgresql://${env.KC_DB_URL_HOST}/${env.KC_DB_URL_DATABASE}"
@@ -42,14 +39,14 @@
 
 <cache-container name="keycloak">
   <transport lock-timeout="60000" stack="${env.KC_DB}-jdbc-ping-tcp"/>
-  <local-cache name="realms">
+  <local-cache name="realms" simple-cache="true">
     <encoding>
       <key media-type="application/x-java-object"/>
       <value media-type="application/x-java-object"/>
     </encoding>
     <memory max-count="10000"/>
   </local-cache>
-  <local-cache name="users">
+  <local-cache name="users" simple-cache="true">
     <encoding>
       <key media-type="application/x-java-object"/>
       <value media-type="application/x-java-object"/>
@@ -58,15 +55,18 @@
   </local-cache>
   <distributed-cache name="sessions" owners="2">
     <expiration lifespan="-1"/>
+    <memory max-count="10000"/>
   </distributed-cache>
   <distributed-cache name="authenticationSessions" owners="2">
     <expiration lifespan="-1"/>
   </distributed-cache>
   <distributed-cache name="offlineSessions" owners="2">
     <expiration lifespan="-1"/>
+    <memory max-count="10000"/>
   </distributed-cache>
   <distributed-cache name="clientSessions" owners="2">
     <expiration lifespan="-1"/>
+    <memory max-count="10000"/>
   </distributed-cache>
   <distributed-cache name="offlineClientSessions" owners="2">
     <expiration lifespan="-1"/>
@@ -74,7 +74,7 @@
   <distributed-cache name="loginFailures" owners="2">
     <expiration lifespan="-1"/>
   </distributed-cache>
-  <local-cache name="authorization">
+  <local-cache name="authorization" simple-cache="true">
     <encoding>
       <key media-type="application/x-java-object"/>
       <value media-type="application/x-java-object"/>
@@ -84,7 +84,7 @@
   <replicated-cache name="work">
     <expiration lifespan="-1"/>
   </replicated-cache>
-  <local-cache name="keys">
+  <local-cache name="keys" simple-cache="true">
     <encoding>
       <key media-type="application/x-java-object"/>
       <value media-type="application/x-java-object"/>
@@ -92,6 +92,14 @@
     <expiration max-idle="3600000"/>
     <memory max-count="1000"/>
   </local-cache>
+  <local-cache name="crl" simple-cache="true">
+    <encoding>
+        <key media-type="application/x-java-object"/>
+        <value media-type="application/x-java-object"/>
+    </encoding>
+    <expiration lifespan="-1"/>
+    <memory max-count="1000"/>
+</local-cache>
   <distributed-cache name="actionTokens" owners="2">
     <encoding>
       <key media-type="application/x-java-object"/>

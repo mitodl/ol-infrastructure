@@ -9,6 +9,8 @@ services:
     - --http-enabled=true
     - --hostname=${KC_URL}
     - --proxy-headers=xforwarded
+    - --cache-stack=postgres-jdbc-ping-tcp
+    - --cache-config-file=cache-ispn-jdbc-ping.xml
     env_file:
     - ./.env
     labels:
@@ -21,6 +23,7 @@ services:
     ports:
     - "7800:7800"
     - "8080:8080"
+    - "57800:57800"
     volumes:
     - /etc/docker/compose/cache-ispn-jdbc-ping.xml:/opt/keycloak/conf/cache-ispn-jdbc-ping.xml:ro
   traefik:
