@@ -521,16 +521,6 @@ if not mitxonline_config.get_bool("k8s_deploy"):
 
 # Begin k8s resources
 if mitxonline_config.get_bool("k8s_deploy"):
-    # The mount already exists and is created by hand outside of CI
-    # We will create and manage it in CI
-    #
-    # Once it is imported for the first time we can remove this logic
-    if stack_info.env_suffix != "production":
-        mount_opts = None
-    else:
-        mount_opts = ResourceOptions(
-            import_="secret-mitxonline", ignore_changes=["options"]
-        )
     # TODO (TMM 2025-05-06): The vault mount is also # noqa: TD003, FIX002
     # created/managed as part of the edxapp project. This needs to be factored out into
     # a substructure project or referenced from one stack to the other via stack
@@ -540,7 +530,6 @@ if mitxonline_config.get_bool("k8s_deploy"):
         description="Static secrets storage for Open edX {stack_info.env_prefix} applications and services",
         path="secret-mitxonline",
         type="kv",
-        opts=mount_opts,
     )
     mitxonline_collected_secrets = read_yaml_secrets(
         Path(f"mitxonline/secrets.{stack_info.env_suffix}.yaml")
