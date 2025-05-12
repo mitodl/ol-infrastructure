@@ -27,7 +27,7 @@ x-superset-volumes: &superset-volumes
 version: "3.7"
 services:
   redis:
-    image: redis:7
+    image: redis:8
     container_name: superset_cache
     restart: unless-stopped
     volumes:
