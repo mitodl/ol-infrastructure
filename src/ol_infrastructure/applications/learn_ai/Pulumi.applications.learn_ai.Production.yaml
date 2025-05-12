@@ -17,12 +17,12 @@ config:
       "https://learn.mit.edu", "https://api.learn.mit.edu"]'
     DEBUG: "false"
     DEV_ENV: "false"
-    ENVIRONMENT: "production"
     LANGSMITH_PROJECT: "learn-ai-production"
     LANGSMITH_TRACING: "true"
     MITOL_APP_BASE_URL: "https://learn-ai.ol.mit.edu"
     MITOL_COOKIE_DOMAIN: "ol.mit.edu"
     MITOL_COOKIE_NAME: "mitol"
+    MITOL_ENVIRONMENT: "production"
     MITOL_FEATURES_DEFAULT: "true"
     NODE_ENV: "development"
     OPENTELEMETRY_ENABLED: "true"

@@ -16,12 +16,12 @@ config:
     CSRF_TRUSTED_ORIGINS: '["https://learn-ai-ci.ol.mit.edu", "https://api-learn-ai-ci.ol.mit.edu"]'
     DEBUG: "false"
     DEV_ENV: "false"
-    ENVIRONMENT: "ci"
     LANGSMITH_PROJECT: "learn-ai-ci"
     LANGSMITH_TRACING: "true"
     MITOL_APP_BASE_URL: "https://learn-ai-ci.ol.mit.edu"
     MITOL_COOKIE_DOMAIN: "ol.mit.edu"
     MITOL_COOKIE_NAME: "mitol"
+    MITOL_ENVIRONMENT: "ci"
     MITOL_FEATURES_DEFAULT: "true"
     NODE_ENV: "development"
     SENTRY_LOG_LEVEL: "ERROR"

@@ -22,12 +22,12 @@ config:
       "https://rc.learn.mit.edu", "https://api.rc.learn.mit.edu"]'
     DEBUG: "false"
     DEV_ENV: "false"
-    ENVIRONMENT: "rc"
     LANGSMITH_PROJECT: "learn-ai-rc"
     LANGSMITH_TRACING: "true"
     MITOL_APP_BASE_URL: "https://learn-ai-qa.ol.mit.edu"
     MITOL_COOKIE_DOMAIN: "ol.mit.edu"
     MITOL_COOKIE_NAME: "mitol"
+    MITOL_ENVIRONMENT: "rc"
     MITOL_FEATURES_DEFAULT: "true"
     NODE_ENV: "development"
     OPENTELEMETRY_ENABLED: "true"

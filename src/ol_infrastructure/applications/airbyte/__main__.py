@@ -140,7 +140,7 @@ parliament_config = {
         "ignore_locations": [{"actions": ["s3:putobjectacl"]}]
     },
     "UNKNOWN_ACTION": {"ignore_locations": []},
-    "RESOURCE_MISMATCH": {},
+    "RESOURCE_MISMATCH": {"ignore_locations": []},
     "UNKNOWN_CONDITION_FOR_ACTION": {"ignore_locations": []},
     "RESOURCE_STAR": {"ignore_locations": []},
 }
