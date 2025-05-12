@@ -3,7 +3,7 @@ sources:
   collect_keycloak_metrics:
     type: prometheus_scrape
     endpoints:
-    - http://localhost:{{ context.keycloak_prometheus_port }}/realms/master/metrics
+    - http://localhost:9000/metrics
     scrape_interval_secs: 60
 
 transforms:
