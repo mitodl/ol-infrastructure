@@ -14,6 +14,7 @@ config:
     AI_MIT_SEARCH_DETAIL_URL: "https://rc.learn.mit.edu/?resource="
     AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
+    AI_PROMPT_CACHE_FUNCTION: "ai_chatbots.utils.get_django_cache"
     CELERY_TASK_ALWAYS_EAGER: "false"
     CSRF_ALLOWED_ORIGINS: '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qa.ol.mit.edu",
       "https://rc.learn.mit.edu", "https://api.rc.learn.mit.edu"]'
@@ -22,6 +23,8 @@ config:
     DEBUG: "false"
     DEV_ENV: "false"
     ENVIRONMENT: "rc"
+    LANGSMITH_PROJECT: "learn-ai-rc"
+    LANGSMITH_TRACING: "true"
     MITOL_APP_BASE_URL: "https://learn-ai-qa.ol.mit.edu"
     MITOL_COOKIE_DOMAIN: "ol.mit.edu"
     MITOL_COOKIE_NAME: "mitol"
