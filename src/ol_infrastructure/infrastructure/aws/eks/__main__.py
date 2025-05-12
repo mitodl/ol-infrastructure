@@ -1136,11 +1136,23 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                 # Disabled for traditional mode
                 "dataPlane": {
                     "enabled": False,
+                    "metrics": {
+                        "enabled": True,
+                        "serviceMonitor": {
+                            "enabled": True,
+                        },
+                    },
                 },
                 # --- Control Plane (Admin API) ---
                 # In traditional mode, this also handles gateway traffic
                 "controlPlane": {
                     "enabled": True,
+                    "metrics": {
+                        "enabled": True,
+                        "serviceMonitor": {
+                            "enabled": True,
+                        },
+                    },
                     "useDaemonSet": True,
                     "pdb": {
                         "create": False
