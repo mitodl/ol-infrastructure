@@ -833,7 +833,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.0,<0.29" },
     { name = "hvac", extras = ["parser"], specifier = ">=2.0.0,<3" },
     { name = "packaging", specifier = ">=24.2" },
-    { name = "parliament", specifier = "<=1.6.4" },
+    { name = "parliament", specifier = "!=1.6.4" },
     { name = "pulumi", specifier = ">=3.39.1,<4" },
     { name = "pulumi-aws", specifier = ">=6.0.0,<7" },
     { name = "pulumi-aws-native", specifier = ">=1.25.0,<2" },
@@ -889,7 +889,7 @@ wheels = [
 
 [[package]]
 name = "parliament"
-version = "1.6.4"
+version = "1.6.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "boto3" },
@@ -897,9 +897,9 @@ dependencies = [
     { name = "json-cfg" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a6/12/92bbf5db0eac6d901ccca51f001b64a4a57f8b06d7189147cd3c9ee570ce/parliament-1.6.4.tar.gz", hash = "sha256:ea6b930de2afd2f1591d5624b56b8c9361e746c76ce50a9586cab209054dfa4c", size = 610899, upload-time = "2025-04-25T18:02:00.272Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a6/3f/b7262b8a7c8d41c243950c5858cefc29652623599a6fafb2f753621b9702/parliament-1.6.3.tar.gz", hash = "sha256:13e0f21048c3f2f6dbc3e90035421a7f2e35eda55c829794ec3f410140ce6740", size = 533356, upload-time = "2024-07-26T14:14:27.717Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/09/a5/a2e7b5fc959fa2ce17d0612366b250f1bb33e33c69e72ab53aeec117a0c7/parliament-1.6.4-py3-none-any.whl", hash = "sha256:459a5870a8bc5fdfa07f55968d3d859f6ddd1d5464890f3a782cd0c4703b10fa", size = 634286, upload-time = "2025-04-25T18:01:58.81Z" },
+    { url = "https://files.pythonhosted.org/packages/65/18/3258de47a043dd19468387463a0264dde38c702e0b4f6ffc811a8133a914/parliament-1.6.3-py3-none-any.whl", hash = "sha256:f9022ce24243701e3bcd6a1f21b30c617ab12324c6e87e34e87774be1c53efa1", size = 554075, upload-time = "2024-07-26T14:13:38.383Z" },
 ]
 
 [[package]]
