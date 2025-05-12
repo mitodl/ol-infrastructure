@@ -557,6 +557,33 @@ for namespace in namespaces:
 export("namespaces", [*namespaces, "operations"])
 
 ############################################################
+# Install custom resource definitions for prometheus operator configs
+############################################################
+# Install CRDs for Prometheus Operator (ServiceMonitors and PodMonitors)
+# These are typically bundled with kube-prometheus-stack, but we install them separately
+# to allow other tools or lighter-weight Prometheus setups to use them.
+# CRD definitions from Prometheus Operator v0.73.2
+#
+# We install just the four custom resource definitions that alloy supports
+PROMETHEUS_OPERATOR_CRD_VERSION = "v0.73.2"
+PROMETHEUS_OPERATOR_CRD_BASE_URL = f"https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/{PROMETHEUS_OPERATOR_CRD_VERSION}/example/prometheus-operator-crd"
+
+prometheus_operator_crds = kubernetes.yaml.v2.ConfigGroup(
+    f"{cluster_name}-prometheus-operator-crds",
+    files=[
+        f"{PROMETHEUS_OPERATOR_CRD_BASE_URL}/monitoring.coreos.com_podmonitors.yaml",
+        f"{PROMETHEUS_OPERATOR_CRD_BASE_URL}/monitoring.coreos.com_servicemonitors.yaml",
+        f"{PROMETHEUS_OPERATOR_CRD_BASE_URL}/monitoring.coreos.com_prometheusrules.yaml",
+        f"{PROMETHEUS_OPERATOR_CRD_BASE_URL}/monitoring.coreos.com_probes.yaml",
+    ],
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        delete_before_replace=True,
+    ),
+)
+
+
+############################################################
 # Configure CSI Drivers
 ############################################################
 csi_driver_role_parliament_config = {
@@ -1022,6 +1049,13 @@ traefik_helm_release = kubernetes.helm.v3.Release(
                     "memory": "150Mi",
                 },
             },
+            "metrics": {
+                "prometheus": {
+                    "serviceMonitor": {
+                        "enabled": True,
+                    },
+                },
+            },
             "service": {
                 # These control the configuration of the network load balancer that EKS will create
                 # automatically and point at every traefik pod.
@@ -1041,7 +1075,13 @@ traefik_helm_release = kubernetes.helm.v3.Release(
         provider=k8s_provider,
         parent=operations_namespace,
         delete_before_replace=True,
-        depends_on=[cluster, node_groups[0], operations_namespace, gateway_api_crds],
+        depends_on=[
+            cluster,
+            node_groups[0],
+            operations_namespace,
+            gateway_api_crds,
+            prometheus_operator_crds,
+        ],
     ),
 )
 
