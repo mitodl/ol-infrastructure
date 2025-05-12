@@ -12,7 +12,7 @@ config:
   mitxonline:db_password:
     secure: v1:1SGxkH66kKNXMVc0:P9FztYdyzfxIrapGHU3pD5gz9ZkW6Of/zTqhaZf4O+L+Y8yAbcissYxogKfyDMxSJYSSUxI12K0=
   mitxonline:domain: "api.mitxonline.mit.edu"
-  mitxonline:k8s_deploy: "false"
+  mitxonline:k8s_deploy: "true"
   mitxonline:vars:
     AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-production"
     CRON_COURSE_CERTIFICATES_HOURS: "18"
