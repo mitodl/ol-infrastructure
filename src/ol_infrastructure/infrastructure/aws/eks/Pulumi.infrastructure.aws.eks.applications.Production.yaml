@@ -21,6 +21,9 @@ config:
   - "api-learn-ai.ol.mit.edu"
   - "api.learn.mit.edu"
   - "api.mitxonline.mit.edu"
+  eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
+  eks:developer_role_kubernetes_groups: ["admin"]
+  eks:developer_role_scope: "cluster"
   eks:ebs_csi_provisioner: "true"
   eks:efs_csi_provisioner: "true"
   eks:gateway_release_channel: "experimental"
