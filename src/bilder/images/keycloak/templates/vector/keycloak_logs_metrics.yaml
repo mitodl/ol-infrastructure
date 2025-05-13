@@ -16,6 +16,14 @@ transforms:
       .tags.application = "keycloak"
       .tags.service = "keycloak"
 
+      # Drop metrics if:
+      # 1. Name starts with "vendor_statistics_" AND service is "keycloak"
+      # OR
+      # 2. Name is "http_server_requests_seconds_bucket" AND service is "keycloak"
+      if (starts_with(.name, "vendor_statistics_") || .name == "http_server_requests_seconds_bucket") && .tags.service == "keycloak" {
+        abort
+      }
+
   parse_keycloak_logs:
     type: remap
     inputs:
