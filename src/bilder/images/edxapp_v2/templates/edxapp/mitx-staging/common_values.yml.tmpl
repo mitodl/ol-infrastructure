@@ -28,7 +28,7 @@ EMAIL_HOST_USER: {{ .Data.email_username }}
 FERNET_KEYS: {{ .Data.fernet_keys }}  # MODIFIED KEY - Needs to be an array
 redis_cache_config: &redis_cache_config
   BACKEND: django_redis.cache.RedisCache
-  LOCATION: rediss://default@edxapp-redis.service.consul:6379/0?ssl_check_hostname=false
+  LOCATION: rediss://default@{{ with node "edxapp-redis" }}{{ .Node.Address }}{{ end }}:6379:6379/0
   KEY_FUNCTION: common.djangoapps.util.memcache.safe_key
   OPTIONS:
     CLIENT_CLASS: django_redis.client.DefaultClient
@@ -186,7 +186,7 @@ CACHES:  # MODIFIED
       KEY_PREFIX: staticfiles
 CANVAS_BASE_URL: {{ key "edxapp/canvas-url" }}
 CELERYBEAT_SCHEDULER: redbeat.RedBeatScheduler  # MODIFIED
-CELERY_BROKER_HOSTNAME: edxapp-redis.service.consul:6379  # MODIFIED
+CELERY_BROKER_HOSTNAME: {{ with node "edxapp-redis" }}{{ .Node.Address }}{{ end }}:6379  # MODIFIED
 CELERY_BROKER_TRANSPORT: rediss  # MODIFIED - second "s" indicates "secure"
 CELERY_BROKER_USER: default # MODIFIED
 CELERY_BROKER_USE_SSL:  # MODIFIED
