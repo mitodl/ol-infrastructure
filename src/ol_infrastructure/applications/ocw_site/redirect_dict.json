@@ -357,6 +357,8 @@
   "/STS-081S17": "307|keep|https://{{AK_HOSTHEADER}}/courses/science-technology-and-society/sts-081-innovation-systems-for-science-technology-energy-manufacturing-and-health-spring-2017/",
   "/about/contactus": "301|keep|https://{{AK_HOSTHEADER}}/contact/",
   "/ans7870/21f/21f.027/home/index.html": "307|discard|https://visualizingcultures.mit.edu/",
+  "/ans7870/featured/mitx-courses-on-edx.htm": "301|discard|https://openlearning.mit.edu/courses-programs/mitx-courses/",
+  "/ans7870/resources/Strang/Edited/Calculus/Calculus.pdf": "301|discard|https://{{AK_HOSTHEADER}}/courses/res-18-001-calculus-fall-2023/pages/textbook/",
   "/comments": "307|discard|https://mitocw.zendesk.com/hc/en-us/articles/6636015233051-Comments-Policy-for-YouTube-and-Social-Media",
   "/courses": "307|keep|https://{{AK_HOSTHEADER}}/search/?s=department_course_numbers.sort_coursenum",
   "/courses/18-785-number-theory-i-fall-2019": "301|keep|https://{{AK_HOSTHEADER}}/courses/18-785-number-theory-i-fall-2021/",
@@ -480,6 +482,5 @@
   "/courses/intro-programming": "307|keep|https://{{AK_HOSTHEADER}}/collections/introductory-programming/",
   "/courses/transportation-courses": "307|keep|https://{{AK_HOSTHEADER}}/collections/transportation/",
   "/courses/ocw-scholar": "307|keep|https://{{AK_HOSTHEADER}}/course-lists/scholar-courses/",
-  "/fairuse": "301|keep|https://mitocw.zendesk.com/hc/en-us/articles/4414756181403-How-is-all-rights-reserved-content-different-from-the-rest-of-OCW-content/",
-  "/ans7870/featured/mitx-courses-on-edx.htm": "301|discard|https://openlearning.mit.edu/courses-programs/mitx-courses/"
+  "/fairuse": "301|keep|https://mitocw.zendesk.com/hc/en-us/articles/4414756181403-How-is-all-rights-reserved-content-different-from-the-rest-of-OCW-content/"
 }
