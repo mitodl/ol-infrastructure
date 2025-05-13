@@ -28,7 +28,7 @@ EMAIL_HOST_USER: {{ .Data.email_username }}
 FERNET_KEYS: {{ .Data.fernet_keys }}  # MODIFIED KEY - Needs to be an array
 redis_cache_config: &redis_cache_config
   BACKEND: django_redis.cache.RedisCache
-  LOCATION: rediss://default@edxapp-redis.service.consul:6379/0
+  LOCATION: rediss://default@edxapp-redis.service.consul:6379/0?ssl_check_hostname=false
   KEY_FUNCTION: common.djangoapps.util.memcache.safe_key
   OPTIONS:
     CLIENT_CLASS: django_redis.client.DefaultClient
