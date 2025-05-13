@@ -874,7 +874,7 @@ redis_cache_config = OLAmazonRedisConfig(
     )["redis_auth_token"],
     cluster_mode_enabled=False,
     encrypted=True,
-    engine_version="6.2",
+    engine_version="7.1",
     instance_type=redis_instance_type,
     num_instances=3,
     shard_count=1,
