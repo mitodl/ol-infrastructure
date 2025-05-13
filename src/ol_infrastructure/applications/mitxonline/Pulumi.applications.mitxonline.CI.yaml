@@ -24,7 +24,7 @@ config:
     MITX_ONLINE_BASE_URL: "https://ci.mitxonline.mit.edu"
     MITX_ONLINE_ENVIRONMENT: "rc"
     MITX_ONLINE_LOG_LEVEL: "INFO"
-    MITX_ONLINE_SECURE_SSL_HOST: "mitxonline-ci.mitxonline.mit.edu"
+    MITX_ONLINE_SECURE_SSL_HOST: "ci.mitxonline.mit.edu"
     OPENEDX_API_BASE_URL: "https://courses-qa.mitxonline.mit.edu" # Points to RC
     OPENEDX_OAUTH_PROVIDER: "ol-oauth2"
     OPENEDX_SOCIAL_LOGIN_PATH: "/auth/login/ol-oauth2/?auth_entry=login"
