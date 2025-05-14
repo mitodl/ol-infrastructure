@@ -368,6 +368,9 @@ alloy_env_vars_static_secret_config = OLVaultK8SStaticSecretConfig(
         "GRAFANA_CLOUD_LOKI_URL": '{{ get .Secrets "loki_endpoint" }}',
         "GRAFANA_CLOUD_LOKI_PASSWORD": '{{ get .Secrets "loki_api_key" }}',
         "GRAFANA_CLOUD_LOKI_USERNAME": '{{ get .Secrets "loki_user_id" }}',
+        "GRAFANA_CLOUD_PROMETHEUS_URL": '{{ get .Secrets "prometheus_endpoint" }}',
+        "GRAFANA_CLOUD_PROMETHEUS_PASSWORD": '{{ get .Secrets "prometheus_api_key" }}',
+        "GRAFANA_CLOUD_PROMETHEUS_USERNAME": '{{ get .Secrets "prometheus_user_id" }}',
         "GRAFANA_CLOUD_TEMPO_URL": '{{ get .Secrets "tempo_endpoint" }}',
         "GRAFANA_CLOUD_TEMPO_PASSWORD": '{{ get .Secrets "tempo_api_key" }}',
         "GRAFANA_CLOUD_TEMPO_USERNAME": '{{ get .Secrets "tempo_user_id" }}',
@@ -398,13 +401,50 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
     data={
         "config.alloy": textwrap.dedent(
             f"""
+            // ----------------------------------------------------------
+            // General configuration of loki
             logging {{
               level = "info"
               format = "logfmt"
             }}
 
-            // Collect all pod logs
-discovery.kubernetes "pods" {{
+            // ----------------------------------------------------------
+            // Discover servicemonitor and podmonitor resources in the
+            // cluster and ship their metrics to prometheus @ grafana cloud
+            prometheus.remote_write "publish_to_grafana" {{
+              endpoint {{
+                url = env("GRAFANA_CLOUD_PROMETHEUS_URL")
+                basic_auth {{
+                  username = env("GRAFANA_CLOUD_PROMETHEUS_USERNAME")
+                  password = env("GRAFANA_CLOUD_PROMETHEUS_PASSWORD")
+                }}
+              }}
+            }}
+
+            prometheus.operator.servicemonitors "servicemonitors" {{
+              forward_to = [prometheus.remote_write.publish_to_grafana.receiver]
+              // Drop metrics that start with go_
+              // These are usually metrics about the exporter itself rather than
+              // the application / service we are interested in.
+              rule {{
+                source_labels = ["__name__"]
+                regex         = "go_.*"
+                action        = "drop"
+              }}
+              // Add cluster label
+              rule {{
+                target_label = "cluster"
+                replacement  = "{cluster_name}"
+                action       = "replace"
+              }}
+            }}
+
+            // ----------------------------------------------------------
+            // Collect all pod logs and cluster events and ship to loki
+            // @ grafana cloud
+
+
+            discovery.kubernetes "pods" {{
               role = "pod"
             }}
 
@@ -550,6 +590,7 @@ discovery.kubernetes "pods" {{
               }}
             }}
 
+            // ----------------------------------------------------------
             // OpenTelemetry trace collection
             otelcol.receiver.otlp "kubernetes_traces" {{
               grpc {{
