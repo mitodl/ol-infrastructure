@@ -11,7 +11,7 @@ config:
   opensearch:domain_name: "omdq"
   opensearch:cluster_size: "3"
   opensearch:disk_size_gb: "60"
-  opensearch:engine_version: "OpenSearch_2.11"
+  opensearch:engine_version: "OpenSearch_2.19"
   opensearch:instance_type: t3.medium.search
   opensearch:public_web: "false"
   opensearch:secured_cluster: "true"
