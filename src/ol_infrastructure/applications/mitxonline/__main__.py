@@ -664,7 +664,7 @@ if mitxonline_config.get_bool("k8s_deploy"):
             celery_worker_configs=[
                 OLApplicationK8sCeleryWorkerConfig(
                     worker_name="default",
-                    queues=["default"],
+                    queues=["default", "hubspot_sync"],
                     resource_requests={"cpu": "500m", "memory": "1024Mi"},
                     resource_limits={"cpu": "1000m", "memory": "2048Mi"},
                 ),
