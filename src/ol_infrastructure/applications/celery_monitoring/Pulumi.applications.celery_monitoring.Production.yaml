@@ -17,7 +17,4 @@ config:
     - ocw-studio
     - xpro-production
     odl-devops:
-    - mitxonline-production
     - odl-open-discussions
-    ol-engineering-finance:
-    - mitopen-production
