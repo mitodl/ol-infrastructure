@@ -29,6 +29,7 @@ from bridge.lib.versions import (
     EFS_CSI_DRIVER_VERSION,
     EXTERNAL_DNS_CHART_VERSION,
     GATEWAY_API_VERSION,
+    PROMETHEUS_OPERATOR_CRD_VERSION,
     TRAEFIK_CHART_VERSION,
     VAULT_SECRETS_OPERATOR_CHART_VERSION,
 )
@@ -96,6 +97,9 @@ VERSIONS = {
     ),
     # K8S version is special, retrieve it from the AWS APIs
     "KUBERNETES": os.environ.get("KUBERNETES", get_cluster_version()),
+    "PROMETHEUS_OPERATOR": os.environ.get(
+        "PROMETHEUS_OPERATOR", PROMETHEUS_OPERATOR_CRD_VERSION
+    ),
 }
 
 # A global toleration to allow operators to run on nodes tainted as
@@ -562,11 +566,9 @@ export("namespaces", [*namespaces, "operations"])
 # Install CRDs for Prometheus Operator (ServiceMonitors and PodMonitors)
 # These are typically bundled with kube-prometheus-stack, but we install them separately
 # to allow other tools or lighter-weight Prometheus setups to use them.
-# CRD definitions from Prometheus Operator v0.73.2
 #
 # We install just the four custom resource definitions that alloy supports
-PROMETHEUS_OPERATOR_CRD_VERSION = "v0.73.2"
-PROMETHEUS_OPERATOR_CRD_BASE_URL = f"https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/{PROMETHEUS_OPERATOR_CRD_VERSION}/example/prometheus-operator-crd"
+PROMETHEUS_OPERATOR_CRD_BASE_URL = f"https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/{VERSIONS['PROMETHEUS_OPERATOR']}/example/prometheus-operator-crd"
 
 prometheus_operator_crds = kubernetes.yaml.v2.ConfigGroup(
     f"{cluster_name}-prometheus-operator-crds",

@@ -41,3 +41,5 @@ VANTAGE_K8S_AGENT_CHART_VERSION = "1.1.2"
 VAULT_SECRETS_OPERATOR_CHART_VERSION = "0.10.0"
 # renovate: datasource=docker depName=nginx
 NGINX_VERSION = "1.28.0"
+# renovate: datasource=github-releases depName=prometheus-operator packageName=prometheus-operator/prometheus-operator
+PROMETHEUS_OPERATOR_CRD_VERSION = "v0.73.2"
