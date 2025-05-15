@@ -437,11 +437,6 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
                 regex         = "go_.*"
                 action        = "drop"
               }}
-              rule {{
-                source_labels = ["__name__"]
-                regex         = "karpenter_cloudprovider_.*"
-                action        = "drop"
-              }}
               // Add cluster label
               rule {{
                 target_label = "cluster"

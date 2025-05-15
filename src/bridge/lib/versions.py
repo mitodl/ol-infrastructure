@@ -33,9 +33,9 @@ EXTERNAL_DNS_CHART_VERSION = "1.15.0"
 GATEWAY_API_VERSION = "v1.3.0"
 # renovate: datasource=docker depName=karpenter packageName=public.ecr.aws/karpenter/karpenter
 KARPENTER_CHART_VERSION = "1.4.0"
-# renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
 # renovate: datasource=docker depName=kube-state-metrics packageName=registry-1.docker.io/bitnamicharts/kube-state-metrics
 KUBE_STATE_METRICS_CHART_VERSION = "5.0.8"
+# renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
 TRAEFIK_CHART_VERSION = "35.2.0"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
 VANTAGE_K8S_AGENT_CHART_VERSION = "1.1.2"
