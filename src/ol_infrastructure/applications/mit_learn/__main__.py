@@ -93,6 +93,7 @@ cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info
 
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 apps_vpc = network_stack.require_output("applications_vpc")
+operations_vpc = network_stack.require_output("operations_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 
 vector_log_proxy_stack = StackReference(
@@ -1360,7 +1361,10 @@ redis_cluster_security_group = ec2.SecurityGroup(
     description="Access control for the mitlearn redis cluster.",
     ingress=[
         ec2.SecurityGroupIngressArgs(
-            security_groups=[mitlearn_app_security_group.id],
+            security_groups=[
+                mitlearn_app_security_group.id,
+                operations_vpc["security_groups"]["celery_monitoring"],
+            ],
             protocol="tcp",
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,

@@ -368,7 +368,10 @@ redis_cluster_security_group = ec2.SecurityGroup(
     description="Access control for the mitxonline redis cluster.",
     ingress=[
         ec2.SecurityGroupIngressArgs(
-            security_groups=[mitxonline_app_security_group.id],
+            security_groups=[
+                mitxonline_app_security_group.id,
+                operations_vpc["security_groups"]["celery_monitoring"],
+            ],
             protocol="tcp",
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,

@@ -90,6 +90,7 @@ vector_log_proxy_stack = StackReference(
 )
 
 apps_vpc = network_stack.require_output("applications_vpc")
+operations_vpc = network_stack.require_output("operations_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 learn_ai_environment = f"applications-{stack_info.env_suffix}"
 
@@ -547,7 +548,10 @@ redis_cluster_security_group = ec2.SecurityGroup(
     description="Access control for the learn-ai redis cluster.",
     ingress=[
         ec2.SecurityGroupIngressArgs(
-            security_groups=[learn_ai_application_security_group.id],
+            security_groups=[
+                learn_ai_application_security_group.id,
+                operations_vpc["security_groups"]["celery_monitoring"],
+            ],
             protocol="tcp",
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,
