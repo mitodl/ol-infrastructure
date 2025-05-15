@@ -101,6 +101,9 @@ stacks = [
     f"applications.edxapp.mitx.{stack_info.name}",
     f"applications.edxapp.mitx-staging.{stack_info.name}",
     f"applications.superset.{stack_info.name}",
+    f"applications.mitxonline.{stack_info.name}",
+    f"applications.mit_learn.{stack_info.name}",
+    f"applications.learn_ai.{stack_info.name}",
 ]
 # mitxonline CI is not up at the moment.
 if stack_info.name != "CI":

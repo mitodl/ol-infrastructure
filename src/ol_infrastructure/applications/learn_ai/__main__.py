@@ -19,6 +19,7 @@ from pulumi import (
     Output,
     ResourceOptions,
     StackReference,
+    export,
 )
 from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
 
@@ -1213,3 +1214,12 @@ if stack_info.env_suffix != "ci":
         plaintext_value=mitlearn_posthog_secrets["personal_api_key"],
         opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
     )
+
+export(
+    "learn_ai",
+    {
+        "rds_host": learn_ai_db.app_db.db_instance.address,
+        "redis": redis_cache.address,
+        "redis_token": redis_cache.cache_cluster.auth_token,
+    },
+)

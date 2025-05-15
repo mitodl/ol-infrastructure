@@ -17,7 +17,4 @@ config:
     - ocw-studio-rc
     - xpro-rc
     odl-devops:
-    - mitxonline-rc
     - odl-open-discussions-rc
-    ol-engineering-finance:
-    - mitopen-rc

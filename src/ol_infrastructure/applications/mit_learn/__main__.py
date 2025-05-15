@@ -1610,8 +1610,10 @@ learn_external_service_apisix_route = OLApisixRoute(
 
 
 export(
-    "mitopen",
+    "mit_learn",
     {
+        "redis": redis_cache.address,
+        "redis_token": redis_cache.cache_cluster.auth_token,
         "iam_policy": mitopen_iam_policy.arn,
         "vault_iam_role": Output.all(
             mitlearn_vault_iam_role.backend, mitlearn_vault_iam_role.name
