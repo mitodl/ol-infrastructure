@@ -56,6 +56,9 @@ def build_broker_subscriptions(
         return re.sub(r"[^a-zA-Z]", "", "".join(stack.split(".")[1:-1]))
 
     for stack, project_output in project_outputs:
+        app_name = stack_to_app(stack)
+        if app_name.endswith("mitx"):
+            app_name += "live"
         broker_subs.append(
             {
                 "broker": f"rediss://default:{project_output['redis_token']}@{project_output['redis']}:6379/1?ssl_cert_reqs=required",
@@ -64,7 +67,7 @@ def build_broker_subscriptions(
                 "queue": "leek.fanout",
                 "routing_key": "#",
                 "org_name": "MIT Open Learning Engineering",
-                "app_name": stack_to_app(stack),
+                "app_name": app_name,
                 "app_env": stack_info.env_suffix,
             }
         )
