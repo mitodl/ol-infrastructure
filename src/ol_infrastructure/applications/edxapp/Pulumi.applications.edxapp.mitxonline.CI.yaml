@@ -65,7 +65,7 @@ config:
     gradebook: gradebook
     learning: learn
     ora_grading: ora-grading
-  edxapp:google_analytics_id:
+  edxapp:google_analytics_id: ""
   edxapp:elb_healthcheck_interval: '30'
   edxapp:mail_domain: edxapp-mail-ci.mitxonline.mit.edu
   edxapp:proctortrack_url: https://preproduction.verificient.com
@@ -81,3 +81,5 @@ config:
   edxapp:web_node_capacity: "2"
   edxapp:worker_node_capacity: "1"
   mongodb:atlas_project_id: 6196c37185012b5319a42e16
+  edxapp:edx_xqueue_secrets:
+    secure: v1:dh6OMi07yWRUJk/B:uoUEEYflcgbAADKASHNMkuuyocGFon9KU/bwQj7hcfKXlv3iXYqyTcwD5D2rCRxKnWPvckSAvA4JR9sqhJ0DbIIH/4BkFApJ5XrBKjhUD6S7iACp/pLwjymlaXF5/OhAKdyNcByi2VdrB800oHww3BfhvltrD+2CW5pgGnYv/7+HEMtC7HvzWO2Npe/rZQQebBKK0yGvtg==
