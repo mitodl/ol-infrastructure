@@ -728,7 +728,7 @@ ksm_release = kubernetes.helm.v3.Release(
     kubernetes.helm.v3.ReleaseArgs(
         name="kube-state-metrics",
         chart="oci://registry-1.docker.io/bitnamicharts/kube-state-metrics",
-        version="5.0.8",
+        version=VERSIONS["KUBE_STATE_METRICS_VERSION"],
         namespace="operations",
         cleanup_on_fail=True,
         skip_await=True,
