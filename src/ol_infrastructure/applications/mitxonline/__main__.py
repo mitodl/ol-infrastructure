@@ -66,9 +66,10 @@ vault_config = Config("vault")
 
 stack_info = parse_stack()
 cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
-
+vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 apps_vpc = network_stack.require_output("applications_vpc")
+data_vpc = network_stack.require_output("data_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 operations_vpc = network_stack.require_output("operations_vpc")
 mitxonline_environment = f"mitxonline-{stack_info.env_suffix}"
@@ -220,7 +221,12 @@ mitxonline_db_security_group = ec2.SecurityGroup(
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
-            security_groups=[mitxonline_app_security_group.id],
+            security_groups=[
+                mitxonline_app_security_group.id,
+                data_vpc["security_groups"]["orchestrator"],
+                data_vpc["security_groups"]["integrator"],
+                vault_stack.require_output("vault_server")["security_group"],
+            ],
             description="Allow access from the app running in Kubernetes",
         )
     ],
