@@ -9,7 +9,10 @@ import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 
-from bridge.lib.versions import VANTAGE_K8S_AGENT_CHART_VERSION
+from bridge.lib.versions import (
+    KUBE_STATE_METRICS_CHART_VERSION,
+    VANTAGE_K8S_AGENT_CHART_VERSION,
+)
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
@@ -28,7 +31,10 @@ aws_account = aws.get_caller_identity()
 VERSIONS = {
     "VANTAGE_K8S_AGENT_VERSION": os.environ.get(
         "VANTAGE_K8S_AGENT_CHART_VERSION", VANTAGE_K8S_AGENT_CHART_VERSION
-    )
+    ),
+    "KUBE_STATE_METRICS_VERSION": os.environ.get(
+        "KUBE_STATE_METRICS_CHART_VERSION", KUBE_STATE_METRICS_CHART_VERSION
+    ),
 }
 
 stack_info = parse_stack()
@@ -713,6 +719,28 @@ alloy_release = kubernetes.helm.v3.Release(
         provider=k8s_provider,
         parent=k8s_provider,
         depends_on=[alloy_configmap],
+        delete_before_replace=True,
+    ),
+)
+
+ksm_release = kubernetes.helm.v3.Release(
+    f"{cluster_name}-kube-state-metrics-helm-release",
+    kubernetes.helm.v3.ReleaseArgs(
+        name="kube-state-metrics",
+        chart="oci://registry-1.docker.io/bitnamicharts/kube-state-metrics",
+        version=VERSIONS["KUBE_STATE_METRICS_VERSION"],
+        namespace="operations",
+        cleanup_on_fail=True,
+        skip_await=True,
+        values={
+            "serviceMonitor": {
+                "enabled": True,
+            },
+        },
+    ),
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=k8s_provider,
         delete_before_replace=True,
     ),
 )

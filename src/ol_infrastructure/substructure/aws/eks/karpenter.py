@@ -203,8 +203,8 @@ def setup_karpenter(  # noqa: PLR0913
                         "eks.amazonaws.com/role-arn": karpenter_trust_role.role.arn,
                     },
                 },
-                "serviceMonitor": {  # TODO: doesn't seem to work  # noqa: TD002, TD003, FIX002
-                    "enabled": True,
+                "serviceMonitor": {
+                    "enabled": False,  # works TOO well, need to find a good way to reduce # of metrics
                 },
                 "controller": {
                     "resources": {
