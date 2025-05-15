@@ -70,8 +70,6 @@ cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 apps_vpc = network_stack.require_output("applications_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
-
-mitxonline_vpc = network_stack.require_output("mitxonline_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
 mitxonline_environment = f"mitxonline-{stack_info.env_suffix}"
 
@@ -223,7 +221,7 @@ mitxonline_db_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
             security_groups=[mitxonline_app_security_group.id],
-            description="Allow access over the public internet from Heroku",
+            description="Allow access from the app running in Kubernetes",
         )
     ],
     egress=[
@@ -238,7 +236,7 @@ mitxonline_db_security_group = ec2.SecurityGroup(
     tags=aws_config.merged_tags(
         {"Name": "mitxonline-db-access-applications-{stack_info.env_suffix}"}
     ),
-    vpc_id=mitxonline_vpc["id"],
+    vpc_id=apps_vpc["id"],
 )
 
 db_defaults = {**defaults(stack_info)["rds"]}
@@ -249,7 +247,7 @@ db_instance_name = f"mitxonline-{stack_info.env_suffix}-app-db"
 mitxonline_db_config = OLPostgresDBConfig(
     instance_name=db_instance_name,
     password=mitxonline_config.require("db_password"),
-    subnet_group_name=mitxonline_vpc["rds_subnet"],
+    subnet_group_name=apps_vpc["rds_subnet"],
     security_groups=[mitxonline_db_security_group],
     engine_major_version="15",
     tags=aws_config.tags,
