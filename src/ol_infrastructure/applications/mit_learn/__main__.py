@@ -90,9 +90,10 @@ vault_config = Config("vault")
 stack_info = parse_stack()
 
 cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
-
+vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 apps_vpc = network_stack.require_output("applications_vpc")
+data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 
@@ -458,6 +459,16 @@ vault_k8s_resources = OLVaultK8SResources(
 )
 
 ### End vault resources
+# Create a security group for the application pods
+mitlearn_app_security_group = ec2.SecurityGroup(
+    f"mitlearn-app-sg-{stack_info.env_suffix}",
+    name=f"mitlearn-app-sg-{stack_info.env_suffix}",
+    description="Security group for mitlearn application pods",
+    egress=default_psg_egress_args,
+    ingress=get_default_psg_ingress_args(k8s_pod_subnet_cidrs=k8s_pod_subnet_cidrs),
+    tags=aws_config.tags,
+    vpc_id=apps_vpc["id"],
+)
 
 mitopen_db_security_group = ec2.SecurityGroup(
     f"ol-mitopen-db-access-{stack_info.env_suffix}",
@@ -467,8 +478,12 @@ mitopen_db_security_group = ec2.SecurityGroup(
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
-            cidr_blocks=["0.0.0.0/0"],
-            ipv6_cidr_blocks=["::/0"],
+            security_groups=[
+                mitlearn_app_security_group.id,
+                data_vpc["security_groups"]["orchestrator"],
+                data_vpc["security_groups"]["integrator"],
+                vault_stack.require_output("vault_server")["security_group"],
+            ],
             description="Allow access over the public internet from Heroku.",
         )
     ],
@@ -1335,18 +1350,6 @@ consul.Keys(
         )
     ],
     opts=mitxonline_consul_opts,
-)
-
-
-# Create a security group for the application pods
-mitlearn_app_security_group = ec2.SecurityGroup(
-    f"mitlearn-app-sg-{stack_info.env_suffix}",
-    name=f"mitlearn-app-sg-{stack_info.env_suffix}",
-    description="Security group for mitlearn application pods",
-    egress=default_psg_egress_args,
-    ingress=get_default_psg_ingress_args(k8s_pod_subnet_cidrs=k8s_pod_subnet_cidrs),
-    tags=aws_config.tags,
-    vpc_id=apps_vpc["id"],
 )
 
 # Redis / Elasticache
