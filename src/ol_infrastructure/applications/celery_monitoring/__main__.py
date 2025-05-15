@@ -67,7 +67,7 @@ def build_broker_subscriptions(
                 "queue": "leek.fanout",
                 "routing_key": "#",
                 "org_name": "MIT Open Learning Engineering",
-                "app_name": app_name,
+                "app_name": app_name[:15],
                 "app_env": stack_info.env_suffix,
             }
         )
