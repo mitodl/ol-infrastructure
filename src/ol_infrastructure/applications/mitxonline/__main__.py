@@ -444,7 +444,7 @@ mitxonline_k8s_app = OLApplicationK8s(
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
                 worker_name="default",
-                queues=["default", "hubspot_sync"],
+                queues=["celery", "hubspot_sync"],
                 resource_requests={"cpu": "500m", "memory": "1024Mi"},
                 resource_limits={"cpu": "1000m", "memory": "2048Mi"},
             ),
