@@ -1,5 +1,6 @@
 import base64
 import json
+import re
 import textwrap
 from pathlib import Path
 
@@ -46,21 +47,16 @@ policy_stack = StackReference("infrastructure.aws.policies")
 
 
 def build_broker_subscriptions(
-    project_outputs: list[Output],
+    project_outputs: list[tuple[str, Output]],
 ) -> str:
     """Create a dict of Redis cache configs for each edxapp stack"""
     broker_subs = []
 
-    deployment_name_map = {
-        "mitx": "mitxlive",
-        "mitxonline": "mitxonline",
-        "mitx-staging": "mitxstaging",
-        "xpro": "xpro",
-        "superset": "superset",
-    }
+    def stack_to_app(stack):
+        return re.sub(r"[^a-zA-Z]", "", "".join(stack.split(".")[1:-2]))
 
-    for project_output in project_outputs:
-        broker_subs.append(  # noqa: PERF401
+    for stack, project_output in project_outputs:
+        broker_subs.append(
             {
                 "broker": f"rediss://default:{project_output['redis_token']}@{project_output['redis']}:6379/1?ssl_cert_reqs=required",
                 "broker_management_url": None,
@@ -68,7 +64,7 @@ def build_broker_subscriptions(
                 "queue": "leek.fanout",
                 "routing_key": "#",
                 "org_name": "MIT Open Learning Engineering",
-                "app_name": deployment_name_map[project_output["deployment"]],
+                "app_name": stack_to_app(stack),
                 "app_env": stack_info.env_suffix,
             }
         )
@@ -100,21 +96,17 @@ stacks = [
     f"applications.edxapp.xpro.{stack_info.name}",
     f"applications.edxapp.mitx.{stack_info.name}",
     f"applications.edxapp.mitx-staging.{stack_info.name}",
+    f"applications.edxapp.mitxonline.{stack_info.name}",
     f"applications.superset.{stack_info.name}",
     f"applications.mitxonline.{stack_info.name}",
     f"applications.mit_learn.{stack_info.name}",
     f"applications.learn_ai.{stack_info.name}",
 ]
-# mitxonline CI is not up at the moment.
-if stack_info.name != "CI":
-    stacks.append(
-        f"applications.edxapp.mitxonline.{stack_info.name}",
-    )
 
-redis_outputs: list[Output] = []
+redis_outputs: list[tuple[str, Output]] = []
 for stack in stacks:
     project = stack.split(".")[1]
-    redis_outputs.append(StackReference(stack).require_output(project))
+    redis_outputs.append((stack, StackReference(stack).require_output(project)))
 redis_broker_subscriptions = Output.all(*redis_outputs).apply(
     build_broker_subscriptions
 )
