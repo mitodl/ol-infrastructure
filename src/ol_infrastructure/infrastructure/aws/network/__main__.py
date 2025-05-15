@@ -82,7 +82,7 @@ apps_config = Config("apps_vpc")
 applications_vpc_config = OLVPCConfig(
     vpc_name=f"applications-{stack_info.env_suffix}",
     cidr_block=apps_config.require("cidr_block"),
-    num_subnets=4,
+    num_subnets=5,
     tags={
         "OU": "operations",
         "Environment": f"applications-{stack_info.env_suffix}",
