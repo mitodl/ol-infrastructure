@@ -53,7 +53,7 @@ def build_broker_subscriptions(
     broker_subs = []
 
     def stack_to_app(stack):
-        return re.sub(r"[^a-zA-Z]", "", "".join(stack.split(".")[1:-2]))
+        return re.sub(r"[^a-zA-Z]", "", "".join(stack.split(".")[1:-1]))
 
     for stack, project_output in project_outputs:
         broker_subs.append(
