@@ -1446,6 +1446,7 @@ mitlearn_k8s_app = OLApplicationK8s(
         resource_limits={"cpu": "1000m", "memory": "1600Mi"},
         init_migrations=True,  # Assuming Django app needs migrations
         init_collectstatic=True,  # Assuming Django app needs collectstatic
+        probe_configs={},
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
                 worker_name="default",
