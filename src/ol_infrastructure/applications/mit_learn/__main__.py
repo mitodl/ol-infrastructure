@@ -484,6 +484,12 @@ mitopen_db_security_group = ec2.SecurityGroup(
                 data_vpc["security_groups"]["integrator"],
                 vault_stack.require_output("vault_server")["security_group"],
             ],
+            # Airbyte isn't using pod security groups in Kubernetes. This is a
+            # workaround to allow for data integration from the data Kubernetes
+            # cluster. (TMM 2025-05-16)
+            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"].apply(
+                lambda pod_cidrs: [*pod_cidrs]
+            ),
             description="Allow access over the public internet from Heroku.",
         )
     ],
