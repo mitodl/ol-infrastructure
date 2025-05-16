@@ -131,22 +131,59 @@ class OLApplicationK8sConfig(BaseModel):
     init_migrations: bool = Field(default=True)
     init_collectstatic: bool = Field(default=True)
     celery_worker_configs: list[OLApplicationK8sCeleryWorkerConfig] = []
+    probe_configs: dict[str, kubernetes.core.v1.ProbeArgs] = {
+        # Liveness probe to check if the application is still running
+        "liveness_probe": kubernetes.core.v1.ProbeArgs(
+            http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                path="/health/liveness/",
+                port=DEFAULT_UWSGI_PORT,
+            ),
+            initial_delay_seconds=30,  # Wait 30 seconds before first probe
+            period_seconds=30,
+            failure_threshold=3,  # Consider failed after 3 attempts
+        ),
+        # Readiness probe to check if the application is ready to serve traffic
+        "readiness_probe": kubernetes.core.v1.ProbeArgs(
+            http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                path="/health/readiness/",
+                port=DEFAULT_UWSGI_PORT,
+            ),
+            initial_delay_seconds=15,  # Wait 15 seconds before first probe
+            period_seconds=15,
+            failure_threshold=3,  # Consider failed after 3 attempts
+        ),
+        # Startup probe to ensure the application is fully initialized before other probes start
+        "startup_probe": kubernetes.core.v1.ProbeArgs(
+            http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                path="/health/startup/",
+                port=DEFAULT_UWSGI_PORT,
+            ),
+            initial_delay_seconds=10,  # Wait 10 seconds before first probe
+            period_seconds=10,  # Probe every 10 seconds
+            failure_threshold=30,  # Allow up to 5 minutes (30 * 10s) for startup
+            success_threshold=1,
+            timeout_seconds=5,
+        ),
+    }
 
     # See https://www.pulumi.com/docs/reference/pkg/python/pulumi/#pulumi.Output.from_input
     # for docs. This unwraps the value so Pydantic can store it in the config class.
     @field_validator("application_security_group_id")
     @classmethod
     def validate_sec_group_id(cls, application_security_group_id: Output[str]):
+        """Ensure that the security group ID is unwrapped from the Pulumi Output."""
         return Output.from_input(application_security_group_id)
 
     @field_validator("application_security_group_name")
     @classmethod
     def validate_sec_group_name(cls, application_security_group_name: Output[str]):
+        """Ensure that the security group name is unwrapped from the Pulumi Output."""
         return Output.from_input(application_security_group_name)
 
     @field_validator("application_config")
     @classmethod
     def validate_application_config(cls, application_config: dict[str, Any]):
+        """Ensure that all application config values are strings."""
         # Convert all values to strings because that is what k8s expects.
         return {key: str(value) for key, value in application_config.items()}
 
@@ -427,6 +464,7 @@ class OLApplicationK8s(ComponentResource):
                                 env=application_deployment_env_vars,
                                 env_from=application_deployment_envfrom,
                                 volume_mounts=webapp_volume_mounts,
+                                **ol_app_k8s_config.probe_configs,
                             ),
                         ],
                     ),
@@ -684,6 +722,7 @@ class OLApisixRouteConfig(BaseModel):
 
     @model_validator(mode="after")
     def check_backend_or_upstream(self) -> "OLApisixRouteConfig":
+        """Ensure that either upstream or backend service details are provided, not both."""
         upstream: str | None = self.upstream
         backend_service_name: str | None = self.backend_service_name
         backend_service_port: str | None = self.backend_service_port
@@ -712,6 +751,7 @@ class OLApisixRoute(pulumi.ComponentResource):
         k8s_labels: dict[str, str],
         opts: pulumi.ResourceOptions | None = None,
     ):
+        """Initialize the OLApisixRoute component resource."""
         super().__init__(
             "ol:infrastructure:services:k8s:OLApisixRoute", name, None, opts
         )
@@ -805,6 +845,7 @@ class OLApisixOIDCResources(pulumi.ComponentResource):
         oidc_config: OLApisixOIDCConfig,
         opts: pulumi.ResourceOptions | None = None,
     ):
+        """Initialize the OLApisixOIDCResources component resource."""
         super().__init__(
             "ol:infrastructure:services:k8s:OLApisixOIDCResources", name, None, opts
         )
@@ -868,12 +909,14 @@ class OLApisixOIDCResources(pulumi.ComponentResource):
             )
 
     def get_base_oidc_config(self, unauth_action: str) -> dict[str, Any]:
+        """Return the base OIDC configuration dictionary."""
         return {
             **self.base_oidc_config,
             "unauth_action": unauth_action,
         }
 
     def get_full_oidc_plugin_config(self, unauth_action: str) -> dict[str, Any]:
+        """Return the full OIDC plugin configuration dictionary for Apisix."""
         return {
             "name": "openid-connect",
             "enable": True,
@@ -906,6 +949,7 @@ class OLApisixSharedPlugins(pulumi.ComponentResource):
         plugin_config: OLApisixSharedPluginsConfig,
         opts: pulumi.ResourceOptions | None = None,
     ):
+        """Initialize the OLApisixSharedPlugins component resource."""
         super().__init__(
             "ol:infrastructure:services:k8s:OLApisixSharedPlugin", name, None, opts
         )
@@ -990,6 +1034,7 @@ class OLApisixExternalUpstream(pulumi.ComponentResource):
         external_upstream_config: OLApisixExternalUpstreamConfig,
         opts: pulumi.ResourceOptions | None = None,
     ):
+        """Initialize the OLApisixExternalUpstream component resource."""
         super().__init__(
             "ol:infrastructure:services:k8s:OLApisixExternalUpstream", name, None, opts
         )
