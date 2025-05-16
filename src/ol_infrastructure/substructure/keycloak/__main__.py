@@ -127,6 +127,17 @@ ol_platform_engineering_realm = keycloak.Realm(
     opts=resource_options,
 )
 
+ol_platform_engineering_realm_events = keycloak.RealmEvents(
+    "realmEvents",
+    realm_id=ol_platform_engineering_realm.realm,
+    events_enabled=True,
+    events_expiration=SECONDS_IN_ONE_DAY,
+    admin_events_enabled=True,
+    admin_events_details_enabled=True,
+    events_listeners=["jboss-logging"],
+    opts=resource_options,
+)
+
 required_action_configure_otp = keycloak.RequiredAction(
     "configure-totp",
     realm_id=ol_platform_engineering_realm.realm,
@@ -495,6 +506,17 @@ ol_data_platform_realm = keycloak.Realm(
     offline_session_idle_timeout="168h",
     sso_session_idle_timeout="2h",
     sso_session_max_lifespan="24h",
+    opts=resource_options,
+)
+
+ol_data_platform_realm_events = keycloak.RealmEvents(
+    "realmEvents",
+    realm_id=ol_data_platform_realm.realm,
+    events_enabled=True,
+    events_expiration=SECONDS_IN_ONE_DAY,
+    admin_events_enabled=True,
+    admin_events_details_enabled=True,
+    events_listeners=["jboss-logging"],
     opts=resource_options,
 )
 

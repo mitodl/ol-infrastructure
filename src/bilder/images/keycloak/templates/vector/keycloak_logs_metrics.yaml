@@ -3,7 +3,7 @@ sources:
   collect_keycloak_metrics:
     type: prometheus_scrape
     endpoints:
-    - http://localhost:{{ context.keycloak_prometheus_port }}/realms/master/metrics
+    - http://localhost:9000/metrics
     scrape_interval_secs: 60
 
 transforms:
@@ -15,6 +15,14 @@ transforms:
       .tags.environment = "${ENVIRONMENT}"
       .tags.application = "keycloak"
       .tags.service = "keycloak"
+
+      # Drop metrics if:
+      # 1. Name starts with "vendor_statistics_" AND service is "keycloak"
+      # OR
+      # 2. Name is "http_server_requests_seconds_bucket" AND service is "keycloak"
+      if (starts_with(.name, "vendor_statistics_") || .name == "http_server_requests_seconds_bucket") && .tags.service == "keycloak" {
+        abort
+      }
 
   parse_keycloak_logs:
     type: remap
