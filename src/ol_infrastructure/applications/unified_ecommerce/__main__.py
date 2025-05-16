@@ -664,6 +664,7 @@ ecommerce_k8s_config: OLApplicationK8sConfig = OLApplicationK8sConfig(
     application_docker_tag=UNIFIED_ECOMMERCE_DOCKER_TAG,
     vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
     import_nginx_config=True,
+    probe_configs={},
 )
 
 ol_k8s_application = OLApplicationK8s(
