@@ -136,7 +136,7 @@ class OLApplicationK8sConfig(BaseModel):
         "liveness_probe": kubernetes.core.v1.ProbeArgs(
             http_get=kubernetes.core.v1.HTTPGetActionArgs(
                 path="/health/liveness/",
-                port=DEFAULT_UWSGI_PORT,
+                port=DEFAULT_NGINX_PORT,
             ),
             initial_delay_seconds=30,  # Wait 30 seconds before first probe
             period_seconds=30,
@@ -146,7 +146,7 @@ class OLApplicationK8sConfig(BaseModel):
         "readiness_probe": kubernetes.core.v1.ProbeArgs(
             http_get=kubernetes.core.v1.HTTPGetActionArgs(
                 path="/health/readiness/",
-                port=DEFAULT_UWSGI_PORT,
+                port=DEFAULT_NGINX_PORT,
             ),
             initial_delay_seconds=15,  # Wait 15 seconds before first probe
             period_seconds=15,
@@ -156,7 +156,7 @@ class OLApplicationK8sConfig(BaseModel):
         "startup_probe": kubernetes.core.v1.ProbeArgs(
             http_get=kubernetes.core.v1.HTTPGetActionArgs(
                 path="/health/startup/",
-                port=DEFAULT_UWSGI_PORT,
+                port=DEFAULT_NGINX_PORT,
             ),
             initial_delay_seconds=10,  # Wait 10 seconds before first probe
             period_seconds=10,  # Probe every 10 seconds
