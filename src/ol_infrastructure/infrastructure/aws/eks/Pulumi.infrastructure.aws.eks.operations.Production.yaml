@@ -12,7 +12,8 @@ config:
   eks:ebs_csi_provisioner: true
   eks:efs_csi_provisioner: true
   eks:gateway_release_channel: "experimental"
-  eks:namespaces: []
+  eks:namespaces:
+  - keycloak
   eks:nodegroups:
     worker-xlarge:
       instance_type: "r7a.xlarge"
