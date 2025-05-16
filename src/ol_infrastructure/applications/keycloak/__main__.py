@@ -10,6 +10,7 @@ from pathlib import Path
 import pulumi_consul as consul
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
+import requests
 import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import acm, ec2, get_caller_identity, iam, route53
@@ -115,7 +116,32 @@ keycloak_operator_crds = kubernetes.yaml.v2.ConfigGroup(
     ),
 )
 
-# Install the keycloak resources
+# We need to do some janky stuff to set a namespace on the resources pulled
+# down from the github
+
+# First pull the raw file from github
+response = requests.get(f"{KEYCLOAK_OPERATOR_CRD_BASE_URL}/kubernetes.yml")  # noqa: S113
+content = response.content.decode("utf-8")
+raw_resource_documents = yaml.safe_load_all(content)
+
+# safe_load_all returns a generator, so loop over it to make a normal list
+# for normal people
+keycloak_resource_list = [doc for doc in raw_resource_documents if doc is not None]
+
+# Update metadata.namespace for each resource to ensure it is created in
+# the keycloak namespace
+for resource in keycloak_resource_list:
+    resource["metadata"]["namespace"] = keycloak_namespace
+
+# Finally, create the resources
+keycloak_resources = kubernetes.yaml.v2.ConfigGroup(
+    f"{env_name}-keycloak-resources",
+    objs=keycloak_resource_list,
+    opts=ResourceOptions(
+        depends_on=[keycloak_operator_crds],
+        delete_before_replace=False,
+    ),
+)
 
 # IAM and instance profile
 keycloak_instance_role = iam.Role(
