@@ -11,6 +11,7 @@ services:
     - --proxy-headers=xforwarded
     - --cache-stack=postgres-jdbc-ping-tcp
     - --cache-config-file=cache-ispn-jdbc-ping.xml
+    - --features=organization
     env_file:
     - ./.env
     labels:

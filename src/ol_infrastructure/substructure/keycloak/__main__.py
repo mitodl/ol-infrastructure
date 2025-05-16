@@ -447,15 +447,17 @@ ol_data_platform_realm = keycloak.Realm(
     display_name="OL Data",
     display_name_html="<b>OL Data</b>",
     enabled=True,
-    login_theme="keycloak",
+    account_theme="keycloak.v3",
+    admin_theme="keycloak.v2",
+    login_theme="keycloak.v2",
+    email_theme="keycloak",
+    registration_email_as_username=True,
+    login_with_email_allowed=True,
     duplicate_emails_allowed=False,
     realm="ol-data-platform",
     reset_password_allowed=False,
     verify_email=False,
     registration_allowed=False,
-    password_policy=(  # noqa: S106 # pragma: allowlist secret
-        "length(16) and forceExpiredPasswordChange(365)  and notUsername and notEmail"
-    ),
     security_defenses=keycloak.RealmSecurityDefensesArgs(
         brute_force_detection=keycloak.RealmSecurityDefensesBruteForceDetectionArgs(
             failure_reset_time_seconds=43200,
@@ -496,7 +498,93 @@ ol_data_platform_realm = keycloak.Realm(
     sso_session_idle_timeout="2h",
     sso_session_max_lifespan="24h",
     opts=resource_options,
+    web_authn_passwordless_policy={
+        "relying_party_entity_name": f"mit-ol-sso-{stack_info.env_suffix}",
+        "relying_party_id": f"sso-{stack_info.env_suffix}.ol.mit.edu",
+        "require_resident_key": "Yes",
+        "user_verification_requirement": "required",
+    },
 )
+
+ol_data_platforme_realm_events = keycloak.RealmEvents(
+    "ol-data-platforme-realm-events",
+    realm_id=ol_data_platform_realm.realm,
+    events_enabled=True,
+    events_expiration=604800,
+    admin_events_enabled=True,
+    admin_events_details_enabled=True,
+    enabled_event_types=[],
+    events_listeners=["jboss-logging"],
+)
+
+ol_data_required_action_configure_otp = keycloak.RequiredAction(
+    "webauthn-register-passwordless",
+    realm_id=ol_data_platform_realm.realm,
+    alias="webauthn-register-passwordless",
+    default_action=True,
+    enabled=True,
+    name="Webauthn Register Passwordless",
+    opts=resource_options,
+)
+
+ol_data_required_action_verify_email = keycloak.RequiredAction(
+    "ol-data-verify-email",
+    realm_id=ol_platform_engineering_realm.realm,
+    alias="VERIFY_EMAIL",
+    default_action=False,
+    enabled=False,
+    opts=resource_options,
+)
+
+# OL Data - Passwordless Browser login flow with [START]
+ol_data_passwordless_browser_flow = keycloak.authentication.Flow(
+    "ol-data-passwordless-browser-flow",
+    realm_id=ol_data_platform_realm.id,
+    alias="ol-data-passwordless-browser-flow",
+    opts=resource_options,
+)
+ol_data_passwordless_browser_flow_cookie = keycloak.authentication.Execution(
+    "ol-data-passwordless-browser-flow-cookie",
+    parent_flow_alias=ol_data_passwordless_browser_flow.alias,
+    authenticator="auth-cookie",
+    realm_id=ol_data_platform_realm.realm,
+    requirement="ALTERNATIVE",
+    opts=resource_options,
+)
+ol_data_passwordless_browser_flow_webauthn_flow = keycloak.authentication.Subflow(
+    "ol-data-passwordless-browser-flow-webauthn-flow",
+    realm_id=ol_data_platform_realm.id,
+    alias="ol-data-passwordless-browser-flow-webauthn-flow",
+    parent_flow_alias=ol_data_passwordless_browser_flow.alias,
+    provider_id="basic-flow",
+    requirement="ALTERNATIVE",
+    opts=resource_options,
+)
+ol_data_passwordless_browser_flow_username_form = keycloak.authentication.Execution(
+    "ol-data-passwordless-browser-flow-username-form",
+    parent_flow_alias=ol_data_passwordless_browser_flow_webauthn_flow.alias,
+    authenticator="auth-username-form",
+    realm_id=ol_data_platform_realm.realm,
+    requirement="REQUIRED",
+    opts=resource_options,
+)
+ol_data_passwordless_browser_flow_webauthn_passwordless_auth = (
+    keycloak.authentication.Execution(
+        "ol-data-passwordless-browser-flow-webauthn-passwordless-auth",
+        parent_flow_alias=ol_data_passwordless_browser_flow_webauthn_flow.alias,
+        authenticator="webauthn-authenticator-passwordless",
+        realm_id=ol_data_platform_realm.realm,
+        requirement="REQUIRED",
+        opts=resource_options,
+    )
+)
+ol_data_passwordless_browser_flow_binding = keycloak.authentication.Bindings(
+    "ol-data-passwordless-browser-flow-binding",
+    browser_flow=ol_data_passwordless_browser_flow.alias,
+    realm_id=ol_data_platform_realm.realm,
+    opts=resource_options,
+)
+# OL - Passwordless Browser login flow [END]
 
 # OL Data - First login flow [START]
 # Does not require email verification or confirmation to connect with existing account.
@@ -562,6 +650,7 @@ ol_data_touchstone_user_creation_or_linking_subflow_automatically_set_existing_u
 ol_data_platform_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
     "ol-data-touchstone-idp",
     realm=ol_data_platform_realm.id,
+    enabled=False,
     alias="touchstone-idp",
     display_name="MIT Touchstone",
     entity_id=f"{keycloak_url}/realms/ol-data-platform",
@@ -1101,14 +1190,17 @@ ol_data_platform_superset_client = keycloak.openid.Client(
 ol_data_platform_superset_client_roles = keycloak_realm_config.get_object(
     "ol-data-platform-superset-client-roles"
 )
+ol_data_platform_superset_client_role_refs = {}
 for role in ol_data_platform_superset_client_roles:
-    keycloak.Role(
+    role_ref = keycloak.Role(
         f"ol-data-platform-superset-client-{role}",
         name=role,
         realm_id="ol-data-platform",
         client_id=ol_data_platform_superset_client.id,
         opts=resource_options,
     )
+    ol_data_platform_superset_client_role_refs[role] = role_ref
+
 ol_data_platform_superset_client_data = vault.generic.Secret(
     "ol-data-platform-superset-client-vault-oidc-credentials",
     path="secret-operations/sso/superset",
@@ -1129,6 +1221,73 @@ ol_data_platform_superset_client_data = vault.generic.Secret(
         ),
     ).apply(json.dumps),
 )
+
+# Create realm roles for ol-data-platform
+ol_data_platform_eng_data_role = keycloak.Role(
+    "ol-data-platform-eng-data-role",
+    realm_id=ol_data_platform_realm.id,
+    name="ol-eng-data",
+    description="OL Engineering Data role - maps to superset_admin",
+    composite_roles=[ol_data_platform_superset_client_role_refs["superset_admin"].id],
+    opts=resource_options,
+)
+
+ol_data_platform_eng_developer_role = keycloak.Role(
+    "ol-data-platform-eng-developer-role",
+    realm_id=ol_data_platform_realm.id,
+    name="ol-eng-developer",
+    description="OL Engineering Developer role - maps to superset_alpha",
+    composite_roles=[ol_data_platform_superset_client_role_refs["superset_alpha"].id],
+    opts=resource_options,
+)
+
+ol_data_platform_eng_reporter_role = keycloak.Role(
+    "ol-data-platform-eng-reporter-role",
+    realm_id=ol_data_platform_realm.id,
+    name="ol-eng-reporter",
+    description="OL Engineering Reporter role - maps to superset_gamma",
+    composite_roles=[ol_data_platform_superset_client_role_refs["superset_gamma"].id],
+    opts=resource_options,
+)
+
+ol_data_platform_role_keys_openid_client_scope = keycloak.openid.ClientScope(
+    "ol-data-platform-role-keys-openid-client-scope",
+    realm_id=ol_data_platform_realm.id,
+    name="roles",
+    description="Scope will map a user's group memberships to a claim",
+    include_in_token_scope=True,
+    opts=resource_options,
+)
+
+ol_data_platform_role_keys_openid_client_scope_mapper = (
+    keycloak.openid.UserClientRoleProtocolMapper(
+        "ol-data-platform-role-keys-openid-client-scope-mapper",
+        claim_name="role_keys",
+        realm_id=ol_data_platform_realm.id,
+        add_to_access_token=True,
+        add_to_id_token=True,
+        add_to_userinfo=True,
+        claim_value_type="String",
+        client_id_for_role_mappings="ol-superset-client",
+        client_scope_id=ol_data_platform_role_keys_openid_client_scope.id,
+        multivalued=True,
+        name="role_keys",
+    )
+)
+
+ol_data_platform_superset_client_scope = keycloak.openid.ClientDefaultScopes(
+    "ol-data-platform-superset-client-default-scopes",
+    realm_id="ol-data-platform",
+    client_id=ol_data_platform_superset_client.id,
+    default_scopes=[
+        "acr",
+        "email",
+        "profile",
+        "roles",
+        "web-origins",
+    ],
+)
+
 # SUPERSET [END] # noqa: ERA001
 
 # OPENMETADATA [START] # noqa: ERA001
