@@ -83,6 +83,11 @@ class OLAppDatabase(ComponentResource):
             opts=opts,
         )
 
+        network_stack = StackReference(
+            name=f"db_network_stack_reference_{ol_db_config.app_db_name}",
+            stack_name=f"infrastructure.aws.network.{stack_info.name}",
+        )
+        data_vpc = network_stack.require_output("data_vpc")
         vault_stack = StackReference(
             name=f"db_vault_stack_reference_{ol_db_config.app_db_name}",
             stack_name=f"infrastructure.vault.operations.{stack_info.name}",
@@ -105,10 +110,16 @@ class OLAppDatabase(ComponentResource):
                         consul_stack.require_output("security_groups")["consul_server"],
                         vault_stack.require_output("vault_server")["security_group"],
                     ],
+                    # Airbyte isn't using pod security groups in Kubernetes. This is a
+                    # workaround to allow for data integration from the data Kubernetes
+                    # cluster. (TMM 2025-05-16)
+                    cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"].apply(
+                        lambda pod_cidrs: [*pod_cidrs]
+                    ),
                     protocol="tcp",
                     from_port=DEFAULT_POSTGRES_PORT,
                     to_port=DEFAULT_POSTGRES_PORT,
-                    description="Access to postgres from consul and vault.",
+                    description="Access to postgres from consul, airbyte, and vault.",
                 ),
                 ec2.SecurityGroupIngressArgs(
                     security_groups=[ol_db_config.app_security_group],
@@ -133,7 +144,6 @@ class OLAppDatabase(ComponentResource):
             subnet_group_name=ol_db_config.app_vpc["rds_subnet"],
             security_groups=[self.db_security_group],
             storage=ol_db_config.app_db_capacity or AWS_RDS_DEFAULT_DATABASE_CAPACITY,
-            engine_major_version="16",
             tags=ol_db_config.aws_config.tags,
             db_name=ol_db_config.app_db_name,
             **defaults(stack_info)["rds"],
