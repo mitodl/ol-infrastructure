@@ -45,3 +45,6 @@ VAULT_SECRETS_OPERATOR_CHART_VERSION = "0.10.0"
 NGINX_VERSION = "1.28.0"
 # renovate: datasource=github-releases depName=prometheus-operator packageName=prometheus-operator/prometheus-operator
 PROMETHEUS_OPERATOR_CRD_VERSION = "v0.82.2"
+
+# renovate: datasource=github-releases depName=prometheus-operator packageName=prometheus-operator/prometheus-operator
+KEYCLOAK_OPERATOR_CRD_VERSION = "26.2.4"

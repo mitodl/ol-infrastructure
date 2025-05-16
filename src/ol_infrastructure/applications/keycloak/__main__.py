@@ -8,6 +8,7 @@ from itertools import chain
 from pathlib import Path
 
 import pulumi_consul as consul
+import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
@@ -19,6 +20,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
 )
+from bridge.lib.versions import KEYCLOAK_OPERATOR_CRD_VERSION
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
@@ -35,9 +37,18 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
+from ol_infrastructure.lib.aws.eks_helper import (
+    check_cluster_namespace,
+    setup_k8s_provider,
+)
 from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_records
 from ol_infrastructure.lib.consul import consul_key_helper, get_consul_provider
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.ol_types import (
+    AWSBase,
+    BusinessUnit,
+    K8sGlobalLabels,
+    Services,
+)
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -49,6 +60,7 @@ stack_info = parse_stack()
 
 aws_account = get_caller_identity()
 
+cluster_stack = StackReference(f"infrastructure.aws.eks.operations.{stack_info.name}")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
@@ -66,6 +78,15 @@ data_vpc = network_stack.require_output("data_vpc")
 mitol_zone_id = dns_stack.require_output("ol")["id"]
 keycloak_domain = keycloak_config.get("domain")
 
+k8s_global_labels = K8sGlobalLabels(
+    ou=BusinessUnit.operations, service=Services.keycloak, stack=stack_info
+).model_dump()
+setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
+keycloak_namespace = "keycloak"
+cluster_stack.require_output("namespaces").apply(
+    lambda ns: check_cluster_namespace(keycloak_namespace, ns)
+)
+
 # TODO MD 20230206  # noqa: FIX002, TD002, TD003, TD004
 # This might be needed in the future but right now it just causes errors
 secrets = read_yaml_secrets(Path(f"keycloak/data.{stack_info.env_suffix}.yaml"))
@@ -79,6 +100,22 @@ aws_config = AWSBase(
 consul_provider = get_consul_provider(stack_info)
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+
+# Install custom resource definitions for the keycloak operator
+KEYCLOAK_OPERATOR_CRD_BASE_URL = f"https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/{KEYCLOAK_OPERATOR_CRD_VERSION}/kubernetes"
+
+keycloak_operator_crds = kubernetes.yaml.v2.ConfigGroup(
+    f"{env_name}-keycloak-operator-crds",
+    files=[
+        f"{KEYCLOAK_OPERATOR_CRD_BASE_URL}/keycloaks.k8s.keycloak.org-v1.yml",
+        f"{KEYCLOAK_OPERATOR_CRD_BASE_URL}/keycloakrealmimports.k8s.keycloak.org-v1.yml",
+    ],
+    opts=ResourceOptions(
+        delete_before_replace=False,
+    ),
+)
+
+# Install the keycloak resources
 
 # IAM and instance profile
 keycloak_instance_role = iam.Role(
