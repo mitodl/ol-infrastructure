@@ -32,6 +32,13 @@ from ol_infrastructure.components.aws.auto_scale_group import (
     OLTargetGroupConfig,
     TagSpecification,
 )
+from ol_infrastructure.components.services.vault import (
+    OLVaultK8SDynamicSecretConfig,
+    OLVaultK8SResources,
+    OLVaultK8SResourcesConfig,
+    OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
+)
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -57,6 +64,7 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 setup_vault_provider()
 
 keycloak_config = Config("keycloak")
+vault_config = Config("vault")
 stack_info = parse_stack()
 
 aws_account = get_caller_identity()
@@ -102,7 +110,8 @@ consul_provider = get_consul_provider(stack_info)
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
-# Install custom resource definitions for the keycloak operator
+# Install the keycloak operator into k8s
+# download custom resource definitions for the keycloak operator
 KEYCLOAK_OPERATOR_CRD_BASE_URL = f"https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/{KEYCLOAK_OPERATOR_CRD_VERSION}/kubernetes"
 
 keycloak_operator_crds = kubernetes.yaml.v2.ConfigGroup(
@@ -142,6 +151,7 @@ keycloak_resources = kubernetes.yaml.v2.ConfigGroup(
         delete_before_replace=False,
     ),
 )
+
 
 # IAM and instance profile
 keycloak_instance_role = iam.Role(
@@ -489,8 +499,13 @@ keycloak_server_vault_policy = vault.Policy(
     name="keycloak-server",
     policy=Path(__file__).parent.joinpath("keycloak_server_policy.hcl").read_text(),
 )
+keycloak_operator_vault_policy = vault.Policy(
+    "keycloak-operator-vault-policy",
+    name="keycloak-operator",
+    policy=Path(__file__).parent.joinpath("keycloak_server_policy.hcl").read_text(),
+)
 
-vault.aws.AuthBackendRole(
+keycloak_aws_auth_backend_role = vault.aws.AuthBackendRole(
     "keycloak-server-ec2-vault-auth",
     backend="aws",
     auth_type="iam",
@@ -502,6 +517,57 @@ vault.aws.AuthBackendRole(
     bound_account_ids=[aws_account.account_id],
     bound_vpc_ids=[target_vpc_id],
     token_policies=[keycloak_server_vault_policy.name],
+)
+keycloak_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
+    f"keycloak-operator-k8s-vault-auth-backend-role-{stack_info.env_suffix}",
+    role_name="keycloak-operator",
+    backend=cluster_stack.require_output("vault_auth_endpoint"),
+    bound_service_account_names=["*"],
+    bound_service_account_namespaces=[keycloak_namespace],
+    token_policies=[keycloak_operator_vault_policy.name],
+)
+
+vault_k8s_resources_config = OLVaultK8SResourcesConfig(
+    application_name="keycloak-operator",
+    namespace=keycloak_namespace,
+    labels=k8s_global_labels,
+    vault_address=vault_config.require("address"),
+    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+    vault_auth_role_name=keycloak_k8s_auth_backend_role.role_name,
+)
+
+vault_k8s_resources = OLVaultK8SResources(
+    resource_config=vault_k8s_resources_config,
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[keycloak_k8s_auth_backend_role],
+    ),
+)
+
+db_creds_secret_name = "keycloak_db_creds"
+db_creds_secret = Output.all(
+    address=keycloak_db.db_instance.address,
+    port=keycloak_db.db_instance.port,
+    db_name=keycloak_db.db_instance.db_name,
+).apply(
+    lambda db: OLVaultK8SSecret(
+        f"keycloak-operator-db-creds-{stack_info.env_suffix}",
+        OLVaultK8SDynamicSecretConfig(
+            name="keycloak-db-creds",
+            namespace=keycloak_namespace,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=db_creds_secret_name,
+            labels=k8s_global_labels,
+            mount=keycloak_db_vault_backend.mount_point,
+            path="creds/app",
+            templates={},
+            vaultauth=vault_k8s_resources_config.auth_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=vault_k8s_resources,
+        ),
+    )
 )
 
 # Vault KV2 mount definition
