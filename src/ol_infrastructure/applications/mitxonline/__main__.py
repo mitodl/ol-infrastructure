@@ -240,7 +240,7 @@ mitxonline_db_security_group = ec2.SecurityGroup(
         )
     ],
     tags=aws_config.merged_tags(
-        {"Name": "mitxonline-db-access-applications-{stack_info.env_suffix}"}
+        {"Name": f"mitxonline-db-access-applications-{stack_info.env_suffix}"}
     ),
     vpc_id=apps_vpc["id"],
 )
