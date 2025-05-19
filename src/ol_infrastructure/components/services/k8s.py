@@ -591,6 +591,8 @@ class OLApplicationK8s(ComponentResource):
                                         "-B",
                                         "-l",
                                         celery_worker_config.log_level,
+                                        "--max-tasks-per-child",
+                                        "100",
                                     ],
                                     env=application_deployment_env_vars,
                                     env_from=application_deployment_envfrom,
