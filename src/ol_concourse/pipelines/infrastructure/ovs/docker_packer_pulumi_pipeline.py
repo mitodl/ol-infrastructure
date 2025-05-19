@@ -184,6 +184,7 @@ def build_ovs_pipeline() -> Pipeline:
 
     rc_pulumi_fragment = pulumi_jobs_chain(
         ovs_pulumi_code,
+        enable_github_issue_resource=False,
         stack_names=[
             f"applications.odl_video_service.{stage}" for stage in ["QA", "Production"]
         ],
