@@ -16,12 +16,18 @@ config:
   mitxonline:vars:
     AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-production"
     CRON_COURSE_CERTIFICATES_HOURS: "18"
+    CRON_PROCESS_REFUND_REQUESTS_MINUTES": "*/5"
+    FEATURE_ENABLE_ADDL_PROFILE_FIELDS: "true"
+    FEATURE_ENABLE_UPGRADE_DIALOG: "true"
     GA_TRACKING_ID: "UA-5145472-48"
     GTM_TRACKING_ID: "GTM-M47BLXN"
+    HUBSPOT_MAX_CONCURRENT_TASKS: "2"
     LOGOUT_REDIRECT_URL: "https://courses.mitxonline.mit.edu/logout"
     MAILGUN_FROM_EMAIL: "MITx Online <no-reply@mail.mitxonline.mit.edu>"
     MAILGUN_SENDER_DOMAIN: "mail.mitxonline.mit.edu"
+    MITOL_GOOGLE_SHEETS_DEFERRALS_REQUEST_WORKSHEET_ID: "268521316"
     MITOL_GOOGLE_SHEETS_PROCESSOR_APP_NAME: "MITx Online (production)"
+    MITOL_GOOGLE_SHEETS_PROCESS_ONLY_LAST_ROWS_NUM: "30"
     MITOL_GOOGLE_SHEETS_REFUNDS_FIRST_ROW: "4"
     MITOL_GOOGLE_SHEETS_REFUNDS_REQUEST_WORKSHEET_ID: "0"
     MITOL_HUBSPOT_API_ID_PREFIX: "mitxonline"
@@ -38,6 +44,8 @@ config:
     OPENTELEMETRY_ENDPOINT: "grafana-alloy.operations.svc.cluster.local:4317"
     SENTRY_LOG_LEVEL: "ERROR"
     SESSION_COOKIE_NAME: "session_mitxonline"
+    UWSGI_ENABLE_THREADS: "1"
+    UWSGI_THREADS: "25"
   redis:password:
     secure: v1:yvRUeBECxXQn0EuQ:CzfHq2P7kQGgULkRI7EFThTAnZyxq4uLvCTAdCYWpgvKl6Hwir6Gfk6UgU//ceOEKXrLVw6mRf34oWU=
   vault:address: https://vault-production.odl.mit.edu

@@ -283,9 +283,8 @@ mitxonline_vault_backend = OLVaultDatabaseBackend(mitxonline_vault_backend_confi
 
 env_vars = {
     "CRON_COURSERUN_SYNC_HOURS": "*",
-    "MITX_ONLINE_SUPPORT_EMAIL": "mitxonline-support@mit.edu",
-    "FEATURE_SYNC_ON_DASHBOARD_LOAD": "True",
     "FEATURE_IGNORE_EDX_FAILURES": "True",
+    "FEATURE_SYNC_ON_DASHBOARD_LOAD": "True",
     "HUBSPOT_PIPELINE_ID": "19817792",
     "MITOL_GOOGLE_SHEETS_REFUNDS_COMPLETED_DATE_COL": "12",
     "MITOL_GOOGLE_SHEETS_REFUNDS_ERROR_COL": "13",
@@ -297,17 +296,16 @@ env_vars = {
     "MITX_ONLINE_OAUTH_PROVIDER": "mitxonline-oauth2",
     "MITX_ONLINE_REPLY_TO_ADDRESS": "MITx Online <mitxonline-support@mit.edu>",
     "MITX_ONLINE_SECURE_SSL_REDIRECT": "True",
+    "MITX_ONLINE_SUPPORT_EMAIL": "mitxonline-support@mit.edu",
     "MITX_ONLINE_USE_S3": "True",
     "NODE_MODULES_CACHE": "False",
-    "OPEN_EXCHANGE_RATES_URL": "https://openexchangerates.org/api/",
     "OPENEDX_SERVICE_WORKER_USERNAME": "login_service_user",
-    "PGBOUNCER_DEFAULT_POOL_SIZE": "50",
-    "PGBOUNCER_MIN_POOL_SIZE": "5",
+    "OPEN_EXCHANGE_RATES_URL": "https://openexchangerates.org/api/",
+    "POSTHOG_API_HOST": "https://ph.ol.mit.edu",
+    "POSTHOG_ENABLED": "True",
     "SITE_NAME": "MITx Online",
     "USE_X_FORWARDED_HOST": "True",
     "ZENDESK_HELP_WIDGET_ENABLED": "True",
-    "POSTHOG_API_HOST": "https://ph.ol.mit.edu",
-    "POSTHOG_ENABLED": "True",
 }
 env_vars.update(**mitxonline_config.get_object("vars"))
 
