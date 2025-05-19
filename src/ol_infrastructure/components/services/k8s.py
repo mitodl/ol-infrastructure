@@ -97,6 +97,7 @@ class OLApplicationK8sConfig(BaseModel):
     application_cmd_array: list[str] | None = None
     vault_k8s_resource_auth_name: str
     use_pullthrough_cache: bool = True
+    image_pull_policy: str = "IfNotPresent"
     # You get CPU and memory autoscaling by default
     hpa_scaling_metrics: list[kubernetes.autoscaling.v2.MetricSpecArgs] = [
         kubernetes.autoscaling.v2.MetricSpecArgs(
@@ -197,7 +198,7 @@ class OLApplicationK8s(ComponentResource):
     Main K8s component resource class
     """
 
-    def __init__(  # noqa: C901
+    def __init__(  # noqa: C901, PLR0912
         self,
         ol_app_k8s_config: OLApplicationK8sConfig,
         opts: ResourceOptions | None = None,
@@ -396,6 +397,10 @@ class OLApplicationK8s(ComponentResource):
             ),
         }
 
+        image_pull_policy = ol_app_k8s_config.image_pull_policy
+        if ol_app_k8s_config.application_docker_tag.lower() == "latest":
+            image_pull_policy = "Always"
+
         _application_deployment = kubernetes.apps.v1.Deployment(
             f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-deployment",
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -455,7 +460,7 @@ class OLApplicationK8s(ComponentResource):
                                         container_port=DEFAULT_UWSGI_PORT
                                     )
                                 ],
-                                image_pull_policy="IfNotPresent",
+                                image_pull_policy=image_pull_policy,
                                 resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                     requests=ol_app_k8s_config.resource_requests,
                                     limits=ol_app_k8s_config.resource_limits,
