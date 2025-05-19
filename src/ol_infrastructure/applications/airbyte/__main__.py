@@ -717,8 +717,8 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                 },
                 "jobs": {
                     "resources": {
-                        "limits": {"memory": "20Gi", "cpu": "2000m"},
-                        "requests": {"memory": "5Gi", "cpu": "500m"},
+                        "limits": {"memory": "10Gi", "cpu": "2000m"},
+                        "requests": {"memory": "5Gi", "cpu": "1000m"},
                     }
                 },
             },
