@@ -197,7 +197,6 @@ CELERYBEAT_SCHEDULER: redbeat.RedBeatScheduler  # MODIFIED
 CELERY_BROKER_HOSTNAME: {{ with node "edxapp-redis" }}{{ .Node.Address }}{{ end }}:6379  # MODIFIED
 CELERY_BROKER_TRANSPORT: rediss  # MODIFIED - second "s" indicates "secure"
 CELERY_BROKER_USER: default # MODIFIED
-BROKER_USE_SSL: true
 CELERY_BROKER_USE_SSL:  # MODIFIED
   ssl_cert_reqs: optional  # This is the required dictionary for SSL support to work
   # https://docs.celeryproject.org/en/stable/userguide/configuration.html#redis-backend-settings
