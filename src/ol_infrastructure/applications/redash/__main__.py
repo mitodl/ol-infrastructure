@@ -328,14 +328,14 @@ if redash_config.get_bool("manage_datasources"):
         datasource_config_consul_keys.append(
             consul.KeysKeyArgs(
                 path="redash/datasource_configs/mitxonline-rc/db_host",
-                value=mitxonline_stack.require_output("mitxonline_app")["rds_host"],
+                value=mitxonline_stack.require_output("mitxonline")["rds_host"],
             )
         )
     elif stack_info.name == "Production":
         datasource_config_consul_keys.append(
             consul.KeysKeyArgs(
                 path="redash/datasource_configs/mitxonline-production/db_host",
-                value=mitxonline_stack.require_output("mitxonline_app")["rds_host"],
+                value=mitxonline_stack.require_output("mitxonline")["rds_host"],
             )
         )
         datasource_config_consul_keys.append(
