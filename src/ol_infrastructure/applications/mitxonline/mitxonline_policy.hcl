@@ -41,3 +41,7 @@ path "sys/leases/revoke" {
     lease_id = ["postgres-mitopen/creds/app/*"]
   }
 }
+
+path "secret-operations/sso/mitlearn" {
+  capabilities = ["read"]
+}
