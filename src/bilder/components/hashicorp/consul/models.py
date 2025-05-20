@@ -63,10 +63,23 @@ class ConsulTelemetry(FlexibleBaseModel):
     prometheus_retention_time: Optional[str] = "60s"
 
 
-class ConsulLimitConfig(FlexibleBaseModel):
+class ConsulRequestLimitConfig(FlexibleBaseModel):
     mode: Literal["disabled", "permissive", "enforcing"] = "disabled"
     read_rate: int = -1
     write_rate: int = -1
+
+
+class ConsulLimitConfig(FlexibleBaseModel):
+    http_max_conns_per_client: int = 200
+    https_handshake_timeout: Optional[str] = "5s"
+    request_limits: ConsulRequestLimitConfig = ConsulRequestLimitConfig()
+    rpc_handshake_timeout: Optional[str] = "5s"
+    rpc_client_timeout: Optional[str] = "5s"
+    rpc_max_conns_per_client: int
+    rpc_rate: Optional[int] = None
+    rpc_max_burst: Optional[int] = None
+    kv_max_value_size: Optional[int] = None
+    txn_max_req_len: Optional[int] = None
 
 
 class ConsulConfig(HashicorpConfig):
@@ -91,7 +104,7 @@ class ConsulConfig(HashicorpConfig):
         description="List of DNS servers to use for resolving non-consul addresses",
     )
     rejoin_after_leave: bool = True
-    request_limits: Optional[ConsulLimitConfig] = ConsulLimitConfig()
+    limits: Optional[ConsulLimitConfig] = ConsulLimitConfig()
     retry_join: Optional[list[str]] = None
     retry_join_wan: Optional[list[str]] = None
     server: bool = False
