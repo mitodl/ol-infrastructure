@@ -15,6 +15,7 @@ config:
     LOGOUT_REDIRECT_URL: "https://courses-qa.mitxonline.mit.edu/logout" # Points to RC
     MAILGUN_FROM_EMAIL: "MITx Online <no-reply@mitxonline-rc-mail.mitxonline.mit.edu>"
     MAILGUN_SENDER_DOMAIN: "mitxonline-rc-mail.mitxonline.mit.edu"
+    MITOL_APIGATEWAY_DISABLE_MIDDLEWARE: "false"
     MITOL_GOOGLE_SHEETS_PROCESSOR_APP_NAME: "MITx Online (ci)"
     MITOL_GOOGLE_SHEETS_REFUNDS_FIRST_ROW: "4"
     MITOL_GOOGLE_SHEETS_REFUNDS_REQUEST_WORKSHEET_ID: "0"
