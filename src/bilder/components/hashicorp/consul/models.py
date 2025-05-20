@@ -1,7 +1,7 @@
 import abc
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import SerializeAsAny
 from pydantic.fields import Field
@@ -63,6 +63,12 @@ class ConsulTelemetry(FlexibleBaseModel):
     prometheus_retention_time: Optional[str] = "60s"
 
 
+class ConsulLimitConfig(FlexibleBaseModel):
+    mode: Literal["disabled", "permissive", "enforcing"] = "disabled"
+    read_rate: int = -1
+    write_rate: int = -1
+
+
 class ConsulConfig(HashicorpConfig):
     model_config = SettingsConfigDict(env_prefix="consul_")
     acl: Optional[ConsulACL] = None
@@ -85,6 +91,7 @@ class ConsulConfig(HashicorpConfig):
         description="List of DNS servers to use for resolving non-consul addresses",
     )
     rejoin_after_leave: bool = True
+    request_limits: Optional[ConsulLimitConfig] = ConsulLimitConfig()
     retry_join: Optional[list[str]] = None
     retry_join_wan: Optional[list[str]] = None
     server: bool = False
