@@ -560,8 +560,6 @@ ReleaseMap: dict[
             OpenEdxApplicationVersion(
                 application="xqwatcher",
                 application_type="IDA",
-                branch_override="master",
-                origin_override="https://github.com/mitodl/xqueue-watcher",
                 release="master",
             ),
         ],
@@ -636,7 +634,7 @@ ReleaseMap: dict[
             OpenEdxApplicationVersion(
                 application="xqwatcher",
                 application_type="IDA",
-                branch_override="master",
+                release="master",
             ),
         ],
         "mitx-staging": [
@@ -708,9 +706,7 @@ ReleaseMap: dict[
                 release="master",
             ),
             OpenEdxApplicationVersion(
-                application="xqwatcher",
-                application_type="IDA",
-                branch_override="master",
+                application="xqwatcher", application_type="IDA", release="master"
             ),
         ],
     },
