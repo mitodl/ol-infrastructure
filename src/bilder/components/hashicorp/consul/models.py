@@ -75,7 +75,7 @@ class ConsulLimitConfig(FlexibleBaseModel):
     request_limits: ConsulRequestLimitConfig = ConsulRequestLimitConfig()
     rpc_handshake_timeout: Optional[str] = "5s"
     rpc_client_timeout: Optional[str] = "5s"
-    rpc_max_conns_per_client: int
+    rpc_max_conns_per_client: Optional[int] = None
     rpc_rate: Optional[int] = None
     rpc_max_burst: Optional[int] = None
     kv_max_value_size: Optional[int] = None
