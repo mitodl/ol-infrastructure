@@ -21,8 +21,9 @@ class BusinessUnit(str, Enum):
     bootcamps = "bootcamps"
     data = "data"
     digital_credentials = "digital-credentials"
-    mit_learn = "mit-learn"
+    ecommerce = "unified-ecommerce"
     micromasters = "micromasters"
+    mit_learn = "mit-learn"
     mit_open = "mit-open"
     mitx = "mitx"
     mitx_online = "mitxonline"
@@ -32,20 +33,19 @@ class BusinessUnit(str, Enum):
     residential = "residential"
     residential_staging = "residential-staging"
     xpro = "mitxpro"
-    ecommerce = "unified-ecommerce"
 
 
 @unique
 class Environment(str, Enum):
     """Canonical reference for valid environment names."""
 
-    xpro = "xpro"
-    mitx_staging = "mitx-staging"
-    mitx = "mitx"
-    mitx_online = "mitxonline"
     applications = "applications"
     data = "data"
+    mitx = "mitx"
+    mitx_online = "mitxonline"
+    mitx_staging = "mitx-staging"
     operations = "operations"
+    xpro = "xpro"
 
 
 @unique
@@ -55,8 +55,11 @@ class Services(str, Enum):
     airbyte = "airbyte"
     bootcamps = "bootcamps"
     dagster = "dagster"
+    ecommerce = "unified-ecommerce"
     edxapp = "edxapp"
+    keycloak = "keycloak"
     micromasters = "micromasters"
+    mit_learn = "mit-learn"
     mit_open = "open"
     mitx_edx = "mitx-edx"
     mitxonline = "mitxonline"
@@ -64,11 +67,9 @@ class Services(str, Enum):
     mitxpro_edx = "xpro-edx"
     ocw_build = "ocw-build"
     odl_video_service = "ovs"
+    open_metadata = "open-metadata"
     redash = "redash"
     xpro = "xpro"
-    ecommerce = "unified-ecommerce"
-    mit_learn = "mit-learn"
-    open_metadata = "open-metadata"
 
 
 class K8sGlobalLabels(BaseModel):
