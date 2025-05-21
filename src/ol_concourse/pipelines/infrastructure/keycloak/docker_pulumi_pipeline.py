@@ -4,7 +4,7 @@ import textwrap
 from bridge.lib.versions import KEYCLOAK_VERSION
 from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.containers import container_build_task
-from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
+from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
@@ -13,6 +13,7 @@ from ol_concourse.lib.models.pipeline import (
     Identifier,
     Input,
     Job,
+    LoadVarStep,
     Output,
     Platform,
     PutStep,
@@ -68,17 +69,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
         image_repository="mitodl/keycloak",
         username="((dockerhub.username))",
         password="((dockerhub.password))",  # noqa: S106
-    )
-
-    keycloak_packer_code = git_repo(
-        name=Identifier("ol-infrastructure-packer-build"),
-        uri="https://github.com/mitodl/ol-infrastructure",
-        branch="main",
-        paths=[
-            "src/bridge/lib/versions.py",
-            "src/bilder/components/",
-            "src/bilder/images/keycloak",
-        ],
     )
 
     keycloak_pulumi_code = git_repo(
@@ -212,23 +202,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
         jobs=[docker_build_job],
     )
 
-    ami_fragment = packer_jobs(
-        dependencies=[
-            GetStep(
-                get=keycloak_registry_image.name,
-                trigger=True,
-                passed=[docker_build_job.name],
-            ),
-            GetStep(get=keycloak_customization_repo.name, trigger=False),
-        ],
-        image_code=keycloak_packer_code,
-        packer_template_path="src/bilder/images/keycloak/keycloak.pkr.hcl",
-        env_vars_from_files={
-            "KEYCLOAK_VERSION": f"{keycloak_registry_image.name}/digest"
-        },
-        job_name_suffix="keycloak",
-    )
-
     pulumi_fragment = pulumi_jobs_chain(
         keycloak_pulumi_code,
         stack_names=[
@@ -245,28 +218,39 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
         ),
         dependencies=[
             GetStep(
-                get=ami_fragment.resources[-1].name,
+                get=container_fragment.resources[-1].name,
                 trigger=True,
-                passed=[ami_fragment.jobs[-1].name],
+                passed=[container_fragment.jobs[-1].name],
             ),
             GetStep(
                 get=keycloak_customization_repo.name,
                 trigger=True,
-                passed=[ami_fragment.jobs[-1].name],
+                passed=[container_fragment.jobs[-1].name],
+            ),
+            GetStep(
+                get=keycloak_registry_image.name,
+                trigger=True,
+                passed=[container_fragment.jobs[-1].name],
+            ),
+            LoadVarStep(
+                load_var="image_digest",
+                file=f"{keycloak_registry_image.name}/digest",
+                reveal=True,
             ),
         ],
+        additional_env_vars={
+            "KEYCLOAK_DOCKER_DIGEST": "((.:image_digest))",
+        },
     )
 
     combined_fragments = PipelineFragment.combine_fragments(
         container_fragment,
-        ami_fragment,
         pulumi_fragment,
     )
     return PipelineFragment(
         resource_types=combined_fragments.resource_types,
         resources=[
             *combined_fragments.resources,
-            keycloak_packer_code,
             keycloak_pulumi_code,
             keycloak_upstream_registry_image,
         ],
