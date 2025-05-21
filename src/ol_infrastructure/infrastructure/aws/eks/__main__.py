@@ -1065,7 +1065,7 @@ traefik_helm_release = kubernetes.helm.v3.Release(
                 "annotations": {
                     "service.beta.kubernetes.io/aws-load-balancer-type": "nlb",
                     "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "instance",
-                    "service.beta.kubernetes.io/aws-load-balancer-target-group-attributes": "preserve_client_ip.enabled=false",
+                    "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled": "true",
                     "service.beta.kubernetes.io/aws-load-balancer-subnets": target_vpc.apply(
                         lambda tvpc: ",".join(tvpc["k8s_public_subnet_ids"])
                     ),
@@ -1219,7 +1219,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                             ),
                             "service.beta.kubernetes.io/aws-load-balancer-type": "nlb",
                             "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "instance",
-                            "service.beta.kubernetes.io/aws-load-balancer-target-group-attributes": "preserve_client_ip.enabled=false",
+                            "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled": "true",
                             "service.beta.kubernetes.io/aws-load-balancer-subnets": target_vpc.apply(
                                 lambda tvpc: ",".join(tvpc["k8s_public_subnet_ids"])
                             ),
