@@ -57,6 +57,7 @@ config:
   - "https://ci.learn.mit.edu/*"
   - "https://learn-ai-ci.ol.mit.edu/*"
   - "https://pay-ci.ol.mit.edu/*"
+  - "https://ci.mitxonline.mit.edu/*"
   keycloak_realm:olapps-mitlearn-client-redirect-uris:
   - "https://api.ci.learn.mit.edu/*"
   - "https://ci.learn.mit.edu/*"
@@ -64,6 +65,8 @@ config:
   - "https://learn-ai-ci.ol.mit.edu/*"
   - "https://api-pay-ci.ol.mit.edu/*"
   - "https://pay-ci.ol.mit.edu/*"
+  - "https://ci.mitxonline.mit.edu/*"
+  - "https://api.ci.mitxonline.mit.edu/*"
   keycloak_realm:olapps-mitlearn-client-secret:
     secure: v1:sJuWLKHeep4Qz9cr:YbZNIQoy3Bn1nbpKsCUPNUeEtZJgd+tA5LAU8pDfSKWr2fzvjfMy0XcmO4CR7a3q
   keycloak_realm:olapps-open-discussions-client-redirect-uris: ["https://discussions-ci.odl.mit.edu/*"]
