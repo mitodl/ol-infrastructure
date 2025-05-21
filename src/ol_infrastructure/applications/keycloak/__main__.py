@@ -1,7 +1,10 @@
+# ruff: noqa: ERA001
+
 """The complete state needed to provision Keycloak running on Docker."""
 
 import base64
 import json
+import os
 import textwrap
 from functools import partial
 from itertools import chain
@@ -13,7 +16,7 @@ import pulumi_vault as vault
 import requests
 import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import acm, ec2, get_caller_identity, iam, route53
+from pulumi_aws import acm, ec2, get_caller_identity, iam
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
@@ -32,16 +35,20 @@ from ol_infrastructure.components.aws.auto_scale_group import (
     OLTargetGroupConfig,
     TagSpecification,
 )
+from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.eks import (
+    OLEKSGateway,
+    OLEKSGatewayConfig,
+    OLEKSGatewayListenerConfig,
+    OLEKSGatewayRouteConfig,
+)
 from ol_infrastructure.components.services.vault import (
+    OLVaultDatabaseBackend,
     OLVaultK8SDynamicSecretConfig,
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
-)
-from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
-from ol_infrastructure.components.services.vault import (
-    OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
@@ -85,7 +92,9 @@ target_vpc_id = target_vpc["id"]
 data_vpc = network_stack.require_output("data_vpc")
 
 mitol_zone_id = dns_stack.require_output("ol")["id"]
-keycloak_domain = keycloak_config.get("domain")
+keycloak_domain = (
+    keycloak_config.get("domain") or f"sso-{stack_info.env_suffix}.ol.mit.edu"
+)
 
 k8s_global_labels = K8sGlobalLabels(
     ou=BusinessUnit.operations, service=Services.keycloak, stack=stack_info
@@ -544,8 +553,9 @@ vault_k8s_resources = OLVaultK8SResources(
     ),
 )
 
-db_creds_secret_name = "keycloak_db_creds"
+db_creds_secret_name = "keycloak-db-creds"  # noqa: S105  # pragma: allowlist secret
 db_creds_secret = Output.all(
+    # These don't seem to be needed but we will include them just because
     address=keycloak_db.db_instance.address,
     port=keycloak_db.db_instance.port,
     db_name=keycloak_db.db_instance.db_name,
@@ -558,16 +568,164 @@ db_creds_secret = Output.all(
             dest_secret_labels=k8s_global_labels,
             dest_secret_name=db_creds_secret_name,
             labels=k8s_global_labels,
-            mount=keycloak_db_vault_backend.mount_point,
+            mount=keycloak_db_vault_backend.db_mount.path,
             path="creds/app",
-            templates={},
-            vaultauth=vault_k8s_resources_config.auth_name,
+            templates={
+                "username": "{{ .Secrets.username }}",
+                "password": "{{ .Secrets.password }}",
+                "database": f"{db['db_name']}",
+                "port": f"{db['port']}",
+                "host": f"{db['address']}",
+            },
+            vaultauth=vault_k8s_resources.auth_name,
         ),
         opts=ResourceOptions(
             delete_before_replace=True,
             depends_on=vault_k8s_resources,
         ),
     )
+)
+
+# We need a duplicate of this in the keycloak namespace because we can't
+# reference the one in the operation namespace
+star_ol_mit_edu_secret_name = (
+    "ol-wildcard-cert"  # pragma: allowlist secret #  noqa: S105
+)
+star_ol_mit_edu_static_secret = OLVaultK8SSecret(
+    f"keycloak-star-ol-mit.edu-wildcard-static-secret-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name="vault-kv-global-ol-wildcard",
+        namespace=keycloak_namespace,
+        labels=k8s_global_labels,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name=star_ol_mit_edu_secret_name,
+        dest_secret_type="kubernetes.io/tls",  # noqa: S106  # pragma: allowlist secret
+        mount="secret-global",
+        mount_type="kv-v2",
+        path="ol-wildcard",
+        templates={
+            "tls.key": '{{ get .Secrets "key_with_proper_newlines" }}',
+            "tls.crt": '{{ get .Secrets "cert_with_proper_newlines" }}',
+            # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_tls/
+            "key": '{{ get .Secrets "key_with_proper_newlines" }}',
+            "cert": '{{ get .Secrets "cert_with_proper_newlines" }}',
+        },
+        refresh_after="1h",
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+    ),
+)
+
+# Fail hard if LEARN_AI_DOCKER_TAG is not set
+if "KEYCLOAK_DOCKER_DIGEST" not in os.environ:
+    msg = "KEYCLOAK_DOCKER_DIGEST must be set"
+    raise OSError(msg)
+KEYCLOAK_DOCKER_DIGEST = os.getenv("KEYCLOAK_DOCKER_DIGEST")
+
+keycloak_resource_name = f"keycloak-{stack_info.env_suffix}"
+keycloak_resource = kubernetes.apiextensions.CustomResource(
+    f"{env_name}-keycloak",
+    api_version="k8s.keycloak.org/v2alpha1",
+    kind="Keycloak",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=keycloak_resource_name,
+        namespace=keycloak_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        "instances": 2,
+        "image": f"610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/keycloak@{KEYCLOAK_DOCKER_DIGEST}",  # noqa: E501
+        "db": {
+            "vendor": "postgres",
+            "database": keycloak_db_config.db_name,
+            "port": db_port,
+            "host": db_address,
+            "usernameSecret": {
+                "name": db_creds_secret_name,
+                "key": "username",
+            },
+            "passwordSecret": {
+                "name": db_creds_secret_name,
+                "key": "password",
+            },
+        },
+        "startOptimized": False,
+        "http": {
+            "tlsSecret": star_ol_mit_edu_secret_name,
+        },
+        "additionalOptions": [
+            {
+                "name": "spi-sticky-session-encoder-infinispan-should-attach-route",
+                "value": "false",
+            },
+            {
+                "name": "spi-login-provider",
+                "value": "ol-freemarker",
+            },
+            {
+                "name": "spi-theme-welcome-theme",
+                "value": "scim",
+            },
+            {
+                "name": "spi-realm-restapi-extension-scim-admin-url-check",
+                "value": "no-context-path",
+            },
+            {
+                "name": "disable-external-access",
+                "value": "true",
+            },
+        ],
+        "hostname": {
+            "hostname": keycloak_domain,
+        },
+        "proxy": {
+            "headers": "xforwarded",
+        },
+    },
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[keycloak_resources, db_creds_secret],
+    ),
+)
+
+gateway_config = OLEKSGatewayConfig(
+    cert_issuer="letsencrypt-production",
+    cert_issuer_class="cluster-issuer",
+    gateway_name="keycloak",
+    labels=k8s_global_labels,
+    namespace=keycloak_namespace,
+    listeners=[
+        OLEKSGatewayListenerConfig(
+            name="https",
+            hostname=keycloak_domain,
+            port=8443,
+            tls_mode="Terminate",
+            certificate_secret_name=star_ol_mit_edu_secret_name,
+            certificate_secret_namespace=keycloak_namespace,
+        ),
+    ],
+    routes=[
+        OLEKSGatewayRouteConfig(
+            backend_service_name=f"{keycloak_resource_name}-service",
+            backend_service_namespace=keycloak_namespace,
+            backend_service_port=8443,
+            hostnames=[keycloak_domain],
+            name="keycloak-https",
+            listener_name="https",
+            port=8443,
+        )
+    ],
+)
+
+gateway = OLEKSGateway(
+    f"keycloak-gateway-{stack_info.env_suffix}",
+    gateway_config=gateway_config,
+    opts=ResourceOptions(
+        depends_on=[keycloak_resource],
+        delete_before_replace=True,
+    ),
 )
 
 # Vault KV2 mount definition
@@ -598,15 +756,15 @@ consul.Keys(
 )
 
 # Create Route53 DNS records
-five_minutes = 60 * 5
-route53.Record(
-    f"keycloak-server-dns-record-{keycloak_domain}",
-    name=keycloak_domain,
-    type="CNAME",
-    ttl=five_minutes,
-    records=[autoscale_setup.load_balancer.dns_name],
-    zone_id=mitol_zone_id,
-)
+# five_minutes = 60 * 5
+# route53.Record(
+#    f"keycloak-server-dns-record-{keycloak_domain}",
+#    name=keycloak_domain,
+#    type="CNAME",
+#    ttl=five_minutes,
+#    records=[autoscale_setup.load_balancer.dns_name],
+#    zone_id=mitol_zone_id,
+# )
 
 # TODO MD 20230206 revisit this, probably need to export more things  # noqa: E501, FIX002, TD002, TD003, TD004
 export(
