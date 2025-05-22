@@ -92,7 +92,7 @@ cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(keycloak_namespace, ns)
 )
 
-# TODO MD 20230206  # noqa: FIX002, TD002, TD003, TD004
+# TODO MD 20230206  # noqa: FIX002, TD002, TD004
 # This might be needed in the future but right now it just causes errors
 secrets = read_yaml_secrets(Path(f"keycloak/data.{stack_info.env_suffix}.yaml"))
 if secrets is None:
@@ -246,7 +246,7 @@ keycloak_database_security_group = ec2.SecurityGroup(
                 vault_stack.require_output("vault_server")["security_group"],
                 data_vpc["security_groups"]["integrator"],
             ],
-            # TODO: @Ardiea 20250521 Why are we opening the entire VPC?  # noqa: FIX002, TD002, TD003 E501
+            # TODO: @Ardiea 20250521 Why are we opening the entire VPC?  # noqa: FIX002, TD002, E501
             cidr_blocks=[target_vpc["cidr"]],
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
@@ -441,6 +441,7 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
         labels=k8s_global_labels,
     ),
     spec={
+        "update": {"strategy": "Auto"},
         "instances": keycloak_config.get_int("replicas") or 2,
         "image": f"610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/keycloak@{KEYCLOAK_DOCKER_DIGEST}",  # noqa: E501
         "db": {
@@ -473,25 +474,34 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
         },
         "additionalOptions": [
             {
-                "name": "spi-sticky-session-encoder-infinispan-should-attach-route",
-                "value": "false",
+                "name": "disable-external-access",
+                "value": "true",
             },
+            {"name": "log", "value": "console"},
+            {"name": "log-console-format", "value": "json"},
+            {"name": "metrics-enabled", "value": "true"},
             {
                 "name": "spi-login-provider",
                 "value": "ol-freemarker",
-            },
-            {
-                "name": "spi-theme-welcome-theme",
-                "value": "scim",
             },
             {
                 "name": "spi-realm-restapi-extension-scim-admin-url-check",
                 "value": "no-context-path",
             },
             {
-                "name": "disable-external-access",
-                "value": "true",
+                "name": "spi-sticky-session-encoder-infinispan-should-attach-route",
+                "value": "false",
             },
+            {
+                "name": "spi-theme-welcome-theme",
+                "value": "scim",
+            },
+            {"name": "tracing-enabled", "value": "true"},
+            {
+                "name": "tracing-endpoint",
+                "value": "http://grafana-alloy.operations.svc.cluster.local:4317",
+            },
+            {"name": "tracing-smapler-ratio", "value": "0.2"},
         ],
         "hostname": {
             "hostname": keycloak_domain,
@@ -503,6 +513,41 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
     opts=ResourceOptions(
         delete_before_replace=True,
         depends_on=[keycloak_resources, db_creds_secret],
+    ),
+)
+
+keycloak_service_monitor = kubernetes.apiextensions.CustomResource(
+    f"{env_name}-keycloak-service-monitor",
+    api_version="monitoring.coreos.com/v1",
+    kind="ServiceMonitor",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=f"{keycloak_resource_name}-monitor",
+        namespace=keycloak_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        "selector": {
+            "matchLabels": {
+                "app": "keycloak",
+                "keycloak": keycloak_resource_name,
+            }
+        },
+        "endpoints": [
+            {
+                "port": "management",
+                "path": "/metrics",
+                "scheme": "http",
+                "interval": "30s",
+                "tlsConfig": {
+                    "insecureSkipVerify": True  # For internal metrics scraping, often
+                    # used if Prometheus doesn't have the CA
+                },
+            }
+        ],
+        "namespaceSelector": {"matchNames": [keycloak_namespace]},
+    },
+    opts=ResourceOptions(
+        depends_on=[keycloak_resource],
     ),
 )
 
