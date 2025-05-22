@@ -1335,7 +1335,12 @@ consul.Keys(
             path="edxapp/learn-api-domain",
             delete=False,
             value=mitlearn_api_domain,
-        )
+        ),
+        consul.KeysKeyArgs(
+            path="edxapp/learn-frontend-domain",
+            delete=False,
+            value=learn_frontend_domain,
+        ),
     ],
     opts=xpro_consul_opts,
 )
@@ -1353,7 +1358,12 @@ consul.Keys(
             path="edxapp/learn-api-domain",
             delete=False,
             value=mitlearn_api_domain,
-        )
+        ),
+        consul.KeysKeyArgs(
+            path="edxapp/learn-frontend-domain",
+            delete=False,
+            value=learn_frontend_domain,
+        ),
     ],
     opts=mitxonline_consul_opts,
 )
