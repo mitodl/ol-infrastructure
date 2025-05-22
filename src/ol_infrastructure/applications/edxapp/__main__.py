@@ -516,7 +516,7 @@ edxapp_db_security_group = ec2.SecurityGroup(
                 data_vpc["security_groups"]["integrator"],
                 vault_stack.require_output("vault_server")["security_group"],
             ],
-            # TODO: Create Vault security group to act as source of allowed  # noqa: FIX002, TD002, TD003
+            # TODO: Create Vault security group to act as source of allowed  # noqa: FIX002, TD002
             # traffic. (TMM 2021-05-04)
             cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"].apply(
                 lambda pod_cidrs: [*pod_cidrs, edxapp_vpc["cidr"]]

@@ -269,7 +269,7 @@ data_lake_policy = iam.Policy(
 )
 
 # Create IAM policy for Airbyte to read from S3 source buckets
-# TODO: Turn this into a stack reference after exporting the bucket names from the  # noqa: E501, FIX002, TD002, TD003
+# TODO: Turn this into a stack reference after exporting the bucket names from the  # noqa: E501, FIX002, TD002
 # edxapp Pulumi project. (TMM 2023-06-02)
 s3_source_buckets = [
     f"{edxapp_deployment}-{stack_info.env_suffix}-edxapp-tracking"
