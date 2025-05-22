@@ -57,7 +57,7 @@ from bridge.lib.versions import (
 from bridge.secrets.sops import set_env_secrets
 
 
-# TODO MD 20231013 Switch over to the shared lib functions that do this  # noqa: E501, FIX002, TD002, TD003, TD004
+# TODO MD 20231013 Switch over to the shared lib functions that do this  # noqa: E501, FIX002, TD002, TD004
 def place_jinja_template_file(  # noqa: PLR0913
     name: str,
     repo_path: Path,
@@ -76,7 +76,7 @@ def place_jinja_template_file(  # noqa: PLR0913
     watched_files.append(destination_path.joinpath(name))
 
 
-# TODO MD 20231013 Switch over to the shared lib functions that do this  # noqa: E501, FIX002, TD002, TD003, TD004
+# TODO MD 20231013 Switch over to the shared lib functions that do this  # noqa: E501, FIX002, TD002, TD004
 def place_consul_template_file(  # noqa: PLR0913
     name: str,
     repo_path: Path,
