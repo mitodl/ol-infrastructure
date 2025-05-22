@@ -915,21 +915,29 @@ class OLApisixOIDCResources(pulumi.ComponentResource):
                 oidc_config.oidc_session_contents
             )
 
-    def get_base_oidc_config(self, unauth_action: str) -> dict[str, Any]:
+    def get_base_oidc_config(
+        self, unauth_action: str, cookie_domain: str | None = None
+    ) -> dict[str, Any]:
         """Return the base OIDC configuration dictionary."""
+        cookie_domain_config = (
+            {"session": {"cookie": {"domain": cookie_domain}}} if cookie_domain else {}
+        )
         return {
             **self.base_oidc_config,
+            **cookie_domain_config,
             "unauth_action": unauth_action,
         }
 
-    def get_full_oidc_plugin_config(self, unauth_action: str) -> dict[str, Any]:
+    def get_full_oidc_plugin_config(
+        self, unauth_action: str, cookie_domain: str | None = None
+    ) -> dict[str, Any]:
         """Return the full OIDC plugin configuration dictionary for Apisix."""
         return {
             "name": "openid-connect",
             "enable": True,
             "secretRef": self.secret_name,
             "config": {
-                **self.get_base_oidc_config(unauth_action),
+                **self.get_base_oidc_config(unauth_action, cookie_domain),
             },
         }
 

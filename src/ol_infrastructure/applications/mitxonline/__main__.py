@@ -325,7 +325,7 @@ openedx_environment = f"mitxonline-{stack_info.env_suffix.lower()}"
 rds_endpoint = f"{db_instance_name}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:{DEFAULT_POSTGRES_PORT}"
 
 # Begin k8s resources
-# TODO (TMM 2025-05-06): The vault mount is also # noqa: TD003, FIX002
+# TODO (TMM 2025-05-06): The vault mount is also # noqa: FIX002
 # created/managed as part of the edxapp project. This needs to be factored out into
 # a substructure project or referenced from one stack to the other via stack
 # references. There is some ambiguity about the properl directionality of ownership.
@@ -555,7 +555,9 @@ mitxonline_apisix_route_direct = OLApisixRoute(
             paths=["/*"],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             plugins=[
-                mitxonline_direct_oidc.get_full_oidc_plugin_config(unauth_action="pass")
+                mitxonline_direct_oidc.get_full_oidc_plugin_config(
+                    unauth_action="pass", cookie_domain=api_domain.removeprefix("api")
+                )
             ],
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
             backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
@@ -578,7 +580,9 @@ mitxonline_apisix_route_direct = OLApisixRoute(
             hosts=[api_domain],
             paths=["/login/*", "/admin/login/*", "/login"],
             plugins=[
-                mitxonline_direct_oidc.get_full_oidc_plugin_config(unauth_action="auth")
+                mitxonline_direct_oidc.get_full_oidc_plugin_config(
+                    unauth_action="auth", cookie_domain=api_domain.removeprefix("api")
+                )
             ],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
