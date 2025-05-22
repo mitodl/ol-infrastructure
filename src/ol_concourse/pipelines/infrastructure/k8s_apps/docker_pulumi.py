@@ -1,3 +1,5 @@
+# ruff: noqa: PLR2004, PLR0913
+
 import sys
 from typing import Any, Optional
 
@@ -45,24 +47,25 @@ pipeline_params = {
 
 def _define_git_resources(
     app_name: str,
+    repo_name: str,
 ) -> tuple[Resource, Resource, Resource, Resource]:
     """Define the git resources needed for the pipeline."""
     main_repo = git_repo(
         name=Identifier(f"{app_name}-main"),
-        uri=f"https://github.com/mitodl/{app_name}",
+        uri=f"https://github.com/mitodl/{repo_name}",
         branch="main",
     )
 
     release_candidate_repo = git_repo(
         name=Identifier(f"{app_name}-release-candidate"),
-        uri=f"https://github.com/mitodl/{app_name}",
+        uri=f"https://github.com/mitodl/{repo_name}",
         branch="release-candidate",
         fetch_tags=True,
     )
 
     release_repo = git_repo(
         name=Identifier(f"{app_name}-release"),
-        uri=f"http://github.com/mitodl/{app_name}",
+        uri=f"http://github.com/mitodl/{repo_name}",
         branch="release",
         fetch_tags=True,
         tag_regex=r"v[0-9]\.[0-9]*\.[0-9]",  # examples v0.24.0, v0.26.3
@@ -130,6 +133,7 @@ def _define_pulumi_resources(
 def _build_image_job(
     app_name: str,
     branch_type: str,
+    dockerfile_path: str,
     git_repo_resource: Resource,
     registry_image_resource: Resource,
     build_target: Optional[str] = None,
@@ -193,6 +197,7 @@ def _build_image_job(
                 inputs=[Input(name=git_repo_resource.name)],
                 build_parameters={
                     "CONTEXT": git_repo_resource.name,
+                    "DOCKERFILE": f"{git_repo_resource.name}/{dockerfile_path}",
                     "BUILD_ARG_GIT_REF": "((.:git_ref))",
                     **version_args,
                     **additional_build_params,
@@ -215,14 +220,18 @@ def _build_image_job(
     return Job(name=Identifier(job_name), build_log_retention={"builds": 10}, plan=plan)
 
 
-def build_app_pipeline(app_name: str) -> Pipeline:
+def build_app_pipeline(
+    app_name: str,
+    repo_name: str,
+    dockerfile_path: str,
+) -> Pipeline:
     # Define Resources
     (
         main_repo,
         release_candidate_repo,
         release_repo,
         ol_infra_repo,
-    ) = _define_git_resources(app_name)
+    ) = _define_git_resources(app_name, repo_name)
     app_ci_image, app_rc_image = _define_registry_image_resources(app_name)
     pulumi_resource_type, pulumi_resource = _define_pulumi_resources(
         app_name, ol_infra_repo.name
@@ -238,6 +247,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     main_image_build_job = _build_image_job(
         app_name=app_name,
         branch_type="main",
+        dockerfile_path=dockerfile_path,
         git_repo_resource=main_repo,
         registry_image_resource=app_ci_image,
         build_target=pipeline_parameters.build_target,
@@ -245,6 +255,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     rc_image_build_job = _build_image_job(
         app_name=app_name,
         branch_type="release_candidate",
+        dockerfile_path=dockerfile_path,
         git_repo_resource=release_candidate_repo,
         registry_image_resource=app_rc_image,
         build_target=pipeline_parameters.build_target,
@@ -358,11 +369,28 @@ if __name__ == "__main__":
     if not app_name:
         msg = "Please provide an app name as a command line argument."
         raise ValueError(msg)
+
+    repo_name = sys.argv[2] if len(sys.argv) > 2 else None
+    if not repo_name:
+        msg = "Please provide an repo name as a command line argument."
+        raise ValueError(msg)
+
+    dockerfile_path = sys.argv[3] if len(sys.argv) > 3 else None
+    if not dockerfile_path:
+        msg = "Please provide a dockerfile path as a command line argument."
+        raise ValueError(msg)
+
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(
-            build_app_pipeline(app_name=app_name).model_dump_json(indent=2)
+            build_app_pipeline(
+                app_name=app_name, repo_name=repo_name, dockerfile_path=dockerfile_path
+            ).model_dump_json(indent=2)
         )
-    sys.stdout.write(build_app_pipeline(app_name=app_name).model_dump_json(indent=2))
+    sys.stdout.write(
+        build_app_pipeline(
+            app_name=app_name, repo_name=repo_name, dockerfile_path=dockerfile_path
+        ).model_dump_json(indent=2)
+    )
     # Note: The pipeline name generated below might need adjustment
     # if the app_name changes the resulting pipeline identifier.
     pipeline_name = f"docker-pulumi-{app_name}"
