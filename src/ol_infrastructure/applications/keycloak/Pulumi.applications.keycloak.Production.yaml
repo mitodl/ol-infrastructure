@@ -4,10 +4,11 @@ encryptedkey: AQICAHiiGjYUolrtj8PCnScLM7oLAdMl8nJrLjQjnqyl1LykYgF8ItwPuXAW1jH6lq
 config:
   aws:region: us-east-1
   consul:address: https://consul-operations-production.odl.mit.edu
-  keycloak:auto_scale:
-    desired: 2
-    max: 3
-    min: 1
+  keycloak:replicas: 3
+  keycloak:memory_request: 2Gi
+  keycloak:memory_limit: 4Gi
+  keycloak:cpu_request: 1000m
+  keycloak:cpu_limit: 2000m
   keycloak:db_capacity: "100"
   keycloak:domain: sso.ol.mit.edu
   keycloak:instance_type: general_purpose_large

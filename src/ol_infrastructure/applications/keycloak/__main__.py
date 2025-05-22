@@ -2,11 +2,8 @@
 
 """The complete state needed to provision Keycloak running on Docker."""
 
-import base64
 import json
 import os
-import textwrap
-from functools import partial
 from itertools import chain
 from pathlib import Path
 
@@ -16,7 +13,7 @@ import pulumi_vault as vault
 import requests
 import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import acm, ec2, get_caller_identity, iam
+from pulumi_aws import ec2, get_caller_identity, iam
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
@@ -26,15 +23,6 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.lib.versions import KEYCLOAK_OPERATOR_CRD_VERSION
 from bridge.secrets.sops import read_yaml_secrets
-from ol_infrastructure.components.aws.auto_scale_group import (
-    BlockDeviceMapping,
-    OLAutoScaleGroupConfig,
-    OLAutoScaling,
-    OLLaunchTemplateConfig,
-    OLLoadBalancerConfig,
-    OLTargetGroupConfig,
-    TagSpecification,
-)
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.eks import (
     OLEKSGateway,
@@ -51,12 +39,11 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
 )
-from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
+from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
 )
-from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_records
 from ol_infrastructure.lib.consul import consul_key_helper, get_consul_provider
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
@@ -259,6 +246,7 @@ keycloak_database_security_group = ec2.SecurityGroup(
                 vault_stack.require_output("vault_server")["security_group"],
                 data_vpc["security_groups"]["integrator"],
             ],
+            # TODO: @Ardiea 20250521 Why are we opening the entire VPC?  # noqa: FIX002, TD002, TD003 E501
             cidr_blocks=[target_vpc["cidr"]],
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
@@ -335,198 +323,16 @@ keycloak_db_consul_service = Service(
     opts=consul_provider,
 )
 
-# Provision EC2 resources
-instance_type_name = keycloak_config.get(
-    "instance_type", InstanceTypes.general_purpose_large.name
-)
-instance_type = InstanceTypes.dereference(instance_type_name)
-
 subnets = target_vpc["subnet_ids"]
 subnet_id = subnets.apply(chain)
 
-grafana_credentials = read_yaml_secrets(
-    Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
-)
-consul_datacenter = consul_stack.require_output("datacenter")
-
-instance_tags = aws_config.merged_tags({"Name": f"keycloak-{stack_info.env_suffix}"})
-
-keycloak_server_ami = ec2.get_ami(
-    filters=[
-        {
-            "name": "tag:Name",
-            "values": ["keycloak-server"],
-        },
-        {
-            "name": "virtualization-type",
-            "values": ["hvm"],
-        },
-    ],
-    most_recent=True,
-    owners=[str(aws_account.id)],
-)
-
-block_device_mappings = [BlockDeviceMapping()]
-
-# Create an auto-scale group for web application servers
-keycloak_web_acm_cert = acm.Certificate(
-    "keycloak-load-balancer-acm-certificate",
-    domain_name=keycloak_domain,
-    validation_method="DNS",
-    tags=aws_config.tags,
-)
-
-keycloak_acm_cert_validation_records = (
-    keycloak_web_acm_cert.domain_validation_options.apply(
-        partial(
-            acm_certificate_validation_records,
-            cert_name="keycloak",
-            zone_id=mitol_zone_id,
-            stack_info=stack_info,
-        )
-    )
-)
-
-keycloak_web_acm_validated_cert = acm.CertificateValidation(
-    "wait-for-keycloak-acm-cert-validation",
-    certificate_arn=keycloak_web_acm_cert.arn,
-    validation_record_fqdns=keycloak_acm_cert_validation_records.apply(
-        lambda validation_records: [
-            validation_record.fqdn for validation_record in validation_records
-        ]
-    ),
-)
-keycloak_lb_config = OLLoadBalancerConfig(
-    enable_insecure_http=False,
-    listener_cert_domain=keycloak_domain,
-    listener_use_acm=True,
-    listener_cert_arn=keycloak_web_acm_cert.arn,
-    security_groups=[keycloak_server_security_group],
-    subnets=subnets,
-    tags=instance_tags,
-)
-
-keycloak_tg_config = OLTargetGroupConfig(
-    vpc_id=target_vpc["id"],
-    target_group_healthcheck=False,
-    health_check_interval=60,
-    health_check_matcher="404",  # TODO Figure out a real endpoint for this  # noqa: E501, FIX002, TD002, TD003, TD004
-    health_check_path="/ping",
-    stickiness="lb_cookie",
-    tags=instance_tags,
-)
-
-keycloak_lt_config = OLLaunchTemplateConfig(
-    block_device_mappings=block_device_mappings,
-    image_id=keycloak_server_ami.id,
-    instance_type=instance_type,
-    instance_profile_arn=keycloak_server_instance_profile.arn,
-    security_groups=[
-        target_vpc["security_groups"]["default"],
-        keycloak_server_security_group,
-    ],
-    tags=instance_tags,
-    tag_specifications=[
-        TagSpecification(
-            resource_type="instance",
-            tags=instance_tags,
-        ),
-        TagSpecification(
-            resource_type="volume",
-            tags=instance_tags,
-        ),
-    ],
-    user_data=consul_datacenter.apply(
-        lambda consul_dc: base64.b64encode(
-            "#cloud-config\n{}".format(
-                yaml.dump(
-                    {
-                        "write_files": [
-                            {
-                                "path": "/etc/consul.d/02-autojoin.json",
-                                "content": json.dumps(
-                                    {
-                                        "retry_join": [
-                                            "provider=aws tag_key=consul_env "
-                                            f"tag_value={consul_dc}"
-                                        ],
-                                        "datacenter": consul_dc,
-                                    }
-                                ),
-                                "owner": "consul:consul",
-                            },
-                            {
-                                "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
-                            ENVIRONMENT={consul_dc}
-                            APPLICATION=keycloak
-                            SERVICE=sso
-                            VECTOR_CONFIG_DIR=/etc/vector/
-                            VECTOR_STRICT_ENV_VARS=false
-                            AWS_REGION={aws_config.region}
-                            GRAFANA_CLOUD_API_KEY={grafana_credentials["api_key"]}
-                            GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials["prometheus_user_id"]}
-                            GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials["loki_user_id"]}
-                            """
-                                ),
-                                "owner": "root:root",
-                            },
-                        ],
-                    }
-                ),
-            ).encode("utf8")
-        ).decode("utf8")
-    ),
-)
-
-keycloak_autoscale_sizes = keycloak_config.get_object("auto_scale") or {
-    "desired": 2,
-    "min": 1,
-    "max": 3,
-}
-keycloak_asg_config = OLAutoScaleGroupConfig(
-    asg_name=f"keycloak-{stack_info.env_suffix}",
-    aws_config=aws_config,
-    desired_size=keycloak_autoscale_sizes["desired"],
-    min_size=keycloak_autoscale_sizes["min"],
-    max_size=keycloak_autoscale_sizes["max"],
-    vpc_zone_identifiers=target_vpc["subnet_ids"],
-    tags=instance_tags,
-)
-
-autoscale_setup = OLAutoScaling(
-    asg_config=keycloak_asg_config,
-    lt_config=keycloak_lt_config,
-    tg_config=keycloak_tg_config,
-    lb_config=keycloak_lb_config,
-)
-
 # Vault policy definition
-keycloak_server_vault_policy = vault.Policy(
-    "keycloak-server-vault-policy",
-    name="keycloak-server",
-    policy=Path(__file__).parent.joinpath("keycloak_server_policy.hcl").read_text(),
-)
 keycloak_operator_vault_policy = vault.Policy(
     "keycloak-operator-vault-policy",
     name="keycloak-operator",
     policy=Path(__file__).parent.joinpath("keycloak_server_policy.hcl").read_text(),
 )
 
-keycloak_aws_auth_backend_role = vault.aws.AuthBackendRole(
-    "keycloak-server-ec2-vault-auth",
-    backend="aws",
-    auth_type="iam",
-    role="keycloak-server",
-    inferred_entity_type="ec2_instance",
-    inferred_aws_region=aws_config.region,
-    bound_iam_instance_profile_arns=[keycloak_server_instance_profile.arn],
-    bound_ami_ids=[keycloak_server_ami.id],
-    bound_account_ids=[aws_account.account_id],
-    bound_vpc_ids=[target_vpc_id],
-    token_policies=[keycloak_server_vault_policy.name],
-)
 keycloak_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
     f"keycloak-operator-k8s-vault-auth-backend-role-{stack_info.env_suffix}",
     role_name="keycloak-operator",
@@ -635,7 +441,7 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
         labels=k8s_global_labels,
     ),
     spec={
-        "instances": 2,
+        "instances": keycloak_config.get_int("replicas") or 2,
         "image": f"610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/keycloak@{KEYCLOAK_DOCKER_DIGEST}",  # noqa: E501
         "db": {
             "vendor": "postgres",
@@ -649,6 +455,16 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
             "passwordSecret": {
                 "name": db_creds_secret_name,
                 "key": "password",
+            },
+        },
+        "resources": {
+            "requests": {
+                "cpu": keycloak_config.get("cpu_request") or "500m",
+                "memory": keycloak_config.get("memory_request") or "512Mi",
+            },
+            "limits": {
+                "cpu": keycloak_config.get("cpu_limit") or "2000m",
+                "memory": keycloak_config.get("memory_limit") or "1Gi",
             },
         },
         "startOptimized": False,
@@ -755,18 +571,6 @@ consul.Keys(
     opts=consul_provider,
 )
 
-# Create Route53 DNS records
-# five_minutes = 60 * 5
-# route53.Record(
-#    f"keycloak-server-dns-record-{keycloak_domain}",
-#    name=keycloak_domain,
-#    type="CNAME",
-#    ttl=five_minutes,
-#    records=[autoscale_setup.load_balancer.dns_name],
-#    zone_id=mitol_zone_id,
-# )
-
-# TODO MD 20230206 revisit this, probably need to export more things  # noqa: E501, FIX002, TD002, TD003, TD004
 export(
     "keycloak",
     {
