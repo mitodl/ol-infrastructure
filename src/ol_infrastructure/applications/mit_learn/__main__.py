@@ -909,16 +909,6 @@ mitopen_fastly_service = fastly.ServiceVcl(
     ),
 )
 
-# LEGACY RETIREMENT : goes away
-# MD : 2025-03-21 Leaving this out of OLApisix* refactoring
-# Resource moved below into conditional block
-
-# Resource moved below into conditional block
-# learn_external_service_oidc_resources = OLApisixOIDCResources(...)
-# Resource moved below into conditional block
-
-# Resource moved below into conditional block
-
 five_minutes = 60 * 5
 route53.Record(
     "ol-mitopen-frontend-dns-record",

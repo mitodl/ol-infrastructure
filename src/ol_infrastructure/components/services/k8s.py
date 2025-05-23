@@ -834,6 +834,7 @@ class OLApisixOIDCConfig(BaseModel):
         "id_token": True,
         "user": True,
     }
+    oidc_session_cookie_domain: str | None = None
     oidc_session_cookie_lifetime: NonNegativeInt = 0
     oidc_ssl_verify: bool = False
     oidc_use_session_secret: bool = False
@@ -893,6 +894,12 @@ class OLApisixOIDCResources(pulumi.ComponentResource):
             ),
         )
 
+        cookie_config = {}
+        if oidc_config.oidc_session_cookie_domain:
+            cookie_config["session"] = {
+                "cookie": {"domain": oidc_config.oidc_session_cookie_domain}
+            }
+
         self.base_oidc_config = {
             "scope": oidc_config.oidc_scope,
             "bearer_only": oidc_config.oidc_bearer_only,
@@ -901,6 +908,7 @@ class OLApisixOIDCResources(pulumi.ComponentResource):
             "renew_access_token_on_expiry": oidc_config.oidc_renew_access_token_on_expiry,
             "logout_path": oidc_config.oidc_logout_path,
             "post_logout_redirect_uri": oidc_config.oidc_post_logout_redirect_uri,
+            **cookie_config,
         }
 
         if oidc_config.oidc_session_cookie_lifetime:
@@ -915,29 +923,21 @@ class OLApisixOIDCResources(pulumi.ComponentResource):
                 oidc_config.oidc_session_contents
             )
 
-    def get_base_oidc_config(
-        self, unauth_action: str, cookie_domain: str | None = None
-    ) -> dict[str, Any]:
+    def get_base_oidc_config(self, unauth_action: str) -> dict[str, Any]:
         """Return the base OIDC configuration dictionary."""
-        cookie_domain_config = (
-            {"session": {"cookie": {"domain": cookie_domain}}} if cookie_domain else {}
-        )
         return {
             **self.base_oidc_config,
-            **cookie_domain_config,
             "unauth_action": unauth_action,
         }
 
-    def get_full_oidc_plugin_config(
-        self, unauth_action: str, cookie_domain: str | None = None
-    ) -> dict[str, Any]:
+    def get_full_oidc_plugin_config(self, unauth_action: str) -> dict[str, Any]:
         """Return the full OIDC plugin configuration dictionary for Apisix."""
         return {
             "name": "openid-connect",
             "enable": True,
             "secretRef": self.secret_name,
             "config": {
-                **self.get_base_oidc_config(unauth_action, cookie_domain),
+                **self.get_base_oidc_config(unauth_action),
             },
         }
 

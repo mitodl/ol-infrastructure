@@ -1196,6 +1196,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                             "http_server_configuration_snippet": textwrap.dedent(
                                 """\
                                 set $session_compressor zlib;
+                                set $session_name gateway_session;
                                 """
                             ),
                         },
