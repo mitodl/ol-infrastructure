@@ -165,7 +165,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
 
         ingress_cidr = ["0.0.0.0/0"]
         if not config.listener_open_to_all_traffic:
-            # TODO: need to provide capabilitiy for caller to set IP range  # noqa: E501, FIX002, TD002, TD003
+            # TODO: need to provide capabilitiy for caller to set IP range  # noqa: E501, FIX002, TD002
             msg = "If listener is not open to all IP ranges, valid CIDR block must be present"  # noqa: E501
             raise ValueError(msg)
 
@@ -262,7 +262,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
             opts=resource_options,
         )
 
-        # TODO: route 53, hosted zone, record created  # noqa: FIX002, TD002, TD003
+        # TODO: route 53, hosted zone, record created  # noqa: FIX002, TD002
 
         # Only containers that explicitly asked to be attached to TG will
         load_balancer_configuration = self.attach_containers_to_target_group(
@@ -319,7 +319,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
         if config.load_balancer_protocol == Protocol.https:
             listener_protocol = "HTTPS"
 
-            # TODO: allow this to be configured  # noqa: FIX002, TD002, TD003
+            # TODO: allow this to be configured  # noqa: FIX002, TD002
             ssl_policy = "ELBSecurityPolicy-2016-08"
             config.listener_port = 443
 

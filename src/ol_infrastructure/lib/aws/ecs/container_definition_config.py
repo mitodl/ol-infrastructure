@@ -38,7 +38,7 @@ class Secret(BaseModel):
 
 
 class OLContainerLogConfig(BaseModel):
-    # TODO: Put list of options in Enum object and set as type (TMM 2021-09-15)  # noqa: E501, FIX002, TD002, TD003
+    # TODO: Put list of options in Enum object and set as type (TMM 2021-09-15)  # noqa: E501, FIX002, TD002
     # Possible values are: "awslogs", "fluentd", "gelf", "json-file", "journald",
     # "logentries", "splunk", "syslog", "awsfirelens"
     log_driver: str
