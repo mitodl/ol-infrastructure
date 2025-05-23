@@ -42,6 +42,9 @@ class AppPipelineParams(BaseModel):
 
 pipeline_params = {
     "mitxonline": AppPipelineParams(app_name="mitxonline", build_target="production"),
+    "mit-learn-nextjs": AppPipelineParams(
+        app_name="mit-learn-nextjs", build_target="build_skip_yarn"
+    ),
 }
 
 
