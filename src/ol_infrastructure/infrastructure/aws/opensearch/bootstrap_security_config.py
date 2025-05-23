@@ -30,10 +30,10 @@ read_only_role = {
         {
             "index_patterns": [
                 "*"
-            ],  # TODO: Define actual indices  # noqa: FIX002, TD002, TD003
+            ],  # TODO: Define actual indices  # noqa: FIX002, TD002
             "allowed_actions": [
                 "read"
-            ],  # TODO: Confirm this is all that is needed  # noqa: FIX002, TD002, TD003
+            ],  # TODO: Confirm this is all that is needed  # noqa: FIX002, TD002
         }
     ],
 }
@@ -47,7 +47,7 @@ read_write_role = {
         {
             "index_patterns": [
                 "*"
-            ],  # TODO: Define actual indices  # noqa: FIX002, TD002, TD003
+            ],  # TODO: Define actual indices  # noqa: FIX002, TD002
             "allowed_actions": [
                 "crud",
                 "create_index",
@@ -56,7 +56,7 @@ read_write_role = {
                 "indices:data/read/scroll/clear",
                 "indices:data/read/scroll*",
                 "indices:data/read/scroll/clear*",
-            ],  # TODO: Confirm this is all that is needed  # noqa: FIX002, TD002, TD003
+            ],  # TODO: Confirm this is all that is needed  # noqa: FIX002, TD002
         }
     ],
 }
