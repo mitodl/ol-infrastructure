@@ -457,7 +457,7 @@ def cloud_init_user_data(  # noqa: PLR0913
                 ),
                 "owner": "root:root",
             },
-            # TODO: Move TLS key and cert injection to Packer build so that private key  # noqa: E501, FIX002, TD002, TD003
+            # TODO: Move TLS key and cert injection to Packer build so that private key  # noqa: E501, FIX002, TD002
             # information isn't being passed as userdata (TMM 2021-08-06)
             {
                 "path": "/etc/vault/ssl/vault.key",
