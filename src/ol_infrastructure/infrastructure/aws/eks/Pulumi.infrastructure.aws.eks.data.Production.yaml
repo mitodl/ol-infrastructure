@@ -29,8 +29,8 @@ config:
         ondemand: true
       node_group_options: {}
       scaling:
-        desired: 3
-        max: 5
+        desired: 4
+        max: 6
         min: 2
       tags: {}
       taints: {}
