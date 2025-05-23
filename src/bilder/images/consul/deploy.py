@@ -45,7 +45,7 @@ TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
 
 install_baseline_packages()
-# TODO bootstrap Consul ACL  # noqa: FIX002, TD002, TD003, TD004
+# TODO bootstrap Consul ACL  # noqa: FIX002, TD002, TD004
 set_env_secrets(Path("consul/consul.env"))
 consul_configuration = {
     Path("00-default.json"): ConsulConfig(
@@ -56,7 +56,7 @@ consul_configuration = {
     )
 }
 
-# TODO ACL token  # noqa: FIX002, TD002, TD003, TD004
+# TODO ACL token  # noqa: FIX002, TD002, TD004
 consul_esm_configuration = {
     Path("00-default.json"): ConsulExternalServicesMonitorConfig(token=""),
 }
