@@ -60,7 +60,7 @@ default_instance_policy = iam.Policy(
     ),
 )
 
-# TODO MAD 20221208  # noqa: FIX002, TD002, TD003, TD004
+# TODO MAD 20221208  # noqa: FIX002, TD002, TD004
 # Leave this to not break compatibility with other stacks importing this
 # Could probably be intergated with app_route_53 zone loop with a tweak
 # the output of the infrastructure.aws.dns stack
