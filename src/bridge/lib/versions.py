@@ -32,7 +32,7 @@ EXTERNAL_DNS_CHART_VERSION = "1.15.0"
 # renovate: datasource=github-releases depName=gateway-api packageName=kubernetes-sigs/gateway-api
 GATEWAY_API_VERSION = "v1.3.0"
 # renovate: datasource=docker depName=karpenter packageName=public.ecr.aws/karpenter/karpenter
-KARPENTER_CHART_VERSION = "1.4.0"
+KARPENTER_CHART_VERSION = "1.5.0"
 # renovate: datasource=docker depName=kube-state-metrics packageName=registry-1.docker.io/bitnamicharts/kube-state-metrics
 KUBE_STATE_METRICS_CHART_VERSION = "5.0.8"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
