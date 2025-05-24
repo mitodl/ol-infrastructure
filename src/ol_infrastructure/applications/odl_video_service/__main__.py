@@ -154,7 +154,7 @@ ovs_server_policy_document = {
         },
         # This block against odl-video-service* buckets is REQUIRED
         # App does not work without it?????
-        # TODO MAD 20221115 Why is it required?  # noqa: FIX002, TD002, TD003, TD004
+        # TODO MAD 20221115 Why is it required?  # noqa: FIX002, TD002, TD004
         # The S3 permissions block following this SHOULD cover what this provides
         # but the app must be making some kind of call to bucket that isn't qualified
         # by the environment (CI,RC,Production)
@@ -525,7 +525,7 @@ ovs_tg_config = OLTargetGroupConfig(
     vpc_id=target_vpc["id"],
     target_group_healthcheck=False,
     health_check_interval=60,
-    health_check_matcher="404",  # TODO Figure out a real endpoint for this  # noqa: E501, FIX002, TD002, TD003, TD004
+    health_check_matcher="404",  # TODO Figure out a real endpoint for this  # noqa: E501, FIX002, TD002, TD004
     health_check_path="/ping",
     stickiness="lb_cookie",
     tags=instance_tags,
