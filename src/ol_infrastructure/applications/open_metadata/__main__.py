@@ -106,7 +106,7 @@ open_metadata_database_security_group = ec2.SecurityGroup(
             to_port=DEFAULT_POSTGRES_PORT,
             description="Access to postgres from open metadata servers.",
         ),
-        # TODO @Ardiea: switch to use pod-security-groups once implemented  # noqa: TD003, FIX002, E501
+        # TODO @Ardiea: switch to use pod-security-groups once implemented  # noqa: FIX002, E501
         ec2.SecurityGroupIngressArgs(
             security_groups=[],
             protocol="tcp",
