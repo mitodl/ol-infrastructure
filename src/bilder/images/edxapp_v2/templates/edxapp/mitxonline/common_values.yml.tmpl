@@ -379,6 +379,7 @@ ICP_LICENSE_INFO: {}
 IDA_LOGOUT_URI_LIST:
   - https://{{ key "edxapp/marketing-domain" }}/logout
   - https://{{ key "edxapp/studio-domain" }}/logout
+  - https://{{ key "edxapp/learn-api-domain" }}/logout
 ID_VERIFICATION_SUPPORT_LINK: ''
 INTEGRATED_CHANNELS_API_CHUNK_TRANSMISSION_LIMIT:
     SAP: 1
@@ -388,11 +389,13 @@ LANGUAGE_COOKIE: {{ env "ENVIRONMENT" }}-openedx-language-preference
 MIT_LEARN_AI_API_URL: https://{{ key "edxapp/learn-api-domain" }}/ai  # Added for ol_openedx_chat
 MIT_LEARN_API_BASE_URL: https://{{ key "edxapp/learn-api-domain" }}/learn  # Added for ol_openedx_chat
 MIT_LEARN_SUMMARY_FLASHCARD_URL: https://{{ key "edxapp/learn-api-domain" }}/learn/api/v1/contentfiles/  # Added for ol_openedx_chat
-MIT_LEARN_BASE_URL = "https://learn.mit.edu"
-MIT_LEARN_SUPPORT_EMAIL = "mitlearn-support@mit.edu"
-MIT_LEARN_API_BASE_URL = "https://api.learn.mit.edu"
+MIT_LEARN_BASE_URL: "https://{{ key edxapp/learn-frontend-domain}}"
+MIT_LEARN_SUPPORT_EMAIL: "mitlearn-support@mit.edu"
+MIT_LEARN_COURSE_KEY_FORMATS:
+  - course-v1:uai_source
+  - course-v1:uai_hhc
+  - course-v1:uai_mit
 MIT_LEARN_LOGO = https://{{ key "edxapp/lms-domain" }}/static/mitxonline/images/mit-learn-logo.svg"
-MITXT_COURSE_KEY_FORMAT = "course-v1:mitxt"
 LEARNER_PORTAL_URL_ROOT: https://learner-portal-localhost:18000
 LEARNER_HOME_MICROFRONTEND_URL: '/dashboard/'
 LEARNING_MICROFRONTEND_URL: https://{{ key "edxapp/lms-domain" }}/learn

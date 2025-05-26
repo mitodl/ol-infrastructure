@@ -1,13 +1,13 @@
 import { PLUGIN_OPERATIONS, DIRECT_PLUGIN } from '@openedx/frontend-plugin-framework';
-import { getConfig, mergeConfig } from '@edx/frontend-platform';
+import { getConfig } from '@edx/frontend-platform';
 import Footer, { Logo, MenuLinks, CopyrightNotice } from './Footer.jsx';
 
 const configData = getConfig();
 const currentYear = new Date().getFullYear();
 const edxMfeAppName = configData.APP_ID;
 const authoringAppID = "authoring";
-const MITxTCourseKeyFormat = "course-v1:mitxt";
-const isMITxTCourse = window.location.href.toLowerCase().includes(MITxTCourseKeyFormat);
+const LearnCourseKeyFormats = ["course-v1:uai_source", "course-v1:uai_hhc", "course-v1:uai_mit"];
+const isLearnCourse = LearnCourseKeyFormats.some((key) => window.location.href.toLowerCase().includes(key));
 const accessibilityURL = process.env.ACCESSIBILITY_URL || 'https://accessibility.mit.edu/';
 const linkTitles = {
   dashboard: "Dashboard",
@@ -21,44 +21,22 @@ const linkTitles = {
   accessibility: "Accessibility",
 };
 
-let copyRightText = 'Massachusetts Institute of Technology';
-let logo = <Logo imageUrl={process.env.MIT_LEARN_LOGO} destinationUrl={process.env.MIT_LEARN_BASE_URL} />;
+const copyRightText = `${configData.SITE_NAME.replace(/\b(CI|QA|Staging)\b/g, "").trim()}. All rights reserved.`;
+
+const logo = <Logo imageUrl={configData.LOGO_URL} destinationUrl={configData.MARKETING_SITE_BASE_URL} />;
+
 let userMenu = [
   {
     url: `${process.env.MIT_LEARN_BASE_URL}/dashboard`,
     title: linkTitles.dashboard,
   },
   {
-    url: `${process.env.MIT_LEARN_API_BASE_URL}/learn/logout/`,
+    url: `${configData.LMS_BASE_URL}/logout`,
     title: linkTitles.logout,
   },
 ];
-let footerLegalLinks = [
-  {
-    url: `${process.env.MIT_LEARN_BASE_URL}/about`,
-    title: linkTitles.aboutUs,
-  },
-  {
-    url: `${process.env.MIT_LEARN_BASE_URL}/privacy`,
-    title: linkTitles.privacyPolicy,
-  },
-  {
-    url: `${process.env.MIT_LEARN_BASE_URL}/honor`,
-    title: linkTitles.honorCode,
-  },
-  {
-    url: `${process.env.MIT_LEARN_BASE_URL}/terms-of-service`,
-    title: linkTitles.termsOfService,
-  },
-  {
-    url: accessibilityURL,
-    title: linkTitles.accessibility,
-  },
-];
 
-if (isMITxTCourse && edxMfeAppName !== authoringAppID) {
-  copyRightText = `${configData.SITE_NAME.replace(/\b(CI|QA|Staging)\b/g, "").trim()}. All rights reserved.`;
-  logo = <Logo imageUrl={configData.LOGO_URL} destinationUrl={configData.MARKETING_SITE_BASE_URL} />;
+if (!isLearnCourse) {
 
   userMenu = [
     {
@@ -79,7 +57,9 @@ if (isMITxTCourse && edxMfeAppName !== authoringAppID) {
     },
   ];
 
-  footerLegalLinks = [
+}
+
+const footerLegalLinks = [
     {
       url: `${configData.MARKETING_SITE_BASE_URL}/about-us/`,
       title: linkTitles.aboutUs,
@@ -101,7 +81,6 @@ if (isMITxTCourse && edxMfeAppName !== authoringAppID) {
       title: linkTitles.accessibility,
     },
   ];
-}
 
 const DesktopHeaderUserMenu = (widget) => {
   widget.content.menu = [
@@ -197,13 +176,6 @@ let config = {
 
 // Additional plugin config based on MFE
 if (edxMfeAppName === authoringAppID) {
-  mergeConfig(
-    {
-      "LOGO_URL": process.env.MIT_LEARN_LOGO,
-      "LOGOUT_URL": `${process.env.MIT_LEARN_API_BASE_URL}/learn/logout/`,
-      "SITE_NAME": "MIT Learn",
-    }
-  );
   config = {
     ...config,
     pluginSlots: {
@@ -247,28 +219,6 @@ if (learningApps.includes(edxMfeAppName)) {
       },
     ],
   };
-}
-
-const MITLearnLogo = ( widget ) => {
-  widget.content.href = process.env.MIT_LEARN_BASE_URL;
-  widget.content.src = process.env.MIT_LEARN_LOGO;
-  return widget;
-};
-
-if (!isMITxTCourse) {
-  config.pluginSlots = {
-    ...config.pluginSlots,
-    logo_slot: {
-      keepDefault: true,
-      plugins: [
-        {
-          op: PLUGIN_OPERATIONS.Modify,
-          widgetId: 'default_contents',
-          fn: MITLearnLogo,
-        },
-      ]
-    },
-  }
 }
 
 export default config;
