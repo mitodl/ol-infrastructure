@@ -3,9 +3,10 @@ set -euo pipefail
 ###############################################################################
 # Helper script to login to an EKS cluster. It accepts the following options:
 #
-# -c <context>   The Kubernetes context to use (default: applications-qa)
-# -n <namespace> The Kubernetes namespace to use (default: none)
+# -c <context>   The Kubernetes context to use (ex: applications-qa, default: none))
+# -n <namespace> The Kubernetes namespace to use (ex: learn-ai, default: none)
 # -d <duration>  The duration in minutes for which the AWS credentials are valid
+# -g Set AWS creds globally (default: false)
 #
 # Usage: bash ./eks.sh -c <context> -n <namespace>
 # Example: bash ./eks.sh -c applications-qa -n learn-ai
@@ -16,13 +17,15 @@ set -euo pipefail
 ###############################################################################
 
 # Initialize variables for context and namespace
-KUBE_CONTEXT="applications-qa"
+KUBE_CONTEXT=""
 KUBE_NAMESPACE=""
 AWS_EXPIRES_IN="60"
+AWS_GLOBAL_CREDS=false
 EKS_PATH="../../src/ol_infrastructure/infrastructure/aws/eks"
+START_LENS=false
 
 # Parse command-line options
-while getopts ":c:n:d:" opt; do
+while getopts ":c:n:d:gl" opt; do
   case $opt in
     c)
       KUBE_CONTEXT="$OPTARG"
@@ -32,6 +35,11 @@ while getopts ":c:n:d:" opt; do
       ;;
     d)
       AWS_EXPIRES_IN="$OPTARG"
+      ;;
+    g)
+      AWS_GLOBAL_CREDS=true
+      ;;
+    l) START_LENS=true
       ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
@@ -59,6 +67,14 @@ source github.env
 python "$EKS_PATH/login_helper.py" aws_creds -d "$AWS_EXPIRES_IN" | grep '^export' > eks.env
 # shellcheck source=/dev/null
 source eks.env
+if [ "$AWS_GLOBAL_CREDS" == true ]; then
+  echo "Setting global AWS credentials globally"
+  aws configure set aws_access_key_id "$AWS_ACCESS_KEY_ID"
+  aws configure set aws_secret_access_key "$AWS_SECRET_ACCESS_KEY"
+  aws configure set aws_region  "$AWS_REGION"
+  aws configure set aws_default_region "$AWS_DEFAULT_REGION"
+fi
+
 python "$EKS_PATH/login_helper.py" kubeconfig > ~/.kube/config
 
 if [ -n "$KUBE_CONTEXT" ]; then
@@ -66,4 +82,12 @@ if [ -n "$KUBE_CONTEXT" ]; then
 fi
 if [ -n "$KUBE_NAMESPACE" ]; then
   kubectl get pods -n "$KUBE_NAMESPACE"
+fi
+if [ "$START_LENS" == true ]; then
+  echo "Starting Lens..."
+  if command -v lens-desktop &> /dev/null; then
+    lens-desktop > /dev/null 2>&1 &
+  else
+    echo "Lens is not installed. Please install Lens to manage your Kubernetes clusters."
+  fi
 fi
