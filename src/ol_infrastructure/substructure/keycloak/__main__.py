@@ -450,13 +450,16 @@ ol_data_platform_realm = keycloak.Realm(
     account_theme="keycloak.v3",
     admin_theme="keycloak.v2",
     login_theme="keycloak.v2",
-    email_theme="keycloak",
+    email_theme="ol-data-platform",
     registration_email_as_username=True,
     login_with_email_allowed=True,
     duplicate_emails_allowed=False,
     realm="ol-data-platform",
     reset_password_allowed=False,
     verify_email=False,
+    password_policy=(  # noqa: S106 # pragma: allowlist secret
+        "length(30) and forceExpiredPasswordChange(365)  and notUsername and notEmail"
+    ),
     registration_allowed=False,
     security_defenses=keycloak.RealmSecurityDefensesArgs(
         brute_force_detection=keycloak.RealmSecurityDefensesBruteForceDetectionArgs(
@@ -518,12 +521,11 @@ ol_data_platforme_realm_events = keycloak.RealmEvents(
 )
 
 ol_data_required_action_configure_otp = keycloak.RequiredAction(
-    "webauthn-register-passwordless",
+    "ol-data-configure-totp",
     realm_id=ol_data_platform_realm.realm,
-    alias="webauthn-register-passwordless",
+    alias="CONFIGURE_TOTP",
     default_action=True,
     enabled=True,
-    name="Webauthn Register Passwordless",
     opts=resource_options,
 )
 
@@ -535,56 +537,6 @@ ol_data_required_action_verify_email = keycloak.RequiredAction(
     enabled=False,
     opts=resource_options,
 )
-
-# OL Data - Passwordless Browser login flow with [START]
-ol_data_passwordless_browser_flow = keycloak.authentication.Flow(
-    "ol-data-passwordless-browser-flow",
-    realm_id=ol_data_platform_realm.id,
-    alias="ol-data-passwordless-browser-flow",
-    opts=resource_options,
-)
-ol_data_passwordless_browser_flow_cookie = keycloak.authentication.Execution(
-    "ol-data-passwordless-browser-flow-cookie",
-    parent_flow_alias=ol_data_passwordless_browser_flow.alias,
-    authenticator="auth-cookie",
-    realm_id=ol_data_platform_realm.realm,
-    requirement="ALTERNATIVE",
-    opts=resource_options,
-)
-ol_data_passwordless_browser_flow_webauthn_flow = keycloak.authentication.Subflow(
-    "ol-data-passwordless-browser-flow-webauthn-flow",
-    realm_id=ol_data_platform_realm.id,
-    alias="ol-data-passwordless-browser-flow-webauthn-flow",
-    parent_flow_alias=ol_data_passwordless_browser_flow.alias,
-    provider_id="basic-flow",
-    requirement="ALTERNATIVE",
-    opts=resource_options,
-)
-ol_data_passwordless_browser_flow_username_form = keycloak.authentication.Execution(
-    "ol-data-passwordless-browser-flow-username-form",
-    parent_flow_alias=ol_data_passwordless_browser_flow_webauthn_flow.alias,
-    authenticator="auth-username-form",
-    realm_id=ol_data_platform_realm.realm,
-    requirement="REQUIRED",
-    opts=resource_options,
-)
-ol_data_passwordless_browser_flow_webauthn_passwordless_auth = (
-    keycloak.authentication.Execution(
-        "ol-data-passwordless-browser-flow-webauthn-passwordless-auth",
-        parent_flow_alias=ol_data_passwordless_browser_flow_webauthn_flow.alias,
-        authenticator="webauthn-authenticator-passwordless",
-        realm_id=ol_data_platform_realm.realm,
-        requirement="REQUIRED",
-        opts=resource_options,
-    )
-)
-ol_data_passwordless_browser_flow_binding = keycloak.authentication.Bindings(
-    "ol-data-passwordless-browser-flow-binding",
-    browser_flow=ol_data_passwordless_browser_flow.alias,
-    realm_id=ol_data_platform_realm.realm,
-    opts=resource_options,
-)
-# OL - Passwordless Browser login flow [END]
 
 # OL Data - First login flow [START]
 # Does not require email verification or confirmation to connect with existing account.
@@ -1217,6 +1169,8 @@ ol_data_platform_superset_client = keycloak.openid.Client(
     client_secret=keycloak_realm_config.get("ol-data-platform-superset-client-secret"),
     enabled=True,
     access_type="CONFIDENTIAL",
+    # Needed to use for Superset API access
+    direct_access_grants_enabled=True,
     standard_flow_enabled=True,
     implicit_flow_enabled=False,
     service_accounts_enabled=True,
