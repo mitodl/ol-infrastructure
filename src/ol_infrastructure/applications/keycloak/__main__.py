@@ -494,13 +494,12 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
                 "name": "spi-theme-welcome-theme",
                 "value": "scim",
             },
-            {"name": "tracing-enabled", "value": "true"},
-            {
-                "name": "tracing-endpoint",
-                "value": "http://grafana-alloy.operations.svc.cluster.local:4317",
-            },
-            {"name": "tracing-smapler-ratio", "value": "0.2"},
         ],
+        "tracing": {
+            "enabled": True,
+            "endpoint": "http://grafana-alloy.operations.svc.cluster.local:4317",
+            "samplerRatio": 0.2,
+        },
         "hostname": {
             "hostname": keycloak_domain,
         },
