@@ -155,9 +155,9 @@ def create_mitxonline_k8s_secrets(
         and a list of the corresponding Pulumi resource objects.
     """
     secret_names: list[str] = []
-    secret_resources: list[
-        Union[OLVaultK8SSecret, kubernetes.core.v1.Secret]
-    ] = []  # Keep track of resources if needed later
+    secret_resources: list[Union[OLVaultK8SSecret, kubernetes.core.v1.Secret]] = (
+        []
+    )  # Keep track of resources if needed later
 
     vaultauth = vault_k8s_resources.auth_name
 
@@ -239,6 +239,8 @@ def create_mitxonline_k8s_secrets(
                 "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET_KEY_ID": '{{ index .Secrets "cybersource" "merchant-secret-key-id" }}',
                 "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID": '{{ index .Secrets "cybersource" "profile-id" }}',
                 "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY": '{{ index .Secrets "cybersource" "security-key" }}',
+                "MITOL_SCIM_KEYCLOAK_CLIENT_ID": '{{ index .Secrets "keycloak-scim" "client-id" }}',
+                "MITOL_SCIM_KEYCLOAK_CLIENT_SECRET": '{{ index .Secrets "keycloak-scim" "client-secret" }}',
                 "MITX_ONLINE_REFINE_OIDC_CONFIG_CLIENT_ID": '{{ index .Secrets "refine-oidc" "client-id" }}',
                 "OIDC_RSA_PRIVATE_KEY": '{{ index .Secrets "refine-oidc" "rsa-private-key" }}',
                 "OPENEDX_API_CLIENT_ID": '{{ index .Secrets "open-edx-api-client" "client-id" }}',

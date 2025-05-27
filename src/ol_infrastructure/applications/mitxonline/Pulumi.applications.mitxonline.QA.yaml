@@ -28,6 +28,7 @@ config:
     MITOL_HUBSPOT_API_ID_PREFIX: "mitxonline-rc"
     MITOL_PAYMENT_GATEWAY_CYBERSOURCE_REST_API_ENVIRONMENT: "apitest.cybersource.com"
     MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
+    MITOL_SCIM_KEYCLOAK_BASE_URL: "https://sso-qa.ol.mit.edu/realms/olapps/"
     MITXONLINE_NEW_USER_LOGIN_URL: https://rc.mitxonline.mit.edu/create-profile
     MITX_ONLINE_BASE_URL: "https://rc.mitxonline.mit.edu"
     MITX_ONLINE_ENVIRONMENT: "rc"
