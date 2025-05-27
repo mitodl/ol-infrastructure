@@ -53,7 +53,6 @@ class OpenEdxVars(BaseModel):
     logo_url: str
     marketing_site_domain: str
     mit_learn_base_url: Optional[str] = None
-    mit_learn_logo: Optional[str] = None
     plugin_slot_config_file_map: Optional[dict[str, str]] = None
     privacy_policy_url: Optional[str] = None
     schedule_email_section: Optional[str] = None
