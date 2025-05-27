@@ -155,9 +155,9 @@ def create_mitxonline_k8s_secrets(
         and a list of the corresponding Pulumi resource objects.
     """
     secret_names: list[str] = []
-    secret_resources: list[Union[OLVaultK8SSecret, kubernetes.core.v1.Secret]] = (
-        []
-    )  # Keep track of resources if needed later
+    secret_resources: list[
+        Union[OLVaultK8SSecret, kubernetes.core.v1.Secret]
+    ] = []  # Keep track of resources if needed later
 
     vaultauth = vault_k8s_resources.auth_name
 
