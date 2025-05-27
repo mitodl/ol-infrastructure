@@ -20,7 +20,9 @@ setup_vault_provider()
 
 
 def fetch_realm_public_key(keycloak_url: str, realm_id: str) -> str:
-    with urllib.request.urlopen(f"{keycloak_url}/realms/{realm_id}/") as response:  # noqa: S310
+    with urllib.request.urlopen(
+        f"{keycloak_url}/realms/{realm_id}/"
+    ) as response:  # noqa: S310
         public_key_url_response = json.load(response)
     public_key = public_key_url_response["public_key"]
     if public_key:
@@ -910,7 +912,7 @@ olapps_open_discussions_client_data = vault.generic.Secret(
     ).apply(json.dumps),
 )
 # OPEN DISCUSSIONS [END]
-# OLAPPS REALM - OpenID Clients [START]
+# OLAPPS REALM - OpenID Clients [END]
 
 # OL-PLATFORM-ENGINEERING REALM - OpenID Clients [START]
 
