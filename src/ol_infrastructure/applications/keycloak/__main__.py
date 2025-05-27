@@ -477,8 +477,6 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
                 "name": "disable-external-access",
                 "value": "true",
             },
-            {"name": "log", "value": "console"},
-            {"name": "log-console-format", "value": "json"},
             {"name": "metrics-enabled", "value": "true"},
             {
                 "name": "spi-login-provider",
