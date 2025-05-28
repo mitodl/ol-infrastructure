@@ -262,6 +262,14 @@ def create_mitxonline_k8s_secrets(
                 "MITX_ONLINE_REGISTRATION_ACCESS_TOKEN": '{{ get .Secrets "value" }}',
             },
         },
+        {
+            "base_name": "mitxonline-keycloak-scim-details",
+            "path": "secret-mitxonline/keycloak-scim",
+            "templates": {
+                "MITOL_SCIM_KEYCLOAK_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+                "MITOL_SCIM_KEYCLOAK_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+            },
+        },
     ]
 
     for config in mitxonline_secrets_configs:
