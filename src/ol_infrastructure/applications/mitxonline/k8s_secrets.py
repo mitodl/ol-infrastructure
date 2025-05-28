@@ -263,8 +263,8 @@ def create_mitxonline_k8s_secrets(
             },
         },
         {
-            "base_name": "mitxonline-keycloak-scim-details",
-            "path": "secret-mitxonline/keycloak-scim",
+            "base_name": "keycloak-scim-details",
+            "path": "keycloak-scim",
             "templates": {
                 "MITOL_SCIM_KEYCLOAK_CLIENT_ID": '{{ get .Secrets "client_id" }}',
                 "MITOL_SCIM_KEYCLOAK_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
