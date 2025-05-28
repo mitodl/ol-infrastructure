@@ -910,6 +910,44 @@ olapps_open_discussions_client_data = vault.generic.Secret(
     ).apply(json.dumps),
 )
 # OPEN DISCUSSIONS [END]
+
+# MITXONLINE SCIM [START]
+olapps_mitxonline_client = keycloak.openid.Client(
+    "olapps-mitxonline-client",
+    name="ol-mitxonline-client",
+    realm_id="olapps",
+    client_id="ol-mitxonline-client",
+    client_secret=keycloak_realm_config.get("olapps-mitxonline-client-secret"),
+    enabled=True,
+    access_type="CONFIDENTIAL",
+    standard_flow_enabled=False,
+    implicit_flow_enabled=False,
+    service_accounts_enabled=True,
+    opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+)
+olapps_mitxonline_client_data = vault.generic.Secret(
+    "olapps-mitxonline-client-vault-oidc-credentials",
+    path="secret-mitxonline/keycloak-scim",
+    data_json=Output.all(
+        url=olapps_mitxonline_client.realm_id.apply(
+            lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+        ),
+        client_id=olapps_mitxonline_client.client_id,
+        client_secret=olapps_mitxonline_client.client_secret,
+        # This is included for the case where we are using traefik-forward-auth.
+        # It requires a random secret value to be present which is independent
+        # of the OAuth credentials.
+        secret=secrets.token_urlsafe(),
+        realm_id=olapps_mitxonline_client.realm_id,
+        realm_name="olapps",
+        realm_public_key=olapps_mitxonline_client.realm_id.apply(
+            lambda realm_id: fetch_realm_public_key_partial(realm_id)
+        ),
+    ).apply(json.dumps),
+)
+
+# MITXONLINE SCIM [END]
+
 # OLAPPS REALM - OpenID Clients [START]
 
 # OL-PLATFORM-ENGINEERING REALM - OpenID Clients [START]
