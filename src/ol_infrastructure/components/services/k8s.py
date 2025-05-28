@@ -836,8 +836,8 @@ class OLApisixOIDCConfig(BaseModel):
     }
     oidc_session_cookie_domain: str | None = None
     oidc_session_cookie_lifetime: NonNegativeInt = 0
-    oidc_ssl_verify: bool = False
-    oidc_use_session_secret: bool = False
+    oidc_ssl_verify: bool = True
+    oidc_use_session_secret: bool = True
 
 
 class OLApisixOIDCResources(pulumi.ComponentResource):
