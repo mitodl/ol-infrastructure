@@ -8,6 +8,9 @@ set -euo pipefail
 # -d <duration>  The duration in minutes for which the AWS credentials are valid
 # -g Set AWS creds globally (default: false)
 #
+# After the command completes, run `source eks.env` to set the environment vars
+# in your current shell session.
+#
 # Usage: bash ./eks.sh -c <context> -n <namespace>
 # Example: bash ./eks.sh -c applications-qa -n learn-ai
 #
@@ -22,10 +25,9 @@ KUBE_NAMESPACE=""
 AWS_EXPIRES_IN="60"
 AWS_GLOBAL_CREDS=false
 EKS_PATH="../../src/ol_infrastructure/infrastructure/aws/eks"
-START_LENS=false
 
 # Parse command-line options
-while getopts ":c:n:d:gl" opt; do
+while getopts ":c:n:d:g" opt; do
   case $opt in
     c)
       KUBE_CONTEXT="$OPTARG"
@@ -38,8 +40,6 @@ while getopts ":c:n:d:gl" opt; do
       ;;
     g)
       AWS_GLOBAL_CREDS=true
-      ;;
-    l) START_LENS=true
       ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
@@ -82,12 +82,4 @@ if [ -n "$KUBE_CONTEXT" ]; then
 fi
 if [ -n "$KUBE_NAMESPACE" ]; then
   kubectl get pods -n "$KUBE_NAMESPACE"
-fi
-if [ "$START_LENS" == true ]; then
-  echo "Starting Lens..."
-  if command -v lens-desktop &> /dev/null; then
-    lens-desktop > /dev/null 2>&1 &
-  else
-    echo "Lens is not installed. Please install Lens to manage your Kubernetes clusters."
-  fi
 fi
