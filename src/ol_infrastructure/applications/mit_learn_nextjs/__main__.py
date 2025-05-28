@@ -1,9 +1,15 @@
 import os
 
 import pulumi_kubernetes as kubernetes
-from pulumi import ResourceOptions, StackReference
+from pulumi import Config, ResourceOptions, StackReference
 
 from bridge.lib.magic_numbers import DEFAULT_NEXTJS_PORT
+from ol_infrastructure.components.aws.eks import (
+    OLEKSGateway,
+    OLEKSGatewayConfig,
+    OLEKSGatewayListenerConfig,
+    OLEKSGatewayRouteConfig,
+)
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
@@ -32,25 +38,31 @@ cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(learn_namespace, ns)
 )
 
+nextjs_config = Config("nextjs")
+
 raw_env_vars = {
-    "NEXT_PUBLIC_APPZI_URL": "sample",
-    "NEXT_PUBLIC_CSRF_COOKIE_NAME": "sample",
-    "NEXT_PUBLIC_EMBEDLY_KEY": "sample",
-    "NEXT_PUBLIC_LEARN_AI_RECOMMENDATION_ENDPOINT": "https://api.rc.learn.mit.edu/sample",
-    "NEXT_PUBLIC_LEARN_AI_SYLLABUS_ENDPOINT": "https://api.rc.learn.mit.edu/sample",
-    "NEXT_PUBLIC_MITOL_API_BASE_URL": "https://api.rc.learn.mit.edu",
+    "NEXT_PUBLIC_APPZI_URL": nextjs_config.require("appzi_url"),
+    "NEXT_PUBLIC_CSRF_COOKIE_NAME": f"learn-{stack_info.env_suffix}-csrftoken",
+    "NEXT_PUBLIC_EMBEDLY_KEY": nextjs_config.require("embedly_key"),
+    "NEXT_PUBLIC_LEARN_AI_RECOMMENDATION_ENDPOINT": nextjs_config.require(
+        "recommendation_endpoint"
+    ),
+    "NEXT_PUBLIC_LEARN_AI_SYLLABUS_ENDPOINT": nextjs_config.require(
+        "syllabus_endpoint"
+    ),
+    "NEXT_PUBLIC_MITOL_API_BASE_URL": nextjs_config.require("mitlearn_api_base_url"),
     "NEXT_PUBLIC_MITOL_AXIOS_WITH_CREDENTIALS": "true",
     "NEXT_PUBLIC_MITOL_SUPPORT_EMAIL": "mitlearn-support@mit.edu",
-    "NEXT_PUBLIC_ORIGIN": "https://rc.learn.mit.edu",
-    "NEXT_PUBLIC_POSTHOG_API_HOST": "https://ph.ol.mit.edu",
-    "NEXT_PUBLIC_POSTHOG_API_KEY": "sample",  # pragma: allowlist secret
-    "NEXT_PUBLIC_POSTHOG_PROJECT_ID": "sample",
-    "NEXT_PUBLIC_SENTRY_DSN": "sample",
+    "NEXT_PUBLIC_ORIGIN": nextjs_config.require("origin"),
+    "NEXT_PUBLIC_POSTHOG_API_HOST": nextjs_config.require("posthog_api_host"),
+    "NEXT_PUBLIC_POSTHOG_API_KEY": nextjs_config.require("posthog_api_key"),
+    "NEXT_PUBLIC_POSTHOG_PROJECT_ID": nextjs_config.require("posthog_project_id"),
+    "NEXT_PUBLIC_SENTRY_DSN": nextjs_config.require("sentry_dsn"),
     "NEXT_PUBLIC_SENTRY_ENV": "sample",
-    "NEXT_PUBLIC_SENTRY_PROFILES_SAMPLE_RATE": "sample",
-    "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE": "sample",
+    "NEXT_PUBLIC_SENTRY_PROFILES_SAMPLE_RATE": "1",
+    "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE": "1",
     "NEXT_PUBLIC_SITE_NAME": "MIT Learn",
-    "NEXT_PUBLIC_VERSION": "sample",
+    "NEXT_PUBLIC_VERSION": MIT_LEARN_NEXTJS_DOCKER_TAG,
 }
 
 env_vars = []
@@ -136,6 +148,7 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
 )
 
 # Create a Kubernetes Service to expose the deployment
+mit_learn_nextjs_service_name = "mit-learn-nextjs"
 mit_learn_nextjs_service = kubernetes.core.v1.Service(
     f"mit-learn-nextjs-{stack_info.name}-service-resource",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -157,5 +170,40 @@ mit_learn_nextjs_service = kubernetes.core.v1.Service(
     ),
     opts=ResourceOptions(
         parent=mit_learn_nextjs_deployment,
+    ),
+)
+
+gateway = OLEKSGateway(
+    f"mit-learn-nextjs-{stack_info.name}-gateway",
+    gateway_config=OLEKSGatewayConfig(
+        cert_issuer="letsencrypt-production",
+        cert_issuer_class="cluster-issuer",
+        gateway_name="mit-learn-nextjs-gateway",
+        labels=k8s_global_labels,
+        namespace=learn_namespace,
+        listeners=[
+            OLEKSGatewayListenerConfig(
+                name="https",
+                hostname=nextjs_config.require("domain"),
+                port=8443,
+                tls_mode="Terminate",
+                certificate_secret_name="mit-learn-nextjs-tls",  # noqa: S106  # pragma: allowlist secret
+                certificate_secret_namespace=learn_namespace,
+            ),
+        ],
+        routes=[
+            OLEKSGatewayRouteConfig(
+                backend_service_name=mit_learn_nextjs_service_name,
+                backend_service_namespace=learn_namespace,
+                backend_service_port=DEFAULT_NEXTJS_PORT,
+                hostnames=[nextjs_config.require("domain")],
+                name="mit-learn-nextjs-https",
+                listener_name="https",
+                port=8443,
+            ),
+        ],
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
     ),
 )

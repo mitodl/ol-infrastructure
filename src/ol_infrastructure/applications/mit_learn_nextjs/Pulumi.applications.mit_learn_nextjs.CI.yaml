@@ -1,3 +1,21 @@
 ---
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAECRkF0SPcf8lDRwZkP0LN3AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMDkc54eRDletxkPX3AgEQgDsebq8LFx4iGrKOWHJC8kRcQT5fimO+OzsUcgyFJPcD/Qg4M/HTVyYjm6DtaMMQ0W05CyXPpeygVLBvRg==
+config:
+  nextjs:appzi_url:
+    secure: v1:yyK+IL139zcQwO6R:FLalp7XHE+gDfCWBDooLwg==
+  nextjs:domain: "next.ci.learn.mit.edu"
+  nextjs:embedly_key:
+    secure: v1:9n/aYdG9CsOgh24r:I1i8lrMAmDCGiGyL6HKXRnz2Mk571vvk0/uiQg5wlte69B2CEQl0cKhMgd9F1Gpq
+  nextjs:mitlearn_api_base_url: "https://api.ci.learn.mit.edu"
+  nextjs:origin: "https://ci.learn.mit.edu"
+  nextjs:posthog_api_host: "https://ph.ol.mi.edu"
+  nextjs:posthog_api_key:
+    secure: v1:zGa9gfGxm9+PIj4h:RkSzQvMgCoYy1LyCjYaLgITlE6OXsmeIelfDoJ+3weNLG4OQrBHhY4Xxh9pOtgzcT+JqEX8kgEoz22KCbwje
+  nextjs:posthog_project_id:
+    secure: v1:Xv1qHgJWezgxxzR4:kJgfz6aWcSZcexA6GuB3cVg2ERZlhmnvi/WoXgvo8C6pSH5Pmw2P+D9kDcRIqLTkQYBOxOmkWgkUvmoQMVVS8VFfAg==
+  nextjs:recommendation_endpoint: "https://api.ci.learn.mit.edu/http/recommendation_agent/"
+  nextjs:sentry_dsn:
+    secure: v1:GISrW09cyDNOopo5:3ubNcN1ZOhKreca0xTuBAQ==
+  nextjs:sentry_env: "ci"
+  nextjs:syllabus_endpoint: "https://api.ci.learn.mit.edu/http/syllabus_agent/"
