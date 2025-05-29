@@ -16,6 +16,6 @@ config:
     secure: v1:Xv1qHgJWezgxxzR4:kJgfz6aWcSZcexA6GuB3cVg2ERZlhmnvi/WoXgvo8C6pSH5Pmw2P+D9kDcRIqLTkQYBOxOmkWgkUvmoQMVVS8VFfAg==
   nextjs:recommendation_endpoint: "https://api.ci.learn.mit.edu/http/recommendation_agent/"
   nextjs:sentry_dsn:
-    secure: v1:GISrW09cyDNOopo5:3ubNcN1ZOhKreca0xTuBAQ==
+    secure: v1:SnXgUqO2QU5Do92r:q2aEQCye/qf9Adez/aVPU2wG0IbiIrhcZ9AcNgigh360jQ334kYBo1DBl2G/yYHXueuKY5O7DMR0haXKwFFCpTOrrbkod1hIRmmCMxO1fOXNmWAkMNDI/Rd+Ao/OKczGCdUU9w==
   nextjs:sentry_env: "ci"
   nextjs:syllabus_endpoint: "https://api.ci.learn.mit.edu/http/syllabus_agent/"
