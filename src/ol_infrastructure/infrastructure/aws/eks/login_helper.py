@@ -2,11 +2,22 @@
 
 import argparse
 import os
+import socket
 import sys
 from datetime import datetime, timedelta
 
 import hvac
+import requests.packages.urllib3.util.connection as urllib3_conn
 import yaml
+
+
+# From @nlevesque in Slack: https://mitodl.slack.com/archives/G1VJQHQHK/p1748527356389399
+def allowed_gai_family():
+    """Only allow IPv4 requests."""
+    return socket.AF_INET
+
+
+urllib3_conn.allowed_gai_family = allowed_gai_family
 
 parser = argparse.ArgumentParser(description="EKS Login Helper")
 subparsers = parser.add_subparsers(help="functions")
