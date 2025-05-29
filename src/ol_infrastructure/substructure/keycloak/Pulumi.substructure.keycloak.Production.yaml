@@ -26,13 +26,16 @@ config:
     secure: v1:iwlNVKpViup/xmjh:1nzhVf0/XBinQsI78YdpTcBZQiHgr9heAg+qv9T0rw==
   keycloak_realm:mit_email_username:
     secure: v1:ixrI5oZwMK2WCpQr:NaqM67NVCRDfOCsTlyrnN4tNmrPXcSOs
-  keycloak_realm:olapps-unified-ecommerce-client-redirect-uris: ["https://pay.ol.mit.edu/*",
-    "https://api-pay.ol.mit.edu/*"]
-  keycloak_realm:olapps-unified-ecommerce-client-logout-uris: ["/establish_session*",
-    ".apisix/redirect/*"]
+  keycloak_realm:olapps-unified-ecommerce-client-redirect-uris:
+  - "https://pay.ol.mit.edu/*"
+  - "https://api-pay.ol.mit.edu/*"
+  keycloak_realm:olapps-unified-ecommerce-client-logout-uris:
+  - "/establish_session*"
+  - ".apisix/redirect/*"
   keycloak_realm:olapps-unified-ecommerce-client-roles: ["https://api-pay.ol.mit.edu/*"]
-  keycloak_realm:olapps-learn-ai-redirect-uris: ["https://learn-ai.ol.mit.edu/*",
-    "https://api-learn-ai.ol.mit.edu/*"]
+  keycloak_realm:olapps-learn-ai-redirect-uris:
+  - "https://learn-ai.ol.mit.edu/*"
+  - "https://api-learn-ai.ol.mit.edu/*"
   keycloak_realm:olapps-learn-ai-client-roles: ["https://api-learn-ai.ol.mit.edu/*"]
   keycloak_realm:olapps-mitlearn-client-redirect-uris:
   - "https://api.learn.mit.edu/*"
@@ -52,14 +55,18 @@ config:
   keycloak_realm:ol-platform-engineering-airbyte-redirect-uris: ["https://airbyte.odl.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-dagster-redirect-uris: ["https://pipelines.odl.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-leek-redirect-uris: ["https://celery-monitoring.odl.mit.edu/*"]
-  keycloak_realm:ol-platform-engineering-vault-redirect-uris: ["https://vault.odl.mit.edu/ui/vault/auth/oidc/oidc/callback",
-    "http://localhost:8250/oidc/callback"]
+  keycloak_realm:ol-platform-engineering-vault-redirect-uris:
+  - "https://vault.odl.mit.edu/ui/vault/auth/oidc/oidc/callback"
+  - "http://localhost:8250/oidc/callback"
   keycloak_realm:ol-data-platform-superset-redirect-uris: ["https://bi.ol.mit.edu/*"]
-  keycloak_realm:ol-data-platform-superset-client-roles: ["superset_admin", "superset_alpha",
-    "superset_gamma"]
+  keycloak_realm:ol-data-platform-superset-client-roles:
+  - "superset_admin"
+  - "superset_alpha"
+  - "superset_gamma"
   keycloak_realm:ol-data-platform-openmetadata-redirect-uris: ["https://data.ol.mit.edu/*"]
-  keycloak_realm:ol-data-platform-openmetadata-client-roles: ["open_metadata_admin",
-    "open_metadata_user"]
+  keycloak_realm:ol-data-platform-openmetadata-client-roles:
+  - "open_metadata_admin"
+  - "open_metadata_user"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   keycloak_realm:olapps-unified-ecommerce-client-secret:
