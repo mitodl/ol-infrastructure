@@ -81,5 +81,5 @@ config:
     secure: v1:56Sc/lnkJ3zwDj62:YmgdAN9f8QQK1L5hIygF3I31St5PS8IjlwRyFkP/i2hxNxoNzKsbJQCIskQ58bte
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
-  keycloak:session_secret:
+  keycloak_realm:session_secret:
     secure: v1:SKlByHIh5fj/2MlA:1hzqRgIoqGowunYEVMMhdzPPBPUGucSUjlcOUDuuPL7JIg+Mpp2nGu8sHGfSMtfeAFOKNlQ6bmMF2oQ=

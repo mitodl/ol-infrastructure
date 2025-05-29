@@ -170,7 +170,7 @@ ol_platform_engineering_rsa_key = keycloak.RealmKeystoreRsa(
 """
 
 # Create OL Public Realm
-session_secret = keycloak_config.require("session_secret")
+session_secret = keycloak_realm_config.require("session_secret")
 ol_apps_realm = keycloak.Realm(
     "olapps",
     access_code_lifespan="30m",
