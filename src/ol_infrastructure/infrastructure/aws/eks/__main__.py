@@ -1106,6 +1106,9 @@ traefik_helm_release = kubernetes.helm.v3.Release(
 # Ref: https://artifacthub.io/packages/helm/bitnami/apisix
 if eks_config.get_bool("apisix_ingress_enabled"):
     apisix_domains = eks_config.require_object("apisix_domains")
+    session_cookie_name = f"{stack_info.env_suffix}_gateway_session".removeprefix(
+        "production"
+    ).strip("_")
     apisix_helm_release = kubernetes.helm.v3.Release(
         f"{cluster_name}-apisix-gateway-controller-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
@@ -1194,9 +1197,9 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                                 """
                             ),
                             "http_server_configuration_snippet": textwrap.dedent(
-                                """\
+                                f"""\
                                 set $session_compressor zlib;
-                                set $session_name gateway_session;
+                                set $session_name {session_cookie_name};
                                 """
                             ),
                         },
