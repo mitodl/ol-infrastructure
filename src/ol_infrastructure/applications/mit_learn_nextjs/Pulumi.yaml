@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-mit-learn-ne-application
+runtime: python
+description: Manage infrastructure required by the MIT Learn application
+backend:
+  url: s3://mitol-pulumi-state/
