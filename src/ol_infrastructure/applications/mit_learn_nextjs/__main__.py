@@ -93,7 +93,7 @@ nextjs_build_cache_volume_mount = kubernetes.core.v1.VolumeMountArgs(
 mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
     f"mit-learn-nextjs-{stack_info.name}-deployment-resource",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="mit-learn-nextjs",
+        name="mitlearn-nextjs",
         namespace=learn_namespace,
         labels=application_labels,
     ),
@@ -103,7 +103,7 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
         ),
         template=kubernetes.core.v1.PodTemplateSpecArgs(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                name="mit-learn-nextjs",
+                name="mitlearn-nextjs",
                 namespace=learn_namespace,
                 labels=application_labels,
             ),
