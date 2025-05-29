@@ -1,5 +1,4 @@
 import json
-import secrets
 import urllib.request
 from functools import partial
 
@@ -171,6 +170,7 @@ ol_platform_engineering_rsa_key = keycloak.RealmKeystoreRsa(
 """
 
 # Create OL Public Realm
+session_secret = keycloak_config.require("session_secret")
 ol_apps_realm = keycloak.Realm(
     "olapps",
     access_code_lifespan="30m",
@@ -731,7 +731,7 @@ olapps_unified_ecommerce_client_data = vault.generic.Secret(
         # This is included for the case where we are using traefik-forward-auth.
         # It requires a random secret value to be present which is independent
         # of the OAuth credentials.
-        secret=secrets.token_urlsafe(),
+        secret=session_secret,
         realm_id=olapps_unified_ecommerce_client.realm_id,
         realm_name="olapps",
         realm_public_key=olapps_unified_ecommerce_client.realm_id.apply(
@@ -795,7 +795,7 @@ olapps_learn_ai_client_data = vault.generic.Secret(
         # This is included for the case where we are using traefik-forward-auth.
         # It requires a random secret value to be present which is independent
         # of the OAuth credentials.
-        secret=secrets.token_urlsafe(),
+        secret=session_secret,
         realm_id=olapps_learn_ai_client.realm_id,
         realm_name="olapps",
         realm_public_key=olapps_learn_ai_client.realm_id.apply(
@@ -862,7 +862,7 @@ if keycloak_realm_config.get("olapps-mitlearn-client-secret"):
             # This is included for the case where we are using traefik-forward-auth.
             # It requires a random secret value to be present which is independent
             # of the OAuth credentials.
-            secret=secrets.token_urlsafe(),
+            secret=session_secret,
             realm_id=olapps_mitlearn_client.realm_id,
             realm_name="olapps",
             realm_public_key=olapps_mitlearn_client.realm_id.apply(
@@ -901,7 +901,7 @@ olapps_open_discussions_client_data = vault.generic.Secret(
         # This is included for the case where we are using traefik-forward-auth.
         # It requires a random secret value to be present which is independent
         # of the OAuth credentials.
-        secret=secrets.token_urlsafe(),
+        secret=session_secret,
         realm_id=olapps_open_discussions_client.realm_id,
         realm_name="olapps",
         realm_public_key=olapps_open_discussions_client.realm_id.apply(
@@ -983,7 +983,7 @@ ol_platform_engineering_airbyte_client_data = vault.generic.Secret(
         # This is included for the case where we are using traefik-forward-auth.
         # It requires a random secret value to be present which is independent
         # of the OAuth credentials.
-        secret=secrets.token_urlsafe(),
+        secret=session_secret,
         realm_id=ol_platform_engineering_airbyte_client.realm_id,
         realm_name="ol-platform-engineering",
         realm_public_key=ol_platform_engineering_airbyte_client.realm_id.apply(
@@ -1024,7 +1024,7 @@ ol_platform_engineering_dagster_client_data = vault.generic.Secret(
         # This is included for the case where we are using traefik-forward-auth.
         # It requires a random secret value to be present which is independent
         # of the OAuth credentials.
-        secret=secrets.token_urlsafe(),
+        secret=session_secret,
         realm_id=ol_platform_engineering_dagster_client.realm_id,
         realm_name="ol-platform-engineering",
         realm_public_key=ol_platform_engineering_dagster_client.realm_id.apply(
@@ -1065,7 +1065,7 @@ ol_platform_engineering_leek_client_data = vault.generic.Secret(
         # This is included for the case where we are using traefik-forward-auth.
         # It requires a random secret value to be present which is independent
         # of the OAuth credentials.
-        secret=secrets.token_urlsafe(),
+        secret=session_secret,
         realm_id=ol_platform_engineering_leek_client.realm_id,
         realm_name="ol-platform-engineering",
         realm_public_key=ol_platform_engineering_leek_client.realm_id.apply(
@@ -1107,7 +1107,7 @@ if keycloak_realm_config.get("ol-platform-engineering-vault-client-secret"):
             # This is included for the case where we are using traefik-forward-auth.
             # It requires a random secret value to be present which is independent
             # of the OAuth credentials.
-            secret=secrets.token_urlsafe(),
+            secret=session_secret,
             realm_id=ol_platform_engineering_vault_client.realm_id,
             realm_name="ol-platform-engineering",
             realm_public_key=ol_platform_engineering_vault_client.realm_id.apply(
@@ -1159,7 +1159,7 @@ ol_data_platform_superset_client_data = vault.generic.Secret(
         # This is included for the case where we are using traefik-forward-auth.
         # It requires a random secret value to be present which is independent
         # of the OAuth credentials.
-        secret=secrets.token_urlsafe(),
+        secret=session_secret,
         realm_id=ol_data_platform_superset_client.realm_id,
         realm_name="ol-data-platform",
         realm_public_key=ol_data_platform_superset_client.realm_id.apply(
@@ -1211,7 +1211,7 @@ ol_data_platform_openmetadata_client_data = vault.generic.Secret(
         # This is included for the case where we are using traefik-forward-auth.
         # It requires a random secret value to be present which is independent
         # of the OAuth credentials.
-        secret=secrets.token_urlsafe(),
+        secret=session_secret,
         realm_id=ol_data_platform_openmetadata_client.realm_id,
         realm_name="ol-data-platform",
         realm_public_key=ol_data_platform_openmetadata_client.realm_id.apply(
