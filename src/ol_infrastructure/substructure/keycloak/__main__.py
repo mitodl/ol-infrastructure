@@ -937,7 +937,7 @@ olapps_mitxonline_client_data = vault.generic.Secret(
         # This is included for the case where we are using traefik-forward-auth.
         # It requires a random secret value to be present which is independent
         # of the OAuth credentials.
-        secret=secrets.token_urlsafe(),
+        secret=session_secret,
         realm_id=olapps_mitxonline_client.realm_id,
         realm_name="olapps",
         realm_public_key=olapps_mitxonline_client.realm_id.apply(
