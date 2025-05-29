@@ -11,9 +11,9 @@ config:
   nextjs:origin: "https://learn.mit.edu"
   nextjs:posthog_api_host: "https://ph.ol.mit.edu"
   nextjs:posthog_api_key:
-    secure: v1:GpuqYSDxbQHgaq/9:nyp2sMNDko+aDpiH/GS0RKzxOwGzNbs0ZWyaBTFftAIGuBxB+UCgnYBKNMcqKlG90o1n4w6qNLg8uXWGZ6Od
+    secure: v1:oa2Jq3cyaLttgxTD:U4odgKoAnfUbsDPprhv4ZH3nnJlrgkeM9RS57daOOcx9hFHxUd96mX66kQ8sfdFWKUPMz9FKh+dzsNo1NzmA
   nextjs:posthog_project_id:
-    secure: v1:5C+8JCP5oBneGmbi:WB9FjOcyPuIzPDLGNadqtwGFePEOTgWigeqN8DiUS+bRRH2VFgFnycVJVqCoyk9RKaL+KZQNNKzeoYYoIyZn0ib35A==
+    secure: v1:IY8kATrcMVk0PJdB:U5qEC1Iuoxnm707xldqg5SXBSPb2
   nextjs:recommendation_endpoint: "https://api.learn.mit.edu/http/recommendation_agent/"
   nextjs:sentry_dsn:
     secure: v1:ox5oolYtQIKsmojo:0ogC8iKnU4ECkqSmDxGTb3dHlGU1oQFMOjhIkVLYrYNcc53LGHd3IdaCyLgAXtyyEkE+/Qk+d6l6WpFnKpPzmprsNeWsV5YhQYaGnQhKYBwaaDav4+HPY7S/xXRqwQE3DjbZBA==

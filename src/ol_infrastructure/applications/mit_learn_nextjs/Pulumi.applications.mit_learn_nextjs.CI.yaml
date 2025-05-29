@@ -13,7 +13,7 @@ config:
   nextjs:posthog_api_key:
     secure: v1:zGa9gfGxm9+PIj4h:RkSzQvMgCoYy1LyCjYaLgITlE6OXsmeIelfDoJ+3weNLG4OQrBHhY4Xxh9pOtgzcT+JqEX8kgEoz22KCbwje
   nextjs:posthog_project_id:
-    secure: v1:Xv1qHgJWezgxxzR4:kJgfz6aWcSZcexA6GuB3cVg2ERZlhmnvi/WoXgvo8C6pSH5Pmw2P+D9kDcRIqLTkQYBOxOmkWgkUvmoQMVVS8VFfAg==
+    secure: v1:zDVvOZBoJfzj2JNp:zcKYzRHBEPZ8iM5+NvPL/G7Oskkw
   nextjs:recommendation_endpoint: "https://api.ci.learn.mit.edu/http/recommendation_agent/"
   nextjs:sentry_dsn:
     secure: v1:GISrW09cyDNOopo5:3ubNcN1ZOhKreca0xTuBAQ==
