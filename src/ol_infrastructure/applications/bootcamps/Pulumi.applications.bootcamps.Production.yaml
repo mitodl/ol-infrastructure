@@ -25,8 +25,6 @@ config:
     GTM_TRACKING_ID: "GTM-TFSZHVB"
     HUBSPOT_API_ID_PREFIX: "bootcamp"
     HUBSPOT_ID_PREFIX: "bootcamp"
-    HUBSPOT_FOOTER_FORM_GUID: "2d798908-c195-4c0c-b075-a10b0c1b08f3"
-    HUBSPOT_PORTAL_ID: "6119748"
     JOBMA_BASE_URL: "https://www.jobma.com"
     MAILGUN_FROM_EMAIL: "MIT Bootcamps <no-reply@mail.bootcamp.odl.mit.edu>"
     MAILGUN_SENDER_DOMAIN: "mail.bootcamp.odl.mit.edu"
