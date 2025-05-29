@@ -21,11 +21,12 @@ stack_info = parse_stack()
 
 cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
 # Assume the application image URI comes from a separate image build stack
-app_image = "mitodl/mit-learn-nextjs-app"
 if "MIT_LEARN_NEXTJS_DOCKER_TAG" not in os.environ:
     msg = "MIT_LEARN_NEXTJS_DOCKER_TAG environment varibale must be set."
     raise OSError(msg)
 MIT_LEARN_NEXTJS_DOCKER_TAG = os.environ["MIT_LEARN_NEXTJS_DOCKER_TAG"]
+
+app_image = f"mitodl/mit-learn-nextjs-app:{MIT_LEARN_NEXTJS_DOCKER_TAG}"
 
 k8s_global_labels = K8sGlobalLabels(
     service=Services.mit_learn, ou=BusinessUnit.mit_learn, stack=stack_info
