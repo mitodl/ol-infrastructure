@@ -54,6 +54,7 @@ class Services(str, Enum):
 
     airbyte = "airbyte"
     bootcamps = "bootcamps"
+    botkube = "botkube"
     dagster = "dagster"
     ecommerce = "unified-ecommerce"
     edxapp = "edxapp"
