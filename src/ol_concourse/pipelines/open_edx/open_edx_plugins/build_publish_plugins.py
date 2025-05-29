@@ -49,6 +49,10 @@ plugin_dict = {
         "target_name": "course_structure_api_package",
         "pypi_package_name": "ol-openedx-course-structure-api",
     },
+    "src/ol_openedx_course_sync": {
+        "target_name": "ol_openedx_course_sync_package",
+        "pypi_package_name": "ol-openedx-course-sync",
+    },
     "src/ol_openedx_git_auto_export": {
         "target_name": "edx_git_auto_export",
         "pypi_package_name": "ol-openedx-git-auto-export",
