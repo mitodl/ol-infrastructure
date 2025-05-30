@@ -1,4 +1,4 @@
-# ruff: noqa: CPY001, D100, ERA001
+# ruff: noqa: CPY001, D100
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, StackReference
 
@@ -10,6 +10,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
+    Environment,
     K8sGlobalLabels,
     Services,
 )
@@ -21,14 +22,12 @@ botkube_config = Config("config_botkube")
 opensearch_stack = StackReference(
     f"infrastructure.aws.opensearch.apps.{stack_info.name}"
 )
-cluster_stack = StackReference(
-    f"infrastructure.aws.eks.infrastructure-{stack_info.name}"
-)
-
 opensearch_cluster = opensearch_stack.require_output("cluster")
-botkube_environment = f"infrastructure-{stack_info.env_suffix}"
+
+cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+
 aws_config = AWSBase(
-    tags={"OU": "infrastructure", "Environment": botkube_environment},
+    tags={"OU": BusinessUnit.operations, "Environment": Environment.applications},
 )
 
 k8s_global_labels = K8sGlobalLabels(
@@ -399,7 +398,7 @@ botkube_application = kubernetes.helm.v3.Release(
                         "enabled": False,
                         "channels": {
                             "default": {
-                                "name": "#team-devops",
+                                "name": "#botkube-test",
                                 "bindings": {
                                     "executors": ["k8s-default-tools"],
                                     "sources": [
@@ -412,34 +411,45 @@ botkube_application = kubernetes.helm.v3.Release(
                         "botToken": "",
                         "appToken": "",
                     },
-                    "mattermost": {
-                        "enabled": False,
-                        "botName": "Botkube",
-                        "url": "MATTERMOST_SERVER_URL",
-                        "token": "MATTERMOST_TOKEN",
-                        "team": "MATTERMOST_TEAM",
-                        "channels": {
+                    "elasticsearch": {
+                        "enabled": True,
+                        "awsSigning": {
+                            "enabled": False,
+                            "awsRegion": "us-east-1",
+                            "roleArn": "",
+                        },
+                        "server": opensearch_cluster["endpoint"],
+                        "skipTLSVerify": False,
+                        "logLevel": "",
+                        "indices": {
                             "default": {
-                                "name": "MATTERMOST_CHANNEL",
-                                "notification": {"disabled": False},
+                                "name": "botkube",
+                                "type": "botkube-event",
+                                "shards": 1,
+                                "replicas": 0,
                                 "bindings": {
-                                    "executors": ["k8s-default-tools"],
                                     "sources": [
                                         "k8s-err-events",
                                         "k8s-recommendation-events",
-                                    ],
+                                    ]
                                 },
                             }
                         },
                     },
-                    "discord": {
+                    "webhook": {
                         "enabled": False,
-                        "token": "DISCORD_TOKEN",
-                        "botID": "DISCORD_BOT_ID",
+                        "url": "WEBHOOK_URL",
+                        "bindings": {
+                            "sources": ["k8s-err-events", "k8s-recommendation-events"]
+                        },
+                    },
+                },
+                f"{stack_info.name}-group": {
+                    "socketSlack": {
+                        "enabled": True,
                         "channels": {
                             "default": {
-                                "id": "DISCORD_CHANNEL_ID",
-                                "notification": {"disabled": False},
+                                "name": "#botkube-test",
                                 "bindings": {
                                     "executors": ["k8s-default-tools"],
                                     "sources": [
@@ -449,6 +459,8 @@ botkube_application = kubernetes.helm.v3.Release(
                                 },
                             }
                         },
+                        "botToken": "<Nope. That would be telling.",
+                        "appToken": "<Nope. See above.>",
                     },
                     "elasticsearch": {
                         "enabled": True,
@@ -482,7 +494,7 @@ botkube_application = kubernetes.helm.v3.Release(
                             "sources": ["k8s-err-events", "k8s-recommendation-events"]
                         },
                     },
-                }
+                },
             },
             # Global settings
             "settings": {
