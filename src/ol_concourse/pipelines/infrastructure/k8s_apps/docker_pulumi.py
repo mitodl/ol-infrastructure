@@ -52,6 +52,7 @@ pipeline_params = {
         app_name="mit-learn-nextjs",
         build_target="build_skip_yarn",
         repo_name="mit-learn",
+        dockerfile_path="frontends/main/Dockerfile.web",
     ),
 }
 
