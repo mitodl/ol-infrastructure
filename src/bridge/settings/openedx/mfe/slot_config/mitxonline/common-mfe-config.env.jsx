@@ -6,8 +6,8 @@ const configData = getConfig();
 const currentYear = new Date().getFullYear();
 const edxMfeAppName = configData.APP_ID;
 const authoringAppID = "authoring";
-const learnCourseKeyFormats = ["course-v1:uai_source", "course-v1:uai_hhc", "course-v1:uai_mit"];
-const isLearnCourse = learnCourseKeyFormats.some((key) => window.location.href.toLowerCase().includes(key));
+const learnCourseKeyFormat = "course-v1:uai_";
+const isLearnCourse = window.location.href.toLowerCase().includes(learnCourseKeyFormat);
 const accessibilityURL = process.env.ACCESSIBILITY_URL || 'https://accessibility.mit.edu/';
 const linkTitles = {
   dashboard: "Dashboard",
