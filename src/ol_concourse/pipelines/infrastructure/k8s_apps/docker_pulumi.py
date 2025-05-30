@@ -1,7 +1,9 @@
-import sys
-from typing import Any, Optional
+# ruff: noqa: PLR0913
 
-from pydantic import BaseModel
+import sys
+from typing import Any, Optional, Union
+
+from pydantic import BaseModel, model_validator
 
 from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.containers import container_build_task
@@ -32,40 +34,49 @@ from ol_concourse.pipelines.constants import PULUMI_WATCHED_PATHS
 
 class AppPipelineParams(BaseModel):
     app_name: str
+    repo_name: Optional[str] = None
+    dockerfile_path: str = "./Dockerfile"
     build_target: Optional[str] = None
 
-    class Config:
-        arbitrary_types_allowed = True
+    @model_validator(mode="after")
+    def set_repo_name(self) -> "AppPipelineParams":
+        """Set the repo_name based on the app_name if not provided."""
+        if not self.repo_name:
+            self.repo_name = self.app_name
+        return self
 
 
 pipeline_params = {
     "mitxonline": AppPipelineParams(app_name="mitxonline", build_target="production"),
     "mit-learn-nextjs": AppPipelineParams(
-        app_name="mit-learn-nextjs", build_target="build_skip_yarn"
+        app_name="mit-learn-nextjs",
+        build_target="build_skip_yarn",
+        repo_name="mit-learn",
     ),
 }
 
 
 def _define_git_resources(
     app_name: str,
+    repo_name: Union[str, None],
 ) -> tuple[Resource, Resource, Resource, Resource]:
     """Define the git resources needed for the pipeline."""
     main_repo = git_repo(
         name=Identifier(f"{app_name}-main"),
-        uri=f"https://github.com/mitodl/{app_name}",
+        uri=f"https://github.com/mitodl/{repo_name}",
         branch="main",
     )
 
     release_candidate_repo = git_repo(
         name=Identifier(f"{app_name}-release-candidate"),
-        uri=f"https://github.com/mitodl/{app_name}",
+        uri=f"https://github.com/mitodl/{repo_name}",
         branch="release-candidate",
         fetch_tags=True,
     )
 
     release_repo = git_repo(
         name=Identifier(f"{app_name}-release"),
-        uri=f"http://github.com/mitodl/{app_name}",
+        uri=f"http://github.com/mitodl/{repo_name}",
         branch="release",
         fetch_tags=True,
         tag_regex=r"v[0-9]\.[0-9]*\.[0-9]",  # examples v0.24.0, v0.26.3
@@ -133,6 +144,7 @@ def _define_pulumi_resources(
 def _build_image_job(
     app_name: str,
     branch_type: str,
+    dockerfile_path: str,
     git_repo_resource: Resource,
     registry_image_resource: Resource,
     build_target: Optional[str] = None,
@@ -196,6 +208,7 @@ def _build_image_job(
                 inputs=[Input(name=git_repo_resource.name)],
                 build_parameters={
                     "CONTEXT": git_repo_resource.name,
+                    "DOCKERFILE": f"{git_repo_resource.name}/{dockerfile_path}",
                     "BUILD_ARG_GIT_REF": "((.:git_ref))",
                     **version_args,
                     **additional_build_params,
@@ -219,13 +232,16 @@ def _build_image_job(
 
 
 def build_app_pipeline(app_name: str) -> Pipeline:
+    pipeline_parameters = pipeline_params.get(
+        app_name, AppPipelineParams(app_name=app_name)
+    )
     # Define Resources
     (
         main_repo,
         release_candidate_repo,
         release_repo,
         ol_infra_repo,
-    ) = _define_git_resources(app_name)
+    ) = _define_git_resources(app_name, pipeline_parameters.repo_name)
     app_ci_image, app_rc_image = _define_registry_image_resources(app_name)
     pulumi_resource_type, pulumi_resource = _define_pulumi_resources(
         app_name, ol_infra_repo.name
@@ -233,14 +249,12 @@ def build_app_pipeline(app_name: str) -> Pipeline:
 
     # Retrieve any special configurations needed from mapping above,
     # default to no special configuration if app name is not found in mapping
-    pipeline_parameters = pipeline_params.get(
-        app_name, AppPipelineParams(app_name=app_name)
-    )
 
     # Define Build Jobs
     main_image_build_job = _build_image_job(
         app_name=app_name,
         branch_type="main",
+        dockerfile_path=pipeline_parameters.dockerfile_path,
         git_repo_resource=main_repo,
         registry_image_resource=app_ci_image,
         build_target=pipeline_parameters.build_target,
@@ -248,6 +262,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     rc_image_build_job = _build_image_job(
         app_name=app_name,
         branch_type="release_candidate",
+        dockerfile_path=pipeline_parameters.dockerfile_path,
         git_repo_resource=release_candidate_repo,
         registry_image_resource=app_rc_image,
         build_target=pipeline_parameters.build_target,
