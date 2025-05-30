@@ -36,7 +36,7 @@ config:
   - "odl-video-service"
   eks:nodegroups:
     worker-xlarge:
-      disk_size_gb: 500
+      disk_size_gb: 1000
       instance_type: "r7a.xlarge"
       labels:
         node_size: r7a.xlarge
