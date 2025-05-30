@@ -110,6 +110,7 @@ mitxonline = [
         lms_domain="courses-ci.mitxonline.mit.edu",
         logo_url="https://courses-ci.mitxonline.mit.edu/static/mitxonline/images/logo.svg",
         marketing_site_domain="ci.mitxonline.mit.edu",
+        mit_base_url="https://mit.edu",
         privacy_policy_url="https://ci.mitxonline.mit.edu/privacy-policy/",
         schedule_email_section="true",  # Because the communication MFE treats this boolean as string  # noqa: E501
         site_name="MITx Online CI",
@@ -117,7 +118,7 @@ mitxonline = [
         support_url="mitxonline.zendesk.com/hc/",
         terms_of_service_url="https://ci.mitxonline.mit.edu/terms-of-service/",
         trademark_text="© MITx Online. All rights reserved except where noted.",
-        logo_trademark_url="https://courses-ci.mitxonline.mit.edu/static/mitxonline/images/mit-ol-logo.svg",
+        logo_trademark_url="https://courses-ci.mitxonline.mit.edu/static/mitxonline/images/mit-logo.svg",
     ),
     OpenEdxVars(
         about_us_url="https://rc.mitxonline.mit.edu/about-us/",
@@ -133,6 +134,7 @@ mitxonline = [
         lms_domain="courses-qa.mitxonline.mit.edu",
         logo_url="https://courses-qa.mitxonline.mit.edu/static/mitxonline/images/logo.svg",
         marketing_site_domain="rc.mitxonline.mit.edu",
+        mit_base_url="https://mit.edu",
         privacy_policy_url="https://rc.mitxonline.mit.edu/privacy-policy/",
         schedule_email_section="true",  # Because the communication MFE treats this boolean as string  # noqa: E501
         site_name="MITx Online QA",
@@ -140,7 +142,7 @@ mitxonline = [
         support_url="mitxonline.zendesk.com/hc/",
         terms_of_service_url="https://rc.mitxonline.mit.edu/terms-of-service/",
         trademark_text="© MITx Online. All rights reserved except where noted.",
-        logo_trademark_url="https://courses-qa.mitxonline.mit.edu/static/mitxonline/images/mit-ol-logo.svg",
+        logo_trademark_url="https://courses-qa.mitxonline.mit.edu/static/mitxonline/images/mit-logo.svg",
     ),
     OpenEdxVars(
         about_us_url="https://mitxonline.mit.edu/about-us/",
@@ -156,6 +158,7 @@ mitxonline = [
         lms_domain="courses.mitxonline.mit.edu",
         logo_url="https://courses.mitxonline.mit.edu/static/mitxonline/images/logo.svg",
         marketing_site_domain="mitxonline.mit.edu",
+        mit_base_url="https://mit.edu",
         privacy_policy_url="https://mitxonline.mit.edu/privacy-policy/",
         schedule_email_section="true",  # Because the communication MFE treats this boolean as string  # noqa: E501
         site_name="MITx Online",
@@ -163,7 +166,7 @@ mitxonline = [
         support_url="mitxonline.zendesk.com/hc/",
         terms_of_service_url="https://mitxonline.mit.edu/terms-of-service/",
         trademark_text="© MITx Online. All rights reserved except where noted.",
-        logo_trademark_url="https://courses.mitxonline.mit.edu/static/mitxonline/images/mit-ol-logo.svg",
+        logo_trademark_url="https://courses.mitxonline.mit.edu/static/mitxonline/images/mit-logo.svg",
     ),
 ]
 
