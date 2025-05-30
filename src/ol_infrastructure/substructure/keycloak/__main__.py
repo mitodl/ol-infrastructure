@@ -1,5 +1,4 @@
 import json
-import secrets
 import urllib.request
 from functools import partial
 
@@ -171,6 +170,7 @@ ol_platform_engineering_rsa_key = keycloak.RealmKeystoreRsa(
 """
 
 # Create OL Public Realm
+session_secret = keycloak_realm_config.require("session_secret")
 ol_apps_realm = keycloak.Realm(
     "olapps",
     access_code_lifespan="30m",
@@ -237,6 +237,7 @@ ol_apps_realm = keycloak.Realm(
     ),
     ssl_required="external",
     offline_session_idle_timeout="168h",
+    organizations_enabled=True,
     sso_session_idle_timeout="336h",
     sso_session_max_lifespan="336h",
     opts=resource_options,
@@ -447,15 +448,22 @@ ol_data_platform_realm = keycloak.Realm(
     display_name="OL Data",
     display_name_html="<b>OL Data</b>",
     enabled=True,
-    login_theme="keycloak",
+    account_theme="keycloak.v3",
+    admin_theme="keycloak.v2",
+    login_theme="keycloak.v2",
+    email_theme="ol-data-platform",
+    registration_email_as_username=True,
+    login_with_email_allowed=True,
     duplicate_emails_allowed=False,
     realm="ol-data-platform",
     reset_password_allowed=False,
     verify_email=False,
-    registration_allowed=False,
     password_policy=(  # noqa: S106 # pragma: allowlist secret
-        "length(16) and forceExpiredPasswordChange(365)  and notUsername and notEmail"
+        "length(12) and upperCase(1) and lowerCase(1) and digits(1) and "
+        "specialChars(1) and notUsername and notEmail and passwordHistory(5) "
+        "and forceExpiredPasswordChange(120)"
     ),
+    registration_allowed=False,
     security_defenses=keycloak.RealmSecurityDefensesArgs(
         brute_force_detection=keycloak.RealmSecurityDefensesBruteForceDetectionArgs(
             failure_reset_time_seconds=43200,
@@ -493,177 +501,39 @@ ol_data_platform_realm = keycloak.Realm(
     ),
     ssl_required="external",
     offline_session_idle_timeout="168h",
+    organizations_enabled=True,
     sso_session_idle_timeout="2h",
     sso_session_max_lifespan="24h",
     opts=resource_options,
 )
 
-# OL Data - First login flow [START]
-# Does not require email verification or confirmation to connect with existing account.
-ol_data_touchstone_first_login_flow = keycloak.authentication.Flow(
-    "ol-data-touchstone-first-login-flow",
-    realm_id=ol_data_platform_realm.id,
-    alias="ol-data-first-login-flow",
-    opts=resource_options,
+ol_data_platforme_realm_events = keycloak.RealmEvents(
+    "ol-data-platforme-realm-events",
+    realm_id=ol_data_platform_realm.realm,
+    events_enabled=True,
+    events_expiration=604800,
+    admin_events_enabled=True,
+    admin_events_details_enabled=True,
+    enabled_event_types=[],
+    events_listeners=["jboss-logging"],
 )
-ol_data_touchstone_first_login_flow_review_profile = keycloak.authentication.Execution(
-    "ol-data-touchstone-first-login-flow-review-profile",
-    realm_id=ol_data_platform_realm.id,
-    parent_flow_alias=ol_data_touchstone_first_login_flow.alias,
-    authenticator="idp-review-profile",
-    requirement="REQUIRED",
-    opts=resource_options,
-)
-ol_data_touchstone_first_login_review_profile_config = (
-    keycloak.authentication.ExecutionConfig(
-        "ol-data-touchstone-first-login-review-profile-config",
-        realm_id=ol_data_platform_realm.id,
-        execution_id=ol_data_touchstone_first_login_flow_review_profile.id,
-        alias="review-profile-config",
-        config={
-            "updateProfileOnFirstLogin": "missing",
-        },
-        opts=resource_options,
-    )
-)
-ol_data_touchstone_user_creation_or_linking_subflow = keycloak.authentication.Subflow(
-    "ol-data-touchstone-user-creation-or-linking-subflow",
-    realm_id=ol_data_platform_realm.id,
-    alias="ol-data-touchstone-first-broker-login-user-creation-or-linking",
-    parent_flow_alias=ol_data_touchstone_first_login_flow.alias,
-    provider_id="basic-flow",
-    requirement="REQUIRED",
-    opts=resource_options,
-)
-ol_data_touchstone_user_creation_or_linking_subflow_create_user_if_unique_step = (
-    keycloak.authentication.Execution(
-        "ol-data-touchstone-create-user-if-unique",
-        realm_id=ol_data_platform_realm.id,
-        parent_flow_alias=ol_data_touchstone_user_creation_or_linking_subflow.alias,
-        authenticator="idp-create-user-if-unique",
-        requirement="ALTERNATIVE",
-        opts=resource_options,
-    )
-)
-ol_data_touchstone_user_creation_or_linking_subflow_automatically_set_existing_user_step = keycloak.authentication.Execution(  # noqa: E501
-    "ol-data-touchstone-automatically-set-existing-user",
-    realm_id=ol_data_platform_realm.id,
-    parent_flow_alias=ol_data_touchstone_user_creation_or_linking_subflow.alias,
-    authenticator="idp-auto-link",
-    requirement="ALTERNATIVE",
-    opts=ResourceOptions(
-        provider=keycloak_provider,
-        depends_on=ol_data_touchstone_user_creation_or_linking_subflow_create_user_if_unique_step,
-    ),
-)
-# OL - First login flow [END]
 
-# OL Data - Touchstone SAML
-ol_data_platform_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
-    "ol-data-touchstone-idp",
-    realm=ol_data_platform_realm.id,
-    alias="touchstone-idp",
-    display_name="MIT Touchstone",
-    entity_id=f"{keycloak_url}/realms/ol-data-platform",
-    name_id_policy_format="Unspecified",
-    force_authn=False,
-    post_binding_response=True,
-    post_binding_authn_request=True,
-    principal_type="ATTRIBUTE",
-    principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
-    single_sign_on_service_url="https://idp.mit.edu/idp/profile/SAML2/POST/SSO",
-    trust_email=True,
-    validate_signature=True,
-    signing_certificate=mit_touchstone_cert,
-    want_assertions_encrypted=True,
-    want_assertions_signed=True,
-    first_broker_login_flow_alias=ol_data_touchstone_first_login_flow.alias,
+ol_data_required_action_configure_otp = keycloak.RequiredAction(
+    "ol-data-configure-totp",
+    realm_id=ol_data_platform_realm.realm,
+    alias="CONFIGURE_TOTP",
+    default_action=True,
+    enabled=True,
     opts=resource_options,
 )
 
-ol_data_oidc_attribute_importer_identity_provider_mapper = (
-    keycloak.AttributeImporterIdentityProviderMapper(
-        "ol-data-map-touchstone-saml-email-attribute",
-        realm=ol_data_platform_realm.id,
-        attribute_name="mail",
-        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
-        user_attribute="email",
-        extra_config={
-            "syncMode": "INHERIT",
-        },
-        opts=resource_options,
-    ),
-    keycloak.AttributeImporterIdentityProviderMapper(
-        "ol-data-map-touchstone-saml-last-name-attribute",
-        realm=ol_data_platform_realm.id,
-        attribute_name="sn",
-        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
-        user_attribute="lastName",
-        extra_config={
-            "syncMode": "INHERIT",
-        },
-        opts=resource_options,
-    ),
-    keycloak.AttributeImporterIdentityProviderMapper(
-        "ol-data-map-touchstone-saml-first-name-attribute",
-        realm=ol_data_platform_realm.id,
-        attribute_name="givenName",
-        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
-        user_attribute="firstName",
-        extra_config={
-            "syncMode": "INHERIT",
-        },
-        opts=resource_options,
-    ),
-    keycloak.UserTemplateImporterIdentityProviderMapper(
-        "ol-data-map-touchstone-saml-username-attribute",
-        name="username-formatter",
-        realm=ol_data_platform_realm.id,
-        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
-        template="${ATTRIBUTE.mail | localpart}",
-    ),
-    # Map Moira group membership to superset role
-    # ol-eng-data -> superset_admin
-    keycloak.AttributeToRoleIdentityMapper(
-        "ol-data-saml-superset-admin-ol-eng-data",
-        realm=ol_data_platform_realm.id,
-        attribute_friendly_name="mitMoiraMemberOf",
-        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
-        attribute_value="ol-eng-data",
-        role="ol-superset-client.superset_admin",
-        extra_config={
-            "syncMode": "FORCE",
-        },
-        opts=resource_options,
-    ),
-    # Map Moira group membership to superset role
-    # ol-eng-developer -> superset_alpha
-    keycloak.AttributeToRoleIdentityMapper(
-        "ol-data-saml-superset-alpha-ol-eng-developer",
-        realm=ol_data_platform_realm.id,
-        attribute_friendly_name="mitMoiraMemberOf",
-        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
-        attribute_value="ol-eng-developer",
-        role="ol-superset-client.superset_alpha",
-        extra_config={
-            "syncMode": "FORCE",
-        },
-        opts=resource_options,
-    ),
-    # Map Moira group membership to superset role
-    # ol-eng-reporter -> superset_gamma
-    keycloak.AttributeToRoleIdentityMapper(
-        "ol-data-saml-superset-gamma-ol-eng-reporter",
-        realm=ol_data_platform_realm.id,
-        attribute_friendly_name="mitMoiraMemberOf",
-        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
-        attribute_value="ol-eng-reporter",
-        role="ol-superset-client.superset_gamma",
-        extra_config={
-            "syncMode": "FORCE",
-        },
-        opts=resource_options,
-    ),
+ol_data_required_action_verify_email = keycloak.RequiredAction(
+    "ol-data-verify-email",
+    realm_id=ol_platform_engineering_realm.realm,
+    alias="VERIFY_EMAIL",
+    default_action=False,
+    enabled=False,
+    opts=resource_options,
 )
 
 fetch_realm_public_key_partial = partial(
@@ -731,7 +601,7 @@ olapps_unified_ecommerce_client_data = vault.generic.Secret(
         # This is included for the case where we are using traefik-forward-auth.
         # It requires a random secret value to be present which is independent
         # of the OAuth credentials.
-        secret=secrets.token_urlsafe(),
+        secret=session_secret,
         realm_id=olapps_unified_ecommerce_client.realm_id,
         realm_name="olapps",
         realm_public_key=olapps_unified_ecommerce_client.realm_id.apply(
@@ -795,7 +665,7 @@ olapps_learn_ai_client_data = vault.generic.Secret(
         # This is included for the case where we are using traefik-forward-auth.
         # It requires a random secret value to be present which is independent
         # of the OAuth credentials.
-        secret=secrets.token_urlsafe(),
+        secret=session_secret,
         realm_id=olapps_learn_ai_client.realm_id,
         realm_name="olapps",
         realm_public_key=olapps_learn_ai_client.realm_id.apply(
@@ -862,7 +732,7 @@ if keycloak_realm_config.get("olapps-mitlearn-client-secret"):
             # This is included for the case where we are using traefik-forward-auth.
             # It requires a random secret value to be present which is independent
             # of the OAuth credentials.
-            secret=secrets.token_urlsafe(),
+            secret=session_secret,
             realm_id=olapps_mitlearn_client.realm_id,
             realm_name="olapps",
             realm_public_key=olapps_mitlearn_client.realm_id.apply(
@@ -901,7 +771,7 @@ olapps_open_discussions_client_data = vault.generic.Secret(
         # This is included for the case where we are using traefik-forward-auth.
         # It requires a random secret value to be present which is independent
         # of the OAuth credentials.
-        secret=secrets.token_urlsafe(),
+        secret=session_secret,
         realm_id=olapps_open_discussions_client.realm_id,
         realm_name="olapps",
         realm_public_key=olapps_open_discussions_client.realm_id.apply(
@@ -910,6 +780,44 @@ olapps_open_discussions_client_data = vault.generic.Secret(
     ).apply(json.dumps),
 )
 # OPEN DISCUSSIONS [END]
+
+# MITXONLINE SCIM [START]
+olapps_mitxonline_client = keycloak.openid.Client(
+    "olapps-mitxonline-client",
+    name="ol-mitxonline-client",
+    realm_id="olapps",
+    client_id="ol-mitxonline-client",
+    client_secret=keycloak_realm_config.get("olapps-mitxonline-client-secret"),
+    enabled=True,
+    access_type="CONFIDENTIAL",
+    standard_flow_enabled=False,
+    implicit_flow_enabled=False,
+    service_accounts_enabled=True,
+    opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+)
+olapps_mitxonline_client_data = vault.generic.Secret(
+    "olapps-mitxonline-client-vault-oidc-credentials",
+    path="secret-mitxonline/keycloak-scim",
+    data_json=Output.all(
+        url=olapps_mitxonline_client.realm_id.apply(
+            lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+        ),
+        client_id=olapps_mitxonline_client.client_id,
+        client_secret=olapps_mitxonline_client.client_secret,
+        # This is included for the case where we are using traefik-forward-auth.
+        # It requires a random secret value to be present which is independent
+        # of the OAuth credentials.
+        secret=session_secret,
+        realm_id=olapps_mitxonline_client.realm_id,
+        realm_name="olapps",
+        realm_public_key=olapps_mitxonline_client.realm_id.apply(
+            lambda realm_id: fetch_realm_public_key_partial(realm_id)
+        ),
+    ).apply(json.dumps),
+)
+
+# MITXONLINE SCIM [END]
+
 # OLAPPS REALM - OpenID Clients [START]
 
 # OL-PLATFORM-ENGINEERING REALM - OpenID Clients [START]
@@ -945,7 +853,7 @@ ol_platform_engineering_airbyte_client_data = vault.generic.Secret(
         # This is included for the case where we are using traefik-forward-auth.
         # It requires a random secret value to be present which is independent
         # of the OAuth credentials.
-        secret=secrets.token_urlsafe(),
+        secret=session_secret,
         realm_id=ol_platform_engineering_airbyte_client.realm_id,
         realm_name="ol-platform-engineering",
         realm_public_key=ol_platform_engineering_airbyte_client.realm_id.apply(
@@ -986,7 +894,7 @@ ol_platform_engineering_dagster_client_data = vault.generic.Secret(
         # This is included for the case where we are using traefik-forward-auth.
         # It requires a random secret value to be present which is independent
         # of the OAuth credentials.
-        secret=secrets.token_urlsafe(),
+        secret=session_secret,
         realm_id=ol_platform_engineering_dagster_client.realm_id,
         realm_name="ol-platform-engineering",
         realm_public_key=ol_platform_engineering_dagster_client.realm_id.apply(
@@ -1027,7 +935,7 @@ ol_platform_engineering_leek_client_data = vault.generic.Secret(
         # This is included for the case where we are using traefik-forward-auth.
         # It requires a random secret value to be present which is independent
         # of the OAuth credentials.
-        secret=secrets.token_urlsafe(),
+        secret=session_secret,
         realm_id=ol_platform_engineering_leek_client.realm_id,
         realm_name="ol-platform-engineering",
         realm_public_key=ol_platform_engineering_leek_client.realm_id.apply(
@@ -1069,7 +977,7 @@ if keycloak_realm_config.get("ol-platform-engineering-vault-client-secret"):
             # This is included for the case where we are using traefik-forward-auth.
             # It requires a random secret value to be present which is independent
             # of the OAuth credentials.
-            secret=secrets.token_urlsafe(),
+            secret=session_secret,
             realm_id=ol_platform_engineering_vault_client.realm_id,
             realm_name="ol-platform-engineering",
             realm_public_key=ol_platform_engineering_vault_client.realm_id.apply(
@@ -1090,6 +998,8 @@ ol_data_platform_superset_client = keycloak.openid.Client(
     client_secret=keycloak_realm_config.get("ol-data-platform-superset-client-secret"),
     enabled=True,
     access_type="CONFIDENTIAL",
+    # Needed to use for Superset API access
+    direct_access_grants_enabled=True,
     standard_flow_enabled=True,
     implicit_flow_enabled=False,
     service_accounts_enabled=True,
@@ -1101,14 +1011,17 @@ ol_data_platform_superset_client = keycloak.openid.Client(
 ol_data_platform_superset_client_roles = keycloak_realm_config.get_object(
     "ol-data-platform-superset-client-roles"
 )
+ol_data_platform_superset_client_role_refs = {}
 for role in ol_data_platform_superset_client_roles:
-    keycloak.Role(
+    role_ref = keycloak.Role(
         f"ol-data-platform-superset-client-{role}",
         name=role,
         realm_id="ol-data-platform",
         client_id=ol_data_platform_superset_client.id,
         opts=resource_options,
     )
+    ol_data_platform_superset_client_role_refs[role] = role_ref
+
 ol_data_platform_superset_client_data = vault.generic.Secret(
     "ol-data-platform-superset-client-vault-oidc-credentials",
     path="secret-operations/sso/superset",
@@ -1121,7 +1034,7 @@ ol_data_platform_superset_client_data = vault.generic.Secret(
         # This is included for the case where we are using traefik-forward-auth.
         # It requires a random secret value to be present which is independent
         # of the OAuth credentials.
-        secret=secrets.token_urlsafe(),
+        secret=session_secret,
         realm_id=ol_data_platform_superset_client.realm_id,
         realm_name="ol-data-platform",
         realm_public_key=ol_data_platform_superset_client.realm_id.apply(
@@ -1129,6 +1042,73 @@ ol_data_platform_superset_client_data = vault.generic.Secret(
         ),
     ).apply(json.dumps),
 )
+
+# Create realm roles for ol-data-platform
+ol_data_platform_eng_data_role = keycloak.Role(
+    "ol-data-platform-eng-data-role",
+    realm_id=ol_data_platform_realm.id,
+    name="ol-eng-data",
+    description="OL Engineering Data role - maps to superset_admin",
+    composite_roles=[ol_data_platform_superset_client_role_refs["superset_admin"].id],
+    opts=resource_options,
+)
+
+ol_data_platform_eng_developer_role = keycloak.Role(
+    "ol-data-platform-eng-developer-role",
+    realm_id=ol_data_platform_realm.id,
+    name="ol-eng-developer",
+    description="OL Engineering Developer role - maps to superset_alpha",
+    composite_roles=[ol_data_platform_superset_client_role_refs["superset_alpha"].id],
+    opts=resource_options,
+)
+
+ol_data_platform_eng_reporter_role = keycloak.Role(
+    "ol-data-platform-eng-reporter-role",
+    realm_id=ol_data_platform_realm.id,
+    name="ol-eng-reporter",
+    description="OL Engineering Reporter role - maps to superset_gamma",
+    composite_roles=[ol_data_platform_superset_client_role_refs["superset_gamma"].id],
+    opts=resource_options,
+)
+
+ol_data_platform_role_keys_openid_client_scope = keycloak.openid.ClientScope(
+    "ol-data-platform-role-keys-openid-client-scope",
+    realm_id=ol_data_platform_realm.id,
+    name="ol_roles",
+    description="Scope will map a user's group memberships to a claim",
+    include_in_token_scope=True,
+    opts=resource_options,
+)
+
+ol_data_platform_role_keys_openid_client_scope_mapper = (
+    keycloak.openid.UserClientRoleProtocolMapper(
+        "ol-data-platform-role-keys-openid-client-scope-mapper",
+        claim_name="role_keys",
+        realm_id=ol_data_platform_realm.id,
+        add_to_access_token=True,
+        add_to_id_token=True,
+        add_to_userinfo=True,
+        claim_value_type="String",
+        client_id_for_role_mappings="ol-superset-client",
+        client_scope_id=ol_data_platform_role_keys_openid_client_scope.id,
+        multivalued=True,
+        name="role_keys",
+    )
+)
+
+ol_data_platform_superset_client_scope = keycloak.openid.ClientDefaultScopes(
+    "ol-data-platform-superset-client-default-scopes",
+    realm_id="ol-data-platform",
+    client_id=ol_data_platform_superset_client.id,
+    default_scopes=[
+        "acr",
+        "email",
+        "profile",
+        "ol_roles",
+        "web-origins",
+    ],
+)
+
 # SUPERSET [END] # noqa: ERA001
 
 # OPENMETADATA [START] # noqa: ERA001
@@ -1173,7 +1153,7 @@ ol_data_platform_openmetadata_client_data = vault.generic.Secret(
         # This is included for the case where we are using traefik-forward-auth.
         # It requires a random secret value to be present which is independent
         # of the OAuth credentials.
-        secret=secrets.token_urlsafe(),
+        secret=session_secret,
         realm_id=ol_data_platform_openmetadata_client.realm_id,
         realm_name="ol-data-platform",
         realm_public_key=ol_data_platform_openmetadata_client.realm_id.apply(
