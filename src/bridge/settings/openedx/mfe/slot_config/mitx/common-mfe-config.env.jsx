@@ -5,50 +5,48 @@ import Footer, { Logo, MenuLinks, CopyrightNotice } from './Footer.jsx';
 const configData = getConfig();
 const currentYear = new Date().getFullYear();
 
-const userMenu = {
-    dashboard: {
-        url: `${configData.LMS_BASE_URL}/dashboard`,
-        title: 'Dashboard',
-    },
-    logout: {
-        url: `${configData.LMS_BASE_URL}/logout`,
-        title: 'Sign Out',
-    },
-}
+const userMenu = [
+  {
+    url: `${configData.LMS_BASE_URL}/dashboard`,
+    title: 'Dashboard',
+  },
+  {
+    url: `${configData.LMS_BASE_URL}/logout`,
+    title: 'Sign Out',
+  },
+];
 
 const DesktopHeaderUserMenu = (widget) => {
   widget.content.menu = [
     {
-      items: [
-        {
-          type: 'item',
-          href: userMenu.dashboard.url,
-          content: userMenu.dashboard.title,
-        },
-        {
-          type: 'item',
-          href:  userMenu.logout.url,
-          content: userMenu.logout.title,
-        },
-      ],
+      items: userMenu.map((item) => ({
+        type: 'item',
+        href: item.url,
+        content: item.title,
+      })),
     },
   ];
   return widget;
 };
 
 const LearningHeaderUserMenu = (widget) => {
-  widget.content.items = [
-    {
-      href: userMenu.dashboard.url,
-      message: userMenu.dashboard.title,
-    },
-    {
-      href: userMenu.logout.url,
-      message: userMenu.logout.title,
-    },
-  ];
+  widget.content.items = userMenu.map((item) => ({
+    href: item.url,
+    message: item.title,
+  }))
   return widget;
 };
+
+const footerLegalLinks = [
+  {
+    url: `${configData.MARKETING_SITE_BASE_URL}/tos/`,
+    title: 'Terms of Service',
+  },
+  {
+    url: 'https://accessibility.mit.edu/',
+    title: 'Accessibility',
+  },
+];
 
 const footerSubSlotsConfig = {
   "frontend.shell.footer.desktop.leftLinks.ui": {
@@ -75,7 +73,7 @@ const footerSubSlotsConfig = {
           id: 'custom_menu_links',
           type: DIRECT_PLUGIN,
           RenderWidget: () => (
-            <MenuLinks marketingSiteUrl={configData.MARKETING_SITE_BASE_URL} siteName={configData.SITE_NAME}/>
+            <MenuLinks menuItems={footerLegalLinks} />
           ),
         },
       },
