@@ -33,9 +33,24 @@ from ol_concourse.pipelines.constants import PULUMI_WATCHED_PATHS
 
 
 class AppPipelineParams(BaseModel):
+    """Parameters for the application pipeline.
+    This class defines the parameters needed to configure the pipeline for
+    different applications, including the app name, build target, Dockerfile path,
+    Fastly service prefix, cache purging options, and repository name.
+
+    Attributes:
+        app_name (str): The name of the application.
+        build_target (Optional[str]): The specific target stage to build within the Dockerfile.
+        dockerfile_path (str): The path to the Dockerfile within the repository. Defaults to "./Dockerfile".
+        fastly_service_prefix (Optional[str]): A prefix used to identify Fastly service IDs in Vault.
+        purge_fastly_cache (bool): Whether to include steps to purge the Fastly cache after deployment. Defaults to False.
+        repo_name (Optional[str]): The name of the git repository. Defaults to app_name if not provided.
+    """
+
     app_name: str
     build_target: Optional[str] = None
     dockerfile_path: str = "./Dockerfile"
+    fastly_service_prefix: Optional[str] = None
     purge_fastly_cache: bool = False
     repo_name: Optional[str] = None
 
@@ -55,6 +70,7 @@ pipeline_params = {
         repo_name="mit-learn",
         dockerfile_path="frontends/main/Dockerfile.web",
         purge_fastly_cache=True,
+        fastly_service_prefix="learn_",
     ),
 }
 
@@ -305,7 +321,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                         path="sh",
                         args=[
                             "-exc",
-                            """curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.learn_service_id_ci))/purge_all" """,
+                            f"""curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_ci))/purge_all" """,
                         ],
                     ),
                 ),
@@ -334,7 +350,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                             path="sh",
                             args=[
                                 "-exc",
-                                """curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.learn_service_id_qa))/purge_all" """,
+                                f"""curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_qa))/purge_all" """,
                             ],
                         ),
                     ),
@@ -353,7 +369,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                             path="sh",
                             args=[
                                 "-exc",
-                                """curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.learn_service_id_production))/purge_all" """,
+                                f"""curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_production))/purge_all" """,
                             ],
                         ),
                     ),
