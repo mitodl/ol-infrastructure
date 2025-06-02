@@ -111,6 +111,7 @@ mitxonline = [
         logo_url="https://courses-ci.mitxonline.mit.edu/static/mitxonline/images/logo.svg",
         marketing_site_domain="ci.mitxonline.mit.edu",
         mit_base_url="https://mit.edu",
+        mit_learn_base_url="https://ci.learn.mit.edu",
         privacy_policy_url="https://ci.mitxonline.mit.edu/privacy-policy/",
         schedule_email_section="true",  # Because the communication MFE treats this boolean as string  # noqa: E501
         site_name="MITx Online CI",
