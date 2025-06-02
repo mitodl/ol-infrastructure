@@ -115,7 +115,13 @@ def meta_pipeline(app_names: list[str]) -> Pipeline:
 
 
 if __name__ == "__main__":
-    app_names = ["learn-ai", "unified-ecommerce", "mit-learn", "mitxonline"]
+    app_names = [
+        "learn-ai",
+        "unified-ecommerce",
+        "mit-learn",
+        "mitxonline",
+        "mit-learn-nextjs",
+    ]
 
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(meta_pipeline(app_names).model_dump_json(indent=2))
