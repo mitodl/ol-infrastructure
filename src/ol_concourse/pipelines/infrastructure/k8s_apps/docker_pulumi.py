@@ -1,4 +1,4 @@
-# ruff: noqa: PLR0913
+# ruff: noqa: PLR0913, E501
 
 import sys
 from typing import Any, Optional, Union
@@ -34,9 +34,10 @@ from ol_concourse.pipelines.constants import PULUMI_WATCHED_PATHS
 
 class AppPipelineParams(BaseModel):
     app_name: str
-    repo_name: Optional[str] = None
-    dockerfile_path: str = "./Dockerfile"
     build_target: Optional[str] = None
+    dockerfile_path: str = "./Dockerfile"
+    purge_fastly_cache: bool = False
+    repo_name: Optional[str] = None
 
     @model_validator(mode="after")
     def set_repo_name(self) -> "AppPipelineParams":
@@ -53,6 +54,7 @@ pipeline_params = {
         build_target="build_skip_yarn",
         repo_name="mit-learn",
         dockerfile_path="frontends/main/Dockerfile.web",
+        purge_fastly_cache=True,
     ),
 }
 
@@ -184,7 +186,7 @@ def _build_image_job(
                             path="sh",
                             args=[
                                 "-c",
-                                f"grep 'VERSION = ' {git_repo_resource.name}/main/settings.py | cut -d'\"' -f2 > {version_file}",  # noqa: E501
+                                f"grep 'VERSION = ' {git_repo_resource.name}/main/settings.py | cut -d'\"' -f2 > {version_file}",
                             ],
                         ),
                     ),
@@ -290,10 +292,74 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                 load_var="image_tag", file=f"{app_ci_image.name}/tag", reveal=True
             ),
         ],
+        additional_post_steps=[
+            TaskStep(
+                task=Identifier("purge-fastly-cache"),
+                config=TaskConfig(
+                    platform=Platform.linux,
+                    image_resource=AnonymousResource(
+                        type=REGISTRY_IMAGE,
+                        source=RegistryImage(repository="alpine/curl"),
+                    ),
+                    run=Command(
+                        path="sh",
+                        args=[
+                            "-exc",
+                            """curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.learn_service_id_ci))/purge_all" """,
+                        ],
+                    ),
+                ),
+            ),
+        ]
+        if pipeline_parameters.purge_fastly_cache
+        else [],
         additional_env_vars={
             f"{app_name.replace('-', '_').upper()}_DOCKER_TAG": "((.:image_tag))",
         },
     )
+
+    additional_post_steps: dict[int, list[TaskStep]] = {}
+    if pipeline_parameters.purge_fastly_cache:
+        additional_post_steps = {
+            0: [
+                TaskStep(
+                    task=Identifier("purge-fastly-cache"),
+                    config=TaskConfig(
+                        platform=Platform.linux,
+                        image_resource=AnonymousResource(
+                            type=REGISTRY_IMAGE,
+                            source=RegistryImage(repository="alpine/curl"),
+                        ),
+                        run=Command(
+                            path="sh",
+                            args=[
+                                "-exc",
+                                """curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.learn_service_id_qa))/purge_all" """,
+                            ],
+                        ),
+                    ),
+                ),
+            ],
+            1: [
+                TaskStep(
+                    task=Identifier("purge-fastly-cache"),
+                    config=TaskConfig(
+                        platform=Platform.linux,
+                        image_resource=AnonymousResource(
+                            type=REGISTRY_IMAGE,
+                            source=RegistryImage(repository="alpine/curl"),
+                        ),
+                        run=Command(
+                            path="sh",
+                            args=[
+                                "-exc",
+                                """curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.learn_service_id_production))/purge_all" """,
+                            ],
+                        ),
+                    ),
+                ),
+            ],
+        }
 
     # QA and Production Deployments
     qa_and_production_fragment = pulumi_jobs_chain(
@@ -306,6 +372,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         project_source_path=(
             f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}"
         ),
+        additional_post_steps=additional_post_steps,
         dependencies=[
             GetStep(
                 get=app_rc_image.name,
