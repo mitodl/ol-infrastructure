@@ -44,7 +44,7 @@ config:
     OPENEDX_OAUTH_PROVIDER: "ol-oauth2"
     OPENEDX_SOCIAL_LOGIN_PATH: "/auth/login/ol-oauth2/?auth_entry=login"
     OPENTELEMETRY_ENABLED: "true"
-    OPENTELEMETRY_ENDPOINT: "grafana-alloy.operations.svc.cluster.local:4318"
+    OPENTELEMETRY_ENDPOINT: "grafana-alloy.operations.svc.cluster.local:4317"
     SENTRY_LOG_LEVEL: "ERROR"
     SESSION_COOKIE_NAME: "session_mitxonline"
     UWSGI_ENABLE_THREADS: "1"
