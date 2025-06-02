@@ -14,13 +14,13 @@ REDASH_VERSION = "9d273e4"
 TRAEFIK_VERSION = "3.4.1"
 TUTOR_PERMISSIONS_VERSION = "15.3.4"
 # renovate: datasource=github-releases depName=vault packageName=hashicorp/vault
-VAULT_VERSION = "1.19.4"
+VAULT_VERSION = "1.19.5"
 
 # EKS Specific Versions
 # renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/helm-charts
 AIRBYTE_CHART_VERSION = "1.6.2"
 # renovate: datasource=docker depName=apisix packageName=registry-1.docker.io/bitnamicharts/apisix
-APISIX_CHART_VERSION = "4.2.5"
+APISIX_CHART_VERSION = "5.0.1"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager
 CERT_MANAGER_CHART_VERSION = "v1.16.1"
 # renovate: datasource=aws-eks-addon depName=ebs-csi-driver
@@ -44,6 +44,6 @@ VAULT_SECRETS_OPERATOR_CHART_VERSION = "0.10.0"
 # renovate: datasource=docker depName=nginx
 NGINX_VERSION = "1.28.0"
 # renovate: datasource=github-releases depName=prometheus-operator packageName=prometheus-operator/prometheus-operator
-PROMETHEUS_OPERATOR_CRD_VERSION = "v0.82.2"
+PROMETHEUS_OPERATOR_CRD_VERSION = "v0.83.0"
 # renovate: datasource=github-releases depName=keycloak-k8s-resources packageName=keycloak/keycloak-k8s-resources
 KEYCLOAK_OPERATOR_CRD_VERSION = "26.2.4"

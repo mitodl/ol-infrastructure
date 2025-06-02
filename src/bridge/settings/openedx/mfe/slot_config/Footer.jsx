@@ -85,10 +85,11 @@ export function MenuLinks({ marketingSiteUrl, siteName }) {
 
 export function Logo({
     imageUrl = 'https://edx-cdn.org/v3/default/logo.svg',
-    destinationUrl
+    destinationUrl,
+    logoStyle = { maxHeight: '2rem', height: '33px' }
 }) {
 const image = (
-    <Image src={imageUrl} style={{ maxHeight: '2rem', height: "33px" }} />
+    <Image src={imageUrl} style={logoStyle} />
 );
 
 if (destinationUrl === undefined) {

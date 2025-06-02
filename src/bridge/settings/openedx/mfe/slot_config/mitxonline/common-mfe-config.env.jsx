@@ -86,7 +86,7 @@ const footerSubSlotsConfig = {
           id: 'custom_logo',
           type: DIRECT_PLUGIN,
           RenderWidget: () => (
-            <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={process.env.MIT_BASE_URL} />
+            <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={process.env.MIT_BASE_URL} logoStyle={{ height: '48px' }} />
           ),
         },
       },
