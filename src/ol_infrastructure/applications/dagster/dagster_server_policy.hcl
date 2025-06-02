@@ -64,6 +64,9 @@ path "secret-data/pipelines/*" {
 path "secret-data/pipelines" {
   capabilities = ["read"]
 }
+path "secret-data/superset_service_account" {
+  capabilities = ["read"]
+}
 path "secret-data/dagster-http-auth-password" {
   capabilities = ["read"]
 }
