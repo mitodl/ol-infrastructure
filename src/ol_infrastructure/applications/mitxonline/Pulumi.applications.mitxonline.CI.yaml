@@ -1,10 +1,10 @@
 ---
-secretsprovider: awskms://alias/infrastructure-secrets-qa
-encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QGMy4yIannSd/lzkrjExmbaAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMRoeZfasDehG5AcrtAgEQgDvOsnwTDAZrd6xg7FQjOcT8onJyrpUcL9r4WsBRqifRGolaRMEVohz4EbNnqmE0kxybvS6CKoiC0f16EA==
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAGATRsIirydH1w01TqfxPTVAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMyIKdYiGvV8KezL+IAgEQgDv8uw8x7fPHAeOojyIORtV8iT3vdaQZEGqdifXrupig2b2B3e5/jsdi+zaB9WyUL3aXomvONEP7SlCjsA==
 config:
   aws:region: us-east-1
   mitxonline:db_password:
-    secure: v1:fbLlJgSoQEy+xUJX:deHdkbyyMxQ214zdwkSRsLSLNlPJ0WIhLCKu406g+OjGltrUfH5K1db+2mY7tli56ltvdrjnCupkLxbEa7/aVDYqZG0eErU4X7HdriQHwQI=
+    secure: v1:vEeGgZVBjWBklqb3:FWrkz0af0N+bAW/Faye1raC5aSL7fJwcJgBk3DtWmQCZ95k1v8pRzMyGmPG6FQ10Q2VWNMS0yBO4PMZVp7bSIRz18OiCPwmfVv5wa347Fms=
   mitxonline:domain: "api.ci.mitxonline.mit.edu"
   mitxonline:k8s_deploy: "true"
   mitxonline:vars:
@@ -12,9 +12,9 @@ config:
     CRON_COURSE_CERTIFICATES_HOURS: "18"
     GA_TRACKING_ID: "UA-5145472-46"
     GTM_TRACKING_ID: "GTM-TW97MNR"
-    LOGOUT_REDIRECT_URL: "https://courses-qa.mitxonline.mit.edu/logout" # Points to RC
-    MAILGUN_FROM_EMAIL: "MITx Online <no-reply@mitxonline-rc-mail.mitxonline.mit.edu>"
-    MAILGUN_SENDER_DOMAIN: "mitxonline-rc-mail.mitxonline.mit.edu"
+    LOGOUT_REDIRECT_URL: "https://courses-ci.mitxonline.mit.edu/logout" # Points to RC
+    MAILGUN_FROM_EMAIL: "MITx Online <no-reply@mitxonline-ci-mail.mitxonline.mit.edu>"
+    MAILGUN_SENDER_DOMAIN: "mitxonline-ci-mail.mitxonline.mit.edu"
     MITOL_APIGATEWAY_DISABLE_MIDDLEWARE: "false"
     MITOL_GOOGLE_SHEETS_PROCESSOR_APP_NAME: "MITx Online (ci)"
     MITOL_GOOGLE_SHEETS_REFUNDS_FIRST_ROW: "4"
@@ -27,14 +27,14 @@ config:
     MITX_ONLINE_ENVIRONMENT: "rc"
     MITX_ONLINE_LOG_LEVEL: "INFO"
     MITX_ONLINE_SECURE_SSL_HOST: "ci.mitxonline.mit.edu"
-    OPENEDX_API_BASE_URL: "https://courses-qa.mitxonline.mit.edu" # Points to RC
+    OPENEDX_API_BASE_URL: "https://courses-ci.mitxonline.mit.edu" # Points to RC
     OPENEDX_OAUTH_PROVIDER: "ol-oauth2"
     OPENEDX_SOCIAL_LOGIN_PATH: "/auth/login/ol-oauth2/?auth_entry=login"
     OPENTELEMETRY_ENABLED: "true"
     OPENTELEMETRY_ENDPOINT: "http://grafana-alloy.operations.svc.cluster.local:4318"
     SENTRY_LOG_LEVEL: "ERROR"
-    SESSION_COOKIE_NAME: "session_mitxonline_rc"
+    SESSION_COOKIE_NAME: "session_mitxonline_ci"
   redis:password:
-    secure: v1:B9veLwDMAop9Sjdc:d2ejAJqJnIlBSlJ4OWqgzfPx9Zu+c3Bnkkj8WtSfVPRAUzalgyABVh//A909f9TRR+oU7HdYJ3ZxRzkCRu/UEZxHgRQFp8Y=
+    secure: v1:N1ZyKKPiMa/DaKYH:Y8NIcmgFnBBjTIUkT6PeefRnINIjVI/MMmX8IXKfxF5bLfMjRT/6dG8eYwMtHFSRMn+Kb1ZEJod3oqiSeMdeidttL4LPKK0=
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
