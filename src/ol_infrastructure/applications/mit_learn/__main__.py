@@ -1452,6 +1452,7 @@ mitlearn_k8s_app = OLApplicationK8s(
                 queues=["default", "edx_content"],
                 resource_requests={"cpu": "1000m", "memory": "2048Mi"},
                 resource_limits={"cpu": "1000m", "memory": "6144Mi"},
+                min_replicas=3,
             ),
         ],
         # Using default resource requests/limits for now
