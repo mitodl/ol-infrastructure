@@ -16,7 +16,7 @@ config:
   keycloak_realm:mailgun_email_host:
     secure: v1:AzBV96IWvDteok9U:mHNiirRpuQpeO7jC0oS0Tl88hF5fOaqn4f/+xyct+yI=
   keycloak_realm:mailgun_email_password:
-    secure: v1:GK8CdR+fMwG8SUHU:NQst2z606Csyc+kjqvbrqx6AmgJhf6asRVxn8QlO9GsI1laph24QnBCXeB18bubi1u2wqRA67RyLzAwfO4qaOGFi
+    secure: v1:UtwWVnXWM/InuemD:2EhUzMiGOYT9UJony3qP+LsW0EaeDiI60W4b3lB4ZJmOUDqGRTNd9PJMepFD/LVwsrSfqDVSsMVabn0ta7OXoBUP
   keycloak_realm:mailgun_email_username:
     secure: v1:TfpaJKet+1dR7zPW:uH/rZTfcHuW/+DmQNzeowgCQk8uw3Fi31ZN+UZkUBXnBYbUCZZGjYxYxMuSvuY4=
   keycloak_realm:mailgun_reply_to_address:

@@ -233,7 +233,7 @@ ol_apps_realm = keycloak.Realm(
         host=mailgun_email_host,
         port="465",
         ssl=True,
-        starttls=True,
+        starttls=False,
     ),
     ssl_required="external",
     offline_session_idle_timeout="168h",
