@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 from copy import deepcopy
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 from bridge.settings.github.team_members import DEVOPS_MIT
 from ol_concourse.lib.constants import REGISTRY_IMAGE
@@ -148,6 +148,9 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901, PLR0912
     enable_github_issue_resource: bool = True,  # noqa: FBT001, FBT002
     custom_dependencies: Optional[dict[int, list[GetStep]]] = None,
     dependencies: Optional[list[GetStep]] = None,
+    additional_post_steps: Optional[
+        dict[int, list[Union[GetStep, PutStep, TaskStep]]]
+    ] = None,
     github_issue_assignees: Optional[list[str]] = None,
     github_issue_labels: Optional[list[str]] = None,
     github_issue_repository: Optional[str] = None,
@@ -244,9 +247,11 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901, PLR0912
             project_name,
             project_source_path,
             local_dependencies,
+            (additional_post_steps or {}).get(index, []),
             previous_job,
             additional_env_vars=additional_env_vars,
         )
+
         default_github_issue_labels = [
             "product:infrastructure",
             "DevOps",
@@ -288,6 +293,7 @@ def pulumi_job(  # noqa: PLR0913
     project_name: str,
     project_source_path: Path,
     dependencies: Optional[list[GetStep]] = None,
+    additional_post_steps: Optional[list[Union[GetStep, PutStep, TaskStep]]] = None,
     previous_job: Optional[Job] = None,
     additional_env_vars: Optional[dict[str, str]] = None,
 ) -> PipelineFragment:
@@ -356,7 +362,8 @@ def pulumi_job(  # noqa: PLR0913
                     "stack_name": stack_name,
                 },
             ),
-        ],
+        ]
+        + (additional_post_steps or []),
     )
     return PipelineFragment(
         resources=[pulumi_resource],
