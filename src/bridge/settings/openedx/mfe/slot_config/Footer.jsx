@@ -52,32 +52,12 @@ export function CopyrightNotice({copyrightText}){
     );
 }
 
-export function MenuLinks({ marketingSiteUrl, siteName }) {
-  const isMITX = siteName?.includes("MITx Residential");
-
+export function MenuLinks({ menuItems }) {
   return (
     <ul className="d-flex flex-column flex-md-row flex-wrap list-unstyled gap-3 gap-md-4 menu-links align-items-center justify-content-center">
-      {!isMITX && (
-        <>
-          <li className="mx-2">
-            <Hyperlink destination={`${marketingSiteUrl}/about-us/`}>About Us</Hyperlink>
-          </li>
-          <li className="mx-2">
-            <Hyperlink destination={`${marketingSiteUrl}/privacy-policy/`}>Privacy Policy</Hyperlink>
-          </li>
-          <li className="mx-2">
-            <Hyperlink destination={`${marketingSiteUrl}/honor-code/`}>Honor Code</Hyperlink>
-          </li>
-        </>
-      )}
-      <li className="mx-2">
-        <Hyperlink destination={`${marketingSiteUrl}/${isMITX ? "tos/" : "terms-of-service/"}`}>
-          Terms of Service
-        </Hyperlink>
-      </li>
-      <li className="mx-2">
-        <Hyperlink destination="https://accessibility.mit.edu/">Accessibility</Hyperlink>
-      </li>
+      {
+        menuItems.map((item) => <li className="mx-2"><Hyperlink destination={ item.url }>{item.title}</Hyperlink></li>)
+      }
     </ul>
   );
 }

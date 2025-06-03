@@ -4,75 +4,102 @@ import Footer, { Logo, MenuLinks, CopyrightNotice } from './Footer.jsx';
 
 const configData = getConfig();
 const currentYear = new Date().getFullYear();
+const edxMfeAppName = configData.APP_ID;
+const authoringAppID = "authoring";
+const learnCourseKeyFormat = "course-v1:uai_";
+const isLearnCourse = window.location.href.toLowerCase().includes(learnCourseKeyFormat);
+const accessibilityURL = process.env.ACCESSIBILITY_URL || 'https://accessibility.mit.edu/';
+const linkTitles = {
+  dashboard: "Dashboard",
+  profile: "Profile",
+  account: "Settings",
+  logout: "Sign Out",
+  aboutUs: "About Us",
+  privacyPolicy: "Privacy Policy",
+  honorCode: "Honor Code",
+  termsOfService: "Terms of Service",
+  accessibility: "Accessibility",
+};
 
-const userMenu = {
-    dashboard: {
-        url: `${configData.LMS_BASE_URL}/dashboard`,
-        title: 'Dashboard',
+const copyRightText = `${configData.SITE_NAME.replace(/\b(CI|QA|Staging)\b/g, "").trim()}. All rights reserved.`;
+
+const logo = <Logo imageUrl={configData.LOGO_URL} destinationUrl={configData.MARKETING_SITE_BASE_URL} />;
+
+let userMenu = [
+  {
+    url: `${process.env.MIT_LEARN_BASE_URL}/dashboard`,
+    title: linkTitles.dashboard,
+  },
+  {
+    url: `${configData.LMS_BASE_URL}/logout`,
+    title: linkTitles.logout,
+  },
+];
+
+if (!isLearnCourse) {
+
+  userMenu = [
+    {
+      url: `${configData.MARKETING_SITE_BASE_URL}/dashboard`,
+      title: linkTitles.dashboard,
     },
-    profile: {
-        url: `${configData.MARKETING_SITE_BASE_URL}/profile/`,
-        title: 'Profile',
+    {
+      url: `${configData.MARKETING_SITE_BASE_URL}/profile/`,
+      title: linkTitles.profile,
     },
-    settings: {
-        url: `${configData.MARKETING_SITE_BASE_URL}/account-settings/`,
-        title: 'Settings',
+    {
+      url: `${configData.MARKETING_SITE_BASE_URL}/account-settings/`,
+      title: linkTitles.account,
     },
-    logout: {
-        url: `${configData.LMS_BASE_URL}/logout`,
-        title: 'Sign Out',
+    {
+      url: `${configData.LMS_BASE_URL}/logout`,
+      title: linkTitles.logout,
     },
+  ];
+
 }
+
+const footerLegalLinks = [
+    {
+      url: `${configData.MARKETING_SITE_BASE_URL}/about-us/`,
+      title: linkTitles.aboutUs,
+    },
+    {
+      url: `${configData.MARKETING_SITE_BASE_URL}/privacy-policy/`,
+      title: linkTitles.privacyPolicy,
+    },
+    {
+      url: `${configData.MARKETING_SITE_BASE_URL}/honor-code/`,
+      title: linkTitles.honorCode,
+    },
+    {
+      url: `${configData.MARKETING_SITE_BASE_URL}/terms-of-service/`,
+      title: linkTitles.termsOfService,
+    },
+    {
+      url: accessibilityURL,
+      title: linkTitles.accessibility,
+    },
+  ];
 
 const DesktopHeaderUserMenu = (widget) => {
   widget.content.menu = [
     {
-      items: [
-        {
-          type: 'item',
-          href: userMenu.dashboard.url,
-          content: userMenu.dashboard.title,
-        },
-        {
-          type: 'item',
-          href: userMenu.profile.url,
-          content: userMenu.profile.title,
-        },
-        {
-          type: 'item',
-          href: userMenu.settings.url,
-          content: userMenu.settings.title,
-        },
-        {
-          type: 'item',
-          href:  userMenu.logout.url,
-          content: userMenu.logout.title,
-        },
-      ],
+      items: userMenu.map((item) => ({
+        type: 'item',
+        href: item.url,
+        content: item.title,
+      })),
     },
   ];
   return widget;
 };
 
 const LearningHeaderUserMenu = (widget) => {
-  widget.content.items = [
-    {
-      href: userMenu.dashboard.url,
-      message: userMenu.dashboard.title,
-    },
-    {
-      href: userMenu.profile.url,
-      message: userMenu.profile.title,
-    },
-    {
-      href: userMenu.settings.url,
-      message: userMenu.settings.title,
-    },
-    {
-      href: userMenu.logout.url,
-      message: userMenu.logout.title,
-    },
-  ];
+  widget.content.items = userMenu.map((item) => ({
+    href: item.url,
+    message: item.title,
+  }))
   return widget;
 };
 
@@ -85,9 +112,7 @@ const footerSubSlotsConfig = {
         widget: {
           id: 'custom_logo',
           type: DIRECT_PLUGIN,
-          RenderWidget: () => (
-            <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={process.env.MIT_BASE_URL} logoStyle={{ height: '48px' }} />
-          ),
+          RenderWidget: () => logo,
         },
       },
     ],
@@ -101,7 +126,7 @@ const footerSubSlotsConfig = {
           id: 'custom_menu_links',
           type: DIRECT_PLUGIN,
           RenderWidget: () => (
-            <MenuLinks marketingSiteUrl={configData.MARKETING_SITE_BASE_URL} siteName={configData.SITE_NAME} />
+            <MenuLinks menuItems={footerLegalLinks} />
           ),
         },
       },
@@ -116,7 +141,7 @@ const footerSubSlotsConfig = {
           id: 'custom_legal_notice',
           type: DIRECT_PLUGIN,
           RenderWidget: () => (
-            <CopyrightNotice copyrightText={`© ${currentYear} ${configData.SITE_NAME.replace(/\b(CI|QA|Staging)\b/g, "").trim()}. All rights reserved.`} />
+            <CopyrightNotice copyrightText={`© ${currentYear} ${copyRightText}`} />
           ),
         },
       },
@@ -150,9 +175,7 @@ let config = {
 };
 
 // Additional plugin config based on MFE
-const edxMfeAppName = configData.APP_ID;
-
-if (edxMfeAppName === "authoring") {
+if (edxMfeAppName === authoringAppID) {
   config = {
     ...config,
     pluginSlots: {
