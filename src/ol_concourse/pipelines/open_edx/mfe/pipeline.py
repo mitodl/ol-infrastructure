@@ -177,23 +177,31 @@ def mfe_job(
 
     mfe_setup_lines = [
         f"cp -r {mfe_repo.name}/* {mfe_build_dir.name}",
-        f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/Footer.jsx {mfe_build_dir.name}/Footer.jsx",
-        f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/{slot_config_file}.env.jsx {mfe_build_dir.name}/env.config.jsx",
+        (
+            f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+            f"Footer.jsx {mfe_build_dir.name}/Footer.jsx"
+        ),
+        (
+            f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+            f"{open_edx_deployment.deployment_name}/{slot_config_file}.env.jsx "
+            f"{mfe_build_dir.name}/env.config.jsx"
+        ),
         copy_common_config,
     ]
 
     # Add styles.scss copy for Residential deployments
     if (
         open_edx_deployment.deployment_name in ["mitx", "mitx-staging"]
-        and OpenEdxMicroFrontend[mfe_name].value == OpenEdxMicroFrontend.learner_dashboard.value
+        and OpenEdxMicroFrontend[mfe_name].value
+        == OpenEdxMicroFrontend.learner_dashboard.value
     ):
         mfe_setup_lines.append(
-            f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/mitx-styles.scss {mfe_build_dir.name}/mitx-styles.scss"
+            f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+            f"mitx-styles.scss {mfe_build_dir.name}/mitx-styles.scss"
         )
 
     # Join all commands with newlines
     mfe_setup_command = textwrap.dedent("\n".join(mfe_setup_lines))
-
 
     mfe_setup_plan += [
         clone_mfe_configs,
