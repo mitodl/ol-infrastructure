@@ -6,8 +6,8 @@ const configData = getConfig();
 const currentYear = new Date().getFullYear();
 const edxMfeAppName = configData.APP_ID;
 const authoringAppID = "authoring";
-const learnCourseKeyFormat = "course-v1:uai_";
-const isLearnCourse = window.location.href.toLowerCase().includes(learnCourseKeyFormat);
+const href = window.location.href.toLowerCase();
+const isLearnCourse = ["course-v1:uai_", "course-v1:mit_et"].some(key => href.includes(key));
 const accessibilityURL = process.env.ACCESSIBILITY_URL || 'https://accessibility.mit.edu/';
 const linkTitles = {
   dashboard: "Dashboard",
