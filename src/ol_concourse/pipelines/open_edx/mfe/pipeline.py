@@ -175,14 +175,6 @@ def mfe_job(
         slot_config_file = "learning-mfe-config"
         copy_common_config = f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx {mfe_build_dir.name}/common-mfe-config.env.jsx"  # noqa: E501
 
-    # mfe_setup_command = textwrap.dedent(
-    #     f"""\
-    #     cp -r {mfe_repo.name}/* {mfe_build_dir.name}
-    #     cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/Footer.jsx {mfe_build_dir.name}/Footer.jsx
-    #     cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/{slot_config_file}.env.jsx {mfe_build_dir.name}/env.config.jsx
-    #     {copy_common_config}
-    #     """  # noqa: E501
-    # )
     mfe_setup_lines = [
         f"cp -r {mfe_repo.name}/* {mfe_build_dir.name}",
         f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/Footer.jsx {mfe_build_dir.name}/Footer.jsx",
