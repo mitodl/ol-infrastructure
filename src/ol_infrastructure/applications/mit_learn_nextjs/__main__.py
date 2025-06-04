@@ -43,7 +43,7 @@ nextjs_config = Config("nextjs")
 
 raw_env_vars = {
     "NEXT_PUBLIC_APPZI_URL": nextjs_config.require("appzi_url"),
-    "NEXT_PUBLIC_CSRF_COOKIE_NAME": f"learn-{stack_info.env_suffix}-csrftoken",
+    "NEXT_PUBLIC_CSRF_COOKIE_NAME": nextjs_config.require("csrf_cookie_name"),
     "NEXT_PUBLIC_EMBEDLY_KEY": nextjs_config.require("embedly_key"),
     "NEXT_PUBLIC_LEARN_AI_RECOMMENDATION_ENDPOINT": nextjs_config.require(
         "recommendation_endpoint"
