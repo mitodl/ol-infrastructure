@@ -4,3 +4,4 @@ encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAGWFOFFT3svVBZ4yi
 config:
   ol-infrastructure-botkube-application:secrets-provider:
     secure: v1:GPgn91X29PV4Lf84:vYWvcyl45GIq4S/cQIM6DCmlL0Togk+a6yrABIxwbym/+gf1hgVb3bslGFefYKUTfIxS0y8z9fk=
+  vault:address: https://vault-ci.odl.mit.edu
