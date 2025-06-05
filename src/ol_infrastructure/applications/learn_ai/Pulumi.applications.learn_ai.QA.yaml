@@ -9,8 +9,11 @@ config:
     secure: v1:moKYAbHsHOnTUrEk:4OgRBNFXT0WKrz1KaKZDhQxT09dA36jN4+q/SO0IIAemTSiwGqrXbXn+r5dFlGrr24S+VGtiyNXSVKts+j/TgKS33FTo86OX2saBDrL4dFo=
   learn_ai:env_vars:
     AI_DEBUG: "true"
-    AI_DEFAULT_SYLLABUS_MODEL: "bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0"
-    AI_MIT_SEARCH_URL: "https://api.rc.learn.mit.edu/api/v1/learning_resources_search/"
+    AI_DEFAULT_RECOMMENDATION_MODEL: "openai/gpt-4o-mini"
+    AI_DEFAULT_SYLLABUS_MODEL: "openai/gpt-4o-mini"
+    AI_DEFAULT_VIDEO_GPT_MODEL: "openai/gpt-4o-mini"
+    AI_DEFAULT_TUTOR_MODEL: "openai/gpt-4o"
+    AI_MIT_SEARCH_URL: "https://api.rc.learn.mit.edu/api/v0/vector_learning_resources_search/"
     AI_MIT_SEARCH_DETAIL_URL: "https://rc.learn.mit.edu/?resource="
     AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"

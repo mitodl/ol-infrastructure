@@ -8,7 +8,11 @@ config:
   learn_ai:db_password:
     secure: v1:DIaoiP0dVXpI2w72:zcSTWgD6DInTMOdD1oH1FTdlUJCney7MLeAfL5Q5hcL9lDfW7AjVGynLDeDtpL3DQIZvFBUvcbjIHVaBYQf8Ikf8tdjWamNBv+4Ymwe2
   learn_ai:env_vars:
-    AI_DEFAULT_SYLLABUS_MODEL: "bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+    AI_DEFAULT_RECOMMENDATION_MODEL: "openai/gpt-4o-mini"
+    AI_DEFAULT_SYLLABUS_MODEL: "openai/gpt-4o-mini"
+    AI_DEFAULT_VIDEO_GPT_MODEL: "openai/gpt-4o-mini"
+    AI_DEFAULT_TUTOR_MODEL: "openai/gpt-4o"
+    AI_MIT_SEARCH_URL: "https://api.rc.learn.mit.edu/api/v0/vector_learning_resources_search/"
     AI_PROMPT_CACHE_FUNCTION: "ai_chatbots.utils.get_django_cache"
     CELERY_TASK_ALWAYS_EAGER: "false"
     CSRF_ALLOWED_ORIGINS: '["https://learn-ai.ol.mit.edu", "https://api-learn-ai.ol.mit.edu",

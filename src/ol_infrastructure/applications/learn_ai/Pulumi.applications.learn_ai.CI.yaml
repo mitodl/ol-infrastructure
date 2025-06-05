@@ -6,8 +6,11 @@ config:
   learn_ai:backend_domain: "api-learn-ai-ci.ol.mit.edu"
   learn_ai:learn_backend_domain: "api.ci.learn.mit.edu"
   learn_ai:env_vars:
-    AI_DEFAULT_SYLLABUS_MODEL: "bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0"
-    AI_MIT_SEARCH_URL: "https://api.rc.learn.mit.edu/api/v1/learning_resources_search/"
+    AI_DEFAULT_RECOMMENDATION_MODEL: "openai/gpt-4o-mini"
+    AI_DEFAULT_SYLLABUS_MODEL: "openai/gpt-4o-mini"
+    AI_DEFAULT_VIDEO_GPT_MODEL: "openai/gpt-4o-mini"
+    AI_DEFAULT_TUTOR_MODEL: "openai/gpt-4o"
+    AI_MIT_SEARCH_URL: "https://api.rc.learn.mit.edu/api/v0/vector_learning_resources_search/"
     AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_PROMPT_CACHE_FUNCTION: "ai_chatbots.utils.get_django_cache"
