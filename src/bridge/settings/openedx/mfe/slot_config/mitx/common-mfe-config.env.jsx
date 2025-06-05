@@ -1,6 +1,7 @@
 import { PLUGIN_OPERATIONS, DIRECT_PLUGIN } from '@openedx/frontend-plugin-framework';
 import { getConfig } from '@edx/frontend-platform';
 import Footer, { Logo, MenuLinks, CopyrightNotice } from './Footer.jsx';
+import styles from './mitx-styles.scss';
 
 const configData = getConfig();
 const currentYear = new Date().getFullYear();
@@ -168,6 +169,11 @@ if (learningApps.includes(edxMfeAppName)) {
       },
     ],
   };
+}
+
+// Removes the looking for a new challenge banner from the Learner Dashboard MFE sidebar
+config.pluginSlots.widget_sidebar_slot = {
+  plugins: [{ op: PLUGIN_OPERATIONS.Hide, widgetId: 'default_contents' }]
 }
 
 export default config;
