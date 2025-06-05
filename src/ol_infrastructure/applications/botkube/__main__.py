@@ -34,8 +34,8 @@ vault_config = Config("vault")
 opensearch_stack = StackReference(
     f"infrastructure.aws.opensearch.apps.{stack_info.name}"
 )
-
 opensearch_cluster = opensearch_stack.require_output("cluster")
+opensearch_cluster_endpoint = opensearch_cluster["endpoint"]
 
 cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
 
@@ -64,11 +64,7 @@ botkube_vault_mount = vault.Mount(
     description="Secrets for the learn ai application.",
     opts=ResourceOptions(delete_before_replace=True),
 )
-botkube_static_vault_secrets = vault.generic.Secret(
-    f"botkube-secrets-{stack_info.env_suffix}",
-    path=botkube_vault_mount.path.apply("{}/secrets".format),
-    data_json=json.dumps(botkube_vault_secrets),
-)
+
 botkube_static_vault_secrets = vault.generic.Secret(
     f"botkube-secrets-{stack_info.env_suffix}",
     path=botkube_vault_mount.path.apply("{}/secrets".format),
@@ -134,14 +130,6 @@ static_secrets = OLVaultK8SSecret(
 )
 # end Vault hoo-ha
 
-botkube_config = Config("config_botkube")
-opensearch_stack = StackReference(
-    f"infrastructure.aws.opensearch.apps.{stack_info.name}"
-)
-
-opensearch_cluster = opensearch_stack.require_output("cluster")
-
-cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
 
 aws_config = AWSBase(
     tags={"OU": BusinessUnit.operations, "Environment": Environment.applications},
@@ -528,7 +516,7 @@ botkube_application = kubernetes.helm.v3.Release(
                             "awsRegion": "us-east-1",
                             "roleArn": "",
                         },
-                        "server": opensearch_cluster["endpoint"],
+                        "server": opensearch_cluster_endpoint,
                         "skipTLSVerify": False,
                         "logLevel": "",
                         "indices": {
