@@ -34,16 +34,16 @@ vault_config = Config("vault")
 opensearch_stack = StackReference(
     f"infrastructure.aws.opensearch.apps.{stack_info.name}"
 )
-opensearch_cluster = opensearch_stack.require_output("cluster")
-opensearch_cluster_endpoint = opensearch_cluster["endpoint"]
+# opensearch_cluster = opensearch_stack.require_output("cluster")  noqa: ERA001
+# opensearch_cluster_endpoint = opensearch_cluster["endpoint"]  noqa: ERA001
 
-cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+cluster_stack = StackReference(f"infrastructure.aws.eks.operations.{stack_info.name}")
 
 aws_config = AWSBase(
-    tags={"OU": BusinessUnit.operations, "Environment": Environment.applications},
+    tags={"OU": BusinessUnit.operations, "Environment": Environment.operations},
 )
 
-botkube_namespace = "botkube-namespace"
+botkube_namespace = "operations"
 
 k8s_global_labels = K8sGlobalLabels(
     service=Services.botkube,
@@ -131,10 +131,6 @@ static_secrets = OLVaultK8SSecret(
 # end Vault hoo-ha
 
 
-aws_config = AWSBase(
-    tags={"OU": BusinessUnit.operations, "Environment": Environment.applications},
-)
-
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 cluster_stack.require_output("namespaces").apply(
@@ -151,7 +147,7 @@ botkube_application = kubernetes.helm.v3.Release(
         namespace=botkube_namespace,
         cleanup_on_fail=True,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-            repo="https://helm.botkube.org",
+            repo="https://charts.botkube.io",
         ),
         values={
             "commonLabels": k8s_global_labels,
@@ -496,7 +492,7 @@ botkube_application = kubernetes.helm.v3.Release(
                         "enabled": False,
                         "channels": {
                             "default": {
-                                "name": "#botkube-test",
+                                "name": "#botkube-ci",
                                 "bindings": {
                                     "executors": ["k8s-default-tools"],
                                     "sources": [
@@ -506,68 +502,20 @@ botkube_application = kubernetes.helm.v3.Release(
                                 },
                             }
                         },
-                        "botToken": "",
-                        "appToken": "",
+                        # These will get consumed from k8s secrets as env vars
+                        # "botToken": "", noqa: ERA001
+                        # "appToken": "", noqa: ERA001
                     },
                     "elasticsearch": {
-                        "enabled": True,
-                        "awsSigning": {
-                            "enabled": False,
-                            "awsRegion": "us-east-1",
-                            "roleArn": "",
-                        },
-                        "server": opensearch_cluster_endpoint,
-                        "skipTLSVerify": False,
-                        "logLevel": "",
-                        "indices": {
-                            "default": {
-                                "name": "botkube",
-                                "type": "botkube-event",
-                                "shards": 1,
-                                "replicas": 0,
-                                "bindings": {
-                                    "sources": [
-                                        "k8s-err-events",
-                                        "k8s-recommendation-events",
-                                    ]
-                                },
-                            }
-                        },
-                    },
-                    "webhook": {
                         "enabled": False,
-                        "url": "WEBHOOK_URL",
-                        "bindings": {
-                            "sources": ["k8s-err-events", "k8s-recommendation-events"]
-                        },
-                    },
-                },
-                f"{stack_info.name}-group": {
-                    "socketSlack": {
-                        "enabled": True,
-                        "channels": {
-                            "default": {
-                                "name": "#botkube-test",
-                                "bindings": {
-                                    "executors": ["k8s-default-tools"],
-                                    "sources": [
-                                        "k8s-err-events",
-                                        "k8s-recommendation-events",
-                                    ],
-                                },
-                            }
-                        },
-                        "botToken": "<Nope. That would be telling.",
-                        "appToken": "<Nope. See above.>",
-                    },
-                    "elasticsearch": {
-                        "enabled": True,
                         "awsSigning": {
                             "enabled": False,
                             "awsRegion": "us-east-1",
                             "roleArn": "",
                         },
-                        "server": opensearch_cluster.endpoint,
+                        "server": "ELASTICSEARCH_ADDRESS",
+                        "username": "ELASTICSEARCH_USERNAME",
+                        "password": "ELASTICSEARCH_PASSWORD",
                         "skipTLSVerify": False,
                         "logLevel": "",
                         "indices": {
@@ -659,7 +607,25 @@ botkube_application = kubernetes.helm.v3.Release(
             "resources": {},
             # Environment variables
             "extraEnv": [
-                {"name": "LOG_LEVEL_SOURCE_BOTKUBE_KUBERNETES", "value": "debug"}
+                {"name": "LOG_LEVEL_SOURCE_BOTKUBE_KUBERNETES", "value": "debug"},
+                {
+                    "name": "BOTKUBE_COMMUNICATIONS_DEFAULT-GROUP_SOCKET__SLACK_APP__TOKEN",
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "communication-slack",
+                            "key": "slack-bot-token",
+                        },
+                    },
+                },
+                {
+                    "name": "BOTKUBE_COMMUNICATIONS_DEFAULT-GROUP_SOCKET__SLACK_BOT__TOKEN",
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "communication-slack",
+                            "key": "slack-app-token",
+                        },
+                    },
+                },
             ],
             # Volume configuration
             "extraVolumes": [],

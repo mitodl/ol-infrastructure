@@ -22,6 +22,7 @@ AIRBYTE_CHART_VERSION = "1.6.2"
 # renovate: datasource=docker depName=apisix packageName=registry-1.docker.io/bitnamicharts/apisix
 APISIX_CHART_VERSION = "5.0.2"
 # renovate: datasource=helm depName=botkube packageName=botkube
+BOTKUBE_CHART_VERSION = "v1.14.0"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager
 CERT_MANAGER_CHART_VERSION = "v1.16.1"
 # renovate: datasource=aws-eks-addon depName=ebs-csi-driver
@@ -48,4 +49,3 @@ NGINX_VERSION = "1.28.0"
 PROMETHEUS_OPERATOR_CRD_VERSION = "v0.83.0"
 # renovate: datasource=github-releases depName=keycloak-k8s-resources packageName=keycloak/keycloak-k8s-resources
 KEYCLOAK_OPERATOR_CRD_VERSION = "26.2.4"
-BOTKUBE_CHART_VERSION = "v1.14.0"
