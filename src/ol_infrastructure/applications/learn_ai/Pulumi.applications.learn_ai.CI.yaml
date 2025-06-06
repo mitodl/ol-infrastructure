@@ -10,6 +10,7 @@ config:
     AI_DEFAULT_SYLLABUS_MODEL: "openai/gpt-4o-mini"
     AI_DEFAULT_VIDEO_GPT_MODEL: "openai/gpt-4o-mini"
     AI_DEFAULT_TUTOR_MODEL: "openai/gpt-4o"
+    AI_MIT_CONTENTFILE_URL: "https://api.rc.learn.mit.edu/api/v1/contentfiles/"
     AI_MIT_SEARCH_URL: "https://api.rc.learn.mit.edu/api/v0/vector_learning_resources_search/"
     AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
