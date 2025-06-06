@@ -755,3 +755,57 @@ setup_karpenter(
     aws_account=aws_account,
     k8s_global_labels=k8s_global_labels,
 )
+
+keda_release = kubernetes.helm.v3.Release(
+    f"{cluster_name}-keda-helm-release",
+    kubernetes.helm.v3.ReleaseArgs(
+        name="keda",
+        chart="keda",
+        version="",
+        namespace="operations",
+        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+            repo="https://kedacore.github.io/charts"
+        ),
+        cleanup_on_fail=True,
+        skip_await=True,
+        values={
+            "resources": {
+                "operator": {
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "100Mi",
+                    },
+                    "limits": {
+                        "cpu": "200m",
+                        "memory": "200Mi",
+                    },
+                },
+                "metricServer": {
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "100Mi",
+                    },
+                    "limits": {
+                        "cpu": "200m",
+                        "memory": "200Mi",
+                    },
+                },
+                "webhooks": {
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "100Mi",
+                    },
+                    "limits": {
+                        "cpu": "200m",
+                        "memory": "200Mi",
+                    },
+                },
+            },
+        },
+    ),
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=k8s_provider,
+        delete_before_replace=True,
+    ),
+)
