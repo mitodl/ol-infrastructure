@@ -13,6 +13,6 @@ ol-openedx-logging
 ol-openedx-sentry
 ol-social-auth
 openedx-scorm-xblock
-uwsgi==2.0.29
+uwsgi==2.0.30
 wheel==0.45.1
 ol-openedx-chat
