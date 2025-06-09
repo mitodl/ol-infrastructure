@@ -105,7 +105,7 @@ vault_k8s_resources = OLVaultK8SResources(
 )
 
 # Load the static secrets into a k8s secret via VSO
-static_secrets_name = "botkube-static-secrets"  # pragma: allowlist secret
+static_secrets_name = "communication-slack"  # pragma: allowlist secret
 static_secrets = OLVaultK8SSecret(
     name=f"botkube-{stack_info.env_suffix}-static-secrets",
     resource_config=OLVaultK8SStaticSecretConfig(
