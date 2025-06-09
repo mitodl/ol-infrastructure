@@ -11,7 +11,7 @@ config:
   nextjs:mitlearn_api_base_url: "https://api.learn.mit.edu"
   nextjs:mitxonline_base_url: "https://mitxonline.mit.edu"
   nextjs:origin: "https://learn.mit.edu"
-  nextjs:posthog_api_host: "https://ph.ol.mi.edu"
+  nextjs:posthog_api_host: "https://ph.ol.mit.edu"
   nextjs:posthog_api_key:
     secure: v1:oa2Jq3cyaLttgxTD:U4odgKoAnfUbsDPprhv4ZH3nnJlrgkeM9RS57daOOcx9hFHxUd96mX66kQ8sfdFWKUPMz9FKh+dzsNo1NzmA
   nextjs:posthog_project_id:
