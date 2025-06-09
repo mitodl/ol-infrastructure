@@ -402,6 +402,7 @@ redis_cache_config = OLAmazonRedisConfig(
     cluster_mode_enabled=False,
     encrypted=True,
     engine_version="7.1",
+    engine="redis",
     num_instances=3,
     shard_count=1,
     auto_upgrade=True,

@@ -221,6 +221,7 @@ redash_redis_config = OLAmazonRedisConfig(
     encrypt_transit=True,
     auth_token=redis_config.require("auth_token"),
     engine_version="6.2",
+    engine="redis",
     num_instances=3,
     shard_count=1,
     auto_upgrade=True,
