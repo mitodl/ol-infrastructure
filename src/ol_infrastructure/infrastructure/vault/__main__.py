@@ -304,6 +304,7 @@ vault_security_group = ec2.SecurityGroup(
             from_port=VAULT_HTTP_PORT,
             to_port=VAULT_HTTP_PORT,
             cidr_blocks=["0.0.0.0/0"],
+            ipv6_cidr_blocks=["0::/0"],
             description="Allow traffic to Vault server API endpoints",
         ),
     ],
