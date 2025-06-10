@@ -71,6 +71,7 @@ target_vpc = network_stack.require_output(env_config.require("target_vpc"))
 pod_ip_blocks = target_vpc["k8s_pod_subnet_cidrs"]
 public_ip_blocks = target_vpc["k8s_public_subnet_cidrs"]
 pod_subnet_ids = target_vpc["k8s_pod_subnet_ids"]
+pod_ip_blocks = target_vpc["k8s_pod_subnet_cidrs"]
 service_ip_block = target_vpc["k8s_service_subnet_cidr"]
 
 cluster_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
@@ -330,6 +331,23 @@ cluster = eks.Cluster(
         parent=cluster_role,
         depends_on=[cluster_role, administrator_role],
     ),
+)
+
+
+def __create_apiserver_security_group_rules(pod_subnet_cidrs):
+    for index, subnet_cidr in enumerate(pod_subnet_cidrs):
+        aws.vpc.SecurityGroupIngressRule(
+            f"{cluster_name}-eks-apiserver-sg-rule-{index}",
+            security_group_id=cluster.cluster_security_group_id,
+            cidr_ipv4=subnet_cidr,
+            from_port=443,
+            to_port=443,
+            ip_protocol="tcp",
+        )
+
+
+pod_ip_blocks.apply(
+    lambda pod_subnet_cidrs: __create_apiserver_security_group_rules(pod_subnet_cidrs)
 )
 
 export("cluster_name", cluster_name)
