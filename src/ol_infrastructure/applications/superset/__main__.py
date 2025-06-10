@@ -7,7 +7,7 @@ from pathlib import Path
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi import Alias, Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import acm, ec2, get_caller_identity, iam, route53, ses
 
 from bridge.lib.magic_numbers import (
@@ -429,7 +429,16 @@ redis_cache_config = OLAmazonRedisConfig(
     ],  # the name of the subnet group created in the OLVPC component resource
     tags=aws_config.tags,
 )
-superset_redis_cache = OLAmazonCache(redis_cache_config)
+superset_redis_cache = OLAmazonCache(
+    redis_cache_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"superset-redis-{stack_info.env_suffix}-redis-elasticache-cluster"
+            )
+        ]
+    ),
+)
 superset_redis_consul_node = consul.Node(
     "superset-redis-cache-node",
     name="superset-redis",

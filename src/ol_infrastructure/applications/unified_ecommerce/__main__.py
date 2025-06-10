@@ -536,7 +536,16 @@ redis_cache_config = OLAmazonRedisConfig(
     security_groups=[redis_cluster_security_group.id],
     tags=aws_config.tags,
 )
-redis_cache = OLAmazonCache(redis_cache_config)
+redis_cache = OLAmazonCache(
+    redis_cache_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"unified-ecommerce-redis-{stack_info.env_suffix}-redis-elasticache-cluster"
+            )
+        ]
+    ),
+)
 
 # Create a vault policy and associate it with an auth backend role
 # on the vault k8s cluster auth endpoint

@@ -579,7 +579,16 @@ redis_cache_config = OLAmazonRedisConfig(
     tags=aws_config.tags,
     **redis_defaults,
 )
-redis_cache = OLAmazonCache(redis_cache_config)
+redis_cache = OLAmazonCache(
+    redis_cache_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"learn-ai-redis-{stack_info.env_suffix}-redis-elasticache-cluster"
+            )
+        ]
+    ),
+)
 
 ################################################
 # Create vault policy and associate it with an auth backend role

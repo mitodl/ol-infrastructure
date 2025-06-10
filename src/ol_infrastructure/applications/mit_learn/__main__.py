@@ -1382,7 +1382,16 @@ redis_cache_config = OLAmazonRedisConfig(
     tags=aws_config.tags,
     **redis_defaults,
 )
-redis_cache = OLAmazonCache(redis_cache_config)
+redis_cache = OLAmazonCache(
+    redis_cache_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"mitlearn-redis-{stack_info.env_suffix}-redis-elasticache-cluster"
+            )
+        ]
+    ),
+)
 
 # Create all Kubernetes secrets needed by the application
 secret_names, secret_resources = create_mitlearn_k8s_secrets(
