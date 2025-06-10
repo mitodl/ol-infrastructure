@@ -22,7 +22,7 @@ import pulumi_fastly as fastly
 import pulumi_mongodbatlas as atlas
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi import Alias, Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import (
     acm,
     autoscaling,
@@ -874,7 +874,8 @@ redis_cache_config = OLAmazonRedisConfig(
     )["redis_auth_token"],
     cluster_mode_enabled=False,
     encrypted=True,
-    engine_version="7.1",
+    engine="valkey",
+    engine_version="7.2",
     instance_type=redis_instance_type,
     num_instances=3,
     shard_count=1,
@@ -888,7 +889,12 @@ redis_cache_config = OLAmazonRedisConfig(
     ],  # the name of the subnet group created in the OLVPC component resource
     tags=aws_config.tags,
 )
-edxapp_redis_cache = OLAmazonCache(redis_cache_config)
+edxapp_redis_cache = OLAmazonCache(
+    redis_cache_config,
+    opts=ResourceOptions(
+        aliases=[Alias(name=f"edxapp-redis-{env_name}-redis-elasticache-cluster")]
+    ),
+)
 edxapp_redis_consul_node = Node(
     "edxapp-redis-cache-node",
     name="edxapp-redis",
