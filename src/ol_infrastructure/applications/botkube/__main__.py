@@ -26,18 +26,20 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.vault import setup_vault_provider
 
 stack_info = parse_stack()
+setup_vault_provider(stack_info)
 
 botkube_config = Config("config_botkube")
 vault_config = Config("vault")
 opensearch_stack = StackReference(
     f"infrastructure.aws.opensearch.apps.{stack_info.name}"
 )
-# opensearch_cluster = opensearch_stack.require_output("cluster")  noqa: ERA001
-# opensearch_cluster_endpoint = opensearch_cluster["endpoint"]  noqa: ERA001
+opensearch_cluster = opensearch_stack.require_output("cluster")
+opensearch_cluster_endpoint = opensearch_cluster["endpoint"]
 
-cluster_stack = StackReference(f"infrastructure.aws.eks.operations.{stack_info.name}")
+cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
 
 aws_config = AWSBase(
     tags={"OU": BusinessUnit.operations, "Environment": Environment.operations},
@@ -151,345 +153,10 @@ botkube_application = kubernetes.helm.v3.Release(
         ),
         values={
             "commonLabels": k8s_global_labels,
-            # Botkube Helm values converted to Python dictionary
-            # Botkube image configuration
-            "image": {
-                "registry": "ghcr.io",
-                "repository": "kubeshop/botkube",
-                "pullPolicy": "IfNotPresent",
-                "tag": "v1.14.0",
-            },
-            # Pod Security Policy configuration
-            "podSecurityPolicy": {"enabled": False},
-            # Security context configuration
-            "securityContext": {"runAsUser": 101, "runAsGroup": 101},
-            # Container security context
-            "containerSecurityContext": {
-                "privileged": False,
-                "allowPrivilegeEscalation": False,
-                "readOnlyRootFilesystem": True,
-            },
-            # RBAC configuration
-            "rbac": {
-                "serviceAccountMountPath": "/var/run/7e7fd2f5-b15d-4803-bc52-f54fba357e76/secrets/kubernetes.io/serviceaccount",  # noqa: E501
-                "create": True,
-                "rules": [],  # Deprecated
-                "staticGroupName": "",  # Deprecated
-                "groups": {
-                    "botkube-plugins-default": {
-                        "create": True,
-                        "rules": [
-                            {
-                                "apiGroups": ["*"],
-                                "resources": ["*"],
-                                "verbs": ["get", "watch", "list"],
-                            }
-                        ],
-                    }
-                },
-            },
-            # Kubeconfig settings
-            "kubeconfig": {"enabled": False, "base64Config": "", "existingSecret": ""},
-            # Actions configuration
-            "actions": {
-                "describe-created-resource": {
-                    "enabled": False,
-                    "displayName": "Describe created resource",
-                    "command": "kubectl describe {{ .Event.Kind | lower }}{{ if .Event.Namespace }} -n {{ .Event.Namespace }}{{ end }} {{ .Event.Name }}",  # noqa: E501
-                    "bindings": {
-                        "sources": ["k8s-create-events"],
-                        "executors": ["k8s-default-tools"],
-                    },
-                },
-                "show-logs-on-error": {
-                    "enabled": False,
-                    "displayName": "Show logs on error",
-                    "command": "kubectl logs {{ .Event.Kind | lower }}/{{ .Event.Name }} -n {{ .Event.Namespace }}",  # noqa: E501
-                    "bindings": {
-                        "sources": ["k8s-err-with-logs-events"],
-                        "executors": ["k8s-default-tools"],
-                    },
-                },
-            },
-            # Sources configuration
-            "sources": {
-                "k8s-recommendation-events": {
-                    "displayName": "Kubernetes Recommendations",
-                    "botkube/kubernetes": {
-                        "context": {
-                            "rbac": {
-                                "group": {
-                                    "type": "Static",
-                                    "prefix": "",
-                                    "static": {"values": ["botkube-plugins-default"]},
-                                }
-                            }
-                        },
-                        "enabled": True,
-                        "config": {
-                            "namespaces": {"include": [".*"]},
-                            "recommendations": {
-                                "pod": {"noLatestImageTag": True, "labelsSet": True},
-                                "ingress": {
-                                    "backendServiceValid": True,
-                                    "tlsSecretValid": True,
-                                },
-                            },
-                        },
-                    },
-                },
-                "k8s-all-events": {
-                    "displayName": "Kubernetes Info",
-                    "botkube/kubernetes": {
-                        "context": {
-                            "rbac": {
-                                "group": {
-                                    "type": "Static",
-                                    "prefix": "",
-                                    "static": {"values": ["botkube-plugins-default"]},
-                                }
-                            }
-                        },
-                        "enabled": True,
-                        "config": {
-                            "filters": {
-                                "objectAnnotationChecker": True,
-                                "nodeEventsChecker": True,
-                            },
-                            "namespaces": {"include": [".*"]},
-                            "event": {
-                                "types": ["create", "delete", "error"],
-                                "reason": {"include": [], "exclude": []},
-                                "message": {"include": [], "exclude": []},
-                            },
-                            "annotations": {},
-                            "labels": {},
-                            "resources": [
-                                {"type": "v1/pods"},
-                                {"type": "v1/services"},
-                                {"type": "networking.k8s.io/v1/ingresses"},
-                                {
-                                    "type": "v1/nodes",
-                                    "event": {
-                                        "message": {
-                                            "exclude": [".*nf_conntrack_buckets.*"]
-                                        }
-                                    },
-                                },
-                                {"type": "v1/namespaces"},
-                                {"type": "v1/persistentvolumes"},
-                                {"type": "v1/persistentvolumeclaims"},
-                                {"type": "v1/configmaps"},
-                                {"type": "rbac.authorization.k8s.io/v1/roles"},
-                                {"type": "rbac.authorization.k8s.io/v1/rolebindings"},
-                                {
-                                    "type": "rbac.authorization.k8s.io/v1/clusterrolebindings"  # noqa: E501
-                                },
-                                {"type": "rbac.authorization.k8s.io/v1/clusterroles"},
-                                {
-                                    "type": "apps/v1/daemonsets",
-                                    "event": {
-                                        "types": ["create", "update", "delete", "error"]
-                                    },
-                                    "updateSetting": {
-                                        "includeDiff": True,
-                                        "fields": [
-                                            "spec.template.spec.containers[*].image",
-                                            "status.numberReady",
-                                        ],
-                                    },
-                                },
-                                {
-                                    "type": "batch/v1/jobs",
-                                    "event": {
-                                        "types": ["create", "update", "delete", "error"]
-                                    },
-                                    "updateSetting": {
-                                        "includeDiff": True,
-                                        "fields": [
-                                            "spec.template.spec.containers[*].image",
-                                            "status.conditions[*].type",
-                                        ],
-                                    },
-                                },
-                                {
-                                    "type": "apps/v1/deployments",
-                                    "event": {
-                                        "types": ["create", "update", "delete", "error"]
-                                    },
-                                    "updateSetting": {
-                                        "includeDiff": True,
-                                        "fields": [
-                                            "spec.template.spec.containers[*].image",
-                                            "status.availableReplicas",
-                                        ],
-                                    },
-                                },
-                                {
-                                    "type": "apps/v1/statefulsets",
-                                    "event": {
-                                        "types": ["create", "update", "delete", "error"]
-                                    },
-                                    "updateSetting": {
-                                        "includeDiff": True,
-                                        "fields": [
-                                            "spec.template.spec.containers[*].image",
-                                            "status.readyReplicas",
-                                        ],
-                                    },
-                                },
-                            ],
-                        },
-                    },
-                },
-                "k8s-err-events": {
-                    "displayName": "Kubernetes Errors",
-                    "botkube/kubernetes": {
-                        "context": {
-                            "rbac": {
-                                "group": {
-                                    "type": "Static",
-                                    "prefix": "",
-                                    "static": {"values": ["botkube-plugins-default"]},
-                                }
-                            }
-                        },
-                        "enabled": True,
-                        "config": {
-                            "namespaces": {"include": [".*"]},
-                            "event": {"types": ["error"]},
-                            "resources": [
-                                {"type": "v1/pods"},
-                                {"type": "v1/services"},
-                                {"type": "networking.k8s.io/v1/ingresses"},
-                                {
-                                    "type": "v1/nodes",
-                                    "event": {
-                                        "message": {
-                                            "exclude": [".*nf_conntrack_buckets.*"]
-                                        }
-                                    },
-                                },
-                                {"type": "v1/namespaces"},
-                                {"type": "v1/persistentvolumes"},
-                                {"type": "v1/persistentvolumeclaims"},
-                                {"type": "v1/configmaps"},
-                                {"type": "rbac.authorization.k8s.io/v1/roles"},
-                                {"type": "rbac.authorization.k8s.io/v1/rolebindings"},
-                                {
-                                    "type": "rbac.authorization.k8s.io/v1/clusterrolebindings"  # noqa: E501
-                                },
-                                {"type": "rbac.authorization.k8s.io/v1/clusterroles"},
-                                {"type": "apps/v1/deployments"},
-                                {"type": "apps/v1/statefulsets"},
-                                {"type": "apps/v1/daemonsets"},
-                                {"type": "batch/v1/jobs"},
-                            ],
-                        },
-                    },
-                },
-                "k8s-err-with-logs-events": {
-                    "displayName": "Kubernetes Errors for resources with logs",
-                    "botkube/kubernetes": {
-                        "context": {
-                            "rbac": {
-                                "group": {
-                                    "type": "Static",
-                                    "prefix": "",
-                                    "static": {"values": ["botkube-plugins-default"]},
-                                }
-                            }
-                        },
-                        "enabled": True,
-                        "config": {
-                            "namespaces": {"include": [".*"]},
-                            "event": {"types": ["error"]},
-                            "resources": [
-                                {"type": "v1/pods"},
-                                {"type": "apps/v1/deployments"},
-                                {"type": "apps/v1/statefulsets"},
-                                {"type": "apps/v1/daemonsets"},
-                                {"type": "batch/v1/jobs"},
-                            ],
-                        },
-                    },
-                },
-                "k8s-create-events": {
-                    "displayName": "Kubernetes Resource Created Events",
-                    "botkube/kubernetes": {
-                        "context": {
-                            "rbac": {
-                                "group": {
-                                    "type": "Static",
-                                    "prefix": "",
-                                    "static": {"values": ["botkube-plugins-default"]},
-                                }
-                            }
-                        },
-                        "enabled": True,
-                        "config": {
-                            "namespaces": {"include": [".*"]},
-                            "event": {"types": ["create"]},
-                            "resources": [
-                                {"type": "v1/pods"},
-                                {"type": "v1/services"},
-                                {"type": "networking.k8s.io/v1/ingresses"},
-                                {"type": "v1/nodes"},
-                                {"type": "v1/namespaces"},
-                                {"type": "v1/configmaps"},
-                                {"type": "apps/v1/deployments"},
-                                {"type": "apps/v1/statefulsets"},
-                                {"type": "apps/v1/daemonsets"},
-                                {"type": "batch/v1/jobs"},
-                            ],
-                        },
-                    },
-                },
-            },
-            # Executors configuration
-            "executors": {
-                "k8s-default-tools": {
-                    "botkube/kubectl": {
-                        "displayName": "Kubectl",
-                        "enabled": False,
-                        "config": {"defaultNamespace": "default"},
-                        "context": {
-                            "rbac": {
-                                "group": {
-                                    "type": "Static",
-                                    "prefix": "",
-                                    "static": {"values": ["botkube-plugins-default"]},
-                                }
-                            }
-                        },
-                    },
-                    "botkubeExtra/helm": {
-                        "displayName": "Helm",
-                        "enabled": True,
-                        "context": {
-                            "rbac": {
-                                "group": {
-                                    "type": "Static",
-                                    "prefix": "",
-                                    "static": {"values": ["botkube-plugins-default"]},
-                                }
-                            }
-                        },
-                    },
-                }
-            },
-            # Command aliases
-            "aliases": {
-                "kc": {"command": "kubectl", "displayName": "Kubectl alias"},
-                "k": {"command": "kubectl", "displayName": "Kubectl alias"},
-            },
-            # Communications secret
-            "existingCommunicationsSecretName": "",
-            # Communications configuration
             "communications": {
                 "default-group": {
                     "socketSlack": {
-                        "enabled": False,
+                        "enabled": True,
                         "channels": {
                             "default": {
                                 "name": "#botkube-ci",
@@ -502,89 +169,15 @@ botkube_application = kubernetes.helm.v3.Release(
                                 },
                             }
                         },
-                        # These will get consumed from k8s secrets as env vars
-                        # "botToken": "", noqa: ERA001
-                        # "appToken": "", noqa: ERA001
                     },
                 },
             },
-            # Global settings
-            "settings": {
-                "clusterName": "not-configured",
-                "healthPort": 2114,
-                "upgradeNotifier": True,
-                "log": {"level": "info", "disableColors": False, "formatter": "json"},
-                "systemConfigMap": {"name": "botkube-system"},
-                "persistentConfig": {
-                    "startup": {
-                        "configMap": {
-                            "name": "botkube-startup-config",
-                            "annotations": {},
-                        },
-                        "fileName": "_startup_state.yaml",
-                    },
-                    "runtime": {
-                        "configMap": {
-                            "name": "botkube-runtime-config",
-                            "annotations": {},
-                        },
-                        "fileName": "_runtime_state.yaml",
-                    },
-                },
-            },
-            # SSL configuration
-            "ssl": {"enabled": False, "existingSecretName": "", "cert": ""},
-            # Service configuration
-            "service": {"name": "metrics", "port": 2112, "targetPort": 2112},
-            # ServiceMonitor configuration
-            "serviceMonitor": {
-                "enabled": False,
-                "interval": "10s",
-                "path": "/metrics",
-                "port": "metrics",
-                "labels": {},
-            },
-            # Deployment configuration
-            "deployment": {
-                "annotations": {},
-                "livenessProbe": {
-                    "initialDelaySeconds": 1,
-                    "periodSeconds": 2,
-                    "timeoutSeconds": 1,
-                    "failureThreshold": 35,
-                    "successThreshold": 1,
-                },
-                "readinessProbe": {
-                    "initialDelaySeconds": 1,
-                    "periodSeconds": 2,
-                    "timeoutSeconds": 1,
-                    "failureThreshold": 35,
-                    "successThreshold": 1,
-                },
-            },
-            # Pod configuration
-            "replicaCount": 1,
-            "extraAnnotations": {},
-            "extraLabels": {},
-            "priorityClassName": "",
-            "nameOverride": "",
-            "fullnameOverride": "",
-            # Resource limits and requests
-            "resources": {},
-            # Environment variables
             "extraEnv": [
                 {"name": "LOG_LEVEL_SOURCE_BOTKUBE_KUBERNETES", "value": "debug"},
                 {
-                    "name": "BOTKUBE_COMMUNICATIONS_DEFAULT-GROUP_SOCKET__SLACK_APP__TOKEN",  # noqa: E501
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": "communication-slack",
-                            "key": "slack-bot-token",
-                        },
-                    },
-                },
-                {
-                    "name": "BOTKUBE_COMMUNICATIONS_DEFAULT-GROUP_SOCKET__SLACK_BOT__TOKEN",  # noqa: E501
+                    "name": (
+                        "BOTKUBE_COMMUNICATIONS_DEFAULT-GROUP_SOCKET__SLACK_APP__TOKEN"
+                    ),
                     "valueFrom": {
                         "secretKeyRef": {
                             "name": "communication-slack",
@@ -592,38 +185,18 @@ botkube_application = kubernetes.helm.v3.Release(
                         },
                     },
                 },
-            ],
-            # Service account
-            "serviceAccount": {"create": True, "name": "", "annotations": {}},
-            # Analytics
-            "analytics": {"disable": False},
-            # Config watcher
-            "configWatcher": {
-                "enabled": True,
-                "inCluster": {"informerResyncPeriod": "10m"},
-            },
-            # Plugins configuration
-            "plugins": {
-                "repositories": {
-                    "botkube": {
-                        "url": "https://github.com/kubeshop/botkube/releases/download/v1.14.0/plugins-index.yaml"
-                    },
-                    "botkubeExtra": {
-                        "url": "https://github.com/kubeshop/botkube-plugins/releases/download/v1.14.0/plugins-index.yaml"
+                {
+                    "name": (
+                        "BOTKUBE_COMMUNICATIONS_DEFAULT-GROUP_SOCKET__SLACK_BOT__TOKEN"
+                    ),
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "communication-slack",
+                            "key": "slack-bot-token",
+                        },
                     },
                 },
-                "incomingWebhook": {"enabled": True, "port": 2115, "targetPort": 2115},
-                "restartPolicy": {"type": "DeactivatePlugin", "threshold": 10},
-                "healthCheckInterval": "10s",
-            },
-            # Remote configuration
-            "config": {
-                "provider": {
-                    "identifier": "",
-                    "endpoint": "https://api.botkube.io/graphql",
-                    "apiKey": "",
-                }
-            },
+            ],
         },
         skip_await=False,
     ),
