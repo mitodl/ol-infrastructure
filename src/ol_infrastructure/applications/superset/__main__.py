@@ -432,11 +432,7 @@ redis_cache_config = OLAmazonRedisConfig(
 superset_redis_cache = OLAmazonCache(
     redis_cache_config,
     opts=ResourceOptions(
-        aliases=[
-            Alias(
-                name=f"superset-redis-{stack_info.env_suffix}-redis-elasticache-cluster"
-            )
-        ]
+        aliases=[Alias(name=f"superset-redis-{superset_env}-redis-elasticache-cluster")]
     ),
 )
 superset_redis_consul_node = consul.Node(
