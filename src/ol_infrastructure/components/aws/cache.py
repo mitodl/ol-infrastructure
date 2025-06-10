@@ -6,7 +6,7 @@ This includes:
 """
 
 import re
-from typing import Any, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 import pulumi
 from pulumi_aws import elasticache
@@ -93,8 +93,8 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
     encrypt_transit: bool = True
     auth_token: Optional[PulumiString] = None
     encrypted: bool = True
-    engine: str = "redis"
-    engine_version: str = "7.1"
+    engine: Literal["redis", "valkey"] = "valkey"
+    engine_version: str = "8.0"
     kms_key_id: Optional[PulumiString] = None
     num_instances: conint(ge=1, le=5) = 1  # type: ignore  # noqa: PGH003
     shard_count: PositiveInt = PositiveInt(1)
@@ -168,7 +168,7 @@ class OLAmazonCache(pulumi.ComponentResource):
         )
         resource_options = pulumi.ResourceOptions(parent=self).merge(opts)
 
-        clustered_redis = cache_config.engine == "redis" and getattr(  # noqa: B009
+        clustered_redis = cache_config.engine in ("redis", "valkey") and getattr(  # noqa: B009
             cache_config, "cluster_mode_enabled"
         )
 
@@ -195,7 +195,7 @@ class OLAmazonCache(pulumi.ComponentResource):
             tags=cache_config.tags,
         )
 
-        if cache_config.engine == "redis":
+        if cache_config.engine in ("redis", "valkey"):
             if cache_config.engine_version.startswith("6"):
                 cache_options = resource_options.merge(
                     pulumi.ResourceOptions(ignore_changes=["engine_version"])
@@ -261,7 +261,7 @@ class OLAmazonCache(pulumi.ComponentResource):
             auth_token=cache_config.auth_token,
             auto_minor_version_upgrade=cache_config.auto_upgrade,
             automatic_failover_enabled=True,
-            engine="redis",
+            engine=cache_config.engine,
             engine_version=(
                 "6.x"
                 if cache_config.engine_version.startswith("6")
@@ -315,7 +315,7 @@ class OLAmazonCache(pulumi.ComponentResource):
     def _get_default_monitoring_profile(self, profile_name: str, engine: str):
         if profile_name == "disabled":
             return {}
-        if engine == "redis":
+        if engine in ("redis", "valkey"):
             return self._get_default_redis_monitoring_profile(profile_name)
         elif engine == "memcached":
             return self._get_default_memcached_monitoring_profile(profile_name)
