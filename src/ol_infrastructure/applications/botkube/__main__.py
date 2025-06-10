@@ -506,40 +506,6 @@ botkube_application = kubernetes.helm.v3.Release(
                         # "botToken": "", noqa: ERA001
                         # "appToken": "", noqa: ERA001
                     },
-                    "elasticsearch": {
-                        "enabled": False,
-                        "awsSigning": {
-                            "enabled": False,
-                            "awsRegion": "us-east-1",
-                            "roleArn": "",
-                        },
-                        "server": "ELASTICSEARCH_ADDRESS",
-                        "username": "ELASTICSEARCH_USERNAME",
-                        "password": "ELASTICSEARCH_PASSWORD",
-                        "skipTLSVerify": False,
-                        "logLevel": "",
-                        "indices": {
-                            "default": {
-                                "name": "botkube",
-                                "type": "botkube-event",
-                                "shards": 1,
-                                "replicas": 0,
-                                "bindings": {
-                                    "sources": [
-                                        "k8s-err-events",
-                                        "k8s-recommendation-events",
-                                    ]
-                                },
-                            }
-                        },
-                    },
-                    "webhook": {
-                        "enabled": False,
-                        "url": "WEBHOOK_URL",
-                        "bindings": {
-                            "sources": ["k8s-err-events", "k8s-recommendation-events"]
-                        },
-                    },
                 },
             },
             # Global settings
@@ -609,7 +575,7 @@ botkube_application = kubernetes.helm.v3.Release(
             "extraEnv": [
                 {"name": "LOG_LEVEL_SOURCE_BOTKUBE_KUBERNETES", "value": "debug"},
                 {
-                    "name": "BOTKUBE_COMMUNICATIONS_DEFAULT-GROUP_SOCKET__SLACK_APP__TOKEN",
+                    "name": "BOTKUBE_COMMUNICATIONS_DEFAULT-GROUP_SOCKET__SLACK_APP__TOKEN",  # noqa: E501
                     "valueFrom": {
                         "secretKeyRef": {
                             "name": "communication-slack",
@@ -618,7 +584,7 @@ botkube_application = kubernetes.helm.v3.Release(
                     },
                 },
                 {
-                    "name": "BOTKUBE_COMMUNICATIONS_DEFAULT-GROUP_SOCKET__SLACK_BOT__TOKEN",
+                    "name": "BOTKUBE_COMMUNICATIONS_DEFAULT-GROUP_SOCKET__SLACK_BOT__TOKEN",  # noqa: E501
                     "valueFrom": {
                         "secretKeyRef": {
                             "name": "communication-slack",
@@ -627,17 +593,8 @@ botkube_application = kubernetes.helm.v3.Release(
                     },
                 },
             ],
-            # Volume configuration
-            "extraVolumes": [],
-            "extraVolumeMounts": [],
-            # Node assignment
-            "nodeSelector": {},
-            "tolerations": [],
-            "affinity": {},
             # Service account
             "serviceAccount": {"create": True, "name": "", "annotations": {}},
-            # Extra Kubernetes resources
-            "extraObjects": [],
             # Analytics
             "analytics": {"disable": False},
             # Config watcher
