@@ -146,7 +146,7 @@ def create_mitlearn_k8s_secrets(
         mitlearn_namespace: The Kubernetes namespace for mitlearn resources.
         k8s_global_labels: Standard labels to apply to all Kubernetes resources.
         vault_k8s_resources: Vault Kubernetes auth backend resources.
-        mitlearn_vault_mount: The Vault mount resource for mitopen secrets.
+        mitlearn_vault_mount: The Vault mount resource for mitlearn secrets.
         db_config: Configuration for the Vault dynamic PostgreSQL database backend.
 
     Returns:
@@ -157,10 +157,10 @@ def create_mitlearn_k8s_secrets(
         Union[OLVaultK8SSecret, kubernetes.core.v1.Secret]
     ] = []  # Keep track of resources if needed later
 
-    # 1. Static secrets from the mitopen KV-v2 mount
+    # 1. Static secrets from the mitlearn KV-v2 mount
     # These secrets are specific to the mitlearn application environment.
     # Static secrets derived from mitopen/secrets.*.yaml, fetched via Vault agent
-    mitopen_static_secret_name, mitopen_static_secret = _create_static_secret(
+    mitlearn_static_secret_name, mitlearn_static_secret = _create_static_secret(
         stack_info=stack_info,
         secret_base_name="mitopen",  # Base name for the K8s secret resource  # pragma: allowlist secret  # noqa: S106
         namespace=mitlearn_namespace,
@@ -194,8 +194,8 @@ def create_mitlearn_k8s_secrets(
         },
         vaultauth=vault_k8s_resources.auth_name,
     )
-    secret_names.append(mitopen_static_secret_name)
-    secret_resources.append(mitopen_static_secret)
+    secret_names.append(mitlearn_static_secret_name)
+    secret_resources.append(mitlearn_static_secret)
 
     # 2. Static secrets from the shared 'secret-operations' KV-v1 mount
     # These secrets are shared across multiple applications or services.
@@ -279,7 +279,7 @@ def create_mitlearn_k8s_secrets(
         namespace=mitlearn_namespace,
         labels=k8s_global_labels,
         mount="aws-mitx",
-        path="creds/ol-mitopen-application",
+        path="creds/ol-mitlearn-application",
         templates={
             "AWS_ACCESS_KEY_ID": '{{ get .Secrets "access_key" }}',
             "AWS_SECRET_ACCESS_KEY": '{{ get .Secrets "secret_key" }}',  # Corrected key name

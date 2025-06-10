@@ -1,14 +1,14 @@
-path "aws-mitx/creds/ol-mitopen-application" {
+path "aws-mitx/creds/ol-mitlearn-application" {
   capabilities = ["read"]
 }
-path "aws-mitx/creds/ol-mitopen-application/*" {
+path "aws-mitx/creds/ol-mitlearn-application/*" {
   capabilities = ["read"]
 }
 
-path "postgres-mitopen/creds/app" {
+path "postgres-mitlearn/creds/app" {
   capabilities = ["read"]
 }
-path "postgres-mitopen/creds/app/*" {
+path "postgres-mitlearn/creds/app/*" {
   capabilities = ["read"]
 }
 
@@ -41,9 +41,6 @@ path "secret-global/data/mailgun" {
   capabilities = ["read"]
 }
 
-path "secret-mitopen/*" {
-  capabilities = ["read"]
-}
 path "secret-mitlearn/*" {
   capabilities = ["read"]
 }
@@ -54,12 +51,12 @@ path "secret-mitlearn/*" {
 path "sys/leases/renew" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-mitopen/creds/app/*"]
+    lease_id = ["postgres-mitlearn/creds/app/*"]
   }
 }
 path "sys/leases/revoke" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-mitopen/creds/app/*"]
+    lease_id = ["postgres-mitlearn/creds/app/*"]
   }
 }

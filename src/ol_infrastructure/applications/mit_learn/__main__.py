@@ -114,7 +114,7 @@ aws_config = AWSBase(
     tags={
         "OU": "mit-open",
         "Environment": stack_info.env_suffix,
-        "Application": "mitopen",
+        "Application": Services.mit_learn,
     }
 )
 app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
@@ -291,8 +291,8 @@ gh_workflow_policy_document = {
 
 gh_workflow_iam_policy = iam.Policy(
     f"ol_mitopen_gh_workflow_iam_permissions_{stack_info.env_suffix}",
-    name=f"ol-mitopen-gh-workflow-permissions-{stack_info.env_suffix}",
-    path=f"/ol-applications/mitopen/{stack_info.env_suffix}/",
+    name=f"ol-mitlearn-gh-workflow-permissions-{stack_info.env_suffix}",
+    path=f"/ol-applications/mitlearn/{stack_info.env_suffix}/",
     policy=lint_iam_policy(
         gh_workflow_policy_document, stringify=True, parliament_config=parliament_config
     ),
@@ -364,7 +364,7 @@ application_policy_document = {
     "Statement": application_s3_bucket_permissions,
 }
 
-mitopen_iam_policy = iam.Policy(
+mitlearn_iam_policy = iam.Policy(
     f"ol_mitopen_iam_permissions_{stack_info.env_suffix}",
     name=f"ol-mitopen-application-permissions-{stack_info.env_suffix}",
     path=f"/ol-applications/mitopen/{stack_info.env_suffix}/",
@@ -376,24 +376,13 @@ mitopen_iam_policy = iam.Policy(
 # Begin vault resources
 mitlearn_vault_iam_role = vault.aws.SecretBackendRole(
     f"ol-mitopen-iam-permissions-vault-policy-{stack_info.env_suffix}",
-    name="ol-mitopen-application",
+    name="ol-mitlearn-application",
     backend="aws-mitx",
     credential_type="iam_user",
     iam_tags={"OU": "operations", "vault_managed": "True"},
-    policy_arns=[mitopen_iam_policy.arn],
+    policy_arns=[mitlearn_iam_policy.arn],
 )
 
-# Duplicate the mount as migration planning rather than just axing the old one
-mitopen_vault_mount = vault.Mount(
-    f"ol-mitopen-configuration-secrets-mount-{stack_info.env_suffix}",
-    path="secret-mitopen",
-    type="kv-v2",
-    options={"version": 2},
-    description="Storage of configuration secrets used by MIT-Open",
-    opts=ResourceOptions(
-        delete_before_replace=True, depends_on=[mitlearn_vault_iam_role]
-    ),
-)
 mitlearn_vault_mount = vault.Mount(
     f"ol-mitlearn-configuration-secrets-mount-{stack_info.env_suffix}",
     path="secret-mitlearn",
@@ -407,21 +396,14 @@ mitlearn_vault_mount = vault.Mount(
 
 # There is a reason, I think, why these are still at `bridge/secrets/mitopen`
 # and not `bridge/secrets/mitlearn` -- Open Discussions
-mitopen_vault_secrets = read_yaml_secrets(
+mitlearn_vault_secrets = read_yaml_secrets(
     Path(f"mitlearn/secrets.{stack_info.env_suffix}.yaml"),
 )
 
-# Second duplication of secrets for migration planning, again.
-# This time it is populating the new mount in addition to the old mount.
-mitopen_vault_static_secrets = vault.generic.Secret(
-    f"ol-mitopen-configuration-secrets-{stack_info.env_suffix}",
-    path=mitlearn_vault_mount.path.apply("{}/secrets".format),
-    data_json=json.dumps(mitopen_vault_secrets),
-)
 mitlearn_vault_static_secrets = vault.generic.Secret(
     f"ol-mitlearn-configuration-secrets-{stack_info.env_suffix}",
     path=mitlearn_vault_mount.path.apply("{}/secrets".format),
-    data_json=json.dumps(mitopen_vault_secrets),
+    data_json=json.dumps(mitlearn_vault_secrets),
 )
 
 # The policy has been updated to allow for reading from the old or
@@ -470,7 +452,7 @@ mitlearn_app_security_group = ec2.SecurityGroup(
     vpc_id=apps_vpc["id"],
 )
 
-mitopen_db_security_group = ec2.SecurityGroup(
+mitlearn_db_security_group = ec2.SecurityGroup(
     f"ol-mitopen-db-access-{stack_info.env_suffix}",
     description=f"Access control for the MIT Open application DB in {stack_info.name}",
     ingress=[
@@ -511,29 +493,29 @@ rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["instance_size"] = (
     mitlearn_config.get("db_instance_size") or rds_defaults["instance_size"]
 )
-mitopen_db_config = OLPostgresDBConfig(
+mitlearn_db_config = OLPostgresDBConfig(
     instance_name=f"ol-mitlearn-db-{stack_info.env_suffix}",
     password=rds_password,
     subnet_group_name=apps_vpc["rds_subnet"],
-    security_groups=[mitopen_db_security_group],
+    security_groups=[mitlearn_db_security_group],
     engine_major_version="15",
     tags=aws_config.tags,
     db_name="mitopen",
     public_access=False,
     **rds_defaults,
 )
-mitopen_db_config.parameter_overrides.append(
+mitlearn_db_config.parameter_overrides.append(
     {"name": "password_encryption", "value": "md5"}
 )
 
-mitopen_db = OLAmazonDB(
-    db_config=mitopen_db_config,
+mitlearn_db = OLAmazonDB(
+    db_config=mitlearn_db_config,
     opts=ResourceOptions(aliases=[Alias(f"ol-mitopen-db-{stack_info.env_suffix}")]),
 )
 
-mitopen_role_statements = postgres_role_statements.copy()
-mitopen_role_statements.pop("app")
-mitopen_role_statements["app"] = {
+mitlearn_role_statements = postgres_role_statements.copy()
+mitlearn_role_statements.pop("app")
+mitlearn_role_statements["app"] = {
     "create": [
         # Check if the mitopen role exists and create it if not
         Template(
@@ -659,7 +641,7 @@ mitopen_role_statements["app"] = {
     "renew": [],
     "rollback": [],
 }
-mitopen_role_statements["reverse-etl"] = {
+mitlearn_role_statements["reverse-etl"] = {
     "create": [
         # Check if the reverse_etl role exists and create it if not
         Template(
@@ -748,15 +730,15 @@ mitopen_role_statements["reverse-etl"] = {
     "rollback": [],
 }
 
-mitopen_vault_backend_config = OLVaultPostgresDatabaseConfig(
-    db_name=mitopen_db_config.db_name,
-    mount_point=f"{mitopen_db_config.engine}-mitopen",
-    db_admin_username=mitopen_db_config.username,
+mitlearn_vault_backend_config = OLVaultPostgresDatabaseConfig(
+    db_name=mitlearn_db_config.db_name,
+    mount_point=f"{mitlearn_db_config.engine}-mitlearn",
+    db_admin_username=mitlearn_db_config.username,
     db_admin_password=rds_password,
-    db_host=mitopen_db.db_instance.address,
-    role_statements=mitopen_role_statements,
+    db_host=mitlearn_db.db_instance.address,
+    role_statements=mitlearn_role_statements,
 )
-mitopen_vault_backend = OLVaultDatabaseBackend(mitopen_vault_backend_config)
+mitlearn_vault_backend = OLVaultDatabaseBackend(mitlearn_vault_backend_config)
 
 
 vector_log_proxy_secrets = read_yaml_secrets(
@@ -795,9 +777,9 @@ for k, v in mimetypes.types_map.items():
     ):
         gzip_settings["extensions"].add(k.strip("."))
         gzip_settings["content_types"].add(v)
-mitopen_fastly_service = fastly.ServiceVcl(
+mitlearn_fastly_service = fastly.ServiceVcl(
     f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}",
-    name=f"MIT Open {stack_info.env_suffix}",
+    name=f"MIT Learn {stack_info.env_suffix}",
     comment="Managed by Pulumi",
     backends=[
         fastly.ServiceVclBackendArgs(
@@ -955,7 +937,7 @@ env_vars = {
     "MITOL_EMAIL_TLS": "True",
     "EMBEDDINGS_EXTERNAL_FETCH_USE_WEBDRIVER": True,
     "MITOL_ENVIRONMENT": env_name,
-    "MITOL_FROM_EMAIL": "MITOpen <mitopen-support@mit.edu>",
+    "MITOL_FROM_EMAIL": "MIT Learn <mitopen-support@mit.edu>",
     "MITOL_FRONTPAGE_DIGEST_MAX_POSTS": 10,
     "MITOL_USE_S3": "True",
     "MITOL_NOTIFICATION_EMAIL_BACKEND": "anymail.backends.mailgun.EmailBackend",
@@ -1077,30 +1059,30 @@ secret_operations_tika_access_token = vault.generic.get_secret_output(
 # Gets masked in any console outputs
 sensitive_env_vars = {
     # Vars available locally from SOPS
-    "CKEDITOR_ENVIRONMENT_ID": mitopen_vault_secrets["ckeditor"]["environment_id"],
-    "CKEDITOR_SECRET_KEY": mitopen_vault_secrets["ckeditor"]["secret_key"],
-    "CKEDITOR_UPLOAD_URL": mitopen_vault_secrets["ckeditor"]["upload_url"],
-    "EDX_API_CLIENT_ID": mitopen_vault_secrets["edx_api_client"]["id"],
-    "EDX_API_CLIENT_SECRET": mitopen_vault_secrets["edx_api_client"]["secret"],
-    "MITOL_JWT_SECRET": mitopen_vault_secrets["jwt_secret"],
-    "OLL_API_CLIENT_ID": mitopen_vault_secrets["open_learning_library_client"][
+    "CKEDITOR_ENVIRONMENT_ID": mitlearn_vault_secrets["ckeditor"]["environment_id"],
+    "CKEDITOR_SECRET_KEY": mitlearn_vault_secrets["ckeditor"]["secret_key"],
+    "CKEDITOR_UPLOAD_URL": mitlearn_vault_secrets["ckeditor"]["upload_url"],
+    "EDX_API_CLIENT_ID": mitlearn_vault_secrets["edx_api_client"]["id"],
+    "EDX_API_CLIENT_SECRET": mitlearn_vault_secrets["edx_api_client"]["secret"],
+    "MITOL_JWT_SECRET": mitlearn_vault_secrets["jwt_secret"],
+    "OLL_API_CLIENT_ID": mitlearn_vault_secrets["open_learning_library_client"][
         "client_id"
     ],
-    "OLL_API_CLIENT_SECRET": mitopen_vault_secrets["open_learning_library_client"][
+    "OLL_API_CLIENT_SECRET": mitlearn_vault_secrets["open_learning_library_client"][
         "client_secret"
     ],
-    "OPENAI_API_KEY": mitopen_vault_secrets["openai"]["api_key"],
-    "OPENSEARCH_HTTP_AUTH": mitopen_vault_secrets["opensearch"]["http_auth"],
-    "QDRANT_API_KEY": mitopen_vault_secrets["qdrant"]["api_key"],
-    "QDRANT_HOST": mitopen_vault_secrets["qdrant"]["host_url"],
-    "SECRET_KEY": mitopen_vault_secrets["django_secret_key"],
-    "SENTRY_DSN": mitopen_vault_secrets["sentry_dsn"],
-    "STATUS_TOKEN": mitopen_vault_secrets["django_status_token"],
-    "YOUTUBE_DEVELOPER_KEY": mitopen_vault_secrets["youtube_developer_key"],
-    "POSTHOG_PROJECT_API_KEY": mitopen_vault_secrets["posthog"]["project_api_key"],
-    "POSTHOG_PERSONAL_API_KEY": mitopen_vault_secrets["posthog"]["personal_api_key"],
-    "SEE_API_CLIENT_ID": mitopen_vault_secrets["see_api_client"]["id"],
-    "SEE_API_CLIENT_SECRET": mitopen_vault_secrets["see_api_client"]["secret"],
+    "OPENAI_API_KEY": mitlearn_vault_secrets["openai"]["api_key"],
+    "OPENSEARCH_HTTP_AUTH": mitlearn_vault_secrets["opensearch"]["http_auth"],
+    "QDRANT_API_KEY": mitlearn_vault_secrets["qdrant"]["api_key"],
+    "QDRANT_HOST": mitlearn_vault_secrets["qdrant"]["host_url"],
+    "SECRET_KEY": mitlearn_vault_secrets["django_secret_key"],
+    "SENTRY_DSN": mitlearn_vault_secrets["sentry_dsn"],
+    "STATUS_TOKEN": mitlearn_vault_secrets["django_status_token"],
+    "YOUTUBE_DEVELOPER_KEY": mitlearn_vault_secrets["youtube_developer_key"],
+    "POSTHOG_PROJECT_API_KEY": mitlearn_vault_secrets["posthog"]["project_api_key"],
+    "POSTHOG_PERSONAL_API_KEY": mitlearn_vault_secrets["posthog"]["personal_api_key"],
+    "SEE_API_CLIENT_ID": mitlearn_vault_secrets["see_api_client"]["id"],
+    "SEE_API_CLIENT_SECRET": mitlearn_vault_secrets["see_api_client"]["secret"],
     "EMBEDLY_KEY": secret_operations_global_embedly.data.apply(
         lambda data: "{}".format(data["key"])
     ),
@@ -1194,21 +1176,21 @@ gh_workflow_nextjs_fastly_api_key_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_nextjs_fastly_api_key_env_secret-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"FASTLY_API_KEY_{env_var_suffix}_NEXTJS",  # pragma: allowlist secret
-    plaintext_value=mitopen_vault_secrets["fastly"]["api_key"],
+    plaintext_value=mitlearn_vault_secrets["fastly"]["api_key"],
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_fastly_service_id_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_fastly_service_id_env_secret-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"FASTLY_SERVICE_ID_{env_var_suffix}_NEXTJS",  # pragma: allowlist secret
-    plaintext_value=mitopen_fastly_service.id,
+    plaintext_value=mitlearn_fastly_service.id,
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_sentry_dsn_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_sentry_dsn_env_secret-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"SENTRY_DSN_{env_var_suffix}",
-    plaintext_value=mitopen_vault_secrets["sentry_dsn"],
+    plaintext_value=mitlearn_vault_secrets["sentry_dsn"],
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 # not really secret, just easier this way
@@ -1223,7 +1205,7 @@ gh_workflow_posthog_project_api_key_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_posthog_project_api_key-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"POSTHOG_PROJECT_API_KEY_{env_var_suffix}",
-    plaintext_value=mitopen_vault_secrets["posthog"]["project_api_key"],
+    plaintext_value=mitlearn_vault_secrets["posthog"]["project_api_key"],
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_environment_env_secret = github.ActionsSecret(
@@ -1409,7 +1391,7 @@ secret_names, secret_resources = create_mitlearn_k8s_secrets(
     k8s_global_labels=k8s_global_labels,
     vault_k8s_resources=vault_k8s_resources,
     mitlearn_vault_mount=mitlearn_vault_mount,
-    db_config=mitopen_vault_backend,  # Use the original DB config object
+    db_config=mitlearn_vault_backend,  # Use the original DB config object
     redis_password=redis_config.require("password"),
     redis_cache=redis_cache,
 )
@@ -1629,7 +1611,7 @@ export(
     {
         "redis": redis_cache.address,
         "redis_token": redis_cache.cache_cluster.auth_token,
-        "iam_policy": mitopen_iam_policy.arn,
+        "iam_policy": mitlearn_iam_policy.arn,
         "vault_iam_role": Output.all(
             mitlearn_vault_iam_role.backend, mitlearn_vault_iam_role.name
         ).apply(lambda role: f"{role[0]}/roles/{role[1]}"),
