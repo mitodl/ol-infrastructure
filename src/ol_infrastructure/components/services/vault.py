@@ -124,11 +124,11 @@ class OLVaultDatabaseBackend(ComponentResource):
             opts,
         )
 
-        resource_opts = ResourceOptions(parent=self)
+        resource_opts = ResourceOptions(parent=self, delete_before_replace=True)
 
         self.db_mount = Mount(
             f"{db_config.db_name}-mount-point",
-            opts=resource_opts.merge(ResourceOptions(delete_before_replace=True)),
+            opts=resource_opts,
             path=db_config.mount_point,
             type="database",
             max_lease_ttl_seconds=db_config.max_ttl,
@@ -152,8 +152,10 @@ class OLVaultDatabaseBackend(ComponentResource):
         db_option_dict.update(db_config.connection_options or {})
         self.db_connection = database.SecretBackendConnection(
             f"{db_config.db_name}-database-connection",
-            opts=resource_opts.merge(ResourceOptions(parent=self.db_mount)),
-            backend=db_config.mount_point,
+            opts=resource_opts.merge(
+                ResourceOptions(parent=self.db_mount, depends_on=self.db_mount)
+            ),
+            backend=self.db_mount.path,
             verify_connection=db_config.verify_connection,
             allowed_roles=sorted(db_config.role_statements.keys()),
             name=db_config.db_name,
