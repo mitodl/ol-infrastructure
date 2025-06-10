@@ -175,7 +175,7 @@ def mfe_job(
         slot_config_file = "learning-mfe-config"
         copy_common_config = f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx {mfe_build_dir.name}/common-mfe-config.env.jsx"  # noqa: E501
 
-    mfe_setup_lines = [
+    mfe_setup_steps = [
         f"cp -r {mfe_repo.name}/* {mfe_build_dir.name}",
         (
             f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
@@ -195,13 +195,13 @@ def mfe_job(
         and OpenEdxMicroFrontend[mfe_name].value
         == OpenEdxMicroFrontend.learner_dashboard.value
     ):
-        mfe_setup_lines.append(
+        mfe_setup_steps.append(
             f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
             f"mitx-styles.scss {mfe_build_dir.name}/mitx-styles.scss"
         )
 
     # Join all commands with newlines
-    mfe_setup_command = textwrap.dedent("\n".join(mfe_setup_lines))
+    mfe_setup_command = textwrap.dedent("\n".join(mfe_setup_steps))
 
     mfe_setup_plan += [
         clone_mfe_configs,
