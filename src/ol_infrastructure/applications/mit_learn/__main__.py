@@ -1372,8 +1372,8 @@ redis_cache_config = OLAmazonRedisConfig(
     auth_token=redis_config.require("password"),
     cluster_mode_enabled=False,
     encrypted=True,
-    engine_version="7.1",
-    engine="redis",
+    engine_version="7.2",
+    engine="valkey",
     num_instances=3,
     shard_count=1,
     auto_upgrade=True,
@@ -1384,7 +1384,16 @@ redis_cache_config = OLAmazonRedisConfig(
     tags=aws_config.tags,
     **redis_defaults,
 )
-redis_cache = OLAmazonCache(redis_cache_config)
+redis_cache = OLAmazonCache(
+    redis_cache_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"mitlearn-redis-{stack_info.env_suffix}-redis-elasticache-cluster"
+            )
+        ]
+    ),
+)
 
 # Create all Kubernetes secrets needed by the application
 secret_names, secret_resources = create_mitlearn_k8s_secrets(

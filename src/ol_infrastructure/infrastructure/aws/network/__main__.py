@@ -16,12 +16,16 @@ from pulumi import Config, export
 from pulumi_aws import ec2
 from security_groups import default_group, public_ssh, public_web, salt_minion
 
+from bridge.lib.magic_numbers import DEFAULT_REDIS_PORT
 from ol_infrastructure.components.aws.olvpc import (
     OLVPC,
     OLVPCConfig,
     OLVPCPeeringConnection,
 )
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
+from ol_infrastructure.lib.aws.eks_helper import (
+    default_psg_egress_args,
+)
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
@@ -203,11 +207,18 @@ data_vpc_exports.update(
             "keda": ec2.SecurityGroup(
                 f"{data_vpc_config.vpc_name}-keda",
                 description="Security group KEDA pods running EKS to access redis clusters.",  # noqa: E501
-                vpc_id=operations_vpc.olvpc.id,
-                ingress=[],
-                egress=[],
-                tags=operations_vpc_config.merged_tags(
-                    {"Name": f"applications-{stack_info.env_suffix}-keda"}
+                vpc_id=data_vpc.olvpc.id,
+                ingress=[
+                    ec2.SecurityGroupIngressArgs(
+                        self=True,
+                        from_port=DEFAULT_REDIS_PORT,
+                        to_port=DEFAULT_REDIS_PORT,
+                        protocol="tcp",
+                    ),
+                ],
+                egress=default_psg_egress_args,
+                tags=data_vpc_config.merged_tags(
+                    {"Name": f"data-{stack_info.env_suffix}-keda"}
                 ),
             ).id,
             "ssh": public_ssh(data_vpc_config.vpc_name, data_vpc.olvpc)(
@@ -405,10 +416,17 @@ applications_vpc_exports.update(
             "keda": ec2.SecurityGroup(
                 f"{applications_vpc_config.vpc_name}-keda",
                 description="Security group KEDA pods running EKS to access redis clusters.",  # noqa: E501
-                vpc_id=operations_vpc.olvpc.id,
-                ingress=[],
-                egress=[],
-                tags=operations_vpc_config.merged_tags(
+                vpc_id=applications_vpc.olvpc.id,
+                ingress=[
+                    ec2.SecurityGroupIngressArgs(
+                        self=True,
+                        from_port=DEFAULT_REDIS_PORT,
+                        to_port=DEFAULT_REDIS_PORT,
+                        protocol="tcp",
+                    ),
+                ],
+                egress=default_psg_egress_args,
+                tags=applications_vpc_config.merged_tags(
                     {"Name": f"applications-{stack_info.env_suffix}-keda"}
                 ),
             ).id,
@@ -467,8 +485,15 @@ operations_vpc_exports.update(
                 f"{operations_vpc_config.vpc_name}-keda",
                 description="Security group KEDA pods running EKS to access redis clusters.",  # noqa: E501
                 vpc_id=operations_vpc.olvpc.id,
-                ingress=[],
-                egress=[],
+                ingress=[
+                    ec2.SecurityGroupIngressArgs(
+                        self=True,
+                        from_port=DEFAULT_REDIS_PORT,
+                        to_port=DEFAULT_REDIS_PORT,
+                        protocol="tcp",
+                    ),
+                ],
+                egress=default_psg_egress_args,
                 tags=operations_vpc_config.merged_tags(
                     {"Name": f"operations-{stack_info.env_suffix}-keda"}
                 ),
