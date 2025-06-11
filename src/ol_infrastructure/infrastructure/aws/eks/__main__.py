@@ -71,7 +71,6 @@ target_vpc = network_stack.require_output(env_config.require("target_vpc"))
 pod_ip_blocks = target_vpc["k8s_pod_subnet_cidrs"]
 public_ip_blocks = target_vpc["k8s_public_subnet_cidrs"]
 pod_subnet_ids = target_vpc["k8s_pod_subnet_ids"]
-pod_ip_blocks = target_vpc["k8s_pod_subnet_cidrs"]
 service_ip_block = target_vpc["k8s_service_subnet_cidr"]
 
 cluster_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
