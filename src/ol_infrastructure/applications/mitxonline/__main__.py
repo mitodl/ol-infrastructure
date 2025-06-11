@@ -554,6 +554,17 @@ proxy_rewrite_plugin_config = OLApisixPluginConfig(
         ],
     },
 )
+
+response_rewrite_plugin_config = OLApisixPluginConfig(
+    name="response-rewrite",
+    config={
+        "headers": {
+            "set": {
+                "Content-Security-Policy": f"frame-ancestors 'self' {env_vars['OPENEDX_API_BASE_URL']}"
+            }
+        }
+    },
+)
 mitxonline_apisix_route_direct = OLApisixRoute(
     name=f"mitxonline-apisix-route-direct-{stack_info.env_suffix}",
     k8s_namespace=mitxonline_namespace,
@@ -566,7 +577,10 @@ mitxonline_apisix_route_direct = OLApisixRoute(
             paths=["/*"],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             plugins=[
-                mitxonline_direct_oidc.get_full_oidc_plugin_config(unauth_action="pass")
+                mitxonline_direct_oidc.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+                response_rewrite_plugin_config,
             ],
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
             backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
@@ -578,6 +592,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
             paths=["/logout/oidc/*"],
             plugins=[
                 OLApisixPluginConfig(name="redirect", config={"uri": "/logout/oidc"}),
+                response_rewrite_plugin_config,
             ],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
@@ -589,7 +604,10 @@ mitxonline_apisix_route_direct = OLApisixRoute(
             hosts=[api_domain],
             paths=["/login/", "/admin/login/*", "/login", "/login/oidc*"],
             plugins=[
-                mitxonline_direct_oidc.get_full_oidc_plugin_config(unauth_action="auth")
+                mitxonline_direct_oidc.get_full_oidc_plugin_config(
+                    unauth_action="auth"
+                ),
+                response_rewrite_plugin_config,
             ],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
@@ -617,6 +635,7 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
                 mitxonline_prefixed_oidc_resources.get_full_oidc_plugin_config(
                     unauth_action="pass"
                 ),
+                response_rewrite_plugin_config,
             ],
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
             backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
@@ -628,6 +647,7 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
             paths=[f"/{api_path_prefix}/logout/oidc/*"],
             plugins=[
                 OLApisixPluginConfig(name="redirect", config={"uri": "/logout/oidc"}),
+                response_rewrite_plugin_config,
             ],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
@@ -648,6 +668,7 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
                 mitxonline_prefixed_oidc_resources.get_full_oidc_plugin_config(
                     unauth_action="auth"
                 ),
+                response_rewrite_plugin_config,
             ],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
