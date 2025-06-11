@@ -95,7 +95,6 @@ network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
-applications_vpc = network_stack.require_output("applications_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 
 vector_log_proxy_stack = StackReference(
@@ -1356,7 +1355,7 @@ redis_cluster_security_group = ec2.SecurityGroup(
             security_groups=[
                 mitlearn_app_security_group.id,
                 operations_vpc["security_groups"]["celery_monitoring"],
-                applications_vpc["security_groups"]["keda"],
+                apps_vpc["security_groups"]["keda"],
             ],
             protocol="tcp",
             from_port=DEFAULT_REDIS_PORT,
