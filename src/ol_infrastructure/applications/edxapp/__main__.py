@@ -12,6 +12,7 @@
 
 import base64
 import json
+import os
 import textwrap
 from functools import partial
 from pathlib import Path
@@ -137,6 +138,7 @@ data_vpc = network_stack.require_output("data_vpc")
 data_integrator_secgroup = data_vpc["security_groups"]["integrator"]
 
 framework = edxapp_config.get("framework") or "docker"
+
 ami_filters = [
     ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
     ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
@@ -144,16 +146,26 @@ ami_filters = [
     ec2.GetAmiFilterArgs(name="tag:openedx_release", values=[openedx_release]),
     ec2.GetAmiFilterArgs(name="tag:framework", values=[framework]),
 ]
+web_filters = [ec2.GetAmiFilterArgs(name="name", values=["edxapp-web-*"]), *ami_filters]
+if web_ami_id := os.environ.get("EDXAPP_WEB_AMI_ID"):
+    web_filters.append(
+        ec2.GetAmiFilterArgs(name="image-id", values=[web_ami_id]),
+    )
 edxapp_web_ami = ec2.get_ami(
-    filters=[ec2.GetAmiFilterArgs(name="name", values=["edxapp-web-*"]), *ami_filters],
+    filters=web_filters,
     most_recent=True,
     owners=[aws_account.account_id],
 )
+worker_filters = [
+    ec2.GetAmiFilterArgs(name="name", values=["edxapp-worker-*"]),
+    *ami_filters,
+]
+if worker_ami_id := os.environ.get("EDXAPP_WORKER_AMI_ID"):
+    worker_filters.append(
+        ec2.GetAmiFilterArgs(name="image-id", values=[worker_ami_id]),
+    )
 edxapp_worker_ami = ec2.get_ami(
-    filters=[
-        ec2.GetAmiFilterArgs(name="name", values=["edxapp-worker-*"]),
-        *ami_filters,
-    ],
+    filters=worker_filters,
     most_recent=True,
     owners=[aws_account.account_id],
 )
