@@ -95,6 +95,7 @@ network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
+applications_vpc = network_stack.require_output("applications_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 
 vector_log_proxy_stack = StackReference(
@@ -1355,6 +1356,7 @@ redis_cluster_security_group = ec2.SecurityGroup(
             security_groups=[
                 mitlearn_app_security_group.id,
                 operations_vpc["security_groups"]["celery_monitoring"],
+                applications_vpc["security_groups"]["keda"],
             ],
             protocol="tcp",
             from_port=DEFAULT_REDIS_PORT,
@@ -1431,11 +1433,20 @@ mitlearn_k8s_app = OLApplicationK8s(
         init_collectstatic=True,  # Assuming Django app needs collectstatic
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
-                worker_name="default",
-                queues=["default", "edx_content"],
+                queue_name="default",
                 resource_requests={"cpu": "1000m", "memory": "2048Mi"},
                 resource_limits={"cpu": "1000m", "memory": "6144Mi"},
-                min_replicas=3,
+                redis_host=redis_cache.address,
+                redis_database_index="1",
+                redis_password=redis_config.require("password"),
+            ),
+            OLApplicationK8sCeleryWorkerConfig(
+                queue_name="edx_content",
+                resource_requests={"cpu": "1000m", "memory": "2048Mi"},
+                resource_limits={"cpu": "1000m", "memory": "6144Mi"},
+                redis_host=redis_cache.address,
+                redis_database_index="1",
+                redis_password=redis_config.require("password"),
             ),
         ],
         # Using default resource requests/limits for now

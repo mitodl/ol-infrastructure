@@ -91,6 +91,7 @@ vector_log_proxy_stack = StackReference(
 
 apps_vpc = network_stack.require_output("applications_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
+applications_vpc = network_stack.require_output("applications_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 learn_ai_environment = f"applications-{stack_info.env_suffix}"
 
@@ -551,6 +552,7 @@ redis_cluster_security_group = ec2.SecurityGroup(
             security_groups=[
                 learn_ai_application_security_group.id,
                 operations_vpc["security_groups"]["celery_monitoring"],
+                applications_vpc["security_groups"]["keda"],
             ],
             protocol="tcp",
             from_port=DEFAULT_REDIS_PORT,
@@ -751,11 +753,15 @@ learn_ai_app_k8s = OLApplicationK8s(
         init_collectstatic=True,  # Assuming createcachetable is not needed or handled elsewhere
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
-                worker_name="default",
-                queues=["default", "edx_content"],
+                queue_name="default",
                 resource_requests={"cpu": "500m", "memory": "1000Mi"},
                 resource_limits={"cpu": "1000m", "memory": "2000Mi"},
-            )
+            ),
+            OLApplicationK8sCeleryWorkerConfig(
+                queue_name="edx_content",
+                resource_requests={"cpu": "500m", "memory": "1000Mi"},
+                resource_limits={"cpu": "1000m", "memory": "2000Mi"},
+            ),
         ],
     ),
     opts=ResourceOptions(
