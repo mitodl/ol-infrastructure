@@ -332,6 +332,23 @@ cluster = eks.Cluster(
     ),
 )
 
+
+def __create_apiserver_security_group_rules(pod_subnet_cidrs):
+    for index, subnet_cidr in enumerate(pod_subnet_cidrs):
+        aws.vpc.SecurityGroupIngressRule(
+            f"{cluster_name}-eks-apiserver-sg-rule-{index}",
+            security_group_id=cluster.cluster_security_group_id,
+            cidr_ipv4=subnet_cidr,
+            from_port=443,
+            to_port=443,
+            ip_protocol="tcp",
+        )
+
+
+pod_ip_blocks.apply(
+    lambda pod_subnet_cidrs: __create_apiserver_security_group_rules(pod_subnet_cidrs)
+)
+
 export("cluster_name", cluster_name)
 export("kube_config", cluster.kubeconfig)
 export("cluster_identities", cluster.eks_cluster.identities)
