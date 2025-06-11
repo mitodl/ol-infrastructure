@@ -3,3 +3,4 @@ secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAHZuh4MYwn0ggbh1ISM1qe9AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMGxvlrAt5Q6jwKPFmAgEQgDtdyPKZFs+hemXj+mN7mTqFDVviV9CLdrGBsSAAAYj/V7VmACsanqsse6eg0inRrgWIdobTRYi436d8xw==
 config:
   environment:business_unit: operations
+  environment:target_vpc: applications_vpc
