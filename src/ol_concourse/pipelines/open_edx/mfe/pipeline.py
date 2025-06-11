@@ -62,6 +62,9 @@ class OpenEdxVars(BaseModel):
     terms_of_service_url: str
     trademark_text: Optional[str] = None
     logo_trademark_url: Optional[str] = None
+    enable_video_upload_page_link_in_content_dropdown: Optional[
+        Literal["true", "false"]
+    ] = None
 
     @property
     def release_name(self) -> OpenEdxSupportedRelease:
@@ -117,6 +120,7 @@ def mfe_params(
         "TERMS_OF_SERVICE_URL": open_edx.terms_of_service_url,
         "TRADEMARK_TEXT": open_edx.trademark_text,
         "USER_INFO_COOKIE_NAME": f"{open_edx.environment}-edx-user-info",
+        "ENABLE_VIDEO_UPLOAD_PAGE_LINK_IN_CONTENT_DROPDOWN": open_edx.enable_video_upload_page_link_in_content_dropdown,  # noqa: E501
     }
 
 
