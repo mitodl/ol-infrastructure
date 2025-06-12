@@ -601,7 +601,7 @@ class OLApplicationK8s(ComponentResource):
                 opts=resource_options,
             )
 
-            _celerey_scaled_object = kubernetes.apiextensions.CustomResource(
+            _celery_scaled_object = kubernetes.apiextensions.CustomResource(
                 f"{ol_app_k8s_config.application_name}-celery-worker-{celery_worker_config.queue_name}-{stack_info.env_suffix}-scaledobject",
                 api_version="keda.sh/v1alpha1",
                 kind="ScaledObject",
