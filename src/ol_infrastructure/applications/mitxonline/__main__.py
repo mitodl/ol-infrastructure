@@ -386,7 +386,7 @@ redis_cluster_security_group = ec2.SecurityGroup(
             security_groups=[
                 mitxonline_app_security_group.id,
                 operations_vpc["security_groups"]["celery_monitoring"],
-                operations_vpc["security_groups"]["keda"],
+                apps_vpc["security_groups"]["keda"],
             ],
             protocol="tcp",
             from_port=DEFAULT_REDIS_PORT,
