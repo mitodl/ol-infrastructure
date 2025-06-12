@@ -232,6 +232,9 @@ SQLALCHEMY_POOL_TIMEOUT = 30  # Seconds to wait for a connection from the pool
 SQLALCHEMY_POOL_RECYCLE = 43200  # 12 hours
 SQLALCHEMY_POOL_PRE_PING = True  # Enable connection validation
 
+
+SUPERSET_WEBSERVER_TIMEOUT = 300  # 5 minutes timeout for HTTP requests
+
 # Caching Settings
 cache_base = {
     "CACHE_TYPE": "RedisCache",
