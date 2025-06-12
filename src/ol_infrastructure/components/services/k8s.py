@@ -633,6 +633,10 @@ class OLApplicationK8s(ComponentResource):
                                 "type": "redis",
                                 "metadata": {
                                     "address": f"{deployment_info['redis_host']}:{deployment_info['celery_config'].redis_port}",
+                                    "username": "default",
+                                    "databaseIndex": deployment_info[
+                                        "celery_config"
+                                    ].redis_database_index,
                                     "password": deployment_info[
                                         "celery_config"
                                     ].redis_password,
