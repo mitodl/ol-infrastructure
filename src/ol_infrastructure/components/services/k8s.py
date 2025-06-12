@@ -21,6 +21,7 @@ from pydantic import (
 
 from bridge.lib.magic_numbers import (
     DEFAULT_NGINX_PORT,
+    DEFAULT_REDIS_PORT,
     DEFAULT_UWSGI_PORT,
     MAXIMUM_K8S_NAME_LENGTH,
 )
@@ -38,7 +39,7 @@ def truncate_k8s_metanames(name: str) -> str:
 
 class OLApplicationK8sCeleryWorkerConfig(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    worker_name: str
+    queue_name: str
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "FATAL"] = (
         "INFO"
     )
@@ -47,32 +48,15 @@ class OLApplicationK8sCeleryWorkerConfig(BaseModel):
         default={"cpu": "250m", "memory": "300Mi"}
     )
     resource_limits: dict[str, str] = Field(
-        default={"cpu": "2", "memory": "2000Mi"},
+        default={"cpu": "2000m", "memory": "2000Mi"},
     )
     min_replicas: NonNegativeInt = 1
     max_replicas: NonNegativeInt = 10
-    hpa_scaling_metrics: list[kubernetes.autoscaling.v2.MetricSpecArgs] = [
-        kubernetes.autoscaling.v2.MetricSpecArgs(
-            type="Resource",
-            resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
-                name="cpu",
-                target=kubernetes.autoscaling.v2.MetricTargetArgs(
-                    type="Utilization",
-                    average_utilization=80,  # Target CPU utilization (80%)
-                ),
-            ),
-        ),
-        kubernetes.autoscaling.v2.MetricSpecArgs(
-            type="Resource",
-            resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
-                name="memory",  # Memory utilization as the scaling metric
-                target=kubernetes.autoscaling.v2.MetricTargetArgs(
-                    type="Utilization",
-                    average_utilization=80,  # Target memory utilization (80%)
-                ),
-            ),
-        ),
-    ]
+    autoscale_queue_depth: NonNegativeInt = 10
+    redis_database_index: str = "0"
+    redis_host: Output[str]
+    redis_password: str
+    redis_port: int = DEFAULT_REDIS_PORT
 
 
 class OLApplicationK8sConfig(BaseModel):
@@ -401,12 +385,13 @@ class OLApplicationK8s(ComponentResource):
         if ol_app_k8s_config.application_docker_tag.lower() == "latest":
             image_pull_policy = "Always"
 
+        _application_deployment_name = truncate_k8s_metanames(
+            f"{ol_app_k8s_config.application_name}-app"
+        )
         _application_deployment = kubernetes.apps.v1.Deployment(
             f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-deployment",
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                name=truncate_k8s_metanames(
-                    f"{ol_app_k8s_config.application_name}-app"
-                ),
+                name=_application_deployment_name,
                 namespace=ol_app_k8s_config.application_namespace,
                 labels=application_labels,
             ),
@@ -558,15 +543,18 @@ class OLApplicationK8s(ComponentResource):
                 ),
                 # This is important!
                 # Every type of worker needs a unique set of labels or the pod selectors will break.
-                "ol.mit.edu/worker-name": celery_worker_config.worker_name,
+                "ol.mit.edu/worker-name": celery_worker_config.queue_name,
             }
 
-            kubernetes.apps.v1.Deployment(
-                f"{ol_app_k8s_config.application_name}-celery-worker-{celery_worker_config.worker_name}-{stack_info.env_suffix}",
+            _celery_deployment_name = truncate_k8s_metanames(
+                f"{ol_app_k8s_config.application_name}-{celery_worker_config.queue_name}-celery-worker".replace(
+                    "_", "-"
+                )
+            )
+            _celery_deployment = kubernetes.apps.v1.Deployment(
+                f"{ol_app_k8s_config.application_name}-celery-worker-{celery_worker_config.queue_name}-{stack_info.env_suffix}",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    name=truncate_k8s_metanames(
-                        f"{ol_app_k8s_config.application_name}-{celery_worker_config.worker_name}-celery-worker"
-                    ),
+                    name=_celery_deployment_name,
                     namespace=ol_app_k8s_config.application_namespace,
                     labels=celery_labels,
                 ),
@@ -592,7 +580,7 @@ class OLApplicationK8s(ComponentResource):
                                         "worker",
                                         "-E",
                                         "-Q",
-                                        ",".join(celery_worker_config.queues),
+                                        celery_worker_config.queue_name,
                                         "-B",
                                         "-l",
                                         celery_worker_config.log_level,
@@ -612,48 +600,58 @@ class OLApplicationK8s(ComponentResource):
                 ),
                 opts=resource_options,
             )
-            _celery_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
-                f"celery-{celery_worker_config.worker_name}-hpa",
-                spec=kubernetes.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
-                    scale_target_ref=kubernetes.autoscaling.v2.CrossVersionObjectReferenceArgs(
-                        api_version="apps/v1",
-                        kind="Deployment",
-                        name=truncate_k8s_metanames(
-                            f"{ol_app_k8s_config.application_name}-{celery_worker_config.worker_name}-celery-worker"
-                        ),
-                    ),
-                    min_replicas=celery_worker_config.min_replicas,  # Minimum number of replicas
-                    max_replicas=celery_worker_config.max_replicas,  # Maximum number of replicas
-                    # Corrected parameter name from "metrics" to the proper name for the API
-                    metrics=celery_worker_config.hpa_scaling_metrics,
-                    # Optional: behavior configuration for scaling
-                    behavior=kubernetes.autoscaling.v2.HorizontalPodAutoscalerBehaviorArgs(
-                        scale_up=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
-                            stabilization_window_seconds=60,  # Wait 1 minute before scaling up again
-                            select_policy="Max",  # Choose max value when multiple metrics
-                            policies=[
-                                kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
-                                    type="Percent",
-                                    value=100,  # Double pods at most
-                                    period_seconds=60,  # In this time period
-                                )
-                            ],
-                        ),
-                        scale_down=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
-                            stabilization_window_seconds=300,  # Wait 5 minutes before scaling down
-                            select_policy="Min",
-                            policies=[
-                                kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
-                                    type="Percent",
-                                    value=25,  # Remove at most 25% of pods at once
-                                    period_seconds=60,
-                                )
-                            ],
-                        ),
-                    ),
-                ),
+
+            _celery_scaled_object = kubernetes.apiextensions.CustomResource(
+                f"{ol_app_k8s_config.application_name}-celery-worker-{celery_worker_config.queue_name}-{stack_info.env_suffix}-scaledobject",
+                api_version="keda.sh/v1alpha1",
+                kind="ScaledObject",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=_celery_deployment_name,
                     namespace=ol_app_k8s_config.application_namespace,
+                    labels=celery_labels,
+                ),
+                spec=Output.all(
+                    deployment_name=_celery_deployment_name,
+                    celery_config=celery_worker_config,
+                    redis_host=celery_worker_config.redis_host,
+                ).apply(
+                    lambda deployment_info: {
+                        "scaleTargetRef": {
+                            "kind": "Deployment",
+                            "name": deployment_info["deployment_name"],
+                        },
+                        "pollingInterval": 3,
+                        "cooldownPeriod": 10,
+                        "maxReplicaCount": deployment_info[
+                            "celery_config"
+                        ].max_replicas,
+                        "minReplicaCount": deployment_info[
+                            "celery_config"
+                        ].min_replicas,
+                        "triggers": [
+                            {
+                                "type": "redis",
+                                "metadata": {
+                                    "address": f"{deployment_info['redis_host']}:{deployment_info['celery_config'].redis_port}",
+                                    "password": deployment_info[
+                                        "celery_config"
+                                    ].redis_password,
+                                    "listName": deployment_info[
+                                        "celery_config"
+                                    ].queue_name,
+                                    "listLength": str(
+                                        deployment_info[
+                                            "celery_config"
+                                        ].autoscale_queue_depth
+                                    ),
+                                    "enableTLS": "true",
+                                },
+                            },
+                        ],
+                    }
+                ),
+                opts=resource_options.merge(
+                    ResourceOptions(delete_before_replace=True)
                 ),
             )
 

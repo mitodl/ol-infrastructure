@@ -43,6 +43,9 @@ cluster_stack = StackReference(
     f"infrastructure.aws.eks.{stack_info.env_prefix}.{stack_info.name}"
 )
 kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
+network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+
+target_vpc = network_stack.require_output(env_config.require("target_vpc"))
 
 cluster_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
@@ -769,6 +772,13 @@ keda_release = kubernetes.helm.v3.Release(
         cleanup_on_fail=True,
         skip_await=True,
         values={
+            "podLabels": {
+                "keda": {
+                    "ol.mit.edu/pod-security-group": target_vpc["security_groups"][
+                        "keda"
+                    ],
+                },
+            },
             "resources": {
                 "operator": {
                     "requests": {
@@ -808,4 +818,28 @@ keda_release = kubernetes.helm.v3.Release(
         parent=k8s_provider,
         delete_before_replace=True,
     ),
+)
+
+keda_security_group_policy = kubernetes.apiextensions.CustomResource(
+    f"{cluster_name}-keda-helm-release",
+    api_version="vpcresources.k8s.aws/v1beta1",
+    kind="SecurityGroupPolicy",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="keda-operator",
+        namespace="operations",
+        labels=k8s_global_labels,
+    ),
+    spec={
+        "podSelector": {
+            "matchLabels": {
+                "ol.mit.edu/pod-security-group": target_vpc["security_groups"]["keda"]
+            }
+        },
+        "securityGroups": {
+            "groupIds": [
+                target_vpc["security_groups"]["keda"],
+            ],
+        },
+    },
+    opts=ResourceOptions(depends_on=keda_release, provider=k8s_provider),
 )

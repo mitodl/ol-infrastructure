@@ -386,6 +386,7 @@ redis_cluster_security_group = ec2.SecurityGroup(
             security_groups=[
                 mitxonline_app_security_group.id,
                 operations_vpc["security_groups"]["celery_monitoring"],
+                operations_vpc["security_groups"]["keda"],
             ],
             protocol="tcp",
             from_port=DEFAULT_REDIS_PORT,
@@ -471,10 +472,20 @@ mitxonline_k8s_app = OLApplicationK8s(
         init_collectstatic=True,
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
-                worker_name="default",
-                queues=["celery", "hubspot_sync"],
+                queue_name="celery",
                 resource_requests={"cpu": "500m", "memory": "1024Mi"},
                 resource_limits={"cpu": "1000m", "memory": "2048Mi"},
+                redis_host=redis_cache.address,
+                redis_database_index="1",
+                redis_password=redis_config.require("password"),
+            ),
+            OLApplicationK8sCeleryWorkerConfig(
+                queue_name="hubspot_sync",
+                resource_requests={"cpu": "500m", "memory": "1024Mi"},
+                resource_limits={"cpu": "1000m", "memory": "2048Mi"},
+                redis_host=redis_cache.address,
+                redis_database_index="1",
+                redis_password=redis_config.require("password"),
             ),
         ],
     ),
