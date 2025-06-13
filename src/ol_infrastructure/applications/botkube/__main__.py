@@ -153,6 +153,23 @@ botkube_application = kubernetes.helm.v3.Release(
         ),
         values={
             "commonLabels": k8s_global_labels,
+            "sources": {
+                "k8s-deployment-events": {
+                    "enabled": True,
+                    "type": "kubernetes",
+                    "kubernetes": {
+                        "resources": [{"type": "v1/events", "events": ["create"]}],
+                        "filters": {
+                            "eventTypes": ["Normal"],
+                            "objectAnnotations": {},
+                            "reason": {
+                                "include": ["ScalingReplicaSet", "SuccessfulCreate"]
+                            },
+                            "involvedObject": {"kinds": ["Deployment", "ReplicaSet"]},
+                        },
+                    },
+                },
+            },
             "communications": {
                 "default-group": {
                     "socketSlack": {
