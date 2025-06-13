@@ -1,0 +1,8 @@
+// This file provides an alternative to using brand overrides for MITx Micro Frontends (MFEs).
+
+// Hide the informational banner displayed at the bottom of the course cards in the Learner Dashboard MFE.
+.course-card-banners {
+    div[role=alert] {
+      display: none;
+    }
+}
