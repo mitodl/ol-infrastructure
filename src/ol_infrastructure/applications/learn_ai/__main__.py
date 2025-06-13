@@ -80,6 +80,9 @@ stack_info = parse_stack()
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
 cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+cluster_substructure_stack = StackReference(
+    f"substructure.aws.eks.applications.{stack_info.name}"
+)
 dns_stack = StackReference("infrastructure.aws.dns")
 monitoring_stack = StackReference("infrastructure.monitoring")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
@@ -551,7 +554,9 @@ redis_cluster_security_group = ec2.SecurityGroup(
             security_groups=[
                 learn_ai_application_security_group.id,
                 operations_vpc["security_groups"]["celery_monitoring"],
-                apps_vpc["security_groups"]["keda"],
+                cluster_substructure_stack.require_output(
+                    "cluster_keda_security_group_id"
+                ),
             ],
             protocol="tcp",
             from_port=DEFAULT_REDIS_PORT,

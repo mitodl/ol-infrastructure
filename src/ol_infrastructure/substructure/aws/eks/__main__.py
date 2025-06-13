@@ -9,7 +9,12 @@ import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 
+from bridge.lib.magic_numbers import (
+    DEFAULT_HTTPS_PORT,
+    DEFAULT_KEDA_PORT,
+)
 from bridge.lib.versions import (
+    KEDA_CHART_VERSION,
     KUBE_STATE_METRICS_CHART_VERSION,
     VANTAGE_K8S_AGENT_CHART_VERSION,
 )
@@ -19,6 +24,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
+from ol_infrastructure.lib.aws.eks_helper import default_psg_egress_args
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -759,12 +765,44 @@ setup_karpenter(
     k8s_global_labels=k8s_global_labels,
 )
 
+keda_security_group = aws.ec2.SecurityGroup(
+    f"{cluster_name}-keda-security-group",
+    description="Security group for KEDA operator",
+    vpc_id=target_vpc["id"],
+    ingress=[
+        aws.ec2.SecurityGroupIngressArgs(
+            self=True,
+            from_port=DEFAULT_KEDA_PORT,
+            to_port=DEFAULT_KEDA_PORT,
+            protocol="tcp",
+        ),
+        aws.ec2.SecurityGroupIngressArgs(
+            self=True,
+            from_port=DEFAULT_HTTPS_PORT,
+            to_port=DEFAULT_HTTPS_PORT,
+            protocol="tcp",
+        ),
+        aws.ec2.SecurityGroupIngressArgs(
+            self=True,
+            from_port=8080,
+            to_port=8080,
+            protocol="tcp",
+        ),
+    ],
+    egress=default_psg_egress_args,
+    tags={
+        **aws_config.tags,
+        "Name": f"{cluster_name}-keda-security-group",
+    },
+)
+export("cluster_keda_security_group_id", keda_security_group.id)
+
 keda_release = kubernetes.helm.v3.Release(
     f"{cluster_name}-keda-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
         name="keda",
         chart="keda",
-        version="",
+        version=KEDA_CHART_VERSION,
         namespace="operations",
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://kedacore.github.io/charts"
@@ -774,9 +812,13 @@ keda_release = kubernetes.helm.v3.Release(
         values={
             "podLabels": {
                 "keda": {
-                    "ol.mit.edu/pod-security-group": target_vpc["security_groups"][
-                        "keda"
-                    ],
+                    "ol.mit.edu/pod-security-group": keda_security_group.id,
+                },
+                "metricsAdapter": {
+                    "ol.mit.edu/pod-security-group": keda_security_group.id,
+                },
+                "webhooks": {
+                    "ol.mit.edu/pod-security-group": keda_security_group.id,
                 },
             },
             "resources": {
@@ -832,13 +874,11 @@ keda_security_group_policy = kubernetes.apiextensions.CustomResource(
     spec={
         "podSelector": {
             "matchLabels": {
-                "ol.mit.edu/pod-security-group": target_vpc["security_groups"]["keda"]
+                "ol.mit.edu/pod-security-group": keda_security_group.id,
             }
         },
         "securityGroups": {
-            "groupIds": [
-                target_vpc["security_groups"]["keda"],
-            ],
+            "groupIds": [keda_security_group.id],
         },
     },
     opts=ResourceOptions(depends_on=keda_release, provider=k8s_provider),

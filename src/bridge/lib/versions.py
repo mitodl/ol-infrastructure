@@ -33,6 +33,8 @@ EXTERNAL_DNS_CHART_VERSION = "1.15.0"
 GATEWAY_API_VERSION = "v1.3.0"
 # renovate: datasource=docker depName=karpenter packageName=public.ecr.aws/karpenter/karpenter
 KARPENTER_CHART_VERSION = "1.5.0"
+# renoavate: datasource=helm depName=keda registryUrl=https://kedacore.github.io/charts packageName=keda
+KEDA_CHART_VERSION = "2.17.1"
 # renovate: datasource=docker depName=kube-state-metrics packageName=registry-1.docker.io/bitnamicharts/kube-state-metrics
 KUBE_STATE_METRICS_CHART_VERSION = "5.0.9"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
