@@ -44,16 +44,14 @@ class OLApplicationK8sCeleryWorkerConfig(BaseModel):
         "INFO"
     )
     queues: list[str] = ["default"]
-    resource_requests: dict[str, str] = Field(
-        default={"cpu": "250m", "memory": "300Mi"}
-    )
+    resource_requests: dict[str, str] = Field(default={"cpu": "500m", "memory": "1Gi"})
     resource_limits: dict[str, str] = Field(
-        default={"cpu": "2000m", "memory": "2000Mi"},
+        default={"cpu": "2000m", "memory": "8Gi"},
     )
     min_replicas: NonNegativeInt = 1
     max_replicas: NonNegativeInt = 10
     autoscale_queue_depth: NonNegativeInt = 10
-    redis_database_index: str = "0"
+    redis_database_index: str = "1"
     redis_host: Output[str]
     redis_password: str
     redis_port: int = DEFAULT_REDIS_PORT
@@ -566,6 +564,7 @@ class OLApplicationK8s(ComponentResource):
                         metadata=kubernetes.meta.v1.ObjectMetaArgs(
                             labels=celery_labels,
                         ),
+                        # Ref: https://docs.celeryq.dev/en/stable/reference/cli.html#celery-worker
                         spec=kubernetes.core.v1.PodSpecArgs(
                             service_account_name=ol_app_k8s_config.application_service_account_name,
                             dns_policy="ClusterFirst",
@@ -575,16 +574,16 @@ class OLApplicationK8s(ComponentResource):
                                     image=app_image,
                                     command=[
                                         "celery",
-                                        "-A",
+                                        "-A",  # Application name
                                         "main.celery:app",
-                                        "worker",
-                                        "-E",
-                                        "-Q",
+                                        "worker",  # COMMAND
+                                        "-E",  # send task-related events for monitoring
+                                        "-Q",  # queue name
                                         celery_worker_config.queue_name,
-                                        "-B",
-                                        "-l",
+                                        "-B",  # beat (scheduler?)
+                                        "-l",  # set log level
                                         celery_worker_config.log_level,
-                                        "--max-tasks-per-child",
+                                        "--max-tasks-per-child",  # Max number of tasks the pool worker will process before being replaced
                                         "100",
                                     ],
                                     env=application_deployment_env_vars,

@@ -478,18 +478,12 @@ mitxonline_k8s_app = OLApplicationK8s(
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="celery",
-                resource_requests={"cpu": "500m", "memory": "1024Mi"},
-                resource_limits={"cpu": "1000m", "memory": "2048Mi"},
                 redis_host=redis_cache.address,
-                redis_database_index="1",
                 redis_password=redis_config.require("password"),
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="hubspot_sync",
-                resource_requests={"cpu": "500m", "memory": "1024Mi"},
-                resource_limits={"cpu": "1000m", "memory": "2048Mi"},
                 redis_host=redis_cache.address,
-                redis_database_index="1",
                 redis_password=redis_config.require("password"),
             ),
         ],
