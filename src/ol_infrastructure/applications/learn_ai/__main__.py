@@ -768,16 +768,12 @@ learn_ai_app_k8s = OLApplicationK8s(
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="default",
-                resource_requests={"cpu": "500m", "memory": "1000Mi"},
-                resource_limits={"cpu": "1000m", "memory": "2000Mi"},
                 redis_host=redis_cache.address,
                 redis_database_index="1",
                 redis_password=redis_config.require("password"),
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="edx_content",
-                resource_requests={"cpu": "500m", "memory": "1000Mi"},
-                resource_limits={"cpu": "1000m", "memory": "2000Mi"},
                 redis_host=redis_cache.address,
                 redis_database_index="1",
                 redis_password=redis_config.require("password"),
