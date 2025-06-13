@@ -13,7 +13,7 @@ import pulumi_aws as aws
 import pulumi_eks as eks
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi import Alias, Config, Output, ResourceOptions, StackReference, export
 
 from bridge.lib.magic_numbers import (
     DEFAULT_EFS_PORT,
@@ -336,12 +336,15 @@ cluster = eks.Cluster(
 def __create_apiserver_security_group_rules(pod_subnet_cidrs):
     for index, subnet_cidr in enumerate(pod_subnet_cidrs):
         aws.vpc.SecurityGroupIngressRule(
-            f"{cluster_name}-eks-apiserver-sg-rule-{index}",
+            f"{cluster_name}-eks-apiserver-443-sg-rule-{index}",
             security_group_id=cluster.cluster_security_group_id,
             cidr_ipv4=subnet_cidr,
             from_port=443,
             to_port=443,
             ip_protocol="tcp",
+            opts=ResourceOptions(
+                aliases=[Alias(name=f"{cluster_name}-eks-apiserver-sg-rule-{index}")]
+            ),
         )
 
 

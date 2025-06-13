@@ -788,6 +788,12 @@ keda_security_group = aws.ec2.SecurityGroup(
             to_port=8080,
             protocol="tcp",
         ),
+        aws.ec2.SecurityGroupIngressArgs(
+            from_port=6443,
+            to_port=6443,
+            security_groups=[cluster_stack.require_output("cluster_security_group_id")],
+            protocol="tcp",
+        ),
     ],
     egress=default_psg_egress_args,
     tags={
