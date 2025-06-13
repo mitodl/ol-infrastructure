@@ -21,6 +21,8 @@ VAULT_VERSION = "1.19.5"
 AIRBYTE_CHART_VERSION = "1.6.3"
 # renovate: datasource=docker depName=apisix packageName=registry-1.docker.io/bitnamicharts/apisix
 APISIX_CHART_VERSION = "5.0.2"
+# renovate: datasource=helm depName=botkube packageName=botkube
+BOTKUBE_CHART_VERSION = "v1.14.0"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager
 CERT_MANAGER_CHART_VERSION = "v1.16.1"
 # renovate: datasource=aws-eks-addon depName=ebs-csi-driver
