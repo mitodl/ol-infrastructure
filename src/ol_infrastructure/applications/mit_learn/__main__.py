@@ -90,6 +90,9 @@ vault_config = Config("vault")
 stack_info = parse_stack()
 
 cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+cluster_substructure_stack = StackReference(
+    f"substructure.aws.eks.applications.{stack_info.name}"
+)
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 apps_vpc = network_stack.require_output("applications_vpc")
@@ -1355,7 +1358,9 @@ redis_cluster_security_group = ec2.SecurityGroup(
             security_groups=[
                 mitlearn_app_security_group.id,
                 operations_vpc["security_groups"]["celery_monitoring"],
-                apps_vpc["security_groups"]["keda"],
+                cluster_substructure_stack.require_output(
+                    "cluster_keda_security_group_id"
+                ),
             ],
             protocol="tcp",
             from_port=DEFAULT_REDIS_PORT,
