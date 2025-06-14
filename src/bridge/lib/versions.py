@@ -20,7 +20,7 @@ VAULT_VERSION = "1.19.5"
 # renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/helm-charts
 AIRBYTE_CHART_VERSION = "1.6.3"
 # renovate: datasource=docker depName=apisix packageName=registry-1.docker.io/bitnamicharts/apisix
-APISIX_CHART_VERSION = "5.0.2"
+APISIX_CHART_VERSION = "5.0.3"
 # renovate: datasource=helm depName=botkube packageName=botkube
 BOTKUBE_CHART_VERSION = "v1.14.0"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager
