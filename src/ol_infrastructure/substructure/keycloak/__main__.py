@@ -438,6 +438,10 @@ ol_platform_engineering_rsa_key = keycloak.RealmKeystoreRsa(
 """
 
 # Create OL Data Platform Realm
+if stack_info.env_suffix == "Production":
+    derived_relying_party_id = "sso.ol.mit.edu"
+else:
+    derived_relying_party_id = f"sso-{stack_info.env_suffix}.ol.mit.edu"
 ol_data_platform_realm = keycloak.Realm(
     "ol-data-platform",
     access_code_lifespan="30m",
@@ -460,7 +464,7 @@ ol_data_platform_realm = keycloak.Realm(
     verify_email=False,
     web_authn_passwordless_policy={
         "relying_party_entity_name": f"mit-ol-sso-{stack_info.env_suffix}",
-        "relying_party_id": f"sso-{stack_info.env_suffix}.ol.mit.edu",
+        "relying_party_id": derived_relying_party_id,
         "require_resident_key": "Yes",
         "user_verification_requirement": "required",
     },
@@ -1267,7 +1271,92 @@ ol_data_platform_browser_authentication_binding = keycloak.authentication.Bindin
     opts=resource_options,
 )
 # OL Data Platform - browser flow [END]
+# First login flow [START]
+# Does not require email verification or confirmation to connect with existing account.
+ol_data_platform_touchstone_first_login_flow = keycloak.authentication.Flow(
+    "ol-data-platform-touchstone-first-login-flow",
+    realm_id=ol_apps_realm.id,
+    alias="ol-data-platform-first-login-flow",
+    opts=resource_options,
+)
+ol_data_platform_touchstone_first_login_flow_review_profile = (
+    keycloak.authentication.Execution(
+        "ol-data-platform-touchstone-first-login-flow-review-profile",
+        realm_id=ol_apps_realm.id,
+        parent_flow_alias=ol_data_platform_touchstone_first_login_flow.alias,
+        authenticator="idp-review-profile",
+        requirement="REQUIRED",
+        opts=resource_options,
+    )
+)
+ol_touchstone_first_login_review_profile_config = (
+    keycloak.authentication.ExecutionConfig(
+        "ol-data-platform-touchstone-first-login-review-profile-config",
+        realm_id=ol_apps_realm.id,
+        execution_id=ol_data_platform_touchstone_first_login_flow_review_profile.id,
+        alias="ol-data-platform-review-profile-config",
+        config={
+            "updateProfileOnFirstLogin": "missing",
+        },
+        opts=resource_options,
+    )
+)
+ol_data_platform_touchstone_user_creation_or_linking_subflow = (
+    keycloak.authentication.Subflow(
+        "ol-data-platform-touchstone-user-creation-or-linking-subflow",
+        realm_id=ol_apps_realm.id,
+        alias="ol-data-platform-touchstone-first-broker-login-user-creation-or-linking",
+        parent_flow_alias=ol_data_platform_touchstone_first_login_flow.alias,
+        provider_id="basic-flow",
+        requirement="REQUIRED",
+        opts=resource_options,
+    )
+)
+ol_data_platform_touchstone_user_creation_or_linking_subflow_create_user_if_unique_step = keycloak.authentication.Execution(  # noqa: E501
+    "ol-data-platform-touchstone-create-user-if-unique",
+    realm_id=ol_apps_realm.id,
+    parent_flow_alias=ol_data_platform_touchstone_user_creation_or_linking_subflow.alias,
+    authenticator="idp-create-user-if-unique",
+    requirement="ALTERNATIVE",
+    opts=resource_options,
+)
+ol_data_platform_touchstone_user_creation_or_linking_subflow_automatically_set_existing_user_step = keycloak.authentication.Execution(  # noqa: E501
+    "ol-data-platform-touchstone-automatically-set-existing-user",
+    realm_id=ol_apps_realm.id,
+    parent_flow_alias=ol_data_platform_touchstone_user_creation_or_linking_subflow.alias,
+    authenticator="idp-auto-link",
+    requirement="ALTERNATIVE",
+    opts=ResourceOptions(
+        provider=keycloak_provider,
+        depends_on=ol_data_platform_touchstone_user_creation_or_linking_subflow_create_user_if_unique_step,
+    ),
+)
+# OL - First login flow [END]
 # OL Data Platform Realm - Authentication Flows[END]
+
+# OL Data Platform - Touchstone SAML [START]
+ol_data_platform_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
+    "ol-data-platform-touchstone-idp",
+    realm=ol_data_platform_realm.id,
+    alias="ol-data-touchstone-idp",
+    display_name="MIT Touchstone",
+    entity_id=f"{keycloak_url}/realms/olapps",
+    name_id_policy_format="Unspecified",
+    force_authn=False,
+    post_binding_response=True,
+    post_binding_authn_request=True,
+    principal_type="ATTRIBUTE",
+    principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
+    single_sign_on_service_url="https://idp.mit.edu/idp/profile/SAML2/POST/SSO",
+    trust_email=True,
+    validate_signature=True,
+    signing_certificate=mit_touchstone_cert,
+    want_assertions_encrypted=True,
+    want_assertions_signed=True,
+    opts=resource_options,
+    first_broker_login_flow_alias=ol_data_platform_touchstone_first_login_flow.alias,
+)
+# OL Data Platform - Touchstone SAML [STAENDRT]
 
 # OLAPPS REALM- First login flow [START]
 # Does not require email verification or confirmation to connect with existing account.
