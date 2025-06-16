@@ -1,5 +1,5 @@
-path "secret-operations/global/odl_wildcard_cert" {
-  capabilities = ["read"]
+path "secret-global/*" {
+  capabilities = ["read", "list"]
 }
 path "secret-operations/sso/dagster" {
   capabilities = ["read"]
@@ -91,9 +91,7 @@ path "secret-xpro/mongodb-forum/*" {
 path "secret-xpro/mongodb-forum" {
   capabilities = ["read"]
 }
-path "secret-operations/global/odl_wildcard_cert" {
-  capabilities = ["read"]
-}
+
 path "secret-operations/data/institutional-research-bigquery-service-account" {
   capabilities = ["read"]
 }
