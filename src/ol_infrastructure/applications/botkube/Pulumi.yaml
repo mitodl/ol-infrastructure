@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-botkube-application
+name: ol-infrastructure-botkube
 runtime: python
 description: MIT OL K8s Botkube
 backend:
