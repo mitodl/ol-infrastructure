@@ -111,6 +111,12 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
         repository="ol-keycloak",
     )
 
+    ol_keycloakify = github_release(
+        name=Identifier("ol-keycloakify"),
+        owner="mitodl",
+        repository="ol-keycloakify",
+    )
+
     scim_plugin = s3_object(
         name="scim_for_kecyloak",
         bucket="ol-eng-artifacts",
@@ -128,6 +134,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
             GetStep(get=cas_protocol_spi.name, trigger=True),
             GetStep(get=keycloak_customization_repo.name, trigger=True),
             GetStep(get=keycloakify_spi.name, trigger=True),
+            GetStep(get=ol_keycloakify.name, trigger=True),
             GetStep(get=ol_spi.name, trigger=True),
             GetStep(get=scim_plugin.name, trigger=True),
             TaskStep(
@@ -139,6 +146,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
                         Input(name=keycloak_customization_repo.name),
                         Input(name=cas_protocol_spi.name),
                         Input(name=keycloakify_spi.name),
+                        Input(name=ol_keycloakify.name),
                         Input(name=ol_spi.name),
                         Input(name=scim_plugin.name),
                     ],
@@ -156,6 +164,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
                         cp -r {keycloak_customization_repo.name}/* {image_build_context.name}/
                         cp -r {cas_protocol_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {keycloakify_spi.name}/* {image_build_context.name}/plugins/
+                        cp -r {ol_keycloakify.name}/* {image_build_context.name}/plugins/
                         cp -r {ol_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {scim_plugin.name}/* {image_build_context.name}/plugins/
                         """  # noqa: E501
@@ -196,6 +205,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
             keycloak_registry_image,
             cas_protocol_spi,
             keycloakify_spi,
+            ol_keycloakify,
             ol_spi,
             scim_plugin,
         ],
