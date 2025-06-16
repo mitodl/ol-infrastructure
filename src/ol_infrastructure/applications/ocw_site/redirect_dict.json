@@ -358,6 +358,7 @@
   "/about/contactus": "301|keep|https://{{AK_HOSTHEADER}}/contact/",
   "/ans7870/21f/21f.027/home/index.html": "307|discard|https://visualizingcultures.mit.edu/",
   "/ans7870/featured/mitx-courses-on-edx.htm": "301|discard|https://openlearning.mit.edu/courses-programs/mitx-courses/",
+  "/ans7870/global/MIT_OpenCourseWare_FAQs.pdf": "301|discard|https://{{AK_HOSTHEADER}}/about/",
   "/ans7870/resources/Strang/Edited/Calculus/Calculus.pdf": "301|discard|https://{{AK_HOSTHEADER}}/courses/res-18-001-calculus-fall-2023/pages/textbook/",
   "/comments": "307|discard|https://mitocw.zendesk.com/hc/en-us/articles/6636015233051-Comments-Policy-for-YouTube-and-Social-Media",
   "/courses": "307|keep|https://{{AK_HOSTHEADER}}/search/?s=department_course_numbers.sort_coursenum",
