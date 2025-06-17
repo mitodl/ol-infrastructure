@@ -172,6 +172,7 @@ mitxonline = [
         terms_of_service_url="https://mitxonline.mit.edu/terms-of-service/",
         trademark_text="© MITx Online. All rights reserved except where noted.",
         logo_trademark_url="https://courses.mitxonline.mit.edu/static/mitxonline/images/mit-logo.svg",
+        enable_video_upload_page_link_in_content_dropdown="true",
     ),
 ]
 
