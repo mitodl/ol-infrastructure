@@ -56,6 +56,7 @@ def github_release(  # noqa: PLR0913
     github_token: str = "((github.public_repo_access_token))",  # noqa: S107
     tag_filter: Optional[str] = None,
     order_by: Optional[Literal["time", "version"]] = None,
+    check_frequency="24h",
 ) -> Resource:
     """Generate a github-release resource for the given owner/repository.
 
@@ -89,7 +90,7 @@ def github_release(  # noqa: PLR0913
         name=name,
         type="github-release",
         icon="github",
-        check_every="24h",
+        check_every=check_frequency,
         source=release_config,
     )
 
