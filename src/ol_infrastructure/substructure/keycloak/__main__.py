@@ -1285,6 +1285,7 @@ ol_data_platform_touchstone_first_login_flow_review_profile = (
         realm_id=ol_data_platform_realm.id,
         parent_flow_alias=ol_data_platform_touchstone_first_login_flow.alias,
         authenticator="idp-review-profile",
+        priority=10,
         requirement="REQUIRED",
         opts=resource_options,
     )
@@ -1308,6 +1309,7 @@ ol_data_platform_touchstone_user_creation_or_linking_subflow = (
         alias="ol-data-platform-touchstone-first-broker-login-user-creation-or-linking",
         parent_flow_alias=ol_data_platform_touchstone_first_login_flow.alias,
         provider_id="basic-flow",
+        priority=20,
         requirement="REQUIRED",
         opts=resource_options,
     )
@@ -1317,6 +1319,7 @@ ol_data_platform_touchstone_user_creation_or_linking_subflow_create_user_if_uniq
     realm_id=ol_data_platform_realm.id,
     parent_flow_alias=ol_data_platform_touchstone_user_creation_or_linking_subflow.alias,
     authenticator="idp-create-user-if-unique",
+    priority=30,
     requirement="ALTERNATIVE",
     opts=resource_options,
 )
@@ -1326,10 +1329,8 @@ ol_data_platform_touchstone_user_creation_or_linking_subflow_automatically_set_e
     parent_flow_alias=ol_data_platform_touchstone_user_creation_or_linking_subflow.alias,
     authenticator="idp-auto-link",
     requirement="ALTERNATIVE",
-    opts=ResourceOptions(
-        provider=keycloak_provider,
-        depends_on=ol_data_platform_touchstone_user_creation_or_linking_subflow_create_user_if_unique_step,
-    ),
+    priority=40,
+    opts=resource_options,
 )
 # OL - First login flow [END]
 # OL Data Platform Realm - Authentication Flows[END]
