@@ -1322,7 +1322,7 @@ ol_data_platform_touchstone_user_creation_or_linking_subflow_create_user_if_uniq
 )
 ol_data_platform_touchstone_user_creation_or_linking_subflow_automatically_set_existing_user_step = keycloak.authentication.Execution(  # noqa: E501
     "ol-data-platform-touchstone-automatically-set-existing-user",
-    realm_id=ol_apps_realm.id,
+    realm_id=ol_data_platform_realm.id,
     parent_flow_alias=ol_data_platform_touchstone_user_creation_or_linking_subflow.alias,
     authenticator="idp-auto-link",
     requirement="ALTERNATIVE",
