@@ -528,15 +528,6 @@ ol_data_platforme_realm_events = keycloak.RealmEvents(
     events_listeners=["jboss-logging"],
 )
 
-ol_data_required_action_configure_otp = keycloak.RequiredAction(
-    "ol-data-configure-totp",
-    realm_id=ol_data_platform_realm.realm,
-    alias="CONFIGURE_TOTP",
-    default_action=True,
-    enabled=True,
-    opts=resource_options,
-)
-
 ol_data_required_action_verify_email = keycloak.RequiredAction(
     "ol-data-verify-email",
     realm_id=ol_platform_engineering_realm.realm,
@@ -1339,7 +1330,7 @@ ol_data_platform_touchstone_user_creation_or_linking_subflow_automatically_set_e
 ol_data_platform_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
     "ol-data-platform-touchstone-idp",
     realm=ol_data_platform_realm.id,
-    alias="ol-data-touchstone-idp",
+    alias="touchstone-idp",
     display_name="MIT Touchstone",
     entity_id=f"{keycloak_url}/realms/ol-data-platform",
     name_id_policy_format="Unspecified",
@@ -1356,6 +1347,56 @@ ol_data_platform_touchstone_saml_identity_provider = keycloak.saml.IdentityProvi
     want_assertions_signed=True,
     opts=resource_options,
     first_broker_login_flow_alias=ol_data_platform_touchstone_first_login_flow.alias,
+)
+ol_data_platform_oidc_attribute_importer_identity_provider_mapper = (
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "ol-data-platform-touchstone-saml-email-attribute",
+        name="ol-data-platform-touchstone-saml-email-attribute",
+        realm=ol_data_platform_realm.id,
+        attribute_name="mail",
+        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
+        user_attribute="email",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
+    ),
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "ol-data-platform-touchstone-saml-last-name-attribute",
+        name="ol-data-platform-touchstone-saml-last-name-attribute",
+        realm=ol_data_platform_realm.id,
+        attribute_name="sn",
+        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
+        user_attribute="lastName",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
+    ),
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "ol-data-platform-touchstone-saml-first-name-attribute",
+        name="ol-data-platform-touchstone-saml-first-name-attribute",
+        realm=ol_data_platform_realm.id,
+        attribute_name="givenName",
+        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
+        user_attribute="firstName",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
+    ),
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "ol-data-platform-touchstone-saml-full-name-attribute",
+        name="ol-data-platform-touchstone-saml-full-name-attribute",
+        realm=ol_data_platform_realm.id,
+        attribute_name="displayName",
+        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
+        user_attribute="fullName",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
+    ),
 )
 # OL Data Platform - Touchstone SAML [END]
 
