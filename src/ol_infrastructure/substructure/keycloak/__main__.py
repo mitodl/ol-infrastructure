@@ -1292,7 +1292,7 @@ ol_data_platform_touchstone_first_login_flow_review_profile = (
 ol_touchstone_first_login_review_profile_config = (
     keycloak.authentication.ExecutionConfig(
         "ol-data-platform-touchstone-first-login-review-profile-config",
-        realm_id=ol_apps_realm.id,
+        realm_id=ol_data_platform_realm.id,
         execution_id=ol_data_platform_touchstone_first_login_flow_review_profile.id,
         alias="ol-data-platform-review-profile-config",
         config={
