@@ -1314,7 +1314,7 @@ ol_data_platform_touchstone_user_creation_or_linking_subflow = (
 )
 ol_data_platform_touchstone_user_creation_or_linking_subflow_create_user_if_unique_step = keycloak.authentication.Execution(  # noqa: E501
     "ol-data-platform-touchstone-create-user-if-unique",
-    realm_id=ol_apps_realm.id,
+    realm_id=ol_data_platform_realm.id,
     parent_flow_alias=ol_data_platform_touchstone_user_creation_or_linking_subflow.alias,
     authenticator="idp-create-user-if-unique",
     requirement="ALTERNATIVE",
