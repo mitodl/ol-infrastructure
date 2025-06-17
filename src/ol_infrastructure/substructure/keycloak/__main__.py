@@ -1282,7 +1282,7 @@ ol_data_platform_touchstone_first_login_flow = keycloak.authentication.Flow(
 ol_data_platform_touchstone_first_login_flow_review_profile = (
     keycloak.authentication.Execution(
         "ol-data-platform-touchstone-first-login-flow-review-profile",
-        realm_id=ol_apps_realm.id,
+        realm_id=ol_data_platform_realm.id,
         parent_flow_alias=ol_data_platform_touchstone_first_login_flow.alias,
         authenticator="idp-review-profile",
         requirement="REQUIRED",
