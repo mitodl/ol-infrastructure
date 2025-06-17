@@ -1263,7 +1263,7 @@ ol_browser_data_platform_webauthn_authenticator_flow = (
         opts=resource_options,
     )
 )
-# Bind the flow to the olapps realm for browser login.
+# Bind the flow to the ol-data-platform realm for browser login.
 ol_data_platform_browser_authentication_binding = keycloak.authentication.Bindings(
     "ol-data-platform-browser-authentication-binding",
     realm_id=ol_data_platform_realm.id,
