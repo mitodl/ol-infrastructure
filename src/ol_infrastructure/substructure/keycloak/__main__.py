@@ -1356,7 +1356,7 @@ ol_data_platform_touchstone_saml_identity_provider = keycloak.saml.IdentityProvi
     opts=resource_options,
     first_broker_login_flow_alias=ol_data_platform_touchstone_first_login_flow.alias,
 )
-# OL Data Platform - Touchstone SAML [STAENDRT]
+# OL Data Platform - Touchstone SAML [END]
 
 # OLAPPS REALM- First login flow [START]
 # Does not require email verification or confirmation to connect with existing account.
