@@ -170,7 +170,7 @@ consul_templates.extend(
         ConsulTemplateTemplate(
             contents=(
                 '{{ with secret "secret-global/odl-wildcard" }}'
-                "{{ printf .Data.key_with_proper_newlines }}{{ end }}"
+                "{{ printf .Data.data.key_with_proper_newlines }}{{ end }}"
             ),
             destination=Path(certificate_key_file),
             user="root",
@@ -179,7 +179,7 @@ consul_templates.extend(
         ConsulTemplateTemplate(
             contents=(
                 '{{ with secret "secret-global/odl-wildcard" }}'
-                "{{ printf .Data.cert_with_proper_newlines }}{{ end }}"
+                "{{ printf .Data.data.cert_with_proper_newlines }}{{ end }}"
             ),
             destination=Path(certificate_file),
             user="root",
