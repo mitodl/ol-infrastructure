@@ -1275,7 +1275,7 @@ ol_data_platform_browser_authentication_binding = keycloak.authentication.Bindin
 # Does not require email verification or confirmation to connect with existing account.
 ol_data_platform_touchstone_first_login_flow = keycloak.authentication.Flow(
     "ol-data-platform-touchstone-first-login-flow",
-    realm_id=ol_apps_realm.id,
+    realm_id=ol_data_platform_realm.id,
     alias="ol-data-platform-first-login-flow",
     opts=resource_options,
 )
