@@ -1304,7 +1304,7 @@ ol_touchstone_first_login_review_profile_config = (
 ol_data_platform_touchstone_user_creation_or_linking_subflow = (
     keycloak.authentication.Subflow(
         "ol-data-platform-touchstone-user-creation-or-linking-subflow",
-        realm_id=ol_apps_realm.id,
+        realm_id=ol_data_platform_realm.id,
         alias="ol-data-platform-touchstone-first-broker-login-user-creation-or-linking",
         parent_flow_alias=ol_data_platform_touchstone_first_login_flow.alias,
         provider_id="basic-flow",
