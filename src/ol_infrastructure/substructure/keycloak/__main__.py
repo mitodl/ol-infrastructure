@@ -1196,7 +1196,7 @@ ol_browser_data_platform_cookie = keycloak.authentication.Execution(
     priority=10,
     opts=resource_options,
 )
-ol_browser_data_plaform_idp_redirector = keycloak.authentication.Execution(
+ol_browser_data_platform_idp_redirector = keycloak.authentication.Execution(
     "ol-browser-data-platform-idp-redirector",
     realm_id=ol_data_platform_realm.id,
     parent_flow_alias=ol_browser_data_platform_flow.alias,
