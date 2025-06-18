@@ -37,7 +37,7 @@ config:
   mitlearn:learn_ai_syllabus_endpoint: "https://api.learn.mit.edu/ai/http/syllabus_agent/"
   mitlearn:legacy_api_domain: "api.mitopen.odl.mit.edu"
   mitlearn:legacy_frontend_domain: "mitopen.odl.mit.edu"
-  mitlearn:nextjs_heroku_domain: "mitopen-production-nextjs-6b0d663f9110.herokuapp.com"
+  mitlearn:nextjs_heroku_domain: "next.learn.mit.edu"
   mitlearn:posthog_proxy: "ph.ol.mit.edu"
   mitlearn:vars:
     AI_MIT_SYLLABUS_URL: "https://api.learn.mit.edu/api/v0/vector_content_files_search/"
