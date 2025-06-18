@@ -73,11 +73,11 @@ path "aws-mitx/*" {
   capabilities = ["list"]
 }
 
-path "aws-mitx/creds/mit-open-application-*" {
+path "aws-mitx/creds/mit-learn-application-*" {
   capabilities = ["read", "list"]
 }
 
-path "aws-mitx/creds/ol-mitopen-application" {
+path "aws-mitx/creds/ol-mitlearn-application" {
   capabilities = ["read", "list"]
 }
 
