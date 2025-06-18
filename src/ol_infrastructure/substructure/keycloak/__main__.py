@@ -438,7 +438,7 @@ ol_platform_engineering_rsa_key = keycloak.RealmKeystoreRsa(
 """
 
 # Create OL Data Platform Realm
-if stack_info.env_suffix == "Production":
+if stack_info.env_suffix == "production":
     derived_relying_party_id = "sso.ol.mit.edu"
 else:
     derived_relying_party_id = f"sso-{stack_info.env_suffix}.ol.mit.edu"
