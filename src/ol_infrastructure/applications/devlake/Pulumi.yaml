@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-devlake-application
+runtime: python
+description: Deploy the Apache DevLake project for managing engineering analytics
+backend:
+  url: s3://mitol-pulumi-state/
