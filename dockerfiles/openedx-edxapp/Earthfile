@@ -113,8 +113,10 @@ collected:
   COPY settings/cms.env.yml /openedx/config/cms.env.yml
   COPY settings/lms/assets.not_py /openedx/edx-platform/lms/envs/mitol/assets.py
   COPY settings/lms/i18n.not_py /openedx/edx-platform/lms/envs/mitol/i18n.py
+  COPY settings/mit_config.not_py /openedx/edx-platform/lms/envs/mit_config.py
   COPY settings/cms/assets.not_py /openedx/edx-platform/cms/envs/mitol/assets.py
   COPY settings/cms/i18n.not_py /openedx/edx-platform/cms/envs/mitol/i18n.py
+  COPY settings/mit_config.not_py /openedx/edx-platform/cms/envs/mit_config.py
   COPY settings/set_waffle_flags.not_py /openedx/edx-platform/set_waffle_flags.py
   COPY settings/process_scheduled_emails.not_py /openedx/edx-platform/process_scheduled_emails.py
   COPY settings/saml_pull.not_py /openedx/edx-platform/saml_pull.py
