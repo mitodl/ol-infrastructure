@@ -1,0 +1,6 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAF8yve3DA+XkRwcgTWQOylYAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMA1H8WsYS772WaIPGAgEQgDsTINeG+HH5JSyn9G+wVX28G6qIgWVvQAZqSjEj/uXPm70ytW4f2XEbUOnQmgCqyNr2wsXnyneyz++1qA==
+config:
+  devlake:db_password:
+    secure: v1:4OGrEMlC22yu6Pxn:uv+IxQTgMa0O/afM0vaR0mJMKnBJpvtcEg2kcNnx/HohZC22ohwl+kUclNQJFaKHxfL0DAZYjrfdZSA=
