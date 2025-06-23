@@ -1,4 +1,4 @@
-# ruff: noqa: CPY001, D100
+# ruff: noqa: D100
 import json
 from pathlib import Path
 

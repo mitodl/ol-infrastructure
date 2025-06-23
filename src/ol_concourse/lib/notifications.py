@@ -1,5 +1,3 @@
-from typing import Optional
-
 from ol_concourse.lib.models.pipeline import PutStep, Resource
 
 
@@ -7,7 +5,7 @@ def notification(
     resource: Resource,
     title: str,
     body: str,
-    alert_type: Optional[str] = "default",
+    alert_type: str | None = "default",
 ) -> PutStep:
     """Generate a PutStep for sending notifications (to just slack, for now).
 

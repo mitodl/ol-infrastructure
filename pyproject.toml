@@ -47,7 +47,7 @@ dev = [
     "pre-commit>=4.0.0,<5",
     "pytest>=8.0.0,<9",
     "pytest-testinfra>=10.0.0,<11",
-    "ruff>=0.11,<1",
+    "ruff>=0.12,<1",
 ]
 
 [tool.hatch.build.targets.sdist]
@@ -176,7 +176,6 @@ lint.ignore = [
     "RET508",
     "SIM115",
     "TD003",  # Don't require issue links for TODO comments
-    "UP007"
 ]
 lint.typing-modules = ["colour.hints"]
 

@@ -1,5 +1,3 @@
-# ruff: noqa: ERA001
-
 """The complete state needed to provision Keycloak running on Docker."""
 
 import json

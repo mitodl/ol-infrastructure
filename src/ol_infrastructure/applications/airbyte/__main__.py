@@ -1,5 +1,4 @@
 """Create the resources needed to run a airbyte server.  # noqa: D200"""
-# ruff: noqa: UP042, CPY001, D100, ERA001, D102
 
 import json
 import os

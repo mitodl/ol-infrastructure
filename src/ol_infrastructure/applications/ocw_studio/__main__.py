@@ -1,4 +1,4 @@
-# ruff: noqa: E501, CPY001
+# ruff: noqa: E501
 """Create the infrastructure and services needed to support the OCW Studio application.
 
 - Create a Redis instance in AWS Elasticache

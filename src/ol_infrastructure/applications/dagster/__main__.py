@@ -12,7 +12,7 @@ import base64
 import json
 import textwrap
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 import pulumi_consul as consul
 import pulumi_vault as vault
@@ -73,7 +73,7 @@ s3_tracking_logs_buckets = [
     f"{edxapp_deployment}-{stack_info.env_suffix}-edxapp-tracking"
     for edxapp_deployment in ("mitxonline", "mitx", "mitx-staging", "xpro")
 ]
-dagster_s3_permissions: list[dict[str, Union[str, list[str]]]] = [
+dagster_s3_permissions: list[dict[str, str | list[str]]] = [
     {
         "Effect": "Allow",
         "Action": "s3:ListAllMyBuckets",
@@ -157,7 +157,7 @@ dagster_s3_permissions: list[dict[str, Union[str, list[str]]]] = [
     },
 ]
 
-athena_permissions: list[dict[str, Union[str, list[str]]]] = [
+athena_permissions: list[dict[str, str | list[str]]] = [
     {
         "Effect": "Allow",
         "Action": [

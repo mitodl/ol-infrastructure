@@ -1,7 +1,6 @@
 import abc
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, SerializeAsAny
 
@@ -19,10 +18,10 @@ class FlexibleBaseModel(BaseModel):
 class HashicorpProduct(BaseModel, abc.ABC):
     _name: str
     version: str
-    install_directory: Optional[Path] = None
+    install_directory: Path | None = None
     configuration: dict[Path, SerializeAsAny[HashicorpConfig]]
-    configuration_directory: Optional[Path] = None
-    configuration_file: Optional[Path] = None
+    configuration_directory: Path | None = None
+    configuration_file: Path | None = None
 
     @abc.abstractproperty
     def systemd_template_context(self):

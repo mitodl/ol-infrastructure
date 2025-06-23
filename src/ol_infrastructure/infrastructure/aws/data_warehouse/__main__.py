@@ -1,5 +1,5 @@
 import json
-from typing import Any, Union
+from typing import Any
 
 from pulumi import Config, StackReference, export
 from pulumi_aws import athena, glue, iam, s3
@@ -151,7 +151,7 @@ parliament_config: dict[str, Any] = {
     "RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []}
 }
 
-query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [
+query_engine_permissions: list[dict[str, str | list[str]]] = [
     {
         "Effect": "Allow",
         "Action": [

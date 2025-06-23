@@ -1,5 +1,3 @@
-from typing import Optional, Union
-
 from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_aws import cloudwatch
 from pydantic import BaseModel, ConfigDict, PositiveInt, field_validator
@@ -24,9 +22,9 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
     namespace: str
     period: PositiveInt = 300  # Five minutes
     statistic: str = "Average"
-    threshold: Union[int, float]
+    threshold: int | float
     treat_missing_data_as: str = "missing"
-    unit: Optional[str] = None
+    unit: str | None = None
 
     # TODO: MD 20230315 refactor to accomodate anomaly detection alerts  # noqa: E501, FIX002, TD002
     @field_validator("comparison_operator")
@@ -77,7 +75,7 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
 
     @field_validator("unit")
     @classmethod
-    def is_valid_unit(cls, unit: str) -> Union[str, None]:
+    def is_valid_unit(cls, unit: str) -> str | None:
         valid_units = (
             "Bits",
             "Bits/Second",
@@ -122,7 +120,7 @@ class OLCloudWatchAlarmSimpleElastiCacheConfig(OLCloudWatchAlarmSimpleConfig):
     deployment.
     """
 
-    cluster_id: Union[str, Output[str]]
+    cluster_id: str | Output[str]
     node_id: str
     namespace: str = "AWS/ElastiCache"
     tags: dict[str, str] | None = None
@@ -135,7 +133,7 @@ class OLCloudWatchAlarmSimpleElastiCache(ComponentResource):
     def __init__(
         self,
         alarm_config: OLCloudWatchAlarmSimpleElastiCacheConfig,
-        opts: Optional[ResourceOptions] = None,
+        opts: ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:infrastructure.aws.cloudwatch.OLCloudWatchAlarmElastiCache",
@@ -186,7 +184,7 @@ class OLCloudWatchAlarmSimpleRDS(ComponentResource):
     def __init__(
         self,
         alarm_config: OLCloudWatchAlarmSimpleRDSConfig,
-        opts: Optional[ResourceOptions] = None,
+        opts: ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:infrastructure.aws.cloudwatch.OLCloudWatchAlarmRDS",

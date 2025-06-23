@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Annotated, Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal
 
 from pydantic import (
     BaseModel,
@@ -65,13 +65,13 @@ class Duration(RootModel[str]):
 class RegistryImage(BaseModel):
     repository: str
     tag: str = "latest"
-    tag_regex: Optional[str] = None
+    tag_regex: str | None = None
 
 
 class DisplayConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    background_image: Optional[str] = Field(
+    background_image: str | None = Field(
         None,
         description=(
             "Allow users to specify a custom background image which is put at 30% "
@@ -84,7 +84,7 @@ class DisplayConfig(BaseModel):
 class Cache(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    path: Optional[str] = Field(
+    path: str | None = Field(
         None,
         description=(
             "The path to a directory to be cached.    Paths are relative to the working"
@@ -164,7 +164,7 @@ class Platform(str, Enum):
 class VarSource(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: Optional[str] = Field(
+    name: str | None = Field(
         None,
         description=(
             "The name of the `((var))` source. This should be short and  simple. This"
@@ -180,7 +180,7 @@ class Vars(BaseModel):
 class Command(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    args: Optional[list[str]] = Field(
+    args: list[str] | None = Field(
         None,
         description=(
             "Arguments to pass to the command. Note that when executed with    fly-cli "
@@ -188,7 +188,7 @@ class Command(BaseModel):
             " array."
         ),
     )
-    user: Optional[str] = Field(
+    user: str | None = Field(
         None,
         description=(
             "Explicitly set the user to run as. If not specified, this defaults to the "
@@ -196,7 +196,7 @@ class Command(BaseModel):
             " the Garden backend, and may be e.g. `root` on Linux."
         ),
     )
-    path: Optional[str] = Field(
+    path: str | None = Field(
         None,
         description=(
             "The name of or path to the executable to run.     `path` is relative to"
@@ -208,7 +208,7 @@ class Command(BaseModel):
             " file to execute, e.g. `/bin/bash` ."
         ),
     )
-    dir: Optional[str | Identifier] = Field(
+    dir: str | Identifier | None = Field(
         None,
         description=(
             "A directory, relative to the initial working directory, to set as the "
@@ -224,7 +224,7 @@ class Number(RootModel[float]):
 class DummyConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    vars: Optional[dict[str, Any]] = Field(
+    vars: dict[str, Any] | None = Field(
         None, description="A mapping of var name to var value."
     )
 
@@ -232,14 +232,14 @@ class DummyConfig(BaseModel):
 class GroupConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: Optional[Identifier] = Field(
+    name: Identifier | None = Field(
         None,
         description=(
             "A unique name for the group. This should be short and simple as it will "
             " be used as the tab name for navigation."
         ),
     )
-    jobs: Optional[list[str]] = Field(
+    jobs: list[str] | None = Field(
         None,
         description=(
             "A list of jobs that should appear in this group. A job may  appear in"
@@ -261,7 +261,7 @@ class GroupConfig(BaseModel):
 
 
 class StepModifierMixin(BaseModel):
-    across: Optional[list[AcrossVar]] = Field(
+    across: list[AcrossVar] | None = Field(
         None,
         description=(
             "Run a step multiple times with different combinations of variable values."
@@ -270,56 +270,56 @@ class StepModifierMixin(BaseModel):
             " related pipelines."
         ),
     )
-    attempts: Optional[PositiveInt] = Field(
+    attempts: PositiveInt | None = Field(
         None,
         description=(
             "The total number of times a step should be tried before it should "
             "fail, e.g. 5 will run the step up to 5 times before giving up."
         ),
     )
-    timeout: Optional[Duration] = Field(
+    timeout: Duration | None = Field(
         None,
         description=(
             "The amount of time to limit the step's execution to, e.g. 30m for "
             "30 minutes."
         ),
     )
-    tags: Optional[list[str]] = Field(
+    tags: list[str] | None = Field(
         None,
         description=(
             "The tags by which to match workers. The step will be placed within"
             " the a pool of workers that match all of the given set of tags."
         ),
     )
-    ensure: Optional[SerializeAsAny[Step]] = Field(
+    ensure: SerializeAsAny[Step] | None = Field(
         None,
         description=(
             "Step to execute regardless of whether the job succeeds, fails, errors, or "
             " aborts. Equivalent to the  schema.ensure  hook."
         ),
     )
-    on_abort: Optional[SerializeAsAny[Step]] = Field(
+    on_abort: SerializeAsAny[Step] | None = Field(
         None,
         description=(
             "Step to execute when the task aborts. Equivalent to the schema.on_abort"
             " hook."
         ),
     )
-    on_error: Optional[SerializeAsAny[Step]] = Field(
+    on_error: SerializeAsAny[Step] | None = Field(
         None,
         description=(
             "Step to execute when the task errors. Equivalent to the schema.on_error"
             " hook."
         ),
     )
-    on_failure: Optional[SerializeAsAny[Step]] = Field(
+    on_failure: SerializeAsAny[Step] | None = Field(
         None,
         description=(
             "Step to execute when the task fails. Equivalent to the schema.on_failure"
             " hook."
         ),
     )
-    on_success: Optional[SerializeAsAny[Step]] = Field(
+    on_success: SerializeAsAny[Step] | None = Field(
         None,
         description=(
             "Step to execute when the task succeeds. Equivalent to the"
@@ -331,7 +331,7 @@ class StepModifierMixin(BaseModel):
 class PutStep(Step, StepModifierMixin):
     model_config = ConfigDict(extra="forbid")
 
-    resource: Optional[str] = Field(
+    resource: str | None = Field(
         None,
         description=(
             "Defaults to the value of `put` .  The resource to update,  as configured"
@@ -346,7 +346,7 @@ class PutStep(Step, StepModifierMixin):
             " name: repo\n  type: mock\n```"
         ),
     )
-    params: Optional[dict[str, Any]] = Field(
+    params: dict[str, Any] | None = Field(
         None,
         description=(
             "Arbitrary configuration to pass to the resource. Refer to the resource "
@@ -356,7 +356,7 @@ class PutStep(Step, StepModifierMixin):
             ' "made-via-params"\n\nresources:\n- name: cyberdeck\n  type: mock\n```'
         ),
     )
-    get_params: Optional[dict[str, Any]] = Field(
+    get_params: dict[str, Any] | None = Field(
         None,
         description=(
             "Arbitrary configuration to pass to the resource during the implicit  "
@@ -371,7 +371,7 @@ class PutStep(Step, StepModifierMixin):
             " skip_download: true\n```"
         ),
     )
-    put: Optional[Union[str, Identifier]] = Field(
+    put: str | Identifier | None = Field(
         None,
         description=(
             "When the step succeeds, the version by the step will be immediately "
@@ -387,9 +387,7 @@ class PutStep(Step, StepModifierMixin):
             " cyberdeck\n  type: mock\n```"
         ),
     )
-    inputs: Optional[
-        Union[Literal["all"], Literal["detect"], list[Identifier]]  # noqa: PYI030
-    ] = Field(
+    inputs: Literal["all", "detect"] | list[Identifier] | None = Field(
         None,
         description=(
             "Default `all` .  When not set, or set to `all` , all  artifacts will be"
@@ -415,7 +413,7 @@ class PutStep(Step, StepModifierMixin):
             ' create_files:\n      version.txt: "42"\n```'
         ),
     )
-    no_get: Optional[bool] = Field(
+    no_get: bool | None = Field(
         None,
         description=(
             "Skips the get step that usually follows the completion of the put step."
@@ -426,20 +424,20 @@ class PutStep(Step, StepModifierMixin):
 class AnonymousResource(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    source: Optional[dict[str, Any] | RegistryImage] = Field(
+    source: dict[str, Any] | RegistryImage | None = Field(
         None,
         description=(
             "The configuration for the resource; see    schema.resource.source  ."
         ),
     )
-    params: Optional[dict[str, Any]] = Field(
+    params: dict[str, Any] | None = Field(
         None,
         description=(
             "A map of arbitrary configuration to forward to the resource. Refer to the "
             " resource type's documentation to see what it supports."
         ),
     )
-    version: Optional[Version] = Field(
+    version: Version | None = Field(
         None,
         description=(
             "A specific version of the resource to fetch. This should be a map with "
@@ -447,7 +445,7 @@ class AnonymousResource(BaseModel):
             " fetched."
         ),
     )
-    type: Optional[str] = Field(
+    type: str | None = Field(
         None,
         description=(
             "The type of the resource. Usually `registry-image` .    You can use any"
@@ -461,7 +459,7 @@ class AnonymousResource(BaseModel):
 class Output(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    path: Optional[str] = Field(
+    path: str | None = Field(
         None,
         description=(
             "The path to a directory where the output will be taken from. If not "
@@ -469,7 +467,7 @@ class Output(BaseModel):
             " working directory of the task. Absolute paths are not respected."
         ),
     )
-    name: Optional[Identifier] = Field(
+    name: Identifier | None = Field(
         None,
         description=(
             "The name of the output. The contents under `path` will be made  available"
@@ -481,14 +479,14 @@ class Output(BaseModel):
 class BuildLogRetentionPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    days: Optional[Number] = Field(
+    days: Number | None = Field(
         None,
         description=(
             "Keep logs for builds which have finished within the specified number of "
             " days."
         ),
     )
-    minimum_succeeded_builds: Optional[Number] = Field(
+    minimum_succeeded_builds: Number | None = Field(
         None,
         description=(
             "Keep a minimum number of successful build logs that would normally be "
@@ -501,7 +499,7 @@ class BuildLogRetentionPolicy(BaseModel):
             " build logs, and at least 1 succeeded build log.  Default is 0."
         ),
     )
-    builds: Optional[Number] = Field(
+    builds: Number | None = Field(
         None, description="Keep logs for the last specified number of builds."
     )
 
@@ -509,7 +507,7 @@ class BuildLogRetentionPolicy(BaseModel):
 class Input(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    path: Optional[str] = Field(
+    path: str | None = Field(
         None,
         description=(
             "The path where the input will be placed. If not specified, the input's  "
@@ -517,7 +515,7 @@ class Input(BaseModel):
             " task. Absolute paths  are not respected."
         ),
     )
-    optional: Optional[bool] = Field(
+    optional: bool | None = Field(
         None,
         description=(
             "Default `false` .  If `true` , then the input is not  required by the"
@@ -526,13 +524,13 @@ class Input(BaseModel):
             " running task."
         ),
     )
-    name: Optional[Identifier] = Field(None, description="The name of the input.")
+    name: Identifier | None = Field(None, description="The name of the input.")
 
 
 class AcrossVar(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    var: Optional[Identifier] = Field(
+    var: Identifier | None = Field(
         None,
         description=(
             'The name of the variable that will be added to the    local-vars  " `.` "'
@@ -542,7 +540,7 @@ class AcrossVar(BaseModel):
             " printed."
         ),
     )
-    values: Optional[Union[list[Value], str]] = Field(
+    values: list[Value] | str | None = Field(
         None,
         description=(
             "The list of values that the  schema.across_var.var  var  will  iterate"
@@ -569,7 +567,7 @@ class AcrossVar(BaseModel):
             ' "1.15"}`        `{package: "./cmd/third", go_version: "1.16"}`'
         ),
     )
-    fail_fast: Optional[bool] = Field(
+    fail_fast: bool | None = Field(
         None,
         description=(
             "Default `false` .  When enabled, the `across` step will  fail fast by"
@@ -577,7 +575,7 @@ class AcrossVar(BaseModel):
             " will be interrupted and pending steps will no longer be scheduled."
         ),
     )
-    max_in_flight: Optional[Union[Literal["all"], Number]] = Field(
+    max_in_flight: Literal["all"] | Number | None = Field(
         None,
         description=(
             "Default `1` .  If set to `all` , the substep will run  with all"
@@ -597,13 +595,13 @@ class AcrossVar(BaseModel):
 class DummyVarSource(VarSource):
     model_config = ConfigDict(extra="forbid")
 
-    config: Optional[DummyConfig] = Field(
+    config: DummyConfig | None = Field(
         None,
         description=(
             "dummy_config      vars  vars    A mapping of var name to var value."
         ),
     )
-    type: Optional[Literal["dummy"]] = Field(
+    type: Literal["dummy"] | None = Field(
         "dummy",
         description=(
             "The `dummy` type supports configuring a static map of vars to values.   "
@@ -617,43 +615,43 @@ class DummyVarSource(VarSource):
 class VaultConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    path_prefix: Optional[str] = Field(
+    path_prefix: str | None = Field(
         None,
         description=(
             "Default `/concourse` .  A prefix under which to  look for all credential"
             " values.    See  vault-path-prefix  for more information."
         ),
     )
-    auth_retry_max: Optional[Duration] = Field(
+    auth_retry_max: Duration | None = Field(
         None,
         description="When failing to authenticate, give up after this amount of  time.",
     )
-    url: Optional[str] = Field(None, description="The URL of the Vault API.")
-    client_cert: Optional[str] = Field(
+    url: str | None = Field(None, description="The URL of the Vault API.")
+    client_cert: str | None = Field(
         None,
         description=(
             "A PEM encoded client certificate, for use with TLS based auth.    See "
             " vault-cert-auth  for more information."
         ),
     )
-    client_key: Optional[str] = Field(
+    client_key: str | None = Field(
         None,
         description=(
             "A PEM encoded client key, for use with TLS based auth.    See "
             " vault-cert-auth  for more information."
         ),
     )
-    auth_backend: Optional[str] = Field(
+    auth_backend: str | None = Field(
         None,
         description=(
             "Authenticate using an auth backend, e.g. `cert` or   `approle` .    See "
             " vault-approle-auth  or  vault-cert-auth  for  more information."
         ),
     )
-    server_name: Optional[str] = Field(
+    server_name: str | None = Field(
         None, description="The expected name of the server when connecting through TLS."
     )
-    lookup_templates: Optional[list[str]] = Field(
+    lookup_templates: list[str] | None = Field(
         None,
         description=(
             'Default `["/{{.Team}}/{{.Pipeline}}/{{.Secret}}",'
@@ -662,28 +660,28 @@ class VaultConfig(BaseModel):
             " `namespace` .    See  vault-lookup-templates  for more information."
         ),
     )
-    ca_cert: Optional[str] = Field(
+    ca_cert: str | None = Field(
         None,
         description=(
             "The PEM encoded contents of a CA certificate to use when  connecting to"
             " the API."
         ),
     )
-    client_token: Optional[str] = Field(
+    client_token: str | None = Field(
         None,
         description=(
             "Authenticate via a periodic client token.    See  vault-periodic-token "
             " for more information."
         ),
     )
-    shared_path: Optional[str] = Field(
+    shared_path: str | None = Field(
         None,
         description=(
             "An additional path under which credentials will be looked up.    See "
             " vault-shared-path  for more information."
         ),
     )
-    namespace: Optional[str] = Field(
+    namespace: str | None = Field(
         None,
         description=(
             "A  Vault  namespace "
@@ -691,26 +689,26 @@ class VaultConfig(BaseModel):
             " operate under."
         ),
     )
-    insecure_skip_verify: Optional[bool] = Field(
+    insecure_skip_verify: bool | None = Field(
         None,
         description=(
             "Skip TLS validation. Not recommended. Don't do it. No really,  don't."
         ),
     )
-    auth_max_ttl: Optional[Duration] = Field(
+    auth_max_ttl: Duration | None = Field(
         None,
         description=(
             "Maximum duration to elapse before forcing the client to log in  again."
         ),
     )
-    auth_params: Optional[dict[str, str]] = Field(
+    auth_params: dict[str, str] | None = Field(
         None,
         description=(
             "A key-value map of parameters to pass during authentication.    See "
             " vault-approle-auth  for more information."
         ),
     )
-    auth_retry_initial: Optional[Duration] = Field(
+    auth_retry_initial: Duration | None = Field(
         None,
         description=(
             "When retrying during authentication, start with this retry  interval. The"
@@ -722,7 +720,7 @@ class VaultConfig(BaseModel):
 class SetPipelineStep(Step, StepModifierMixin):
     model_config = ConfigDict(extra="forbid")
 
-    set_pipeline: Optional[Union[Identifier, Literal["self"]]] = Field(
+    set_pipeline: Identifier | Literal["self"] | None = Field(
         None,
         description=(
             "The identifier specifies the name of the pipeline to configure. Unless   "
@@ -743,7 +741,7 @@ class SetPipelineStep(Step, StepModifierMixin):
             " https://github.com/concourse/examples.git\n```"
         ),
     )
-    var_files: Optional[list[str]] = Field(
+    var_files: list[str] | None = Field(
         None,
         description=(
             "A list of paths to `.yml` files that will be passed to the  pipeline"
@@ -762,7 +760,7 @@ class SetPipelineStep(Step, StepModifierMixin):
             " https://github.com/concourse/examples.git\n```"
         ),
     )
-    file: Optional[str] = Field(
+    file: str | None = Field(
         None,
         description=(
             "The path to the pipeline's configuration file.     `file` points at a"
@@ -780,7 +778,7 @@ class SetPipelineStep(Step, StepModifierMixin):
             " https://github.com/concourse/examples.git\n```"
         ),
     )
-    instance_vars: Optional[Vars] = Field(
+    instance_vars: Vars | None = Field(
         None,
         description=(
             "A map of instance vars used to identify    instanced-pipelines  instanced"
@@ -818,7 +816,7 @@ class SetPipelineStep(Step, StepModifierMixin):
             " source:\n    uri: https://github.com/concourse/examples.git\n```"
         ),
     )
-    vars: Optional[Vars] = Field(
+    vars: Vars | None = Field(
         None,
         description=(
             "A map of template variables to pass to the pipeline config. Unlike   "
@@ -836,7 +834,7 @@ class SetPipelineStep(Step, StepModifierMixin):
             " https://github.com/concourse/examples.git\n```"
         ),
     )
-    team: Optional[Identifier] = Field(
+    team: Identifier | None = Field(
         None,
         description=(
             "By default, the `set_pipeline` step sets the pipeline for the  same  teams"
@@ -862,7 +860,7 @@ class SetPipelineStep(Step, StepModifierMixin):
 class LoadVarStep(Step, StepModifierMixin):
     model_config = ConfigDict(extra="forbid")
 
-    format: Optional[Format] = Field(
+    format: Format | None = Field(
         None,
         description=(
             "The format of the file's content.    If unset, Concourse will try to"
@@ -890,7 +888,7 @@ class LoadVarStep(Step, StepModifierMixin):
             " schema.load-var.reveal `reveal: true` is set."
         ),
     )
-    load_var: Optional[Identifier] = Field(
+    load_var: Identifier | None = Field(
         None,
         description=(
             "The identifier will be the name of var, available to subsequent steps  as"
@@ -906,14 +904,14 @@ class LoadVarStep(Step, StepModifierMixin):
             " https://raw.githubusercontent.com/concourse/examples/master/misc/simple-value.txt"
         ),
     )
-    reveal: Optional[bool] = Field(
+    reveal: bool | None = Field(
         None,
         description=(
             "Default `false` .  If set to `true` , allow the var's  content to be"
             " printed in the build output even with secret redaction  enabled."
         ),
     )
-    file: Optional[str] = Field(
+    file: str | None = Field(
         None,
         description=(
             "The path to a file whose content shall be read and used as the var's "
@@ -925,14 +923,14 @@ class LoadVarStep(Step, StepModifierMixin):
 class Resource(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    name: Optional[Identifier] = Field(
+    name: Identifier | None = Field(
         None,
         description=(
             "The name of the resource. This should be short and simple. This name will "
             " be referenced by  build-plans  build plans  of jobs in the  pipeline."
         ),
     )
-    version: Optional[Version] = Field(
+    version: Version | None = Field(
         None,
         description=(
             "A version to pin the resource to across the pipeline. This has the same "
@@ -944,7 +942,7 @@ class Resource(BaseModel):
             " takes precedence and will clear  out the temporary pin."
         ),
     )
-    check_timeout: Optional[Duration] = Field(
+    check_timeout: Duration | None = Field(
         None,
         description=(
             "Default `1h` .  The time limit on checking new versions of  resources."
@@ -952,7 +950,7 @@ class Resource(BaseModel):
             " function  https://golang.org/pkg/time/#ParseDuration  ."
         ),
     )
-    tags: Optional[list[str]] = Field(
+    tags: list[str] | None = Field(
         None,
         description=(
             "Default `[]` .  A list of tags to determine which workers the  checks will"
@@ -963,7 +961,7 @@ class Resource(BaseModel):
             "  for each step."
         ),
     )
-    source: Optional[dict[str, Any]] = Field(
+    source: dict[str, Any] | None = Field(
         None,
         description=(
             "The configuration for the resource. This varies by resource type, and is a"
@@ -976,7 +974,7 @@ class Resource(BaseModel):
             " GitHub  organization  https://github.com/concourse?q=-resource  ."
         ),
     )
-    expose_build_created_by: Optional[bool] = Field(
+    expose_build_created_by: bool | None = Field(
         None,
         description=(
             "Default `false` .  If set to `true` , environment variable   "
@@ -984,7 +982,7 @@ class Resource(BaseModel):
             " of a  get-step  get step  or    put-step  put step  ."
         ),
     )
-    old_name: Optional[Identifier] = Field(
+    old_name: Identifier | None = Field(
         None,
         description=(
             "The old name of the resource. If configured, the history of the old"
@@ -999,7 +997,7 @@ class Resource(BaseModel):
             ' type: git\n  source: {uri: "https://github.com/vito/booklit"}\n```'
         ),
     )
-    public: Optional[bool] = Field(
+    public: bool | None = Field(
         None,
         description=(
             "Default `false` .  If set to `true` , the metadata for each  version of"
@@ -1013,7 +1011,7 @@ class Resource(BaseModel):
             " , metadata will be visible in the build output."
         ),
     )
-    check_every: Optional[Union[Duration, Literal["never"]]] = Field(
+    check_every: Duration | Literal["never"] | None = Field(
         None,
         description=(
             "Default `1m` .  The interval on which to check for new versions  of the"
@@ -1024,7 +1022,7 @@ class Resource(BaseModel):
             " webhooks."
         ),
     )
-    webhook_token: Optional[str] = Field(
+    webhook_token: str | None = Field(
         None,
         description=(
             "If specified, web hooks can be sent to trigger an immediate  check    of"
@@ -1047,7 +1045,7 @@ class Resource(BaseModel):
             ' still  the "source of truth."'
         ),
     )
-    icon: Optional[str] = Field(
+    icon: str | None = Field(
         None,
         description=(
             "The name of a  Material Design icon  https://materialdesignicons.com/   "
@@ -1055,7 +1053,7 @@ class Resource(BaseModel):
             " `github` ."
         ),
     )
-    type: Optional[str] = Field(
+    type: str | None = Field(
         None,
         description="The  resource-types  resource type  implementing the resource.",
     )
@@ -1064,7 +1062,7 @@ class Resource(BaseModel):
 class ContainerLimits(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    cpu: Optional[Number] = Field(
+    cpu: Number | None = Field(
         None,
         description=(
             "The maximum amount of CPU available to the task container, measured in "
@@ -1079,7 +1077,7 @@ class ContainerLimits(BaseModel):
             " CPU\nTotal CPU shares declared: 8\n```"
         ),
     )
-    memory: Optional[Number] = Field(
+    memory: Number | None = Field(
         None,
         description=(
             "The maximum amount of memory available to the task container, measured in "
@@ -1091,7 +1089,7 @@ class ContainerLimits(BaseModel):
 class ResourceType(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    privileged: Optional[bool] = Field(
+    privileged: bool | None = Field(
         None,
         description=(
             "Default `false` .  If set to `true` , the resource's  containers will be"
@@ -1106,14 +1104,14 @@ class ResourceType(BaseModel):
             " escalation  via third-party resource type exploits."
         ),
     )
-    params: Optional[dict[str, Any]] = Field(
+    params: dict[str, Any] | None = Field(
         None,
         description=(
             "Arbitrary config to pass when running the `get` to fetch the resource "
             " type's image."
         ),
     )
-    source: Optional[dict[str, Any] | RegistryImage] = Field(
+    source: dict[str, Any] | RegistryImage | None = Field(
         None,
         description=(
             "The configuration for the resource type's resource. This varies  by"
@@ -1125,7 +1123,7 @@ class ResourceType(BaseModel):
             " resource type your resource type uses) for more information."
         ),
     )
-    tags: Optional[list[str]] = Field(
+    tags: list[str] | None = Field(
         None,
         description=(
             "Default `[]` .  A list of tags to determine which workers the  checks will"
@@ -1133,7 +1131,7 @@ class ResourceType(BaseModel):
             " to a worker's network, for example. See also    schema.tags  ."
         ),
     )
-    type: Optional[Union[str, Identifier]] = Field(
+    type: str | Identifier | None = Field(
         None,
         description=(
             "The type of the resource used to provide the resource type's container "
@@ -1144,7 +1142,7 @@ class ResourceType(BaseModel):
             " forked `registry-image` resource."
         ),
     )
-    name: Optional[Identifier] = Field(
+    name: Identifier | None = Field(
         None,
         description=(
             "The name of the resource type. This should be short and simple. This name "
@@ -1154,7 +1152,7 @@ class ResourceType(BaseModel):
             " the core resource types by  specifying the same name."
         ),
     )
-    check_every: Optional[Duration] = Field(
+    check_every: Duration | None = Field(
         None,
         description=(
             "Default `1m` .  The interval on which to check for new versions  of the"
@@ -1163,7 +1161,7 @@ class ResourceType(BaseModel):
             " https://golang.org/pkg/time/#ParseDuration  ."
         ),
     )
-    defaults: Optional[dict[str, Any]] = Field(
+    defaults: dict[str, Any] | None = Field(
         None,
         description=(
             "The default configuration for the resource type. This varies  by resource"
@@ -1192,9 +1190,7 @@ class ResourceType(BaseModel):
 class GetStep(Step, StepModifierMixin):
     model_config = ConfigDict(extra="forbid")
 
-    version: Optional[
-        Union[Literal["latest"], Literal["every"], Version]  # noqa: PYI030
-    ] = Field(  # noqa: PYI030, RUF100
+    version: Literal["latest"] | Literal["every"] | Version | None = Field(  # noqa: PYI030, RUF100
         None,
         description=(
             "Default `latest` .  The version of the resource to fetch.    If set to"
@@ -1212,7 +1208,7 @@ class GetStep(Step, StepModifierMixin):
             " resources start from the latest version)."
         ),
     )
-    passed: Optional[list[str]] = Field(
+    passed: list[str] | None = Field(
         None,
         description=(
             "When specified, only the versions of the resource that made it through "
@@ -1242,7 +1238,7 @@ class GetStep(Step, StepModifierMixin):
             ' "fan-in" semantics as  things progress through a pipeline.'
         ),
     )
-    trigger: Optional[bool] = Field(
+    trigger: bool | None = Field(
         None,
         description=(
             "Default `false` .  If set to `true` , new builds of the  job will be"
@@ -1258,7 +1254,7 @@ class GetStep(Step, StepModifierMixin):
             " source:\n    uri: https://github.com/concourse/examples.git\n```"
         ),
     )
-    get: Optional[Union[str, Identifier]] = Field(
+    get: str | Identifier | None = Field(
         None,
         description=(
             "The fetched bits will be registered in the build's artifact namespace "
@@ -1277,7 +1273,7 @@ class GetStep(Step, StepModifierMixin):
             " https://github.com/concourse/examples.git\n```"
         ),
     )
-    resource: Optional[str] = Field(
+    resource: str | None = Field(
         None,
         description=(
             "Defaults to the value of `get` .  The resource to fetch,  as configured in"
@@ -1293,7 +1289,7 @@ class GetStep(Step, StepModifierMixin):
             " git\n  source:\n    uri: https://github.com/concourse/examples.git\n```"
         ),
     )
-    params: Optional[dict[str, Any]] = Field(
+    params: dict[str, Any] | None = Field(
         None,
         description=(
             "Arbitrary configuration to pass to the resource. Refer to the resource "
@@ -1310,14 +1306,14 @@ class GetStep(Step, StepModifierMixin):
 class VaultVarSource(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: Optional[Literal["vault"]] = Field(
+    type: Literal["vault"] | None = Field(
         None,
         description=(
             "The `vault` type supports configuring a    Vault "
             " https://www.vaultproject.io  server as a   `((var))` source."
         ),
     )
-    config: Optional[VaultConfig] = Field(
+    config: VaultConfig | None = Field(
         None,
         description=(
             "Configuration for the Vault server has the following schema:     "
@@ -1360,7 +1356,7 @@ class VaultVarSource(BaseModel):
 class TaskConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    image_resource: Optional[AnonymousResource] = Field(
+    image_resource: AnonymousResource | None = Field(
         None,
         description=(
             "The container image to run with, as provided by an anonymous    resources "
@@ -1393,7 +1389,7 @@ class TaskConfig(BaseModel):
             " specified, the latest version will be  fetched."
         ),
     )
-    caches: Optional[list[Cache]] = Field(
+    caches: list[Cache] | None = Field(
         None,
         description=(
             "The cached directories shared between task runs.    On the task's first"
@@ -1412,7 +1408,7 @@ class TaskConfig(BaseModel):
             " the task. Absolute paths  are not respected."
         ),
     )
-    run: Optional[Command] = Field(
+    run: Command | None = Field(
         None,
         description=(
             "The command to execute in the container.    Note that this is  not "
@@ -1435,7 +1431,7 @@ class TaskConfig(BaseModel):
             " there, it's up to  the Garden backend, and may be e.g. `root` on Linux."
         ),
     )
-    inputs: Optional[list[Input]] = Field(
+    inputs: list[Input] | None = Field(
         None,
         description=(
             "The set of artifacts used by task, determining which artifacts will be "
@@ -1453,7 +1449,7 @@ class TaskConfig(BaseModel):
             " current  directory of the running task."
         ),
     )
-    platform: Optional[Platform] = Field(
+    platform: Platform | None = Field(
         None,
         description=(
             "The platform the task should run on. This determines the pool of workers "
@@ -1462,7 +1458,7 @@ class TaskConfig(BaseModel):
             " `linux` , `darwin` , and   `windows` are in use."
         ),
     )
-    params: Optional[dict[str, Optional[str]]] = Field(
+    params: dict[str, str | None] | None = Field(
         None,
         description=(
             "A key-value mapping of string keys and values that are exposed to the task"
@@ -1471,7 +1467,7 @@ class TaskConfig(BaseModel):
             " method of providing credentials to a task."
         ),
     )
-    container_limits: Optional[ContainerLimits] = Field(
+    container_limits: ContainerLimits | None = Field(
         None,
         description=(
             "CPU and memory limits to enforce on the task container.    Note that these"
@@ -1492,7 +1488,7 @@ class TaskConfig(BaseModel):
             " bytes. 0 means unlimited."
         ),
     )
-    outputs: Optional[list[Output]] = Field(
+    outputs: list[Output] | None = Field(
         None,
         description=(
             "The artifacts produced by the task.    Each output configures a directory"
@@ -1507,7 +1503,7 @@ class TaskConfig(BaseModel):
             " are not respected."
         ),
     )
-    rootfs_uri: Optional[str] = Field(
+    rootfs_uri: str | None = Field(
         None,
         description=(
             "A string specifying the rootfs uri of the container, as interpreted by"
@@ -1521,7 +1517,7 @@ class TaskConfig(BaseModel):
 class TaskStep(Step, StepModifierMixin):
     model_config = ConfigDict(extra="forbid")
 
-    config: Optional[TaskConfig] = Field(
+    config: TaskConfig | None = Field(
         None,
         description=(
             "The  tasks  task config  to execute.   \n@example  Task config \n   "
@@ -1532,7 +1528,7 @@ class TaskStep(Step, StepModifierMixin):
             '    args: ["Hello world!"]\n```'
         ),
     )
-    file: Optional[str] = Field(
+    file: str | None = Field(
         None,
         description=(
             "A dynamic alternative to  schema.task.config  .     `file` points at a"
@@ -1550,7 +1546,7 @@ class TaskStep(Step, StepModifierMixin):
             " source:\n    uri: https://github.com/concourse/examples.git\n```"
         ),
     )
-    params: Optional[dict[str, Optional[str]]] = Field(
+    params: dict[str, str | None] | None = Field(
         None,
         description=(
             "A map of task environment variable parameters to set, overriding those "
@@ -1578,7 +1574,7 @@ class TaskStep(Step, StepModifierMixin):
             " uri: https://github.com/concourse/examples.git\n```"
         ),
     )
-    task: Optional[Identifier] = Field(
+    task: Identifier | None = Field(
         None,
         description=(
             "The identifier value is just a name - short and sweet. The value is  shown"
@@ -1602,7 +1598,7 @@ class TaskStep(Step, StepModifierMixin):
             ' initial_version: "1"\n```'
         ),
     )
-    privileged: Optional[bool] = Field(
+    privileged: bool | None = Field(
         None,
         description=(
             "Default `false` .  If set to `true` , the task will run  with escalated"
@@ -1619,7 +1615,7 @@ class TaskStep(Step, StepModifierMixin):
             " containerized."
         ),
     )
-    vars: Optional[Vars] = Field(
+    vars: Vars | None = Field(
         None,
         description=(
             "A map of template variables to pass to an external task. Not to be "
@@ -1646,7 +1642,7 @@ class TaskStep(Step, StepModifierMixin):
             " https://github.com/concourse/examples.git\n```"
         ),
     )
-    output_mapping: Optional[dict[str, str]] = Field(
+    output_mapping: dict[str, str] | None = Field(
         None,
         description=(
             "A map from task output names to concrete names to register in the build "
@@ -1668,7 +1664,7 @@ class TaskStep(Step, StepModifierMixin):
             " source:\n    uri: https://github.com/concourse/examples.git\n```"
         ),
     )
-    image: Optional[Identifier] = Field(
+    image: Identifier | None = Field(
         None,
         description=(
             "Specifies an artifact source containing an image to use for the task. "
@@ -1692,7 +1688,7 @@ class TaskStep(Step, StepModifierMixin):
             " building-an-image-and-using-it-in-a-task"
         ),
     )
-    input_mapping: Optional[dict[str, str]] = Field(
+    input_mapping: dict[str, str] | None = Field(
         None,
         description=(
             "A map from task input names to concrete names in the build plan. This "
@@ -1709,7 +1705,7 @@ class TaskStep(Step, StepModifierMixin):
             " uri: https://github.com/concourse/examples.git\n```"
         ),
     )
-    container_limits: Optional[ContainerLimits] = Field(
+    container_limits: ContainerLimits | None = Field(
         None,
         description=(
             "CPU and memory limits to enforce on the task container.    Note that these"
@@ -1744,7 +1740,7 @@ class TaskStep(Step, StepModifierMixin):
 class InParallelStep(Step, StepModifierMixin):
     model_config = ConfigDict(extra="forbid")
 
-    in_parallel: Optional[Union[list[SerializeAsAny[Step]], InParallelConfig]] = Field(
+    in_parallel: list[SerializeAsAny[Step]] | InParallelConfig | None = Field(
         None,
         description=(
             "Steps are either configured as a array or within an   "
@@ -1768,7 +1764,7 @@ class InParallelStep(Step, StepModifierMixin):
 class Job(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    build_log_retention: Optional[BuildLogRetentionPolicy] = Field(
+    build_log_retention: BuildLogRetentionPolicy | None = Field(
         None,
         description=(
             "Configures the retention policy for build logs. This is useful if you have"
@@ -1804,7 +1800,7 @@ class Job(BaseModel):
             " build logs, and at least 1 succeeded build log.  Default is 0."
         ),
     )
-    build_logs_to_retain: Optional[Number] = Field(
+    build_logs_to_retain: Number | None = Field(
         None,
         description=(
             "Deprecated.  Equivalent to setting   "
@@ -1812,21 +1808,21 @@ class Job(BaseModel):
             " `job.build_log_retention.builds` ."
         ),
     )
-    disable_manual_trigger: Optional[bool] = Field(
+    disable_manual_trigger: bool | None = Field(
         None,
         description=(
             "Default `false` .  If set to `true` , manual triggering of  the job (via"
             " the web UI or  fly-trigger-job  ) will be disabled."
         ),
     )
-    ensure: Optional[SerializeAsAny[Step]] = Field(
+    ensure: SerializeAsAny[Step] | None = Field(
         None,
         description=(
             "Step to execute regardless of whether the job succeeds, fails, errors, or "
             " aborts. Equivalent to the  schema.ensure  hook."
         ),
     )
-    interruptible: Optional[bool] = Field(
+    interruptible: bool | None = Field(
         None,
         description=(
             "Default `false` .  Normally, when a worker is shutting down it  will wait"
@@ -1836,7 +1832,7 @@ class Job(BaseModel):
             " self-deploying Concourse or long-running-but-low-importance jobs."
         ),
     )
-    max_in_flight: Optional[Number] = Field(
+    max_in_flight: Number | None = Field(
         None,
         description=(
             "If set, specifies a maximum number of builds to run at a time. If  "
@@ -1844,13 +1840,13 @@ class Job(BaseModel):
             " value to be `1` ."
         ),
     )
-    name: Optional[Identifier] = Field(
+    name: Identifier | None = Field(
         None,
         description=(
             "The name of the job. This should be short; it will show up in URLs."
         ),
     )
-    old_name: Optional[Identifier] = Field(
+    old_name: Identifier | None = Field(
         None,
         description=(
             "The old name of the job. If configured, the history of old job will be "
@@ -1863,38 +1859,38 @@ class Job(BaseModel):
             " ```yaml\njobs:\n- name: new-name\n  plan: [{get: 10m}]\n```"
         ),
     )
-    on_abort: Optional[SerializeAsAny[Step]] = Field(
+    on_abort: SerializeAsAny[Step] | None = Field(
         None,
         description=(
             "Step to execute when the job aborts. Equivalent to the    schema.on_abort "
             " hook."
         ),
     )
-    on_error: Optional[SerializeAsAny[Step]] = Field(
+    on_error: SerializeAsAny[Step] | None = Field(
         None,
         description=(
             "Step to execute when the job errors. Equivalent to the    schema.on_error "
             " hook."
         ),
     )
-    on_failure: Optional[SerializeAsAny[Step]] = Field(
+    on_failure: SerializeAsAny[Step] | None = Field(
         None,
         description=(
             "Step to execute when the job fails. Equivalent to the    schema.on_failure"
             "  hook."
         ),
     )
-    on_success: Optional[SerializeAsAny[Step]] = Field(
+    on_success: SerializeAsAny[Step] | None = Field(
         None,
         description=(
             "Step to execute when the job succeeds. Equivalent to the"
             " schema.on_success  hook."
         ),
     )
-    plan: Optional[list[SerializeAsAny[Step]]] = Field(
+    plan: list[SerializeAsAny[Step]] | None = Field(
         None, description="The sequence of steps to execute."
     )
-    public: Optional[bool] = Field(
+    public: bool | None = Field(
         None,
         description=(
             "Default `false` .  If set to `true` , the build log of this  job will be"
@@ -1907,14 +1903,14 @@ class Job(BaseModel):
             " set  schema.resource.public    to `true` ."
         ),
     )
-    serial: Optional[bool] = Field(
+    serial: bool | None = Field(
         None,
         description=(
             "Default `false` .  If set to `true` , builds will queue up  and execute"
             " one-by-one, rather than executing in parallel."
         ),
     )
-    serial_groups: Optional[list[Identifier]] = Field(
+    serial_groups: list[Identifier] | None = Field(
         None,
         description=(
             "Default `[]` .  When set to an array of arbitrary tag-like  strings,"
@@ -1942,14 +1938,14 @@ class Pipeline(BaseModel):
     def json(self, *args, **kwargs):
         return self.model_dump_json(*args, **kwargs)
 
-    jobs: Optional[list[Job]] = Field(
+    jobs: list[Job] | None = Field(
         None,
         description=(
             "A set of  jobs  jobs  for the pipeline to continuously schedule. At least"
             " one job is required for a pipeline to be valid."
         ),
     )
-    groups: Optional[list[GroupConfig]] = Field(
+    groups: list[GroupConfig] | None = Field(
         None,
         description=(
             "A list of job groups to use for organizing jobs in the web UI.    Groups"
@@ -1983,17 +1979,17 @@ class Pipeline(BaseModel):
             " in the `all` job above)"
         ),
     )
-    resource_types: Optional[list[ResourceType]] = Field(
+    resource_types: list[ResourceType] | None = Field(
         None,
         description=(
             "A set of  resource-types  resource types  for resources within the "
             " pipeline to use."
         ),
     )
-    var_sources: Optional[list[SerializeAsAny[VarSource]]] = Field(
+    var_sources: list[SerializeAsAny[VarSource]] | None = Field(
         None, description="A set of  var-sources  for the pipeline to use."
     )
-    display: Optional[DisplayConfig] = Field(
+    display: DisplayConfig | None = Field(
         None,
         description=(
             "`display` was introduced in Concourse v6.6.0. It is considered an   **"
@@ -2008,7 +2004,7 @@ class Pipeline(BaseModel):
             " URL."
         ),
     )
-    resources: Optional[list[Resource]] = Field(
+    resources: list[Resource] | None = Field(
         None,
         description=(
             "A set of  resources  resources  for the pipeline to continuously  check."
@@ -2019,7 +2015,7 @@ class Pipeline(BaseModel):
 class TryStep(Step, StepModifierMixin):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    try_: Optional[SerializeAsAny[Step]] = Field(
+    try_: SerializeAsAny[Step] | None = Field(
         None,
         alias="try",
         description=(
@@ -2039,7 +2035,7 @@ class TryStep(Step, StepModifierMixin):
 class InParallelConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    limit: Optional[Number] = Field(
+    limit: Number | None = Field(
         None,
         description=(
             "Default unlimited.  A sempahore which limits the  parallelism when"
@@ -2059,7 +2055,7 @@ class InParallelConfig(BaseModel):
             " git\n  source:\n    uri: https://github.com/concourse/examples.git\n```"
         ),
     )
-    fail_fast: Optional[bool] = Field(
+    fail_fast: bool | None = Field(
         None,
         description=(
             "Default `false` .  When enabled the parallel step will  fail fast by"
@@ -2067,7 +2063,7 @@ class InParallelConfig(BaseModel):
             " will be interrupted and pending steps will no longer be scheduled."
         ),
     )
-    steps: Optional[list[SerializeAsAny[Step]]] = Field(
+    steps: list[SerializeAsAny[Step]] | None = Field(
         None,
         description=(
             "The steps to perform in parallel.   \n@example  Fetching artifacts in"
@@ -2085,7 +2081,7 @@ class InParallelConfig(BaseModel):
 class DoStep(Step, StepModifierMixin):
     model_config = ConfigDict(extra="forbid")
 
-    do: Optional[list[SerializeAsAny[Step]]] = Field(
+    do: list[SerializeAsAny[Step]] | None = Field(
         None,
         description=(
             "@example  Running multiple steps in a try \n   This can be used to perform"

@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Literal, Optional, Union
+from typing import Any, ClassVar, Literal
 
 import pulumi
 import pulumi_aws as aws
@@ -16,11 +16,11 @@ from ol_infrastructure.lib.ol_types import AWSBase
 
 
 class OLEKSGatewayRouteConfig(BaseModel):
-    backend_service_name: Optional[str]
-    backend_service_namespace: Optional[str]
-    backend_service_port: Optional[int]
-    filters: Optional[list[dict[str, Any]]] = []
-    matches: Optional[list[dict[str, Any]]] = None
+    backend_service_name: str | None
+    backend_service_namespace: str | None
+    backend_service_port: int | None
+    filters: list[dict[str, Any]] | None = []
+    matches: list[dict[str, Any]] | None = None
     listener_name: str
     hostnames: list[str]
     name: str
@@ -39,8 +39,8 @@ class OLEKSGatewayListenerConfig(BaseModel):
     port: int
     protocol: Literal["HTTPS", "HTTP"] = "HTTPS"
     tls_mode: Literal["Passthrough", "Terminate"] = "Terminate"
-    certificate_secret_name: Optional[str]
-    certificate_secret_namespace: Optional[str] = ""
+    certificate_secret_name: str | None
+    certificate_secret_namespace: str | None = ""
 
     @model_validator(mode="after")
     def check_tls_config(self):
@@ -56,15 +56,15 @@ class OLEKSGatewayListenerConfig(BaseModel):
 
 
 class OLEKSGatewayConfig(BaseModel):
-    annotations: Optional[dict[str, str]] = None
-    cert_issuer: Optional[str] = None
-    cert_issuer_class: Optional[Literal["cluster-issuer", "issuer", "external"]] = (
+    annotations: dict[str, str] | None = None
+    cert_issuer: str | None = None
+    cert_issuer_class: Literal["cluster-issuer", "issuer", "external"] | None = (
         "cluster-issuer"
     )
     gateway_class_name: str = "traefik"
     gateway_name: str
     http_redirect: bool = True
-    labels: Optional[dict[str, str]] = None
+    labels: dict[str, str] | None = None
     namespace: str
     listeners: list[OLEKSGatewayListenerConfig] = []
     routes: list[OLEKSGatewayRouteConfig] = []
@@ -144,7 +144,7 @@ class OLEKSGateway(pulumi.ComponentResource):
         self,
         name: str,
         gateway_config: OLEKSGatewayConfig,
-        opts: Optional[pulumi.ResourceOptions] = None,
+        opts: pulumi.ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:infrastructure:aws:eks:OLEKSGateway",
@@ -296,15 +296,15 @@ class OLEKSGateway(pulumi.ComponentResource):
 
 
 class OLEKSTrustRoleConfig(AWSBase):
-    account_id: Union[str, PositiveInt]
-    cluster_name: Union[str, pulumi.Output[str]]
+    account_id: str | PositiveInt
+    cluster_name: str | pulumi.Output[str]
     cluster_identities: pulumi.Output
     description: str
     policy_operator: Literal["StringEquals", "StringLike"]
     role_name: str
-    service_account_identifier: Optional[str] = None
-    service_account_name: Optional[str] = None
-    service_account_namespace: Optional[str] = None
+    service_account_identifier: str | None = None
+    service_account_name: str | None = None
+    service_account_namespace: str | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @model_validator(mode="after")
@@ -342,7 +342,7 @@ class OLEKSTrustRole(pulumi.ComponentResource):
         self,
         name: str,
         role_config: OLEKSTrustRoleConfig,
-        opts: Optional[pulumi.ResourceOptions] = None,
+        opts: pulumi.ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:infrastructure:aws:eks:OLEKSTrustRole",

@@ -1,7 +1,7 @@
 import json
 import tempfile
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from pyinfra import host
 from pyinfra.api.deploy import deploy
@@ -64,8 +64,8 @@ def _apt_install():
 
 @deploy("Deploy Docker")
 def deploy_docker(
-    daemon_config: Optional[dict[str, Any]] = None,
-    user_config: Optional[dict[str, Any]] = None,
+    daemon_config: dict[str, Any] | None = None,
+    user_config: dict[str, Any] | None = None,
 ):
     if host.get_fact(DebPackages):
         _apt_install()

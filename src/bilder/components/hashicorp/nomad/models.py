@@ -1,6 +1,5 @@
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Optional
 
 from pydantic_settings import SettingsConfigDict
 
@@ -18,9 +17,9 @@ class NomadServerConfig(FlexibleBaseModel):
 
 class NomadConfig(OLBaseSettings):
     model_config = SettingsConfigDict(env_prefix="nomad_")
-    client: Optional[NomadClientConfig] = None
-    data_dir: Optional[Path] = Path("/var/lib/nomad/")
-    server: Optional[NomadServerConfig] = None
+    client: NomadClientConfig | None = None
+    data_dir: Path | None = Path("/var/lib/nomad/")
+    server: NomadServerConfig | None = None
 
 
 class NomadJob(OLBaseSettings):

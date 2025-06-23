@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ERA001, PLR0913
+# ruff: noqa: E501, PLR0913
 """
 Manage Kubernetes secrets for the mitlearn application using Vault.
 
@@ -6,7 +6,7 @@ This module defines functions to create Kubernetes secrets required by the mitle
 application by fetching data from various Vault secret backends (static KV and dynamic).
 """
 
-from typing import Any, Union
+from typing import Any
 
 import pulumi_kubernetes as kubernetes
 from pulumi import ResourceOptions
@@ -134,7 +134,7 @@ def create_mitlearn_k8s_secrets(
     db_config: OLVaultDatabaseBackend,
     redis_password: str,
     redis_cache: OLAmazonCache,
-) -> tuple[list[str], list[Union[OLVaultK8SSecret, kubernetes.core.v1.Secret]]]:
+) -> tuple[list[str], list[OLVaultK8SSecret | kubernetes.core.v1.Secret]]:
     """
     Create all Kubernetes secrets required by the mitlearn application.
 
@@ -154,7 +154,7 @@ def create_mitlearn_k8s_secrets(
     """
     secret_names: list[str] = []
     secret_resources: list[
-        Union[OLVaultK8SSecret, kubernetes.core.v1.Secret]
+        OLVaultK8SSecret | kubernetes.core.v1.Secret
     ] = []  # Keep track of resources if needed later
 
     # 1. Static secrets from the mitlearn KV-v2 mount

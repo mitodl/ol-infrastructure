@@ -8,7 +8,7 @@ to use the OLDatabase components available in `aws/database.py`.
 """
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from pulumi import Alias, ComponentResource, Output, ResourceOptions, StackReference
 from pulumi_aws import ec2
@@ -64,7 +64,7 @@ class OLAppDatabase(ComponentResource):
     def __init__(
         self,
         ol_db_config: OLAppDatabaseConfig,
-        opts: Optional[ResourceOptions] = None,
+        opts: ResourceOptions | None = None,
     ):
         """
         Create all the resources necessary for an MIT OL Postgres Database.

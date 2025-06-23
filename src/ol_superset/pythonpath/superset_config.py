@@ -2,7 +2,6 @@
 import logging
 import os
 from ssl import CERT_OPTIONAL
-from typing import Optional
 
 from celery.schedules import crontab
 from flask import g
@@ -321,7 +320,7 @@ SLACK_API_TOKEN = vault_client.secrets.kv.v2.read_secret(
 #######################
 # Temporarily add a current_user_email() macro until Superset releases that feature
 # Macro function that returns the current user's email
-def current_user_email() -> Optional[str]:
+def current_user_email() -> str | None:
     """
     Get the email (if defined) associated with the current user.
 

@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Union
 
 import pulumi
 import pulumi_fastly as fastly
@@ -106,7 +105,7 @@ def build_fastly_log_format_string(additional_static_fields: dict[str, str]) -> 
 
 def get_fastly_provider(
     wrap_in_pulumi_options: bool = True,  # noqa: FBT001, FBT002
-) -> Union[fastly.Provider, pulumi.ResourceOptions]:
+) -> fastly.Provider | pulumi.ResourceOptions:
     pulumi.Config("fastly")
     fastly_provider = fastly.Provider(
         "fastly-provider",
