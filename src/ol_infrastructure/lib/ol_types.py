@@ -1,4 +1,3 @@
-# ruff: noqa: D100, D102
 from enum import Enum, unique
 
 from pydantic import BaseModel, field_validator

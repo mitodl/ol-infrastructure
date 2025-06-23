@@ -1,4 +1,4 @@
-# ruff: noqa: ERA001, E501, D103, D101
+# ruff: noqa: ERA001, E501
 """
 This is a service components that replaces a number of "boilerplate" kubernetes
 calls we currently make into one convenient callable package.
