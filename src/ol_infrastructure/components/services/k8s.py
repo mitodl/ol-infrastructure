@@ -1,4 +1,4 @@
-# ruff: noqa: ERA001, E501
+# ruff: noqa: ERA001, C416, E501, CPY001, D103, D101
 """
 This is a service components that replaces a number of "boilerplate" kubernetes
 calls we currently make into one convenient callable package.
@@ -8,7 +8,9 @@ from pathlib import Path
 from typing import Any, Literal
 
 import pulumi
+import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
+import pulumi_vault as vault
 from pulumi import ComponentResource, Output, ResourceOptions
 from pydantic import (
     BaseModel,
@@ -26,10 +28,12 @@ from bridge.lib.magic_numbers import (
     MAXIMUM_K8S_NAME_LENGTH,
 )
 from bridge.lib.versions import NGINX_VERSION
+from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
+from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
