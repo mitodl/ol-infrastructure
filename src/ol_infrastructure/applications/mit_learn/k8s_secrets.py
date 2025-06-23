@@ -179,7 +179,6 @@ def create_mitlearn_k8s_secrets(
             "OLL_API_CLIENT_SECRET": '{{ index .Secrets "open_learning_library_client" "client_secret" }}',
             "OPENAI_API_KEY": '{{ index .Secrets "openai" "api_key" }}',
             "OPENSEARCH_HTTP_AUTH": '{{ index .Secrets "opensearch" "http_auth" }}',
-            "WEBHOOK_SECRET": '{{ index .Secrets "learn" "shared_hmac" }}',
             "QDRANT_API_KEY": '{{ index .Secrets "qdrant" "api_key" }}',
             "QDRANT_HOST": '{{ index .Secrets "qdrant" "host_url" }}',
             "POSTHOG_PROJECT_API_KEY": '{{ index .Secrets "posthog" "project_api_key" }}',
@@ -271,6 +270,20 @@ def create_mitlearn_k8s_secrets(
     )
     secret_names.append(secret_global_mailgun_name)
     secret_resources.append(secret_global_mailgun)
+
+    secret_global_hmac_token_name, secret_global_hmac_token = _create_static_secret(
+        stack_info=stack_info,
+        secret_base_name="secret-global-hmac-token",  # HMAC token # pragma: allowlist secret  # noqa: S106
+        namespace=mitlearn_namespace,
+        labels=k8s_global_labels,
+        mount="secret-global",
+        mount_type="kv-v2",
+        path="shared_hmac",
+        templates={"WEBHOOK_KEY": '{{ get (get .Secrets "learn") "token" }}'},
+        vaultauth=vault_k8s_resources.auth_name,
+    )
+    secret_names.append(secret_global_hmac_token_name)
+    secret_resources.append(secret_global_hmac_token)
 
     # 4. Dynamic AWS credentials from the 'aws-mitx' backend
     # Provides temporary AWS access keys for the application role.
