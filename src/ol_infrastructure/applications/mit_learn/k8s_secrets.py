@@ -279,7 +279,7 @@ def create_mitlearn_k8s_secrets(
         mount="secret-global",
         mount_type="kv-v2",
         path="shared_hmac",
-        templates={"WEBHOOK_KEY": '{{ get (get .Secrets "learn") "token" }}'},
+        templates={"WEBHOOK_SECRET": '{{ get (get .Secrets "learn") "token" }}'},
         vaultauth=vault_k8s_resources.auth_name,
     )
     secret_names.append(secret_global_hmac_token_name)
