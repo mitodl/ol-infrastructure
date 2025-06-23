@@ -2,6 +2,4 @@
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHhqOJ2Z8sG3n7hWWcpjCsXLNGmx4P0tPAz2k7fgHp3oHwGXFPGGU5tvWBa8yiSjR4KOAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMTzPRsiksB53Yf17OAgEQgDtdvo8xnG6L/EBa/CmfCYphKQ/oE4x/LaZY2tdEZzaeFGLnL65Kz8mZCWJhWIHZgEZcC7aJ+dODOd2p9R==
 config:
-  ol-infrastructure-botkube-operations:secrets-provider:
-    secure: v1:JPgn92Y39QW5Mg85:wZXwdym46HJr5T/dRJN7EDnmM1Uohk+b7zsACJyxbzn/+hg2ihe4ctmGFffZKVUgJyxT1z9a0gk=
   vault:address: https://vault-qa.odl.mit.edu
