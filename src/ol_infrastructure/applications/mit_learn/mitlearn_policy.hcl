@@ -22,7 +22,7 @@ path "secret-operations/sso/mitlearn" {
 path "secret-operations/global/embedly" {
   capabilities = ["read"]
 }
-path "secret-operations/global/shared_hmac" {
+path "secret-operations/global/embedly/*" {
   capabilities = ["read"]
 }
 path "secret-operations/global/odlbot-github-access-token" {
@@ -38,6 +38,9 @@ path "secret-operations/tika/access-token" {
   capabilities = ["read"]
 }
 path "secret-global/data/mailgun" {
+  capabilities = ["read"]
+}
+path "secret-global/data/shared_hmac" {
   capabilities = ["read"]
 }
 
