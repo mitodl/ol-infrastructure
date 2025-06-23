@@ -179,6 +179,7 @@ def create_mitlearn_k8s_secrets(
             "OLL_API_CLIENT_SECRET": '{{ index .Secrets "open_learning_library_client" "client_secret" }}',
             "OPENAI_API_KEY": '{{ index .Secrets "openai" "api_key" }}',
             "OPENSEARCH_HTTP_AUTH": '{{ index .Secrets "opensearch" "http_auth" }}',
+            "WEBHOOK_SECRET": '{{ index .Secrets "learn" "shared_hmac" }}',
             "QDRANT_API_KEY": '{{ index .Secrets "qdrant" "api_key" }}',
             "QDRANT_HOST": '{{ index .Secrets "qdrant" "host_url" }}',
             "POSTHOG_PROJECT_API_KEY": '{{ index .Secrets "posthog" "project_api_key" }}',
