@@ -140,9 +140,8 @@ cluster_stack.require_output("namespaces").apply(
 )
 
 pulumi_stack = get_stack()
-channel_stack = pulumi_stack.replace(".", "-")
+slack_channel = pulumi_stack.replace(".", "-")
 
-slack_channel = f"botkube-{channel_stack}"
 log.info(f"Botkube Slack channel name: {slack_channel}")
 
 # Install the botkube helm chart
