@@ -9,6 +9,9 @@ config:
   mitxonline:k8s_deploy: "true"
   mitxonline:vars:
     AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-ci"
+    CORS_ALLOWED_ORIGINS: "https://ci.mitxonline.mit.edu,https://ci.learn.mit.edu"
+    CSRF_TRUSTED_ORIGINS: "https://ci.mitxonline.mit.edu,https://ci.learn.mit.edu"
+    CSRF_COOKIE_DOMAIN: ".ci.mitxonline.mit.edu"
     CRON_COURSE_CERTIFICATES_HOURS: "18"
     GA_TRACKING_ID: "UA-5145472-46"
     GTM_TRACKING_ID: "GTM-TW97MNR"
