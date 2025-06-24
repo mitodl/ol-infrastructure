@@ -684,9 +684,6 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                 "serviceAccountName": airbyte_service_account_name,
                 "deploymentMode": "oss",
                 "edition": "community",
-                "env_vars": {
-                    "AIRBYTE_API_HOST": f"https://{airbyte_config.require('api_host_domain')}/api/public"
-                },
                 "database": {
                     "type": "external",
                     "secretName": app_db_creds_secret_name,
