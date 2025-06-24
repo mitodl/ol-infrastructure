@@ -1,4 +1,3 @@
-# ruff: noqa: D100
 import json
 from pathlib import Path
 

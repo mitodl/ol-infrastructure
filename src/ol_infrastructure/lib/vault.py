@@ -313,7 +313,7 @@ def get_vault_provider(
     vault_address: str,
     vault_env_namespace: str,
     provider_name: str | None = None,
-    skip_child_token: bool | None = None,
+    skip_child_token: bool | None = None,  # noqa: FBT001
 ) -> pulumi.ResourceTransformationResult:
     pulumi_vault_creds = read_yaml_secrets(
         Path().joinpath(
@@ -341,7 +341,7 @@ def set_vault_provider(
     vault_address: str,
     vault_env_namespace: str,
     resource_args: pulumi.ResourceTransformationArgs,
-    skip_child_token: bool | None = None,
+    skip_child_token: bool | None = None,  # noqa: FBT001
 ) -> pulumi.ResourceTransformationResult:
     if resource_args.type_.split(":")[0] == "vault":
         resource_args.opts.provider = get_vault_provider(

@@ -254,7 +254,7 @@ def registry_image(  # noqa: PLR0913
     image_tag: str | None = "latest",
     variant: str | None = None,
     tag_regex: str | None = None,
-    sort_by_creation: bool | None = None,
+    sort_by_creation: bool | None = None,  # noqa: FBT001
     username=None,
     password=None,
     check_every: str | None = None,
