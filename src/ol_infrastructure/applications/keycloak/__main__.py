@@ -558,7 +558,7 @@ keycloak_cookie_filter = OLTraefikMiddleware(
         "headers": {
             "customRequestHeaders": {
                 "Cookie": textwrap.dedent(
-                    """
+                    """\
                     {{- $cookieHeader := index .Request.Header "Cookie" -}}
                     {{- if $cookieHeader -}}
                       {{- $cookies := split (index $cookieHeader 0) ";" -}}
@@ -613,7 +613,7 @@ gateway_config = OLEKSGatewayConfig(
             middlewares=[
                 {
                     "name": KEYCLOAK_COOKIE_FILTER_NAME,
-                    "namespace": "operations",
+                    "namespace": "keycloak",
                 }
             ],
         )
