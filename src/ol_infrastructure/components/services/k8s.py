@@ -1111,30 +1111,3 @@ class OLTraefikMiddleware(pulumi.ComponentResource):
             spec=spec,
             opts=resource_options,
         )
-
-
-keycloak_cookie_filter = OLTraefikMiddleware(
-    "keycloak-cookie-filter",
-    middleware_name="keycloak-cookie-filter",
-    namespace="operations",
-    spec={
-        "headers": {
-            "customRequestHeaders": {
-                "Cookie": """{{- $cookieHeader := index .Request.Header "Cookie" -}}
-{{- if $cookieHeader -}}
-  {{- $cookies := split (index $cookieHeader 0) ";" -}}
-  {{- $filtered := list -}}
-  {{- range $cookies -}}
-    {{- $cookie := trim . " " -}}
-    {{- if or (hasPrefix $cookie "KEYCLOAK_") (hasPrefix $cookie "AUTH_SESSION_") (hasPrefix $cookie "JSESSIONID") (hasPrefix $cookie "KC_") -}}
-      {{- $filtered = append $filtered $cookie -}}
-    {{- end -}}
-  {{- end -}}
-  {{- if $filtered -}}
-    {{- join $filtered "; " -}}
-  {{- end -}}
-{{- end -}}"""
-            }
-        }
-    },
-)
