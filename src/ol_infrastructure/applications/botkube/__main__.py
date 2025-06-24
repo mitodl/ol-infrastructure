@@ -140,7 +140,7 @@ cluster_stack.require_output("namespaces").apply(
 )
 
 pulumi_stack = get_stack()
-slack_channel = pulumi_stack.replace(".", "-")
+slack_channel = pulumi_stack.replace(".", "-").lower()
 
 log.info(f"Botkube Slack channel name: {slack_channel}")
 
