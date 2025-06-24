@@ -181,7 +181,7 @@ botkube_application = kubernetes.helm.v3.Release(
                         "enabled": True,
                         "channels": {
                             "default": {
-                                "name": slack_channel,
+                                "name": f"#{slack_channel}",
                                 "bindings": {
                                     "executors": ["k8s-default-tools"],
                                     "sources": [
