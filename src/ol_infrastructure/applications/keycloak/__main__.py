@@ -2,6 +2,7 @@
 
 import json
 import os
+import textwrap
 from itertools import chain
 from pathlib import Path
 
@@ -547,32 +548,38 @@ keycloak_service_monitor = kubernetes.apiextensions.CustomResource(
     ),
 )
 
+KEYCLOAK_COOKIE_FILTER_NAME = "keycloak-cookie-filter"
+
 keycloak_cookie_filter = OLTraefikMiddleware(
     "keycloak-cookie-filter",
-    middleware_name="keycloak-cookie-filter",
-    namespace="operations",
+    middleware_name=KEYCLOAK_COOKIE_FILTER_NAME,
+    namespace="keycloak",
     spec={
         "headers": {
             "customRequestHeaders": {
-                "Cookie": """{{- $cookieHeader := index .Request.Header "Cookie" -}}
-{{- if $cookieHeader -}}
-  {{- $cookies := split (index $cookieHeader 0) ";" -}}
-  {{- $filtered := list -}}
-  {{- range $cookies -}}
-    {{- $cookie := trim . " " -}}
-    {{- if or
-      (hasPrefix $cookie "KEYCLOAK_")
-      (hasPrefix $cookie "AUTH_SESSION_")
-      (hasPrefix $cookie "JSESSIONID")
-      (hasPrefix $cookie "KC_")
-    -}}
-      {{- $filtered = append $filtered $cookie -}}
-    {{- end -}}
-  {{- end -}}
-  {{- if $filtered -}}
-    {{- join $filtered "; " -}}
-  {{- end -}}
-{{- end -}}"""
+                "Cookie": textwrap.dedent(
+                    """
+                    {{- $cookieHeader := index .Request.Header "Cookie" -}}
+                    {{- if $cookieHeader -}}
+                      {{- $cookies := split (index $cookieHeader 0) ";" -}}
+                      {{- $filtered := list -}}
+                      {{- range $cookies -}}
+                        {{- $cookie := trim . " " -}}
+                        {{- if or
+                          (hasPrefix $cookie "KEYCLOAK_")
+                          (hasPrefix $cookie "AUTH_SESSION_")
+                          (hasPrefix $cookie "JSESSIONID")
+                          (hasPrefix $cookie "KC_")
+                        -}}
+                          {{- $filtered = append $filtered $cookie -}}
+                        {{- end -}}
+                      {{- end -}}
+                      {{- if $filtered -}}
+                        {{- join $filtered "; " -}}
+                      {{- end -}}
+                    {{- end -}}
+                    """
+                )
             }
         }
     },
@@ -605,7 +612,7 @@ gateway_config = OLEKSGatewayConfig(
             port=8443,
             middlewares=[
                 {
-                    "name": "keycloak-cookie-filter",
+                    "name": KEYCLOAK_COOKIE_FILTER_NAME,
                     "namespace": "operations",
                 }
             ],
