@@ -177,7 +177,11 @@ def mfe_job(
         cp package/dist/bundles/* public/static/smoot-design
         """
         slot_config_file = "learning-mfe-config"
-        copy_common_config = f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx {mfe_build_dir.name}/common-mfe-config.env.jsx"  # noqa: E501
+        copy_common_config = (
+            f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+            f"{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx "
+            f"{mfe_build_dir.name}/common-mfe-config.env.jsx"
+        )
 
     mfe_setup_steps = [
         f"cp -r {mfe_repo.name}/* {mfe_build_dir.name}",
@@ -190,8 +194,9 @@ def mfe_job(
             f"{open_edx_deployment.deployment_name}/{slot_config_file}.env.jsx "
             f"{mfe_build_dir.name}/env.config.jsx"
         ),
-        copy_common_config,
     ]
+    if copy_common_config:
+        mfe_setup_steps.append(copy_common_config)
 
     # Add styles.scss copy for Residential deployments
     if (
