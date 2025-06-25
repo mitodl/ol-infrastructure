@@ -26,7 +26,7 @@ class SFTPServerConfig(AWSBase):
     server_name: str
     bucket_name: str
     domain: str = "S3"
-    endpoint_type: str = "PUBLIC"
+    endpoint_type: Literal["PUBLIC", <other_thing>] = "PUBLIC"
     identity_provider_type: str = "SERVICE_MANAGED"
     protocols: ClassVar[list[str]] = ["SFTP"]
     users: list[SFTPUserConfig] = Field(default_factory=list)
