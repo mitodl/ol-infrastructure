@@ -1,7 +1,7 @@
 """Module for creating and managing AWS Transfer Family SFTP servers backed by S3."""
 
 import json
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 from pulumi import ComponentResource, ResourceOptions
 from pulumi_aws import iam, s3, transfer
@@ -25,8 +25,8 @@ class SFTPServerConfig(AWSBase):
 
     server_name: str
     bucket_name: str
-    domain: str = "S3"
-    endpoint_type: Literal["PUBLIC", <other_thing>] = "PUBLIC"
+    domain: Literal["S3", "EFS"] = "S3"
+    endpoint_type: Literal["PUBLIC", "VPC", "VPC_ENDPOINT"] = "PUBLIC"
     identity_provider_type: str = "SERVICE_MANAGED"
     protocols: ClassVar[list[str]] = ["SFTP"]
     users: list[SFTPUserConfig] = Field(default_factory=list)
