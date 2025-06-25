@@ -2,6 +2,8 @@
 Pulumi project for MIT OL SFTP Sites
 """
 
+from pulumi import Config
+
 from ol_infrastructure.components.aws.sftp import (
     SFTPServer,
     SFTPServerConfig,
@@ -19,9 +21,12 @@ aws_config = AWSBase(
     }
 )
 
+sftp_config = Config("ol-infrastructure-aws-sftp")
+mitpress_sftp_public_key = sftp_config.require("mitpress_sftp_public_key")
+
 mit_press_sftp_user_config = SFTPUserConfig(
     username="mit_press",
-    public_keys=["Dummy MIT press SFTP key"],
+    public_keys=[mitpress_sftp_public_key],
     home_directory="/mit_press",
 )
 
