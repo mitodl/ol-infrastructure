@@ -121,6 +121,7 @@ def mfe_params(
         "TRADEMARK_TEXT": open_edx.trademark_text,
         "USER_INFO_COOKIE_NAME": f"{open_edx.environment}-edx-user-info",
         "ENABLE_VIDEO_UPLOAD_PAGE_LINK_IN_CONTENT_DROPDOWN": open_edx.enable_video_upload_page_link_in_content_dropdown,  # noqa: E501
+        "PARAGON_THEME_URLS" : {},
     }
 
 
