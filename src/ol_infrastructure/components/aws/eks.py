@@ -21,6 +21,7 @@ class OLEKSGatewayRouteConfig(BaseModel):
     backend_service_port: int | None
     filters: list[dict[str, Any]] | None = []
     matches: list[dict[str, Any]] | None = None
+    middlewares: list[dict[str, Any]] | None = None
     listener_name: str
     hostnames: list[str]
     name: str
