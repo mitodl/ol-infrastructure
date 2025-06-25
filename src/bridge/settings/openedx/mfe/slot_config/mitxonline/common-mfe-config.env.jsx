@@ -25,29 +25,39 @@ const copyRightText = `${configData.SITE_NAME.replace(/\b(CI|QA|Staging)\b/g, ""
 
 const logo = <Logo imageUrl={configData.LOGO_URL} destinationUrl={configData.MARKETING_SITE_BASE_URL} />;
 
-const userMenu = [
+let userMenu = [
   {
     url: `${configData.MARKETING_SITE_BASE_URL}/dashboard`,
     title: linkTitles.dashboard,
   },
-  ...(!isLearnCourse
-    ? [
-        {
-          url: `${configData.MARKETING_SITE_BASE_URL}/profile/`,
-          title: linkTitles.profile,
-        },
-        {
-          url: `${configData.MARKETING_SITE_BASE_URL}/account-settings/`,
-          title: linkTitles.account,
-        },
-      ]
-    : []),
   {
     url: `${configData.LMS_BASE_URL}/logout`,
     title: linkTitles.logout,
   },
 ];
 
+if (!isLearnCourse) {
+
+  userMenu = [
+    {
+      url: `${configData.MARKETING_SITE_BASE_URL}/dashboard`,
+      title: linkTitles.dashboard,
+    },
+    {
+      url: `${configData.MARKETING_SITE_BASE_URL}/profile/`,
+      title: linkTitles.profile,
+    },
+    {
+      url: `${configData.MARKETING_SITE_BASE_URL}/account-settings/`,
+      title: linkTitles.account,
+    },
+    {
+      url: `${configData.LMS_BASE_URL}/logout`,
+      title: linkTitles.logout,
+    },
+  ];
+
+}
 
 const footerLegalLinks = [
     {
