@@ -610,12 +610,7 @@ gateway_config = OLEKSGatewayConfig(
             name="keycloak-https",
             listener_name="https",
             port=8443,
-            middlewares=[
-                {
-                    "name": KEYCLOAK_COOKIE_FILTER_NAME,
-                    "namespace": "keycloak",
-                }
-            ],
+            filters=[keycloak_cookie_filter.gateway_filter],
         )
     ],
 )
