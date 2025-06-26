@@ -1,7 +1,7 @@
 """Module for creating and managing AWS Transfer Family SFTP servers backed by S3."""
 
 import json
-from typing import ClassVar, Literal
+from typing import Literal
 
 from pulumi import ComponentResource, ResourceOptions
 from pulumi_aws import iam, s3, transfer
@@ -30,7 +30,6 @@ class SFTPServerConfig(AWSBase):
     identity_provider_type: Literal[
         "SERVICE_MANAGED", "AWS_LAMBDA", "API_GATEWAY", "AWS_DIRECTORY_SERVICE"
     ] = "SERVICE_MANAGED"
-    protocols: ClassVar[list[str]] = ["SFTP"]
     users: list[SFTPUserConfig] = Field(default_factory=list)
     security_policy_name: str = "TransferSecurityPolicy-2024-01"
 
@@ -166,7 +165,7 @@ class SFTPServer(ComponentResource):
             domain=sftp_config.domain,
             endpoint_type=sftp_config.endpoint_type,
             identity_provider_type=sftp_config.identity_provider_type,
-            protocols=sftp_config.protocols,
+            protocols=["SFTP"],
             security_policy_name=sftp_config.security_policy_name,
             tags=sftp_config.merged_tags(
                 {"Name": f"{sftp_config.server_name}-sftp-server"}
