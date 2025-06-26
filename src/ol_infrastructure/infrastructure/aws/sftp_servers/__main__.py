@@ -33,7 +33,7 @@ mit_press_sftp_user_config = SFTPUserConfig(
 
 mit_press_sftp_server_config = SFTPServerConfig(
     server_name="mit_press_sftp",
-    bucket_name=f"ol-mitlearn-mitpress-sftp-{stack_info.env_suffix}",
+    bucket_name=f"ol-data-lake-sftp-{stack_info.env_suffix}",
     users=[mit_press_sftp_user_config],
     tags=aws_config.tags,
 )
