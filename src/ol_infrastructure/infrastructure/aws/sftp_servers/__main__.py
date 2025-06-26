@@ -21,7 +21,7 @@ aws_config = AWSBase(
     }
 )
 
-sftp_config = Config("ol-infrastructure-aws-sftp")
+sftp_config = Config("aws_sftp")
 mitpress_sftp_user_name = sftp_config.require("mitpress_sftp_user_name")
 mitpress_sftp_public_key = sftp_config.require("mitpress_sftp_public_key")
 
