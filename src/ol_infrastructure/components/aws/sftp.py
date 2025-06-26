@@ -109,7 +109,7 @@ class SFTPServer(ComponentResource):
             opts=generic_resource_opts,
         )
 
-        # Create IAM policy for S3 access
+        # Create IAM policy for S3 access (constrained to user's home directory)
         self.s3_access_policy = iam.Policy(
             f"{sftp_config.server_name}-sftp-s3-access-policy",
             policy=self.bucket.arn.apply(
@@ -126,12 +126,20 @@ class SFTPServer(ComponentResource):
                                     "s3:DeleteObject",
                                     "s3:DeleteObjectVersion",
                                 ],
-                                "Resource": f"{bucket_arn}/*",
+                                "Resource": f"{bucket_arn}/${{transfer:UserName}}/*",
                             },
                             {
                                 "Effect": "Allow",
                                 "Action": ["s3:ListBucket", "s3:GetBucketLocation"],
                                 "Resource": bucket_arn,
+                                "Condition": {
+                                    "StringLike": {
+                                        "s3:prefix": [
+                                            "${{transfer:UserName}}/*",
+                                            "${{transfer:UserName}}",
+                                        ]
+                                    }
+                                },
                             },
                         ],
                     }
