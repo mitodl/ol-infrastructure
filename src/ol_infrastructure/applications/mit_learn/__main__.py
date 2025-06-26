@@ -976,7 +976,7 @@ env_vars = {
     "SEE_BASE_URL": "https://executive.mit.edu/",
     "SOCIAL_AUTH_OL_OIDC_KEY": "ol-mitlearn-client",
     "USE_X_FORWARDED_HOST": "True",
-    "MITOL_AUTHENTICATION_PLUGINS": "learning_resources.plugins.FavoritesListPlugin,learning_resources.plugins.FavoritesListPlugin,profiles.plugins.CreateProfilePlugin",
+    "MITOL_AUTHENTICATION_PLUGINS": "learning_resources.plugins.FavoritesListPlugin,profiles.plugins.CreateProfilePlugin",
     "USE_X_FORWARDED_PORT": "True",
     "XPRO_CATALOG_API_URL": "https://xpro.mit.edu/api/programs/",
     "XPRO_COURSES_API_URL": "https://xpro.mit.edu/api/courses/",
