@@ -27,7 +27,9 @@ class SFTPServerConfig(AWSBase):
     bucket_name: str
     domain: Literal["S3", "EFS"] = "S3"
     endpoint_type: Literal["PUBLIC", "VPC", "VPC_ENDPOINT"] = "PUBLIC"
-    identity_provider_type: str = "SERVICE_MANAGED"
+    identity_provider_type: Literal[
+        "SERVICE_MANAGED", "AWS_LAMBDA", "API_GATEWAY", "AWS_DIRECTORY_SERVICE"
+    ] = "SERVICE_MANAGED"
     protocols: ClassVar[list[str]] = ["SFTP"]
     users: list[SFTPUserConfig] = Field(default_factory=list)
     security_policy_name: str = "TransferSecurityPolicy-2024-01"
