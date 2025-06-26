@@ -187,6 +187,7 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901, PLR0912
                 "deployed.",
                 issue_prefix=f"[bot] Pulumi {project_name} {stack_name} deployed.",
                 issue_state="closed",
+                poll_frequency="15m",
             )
 
         if enable_github_issue_resource:
