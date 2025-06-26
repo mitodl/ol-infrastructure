@@ -4,4 +4,4 @@ encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAFtdIRaD42D/d+G6v
 config:
   ol-infrastructure-aws-sftp:mitpress_sftp_public_key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKmd1OSFse7x+7llsEA+xWpl6kvqoQq0hGSY/sJAhUzv
     cpatti@dhcp-10-29-185-102.dyn.MIT.EDU
-  ol-infrastructure-aws-sftp:mitpress_sftp_user_name: mit_press
+  ol-infrastructure-aws-sftp:mitpress_sftp_user_name: mitpress
