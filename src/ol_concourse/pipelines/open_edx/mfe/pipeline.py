@@ -200,11 +200,7 @@ def mfe_job(
         mfe_setup_steps.append(copy_common_config)
 
     # Add styles.scss copy for Residential deployments
-    if (
-        open_edx_deployment.deployment_name in ["mitx", "mitx-staging"]
-        and OpenEdxMicroFrontend[mfe_name].value
-        == OpenEdxMicroFrontend.learner_dashboard.value
-    ):
+    if open_edx_deployment.deployment_name in ["mitx", "mitx-staging"]:
         mfe_setup_steps.append(
             f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
             f"mitx-styles.scss {mfe_build_dir.name}/mitx-styles.scss"
