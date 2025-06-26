@@ -17,7 +17,7 @@ from typing import Any, Literal
 import pulumi_kubernetes as kubernetes
 from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_aws.acmpca import Certificate, CertificateValidityArgs
-from pulumi_vault import Mount, aws, database, pkisecret
+from pulumi_vault import Mount, aws, database, generic, pkisecret
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from bridge.lib.magic_numbers import (
@@ -667,6 +667,7 @@ class OLVaultK8SStaticSecretConfig(OLVaultK8SSecretConfig):
     kind: str = "VaultStaticSecret"
     refresh_after: str | None = "1h"
     mount_type: Literal["kv-v1", "kv-v2"] = "kv-v2"
+    contents: dict[str, Any] | None = None
 
     @field_validator("kind")
     @classmethod
@@ -748,9 +749,18 @@ class OLVaultK8SSecret(ComponentResource):
                 transformation_block["templates"][name] = {"text": str(text)}
             secret_def["spec"]["destination"]["transformation"] = transformation_block
 
-        if resource_config.kind == "VaultStaticSecret":
+        if isinstance(resource_config, OLVaultK8SStaticSecretConfig):
             secret_def["spec"]["type"] = str(resource_config.mount_type)
             secret_def["spec"]["refreshAfter"] = resource_config.refresh_after
+            if resource_config.contents:
+                generic.Secret(
+                    f"{resource_config.name}-vault-static-secret",
+                    opts=resource_opts,
+                    data_json=json.dumps(resource_config.contents),
+                    path=Output.from_input(resource_config.mount).apply(
+                        lambda mount: f"{mount}/{resource_config.path}"
+                    ),
+                )
 
         self.vault_secret_resource = kubernetes.yaml.v2.ConfigGroup(
             f"OLVaultK8SSecret-{resource_config.namespace}-{resource_config.name}",
