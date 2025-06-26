@@ -28,7 +28,7 @@ mitpress_sftp_public_key = sftp_config.require("mitpress_sftp_public_key")
 mit_press_sftp_user_config = SFTPUserConfig(
     username=mitpress_sftp_user_name,
     public_keys=[mitpress_sftp_public_key],
-    home_directory="/",
+    home_directory="/mitpress",
 )
 
 mit_press_sftp_server_config = SFTPServerConfig(
