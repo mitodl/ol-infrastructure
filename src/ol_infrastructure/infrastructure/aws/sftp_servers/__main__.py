@@ -15,7 +15,7 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 stack_info = parse_stack()
 aws_config = AWSBase(
     tags={
-        "OU": "mit-open",
+        "OU": "mit-learn",
         "Environment": stack_info.env_suffix,
         "Application": Services.mit_learn,
     }
