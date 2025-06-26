@@ -44,6 +44,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
 )
+from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.consul import consul_key_helper, get_consul_provider
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
@@ -262,6 +263,8 @@ keycloak_database_security_group = ec2.SecurityGroup(
 
 # Database
 rds_defaults = defaults(stack_info)["rds"]
+if stack_info.env_suffix == "qa":
+    rds_defaults["instance_size"] = DBInstanceTypes.general_purpose_large.value
 
 rds_password = keycloak_config.require("rds_password")
 
