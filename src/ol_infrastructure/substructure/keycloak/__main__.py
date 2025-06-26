@@ -1105,9 +1105,10 @@ ol_data_platform_superset_client_scope = keycloak.openid.ClientDefaultScopes(
         "acr",
         "basic",
         "email",
+        "ol_roles",
+        "openid",
         "profile",
         "roles",
-        "ol_roles",
         "web-origins",
     ],
 )
