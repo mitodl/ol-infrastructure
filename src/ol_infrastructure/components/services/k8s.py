@@ -1111,3 +1111,7 @@ class OLTraefikMiddleware(pulumi.ComponentResource):
             spec=spec,
             opts=resource_options,
         )
+        self.gateway_filter = {
+            "type": "ExtensionRef",
+            "extensionRef": {"group": "traefik.io", "kind": "Middleware", "name": name},
+        }
