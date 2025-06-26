@@ -113,25 +113,34 @@ class SFTPServer(ComponentResource):
         self.s3_access_policy = iam.Policy(
             f"{sftp_config.server_name}-sftp-s3-access-policy",
             policy=self.bucket.arn.apply(
-                lambda bucket_arn: json.dumps(
+                lambda bucket_arn: json.dumps(  # noqa: ARG005
                     {
                         "Version": "2012-10-17",
                         "Statement": [
                             {
+                                "Sid": "AllowListingOfUserFolder",
+                                "Action": ["s3:ListBucket"],
                                 "Effect": "Allow",
-                                "Action": [
-                                    "s3:GetObject",
-                                    "s3:GetObjectVersion",
-                                    "s3:PutObject",
-                                    "s3:DeleteObject",
-                                    "s3:DeleteObjectVersion",
-                                ],
-                                "Resource": f"{bucket_arn}/*",
+                                "Resource": ["arn:aws:s3:::${transfer:HomeBucket}"],
+                                "Condition": {
+                                    "StringLike": {
+                                        "s3:prefix": [
+                                            "${transfer:HomeFolder}/*",
+                                            "${transfer:HomeFolder}",
+                                        ]
+                                    }
+                                },
                             },
                             {
+                                "Sid": "HomeDirObjectAccess",
                                 "Effect": "Allow",
-                                "Action": ["s3:ListBucket", "s3:GetBucketLocation"],
-                                "Resource": bucket_arn,
+                                "Action": [
+                                    "s3:PutObject",
+                                    "s3:GetObject",
+                                    "s3:DeleteObject",
+                                    "s3:GetObjectVersion",
+                                ],
+                                "Resource": "arn:aws:s3:::${transfer:HomeDirectory}/*",
                             },
                         ],
                     }
