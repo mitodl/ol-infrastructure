@@ -1,4 +1,4 @@
-apache-superset[cors,thumbnails,prophet,trino]>=4.0,<5
+apache-superset[cors,thumbnails,prophet,trino]>=5.0,<6
 authlib
 celery-redbeat
 duckdb
@@ -8,3 +8,4 @@ flask-openid
 hvac
 psycopg2-binary
 redis
+shillelagh[all]
