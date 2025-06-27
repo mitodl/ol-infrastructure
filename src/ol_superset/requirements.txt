@@ -6,6 +6,7 @@ flask-caching
 flask-oidc
 flask-openid
 hvac
+playwright
 psycopg2-binary
 redis
 shillelagh[all]
