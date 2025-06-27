@@ -22,13 +22,12 @@ aws_config = AWSBase(
 )
 
 sftp_config = Config("aws_sftp")
-mitpress_sftp_user_name = sftp_config.require("mitpress_sftp_user_name")
+mitpress_sftp_user_name = "mitpress"
 mitpress_sftp_public_key = sftp_config.require("mitpress_sftp_public_key")
 
 mit_press_sftp_user_config = SFTPUserConfig(
     username=mitpress_sftp_user_name,
     public_keys=[mitpress_sftp_public_key],
-    home_directory="/mitpress",
 )
 
 mit_press_sftp_server_config = SFTPServerConfig(

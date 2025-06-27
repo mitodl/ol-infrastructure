@@ -14,7 +14,6 @@ class SFTPUserConfig(BaseModel):
     """Configuration for SFTP users."""
 
     username: str
-    home_directory: str
     role_arn: str | None = None
     public_keys: list[str] = Field(default_factory=list)
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -221,7 +220,13 @@ class SFTPServer(ComponentResource):
                 f"{sftp_config.server_name}-sftp-user-{user_config.username}",
                 server_id=self.transfer_server.id,
                 user_name=user_config.username,
-                home_directory=user_config.home_directory,
+                home_directory_type="LOGICAL",
+                home_directory_mappings=[
+                    transfer.UserHomeDirectoryMappingArgs(
+                        entry="/",
+                        target=f"/{sftp_config.bucket_name}/{user_config.username}",
+                    )
+                ],
                 role=user_role_arn,
                 tags=sftp_config.merged_tags(
                     {
