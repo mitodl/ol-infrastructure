@@ -3,7 +3,7 @@ CONCOURSE_VERSION = "7.13.2"
 # renovate: datasource=github-releases depName=consul-template packageName=hashicorp/consul-template
 CONSUL_TEMPLATE_VERSION = "0.41.0"
 # renovate: datasource=github-releases depName=consul packageName=hashicorp/consul
-CONSUL_VERSION = "1.21.1"
+CONSUL_VERSION = "1.21.2"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
 KEYCLOAK_VERSION = "26.2.5"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
