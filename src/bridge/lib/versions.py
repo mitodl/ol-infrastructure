@@ -18,7 +18,7 @@ VAULT_VERSION = "1.19.5"
 
 # EKS Specific Versions
 # renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/helm-charts
-AIRBYTE_CHART_VERSION = "1.7.0"
+AIRBYTE_CHART_VERSION = "1.7.1"
 # renovate: datasource=docker depName=apisix packageName=registry-1.docker.io/bitnamicharts/apisix
 APISIX_CHART_VERSION = "5.0.4"
 # renovate: datasource=helm depName=botkube packageName=botkube
