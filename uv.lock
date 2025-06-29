@@ -846,7 +846,7 @@ requires-dist = [
     { name = "pulumi-mailgun", specifier = ">=3.0.0,<4" },
     { name = "pulumi-mongodbatlas", specifier = ">=3.3.0,<4" },
     { name = "pulumi-tls", specifier = ">=5.0.0,<6" },
-    { name = "pulumi-vault", specifier = ">=6.0.0,<7" },
+    { name = "pulumi-vault", specifier = ">=7,<8" },
     { name = "pulumiverse-heroku", specifier = ">=1.0.3,<2" },
     { name = "pydantic", specifier = ">=2,<3" },
     { name = "pydantic-settings", specifier = ">=2.0.1,<3" },
@@ -1182,16 +1182,16 @@ wheels = [
 
 [[package]]
 name = "pulumi-vault"
-version = "6.7.1"
+version = "7.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "parver" },
     { name = "pulumi" },
     { name = "semver" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3a/bc/ddb79af54c0f5639e921e9c5422fb0ad99bcfd3d895f19610e1af18a3b28/pulumi_vault-6.7.1.tar.gz", hash = "sha256:e04022860991567e4b2df09f671b15bc9482897b1215f0476539cc81d81c73ab", size = 555775, upload-time = "2025-05-05T14:46:32.073Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/51/b7/242234e6ca9579898dddc46eb788d349d83f06c3370513be2d9199440675/pulumi_vault-7.0.0.tar.gz", hash = "sha256:51a99be3cfb900b74822a3b8f0d1139ccbf7d3a63853fb582df82d7dac046347", size = 555354, upload-time = "2025-06-26T19:44:11.619Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/36/dd30e172e79145a99d40e11c0e2ab996f12ad47fa7397a6bf8aaddb14d9c/pulumi_vault-6.7.1-py3-none-any.whl", hash = "sha256:1df7e08e3061f5b68c3fef2be29865a999e1ea065d7c3a229d4d2b13597e0dae", size = 811860, upload-time = "2025-05-05T14:46:29.811Z" },
+    { url = "https://files.pythonhosted.org/packages/2b/68/4b2cc9a59ea2452fa55c6d176d1e72f41a49ea92e23dc85350a49dc773c8/pulumi_vault-7.0.0-py3-none-any.whl", hash = "sha256:8d38bd78304c027cc08720efe1775c6df9f1cd2aee10680ae2632bfac28c630e", size = 808496, upload-time = "2025-06-26T19:44:09.598Z" },
 ]
 
 [[package]]
