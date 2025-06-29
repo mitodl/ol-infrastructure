@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-x-superset-image: &superset-image apachesuperset.docker.scarf.sh/apache/superset:${TAG:-latest-dev}
+x-superset-image: &superset-image ${SUPERSET_IMAGE:-mitodl/superset}@${SUPERSET_IMAGE_SHA}
 x-superset-depends-on: &superset-depends-on
 - db
 - redis
@@ -23,6 +23,8 @@ x-superset-volumes: &superset-volumes
                     # /app/pythonpath_docker will be appended to the PYTHONPATH in the final container
 - ./docker:/app/docker
 - superset_home:/app/superset_home
+# Add conditional volume mount for CI config
+- ${CI_CONFIG:-/dev/null}:/app/superset_config_ci.py:ro
 
 version: "3.7"
 services:
