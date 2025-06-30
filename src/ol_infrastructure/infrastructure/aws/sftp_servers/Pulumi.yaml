@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-aws-sftp
+runtime: python
+description: Pulumi project for handling SFTP Servers backed by S3 buckets.
+backend:
+  url: s3://mitol-pulumi-state/
