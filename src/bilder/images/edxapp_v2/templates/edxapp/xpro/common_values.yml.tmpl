@@ -233,7 +233,6 @@ CREDIT_PROVIDER_SECRET_KEYS: {}
 CROSS_DOMAIN_CSRF_COOKIE_DOMAIN: {{ key "edxapp/lms-domain" }}  # MODIFIED
 CROSS_DOMAIN_CSRF_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edxapp-csrftoken  # MODIFIED
 CSRF_COOKIE_SECURE: true  # MODIFIED
-CSRF_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edx-csrftoken
 CSRF_TRUSTED_ORIGINS:  # MODIFIED
   - https://{{ key "edxapp/lms-domain" }}
 DASHBOARD_COURSE_LIMIT: null
