@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Optional
 
 from pyinfra.api import deploy
 from pyinfra.operations import apt, files, systemd
@@ -7,7 +6,7 @@ from pyinfra.operations import apt, files, systemd
 
 @deploy("Install baseline requirements")
 def install_baseline_packages(
-    packages: Optional[list[str]] = None,
+    packages: list[str] | None = None,
     upgrade_system: bool = False,  # noqa: FBT001, FBT002
 ):
     apt.packages(
@@ -22,7 +21,7 @@ def install_baseline_packages(
 def service_configuration_watches(
     service_name: str,
     watched_files: list[Path],
-    onchange_command: Optional[str] = None,
+    onchange_command: str | None = None,
     start_now: bool = True,  # noqa: FBT001, FBT002
 ):
     onchange_command = (

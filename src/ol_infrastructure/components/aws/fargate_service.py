@@ -22,7 +22,6 @@ Required On Input:
 
 import json
 from enum import Enum, unique
-from typing import Optional, Union
 
 import pulumi
 from pulumi_aws.ec2 import SecurityGroup, get_subnet_ids
@@ -65,11 +64,11 @@ class OLFargateServiceConfig(AWSBase):
     # base name for all resources
     service_name: str
     # ECS cluster that will be parent of ECS Service. Will be created if not provided
-    cluster: Optional[Cluster]
+    cluster: Cluster | None
     # Determines whether ECS Fargate service will have public IP or not.
     assign_public_ip: bool = True
     # IAM Role for ECS Service to use for Load Balancer communication
-    service_role: Optional[Role]
+    service_role: Role | None
     # Desired count for number of tasks on ECS Service
     desired_count: PositiveInt = PositiveInt(1)
     # Max amount, as percentage, of running tasks that can run during a deployment
@@ -87,9 +86,9 @@ class OLFargateServiceConfig(AWSBase):
     enable_ecs_managed_tags: bool = False
     # VPC service will be deployed into. Service and tasks will be deployed into public
     # subnets, from this VPC
-    vpc_id: Union[pulumi.Output[str], str]
+    vpc_id: pulumi.Output[str] | str
     # Security groups associated with the service and tasks
-    security_groups: list[Union[SecurityGroup, AwaitableGetSecurityGroupResult]]
+    security_groups: list[SecurityGroup | AwaitableGetSecurityGroupResult]
     # Force a new task deploymennt of the service
     force_new_deployment: bool = False
     # Task Definition(s) to be used with ECS Service
@@ -102,7 +101,7 @@ class OLFargateServiceConfig(AWSBase):
     _launch_type: LaunchTypes = LaunchTypes.fargate
     # Load balancer configuration that will be used to attach containers to target
     # groups
-    load_balancer_configuration: Optional[list[ServiceLoadBalancerArgs]] = None
+    load_balancer_configuration: list[ServiceLoadBalancerArgs] | None = None
 
     # Retrieve all subnets from the provided VPC (vpc id). NOTE: No filtering is made
     # upon subnets

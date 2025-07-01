@@ -3,24 +3,24 @@ CONCOURSE_VERSION = "7.13.2"
 # renovate: datasource=github-releases depName=consul-template packageName=hashicorp/consul-template
 CONSUL_TEMPLATE_VERSION = "0.41.0"
 # renovate: datasource=github-releases depName=consul packageName=hashicorp/consul
-CONSUL_VERSION = "1.21.1"
+CONSUL_VERSION = "1.21.2"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
 KEYCLOAK_VERSION = "26.2.5"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
-OPEN_METADATA_VERSION = "1.7.4"
+OPEN_METADATA_VERSION = "1.8.0"
 OVS_VERSION = "v0.65.1-3-g2630021"
 REDASH_VERSION = "9d273e4"
 # renovate: datasource=github-releases depName=traefik packageName=traefik/traefik
-TRAEFIK_VERSION = "3.4.1"
+TRAEFIK_VERSION = "3.4.3"
 TUTOR_PERMISSIONS_VERSION = "15.3.4"
 # renovate: datasource=github-releases depName=vault packageName=hashicorp/vault
-VAULT_VERSION = "1.19.5"
+VAULT_VERSION = "1.20.0"
 
 # EKS Specific Versions
 # renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/helm-charts
-AIRBYTE_CHART_VERSION = "1.7.0"
+AIRBYTE_CHART_VERSION = "1.7.1"
 # renovate: datasource=docker depName=apisix packageName=registry-1.docker.io/bitnamicharts/apisix
-APISIX_CHART_VERSION = "5.0.3"
+APISIX_CHART_VERSION = "5.0.4"
 # renovate: datasource=helm depName=botkube packageName=botkube
 BOTKUBE_CHART_VERSION = "v1.14.0"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager
@@ -34,19 +34,19 @@ EXTERNAL_DNS_CHART_VERSION = "1.15.0"
 # renovate: datasource=github-releases depName=gateway-api packageName=kubernetes-sigs/gateway-api
 GATEWAY_API_VERSION = "v1.3.0"
 # renovate: datasource=docker depName=karpenter packageName=public.ecr.aws/karpenter/karpenter
-KARPENTER_CHART_VERSION = "1.5.0"
+KARPENTER_CHART_VERSION = "1.5.1"
 # renoavate: datasource=helm depName=keda registryUrl=https://kedacore.github.io/charts packageName=keda
 KEDA_CHART_VERSION = "2.17.1"
 # renovate: datasource=docker depName=kube-state-metrics packageName=registry-1.docker.io/bitnamicharts/kube-state-metrics
-KUBE_STATE_METRICS_CHART_VERSION = "5.0.10"
+KUBE_STATE_METRICS_CHART_VERSION = "5.0.11"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
-TRAEFIK_CHART_VERSION = "36.1.0"
+TRAEFIK_CHART_VERSION = "36.2.0"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
 VANTAGE_K8S_AGENT_CHART_VERSION = "1.1.2"
 # renovate: datasource=helm depName=vault-secrets-operator packageName=vault-secrets-operator registryUrl=https://helm.releases.hashicorp.com
 VAULT_SECRETS_OPERATOR_CHART_VERSION = "0.10.0"
 # renovate: datasource=docker depName=nginx
-NGINX_VERSION = "1.28.0"
+NGINX_VERSION = "1.29.0"
 # renovate: datasource=github-releases depName=prometheus-operator packageName=prometheus-operator/prometheus-operator
 PROMETHEUS_OPERATOR_CRD_VERSION = "v0.83.0"
 # renovate: datasource=github-releases depName=keycloak-k8s-resources packageName=keycloak/keycloak-k8s-resources

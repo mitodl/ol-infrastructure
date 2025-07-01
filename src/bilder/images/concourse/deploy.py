@@ -3,7 +3,6 @@ import os
 from functools import partial
 from ipaddress import IPv4Address
 from pathlib import Path
-from typing import Union
 
 import yaml
 from pyinfra import host
@@ -169,9 +168,9 @@ concourse_config_map = {
         containerd_network_pool="10.250.0.0/16",
     ),
 }
-concourse_config: Union[ConcourseWebConfig, ConcourseWorkerConfig] = (
-    concourse_config_map[node_type]()
-)
+concourse_config: ConcourseWebConfig | ConcourseWorkerConfig = concourse_config_map[
+    node_type
+]()
 vault_template_map = {
     CONCOURSE_WEB_NODE_TYPE: [
         partial(

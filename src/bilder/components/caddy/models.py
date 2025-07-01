@@ -1,6 +1,6 @@
 from itertools import chain
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from pydantic.main import BaseModel
@@ -17,21 +17,21 @@ class CaddyPlugin(BaseModel):
     """
 
     repository: str
-    version: Optional[str] = None
+    version: str | None = None
 
 
 class CaddyConfig(OLBaseSettings):
     model_config = SettingsConfigDict(env_prefix="caddy_")
     caddyfile: Path = Path(__file__).resolve().parent.joinpath("templates/Caddyfile.j2")
     data_directory: Path = Path("/var/lib/caddy/")
-    domains: Optional[list[str]] = None
-    log_file: Optional[Path] = Path("/var/log/caddy/caddy.log")
-    plugins: Optional[list[CaddyPlugin]] = None
-    template_context: Optional[dict[str, Any]] = None
-    upstream_address: Optional[str] = None
+    domains: list[str] | None = None
+    log_file: Path | None = Path("/var/log/caddy/caddy.log")
+    plugins: list[CaddyPlugin] | None = None
+    template_context: dict[str, Any] | None = None
+    upstream_address: str | None = None
     tls_cert_path: Path = Path("/etc/caddy/odl_wildcard.cert")
     tls_key_path: Path = Path("/etc/caddy/odl_wildcard.key")
-    caddy_user: Optional[str] = "caddy"
+    caddy_user: str | None = "caddy"
 
     def custom_download_url(self, os: str = "linux", arch: str = "amd64"):
         url_base = "https://caddyserver.com/api/download"

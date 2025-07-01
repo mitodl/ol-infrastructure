@@ -1,4 +1,4 @@
-# ruff: noqa: ERA001, TD003, TD002, TD004 FIX002, E501
+# ruff: noqa: ERA001, TD002, TD004, FIX002, E501
 """Pulumi program for deploying an EKS cluster."""
 
 # Misc Ref: https://docs.aws.amazon.com/eks/latest/userguide/associate-service-account-role.html

@@ -1,5 +1,4 @@
 from functools import lru_cache, partial
-from typing import Optional
 
 import boto3
 import pulumi
@@ -72,7 +71,7 @@ def get_cluster_version(*, use_default: bool = True) -> str:
 @lru_cache
 def get_k8s_provider(
     kubeconfig: str,
-    provider_name: Optional[str],
+    provider_name: str | None,
 ):
     return Provider(
         provider_name or "k8s-provider",
@@ -82,7 +81,7 @@ def get_k8s_provider(
 
 def set_k8s_provider(
     kubeconfig: str,
-    provider_name: Optional[str],
+    provider_name: str | None,
     resource_args: pulumi.ResourceTransformationArgs,
 ) -> pulumi.ResourceTransformationResult:
     if resource_args.type_.split(":")[0] == "kubernetes":
@@ -98,7 +97,7 @@ def set_k8s_provider(
 
 def setup_k8s_provider(
     kubeconfig: str,
-    provider_name: Optional[str] = None,
+    provider_name: str | None = None,
 ):
     pulumi.runtime.register_stack_transformation(
         partial(

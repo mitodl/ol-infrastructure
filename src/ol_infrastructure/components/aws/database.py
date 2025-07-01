@@ -10,7 +10,6 @@ This includes:
 """  # noqa: E501
 
 from enum import Enum
-from typing import Optional, Union
 
 import pulumi
 from pulumi_aws import rds
@@ -57,7 +56,7 @@ class OLReplicaDBConfig(BaseModel):
     instance_size: str = DBInstanceTypes.medium
     storage_type: StorageType = StorageType.ssd
     public_access: bool = False
-    security_groups: Optional[list[SecurityGroup]] = None
+    security_groups: list[SecurityGroup] | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -65,19 +64,19 @@ class OLDBConfig(AWSBase):
     """Configuration object for defining the interface to create an RDS instance with sane defaults."""  # noqa: E501
 
     engine: str
-    engine_full_version: Optional[str] = None
-    engine_major_version: Optional[str | int] = None
+    engine_full_version: str | None = None
+    engine_major_version: str | int | None = None
     instance_name: str  # The name of the RDS instance
     password: SecretStr
-    parameter_overrides: list[dict[str, Union[str, bool, int, float]]]
+    parameter_overrides: list[dict[str, str | bool | int | float]]
     port: PositiveInt
-    subnet_group_name: Union[str, pulumi.Output[str]]
+    subnet_group_name: str | pulumi.Output[str]
     security_groups: list[SecurityGroup]
     backup_days: conint(ge=0, le=MAX_BACKUP_DAYS, strict=True) = 30  # type: ignore  # noqa: PGH003
-    db_name: Optional[str] = None  # The name of the database schema to create
+    db_name: str | None = None  # The name of the database schema to create
     instance_size: str = DBInstanceTypes.general_purpose_large.value
     # Set to allow for storage autoscaling. Default to 1 TB
-    max_storage: Optional[PositiveInt] = 1000
+    max_storage: PositiveInt | None = 1000
     multi_az: bool = True
     prevent_delete: bool = True
     public_access: bool = False
@@ -85,7 +84,7 @@ class OLDBConfig(AWSBase):
     storage: PositiveInt = PositiveInt(50)
     storage_type: StorageType = StorageType.ssd
     username: str = "oldevops"
-    read_replica: Optional[OLReplicaDBConfig] = None
+    read_replica: OLReplicaDBConfig | None = None
     monitoring_profile_name: str
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -153,7 +152,7 @@ class OLPostgresDBConfig(OLDBConfig):
     engine: str = "postgres"
     engine_major_version: str | int = "16"
     port: PositiveInt = PositiveInt(5432)
-    parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [  # noqa: RUF012
+    parameter_overrides: list[dict[str, str | bool | int | float]] = [  # noqa: RUF012
         {"name": "client_encoding", "value": "UTF-8"},
         {"name": "timezone", "value": "UTC"},
         {"name": "rds.force_ssl", "value": 1},
@@ -167,7 +166,7 @@ class OLMariaDBConfig(OLDBConfig):
     engine: str = "mariadb"
     engine_major_version: str | int = "11.4"
     port: PositiveInt = PositiveInt(3306)
-    parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [  # noqa: RUF012
+    parameter_overrides: list[dict[str, str | bool | int | float]] = [  # noqa: RUF012
         {"name": "character_set_client", "value": "utf8mb4"},
         {"name": "character_set_connection", "value": "utf8mb4"},
         {"name": "character_set_database", "value": "utf8mb4"},
@@ -184,7 +183,7 @@ class OLAmazonDB(pulumi.ComponentResource):
     """Component to create an RDS instance with sane defaults and manage associated resources."""  # noqa: E501
 
     def __init__(
-        self, db_config: OLDBConfig, opts: Optional[pulumi.ResourceOptions] = None
+        self, db_config: OLDBConfig, opts: pulumi.ResourceOptions | None = None
     ):
         """Create an RDS instance, parameter group, and optionally read replica.
 

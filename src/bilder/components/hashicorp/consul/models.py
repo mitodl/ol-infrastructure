@@ -1,7 +1,7 @@
 import abc
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import SerializeAsAny
 from pydantic.fields import Field
@@ -19,14 +19,14 @@ class ConsulACLToken(FlexibleBaseModel):
 
 
 class ConsulACL(FlexibleBaseModel):
-    tokens: Optional[list[ConsulACLToken]] = None
+    tokens: list[ConsulACLToken] | None = None
 
 
 class ConsulAddresses(FlexibleBaseModel):
-    dns: Optional[str] = "0.0.0.0"  # noqa: S104
-    http: Optional[str] = "0.0.0.0"  # noqa: S104
-    https: Optional[str] = None
-    grpc: Optional[str] = None
+    dns: str | None = "0.0.0.0"  # noqa: S104
+    http: str | None = "0.0.0.0"  # noqa: S104
+    https: str | None = None
+    grpc: str | None = None
 
 
 class ConsulDNSConfig(FlexibleBaseModel):
@@ -36,31 +36,31 @@ class ConsulDNSConfig(FlexibleBaseModel):
 
 
 class ConsulServiceCheck(FlexibleBaseModel, abc.ABC):
-    id: Optional[str] = None
+    id: str | None = None
 
 
 class ConsulServiceTCPCheck(ConsulServiceCheck):
-    id: Optional[str] = None
+    id: str | None = None
     name: str
     tcp: str
-    interval: Optional[str] = None
-    timeout: Optional[str] = None
+    interval: str | None = None
+    timeout: str | None = None
 
 
 class ConsulService(FlexibleBaseModel):
-    id: Optional[str] = None
-    tags: Optional[list[str]] = None
-    meta: Optional[dict[str, str]] = None
+    id: str | None = None
+    tags: list[str] | None = None
+    meta: dict[str, str] | None = None
     name: str
-    port: Optional[int] = None
-    address: Optional[str] = None
-    check: Optional[SerializeAsAny[ConsulServiceCheck]] = None
+    port: int | None = None
+    address: str | None = None
+    check: SerializeAsAny[ConsulServiceCheck] | None = None
 
 
 class ConsulTelemetry(FlexibleBaseModel):
-    dogstatsd_addr: Optional[str] = None
-    disable_hostname: Optional[bool] = True
-    prometheus_retention_time: Optional[str] = "60s"
+    dogstatsd_addr: str | None = None
+    disable_hostname: bool | None = True
+    prometheus_retention_time: str | None = "60s"
 
 
 class ConsulRequestLimitConfig(FlexibleBaseModel):
@@ -71,47 +71,47 @@ class ConsulRequestLimitConfig(FlexibleBaseModel):
 
 class ConsulLimitConfig(FlexibleBaseModel):
     http_max_conns_per_client: int = 200
-    https_handshake_timeout: Optional[str] = "5s"
+    https_handshake_timeout: str | None = "5s"
     request_limits: ConsulRequestLimitConfig = ConsulRequestLimitConfig()
-    rpc_handshake_timeout: Optional[str] = "5s"
-    rpc_client_timeout: Optional[str] = "5s"
-    rpc_max_conns_per_client: Optional[int] = None
-    rpc_rate: Optional[int] = None
-    rpc_max_burst: Optional[int] = None
-    kv_max_value_size: Optional[int] = None
-    txn_max_req_len: Optional[int] = None
+    rpc_handshake_timeout: str | None = "5s"
+    rpc_client_timeout: str | None = "5s"
+    rpc_max_conns_per_client: int | None = None
+    rpc_rate: int | None = None
+    rpc_max_burst: int | None = None
+    kv_max_value_size: int | None = None
+    txn_max_req_len: int | None = None
 
 
 class ConsulConfig(HashicorpConfig):
     model_config = SettingsConfigDict(env_prefix="consul_")
-    acl: Optional[ConsulACL] = None
-    addresses: Optional[ConsulAddresses] = ConsulAddresses()
-    advertise_addr: Optional[str] = None
-    bootstrap_expect: Optional[int] = None
-    client_addr: Optional[str] = None
-    data_dir: Optional[Path] = Path("/var/lib/consul/")
-    datacenter: Optional[str] = None
-    disable_host_node_id: Optional[bool] = True
-    dns_config: Optional[ConsulDNSConfig] = ConsulDNSConfig()
-    encrypt: Optional[str] = None
+    acl: ConsulACL | None = None
+    addresses: ConsulAddresses | None = ConsulAddresses()
+    advertise_addr: str | None = None
+    bootstrap_expect: int | None = None
+    client_addr: str | None = None
+    data_dir: Path | None = Path("/var/lib/consul/")
+    datacenter: str | None = None
+    disable_host_node_id: bool | None = True
+    dns_config: ConsulDNSConfig | None = ConsulDNSConfig()
+    encrypt: str | None = None
     enable_syslog: bool = True
     leave_on_terminate: bool = True
-    log_level: Optional[str] = "WARN"
+    log_level: str | None = "WARN"
     log_json: bool = True
-    primary_datacenter: Optional[str] = None
-    recursors: Optional[list[str]] = Field(
+    primary_datacenter: str | None = None
+    recursors: list[str] | None = Field(
         None,
         description="List of DNS servers to use for resolving non-consul addresses",
     )
     rejoin_after_leave: bool = True
-    limits: Optional[ConsulLimitConfig] = ConsulLimitConfig()
-    retry_join: Optional[list[str]] = None
-    retry_join_wan: Optional[list[str]] = None
+    limits: ConsulLimitConfig | None = ConsulLimitConfig()
+    retry_join: list[str] | None = None
+    retry_join_wan: list[str] | None = None
     server: bool = False
-    service: Optional[ConsulService] = None
-    services: Optional[list[ConsulService]] = None
+    service: ConsulService | None = None
+    services: list[ConsulService] | None = None
     skip_leave_on_interrupt: bool = True
-    telemetry: Optional[ConsulTelemetry] = None
+    telemetry: ConsulTelemetry | None = None
     ui: bool = False
 
 

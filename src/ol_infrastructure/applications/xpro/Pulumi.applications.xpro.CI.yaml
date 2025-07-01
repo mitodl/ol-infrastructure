@@ -36,7 +36,6 @@ config:
     SHEETS_REFUND_SKIP_ROW_COL: 14
     VOUCHER_COMPANY_ID: 1
     ZENDESK_DOMAIN_VERIFICATION_TAG_VALUE: "o0itxdfh369m1bw4cuz9"
-    ZENDESK_HELP_WIDGET_KEY: "4bde85d7-9202-4a71-9a35-d9295e7a5b3d"
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
   xpro:db_password:

@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Optional, Union
+from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
@@ -16,9 +16,9 @@ from bilder.components.traefik.models.traefik_static import (
 
 
 class Certificate(BaseModel):
-    cert_file: Optional[str] = Field(None, alias="certFile")
-    key_file: Optional[str] = Field(None, alias="keyFile")
-    stores: Optional[list[str]] = Field(
+    cert_file: str | None = Field(None, alias="certFile")
+    key_file: str | None = Field(None, alias="keyFile")
+    stores: list[str] | None = Field(
         None,
         description=(
             "A list of stores can be specified here to indicate where the certificates"
@@ -31,7 +31,7 @@ class Certificate(BaseModel):
 class ClientAuth(BaseModel):
     """Traefik supports mutual authentication, through the clientAuth section."""
 
-    ca_files: Optional[list[str]] = Field(
+    ca_files: list[str] | None = Field(
         None,
         alias="caFiles",
         description=(
@@ -40,14 +40,14 @@ class ClientAuth(BaseModel):
             " here."
         ),
     )
-    client_auth_type: Optional[str] = Field(None, alias="clientAuthType")
+    client_auth_type: str | None = Field(None, alias="clientAuthType")
 
 
 class Options(BaseModel):
-    min_version: Optional[str] = Field(
+    min_version: str | None = Field(
         None, alias="minVersion", description="Minimum TLS Version"
     )
-    max_version: Optional[str] = Field(
+    max_version: str | None = Field(
         None,
         alias="maxVersion",
         description=(
@@ -56,7 +56,7 @@ class Options(BaseModel):
             " TLS1.3."
         ),
     )
-    cipher_suites: Optional[list[str]] = Field(
+    cipher_suites: list[str] | None = Field(
         None,
         alias="cipherSuites",
         description=(
@@ -65,7 +65,7 @@ class Options(BaseModel):
             " supported cipher suites are safe in this case)."
         ),
     )
-    curve_preferences: Optional[list[str]] = Field(
+    curve_preferences: list[str] | None = Field(
         None,
         alias="curvePreferences",
         description=(
@@ -74,7 +74,7 @@ class Options(BaseModel):
             " the RFC defined names (e.g. secp521r1) can be used."
         ),
     )
-    sni_strict: Optional[bool] = Field(
+    sni_strict: bool | None = Field(
         None,
         alias="sniStrict",
         description=(
@@ -83,7 +83,7 @@ class Options(BaseModel):
             " certificate configured on the tlsOption."
         ),
     )
-    prefer_server_cipher_suites: Optional[bool] = Field(
+    prefer_server_cipher_suites: bool | None = Field(
         None,
         alias="preferServerCipherSuites",
         description=(
@@ -92,7 +92,7 @@ class Options(BaseModel):
             " when minVersion or maxVersion are set."
         ),
     )
-    client_auth: Optional[ClientAuth] = Field(
+    client_auth: ClientAuth | None = Field(
         None,
         alias="clientAuth",
         description=(
@@ -110,15 +110,15 @@ class DefaultCertificate(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    cert_file: Optional[str] = Field(None, alias="certFile")
-    key_file: Optional[str] = Field(None, alias="keyFile")
+    cert_file: str | None = Field(None, alias="certFile")
+    key_file: str | None = Field(None, alias="keyFile")
 
 
 class Domain(BaseModel):
     """Domain is the domain definition for the DefaultCertificate."""
 
-    main: Optional[str] = Field(None, description="Main defines the main domain name.")
-    sans: Optional[list[str]] = Field(
+    main: str | None = Field(None, description="Main defines the main domain name.")
+    sans: list[str] | None = Field(
         None, description="SANs defines the subject alternative domain names."
     )
 
@@ -128,14 +128,14 @@ class DefaultGeneratedCert(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    resolver: Optional[str] = Field(
+    resolver: str | None = Field(
         None,
         description=(
             "Resolver is the name of the resolver that will be used to issue the"
             " DefaultCertificate."
         ),
     )
-    domain: Optional[Domain] = Field(
+    domain: Domain | None = Field(
         None, description="Domain is the domain definition for the DefaultCertificate."
     )
 
@@ -143,7 +143,7 @@ class DefaultGeneratedCert(BaseModel):
 class Stores(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    default_certificate: Optional[DefaultCertificate] = Field(
+    default_certificate: DefaultCertificate | None = Field(
         None,
         alias="defaultCertificate",
         description=(
@@ -152,7 +152,7 @@ class Stores(BaseModel):
             " generates and uses a self-signed certificate."
         ),
     )
-    default_generated_cert: Optional[DefaultGeneratedCert] = Field(
+    default_generated_cert: DefaultGeneratedCert | None = Field(
         None,
         alias="defaultGeneratedCert",
         description=(
@@ -166,15 +166,15 @@ class Tls(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    certificates: Optional[list[Certificate]] = None
-    options: Optional[dict[str, Options]] = Field(
+    certificates: list[Certificate] | None = None
+    options: dict[str, Options] | None = Field(
         None,
         description=(
             "The TLS options allow one to configure some parameters of the TLS"
             " connection."
         ),
     )
-    stores: Optional[dict[str, Stores]] = Field(
+    stores: dict[str, Stores] | None = Field(
         None,
         description=(
             "Any store definition other than the default one (named default) will be"
@@ -184,8 +184,8 @@ class Tls(BaseModel):
 
 
 class Domain1(BaseModel):
-    main: Optional[str] = Field(None, description="Main defines the main domain name.")
-    sans: Optional[list[str]] = Field(
+    main: str | None = Field(None, description="Main defines the main domain name.")
+    sans: list[str] | None = Field(
         None, description="SANs defines the subject alternative domain names."
     )
 
@@ -200,7 +200,7 @@ class Tls1(BaseModel):
     section, one without.
     """
 
-    options: Optional[str] = Field(
+    options: str | None = Field(
         None,
         description=(
             "The options field enables fine-grained control of the TLS parameters. It"
@@ -208,7 +208,7 @@ class Tls1(BaseModel):
             " defined."
         ),
     )
-    cert_resolver: Optional[str] = Field(
+    cert_resolver: str | None = Field(
         None,
         alias="certResolver",
         description=(
@@ -216,7 +216,7 @@ class Tls1(BaseModel):
             " based on routers Host & HostSNI rules."
         ),
     )
-    domains: Optional[list[Domain1]] = Field(
+    domains: list[Domain1] | None = Field(
         None,
         description=(
             "You can set SANs (alternative domains) for each main domain. Every domain"
@@ -235,7 +235,7 @@ class HttpRouter(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    entry_points: Optional[list[str]] = Field(
+    entry_points: list[str] | None = Field(
         None,
         alias="entryPoints",
         description=(
@@ -253,7 +253,7 @@ class HttpRouter(BaseModel):
             " request to the service."
         ),
     )
-    priority: Optional[int] = Field(
+    priority: int | None = Field(
         0,
         description=(
             "To avoid path overlap, routes are sorted, by default, in descending order"
@@ -264,7 +264,7 @@ class HttpRouter(BaseModel):
         ),
         ge=0,
     )
-    middlewares: Optional[list[str]] = Field(
+    middlewares: list[str] | None = Field(
         None,
         description=(
             "You can attach a list of middlewares to each HTTP router. The middlewares"
@@ -282,7 +282,7 @@ class HttpRouter(BaseModel):
             " HTTP services (not TCP services)."
         ),
     )
-    tls: Optional[Tls | Tls1] = Field(
+    tls: Tls | Tls1 | None = Field(
         None,
         description=(
             "When a TLS section is specified, it instructs Traefik that the current"
@@ -309,15 +309,15 @@ class Server(BaseModel):
 
 
 class Cookie(BaseModel):
-    name: Optional[str] = Field(
+    name: str | None = Field(
         None,
         description=(
             "The default cookie name is an abbreviation of a sha1 (ex: _1d52e)."
         ),
     )
-    secure: Optional[bool] = False
-    http_only: Optional[bool] = Field(default=False, alias="httpOnly")
-    same_site: Optional[str] = Field(
+    secure: bool | None = False
+    http_only: bool | None = Field(default=False, alias="httpOnly")
+    same_site: str | None = Field(
         "", alias="sameSite", description="Can be none, lax, strict or empty."
     )
 
@@ -330,7 +330,7 @@ class Sticky(BaseModel):
     should resend the same cookie.
     """
 
-    cookie: Optional[Cookie] = None
+    cookie: Cookie | None = None
 
 
 class HealthCheck(BaseModel):
@@ -343,37 +343,37 @@ class HealthCheck(BaseModel):
     rotation pool.
     """
 
-    method: Optional[str] = Field(
+    method: str | None = Field(
         None,
         description="If defined, will apply this Method for the health check request.",
     )
-    path: Optional[str] = Field(
+    path: str | None = Field(
         None,
         description=(
             "path is appended to the server URL to set the health check endpoint."
         ),
     )
-    scheme: Optional[str] = Field(
+    scheme: str | None = Field(
         None,
         description=(
             "If defined, will replace the server URL scheme for the health check"
             " endpoint"
         ),
     )
-    hostname: Optional[str] = Field(
+    hostname: str | None = Field(
         None,
         description=(
             "If defined, will apply Host header hostname to the health check request."
         ),
     )
-    port: Optional[int] = Field(
+    port: int | None = Field(
         None,
         description=(
             "If defined, will replace the server URL port for the health check"
             " endpoint."
         ),
     )
-    interval: Optional[str] = Field(
+    interval: str | None = Field(
         None,
         description=(
             "Defines the frequency of the health check calls. Interval is to be given"
@@ -382,7 +382,7 @@ class HealthCheck(BaseModel):
             " interval will be set to timeout + 1 second."
         ),
     )
-    timeout: Optional[str] = Field(
+    timeout: str | None = Field(
         None,
         description=(
             "Defines the maximum duration Traefik will wait for a health check request"
@@ -390,11 +390,11 @@ class HealthCheck(BaseModel):
             " in a format understood by `time.ParseDuration`."
         ),
     )
-    headers: Optional[dict[str, str]] = Field(
+    headers: dict[str, str] | None = Field(
         None,
         description="Defines custom headers to be sent to the health check endpoint.",
     )
-    follow_redirects: Optional[bool] = Field(
+    follow_redirects: bool | None = Field(
         default=True,
         alias="followRedirects",
         description=(
@@ -407,7 +407,7 @@ class HealthCheck(BaseModel):
 class ResponseForwarding(BaseModel):
     """Define how Traefik forwards the response from backend server to the client."""
 
-    flush_interval: Optional[str] = Field(
+    flush_interval: str | None = Field(
         None,
         alias="flushInterval",
         description=(
@@ -437,7 +437,7 @@ class HttpLoadBalancerService(BaseModel):
         description="Servers declare a single instance of your program.",
         min_length=1,
     )
-    sticky: Optional[Sticky] = Field(
+    sticky: Sticky | None = Field(
         None,
         description=(
             "When sticky sessions are enabled, a cookie is set on the initial request"
@@ -446,7 +446,7 @@ class HttpLoadBalancerService(BaseModel):
             " server, the client should resend the same cookie."
         ),
     )
-    health_check: Optional[HealthCheck] = Field(
+    health_check: HealthCheck | None = Field(
         None,
         alias="healthCheck",
         description=(
@@ -459,7 +459,7 @@ class HttpLoadBalancerService(BaseModel):
             " pool."
         ),
     )
-    pass_host_header: Optional[bool] = Field(
+    pass_host_header: bool | None = Field(
         default=True,
         alias="passHostHeader",
         description=(
@@ -467,7 +467,7 @@ class HttpLoadBalancerService(BaseModel):
             " default, passHostHeader is true."
         ),
     )
-    response_forwarding: Optional[ResponseForwarding] = Field(
+    response_forwarding: ResponseForwarding | None = Field(
         None,
         alias="responseForwarding",
         description=(
@@ -475,24 +475,24 @@ class HttpLoadBalancerService(BaseModel):
             " client."
         ),
     )
-    servers_transport: Optional[str] = Field(None, alias="serversTransport")
+    servers_transport: str | None = Field(None, alias="serversTransport")
 
 
 class Service(BaseModel):
-    name: Optional[str] = None
-    weight: Optional[float] = None
+    name: str | None = None
+    weight: float | None = None
 
 
 class Cookie1(BaseModel):
-    name: Optional[str] = Field(
+    name: str | None = Field(
         None,
         description=(
             "The default cookie name is an abbreviation of a sha1 (ex: _1d52e)."
         ),
     )
-    secure: Optional[bool] = False
-    http_only: Optional[bool] = Field(default=False, alias="httpOnly")
-    same_site: Optional[str] = Field(
+    secure: bool | None = False
+    http_only: bool | None = Field(default=False, alias="httpOnly")
+    same_site: str | None = Field(
         "", alias="sameSite", description="Can be none, lax, strict or empty."
     )
 
@@ -505,7 +505,7 @@ class Sticky1(BaseModel):
     should resend the same cookie.
     """
 
-    cookie: Optional[Cookie1] = None
+    cookie: Cookie1 | None = None
 
 
 class HttpWeightedService(BaseModel):
@@ -519,8 +519,8 @@ class HttpWeightedService(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    services: Optional[list[Service]] = None
-    sticky: Optional[Sticky1] = Field(
+    services: list[Service] | None = None
+    sticky: Sticky1 | None = Field(
         None,
         description=(
             "When sticky sessions are enabled, a cookie is set on the initial request"
@@ -529,12 +529,12 @@ class HttpWeightedService(BaseModel):
             " server, the client should resend the same cookie."
         ),
     )
-    health_check: Optional[dict[str, Any]] = Field(None, alias="healthCheck")
+    health_check: dict[str, Any] | None = Field(None, alias="healthCheck")
 
 
 class Mirror(BaseModel):
-    name: Optional[str] = None
-    percent: Optional[float] = Field(None, ge=0, le=100.0)
+    name: str | None = None
+    percent: float | None = Field(None, ge=0, le=100.0)
 
 
 class HttpMirroringService(BaseModel):
@@ -546,8 +546,8 @@ class HttpMirroringService(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    service: Optional[str] = None
-    max_body_size: Optional[int] = Field(
+    service: str | None = None
+    max_body_size: int | None = Field(
         -1,
         alias="maxBodySize",
         description=(
@@ -556,55 +556,53 @@ class HttpMirroringService(BaseModel):
             " which means unlimited size."
         ),
     )
-    mirrors: Optional[list[Mirror]] = None
-    health_check: Optional[dict[str, Any]] = Field(None, alias="healthCheck")
+    mirrors: list[Mirror] | None = None
+    health_check: dict[str, Any] | None = Field(None, alias="healthCheck")
 
 
 class HttpFailoverService(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    service: Optional[str] = None
-    fallback: Optional[str] = None
-    health_check: Optional[dict[str, Any]] = Field(None, alias="healthCheck")
+    service: str | None = None
+    fallback: str | None = None
+    health_check: dict[str, Any] | None = Field(None, alias="healthCheck")
 
 
 class HttpServiceItem(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    load_balancer: Optional[HttpLoadBalancerService] = Field(None, alias="loadBalancer")
+    load_balancer: HttpLoadBalancerService | None = Field(None, alias="loadBalancer")
 
 
 class HttpServiceItem1(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    weighted: Optional[HttpWeightedService] = None
+    weighted: HttpWeightedService | None = None
 
 
 class HttpServiceItem2(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    mirroring: Optional[HttpMirroringService] = None
+    mirroring: HttpMirroringService | None = None
 
 
 class HttpServiceItem3(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    failover: Optional[HttpFailoverService] = None
+    failover: HttpFailoverService | None = None
 
 
 class HttpService(
-    RootModel[
-        Union[HttpServiceItem, HttpServiceItem1, HttpServiceItem2, HttpServiceItem3]
-    ]
+    RootModel[HttpServiceItem | HttpServiceItem1 | HttpServiceItem2 | HttpServiceItem3]
 ):
-    root: Union[
-        HttpServiceItem, HttpServiceItem1, HttpServiceItem2, HttpServiceItem3
-    ] = Field(
-        ...,
-        description=(
-            "The Services are responsible for configuring how to reach the actual"
-            " services that will eventually handle the incoming requests."
-        ),
+    root: HttpServiceItem | HttpServiceItem1 | HttpServiceItem2 | HttpServiceItem3 = (
+        Field(
+            ...,
+            description=(
+                "The Services are responsible for configuring how to reach the actual"
+                " services that will eventually handle the incoming requests."
+            ),
+        )
     )
 
 
@@ -613,7 +611,7 @@ class AddPrefixMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    prefix: Optional[str] = Field(
+    prefix: str | None = Field(
         None,
         description=(
             "prefix is the string to add before the current path in the requested URL."
@@ -629,14 +627,14 @@ class BasicAuthMiddleware(BaseModel):
     of usersFile have precedence over the values in users.
     """
 
-    users: Optional[list[str]] = Field(
+    users: list[str] | None = Field(
         None,
         description=(
             "The users option is an array of authorized users. Each user will be"
             " declared using the `name:hashed-password` format."
         ),
     )
-    users_file: Optional[str] = Field(
+    users_file: str | None = Field(
         None,
         alias="usersFile",
         description=(
@@ -645,14 +643,14 @@ class BasicAuthMiddleware(BaseModel):
             " `name:hashed-password`."
         ),
     )
-    realm: Optional[str] = Field(
+    realm: str | None = Field(
         "traefik",
         description=(
             "You can customize the realm for the authentication with the realm option."
             " The default value is traefik."
         ),
     )
-    header_field: Optional[str] = Field(
+    header_field: str | None = Field(
         None,
         alias="headerField",
         description=(
@@ -660,7 +658,7 @@ class BasicAuthMiddleware(BaseModel):
             " headerField option."
         ),
     )
-    remove_header: Optional[bool] = Field(
+    remove_header: bool | None = Field(
         default=False,
         alias="removeHeader",
         description=(
@@ -684,7 +682,7 @@ class BufferingMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    max_request_body_bytes: Optional[int] = Field(
+    max_request_body_bytes: int | None = Field(
         None,
         alias="maxRequestBodyBytes",
         description=(
@@ -694,7 +692,7 @@ class BufferingMiddleware(BaseModel):
             " 413 (Request Entity Too Large) response."
         ),
     )
-    mem_request_body_bytes: Optional[int] = Field(
+    mem_request_body_bytes: int | None = Field(
         None,
         alias="memRequestBodyBytes",
         description=(
@@ -703,7 +701,7 @@ class BufferingMiddleware(BaseModel):
             " option."
         ),
     )
-    max_response_body_bytes: Optional[int] = Field(
+    max_response_body_bytes: int | None = Field(
         None,
         alias="maxResponseBodyBytes",
         description=(
@@ -713,7 +711,7 @@ class BufferingMiddleware(BaseModel):
             " gets a 413 (Request Entity Too Large) response instead."
         ),
     )
-    mem_response_body_bytes: Optional[int] = Field(
+    mem_response_body_bytes: int | None = Field(
         None,
         alias="memResponseBodyBytes",
         description=(
@@ -722,7 +720,7 @@ class BufferingMiddleware(BaseModel):
             " option."
         ),
     )
-    retry_expression: Optional[str] = Field(
+    retry_expression: str | None = Field(
         None,
         alias="retryExpression",
         description=(
@@ -740,7 +738,7 @@ class ChainMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    middlewares: Optional[list[str]] = Field(None, min_length=1)
+    middlewares: list[str] | None = Field(None, min_length=1)
 
 
 class CircuitBreakerMiddleware(BaseModel):
@@ -758,7 +756,7 @@ class CircuitBreakerMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    expression: Optional[str] = Field(
+    expression: str | None = Field(
         None,
         description=(
             "You can specify an expression that, once matched, will trigger the circuit"
@@ -766,7 +764,7 @@ class CircuitBreakerMiddleware(BaseModel):
             " services)."
         ),
     )
-    check_period: Optional[str] = Field(
+    check_period: str | None = Field(
         None,
         alias="checkPeriod",
         description=(
@@ -774,7 +772,7 @@ class CircuitBreakerMiddleware(BaseModel):
             " (when in standby state)"
         ),
     )
-    fallback_duration: Optional[str] = Field(
+    fallback_duration: str | None = Field(
         None,
         alias="fallbackDuration",
         description=(
@@ -782,7 +780,7 @@ class CircuitBreakerMiddleware(BaseModel):
             " recover (from a tripped state)."
         ),
     )
-    recovery_duration: Optional[str] = Field(
+    recovery_duration: str | None = Field(
         None,
         alias="recoveryDuration",
         description=(
@@ -797,7 +795,7 @@ class CompressMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    excluded_content_types: Optional[list[str]] = Field(
+    excluded_content_types: list[str] | None = Field(
         None,
         alias="excludedContentTypes",
         description=(
@@ -808,7 +806,7 @@ class CompressMiddleware(BaseModel):
             " a case-insensitive, whitespace-ignored manner."
         ),
     )
-    min_response_body_bytes: Optional[int] = Field(
+    min_response_body_bytes: int | None = Field(
         None,
         alias="minResponseBodyBytes",
         description=(
@@ -834,7 +832,7 @@ class ContentTypeMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    auto_detect: Optional[bool] = Field(
+    auto_detect: bool | None = Field(
         default=False,
         alias="autoDetect",
         description=(
@@ -854,14 +852,14 @@ class DigestAuthMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    users: Optional[list[str]] = Field(
+    users: list[str] | None = Field(
         None,
         description=(
             "The users option is an array of authorized users. Each user will be"
             " declared using the `name:realm:encoded-password` format."
         ),
     )
-    users_file: Optional[str] = Field(
+    users_file: str | None = Field(
         None,
         alias="usersFile",
         description=(
@@ -870,14 +868,14 @@ class DigestAuthMiddleware(BaseModel):
             " `name:realm:encoded-password`."
         ),
     )
-    realm: Optional[str] = Field(
+    realm: str | None = Field(
         "traefik",
         description=(
             "You can customize the realm for the authentication with the realm option."
             " The default value is traefik."
         ),
     )
-    header_field: Optional[str] = Field(
+    header_field: str | None = Field(
         None,
         alias="headerField",
         description=(
@@ -885,7 +883,7 @@ class DigestAuthMiddleware(BaseModel):
             " headerField option."
         ),
     )
-    remove_header: Optional[bool] = Field(
+    remove_header: bool | None = Field(
         default=False,
         alias="removeHeader",
         description=(
@@ -904,7 +902,7 @@ class ErrorsMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    status: Optional[list[str]] = Field(
+    status: list[str] | None = Field(
         None,
         description=(
             "The status that will trigger the error page.\n\nThe status code ranges are"
@@ -913,10 +911,10 @@ class ErrorsMiddleware(BaseModel):
             " with a syntax like 500-599."
         ),
     )
-    service: Optional[str] = Field(
+    service: str | None = Field(
         None, description="The service that will serve the new requested error page."
     )
-    query: Optional[str] = Field(
+    query: str | None = Field(
         None,
         description=(
             "The URL for the error page (hosted by service). You can use {status} in"
@@ -928,14 +926,14 @@ class ErrorsMiddleware(BaseModel):
 class Tls2(BaseModel):
     """The TLS configuration from Traefik to the authentication server."""
 
-    ca: Optional[str] = Field(
+    ca: str | None = Field(
         None,
         description=(
             "Certificate Authority used for the secured connection to the"
             " authentication server."
         ),
     )
-    ca_optional: Optional[bool] = Field(
+    ca_optional: bool | None = Field(
         None,
         alias="caOptional",
         description=(
@@ -943,21 +941,21 @@ class Tls2(BaseModel):
             " the authentication server. Requires tls.ca to be defined."
         ),
     )
-    cert: Optional[str] = Field(
+    cert: str | None = Field(
         None,
         description=(
             "Public certificate used for the secured connection to the authentication"
             " server."
         ),
     )
-    key: Optional[str] = Field(
+    key: str | None = Field(
         None,
         description=(
             "Private certificate used for the secure connection to the authentication"
             " server."
         ),
     )
-    insecure_skip_verify: Optional[bool] = Field(
+    insecure_skip_verify: bool | None = Field(
         None,
         alias="insecureSkipVerify",
         description=(
@@ -977,12 +975,12 @@ class ForwardAuthMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    address: Optional[str] = Field(
+    address: str | None = Field(
         None,
         description="The address option defines the authentication server address.",
     )
     tls: Annotated[
-        Optional[Tls2],
+        Tls2 | None,
         Field(
             dependencies={"caOptional": ["ca"]},
             description=(
@@ -991,7 +989,7 @@ class ForwardAuthMiddleware(BaseModel):
             ),
         ),
     ] = None
-    trust_forward_header: Optional[bool] = Field(
+    trust_forward_header: bool | None = Field(
         None,
         alias="trustForwardHeader",
         description=(
@@ -999,7 +997,7 @@ class ForwardAuthMiddleware(BaseModel):
             " X-Forwarded-* headers."
         ),
     )
-    auth_response_headers: Optional[list[str]] = Field(
+    auth_response_headers: list[str] | None = Field(
         None,
         alias="authResponseHeaders",
         description=(
@@ -1007,7 +1005,7 @@ class ForwardAuthMiddleware(BaseModel):
             " authentication server to the request."
         ),
     )
-    auth_response_headers_regex: Optional[str] = Field(
+    auth_response_headers_regex: str | None = Field(
         None,
         alias="authResponseHeadersRegex",
         description=(
@@ -1016,7 +1014,7 @@ class ForwardAuthMiddleware(BaseModel):
             " after stripping all headers that match the regex."
         ),
     )
-    auth_request_headers: Optional[list[str]] = Field(
+    auth_request_headers: list[str] | None = Field(
         None,
         alias="authRequestHeaders",
         description=(
@@ -1031,7 +1029,7 @@ class HeadersMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    custom_request_headers: Optional[dict[str, str]] = Field(
+    custom_request_headers: dict[str, str] | None = Field(
         None,
         alias="customRequestHeaders",
         description=(
@@ -1039,7 +1037,7 @@ class HeadersMiddleware(BaseModel):
             " to the request."
         ),
     )
-    custom_response_headers: Optional[dict[str, str]] = Field(
+    custom_response_headers: dict[str, str] | None = Field(
         None,
         alias="customResponseHeaders",
         description=(
@@ -1047,7 +1045,7 @@ class HeadersMiddleware(BaseModel):
             " apply to the response."
         ),
     )
-    access_control_allow_credentials: Optional[bool] = Field(
+    access_control_allow_credentials: bool | None = Field(
         None,
         alias="accessControlAllowCredentials",
         description=(
@@ -1055,7 +1053,7 @@ class HeadersMiddleware(BaseModel):
             " include user credentials."
         ),
     )
-    access_control_allow_headers: Optional[list[str]] = Field(
+    access_control_allow_headers: list[str] | None = Field(
         None,
         alias="accessControlAllowHeaders",
         description=(
@@ -1063,7 +1061,7 @@ class HeadersMiddleware(BaseModel):
             " used as part of the request."
         ),
     )
-    access_control_allow_methods: Optional[list[str]] = Field(
+    access_control_allow_methods: list[str] | None = Field(
         None,
         alias="accessControlAllowMethods",
         description=(
@@ -1071,7 +1069,7 @@ class HeadersMiddleware(BaseModel):
             " requests."
         ),
     )
-    access_control_allow_origin_list: Optional[list[str]] = Field(
+    access_control_allow_origin_list: list[str] | None = Field(
         None,
         alias="accessControlAllowOriginList",
         description=(
@@ -1082,7 +1080,7 @@ class HeadersMiddleware(BaseModel):
             " contain a list of allowed origins."
         ),
     )
-    access_control_allow_origin_list_regex: Optional[list[str]] = Field(
+    access_control_allow_origin_list_regex: list[str] | None = Field(
         None,
         alias="accessControlAllowOriginListRegex",
         description=(
@@ -1091,7 +1089,7 @@ class HeadersMiddleware(BaseModel):
             " origin values."
         ),
     )
-    access_control_expose_headers: Optional[list[str]] = Field(
+    access_control_expose_headers: list[str] | None = Field(
         None,
         alias="accessControlExposeHeaders",
         description=(
@@ -1099,7 +1097,7 @@ class HeadersMiddleware(BaseModel):
             " to the api of a CORS API specification."
         ),
     )
-    access_control_max_age: Optional[int] = Field(
+    access_control_max_age: int | None = Field(
         None,
         alias="accessControlMaxAge",
         description=(
@@ -1107,7 +1105,7 @@ class HeadersMiddleware(BaseModel):
             " request can be cached."
         ),
     )
-    add_vary_header: Optional[bool] = Field(
+    add_vary_header: bool | None = Field(
         None,
         alias="addVaryHeader",
         description=(
@@ -1117,7 +1115,7 @@ class HeadersMiddleware(BaseModel):
             " origin header."
         ),
     )
-    allowed_hosts: Optional[list[str]] = Field(
+    allowed_hosts: list[str] | None = Field(
         None,
         alias="allowedHosts",
         description=(
@@ -1125,7 +1123,7 @@ class HeadersMiddleware(BaseModel):
             " allowed."
         ),
     )
-    hosts_proxy_headers: Optional[list[str]] = Field(
+    hosts_proxy_headers: list[str] | None = Field(
         None,
         alias="hostsProxyHeaders",
         description=(
@@ -1133,12 +1131,12 @@ class HeadersMiddleware(BaseModel):
             " proxied hostname value for the request."
         ),
     )
-    ssl_redirect: Optional[bool] = Field(
+    ssl_redirect: bool | None = Field(
         None,
         alias="sslRedirect",
         description="The sslRedirect is set to true, then only allow https requests.",
     )
-    ssl_temporary_redirect: Optional[bool] = Field(
+    ssl_temporary_redirect: bool | None = Field(
         None,
         alias="sslTemporaryRedirect",
         description=(
@@ -1146,7 +1144,7 @@ class HeadersMiddleware(BaseModel):
             " 302 (instead of a 301)."
         ),
     )
-    ssl_host: Optional[str] = Field(
+    ssl_host: str | None = Field(
         None,
         alias="sslHost",
         description=(
@@ -1154,7 +1152,7 @@ class HeadersMiddleware(BaseModel):
             " to https."
         ),
     )
-    ssl_proxy_headers: Optional[dict[str, str]] = Field(
+    ssl_proxy_headers: dict[str, str] | None = Field(
         None,
         alias="sslProxyHeaders",
         description=(
@@ -1163,7 +1161,7 @@ class HeadersMiddleware(BaseModel):
             ' proxies with header like: "X-Forwarded-Proto": "https".'
         ),
     )
-    ssl_force_host: Optional[bool] = Field(
+    ssl_force_host: bool | None = Field(
         None,
         alias="sslForceHost",
         description=(
@@ -1171,7 +1169,7 @@ class HeadersMiddleware(BaseModel):
             " even the ones that are already using SSL."
         ),
     )
-    sts_seconds: Optional[int] = Field(
+    sts_seconds: int | None = Field(
         None,
         alias="stsSeconds",
         description=(
@@ -1179,7 +1177,7 @@ class HeadersMiddleware(BaseModel):
             " set to 0, would NOT include the header."
         ),
     )
-    sts_include_subdomains: Optional[bool] = Field(
+    sts_include_subdomains: bool | None = Field(
         None,
         alias="stsIncludeSubdomains",
         description=(
@@ -1187,7 +1185,7 @@ class HeadersMiddleware(BaseModel):
             " will be appended to the Strict-Transport-Security header."
         ),
     )
-    sts_preload: Optional[bool] = Field(
+    sts_preload: bool | None = Field(
         None,
         alias="stsPreload",
         description=(
@@ -1195,7 +1193,7 @@ class HeadersMiddleware(BaseModel):
             " Strict-Transport-Security header."
         ),
     )
-    force_sts_header: Optional[bool] = Field(
+    force_sts_header: bool | None = Field(
         None,
         alias="forceSTSHeader",
         description=(
@@ -1203,7 +1201,7 @@ class HeadersMiddleware(BaseModel):
             " is HTTP."
         ),
     )
-    frame_deny: Optional[bool] = Field(
+    frame_deny: bool | None = Field(
         None,
         alias="frameDeny",
         description=(
@@ -1211,7 +1209,7 @@ class HeadersMiddleware(BaseModel):
             " DENY."
         ),
     )
-    custom_frame_options_value: Optional[str] = Field(
+    custom_frame_options_value: str | None = Field(
         None,
         alias="customFrameOptionsValue",
         description=(
@@ -1219,7 +1217,7 @@ class HeadersMiddleware(BaseModel):
             " set with a custom value. This overrides the FrameDeny option."
         ),
     )
-    content_type_nosniff: Optional[bool] = Field(
+    content_type_nosniff: bool | None = Field(
         None,
         alias="contentTypeNosniff",
         description=(
@@ -1227,7 +1225,7 @@ class HeadersMiddleware(BaseModel):
             " with the value nosniff."
         ),
     )
-    browser_xss_filter: Optional[bool] = Field(
+    browser_xss_filter: bool | None = Field(
         None,
         alias="browserXssFilter",
         description=(
@@ -1235,7 +1233,7 @@ class HeadersMiddleware(BaseModel):
             " value 1; mode=block."
         ),
     )
-    custom_browser_xss_value: Optional[str] = Field(
+    custom_browser_xss_value: str | None = Field(
         None,
         alias="customBrowserXSSValue",
         description=(
@@ -1244,7 +1242,7 @@ class HeadersMiddleware(BaseModel):
             " option."
         ),
     )
-    content_security_policy: Optional[str] = Field(
+    content_security_policy: str | None = Field(
         None,
         alias="contentSecurityPolicy",
         description=(
@@ -1252,7 +1250,7 @@ class HeadersMiddleware(BaseModel):
             " value to be set with a custom value."
         ),
     )
-    public_key: Optional[str] = Field(
+    public_key: str | None = Field(
         None,
         alias="publicKey",
         description=(
@@ -1260,7 +1258,7 @@ class HeadersMiddleware(BaseModel):
             " certificates."
         ),
     )
-    referrer_policy: Optional[str] = Field(
+    referrer_policy: str | None = Field(
         None,
         alias="referrerPolicy",
         description=(
@@ -1268,17 +1266,17 @@ class HeadersMiddleware(BaseModel):
             " Referer header to other sites."
         ),
     )
-    feature_policy: Optional[str] = Field(
+    feature_policy: str | None = Field(
         None,
         alias="featurePolicy",
         description="The featurePolicy allows sites to control browser features.",
     )
-    permissions_policy: Optional[str] = Field(
+    permissions_policy: str | None = Field(
         None,
         alias="permissionsPolicy",
         description="The permissionsPolicy allows sites to control browser features.",
     )
-    is_development: Optional[bool] = Field(
+    is_development: bool | None = Field(
         None,
         alias="isDevelopment",
         description=(
@@ -1296,7 +1294,7 @@ class IpStrategy(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    depth: Optional[int] = Field(
+    depth: int | None = Field(
         None,
         description=(
             "The depth option tells Traefik to use the X-Forwarded-For header and take"
@@ -1306,7 +1304,7 @@ class IpStrategy(BaseModel):
             " equal to 0."
         ),
     )
-    excluded_i_ps: Optional[list[str]] = Field(
+    excluded_i_ps: list[str] | None = Field(
         None,
         alias="excludedIPs",
         description=(
@@ -1321,7 +1319,7 @@ class IpWhiteListMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    source_range: Optional[list[str]] = Field(
+    source_range: list[str] | None = Field(
         None,
         alias="sourceRange",
         description=(
@@ -1329,7 +1327,7 @@ class IpWhiteListMiddleware(BaseModel):
             " using CIDR notation)."
         ),
     )
-    ip_strategy: Optional[IpStrategy] = Field(None, alias="ipStrategy")
+    ip_strategy: IpStrategy | None = Field(None, alias="ipStrategy")
 
 
 class SourceCriterion(BaseModel):
@@ -1341,8 +1339,8 @@ class SourceCriterion(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    ip_strategy: Optional[IpStrategy] = Field(None, alias="ipStrategy")
-    request_header_name: Optional[str] = Field(
+    ip_strategy: IpStrategy | None = Field(None, alias="ipStrategy")
+    request_header_name: str | None = Field(
         None,
         alias="requestHeaderName",
         description=(
@@ -1350,7 +1348,7 @@ class SourceCriterion(BaseModel):
             " from the same source."
         ),
     )
-    request_host: Optional[bool] = Field(
+    request_host: bool | None = Field(
         None,
         alias="requestHost",
         description="Whether to consider the request host as the source.",
@@ -1365,7 +1363,7 @@ class InFlightReqMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    amount: Optional[int] = Field(
+    amount: int | None = Field(
         None,
         description=(
             "The amount option defines the maximum amount of allowed simultaneous"
@@ -1374,7 +1372,7 @@ class InFlightReqMiddleware(BaseModel):
             " same sourceCriterion strategy)."
         ),
     )
-    source_criterion: Optional[SourceCriterion] = Field(None, alias="sourceCriterion")
+    source_criterion: SourceCriterion | None = Field(None, alias="sourceCriterion")
 
 
 class Subject(BaseModel):
@@ -1383,35 +1381,35 @@ class Subject(BaseModel):
     to the X-Forwarded-Tls-Client-Cert-Info header.
     """
 
-    country: Optional[bool] = Field(
+    country: bool | None = Field(
         None,
         description=(
             "Set the country option to true to add the country information into the"
             " subject."
         ),
     )
-    province: Optional[bool] = Field(
+    province: bool | None = Field(
         None,
         description=(
             "Set the province option to true to add the province information into the"
             " subject."
         ),
     )
-    locality: Optional[bool] = Field(
+    locality: bool | None = Field(
         None,
         description=(
             "Set the locality option to true to add the locality information into the"
             " subject."
         ),
     )
-    organization: Optional[bool] = Field(
+    organization: bool | None = Field(
         None,
         description=(
             "Set the organization option to true to add the organization information"
             " into the subject."
         ),
     )
-    common_name: Optional[bool] = Field(
+    common_name: bool | None = Field(
         None,
         alias="commonName",
         description=(
@@ -1419,7 +1417,7 @@ class Subject(BaseModel):
             " the subject."
         ),
     )
-    serial_number: Optional[bool] = Field(
+    serial_number: bool | None = Field(
         None,
         alias="serialNumber",
         description=(
@@ -1427,7 +1425,7 @@ class Subject(BaseModel):
             " into the subject."
         ),
     )
-    domain_component: Optional[bool] = Field(
+    domain_component: bool | None = Field(
         None,
         alias="domainComponent",
         description=(
@@ -1443,35 +1441,35 @@ class Issuer(BaseModel):
     the X-Forwarded-Tls-Client-Cert-Info header.
     """
 
-    country: Optional[bool] = Field(
+    country: bool | None = Field(
         None,
         description=(
             "Set the country option to true to add the country information into the"
             " issuer."
         ),
     )
-    province: Optional[bool] = Field(
+    province: bool | None = Field(
         None,
         description=(
             "Set the province option to true to add the province information into the"
             " issuer."
         ),
     )
-    locality: Optional[bool] = Field(
+    locality: bool | None = Field(
         None,
         description=(
             "Set the locality option to true to add the locality information into the"
             " issuer."
         ),
     )
-    organization: Optional[bool] = Field(
+    organization: bool | None = Field(
         None,
         description=(
             "Set the organization option to true to add the organization information"
             " into the issuer."
         ),
     )
-    common_name: Optional[bool] = Field(
+    common_name: bool | None = Field(
         None,
         alias="commonName",
         description=(
@@ -1479,7 +1477,7 @@ class Issuer(BaseModel):
             " the issuer."
         ),
     )
-    serial_number: Optional[bool] = Field(
+    serial_number: bool | None = Field(
         None,
         alias="serialNumber",
         description=(
@@ -1487,7 +1485,7 @@ class Issuer(BaseModel):
             " into the issuer."
         ),
     )
-    domain_component: Optional[bool] = Field(
+    domain_component: bool | None = Field(
         None,
         alias="domainComponent",
         description=(
@@ -1504,7 +1502,7 @@ class Info(BaseModel):
     escaped concatenation of all the selected certificate details.
     """
 
-    not_after: Optional[bool] = Field(
+    not_after: bool | None = Field(
         None,
         alias="notAfter",
         description=(
@@ -1512,7 +1510,7 @@ class Info(BaseModel):
             " Validity part."
         ),
     )
-    not_before: Optional[bool] = Field(
+    not_before: bool | None = Field(
         None,
         alias="notBefore",
         description=(
@@ -1520,21 +1518,21 @@ class Info(BaseModel):
             " the Validity part."
         ),
     )
-    sans: Optional[bool] = Field(
+    sans: bool | None = Field(
         None,
         description=(
             "Set the sans option to true to add the Subject Alternative Name"
             " information from the Subject Alternative Name part."
         ),
     )
-    subject: Optional[Subject] = Field(
+    subject: Subject | None = Field(
         None,
         description=(
             "The subject select the specific client certificate subject details you"
             " want to add to the X-Forwarded-Tls-Client-Cert-Info header."
         ),
     )
-    issuer: Optional[Issuer] = Field(
+    issuer: Issuer | None = Field(
         None,
         description=(
             "The issuer select the specific client certificate issuer details you want"
@@ -1548,14 +1546,14 @@ class PassTLSClientCertMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    pem: Optional[bool] = Field(
+    pem: bool | None = Field(
         None,
         description=(
             "The pem option sets the X-Forwarded-Tls-Client-Cert header with the escape"
             " certificate."
         ),
     )
-    info: Optional[Info] = Field(
+    info: Info | None = Field(
         None,
         description=(
             "The info option select the specific client certificate details you want to"
@@ -1580,7 +1578,7 @@ class RateLimitMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    average: Optional[Union[str, float]] = Field(
+    average: str | float | None = Field(
         None,
         description=(
             "average is the maximum rate, by default in requests by second, allowed for"
@@ -1590,21 +1588,21 @@ class RateLimitMiddleware(BaseModel):
             " second."
         ),
     )
-    period: Optional[Union[str, float]] = Field(
+    period: str | float | None = Field(
         None,
         description=(
             "period, in combination with average, defines the actual maximum"
             " rate.\n\nIt defaults to 1 second."
         ),
     )
-    burst: Optional[float] = Field(
+    burst: float | None = Field(
         1,
         description=(
             "burst is the maximum number of requests allowed to go through in the same"
             " arbitrarily small period of time.\n\nIt defaults to 1."
         ),
     )
-    source_criterion: Optional[SourceCriterion] = Field(None, alias="sourceCriterion")
+    source_criterion: SourceCriterion | None = Field(None, alias="sourceCriterion")
 
 
 class RedirectRegexMiddleware(BaseModel):
@@ -1612,20 +1610,20 @@ class RedirectRegexMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    permanent: Optional[bool] = Field(
+    permanent: bool | None = Field(
         None,
         description=(
             "Set the permanent option to true to apply a permanent redirection."
         ),
     )
-    regex: Optional[str] = Field(
+    regex: str | None = Field(
         None,
         description=(
             "The regex option is the regular expression to match and capture elements"
             " from the request URL."
         ),
     )
-    replacement: Optional[str] = Field(
+    replacement: str | None = Field(
         None,
         description=(
             "The replacement option defines how to modify the URL to have the new"
@@ -1641,16 +1639,16 @@ class RedirectSchemeMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    permanent: Optional[bool] = Field(
+    permanent: bool | None = Field(
         None,
         description=(
             "Set the permanent option to true to apply a permanent redirection."
         ),
     )
-    scheme: Optional[str] = Field(
+    scheme: str | None = Field(
         None, description="The scheme option defines the scheme of the new url."
     )
-    port: Optional[str] = Field(
+    port: str | None = Field(
         None,
         description=(
             "The port option defines the port of the new url. Port in this"
@@ -1667,7 +1665,7 @@ class ReplacePathMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    path: Optional[str] = Field(
+    path: str | None = Field(
         None,
         description=(
             "The path option defines the path to use as replacement in the request url."
@@ -1684,14 +1682,14 @@ class ReplacePathRegexMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    regex: Optional[str] = Field(
+    regex: str | None = Field(
         None,
         description=(
             "The regex option is the regular expression to match and capture the path"
             " from the request URL."
         ),
     )
-    replacement: Optional[str] = Field(
+    replacement: str | None = Field(
         None,
         description=(
             "The replacement option defines how to modify the path to have the new"
@@ -1717,7 +1715,7 @@ class RetryMiddleware(BaseModel):
             "The attempts option defines how many times the request should be retried."
         ),
     )
-    initial_interval: Optional[str] = Field(
+    initial_interval: str | None = Field(
         None,
         alias="initialInterval",
         description=(
@@ -1735,13 +1733,13 @@ class StripPrefixMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    prefixes: Optional[list[str]] = Field(
+    prefixes: list[str] | None = Field(
         None,
         description=(
             "The prefixes option defines the prefixes to strip from the request URL"
         ),
     )
-    force_slash: Optional[bool] = Field(
+    force_slash: bool | None = Field(
         None,
         alias="forceSlash",
         description=(
@@ -1762,7 +1760,7 @@ class StripPrefixRegexMiddleware(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    regex: Optional[list[str]] = Field(
+    regex: list[str] | None = Field(
         None,
         description=(
             "The regex option is the regular expression to match the path prefix from"
@@ -1774,31 +1772,31 @@ class StripPrefixRegexMiddleware(BaseModel):
 class HttpMiddlewareItem(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    add_prefix: Optional[AddPrefixMiddleware] = Field(None, alias="addPrefix")
+    add_prefix: AddPrefixMiddleware | None = Field(None, alias="addPrefix")
 
 
 class HttpMiddlewareItem1(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    basic_auth: Optional[BasicAuthMiddleware] = Field(None, alias="basicAuth")
+    basic_auth: BasicAuthMiddleware | None = Field(None, alias="basicAuth")
 
 
 class HttpMiddlewareItem2(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    buffering: Optional[BufferingMiddleware] = None
+    buffering: BufferingMiddleware | None = None
 
 
 class HttpMiddlewareItem3(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    chain: Optional[ChainMiddleware] = None
+    chain: ChainMiddleware | None = None
 
 
 class HttpMiddlewareItem4(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    circuit_breaker: Optional[CircuitBreakerMiddleware] = Field(
+    circuit_breaker: CircuitBreakerMiddleware | None = Field(
         None, alias="circuitBreaker"
     )
 
@@ -1806,55 +1804,55 @@ class HttpMiddlewareItem4(BaseModel):
 class HttpMiddlewareItem5(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    compress: Optional[CompressMiddleware] = None
+    compress: CompressMiddleware | None = None
 
 
 class HttpMiddlewareItem6(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    content_type: Optional[ContentTypeMiddleware] = Field(None, alias="contentType")
+    content_type: ContentTypeMiddleware | None = Field(None, alias="contentType")
 
 
 class HttpMiddlewareItem7(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    digest_auth: Optional[DigestAuthMiddleware] = Field(None, alias="digestAuth")
+    digest_auth: DigestAuthMiddleware | None = Field(None, alias="digestAuth")
 
 
 class HttpMiddlewareItem8(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    errors: Optional[ErrorsMiddleware] = None
+    errors: ErrorsMiddleware | None = None
 
 
 class HttpMiddlewareItem9(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    forward_auth: Optional[ForwardAuthMiddleware] = Field(None, alias="forwardAuth")
+    forward_auth: ForwardAuthMiddleware | None = Field(None, alias="forwardAuth")
 
 
 class HttpMiddlewareItem10(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    headers: Optional[HeadersMiddleware] = None
+    headers: HeadersMiddleware | None = None
 
 
 class HttpMiddlewareItem11(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    ip_white_list: Optional[IpWhiteListMiddleware] = Field(None, alias="ipWhiteList")
+    ip_white_list: IpWhiteListMiddleware | None = Field(None, alias="ipWhiteList")
 
 
 class HttpMiddlewareItem12(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    in_flight_req: Optional[InFlightReqMiddleware] = Field(None, alias="inFlightReq")
+    in_flight_req: InFlightReqMiddleware | None = Field(None, alias="inFlightReq")
 
 
 class HttpMiddlewareItem13(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    pass_tls_client_cert: Optional[PassTLSClientCertMiddleware] = Field(
+    pass_tls_client_cert: PassTLSClientCertMiddleware | None = Field(
         None, alias="passTLSClientCert"
     )
 
@@ -1862,27 +1860,25 @@ class HttpMiddlewareItem13(BaseModel):
 class HttpMiddlewareItem14(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    plugin: Optional[PluginMiddleware] = None
+    plugin: PluginMiddleware | None = None
 
 
 class HttpMiddlewareItem15(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    rate_limit: Optional[RateLimitMiddleware] = Field(None, alias="rateLimit")
+    rate_limit: RateLimitMiddleware | None = Field(None, alias="rateLimit")
 
 
 class HttpMiddlewareItem16(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    redirect_regex: Optional[RedirectRegexMiddleware] = Field(
-        None, alias="redirectRegex"
-    )
+    redirect_regex: RedirectRegexMiddleware | None = Field(None, alias="redirectRegex")
 
 
 class HttpMiddlewareItem17(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    redirect_scheme: Optional[RedirectSchemeMiddleware] = Field(
+    redirect_scheme: RedirectSchemeMiddleware | None = Field(
         None, alias="redirectScheme"
     )
 
@@ -1890,13 +1886,13 @@ class HttpMiddlewareItem17(BaseModel):
 class HttpMiddlewareItem18(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    replace_path: Optional[ReplacePathMiddleware] = Field(None, alias="replacePath")
+    replace_path: ReplacePathMiddleware | None = Field(None, alias="replacePath")
 
 
 class HttpMiddlewareItem19(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    replace_path_regex: Optional[ReplacePathRegexMiddleware] = Field(
+    replace_path_regex: ReplacePathRegexMiddleware | None = Field(
         None, alias="replacePathRegex"
     )
 
@@ -1904,55 +1900,53 @@ class HttpMiddlewareItem19(BaseModel):
 class HttpMiddlewareItem20(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    retry: Optional[RetryMiddleware] = None
+    retry: RetryMiddleware | None = None
 
 
 class HttpMiddlewareItem21(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    strip_prefix: Optional[StripPrefixMiddleware] = Field(None, alias="stripPrefix")
+    strip_prefix: StripPrefixMiddleware | None = Field(None, alias="stripPrefix")
 
 
 class HttpMiddlewareItem22(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    strip_prefix_regex: Optional[StripPrefixRegexMiddleware] = Field(
+    strip_prefix_regex: StripPrefixRegexMiddleware | None = Field(
         None, alias="stripPrefixRegex"
     )
 
 
 HttpMiddleware = RootModel[
-    Union[
-        HttpMiddlewareItem,
-        HttpMiddlewareItem1,
-        HttpMiddlewareItem2,
-        HttpMiddlewareItem3,
-        HttpMiddlewareItem4,
-        HttpMiddlewareItem5,
-        HttpMiddlewareItem6,
-        HttpMiddlewareItem7,
-        HttpMiddlewareItem8,
-        HttpMiddlewareItem9,
-        HttpMiddlewareItem10,
-        HttpMiddlewareItem11,
-        HttpMiddlewareItem12,
-        HttpMiddlewareItem13,
-        HttpMiddlewareItem14,
-        HttpMiddlewareItem15,
-        HttpMiddlewareItem16,
-        HttpMiddlewareItem17,
-        HttpMiddlewareItem18,
-        HttpMiddlewareItem19,
-        HttpMiddlewareItem20,
-        HttpMiddlewareItem21,
-        HttpMiddlewareItem22,
-    ]
+    HttpMiddlewareItem
+    | HttpMiddlewareItem1
+    | HttpMiddlewareItem2
+    | HttpMiddlewareItem3
+    | HttpMiddlewareItem4
+    | HttpMiddlewareItem5
+    | HttpMiddlewareItem6
+    | HttpMiddlewareItem7
+    | HttpMiddlewareItem8
+    | HttpMiddlewareItem9
+    | HttpMiddlewareItem10
+    | HttpMiddlewareItem11
+    | HttpMiddlewareItem12
+    | HttpMiddlewareItem13
+    | HttpMiddlewareItem14
+    | HttpMiddlewareItem15
+    | HttpMiddlewareItem16
+    | HttpMiddlewareItem17
+    | HttpMiddlewareItem18
+    | HttpMiddlewareItem19
+    | HttpMiddlewareItem20
+    | HttpMiddlewareItem21
+    | HttpMiddlewareItem22
 ]
 
 
 class Domain2(BaseModel):
-    main: Optional[str] = Field(None, description="Main defines the main domain name.")
-    sans: Optional[list[str]] = Field(
+    main: str | None = Field(None, description="Main defines the main domain name.")
+    sans: list[str] | None = Field(
         None, description="SANs defines the subject alternative domain names."
     )
 
@@ -1966,7 +1960,7 @@ class Tls3(BaseModel):
     that it will send decrypted data to the services.
     """
 
-    passthrough: Optional[bool] = Field(
+    passthrough: bool | None = Field(
         default=False,
         description=(
             "A TLS router will terminate the TLS connection by default. However, the"
@@ -1974,7 +1968,7 @@ class Tls3(BaseModel):
             ' forwarded "as is", keeping all data encrypted.'
         ),
     )
-    options: Optional[str] = Field(
+    options: str | None = Field(
         None,
         description=(
             "The options field enables fine-grained control of the TLS parameters. It"
@@ -1982,7 +1976,7 @@ class Tls3(BaseModel):
             " defined."
         ),
     )
-    cert_resolver: Optional[str] = Field(
+    cert_resolver: str | None = Field(
         None,
         alias="certResolver",
         description=(
@@ -1990,7 +1984,7 @@ class Tls3(BaseModel):
             " based on routers Host & HostSNI rules."
         ),
     )
-    domains: Optional[list[Domain2]] = Field(
+    domains: list[Domain2] | None = Field(
         None,
         description=(
             "You can set SANs (alternative domains) for each main domain. Every domain"
@@ -2009,7 +2003,7 @@ class TcpRouter(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    entry_points: Optional[list[str]] = Field(
+    entry_points: list[str] | None = Field(
         None,
         alias="entryPoints",
         description=(
@@ -2018,7 +2012,7 @@ class TcpRouter(BaseModel):
             " set the entry points option."
         ),
     )
-    middlewares: Optional[list[str]] = None
+    middlewares: list[str] | None = None
     rule: str = Field(
         ...,
         description=(
@@ -2036,7 +2030,7 @@ class TcpRouter(BaseModel):
             " the router. TCP routers can only target TCP services (not HTTP services)."
         ),
     )
-    priority: Optional[int] = Field(
+    priority: int | None = Field(
         0,
         description=(
             "To avoid path overlap, routes are sorted, by default, in descending order"
@@ -2047,7 +2041,7 @@ class TcpRouter(BaseModel):
         ),
         ge=0,
     )
-    tls: Optional[Tls3] = Field(
+    tls: Tls3 | None = Field(
         None,
         description=(
             "When a TLS section is specified, it instructs Traefik that the current"
@@ -2066,7 +2060,7 @@ class Server1(BaseModel):
 
 
 class ProxyProtocol(BaseModel):
-    version: Optional[int] = None
+    version: int | None = None
 
 
 class TcpLoadBalancerService(BaseModel):
@@ -2077,7 +2071,7 @@ class TcpLoadBalancerService(BaseModel):
         description="Servers declare a single instance of your program.",
         min_length=1,
     )
-    termination_delay: Optional[float] = Field(
+    termination_delay: float | None = Field(
         100,
         alias="terminationDelay",
         description=(
@@ -2097,7 +2091,7 @@ class TcpLoadBalancerService(BaseModel):
             " itself)."
         ),
     )
-    proxy_protocol: Optional[ProxyProtocol] = Field(None, alias="proxyProtocol")
+    proxy_protocol: ProxyProtocol | None = Field(None, alias="proxyProtocol")
 
 
 class Service1(BaseModel):
@@ -2116,22 +2110,22 @@ class TcpWeightedService(BaseModel):
 class TcpServiceItem(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    load_balancer: Optional[TcpLoadBalancerService] = Field(None, alias="loadBalancer")
+    load_balancer: TcpLoadBalancerService | None = Field(None, alias="loadBalancer")
 
 
 class TcpServiceItem1(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    weighted: Optional[TcpWeightedService] = None
+    weighted: TcpWeightedService | None = None
 
 
-TcpService = RootModel[Union[TcpServiceItem, TcpServiceItem1]]
+TcpService = RootModel[TcpServiceItem | TcpServiceItem1]
 
 
 class UdpRouter(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    entry_points: Optional[list[str]] = Field(
+    entry_points: list[str] | None = Field(
         None,
         alias="entryPoints",
         description=(
@@ -2185,25 +2179,25 @@ class UdpWeightedService(BaseModel):
 class UdpServiceItem(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    load_balancer: Optional[UdpLoadBalancerService] = Field(None, alias="loadBalancer")
+    load_balancer: UdpLoadBalancerService | None = Field(None, alias="loadBalancer")
 
 
 class UdpServiceItem1(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    weighted: Optional[UdpWeightedService] = None
+    weighted: UdpWeightedService | None = None
 
 
-UdpService = RootModel[Union[UdpServiceItem, UdpServiceItem1]]
+UdpService = RootModel[UdpServiceItem | UdpServiceItem1]
 
 
 class Http(BaseModel):
-    routers: Optional[dict[str, HttpRouter]] = None
-    services: Optional[dict[str, HttpService]] = None
-    servers_transports: Optional[dict[str, ServersTransport]] = Field(
+    routers: dict[str, HttpRouter] | None = None
+    services: dict[str, HttpService] | None = None
+    servers_transports: dict[str, ServersTransport] | None = Field(
         None, alias="serversTransports"
     )
-    middlewares: Optional[dict[str, HttpMiddleware]] = Field(
+    middlewares: dict[str, HttpMiddleware] | None = Field(
         None,
         description=(
             "Attached to the routers, pieces of middleware are a means of tweaking the"
@@ -2217,8 +2211,8 @@ class Http(BaseModel):
 
 
 class Tcp(BaseModel):
-    routers: Optional[dict[str, TcpRouter]] = None
-    services: Optional[dict[str, TcpService]] = Field(
+    routers: dict[str, TcpRouter] | None = None
+    services: dict[str, TcpService] | None = Field(
         None,
         description=(
             "Each of the fields of the service section represents a kind of service."
@@ -2232,7 +2226,7 @@ class Tcp(BaseModel):
 class Udp(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    routers: Optional[dict[str, UdpRouter]] = Field(
+    routers: dict[str, UdpRouter] | None = Field(
         None,
         description=(
             "Similarly to TCP, as UDP is the transport layer, there is no concept of a"
@@ -2244,7 +2238,7 @@ class Udp(BaseModel):
             " time are pretty much only load-balancers in one form or another."
         ),
     )
-    services: Optional[dict[str, UdpService]] = Field(
+    services: dict[str, UdpService] | None = Field(
         None,
         description=(
             "Each of the fields of the service section represents a kind of service."
@@ -2260,10 +2254,10 @@ class TraefikFileConfig(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    http: Optional[Http] = None
-    tcp: Optional[Tcp] = None
-    udp: Optional[Udp] = None
-    tls: Optional[Tls] = Field(
+    http: Http | None = None
+    tcp: Tcp | None = None
+    udp: Udp | None = None
+    tls: Tls | None = Field(
         None,
         description=(
             "Configures the TLS connection, TLS options, and certificate stores."

@@ -1,5 +1,5 @@
 celery-redbeat==2.3.2  # Support for using Redis as the lock for Celery schedules
-django-redis==5.4.0
+django-redis==6.0.0
 ol-openedx-git-auto-export==0.4.0
 edx-sysadmin==0.3.1
 edx-username-changer==0.3.2
@@ -12,7 +12,7 @@ ol-openedx-logging
 ol-openedx-sentry
 openedx-scorm-xblock
 ol-social-auth==0.1.0
-pydantic-settings==2.9.1
+pydantic-settings==2.10.1
 uwsgi==2.0.30
 wheel==0.45.1
 

@@ -40,6 +40,9 @@ path "secret-operations/tika/access-token" {
 path "secret-global/data/mailgun" {
   capabilities = ["read"]
 }
+path "secret-global/data/shared_hmac" {
+  capabilities = ["read"]
+}
 
 path "secret-mitlearn/*" {
   capabilities = ["read"]

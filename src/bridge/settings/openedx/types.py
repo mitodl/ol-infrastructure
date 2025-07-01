@@ -1,5 +1,5 @@
 from enum import Enum, EnumMeta
-from typing import Literal, NamedTuple, Optional, Union
+from typing import Literal, NamedTuple
 
 from pydantic import BaseModel
 
@@ -125,7 +125,7 @@ class DeploymentEnvRelease(BaseModel):
             if env_release.edx_release == release_name
         ]
 
-    def release_by_env(self, env_stage: EnvStage) -> Optional[OpenEdxSupportedRelease]:
+    def release_by_env(self, env_stage: EnvStage) -> OpenEdxSupportedRelease | None:
         for env_release in self.env_release_map:
             if env_release.environment == env_stage:
                 return env_release.edx_release
@@ -141,13 +141,13 @@ class DeploymentEnvRelease(BaseModel):
 
 
 class OpenEdxApplicationVersion(BaseModel):
-    application: Union[OpenEdxApplication, OpenEdxMicroFrontend]
+    application: OpenEdxApplication | OpenEdxMicroFrontend
     release: OpenEdxSupportedRelease
     application_type: OpenEdxApplicationType
-    branch_override: Optional[str] = None
-    origin_override: Optional[str] = None
-    runtime_version_override: Optional[str] = None
-    translation_overrides: Optional[list[str]] = None
+    branch_override: str | None = None
+    origin_override: str | None = None
+    runtime_version_override: str | None = None
+    translation_overrides: list[str] | None = None
 
     @property
     def runtime_version(self) -> str:

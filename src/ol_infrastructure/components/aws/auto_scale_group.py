@@ -1,4 +1,4 @@
-from typing import Literal, Optional, Union
+from typing import Literal
 
 import pulumi
 from pulumi_aws.acm import get_certificate
@@ -50,9 +50,9 @@ class BlockDeviceMapping(BaseModel):
     delete_on_termination: bool = True
     device_name: str = "/dev/xvda"
     encrypted: bool = True
-    kms_key_arn: Optional[pulumi.Output[str] | str] = None
-    iops: Optional[int] = None
-    throughput: Optional[int] = None
+    kms_key_arn: pulumi.Output[str] | str | None = None
+    iops: int | None = None
+    throughput: int | None = None
     volume_size: PositiveInt = PositiveInt(25)
     volume_type: DiskTypes = DiskTypes.ssd
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -62,17 +62,17 @@ class TagSpecification(BaseModel):
     """Container for describing a tag specification for an EC2 launch template"""
 
     resource_type: str
-    tags: Union[pulumi.Output[dict[str, str]], dict[str, str]]
+    tags: pulumi.Output[dict[str, str]] | dict[str, str]
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class OLTargetGroupConfig(AWSBase):
     """Configuration object for defining a target group for use with a loadbalancer."""
 
-    vpc_id: Union[str, pulumi.Output[str]]
+    vpc_id: str | pulumi.Output[str]
     port: NonNegativeInt = NonNegativeInt(443)
     protocol: str = "HTTPS"
-    stickiness: Optional[str] = None
+    stickiness: str | None = None
 
     health_check_enabled: bool = True
     health_check_healthy_threshold: PositiveInt = PositiveInt(2)
@@ -106,9 +106,9 @@ class OLLoadBalancerConfig(AWSBase):
     security_groups: list[SecurityGroup | str | pulumi.Output[str]]
     subnets: pulumi.Output[str]
 
-    idle_timeout_seconds: Optional[int] = 60
+    idle_timeout_seconds: int | None = 60
     listener_use_acm: bool = True
-    listener_cert_arn: Optional[str | pulumi.Output[str]] = None
+    listener_cert_arn: str | pulumi.Output[str] | None = None
     listener_cert_domain: str = "*.odl.mit.edu"
     listener_protocol: str = "HTTPS"
     listener_action_type: str = "forward"
@@ -140,12 +140,12 @@ class OLLaunchTemplateConfig(AWSBase):
 
     block_device_mappings: list[BlockDeviceMapping]
     image_id: str
-    instance_profile_arn: Union[str, pulumi.Output[str]]
+    instance_profile_arn: str | pulumi.Output[str]
     instance_type: str = InstanceTypes.burstable_medium
     key_name: str = "oldevops"
-    security_groups: list[Union[SecurityGroup, pulumi.Output]]
+    security_groups: list[SecurityGroup | pulumi.Output]
     tag_specifications: list[TagSpecification]
-    user_data: Optional[Union[str, pulumi.Output[str]]]
+    user_data: str | pulumi.Output[str] | None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("instance_type")
@@ -179,7 +179,7 @@ class OLAutoScaleGroupConfig(AWSBase):
     instance_refresh_min_healthy_percentage: NonNegativeInt = NonNegativeInt(50)
     instance_refresh_strategy: str = "Rolling"
     instance_refresh_triggers: list[str] = ["tag"]  # noqa: RUF012
-    max_instance_lifetime_seconds: Optional[NonNegativeInt] = 2592000  # 30 days
+    max_instance_lifetime_seconds: NonNegativeInt | None = 2592000  # 30 days
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("instance_refresh_strategy")
@@ -212,9 +212,9 @@ class OLAutoScaling(pulumi.ComponentResource):
         self,
         asg_config: OLAutoScaleGroupConfig,
         lt_config: OLLaunchTemplateConfig,
-        tg_config: Optional[OLTargetGroupConfig] = None,
-        lb_config: Optional[OLLoadBalancerConfig] = None,
-        opts: Optional[pulumi.ResourceOptions] = None,
+        tg_config: OLTargetGroupConfig | None = None,
+        lb_config: OLLoadBalancerConfig | None = None,
+        opts: pulumi.ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:infrastructure:aws:auto_scale_group:OLAutoScaleGroup",

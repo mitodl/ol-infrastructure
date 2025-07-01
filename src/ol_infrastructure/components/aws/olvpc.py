@@ -17,7 +17,7 @@ This includes:
 from functools import partial
 from ipaddress import IPv4Address, IPv4Network, IPv6Address, IPv6Network, ip_address
 from itertools import cycle
-from typing import Literal, Optional
+from typing import Literal
 
 from pulumi import Alias, ComponentResource, ResourceOptions
 from pulumi_aws import ec2, elasticache, rds
@@ -75,7 +75,7 @@ class OLVPCConfig(AWSBase):
 
     vpc_name: str
     cidr_block: IPv4Network
-    k8s_service_subnet: Optional[IPv4Network] = None
+    k8s_service_subnet: IPv4Network | None = None
     k8s_nat_gateway_config: Literal["single", "all"] = "single"
     k8s_subnet_pair_configs: list[OLVPCK8SSubnetPairConfig] = []  # noqa: RUF012
     num_subnets: PositiveInt = MIN_SUBNETS
@@ -118,8 +118,8 @@ class OLVPCConfig(AWSBase):
     @field_validator("k8s_service_subnet")
     @classmethod
     def k8s_service_subnet_is_subnet(
-        cls, k8s_service_subnet: Optional[IPv4Network], info: ValidationInfo
-    ) -> Optional[IPv4Network]:
+        cls, k8s_service_subnet: IPv4Network | None, info: ValidationInfo
+    ) -> IPv4Network | None:
         """Ensure that specified k8s subnet is NOT a subnet of the cidr specified
             for the VPC.
         :param k8s_service_subnet: The K8S service subnet to be created in the VPC.
@@ -166,7 +166,7 @@ class OLVPC(ComponentResource):
     Learning Platform Engineering team constructs and organizes VPC environments in AWS.
     """
 
-    def __init__(self, vpc_config: OLVPCConfig, opts: Optional[ResourceOptions] = None):  # noqa: PLR0915
+    def __init__(self, vpc_config: OLVPCConfig, opts: ResourceOptions | None = None):  # noqa: PLR0915
         """Build an AWS VPC with subnets, internet gateway, and routing table.
 
         :param vpc_config: Configuration object for customizing the created VPC and
@@ -289,7 +289,7 @@ class OLVPC(ComponentResource):
         # specify the ranges in configuration and we are also going to
         # place them near the middle of the VPC's /16 block.
 
-        self.k8s_service_subnet: Optional[ec2.Subnet] = None
+        self.k8s_service_subnet: ec2.Subnet | None = None
         self.k8s_private_subnets: list[ec2.Subnet] = []
         self.k8s_private_route_tables: list[ec2.RouteTable] = []
         self.k8s_nat_gateways: list[ec2.NatGateway] = []
@@ -508,7 +508,7 @@ class OLVPCPeeringConnection(ComponentResource):
         vpc_peer_name: str,
         source_vpc: OLVPC,
         destination_vpc: OLVPC,
-        opts: Optional[ResourceOptions] = None,
+        opts: ResourceOptions | None = None,
     ):
         """Create a peering connection and associated routes between two managed VPCs.
 

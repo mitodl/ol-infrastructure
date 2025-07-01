@@ -2,7 +2,7 @@ import sys
 import textwrap
 from collections import defaultdict
 from itertools import chain, product
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -37,34 +37,34 @@ from ol_concourse.lib.resources import git_repo
 
 
 class OpenEdxVars(BaseModel):
-    about_us_url: Optional[str] = None
-    accessibility_url: Optional[str] = None
-    account_settings_url: Optional[str] = None
-    contact_url: Optional[str] = None
-    enable_certificate_page: Optional[Literal["true", "false"]] = None
+    about_us_url: str | None = None
+    accessibility_url: str | None = None
+    account_settings_url: str | None = None
+    contact_url: str | None = None
+    enable_certificate_page: Literal["true", "false"] | None = None
     deployment_name: OpenEdxDeploymentName
-    display_feedback_widget: Optional[str] = None
+    display_feedback_widget: str | None = None
     environment: str
     environment_stage: EnvStage
     favicon_url: str
-    honor_code_url: Optional[str] = None
-    learning_base_url: Optional[str] = None
+    honor_code_url: str | None = None
+    learning_base_url: str | None = None
     lms_domain: str
     logo_url: str
     marketing_site_domain: str
-    mit_learn_base_url: Optional[str] = None
-    plugin_slot_config_file_map: Optional[dict[str, str]] = None
-    privacy_policy_url: Optional[str] = None
-    schedule_email_section: Optional[str] = None
+    mit_learn_base_url: str | None = None
+    plugin_slot_config_file_map: dict[str, str] | None = None
+    privacy_policy_url: str | None = None
+    schedule_email_section: str | None = None
     site_name: str
     studio_domain: str
     support_url: str
     terms_of_service_url: str
-    trademark_text: Optional[str] = None
-    logo_trademark_url: Optional[str] = None
-    enable_video_upload_page_link_in_content_dropdown: Optional[
-        Literal["true", "false"]
-    ] = None
+    trademark_text: str | None = None
+    logo_trademark_url: str | None = None
+    enable_video_upload_page_link_in_content_dropdown: (
+        Literal["true", "false"] | None
+    ) = None
 
     @property
     def release_name(self) -> OpenEdxSupportedRelease:
@@ -75,7 +75,7 @@ class OpenEdxVars(BaseModel):
 
 def mfe_params(
     open_edx: OpenEdxVars, mfe: OpenEdxApplicationVersion
-) -> dict[str, Optional[str]]:
+) -> dict[str, str | None]:
     learning_mfe_path = OpenEdxMicroFrontend.learn.path
     discussion_mfe_path = OpenEdxMicroFrontend.discussion.path
     return {
@@ -121,6 +121,7 @@ def mfe_params(
         "TRADEMARK_TEXT": open_edx.trademark_text,
         "USER_INFO_COOKIE_NAME": f"{open_edx.environment}-edx-user-info",
         "ENABLE_VIDEO_UPLOAD_PAGE_LINK_IN_CONTENT_DROPDOWN": open_edx.enable_video_upload_page_link_in_content_dropdown,  # noqa: E501
+        "PARAGON_THEME_URLS": "{}",
     }
 
 
@@ -128,7 +129,7 @@ def mfe_job(
     open_edx: OpenEdxVars,
     mfe: OpenEdxApplicationVersion,
     open_edx_deployment: DeploymentEnvRelease,
-    previous_job: Optional[Job] = None,
+    previous_job: Job | None = None,
 ) -> PipelineFragment:
     mfe_name = mfe.application.value
     mfe_repo = git_repo(
@@ -177,7 +178,11 @@ def mfe_job(
         cp package/dist/bundles/* public/static/smoot-design
         """
         slot_config_file = "learning-mfe-config"
-        copy_common_config = f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx {mfe_build_dir.name}/common-mfe-config.env.jsx"  # noqa: E501
+        copy_common_config = (
+            f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+            f"{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx "
+            f"{mfe_build_dir.name}/common-mfe-config.env.jsx"
+        )
 
     mfe_setup_steps = [
         f"cp -r {mfe_repo.name}/* {mfe_build_dir.name}",
@@ -190,15 +195,12 @@ def mfe_job(
             f"{open_edx_deployment.deployment_name}/{slot_config_file}.env.jsx "
             f"{mfe_build_dir.name}/env.config.jsx"
         ),
-        copy_common_config,
     ]
+    if copy_common_config:
+        mfe_setup_steps.append(copy_common_config)
 
     # Add styles.scss copy for Residential deployments
-    if (
-        open_edx_deployment.deployment_name in ["mitx", "mitx-staging"]
-        and OpenEdxMicroFrontend[mfe_name].value
-        == OpenEdxMicroFrontend.learner_dashboard.value
-    ):
+    if open_edx_deployment.deployment_name in ["mitx", "mitx-staging"]:
         mfe_setup_steps.append(
             f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
             f"mitx-styles.scss {mfe_build_dir.name}/mitx-styles.scss"

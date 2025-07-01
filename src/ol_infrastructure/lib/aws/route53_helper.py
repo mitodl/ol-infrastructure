@@ -1,5 +1,3 @@
-from typing import Optional
-
 import boto3
 import pulumi
 from pulumi_aws import route53
@@ -61,7 +59,7 @@ def acm_certificate_validation_records(
     cert_name: str,
     zone_id: str,
     stack_info: StackInfo,
-    opts: Optional[pulumi.ResourceOptions] = None,
+    opts: pulumi.ResourceOptions | None = None,
 ) -> list[route53.Record]:
     records_array = []
     for index, validation in enumerate(validation_options):

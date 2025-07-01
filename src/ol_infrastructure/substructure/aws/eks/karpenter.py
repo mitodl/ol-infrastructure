@@ -1,4 +1,4 @@
-# ruff: noqa: E501 S608
+# ruff: noqa: E501
 import json
 import re
 

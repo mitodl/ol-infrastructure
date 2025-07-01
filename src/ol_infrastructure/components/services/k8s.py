@@ -1,4 +1,4 @@
-# ruff: noqa: ERA001, C416, E501, CPY001, D103, D101
+# ruff: noqa: ERA001, E501
 """
 This is a service components that replaces a number of "boilerplate" kubernetes
 calls we currently make into one convenient callable package.
@@ -1079,3 +1079,39 @@ class OLApisixExternalUpstream(pulumi.ComponentResource):
                 opts=resource_options,
             )
         )
+
+
+class OLTraefikMiddleware(pulumi.ComponentResource):
+    """
+    Generic component for creating Traefik Middleware custom resources.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        middleware_name: str,
+        namespace: str,
+        spec: dict[str, Any],
+        opts: pulumi.ResourceOptions | None = None,
+    ):
+        """Initialize the OLTraefikMiddleware component resource."""
+        super().__init__(
+            "ol:infrastructure:services:k8s:OLTraefikMiddleware", name, None, opts
+        )
+        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)
+
+        self.traefik_middleware = kubernetes.apiextensions.CustomResource(
+            f"OLTraefikMiddleware-{name}",
+            api_version="traefik.io/v1alpha1",
+            kind="Middleware",
+            metadata={
+                "name": middleware_name,
+                "namespace": namespace,
+            },
+            spec=spec,
+            opts=resource_options,
+        )
+        self.gateway_filter = {
+            "type": "ExtensionRef",
+            "extensionRef": {"group": "traefik.io", "kind": "Middleware", "name": name},
+        }

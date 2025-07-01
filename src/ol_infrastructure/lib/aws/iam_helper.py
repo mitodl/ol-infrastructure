@@ -1,6 +1,6 @@
 import json
 import re
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal
 
 from parliament import analyze_policy_string
 from parliament.finding import Finding
@@ -54,10 +54,10 @@ def _is_parliament_finding_filtered(
 
 
 def lint_iam_policy(
-    policy_document: Union[str, dict[str, Any]],
+    policy_document: str | dict[str, Any],
     stringify: bool = False,  # noqa: FBT001, FBT002
-    parliament_config: Optional[dict[str, Any]] = None,
-) -> Union[str, dict[str, Any]]:
+    parliament_config: dict[str, Any] | None = None,
+) -> str | dict[str, Any]:
     """Lint the contents of an IAM policy and abort execution if issues are found.
 
     :param policy_document: An IAM policy document represented as a JSON encoded string

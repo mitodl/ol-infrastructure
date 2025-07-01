@@ -1,9 +1,8 @@
-# ruff: noqa: ERA001
-
 """The complete state needed to provision Keycloak running on Docker."""
 
 import json
 import os
+import textwrap
 from itertools import chain
 from pathlib import Path
 
@@ -30,6 +29,7 @@ from ol_infrastructure.components.aws.eks import (
     OLEKSGatewayListenerConfig,
     OLEKSGatewayRouteConfig,
 )
+from ol_infrastructure.components.services.k8s import OLTraefikMiddleware
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SDynamicSecretConfig,
@@ -44,6 +44,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
 )
+from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.consul import consul_key_helper, get_consul_provider
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
@@ -262,6 +263,8 @@ keycloak_database_security_group = ec2.SecurityGroup(
 
 # Database
 rds_defaults = defaults(stack_info)["rds"]
+if stack_info.env_suffix == "qa":
+    rds_defaults["instance_size"] = DBInstanceTypes.general_purpose_large.value
 
 rds_password = keycloak_config.require("rds_password")
 
@@ -548,6 +551,43 @@ keycloak_service_monitor = kubernetes.apiextensions.CustomResource(
     ),
 )
 
+KEYCLOAK_COOKIE_FILTER_NAME = "keycloak-cookie-filter"
+
+keycloak_cookie_filter = OLTraefikMiddleware(
+    "keycloak-cookie-filter",
+    middleware_name=KEYCLOAK_COOKIE_FILTER_NAME,
+    namespace="keycloak",
+    spec={
+        "headers": {
+            "customRequestHeaders": {
+                "Cookie": textwrap.dedent(
+                    """\
+                    {{- $cookieHeader := index .Request.Header "Cookie" -}}
+                    {{- if $cookieHeader -}}
+                      {{- $cookies := split (index $cookieHeader 0) ";" -}}
+                      {{- $filtered := list -}}
+                      {{- range $cookies -}}
+                        {{- $cookie := trim . " " -}}
+                        {{- if or
+                          (hasPrefix $cookie "KEYCLOAK_")
+                          (hasPrefix $cookie "AUTH_SESSION_")
+                          (hasPrefix $cookie "JSESSIONID")
+                          (hasPrefix $cookie "KC_")
+                        -}}
+                          {{- $filtered = append $filtered $cookie -}}
+                        {{- end -}}
+                      {{- end -}}
+                      {{- if $filtered -}}
+                        {{- join $filtered "; " -}}
+                      {{- end -}}
+                    {{- end -}}
+                    """
+                )
+            }
+        }
+    },
+)
+
 gateway_config = OLEKSGatewayConfig(
     cert_issuer="letsencrypt-production",
     cert_issuer_class="cluster-issuer",
@@ -573,6 +613,7 @@ gateway_config = OLEKSGatewayConfig(
             name="keycloak-https",
             listener_name="https",
             port=8443,
+            filters=[keycloak_cookie_filter.gateway_filter],
         )
     ],
 )
@@ -581,7 +622,7 @@ gateway = OLEKSGateway(
     f"keycloak-gateway-{stack_info.env_suffix}",
     gateway_config=gateway_config,
     opts=ResourceOptions(
-        depends_on=[keycloak_resource],
+        depends_on=[keycloak_resource, keycloak_cookie_filter.traefik_middleware],
         delete_before_replace=True,
     ),
 )

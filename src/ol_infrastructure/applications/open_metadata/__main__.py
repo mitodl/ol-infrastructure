@@ -1,4 +1,3 @@
-# ruff: noqa: UP042, CPY001, D100, ERA001, D102
 from pathlib import Path
 from string import Template
 

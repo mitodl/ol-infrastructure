@@ -15,6 +15,10 @@ config:
   mitxonline:k8s_deploy: "true"
   mitxonline:vars:
     AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-qa"
+    CORS_ALLOWED_ORIGINS: "https://rc.mitxonline.mit.edu,https://rc.learn.mit.edu"
+    CSRF_TRUSTED_ORIGINS: "https://rc.mitxonline.mit.edu,https://rc.learn.mit.edu"
+    CSRF_COOKIE_DOMAIN: ".rc.mitxonline.mit.edu"
+    CSRF_COOKIE_NAME: csrf_mitxonline
     CRON_COURSE_CERTIFICATES_HOURS: "18"
     GA_TRACKING_ID: "UA-5145472-46"
     GTM_TRACKING_ID: "GTM-TW97MNR"
@@ -38,7 +42,7 @@ config:
     OPENEDX_OAUTH_PROVIDER: "ol-oauth2"
     OPENEDX_SOCIAL_LOGIN_PATH: "/auth/login/ol-oauth2/?auth_entry=login"
     OPENTELEMETRY_ENABLED: "true"
-    OPENTELEMETRY_ENDPOINT: "http://grafana-alloy.operations.svc.cluster.local:4318"
+    OPENTELEMETRY_ENDPOINT: "http://grafana-alloy.operations.svc.cluster.local:4318/v1/traces"
     SENTRY_LOG_LEVEL: "ERROR"
     SENTRY_PROFILES_SAMPLE_RATE: "1.0"
     SENTRY_TRACES_SAMPLE_RATE: "1.0"

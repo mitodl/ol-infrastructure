@@ -1,7 +1,7 @@
 # ruff: noqa: PLR0913, E501
 
 import sys
-from typing import Any, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, model_validator
 
@@ -48,11 +48,11 @@ class AppPipelineParams(BaseModel):
     """
 
     app_name: str
-    build_target: Optional[str] = None
+    build_target: str | None = None
     dockerfile_path: str = "./Dockerfile"
-    fastly_service_prefix: Optional[str] = None
+    fastly_service_prefix: str | None = None
     purge_fastly_cache: bool = False
-    repo_name: Optional[str] = None
+    repo_name: str | None = None
 
     @model_validator(mode="after")
     def set_repo_name(self) -> "AppPipelineParams":
@@ -77,7 +77,7 @@ pipeline_params = {
 
 def _define_git_resources(
     app_name: str,
-    repo_name: Union[str, None],
+    repo_name: str | None,
 ) -> tuple[Resource, Resource, Resource, Resource]:
     """Define the git resources needed for the pipeline."""
     main_repo = git_repo(
@@ -166,7 +166,7 @@ def _build_image_job(
     dockerfile_path: str,
     git_repo_resource: Resource,
     registry_image_resource: Resource,
-    build_target: Optional[str] = None,
+    build_target: str | None = None,
 ) -> Job:
     """Generate an image build job for a specific branch type (main or rc)."""
     job_name = f"build-{app_name}-image-from-{branch_type}"

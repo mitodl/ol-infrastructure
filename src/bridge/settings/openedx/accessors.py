@@ -1,5 +1,4 @@
 from functools import partial
-from typing import Optional, Union
 
 from bridge.settings.openedx.types import (
     DeploymentEnvRelease,
@@ -23,8 +22,8 @@ def _fetch_application_version(
     ],
     release_name: OpenEdxSupportedRelease,
     deployment: OpenEdxDeploymentName,
-    application_name: Union[OpenEdxApplication, OpenEdxMicroFrontend],
-) -> Optional[OpenEdxApplicationVersion]:
+    application_name: OpenEdxApplication | OpenEdxMicroFrontend,
+) -> OpenEdxApplicationVersion | None:
     app_versions = release_map[release_name][deployment]
     fetched_app_version = None
     for app_version in app_versions:
