@@ -935,7 +935,7 @@ env_vars = {
     "MITOL_DB_CONN_MAX_AGE": 0,
     "MITOL_DB_DISABLE_SSL": "True",
     "QDRANT_ENABLE_INDEXING_PLUGIN_HOOKS": True,
-    "CANVAS_COURSE_BUCKET_PREFIX": "canvas/canvas_export",
+    "CANVAS_COURSE_BUCKET_PREFIX": "canvas/canvas_content",
     "MITOL_DEFAULT_SITE_KEY": "micromasters",
     "MITOL_EMAIL_PORT": 587,
     "MITOL_EMAIL_TLS": "True",
