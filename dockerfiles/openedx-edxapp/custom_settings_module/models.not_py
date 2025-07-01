@@ -1,0 +1,786 @@
+from enum import Enum
+from typing import Any, Literal, Optional
+
+from pydantic import Field, model_validator
+from pydantic_settings import BaseSettings
+
+
+# Enums for better validation
+class EnvironmentType(str, Enum):
+    DEVELOPMENT = "development"
+    STAGING = "staging"
+    PRODUCTION = "production"
+    TEST = "test"
+
+
+class RuntimeType(str, Enum):
+    LMS = "lms"
+    CMS = "cms"
+
+
+# Core Django Settings
+class DjangoSettings(BaseSettings):
+    """Core Django framework settings."""
+
+    DEBUG: bool = False
+    SECRET_KEY: str = "dev key"
+    ALLOWED_HOSTS: list[str] = ["*"]
+    USE_TZ: bool = True
+    TIME_ZONE: str = "UTC"
+    LANGUAGE_CODE: str = "en"
+    SITE_ID: int = 1
+    ROOT_URLCONF: str = "lms.urls"  # Default to LMS, override for CMS
+    WSGI_APPLICATION: str = "lms.wsgi.application"
+
+    model_config = {"env_prefix": "DJANGO_", "extra": "allow"}
+
+
+class DatabaseSettings(BaseSettings):
+    """Database configuration settings."""
+
+    SESSION_ENGINE: str = "django.contrib.sessions.backends.cache"
+    SESSION_COOKIE_AGE: int = 604800  # 1 week
+    SESSION_COOKIE_DOMAIN: Optional[str] = None
+    SESSION_COOKIE_HTTPONLY: bool = True
+    SESSION_COOKIE_NAME: str = "sessionid"
+    SESSION_COOKIE_SECURE: bool = False
+    SESSION_SAVE_EVERY_REQUEST: bool = False
+
+    # MongoDB settings
+    MONGODB_LOG: dict[str, Any] = {}
+
+    # MySQL/PostgreSQL settings
+    DATABASE_OPTIONS: dict[str, Any] = {}
+    DATABASE_CONN_MAX_AGE: int = 0
+
+    model_config = {"env_prefix": "DB_", "extra": "allow"}
+
+
+class CacheSettings(BaseSettings):
+    """Cache configuration settings."""
+
+    CACHE_TIMEOUT: int = 300  # 5 minutes
+    CACHE_MIDDLEWARE_SECONDS: int = 3600  # 1 hour
+    CACHE_MIDDLEWARE_KEY_PREFIX: str = ""
+    USE_ETAGS: bool = True
+
+    # Cache backends configuration
+    DEFAULT_CACHE_BACKEND: str = "django.core.cache.backends.locmem.LocMemCache"
+    STATICFILES_CACHE_BACKEND: str = "django.core.cache.backends.locmem.LocMemCache"
+
+    model_config = {"env_prefix": "CACHE_", "extra": "allow"}
+
+
+class SecuritySettings(BaseSettings):
+    """Security-related settings."""
+
+    SECRET_KEY: str = "dev key"
+    SECURE_PROXY_SSL_HEADER: tuple[str, str] = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT: bool = False
+    SECURE_HSTS_SECONDS: int = 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS: bool = False
+    SECURE_HSTS_PRELOAD: bool = False
+    SECURE_CONTENT_TYPE_NOSNIFF: bool = True
+    SECURE_BROWSER_XSS_FILTER: bool = True
+    SECURE_REFERRER_POLICY: str = "same-origin"
+
+    # Session security
+    SESSION_COOKIE_SECURE: bool = False
+    SESSION_COOKIE_HTTPONLY: bool = True
+    SESSION_COOKIE_SAMESITE: str = "Lax"
+    SESSION_INACTIVITY_TIMEOUT_IN_SECONDS: Optional[int] = None
+
+    # CSRF protection
+    CSRF_COOKIE_SECURE: bool = False
+    CSRF_COOKIE_HTTPONLY: bool = False
+    CSRF_TRUSTED_ORIGINS: list[str] = []
+    CSRF_USE_SESSIONS: bool = False
+
+    # Third-party auth
+    ENABLE_REQUIRE_THIRD_PARTY_AUTH: bool = False
+    SSL_AUTH_EMAIL_DOMAIN: str = "MIT.EDU"
+    SSL_AUTH_DN_FORMAT_STRING: str = "/C=US/ST=Massachusetts/O=Massachusetts Institute of Technology/OU=Client CA v1/CN={0}/emailAddress={1}"
+
+    model_config = {"env_prefix": "SECURITY_", "extra": "allow"}
+
+
+class StaticFilesSettings(BaseSettings):
+    """Static files and media configuration."""
+
+    STATIC_URL: str = "/static/"
+    STATIC_ROOT: Optional[str] = None
+    STATIC_ROOT_BASE: Optional[str] = None
+    STATIC_URL_BASE: Optional[str] = None
+    STATICFILES_STORAGE: str = "django.contrib.staticfiles.storage.StaticFilesStorage"
+
+    # Media files
+    MEDIA_URL: str = "/media/"
+    MEDIA_ROOT: Optional[str] = None
+
+    # Build-related
+    PYTHON_LIB_FILENAME: str = "python_lib.zip"
+    STATICFILES_IGNORE_PATTERNS: list[str] = ["*.scss", "*.coffee"]
+
+    # Compression
+    COMPRESS_ENABLED: bool = False
+    COMPRESS_CSS_FILTERS: list[str] = [
+        "compressor.filters.css_default.CssAbsoluteFilter"
+    ]
+    COMPRESS_JS_FILTERS: list[str] = ["compressor.filters.jsmin.JSMinFilter"]
+
+    model_config = {"env_prefix": "STATIC_", "extra": "allow"}
+
+
+class TemplateSettings(BaseSettings):
+    """Template configuration settings."""
+
+    DEBUG: bool = False
+    TEMPLATE_DEBUG: bool = False
+
+    # Mako templates
+    MAKO_MODULE_DIR: Optional[str] = None
+    MAKO_TEMPLATE_DIRS: list[str] = []
+
+    # Django templates
+    TEMPLATE_DIRS: list[str] = []
+
+    model_config = {"env_prefix": "TEMPLATE_", "extra": "allow"}
+
+
+class ThemingSettings(BaseSettings):
+    """Theme and localization settings."""
+
+    COMPREHENSIVE_THEME_DIRS: list[str] = []
+    COMPREHENSIVE_THEME_LOCALE_PATHS: list[str] = []
+    PREPEND_LOCALE_PATHS: list[str] = []
+    ENABLE_COMPREHENSIVE_THEMING: bool = False
+    DEFAULT_SITE_THEME: Optional[str] = None
+
+    # Internationalization
+    USE_I18N: bool = True
+    USE_L10N: bool = True
+    LANGUAGES: list[tuple[str, str]] = [("en", "English")]
+    LOCALE_PATHS: list[str] = []
+
+    model_config = {"env_prefix": "THEME_", "extra": "allow"}
+
+
+class ApplicationSettings(BaseSettings):
+    """Django application configuration."""
+
+    INSTALLED_APPS: list[str] = []
+    MIDDLEWARE: list[str] = []
+    AUTHENTICATION_BACKENDS: list[str] = [
+        "django.contrib.auth.backends.ModelBackend",
+    ]
+
+    # Additional apps that can be added per environment
+    ADDL_INSTALLED_APPS: list[str] = []
+    EXTRA_MIDDLEWARE_CLASSES: list[str] = []
+
+    model_config = {"env_prefix": "APP_", "extra": "allow"}
+
+
+class LoggingSettings(BaseSettings):
+    """Logging configuration."""
+
+    LOG_LEVEL: str = "INFO"
+    LOG_DIR: Optional[str] = None
+    LOGGING_ENV: str = "no_env"
+    LOCAL_LOGLEVEL: str = "INFO"
+    SYSLOG_SERVER: Optional[str] = None
+
+    # Feature-specific logging
+    ENABLE_SQL_TRACKING_LOGS: bool = False
+    TRACK_MAX_REQUESTS: int = 10000
+
+    model_config = {"env_prefix": "LOG_", "extra": "allow"}
+
+
+class MonitoringSettings(BaseSettings):
+    """Monitoring and observability settings."""
+
+    # Performance monitoring
+    ENABLE_NEWRELIC_DISTRIBUTED_TRACING: bool = False
+    NEWRELIC_TRANSMIT_TRACES: bool = True
+
+    # Error tracking
+    SENTRY_DSN: Optional[str] = None
+    SENTRY_ENVIRONMENT: Optional[str] = None
+
+    # Metrics
+    DATADOG_API: Optional[str] = None
+    DATADOG_APP: Optional[str] = None
+
+    # Health checks
+    HEARTBEAT_CHECKS: list[str] = []
+    HEARTBEAT_EXTENDED_CHECKS: list[str] = []
+    HEARTBEAT_CELERY_TIMEOUT: int = 5
+    HEARTBEAT_CELERY_ROUTING_KEY: Optional[str] = None
+
+    model_config = {"env_prefix": "MONITORING_", "extra": "allow"}
+
+
+class CourseSettings(BaseSettings):
+    """Course-related configuration."""
+
+    COURSE_LISTINGS: dict[str, Any] = {}
+    VIDEO_CDN_URL: dict[str, Any] = {}
+    HOSTNAME_MODULESTORE_DEFAULT_MAPPINGS: dict[str, Any] = {}
+    DASHBOARD_COURSE_LIMIT: Optional[int] = None
+
+    # Course discovery
+    COURSE_CATALOG_VISIBILITY_PERMISSION: str = "see_in_catalog"
+    COURSE_ABOUT_VISIBILITY_PERMISSION: str = "see_about_page"
+
+    # Grading
+    GRADEBOOK_FREEZE_DAYS: int = 30
+    GENERATE_PROFILE_SCORES: bool = False
+
+    # Course blocks
+    COURSE_BLOCKS_API_EXTRA_FIELDS: list[str] = []
+
+    model_config = {"env_prefix": "COURSE_", "extra": "allow"}
+
+
+class XBlockSettings(BaseSettings):
+    """XBlock configuration settings."""
+
+    XBLOCK_MIXINS: tuple[str, ...] = ()
+    XBLOCK_SELECT_FUNCTION: Optional[str] = None
+    XBLOCK_FIELD_DATA_WRAPPERS: list[str] = []
+
+    # Runtime settings
+    XBLOCK_RUNTIME_V2_EPHEMERAL_DATA: bool = False
+
+    model_config = {"env_prefix": "XBLOCK_", "extra": "allow"}
+
+
+class FeatureFlags(BaseSettings):
+    """Feature toggle configuration."""
+
+    # Core features
+    DISPLAY_DEBUG_INFO_TO_STAFF: bool = True
+    DISPLAY_HISTOGRAMS_TO_STAFF: bool = False
+    REROUTE_ACTIVATION_EMAIL: Optional[str] = None
+
+    # Authentication features
+    ENABLE_OAUTH2_PROVIDER: bool = False
+    ENABLE_COMBINED_LOGIN_REGISTRATION: bool = False
+    ENABLE_THIRD_PARTY_AUTH: bool = False
+
+    # Course features
+    ENABLE_COURSE_DISCOVERY: bool = False
+    ENABLE_COURSE_SORTING_BY_START_DATE: bool = False
+    ENABLE_CROSS_DOMAIN_CSRF_COOKIE: bool = False
+
+    # Analytics features
+    ENABLE_SQL_TRACKING_LOGS: bool = False
+    ENABLE_EVENT_TRACKING: bool = True
+
+    model_config = {"env_prefix": "FEATURES_", "extra": "allow"}
+
+
+class ZendeskSettings(BaseSettings):
+    """Zendesk integration settings."""
+
+    ZENDESK_USER: Optional[str] = None
+    ZENDESK_API_KEY: Optional[str] = None
+    ZENDESK_URL: Optional[str] = None
+    ZENDESK_CUSTOM_FIELDS: dict[str, Any] = {}
+
+    model_config = {"env_prefix": "ZENDESK_", "extra": "allow"}
+
+
+class AnalyticsSettings(BaseSettings):
+    """Analytics and tracking settings."""
+
+    GOOGLE_ANALYTICS_TRACKING_ID: Optional[str] = None
+    GOOGLE_ANALYTICS_LINKEDIN: Optional[str] = None
+    GOOGLE_SITE_VERIFICATION_ID: Optional[str] = None
+    BRANCH_IO_KEY: Optional[str] = None
+
+    # Segment
+    SEGMENT_KEY: Optional[str] = None
+
+    # Event tracking
+    TRACKING_BACKENDS: dict[str, dict[str, Any]] = {}
+    EVENT_TRACKING_ENABLED: bool = True
+    EVENT_TRACKING_BACKENDS: dict[str, dict[str, Any]] = {}
+
+    model_config = {"env_prefix": "ANALYTICS_", "extra": "allow"}
+
+
+class SocialMediaSettings(BaseSettings):
+    """Social media integration settings."""
+
+    FACEBOOK_API_VERSION: Optional[str] = None
+    FACEBOOK_APP_SECRET: Optional[str] = None
+    FACEBOOK_APP_ID: Optional[str] = None
+    PLATFORM_FACEBOOK_ACCOUNT: str = (
+        "http://www.facebook.com/YourPlatformFacebookAccount"
+    )
+    PLATFORM_TWITTER_ACCOUNT: str = "@YourPlatformTwitterAccount"
+
+    # LinkedIn
+    LINKEDIN_API_KEY_ID: Optional[str] = None
+    LINKEDIN_API_KEY_SECRET: Optional[str] = None
+
+    model_config = {"env_prefix": "SOCIAL_", "extra": "allow"}
+
+
+class RegistrationSettings(BaseSettings):
+    """User registration settings."""
+
+    REGISTRATION_EMAIL_PATTERNS_ALLOWED: Optional[list[str]] = None
+    REGISTRATION_CODE_LENGTH: int = 8
+    ENABLE_COPPA_COMPLIANCE: bool = False
+    PARENTAL_CONSENT_AGE_LIMIT: int = 13
+
+    # Email verification
+    RETRY_ACTIVATION_EMAIL_MAX_ATTEMPTS: int = 5
+    RETRY_ACTIVATION_EMAIL_TIMEOUT: float = 0.5
+
+    # Marketing emails
+    MARKETING_EMAILS_OPT_IN: bool = False
+
+    model_config = {"env_prefix": "REGISTRATION_", "extra": "allow"}
+
+
+class EmailSettings(BaseSettings):
+    """Email configuration settings."""
+
+    EMAIL_HOST: str = "localhost"
+    EMAIL_PORT: int = 25
+    EMAIL_HOST_USER: str = ""
+    EMAIL_HOST_PASSWORD: str = ""
+    EMAIL_USE_TLS: bool = False
+    EMAIL_USE_SSL: bool = False
+    EMAIL_TIMEOUT: Optional[int] = None
+    EMAIL_BACKEND: str = "django.core.mail.backends.smtp.EmailBackend"
+
+    # AWS SES settings
+    AWS_SES_REGION_NAME: str = "us-east-1"
+    AWS_SES_REGION_ENDPOINT: str = "email.us-east-1.amazonaws.com"
+
+    # Email addresses
+    DEFAULT_FROM_EMAIL: str = "noreply@example.com"
+    SERVER_EMAIL: str = "noreply@example.com"
+    API_ACCESS_MANAGER_EMAIL: Optional[str] = None
+    API_ACCESS_FROM_EMAIL: Optional[str] = None
+    ADMINS: list[tuple[str, str]] = []
+    MANAGERS: list[tuple[str, str]] = []
+
+    # Email file storage (for development)
+    EMAIL_FILE_PATH: str = "/openedx/data/emails"
+
+    model_config = {"env_prefix": "EMAIL_", "extra": "allow"}
+
+
+class CelerySettings(BaseSettings):
+    """Celery task queue settings."""
+
+    CELERY_RESULT_BACKEND: str = "django-cache"
+    CELERY_ALWAYS_EAGER: bool = False
+    CELERY_EAGER_PROPAGATES_EXCEPTIONS: bool = True
+    CELERY_TASK_SERIALIZER: str = "json"
+    CELERY_RESULT_SERIALIZER: str = "json"
+    CELERY_ACCEPT_CONTENT: list[str] = ["json"]
+    CELERY_TIMEZONE: str = "UTC"
+    CELERY_ENABLE_UTC: bool = True
+
+    # Broker settings
+    BROKER_HEARTBEAT: float = 60.0
+    BROKER_HEARTBEAT_CHECKRATE: int = 2
+    CELERY_BROKER_TRANSPORT: str = ""
+    CELERY_BROKER_HOSTNAME: str = ""
+    CELERY_BROKER_VHOST: str = ""
+    CELERY_BROKER_USER: str = ""
+    CELERY_BROKER_PASSWORD: str = ""
+    BROKER_USE_SSL: bool = False
+    BROKER_POOL_LIMIT: int = 0
+    BROKER_CONNECTION_TIMEOUT: int = 1
+
+    # Task settings
+    CELERYD_PREFETCH_MULTIPLIER: int = 1
+    CELERY_TASK_TIME_LIMIT: Optional[int] = None
+    CELERY_TASK_SOFT_TIME_LIMIT: Optional[int] = None
+    CELERY_WORKER_HIJACK_ROOT_LOGGER: bool = False
+
+    # Queue settings
+    CELERY_EVENT_QUEUE_TTL: Optional[int] = None
+    CERT_QUEUE: str = "test-pull"
+    CELERY_ROUTES: str = "openedx.core.lib.celery.routers.route_task"
+
+    # High-priority and low-priority queues
+    HIGH_PRIORITY_QUEUE: str = "edx.lms.core.high"
+    DEFAULT_PRIORITY_QUEUE: str = "edx.lms.core.default"
+    LOW_PRIORITY_QUEUE: str = "edx.lms.core.low"
+
+    model_config = {"env_prefix": "CELERY_", "extra": "allow"}
+
+
+class PlatformSettings(BaseSettings):
+    """Platform branding and basic configuration."""
+
+    PLATFORM_NAME: str = "Your Platform Name Here"
+    PLATFORM_DESCRIPTION: str = "Your Platform Description Here"
+    STUDIO_NAME: str = "Your Platform Studio"
+    STUDIO_SHORT_NAME: str = "Studio"
+
+    # Platform URLs
+    LMS_ROOT_URL: Optional[str] = None
+    LMS_INTERNAL_ROOT_URL: Optional[str] = None
+    CMS_BASE: Optional[str] = "studio.edx.org"
+    CMS_ROOT_URL: Optional[str] = None
+    LMS_BASE: Optional[str] = None
+
+    # Data directories
+    DATA_DIR: str = "/openedx/data"
+    COURSES_ROOT: Optional[str] = None
+
+    # Maintenance
+    MAINTENANCE_BANNER_TEXT: Optional[str] = None
+    SITE_NAME: str = "localhost"
+
+    # Contact information
+    CONTACT_MAILING_ADDRESS: str = "Your Contact Mailing Address Here"
+    TECH_SUPPORT_EMAIL: str = "technical@example.com"
+    CONTACT_EMAIL: str = "info@example.com"
+    BUGS_EMAIL: str = "bugs@example.com"
+
+    # Default URLs and paths
+    FAVICON_PATH: str = "images/favicon.ico"
+    DEFAULT_COURSE_ABOUT_IMAGE_URL: str = "images/course_image.jpg"
+
+    model_config = {"env_prefix": "PLATFORM_", "extra": "allow"}
+
+
+class AwsSettings(BaseSettings):
+    """Amazon Web Services configuration."""
+
+    # S3 Storage
+    AWS_ACCESS_KEY_ID: Optional[str] = None
+    AWS_SECRET_ACCESS_KEY: Optional[str] = None
+    AWS_STORAGE_BUCKET_NAME: str = "edxuploads"
+    AWS_S3_REGION_NAME: str = "us-east-1"
+    AWS_S3_CUSTOM_DOMAIN: str = "edxuploads.s3.amazonaws.com"
+    AWS_S3_CALLING_FORMAT: str = "boto.s3.connection.OrdinaryCallingFormat"
+    AWS_QUERYSTRING_AUTH: bool = True
+    AWS_QUERYSTRING_EXPIRE: int = 7 * 24 * 60 * 60  # 1 week
+    AWS_DEFAULT_ACL: str = "private"
+    AWS_BUCKET_ACL: str = "private"
+    AWS_S3_ENCRYPTION: bool = True
+    AWS_S3_SECURE_URLS: bool = True
+    AWS_S3_FILE_OVERWRITE: bool = True
+
+    # CloudFront
+    AWS_CLOUDFRONT_DOMAIN: Optional[str] = None
+
+    # Other AWS services
+    AWS_SES_REGION_NAME: str = "us-east-1"
+    AWS_SES_REGION_ENDPOINT: str = "email.us-east-1.amazonaws.com"
+
+    model_config = {"env_prefix": "AWS_", "extra": "allow"}
+
+
+class ApiSettings(BaseSettings):
+    """External API configuration."""
+
+    # Comments service
+    COMMENTS_SERVICE_URL: str = ""
+    COMMENTS_SERVICE_KEY: str = ""
+
+    # Platform APIs
+    EDX_API_KEY: Optional[str] = None
+    OPENAPI_CACHE_TIMEOUT: int = 3600
+
+    # AI/ML APIs
+    CHAT_COMPLETION_API: str = ""
+    CHAT_COMPLETION_API_KEY: str = ""
+
+    # Content authoring
+    AUTHORING_API_URL: str = ""
+
+    # Enterprise APIs
+    DEFAULT_ENTERPRISE_API_URL: Optional[str] = None
+    DEFAULT_ENTERPRISE_CONSENT_API_URL: Optional[str] = None
+    ENTERPRISE_API_URL: Optional[str] = None
+    ENTERPRISE_CONSENT_API_URL: Optional[str] = None
+    ENTERPRISE_ENROLLMENT_API_URL: Optional[str] = None
+    ENTERPRISE_PUBLIC_ENROLLMENT_API_URL: Optional[str] = None
+
+    # External service APIs
+    YOUTUBE_API_KEY: Optional[str] = None
+    VIMEO_API_KEY: Optional[str] = None
+
+    # Rate limiting
+    API_RATE_LIMIT: str = "2000/hour"
+
+    model_config = {"env_prefix": "API_", "extra": "allow"}
+
+
+class OAuthSettings(BaseSettings):
+    """OAuth and authentication provider settings."""
+
+    # OAuth2 Provider settings
+    OAUTH_ENFORCE_SECURE: bool = True
+    OAUTH_EXPIRE_CONFIDENTIAL_CLIENT_DAYS: int = 365
+    OAUTH_EXPIRE_PUBLIC_CLIENT_DAYS: int = 30
+    OAUTH_DELETE_EXPIRED: bool = True
+    OAUTH_ID_TOKEN_EXPIRATION: int = 60 * 60  # 1 hour
+
+    # Third-party auth throttling
+    TPA_PROVIDER_BURST_THROTTLE: str = "10/min"
+    TPA_PROVIDER_SUSTAINED_THROTTLE: str = "50/hr"
+    TPA_AUTOMATIC_LOGOUT_ENABLED: bool = False
+
+    # JWT settings
+    JWT_PRIVATE_SIGNING_JWK: Optional[str] = None
+    JWT_SIGNING_ALGORITHM: str = "RS512"
+    JWT_AUDIENCE: Optional[str] = None
+    JWT_ISSUER: Optional[str] = None
+    JWT_EXPIRATION_DELTA: int = 30  # seconds
+
+    model_config = {"env_prefix": "OAUTH_", "extra": "allow"}
+
+
+# Runtime-specific settings
+class LmsSettings(BaseSettings):
+    """LMS-specific configuration."""
+
+    ENABLE_JASMINE: bool = False
+    LMS_ENROLLMENT_API_PATH: str = "/api/enrollment/v1/"
+    IDA_LOGOUT_URI_LIST: list[str] = []
+    CC_MERCHANT_NAME: str = "Your Platform Name Here"
+
+    # Student-specific features
+    ENABLE_STUDENT_HISTORY_VIEW: bool = True
+    ENABLE_LEARNER_ANALYTICS: bool = False
+
+    # Course discovery
+    ENABLE_COURSE_DISCOVERY: bool = False
+    COURSE_DISCOVERY_API_URL: Optional[str] = None
+
+    # Enrollment settings
+    ENROLLMENT_TRACK_SELECTION_FLAG: bool = True
+
+    # Certificates
+    CERTIFICATES_HTML_VIEW: bool = False
+    CERTIFICATE_TEMPLATE_DIR: str = "certificates"
+
+    # Mobile app
+    ENABLE_MOBILE_REST_API: bool = False
+    MOBILE_API_SUPPORTED_VERSIONS: list[str] = ["v1"]
+
+    # Proctoring
+    ENABLE_SPECIAL_EXAMS: bool = False
+    PROCTORING_BACKEND_PROVIDER: Optional[str] = None
+
+    model_config = {"env_prefix": "LMS_", "extra": "allow"}
+
+
+class CmsSettings(BaseSettings):
+    """CMS (Studio) specific configuration."""
+
+    ENABLE_CREDIT_ELIGIBILITY: bool = True
+    CLEAR_REQUEST_CACHE_ON_TASK_COMPLETION: bool = True
+
+    # CMS URLs
+    CMS_ROOT_URL: Optional[str] = None
+    CMS_BASE: Optional[str] = None
+
+    # Content settings
+    BLOCK_STRUCTURES_SETTINGS: dict[str, Any] = {
+        "COURSE_PUBLISH_TASK_DELAY": 30,
+        "TASK_DEFAULT_RETRY_DELAY": 30,
+        "TASK_MAX_RETRIES": 5,
+    }
+
+    # Email templates
+    EMAIL_FILE_PATH: str = "/openedx/data/emails/studio"
+
+    # Prompt settings for learner engagement
+    LEARNER_ENGAGEMENT_PROMPT_FOR_ACTIVE_CONTRACT: str = ""
+    LEARNER_ENGAGEMENT_PROMPT_FOR_NON_ACTIVE_CONTRACT: str = ""
+    LEARNER_PROGRESS_PROMPT_FOR_ACTIVE_CONTRACT: str = ""
+    LEARNER_PROGRESS_PROMPT_FOR_NON_ACTIVE_CONTRACT: str = ""
+
+    # Content libraries
+    ENABLE_CONTENT_LIBRARIES: bool = True
+    CONTENT_LIBRARY_ENDPOINT: Optional[str] = None
+
+    # Studio features
+    ENABLE_EXPORT_GIT: bool = False
+    ENABLE_EXPORT_MONGODB: bool = False
+
+    # Parse settings (legacy)
+    PARSE_KEYS: dict[str, Any] = {}
+
+    # Celery routing keys for CMS-specific tasks
+    POLICY_CHANGE_GRADES_ROUTING_KEY: Optional[str] = None
+    SCRAPE_YOUTUBE_THUMBNAILS_JOB_QUEUE: Optional[str] = None
+    SHARED_COOKIE_DOMAIN: Optional[str] = None
+    SINGLE_LEARNER_COURSE_REGRADE_ROUTING_KEY: Optional[str] = None
+    SOFTWARE_SECURE_VERIFICATION_ROUTING_KEY: Optional[str] = None
+    UPDATE_SEARCH_INDEX_JOB_QUEUE: Optional[str] = None
+    VIDEO_TRANSCRIPT_MIGRATIONS_JOB_QUEUE: Optional[str] = None
+
+    # Studio-specific analytics
+    CMS_SEGMENT_KEY: Optional[str] = None
+
+    # Studio allowed hosts (can be different from LMS)
+    ALLOWED_HOSTS: list[str] = ["*", "studio.edx.org"]
+
+    model_config = {"env_prefix": "CMS_", "extra": "allow"}
+
+
+class PaymentSettings(BaseSettings):
+    """Payment processing configuration."""
+
+    # Shopping cart
+    ENABLE_SHOPPING_CART: bool = False
+    SHOPPING_CART_PAYMENT_PROCESSOR_NAME: str = "CyberSource"
+
+    # E-commerce
+    ECOMMERCE_API_URL: Optional[str] = None
+    ECOMMERCE_API_SIGNING_KEY: Optional[str] = None
+    ECOMMERCE_PUBLIC_URL_ROOT: Optional[str] = None
+
+    # Payment processors
+    PAYMENT_PROCESSOR_CONFIG: dict[str, Any] = {}
+
+    # Donations
+    ENABLE_DONATIONS: bool = False
+    DONATION_PROCESSING_FEE: float = 0.05  # 5%
+
+    model_config = {"env_prefix": "PAYMENT_", "extra": "allow"}
+
+
+class ExperimentationSettings(BaseSettings):
+    """A/B testing and experimentation configuration."""
+
+    # Optimizely
+    OPTIMIZELY_PROJECT_ID: Optional[str] = None
+
+    # Custom experimentation
+    EXPERIMENT_SETTINGS: dict[str, Any] = {}
+
+    model_config = {"env_prefix": "EXPERIMENT_", "extra": "allow"}
+
+
+# Main configuration classes that combine everything
+class SharedSettings(BaseSettings):
+    """Settings shared between LMS and CMS."""
+
+    # Core configuration
+    environment: EnvironmentType = EnvironmentType.DEVELOPMENT
+
+    # Shared setting groups
+    django: DjangoSettings = Field(default_factory=DjangoSettings)
+    database: DatabaseSettings = Field(default_factory=DatabaseSettings)
+    cache: CacheSettings = Field(default_factory=CacheSettings)
+    security: SecuritySettings = Field(default_factory=SecuritySettings)
+    email: EmailSettings = Field(default_factory=EmailSettings)
+    celery: CelerySettings = Field(default_factory=CelerySettings)
+    platform: PlatformSettings = Field(default_factory=PlatformSettings)
+    aws: AwsSettings = Field(default_factory=AwsSettings)
+    api: ApiSettings = Field(default_factory=ApiSettings)
+    oauth: OAuthSettings = Field(default_factory=OAuthSettings)
+    static_files: StaticFilesSettings = Field(default_factory=StaticFilesSettings)
+    templates: TemplateSettings = Field(default_factory=TemplateSettings)
+    theming: ThemingSettings = Field(default_factory=ThemingSettings)
+    applications: ApplicationSettings = Field(default_factory=ApplicationSettings)
+    logging: LoggingSettings = Field(default_factory=LoggingSettings)
+    monitoring: MonitoringSettings = Field(default_factory=MonitoringSettings)
+    course: CourseSettings = Field(default_factory=CourseSettings)
+    xblock: XBlockSettings = Field(default_factory=XBlockSettings)
+    features: FeatureFlags = Field(default_factory=FeatureFlags)
+    zendesk: ZendeskSettings = Field(default_factory=ZendeskSettings)
+    analytics: AnalyticsSettings = Field(default_factory=AnalyticsSettings)
+    social_media: SocialMediaSettings = Field(default_factory=SocialMediaSettings)
+    registration: RegistrationSettings = Field(default_factory=RegistrationSettings)
+    payment: PaymentSettings = Field(default_factory=PaymentSettings)
+    experimentation: ExperimentationSettings = Field(
+        default_factory=ExperimentationSettings
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_environment_consistency(cls, values):
+        """Ensure environment-specific settings are consistent."""
+        if isinstance(values, dict):
+            environment = values.get("environment")
+            if environment == EnvironmentType.PRODUCTION:
+                # In production, debug should be false
+                if values.get("django") and values["django"].DEBUG:
+                    raise ValueError("DEBUG cannot be True in production environment")
+        return values
+
+    model_config = {"env_prefix": "SHARED_", "extra": "allow"}
+
+
+class LmsRuntimeSettings(SharedSettings):
+    """Complete LMS runtime configuration."""
+
+    runtime: Literal[RuntimeType.LMS] = RuntimeType.LMS
+    lms: LmsSettings = Field(default_factory=LmsSettings)
+
+    @model_validator(mode="before")
+    @classmethod
+    def set_lms_defaults(cls, values):
+        """Set LMS-specific defaults."""
+        if isinstance(values, dict):
+            if "django" not in values:
+                values["django"] = {}
+            values["django"]["ROOT_URLCONF"] = "lms.urls"
+            values["django"]["WSGI_APPLICATION"] = "lms.wsgi.application"
+        return values
+
+    model_config = {"env_prefix": "LMS_", "extra": "allow"}
+
+
+class CmsRuntimeSettings(SharedSettings):
+    """Complete CMS runtime configuration."""
+
+    runtime: Literal[RuntimeType.CMS] = RuntimeType.CMS
+    cms: CmsSettings = Field(default_factory=CmsSettings)
+
+    @model_validator(mode="before")
+    @classmethod
+    def set_cms_defaults(cls, values):
+        """Set CMS-specific defaults."""
+        if isinstance(values, dict):
+            if "django" not in values:
+                values["django"] = {}
+            values["django"]["ROOT_URLCONF"] = "cms.urls"
+            values["django"]["WSGI_APPLICATION"] = "cms.wsgi.application"
+        return values
+
+    model_config = {"env_prefix": "CMS_", "extra": "allow"}
+
+
+# Legacy compatibility - this preserves the original Settings class structure
+class Settings(BaseSettings):
+    """Legacy Settings class for backward compatibility."""
+
+    email: EmailSettings = Field(default_factory=EmailSettings)
+    celery: CelerySettings = Field(default_factory=CelerySettings)
+    database: DatabaseSettings = Field(default_factory=DatabaseSettings)
+    platform: PlatformSettings = Field(default_factory=PlatformSettings)
+    security: SecuritySettings = Field(default_factory=SecuritySettings)
+    aws: AwsSettings = Field(default_factory=AwsSettings)
+    api: ApiSettings = Field(default_factory=ApiSettings)
+    django: DjangoSettings = Field(default_factory=DjangoSettings)
+    templates: TemplateSettings = Field(default_factory=TemplateSettings)
+    static_files: StaticFilesSettings = Field(default_factory=StaticFilesSettings)
+    theming: ThemingSettings = Field(default_factory=ThemingSettings)
+    course: CourseSettings = Field(default_factory=CourseSettings)
+    zendesk: ZendeskSettings = Field(default_factory=ZendeskSettings)
+    analytics: AnalyticsSettings = Field(default_factory=AnalyticsSettings)
+    social_media: SocialMediaSettings = Field(default_factory=SocialMediaSettings)
+    registration: RegistrationSettings = Field(default_factory=RegistrationSettings)
+    lms: LmsSettings = Field(default_factory=LmsSettings)
+    cms: CmsSettings = Field(default_factory=CmsSettings)
+
+    model_config = {"extra": "allow"}  # Added for the legacy Settings class too
