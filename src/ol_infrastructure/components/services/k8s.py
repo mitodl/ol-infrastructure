@@ -1105,7 +1105,7 @@ class OLTraefikMiddleware(pulumi.ComponentResource):
             api_version="traefik.io/v1alpha1",
             kind="Middleware",
             metadata={
-                "name": middleware_name,
+                "name": f"{namespace}-{middleware_name}",
                 "namespace": namespace,
             },
             spec=spec,
@@ -1113,5 +1113,5 @@ class OLTraefikMiddleware(pulumi.ComponentResource):
         )
         self.gateway_filter = {
             "type": "ExtensionRef",
-            "extensionRef": {"group": "traefik.io", "kind": "Middleware", "name": name},
+            "extensionRef": {"group": "traefik.io", "kind": "Middleware", "name": middleware_name},
         }
