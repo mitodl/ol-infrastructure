@@ -172,7 +172,7 @@ def mfe_job(
         and OpenEdxMicroFrontend[mfe_name].value == OpenEdxMicroFrontend.learn.value
     ):
         mfe_smoot_design_overrides = """
-        npm pack @mitodl/smoot-design@^6.6.0
+        npm pack @mitodl/smoot-design@^6.12.0
         tar -xvzf mitodl-smoot-design*.tgz
         mkdir -p public/static/smoot-design
         cp package/dist/bundles/* public/static/smoot-design
