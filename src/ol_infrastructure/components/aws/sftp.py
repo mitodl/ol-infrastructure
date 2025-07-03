@@ -117,17 +117,9 @@ class SFTPServer(ComponentResource):
                         "Statement": [
                             {
                                 "Sid": "AllowListingOfUserFolder",
-                                "Action": ["s3:ListBucket"],
+                                "Action": ["s3:ListBucket", "s3:GetBucketLocation"],
                                 "Effect": "Allow",
-                                "Resource": ["arn:aws:s3:::${transfer:HomeBucket}"],
-                                "Condition": {
-                                    "StringLike": {
-                                        "s3:prefix": [
-                                            "${transfer:HomeFolder}/*",
-                                            "${transfer:HomeFolder}",
-                                        ]
-                                    }
-                                },
+                                "Resource": [f"arn:aws:s3:::{sftp_config.bucket_name}"],
                             },
                             {
                                 "Sid": "HomeDirObjectAccess",
@@ -135,10 +127,15 @@ class SFTPServer(ComponentResource):
                                 "Action": [
                                     "s3:PutObject",
                                     "s3:GetObject",
+                                    "s3:GetObjectTagging",
                                     "s3:DeleteObject",
+                                    "s3:DeleteObjectVersion",
                                     "s3:GetObjectVersion",
+                                    "s3:GetObjectVersionTagging",
+                                    "s3:GetObjectACL",
+                                    "s3:PutObjectACL",
                                 ],
-                                "Resource": "arn:aws:s3:::${transfer:HomeDirectory}/*",
+                                "Resource": f"arn:aws:s3:::{sftp_config.bucket_name}",
                             },
                         ],
                     }
