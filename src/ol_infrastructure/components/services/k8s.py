@@ -1105,7 +1105,7 @@ class OLTraefikMiddleware(pulumi.ComponentResource):
             api_version="traefik.io/v1alpha1",
             kind="Middleware",
             metadata={
-                "name": f"{namespace}-{middleware_name}",
+                "name": middleware_name,
                 "namespace": namespace,
             },
             spec=spec,
