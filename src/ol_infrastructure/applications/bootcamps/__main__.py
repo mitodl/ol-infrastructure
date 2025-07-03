@@ -247,7 +247,6 @@ heroku_vars = {
     "FEATURE_ENABLE_CERTIFICATE_USER_VIEW": "True",
     "FEATURE_SOCIAL_AUTH_API": "True",
     "FEATURE_CMS_HOME_PAGE": "True",
-    "HUBSPOT_PIPELINE_ID": "75e28846-ad0d-4be2-a027-5e1da6590b98",
     "JOBMA_LINK_EXPIRATION_DAYS": 13,
     "MAX_FILE_UPLOAD_MB": 10,
     "NODE_MODULES_CACHE": "False",
@@ -272,9 +271,6 @@ sensitive_heroku_vars = {
     "JOBMA_ACCESS_TOKEN": bootcamps_vault_secrets["jobma"]["access_token"],
     "JOBMA_WEBHOOK_ACCESS_TOKEN": bootcamps_vault_secrets["jobma"][
         "webhook_access_token"
-    ],
-    "MITOL_HUBSPOT_API_PRIVATE_TOKEN": bootcamps_vault_secrets["hubspot"][
-        "api_private_token"
     ],
     "NOVOED_API_KEY": bootcamps_vault_secrets["novoed"]["api_key"],
     "NOVOED_API_SECRET": bootcamps_vault_secrets["novoed"]["api_secret"],
