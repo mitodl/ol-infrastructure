@@ -52,9 +52,9 @@ config:
     secure: v1:xHUw5WC3aN02zuAj:0BozwDxrtF0OA7wkYuv4R4CCnSHYdgXt+vi6/3eP9zwJgHgQO20+8sQfg7rXPC9SIUobEA==
   edxapp:dns_zone: mitxonline
   edxapp:domains:
-    lms: courses-qa.mitxonline.mit.edu
-    preview: preview-qa.mitxonline.mit.edu
-    studio: studio-qa.mitxonline.mit.edu
+    lms: courses.rc.mitxonline.mit.edu
+    preview: preview.rc.mitxonline.mit.edu
+    studio: studio.rc.mitxonline.mit.edu
   edxapp:marketing_domain: rc.mitxonline.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:IqXRArQveCV+9lkE:cRaraFuN2dDmI29PD4QifOU7MrRFdszOoaUb7o3pDJordt4TSjw8fIxldWfMzNhZRLC+NS291DorO1IuN6ASdCbt5d53aMvHVt+3hA6wyuI11OFjk7U=
@@ -68,11 +68,11 @@ config:
     learning: learn
     ora_grading: ora-grading
   edxapp:google_analytics_id: UA-5145472-46
-  edxapp:mail_domain: edxapp-mail-qa.mitxonline.mit.edu
+  edxapp:mail_domain: edxapp-mail.rc.mitxonline.mit.edu
   edxapp:proctortrack_url: https://preproduction.verificient.com
-  edxapp:sender_email_address: support@edxapp-mail-qa.mitxonline.mit.edu
+  edxapp:sender_email_address: support@edxapp-mail.rc.mitxonline.mit.edu
   edxapp:email_use_course_id_from_for_bulk: "True"
-  edxapp:bulk_email_default_from_email: no-reply@edxapp-mail-qa.mitxonline.mit.edu
+  edxapp:bulk_email_default_from_email: no-reply@edxapp-mail.rc.mitxonline.mit.edu
   edxapp:framework: "earthly"
   edxapp:web_node_capacity: "3"
   edxapp:worker_node_capacity: "5"
