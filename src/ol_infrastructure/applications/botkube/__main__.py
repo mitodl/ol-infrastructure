@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference, get_stack, log
+from pulumi import Config, ResourceOptions, StackReference, log
 
 from bridge.lib.versions import BOTKUBE_CHART_VERSION
 from bridge.secrets.sops import read_yaml_secrets
@@ -139,8 +139,7 @@ cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(botkube_namespace, ns)
 )
 
-pulumi_stack = get_stack()
-slack_channel = pulumi_stack.replace(".", "-").lower()
+slack_channel = Config("slack").require("channel_name")
 
 log.info(f"Botkube Slack channel name: {slack_channel}")
 
