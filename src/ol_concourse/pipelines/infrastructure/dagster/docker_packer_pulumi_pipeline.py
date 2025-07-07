@@ -62,7 +62,11 @@ def build_dagster_docker_pipeline() -> Pipeline:
     docker_build_job = Job(
         name="build-mono-dagster-image",
         plan=[
-            GetStep(get=data_platform_repo.name, trigger=True),
+            GetStep(
+                get=data_platform_repo.name,
+                trigger=True,
+                params={"skip_download": True},
+            ),
             container_build_task(
                 inputs=[Input(name=data_platform_repo.name)],
                 build_parameters={
