@@ -1509,6 +1509,27 @@ proxy_rewrite_plugin_config = OLApisixPluginConfig(
     },
 )
 
+mitxonline_response_rewrite_plugin_config = OLApisixPluginConfig(
+    name="response-rewrite",
+    config={
+        "headers": {
+            "set": {
+                "Referrer-Policy": "origin",
+            }
+        }
+    },
+)
+
+mitxonline_proxy_rewrite_plugin_config = OLApisixPluginConfig(
+    name="proxy-rewrite",
+    config={
+        "regex_uri": [
+            "^/mitxonline(.*)",
+            "/$1",
+        ],
+    },
+)
+
 learn_external_service_apisix_route_no_prefix = OLApisixRoute(
     name=f"ol-mitlearn-k8s-apisix-route-no-prefix-{stack_info.env_suffix}",
     k8s_namespace=learn_namespace,
@@ -1616,6 +1637,19 @@ learn_external_service_apisix_route = OLApisixRoute(
             ],
             backend_service_name=mitlearn_k8s_app.application_lb_service_name,
             backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="mitxonline-api",
+            priority=20,
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                mitxonline_response_rewrite_plugin_config,
+                mitxonline_proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+            ],
+            uri="/mitxonline*",
         ),
     ],
     opts=ResourceOptions(
