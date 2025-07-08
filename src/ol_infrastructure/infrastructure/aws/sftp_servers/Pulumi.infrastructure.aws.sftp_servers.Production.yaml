@@ -1,0 +1,7 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAHbECx2g+fzVnt1Oynaa7+nAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMJAA0jtsk80uBT7z6AgEQgDuVEGS54A1tHbLv/2YNcjK/KiZQ9Wk2vVAu6qI1FMCKWqQnnkzw0F9wk7lqYE9nFVPMdG+u11eInPKg1w==
+config:
+  aws_sftp:mitpress_sftp_public_key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKmd1OSFse7x+7llsEA+xWpl6kvqoQq0hGSY/sJAhUzv
+    cpatti@dhcp-10-29-185-102.dyn.MIT.EDU
+  aws_sftp:mitpress_sftp_user_name: mitpress
