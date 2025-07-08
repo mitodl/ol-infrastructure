@@ -629,6 +629,8 @@ mitxonline_apisix_route_direct = OLApisixRoute(
     ),
 )
 
+learn_api_domain = mitxonline_config.require("learn_backend_domain")  # New domain
+
 mitxonline_apisix_route_prefix = OLApisixRoute(
     name=f"mitxonline-apisix-route-prefixed-{stack_info.env_suffix}",
     k8s_namespace=mitxonline_namespace,
@@ -637,7 +639,7 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="passauth",
             priority=10,
-            hosts=[api_domain],
+            hosts=[learn_api_domain],
             paths=[f"/{api_path_prefix}/*"],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             plugins=[
@@ -653,7 +655,7 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="logout-redirect",
             priority=10,
-            hosts=[api_domain],
+            hosts=[learn_api_domain],
             paths=[f"/{api_path_prefix}/logout/oidc/*"],
             plugins=[
                 OLApisixPluginConfig(name="redirect", config={"uri": "/logout/oidc"}),
@@ -666,7 +668,7 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="reqauth",
             priority=10,
-            hosts=[api_domain],
+            hosts=[learn_api_domain],
             paths=[
                 f"/{api_path_prefix}/login/",
                 f"/{api_path_prefix}/login/oidc*",
