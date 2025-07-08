@@ -86,78 +86,6 @@ class SFTPServer(ComponentResource):
             opts=generic_resource_opts,
         )
 
-        # Create IAM role for Transfer Family service
-        self.transfer_service_role = iam.Role(
-            f"{sftp_config.server_name}-sftp-service-role",
-            assume_role_policy=json.dumps(
-                {
-                    "Version": "2012-10-17",
-                    "Statement": [
-                        {
-                            "Effect": "Allow",
-                            "Principal": {"Service": "transfer.amazonaws.com"},
-                            "Action": "sts:AssumeRole",
-                        }
-                    ],
-                }
-            ),
-            tags=sftp_config.merged_tags(
-                {"Name": f"{sftp_config.server_name}-sftp-service-role"}
-            ),
-            opts=generic_resource_opts,
-        )
-
-        # Create IAM policy for S3 access
-        self.s3_access_policy = iam.Policy(
-            f"{sftp_config.server_name}-sftp-s3-access-policy",
-            policy=self.bucket.arn.apply(
-                lambda bucket_arn: json.dumps(  # noqa: ARG005
-                    {
-                        "Version": "2012-10-17",
-                        "Statement": [
-                            {
-                                "Sid": "AllowListingOfUserFolder",
-                                "Action": ["s3:ListBucket"],
-                                "Effect": "Allow",
-                                "Resource": ["arn:aws:s3:::${transfer:HomeBucket}"],
-                                "Condition": {
-                                    "StringLike": {
-                                        "s3:prefix": [
-                                            "${transfer:HomeFolder}/*",
-                                            "${transfer:HomeFolder}",
-                                        ]
-                                    }
-                                },
-                            },
-                            {
-                                "Sid": "HomeDirObjectAccess",
-                                "Effect": "Allow",
-                                "Action": [
-                                    "s3:PutObject",
-                                    "s3:GetObject",
-                                    "s3:DeleteObject",
-                                    "s3:GetObjectVersion",
-                                ],
-                                "Resource": "arn:aws:s3:::${transfer:HomeDirectory}/*",
-                            },
-                        ],
-                    }
-                )
-            ),
-            tags=sftp_config.merged_tags(
-                {"Name": f"{sftp_config.server_name}-sftp-s3-access-policy"}
-            ),
-            opts=generic_resource_opts,
-        )
-
-        # Attach policy to service role
-        iam.RolePolicyAttachment(
-            f"{sftp_config.server_name}-sftp-service-role-policy-attachment",
-            role=self.transfer_service_role.name,
-            policy_arn=self.s3_access_policy.arn,
-            opts=generic_resource_opts,
-        )
-
         # Create Transfer Family server
         self.transfer_server = transfer.Server(
             f"{sftp_config.server_name}-sftp-server",
@@ -177,6 +105,40 @@ class SFTPServer(ComponentResource):
         for user_config in sftp_config.users:
             # Create user-specific IAM role if not provided
             if not user_config.role_arn:
+                user_policy = iam.Policy(
+                    f"{user_config.username}-sftp-iam-policy",
+                    policy=json.dumps(
+                        {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Sid": "AllowListingOfUserFolder",
+                                    "Action": ["s3:ListBucket"],
+                                    "Effect": "Allow",
+                                    "Resource": [
+                                        f"arn:aws:s3:::{sftp_config.bucket_name}"
+                                    ],
+                                },
+                                {
+                                    "Sid": "HomeDirObjectAccess",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:PutObject",
+                                        "s3:GetObject",
+                                        "s3:GetObjectTagging",
+                                        "s3:DeleteObject",
+                                        "s3:DeleteObjectVersion",
+                                        "s3:GetObjectVersion",
+                                        "s3:GetObjectVersionTagging",
+                                        "s3:GetObjectACL",
+                                        "s3:PutObjectACL",
+                                    ],
+                                    "Resource": f"arn:aws:s3:::{sftp_config.bucket_name}/{user_config.username}/*",  # noqa: E501
+                                },
+                            ],
+                        }
+                    ),
+                )
                 user_role = iam.Role(
                     f"{sftp_config.server_name}-sftp-user-{user_config.username}-role",
                     assume_role_policy=json.dumps(
@@ -207,7 +169,7 @@ class SFTPServer(ComponentResource):
                 iam.RolePolicyAttachment(
                     f"{sftp_config.server_name}-sftp-user-{user_config.username}-policy-attachment",
                     role=user_role.name,
-                    policy_arn=self.s3_access_policy.arn,
+                    policy_arn=user_policy.arn,
                     opts=generic_resource_opts,
                 )
 
@@ -250,13 +212,3 @@ class SFTPServer(ComponentResource):
                 )
 
             self.users.append(sftp_user)
-
-        self.register_outputs(
-            {
-                "bucket": self.bucket,
-                "transfer_server": self.transfer_server,
-                "service_role": self.transfer_service_role,
-                "s3_access_policy": self.s3_access_policy,
-                "users": self.users,
-            }
-        )
