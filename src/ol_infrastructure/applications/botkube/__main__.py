@@ -45,7 +45,7 @@ aws_config = AWSBase(
     tags={"OU": BusinessUnit.operations, "Environment": Environment.operations},
 )
 
-botkube_namespace = "operations"
+botkube_namespace = Config("k8s").require("botkube_namespace")
 
 k8s_global_labels = K8sGlobalLabels(
     service=Services.botkube,
