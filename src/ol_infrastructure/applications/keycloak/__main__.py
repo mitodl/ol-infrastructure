@@ -482,7 +482,11 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
                                 {
                                     "name": "QUARKUS_HTTP_LIMITS_MAX_HEADER_SIZE",
                                     "value": "128k",
-                                }
+                                },
+                                {
+                                    "name": "QUARKUS_HTTP_LIMITS_MAX_HEADER_LIST_SIZE",
+                                    "value": "32768",
+                                },
                             ]
                         }
                     ]
