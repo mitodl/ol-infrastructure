@@ -469,7 +469,7 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
                 "memory": keycloak_config.get("memory_limit") or "1Gi",
             },
         },
-        "startOptimized": False,
+        "startOptimized": True,
         "http": {
             "tlsSecret": star_ol_mit_edu_secret_name,
         },
