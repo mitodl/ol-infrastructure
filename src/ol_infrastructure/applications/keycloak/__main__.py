@@ -500,7 +500,7 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
             },
             {"name": "metrics-enabled", "value": "true"},
             {
-                "name": "spi-login-provider",
+                "name": "spi-login--provider",
                 "value": "ol-freemarker",
             },
             {
