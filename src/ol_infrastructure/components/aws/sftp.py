@@ -88,15 +88,13 @@ class SFTPServer(ComponentResource):
 
         # Create Transfer Family server
         self.transfer_server = transfer.Server(
-            f"{sftp_config.server_name}-sftp-server",
+            f"{sftp_config.server_name}",
             domain=sftp_config.domain,
             endpoint_type=sftp_config.endpoint_type,
             identity_provider_type=sftp_config.identity_provider_type,
             protocols=["SFTP"],
             security_policy_name=sftp_config.security_policy_name,
-            tags=sftp_config.merged_tags(
-                {"Name": f"{sftp_config.server_name}-sftp-server"}
-            ),
+            tags=sftp_config.merged_tags({"Name": f"{sftp_config.server_name}"}),
             opts=generic_resource_opts,
         )
 
@@ -139,8 +137,9 @@ class SFTPServer(ComponentResource):
                         }
                     ),
                 )
+
                 user_role = iam.Role(
-                    f"{sftp_config.server_name}-sftp-user-{user_config.username}-role",
+                    f"{sftp_config.server_name}-sftp-{user_config.username}-role",
                     assume_role_policy=json.dumps(
                         {
                             "Version": "2012-10-17",
