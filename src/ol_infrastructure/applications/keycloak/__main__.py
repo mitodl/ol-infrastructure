@@ -473,6 +473,22 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
         "http": {
             "tlsSecret": star_ol_mit_edu_secret_name,
         },
+        "unsupported": {
+            "podTemplate": {
+                "spec": {
+                    "containers": [
+                        {
+                            "env": [
+                                {
+                                    "name": "QUARKUS_HTTP_LIMITS_MAX_HEADER_SIZE",
+                                    "value": "128k",
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+        },
         "additionalOptions": [
             {
                 "name": "disable-external-access",
