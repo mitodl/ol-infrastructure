@@ -402,7 +402,7 @@ class OLApplicationK8s(ComponentResource):
                 strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
                     type="RollingUpdate",
                     rolling_update=kubernetes.apps.v1.RollingUpdateDeploymentArgs(
-                        max_surge=0,
+                        max_surge="50%",
                         max_unavailable=1,
                     ),
                 ),
