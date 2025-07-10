@@ -3,3 +3,4 @@ secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHhqOJ2Z8sG3n7hWWcpjCsXLNGmx4P0tPAz2k7fgHp3oHwGXFPGGU5tvWBa8yiSjR4KOAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMTzPRsiksB53Yf17OAgEQgDtdvo8xnG6L/EBa/CmfCYphKQ/oE4x/LaZY2tdEZzaeFGLnL65Kz8mZCWJhWIHZgEZcC7aJ+dODOd2p9R==
 config:
   vault:address: https://vault-qa.odl.mit.edu
+  slack:channel_name: '#botkube-operations-qa'

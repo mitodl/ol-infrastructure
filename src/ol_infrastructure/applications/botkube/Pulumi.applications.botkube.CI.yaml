@@ -4,4 +4,3 @@ encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAGWFOFFT3svVBZ4yi
 config:
   vault:address: https://vault-ci.odl.mit.edu
   slack:channel_name: '#botkube-applications-ci'
-  k8s:botkube_namespace: applications-ci

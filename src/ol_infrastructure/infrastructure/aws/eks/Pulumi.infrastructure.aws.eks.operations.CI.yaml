@@ -15,7 +15,8 @@ config:
   eks:efs_csi_provisioner: true
   eks:gateway_release_channel: "experimental"
   eks:namespaces:
-  - keycloak
+  - "keycloak"
+  - "botkube"
   eks:nodegroups:
     worker-xlarge:
       instance_type: "r7a.xlarge"
