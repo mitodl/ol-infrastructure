@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference
+from pulumi import Config, ResourceOptions, StackReference, log
 
 from bridge.lib.versions import BOTKUBE_CHART_VERSION
 from bridge.secrets.sops import read_yaml_secrets
@@ -44,7 +44,7 @@ aws_config = AWSBase(
     tags={"OU": BusinessUnit.operations, "Environment": Environment.operations},
 )
 
-botkube_namespace = "operations"
+botkube_namespace = "botkube"
 
 k8s_global_labels = K8sGlobalLabels(
     service=Services.botkube,
@@ -138,6 +138,10 @@ cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(botkube_namespace, ns)
 )
 
+slack_channel = Config("slack").require("channel_name")
+
+log.info(f"Botkube Slack channel name: {slack_channel}")
+
 # Install the botkube helm chart
 botkube_application = kubernetes.helm.v3.Release(
     f"botkube-{stack_info.name}-application-helm-release",
@@ -175,7 +179,7 @@ botkube_application = kubernetes.helm.v3.Release(
                         "enabled": True,
                         "channels": {
                             "default": {
-                                "name": "#botkube-ci",
+                                "name": f"#{slack_channel}",
                                 "bindings": {
                                     "executors": ["k8s-default-tools"],
                                     "sources": [
