@@ -17,3 +17,6 @@ pydantic-settings==2.10.1
 rapid-response-xblock==0.9.1
 uwsgi==2.0.30
 wheel==0.45.1
+
+# Experimental Plugins for AI features
+ol-openedx-chat

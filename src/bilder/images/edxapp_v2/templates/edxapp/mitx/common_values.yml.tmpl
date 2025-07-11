@@ -220,6 +220,8 @@ CORS_ORIGIN_WHITELIST:
   - https://{{ key "edxapp/studio-domain" }}
   - https://idp.mit.edu
   - https://canvas.mit.edu
+  - https://{{ key "edxapp/learn-ai-frontend-domain" }}
+  - https://{{ key "edx/notes-api-host" }}
 COURSES_WITH_UNSAFE_CODE: []
 COURSE_ABOUT_VISIBILITY_PERMISSION: see_exists
 COURSE_CATALOG_API_URL: http://localhost:8008/api/v1
@@ -413,6 +415,9 @@ LOG_DIR: /openedx/data/var/log/edx
 LOGO_URL: https://{{ key "edxapp/lms-domain" }}/static/mitx/images/logo.svg
 LOGO_URL_PNG_FOR_EMAIL: https://{{ key "edxapp/lms-domain" }}/static/mitx/images/logo.png
 LOGO_TRADEMARK_URL: https://{{ key "edxapp/lms-domain" }}/static/mitx/images/mit-ol-logo.svg
+MIT_LEARN_AI_API_URL: https://{{ key "edxapp/learn-api-domain" }}/ai  # Added for ol_openedx_chat
+MIT_LEARN_API_BASE_URL: https://{{ key "edxapp/learn-api-domain" }}/learn  # Added for ol_openedx_chat
+MIT_LEARN_SUMMARY_FLASHCARD_URL: https://{{ key "edxapp/learn-api-domain" }}/learn/api/v1/contentfiles/  # Added for ol_openedx_chat
 MAINTENANCE_BANNER_TEXT: Sample banner message
 MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within the bucket. No leading / allowed
 MEDIA_URL: /media/

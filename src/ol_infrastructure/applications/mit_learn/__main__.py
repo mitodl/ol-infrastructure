@@ -1297,7 +1297,6 @@ cert_manager_certificate = OLCertManagerCert(
     ),
 )
 
-# This now goes outside the conditional since we have a CI environment now.
 xpro_consul_opts = get_consul_provider(
     stack_info=stack_info,
     consul_address=f"https://consul-xpro-{stack_info.env_suffix}.odl.mit.edu",
@@ -1342,6 +1341,29 @@ consul.Keys(
     ],
     opts=mitxonline_consul_opts,
 )
+
+mitx_consul_opts = get_consul_provider(
+    stack_info=stack_info,
+    consul_address=f"https://consul-mitx-{stack_info.env_suffix}.odl.mit.edu",
+    provider_name=f"consul-provider-mitx-{stack_info.env_suffix}",
+)
+consul.Keys(
+    f"learn-api-domain-consul-key-for-mitx-openedx-{stack_info.env_suffix}",
+    keys=[
+        consul.KeysKeyArgs(
+            path="edxapp/learn-api-domain",
+            delete=False,
+            value=mitlearn_api_domain,
+        ),
+        consul.KeysKeyArgs(
+            path="edxapp/learn-frontend-domain",
+            delete=False,
+            value=learn_frontend_domain,
+        ),
+    ],
+    opts=xpro_consul_opts,
+)
+
 
 # Redis / Elasticache
 # only for applications deployed in k8s
