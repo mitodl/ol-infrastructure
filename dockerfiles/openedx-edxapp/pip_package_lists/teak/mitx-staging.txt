@@ -20,3 +20,4 @@ wheel==0.45.1
 
 # Experimental Plugins for AI features
 ol-openedx-chat
+ol-openedx-chat-xblock
