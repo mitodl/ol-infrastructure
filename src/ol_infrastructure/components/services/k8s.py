@@ -114,6 +114,10 @@ class OLApplicationK8sConfig(BaseModel):
     init_migrations: bool = Field(default=True)
     init_collectstatic: bool = Field(default=True)
     celery_worker_configs: list[OLApplicationK8sCeleryWorkerConfig] = []
+    pre_deploy_commands: list[tuple[str, list[str]]] | None = Field(
+        default=None,
+        description="A tuple of <job_name>, <job_command_array> for executing prior to the deployment updating",
+    )
     probe_configs: dict[str, kubernetes.core.v1.ProbeArgs] = {
         # Liveness probe to check if the application is still running
         "liveness_probe": kubernetes.core.v1.ProbeArgs(
@@ -180,7 +184,7 @@ class OLApplicationK8s(ComponentResource):
     Main K8s component resource class
     """
 
-    def __init__(  # noqa: C901, PLR0912
+    def __init__(  # noqa: C901, PLR0912, PLR0915
         self,
         ol_app_k8s_config: OLApplicationK8sConfig,
         opts: ResourceOptions | None = None,
@@ -195,6 +199,7 @@ class OLApplicationK8s(ComponentResource):
             opts=opts,
         )
         resource_options = ResourceOptions(parent=self)
+        deployment_options = ResourceOptions(parent=self)
 
         extra_deployment_args: dict[str, int] = {}
         # If we have ANY metrics args, then we use HPA and don't pass replicas to the deployment
@@ -338,27 +343,31 @@ class OLApplicationK8s(ComponentResource):
                 )
             )
 
+        image_pull_policy = ol_app_k8s_config.image_pull_policy
+        if ol_app_k8s_config.application_docker_tag.lower() == "latest":
+            image_pull_policy = "Always"
+
         init_containers = []
-        if ol_app_k8s_config.init_collectstatic:
+        if ol_app_k8s_config.init_migrations:
             init_containers.append(
                 # Run database migrations at startup
                 kubernetes.core.v1.ContainerArgs(
                     name="migrate",
                     image=app_image,
                     command=["python3", "manage.py", "migrate", "--noinput"],
-                    image_pull_policy="IfNotPresent",
+                    image_pull_policy=image_pull_policy,
                     env=application_deployment_env_vars,
                     env_from=application_deployment_envfrom,
                 )
             )
 
-        if ol_app_k8s_config.init_migrations:
+        if ol_app_k8s_config.init_collectstatic:
             init_containers.append(
                 kubernetes.core.v1.ContainerArgs(
                     name="collectstatic",
                     image=app_image,
                     command=["python3", "manage.py", "collectstatic", "--noinput"],
-                    image_pull_policy="IfNotPresent",
+                    image_pull_policy=image_pull_policy,
                     env=application_deployment_env_vars,
                     env_from=application_deployment_envfrom,
                     volume_mounts=[
@@ -379,13 +388,48 @@ class OLApplicationK8s(ComponentResource):
             ),
         }
 
-        image_pull_policy = ol_app_k8s_config.image_pull_policy
-        if ol_app_k8s_config.application_docker_tag.lower() == "latest":
-            image_pull_policy = "Always"
-
         _application_deployment_name = truncate_k8s_metanames(
             f"{ol_app_k8s_config.application_name}-app"
         )
+
+        if pre_deploy_commands := ol_app_k8s_config.pre_deploy_commands:
+            _pre_deploy_job = kubernetes.batch.v1.Job(
+                f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-job",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=f"{_application_deployment_name}-pre-deploy",
+                    namespace=ol_app_k8s_config.application_namespace,
+                    labels=application_labels,
+                ),
+                spec=kubernetes.batch.v1.JobSpecArgs(
+                    # Remove job 30 minutes after completion
+                    ttl_seconds_after_finished=60 * 30,
+                    template=kubernetes.core.v1.PodTemplateSpecArgs(
+                        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                            labels=application_labels,
+                        ),
+                        spec=kubernetes.core.v1.PodSpecArgs(
+                            service_account_name=ol_app_k8s_config.application_service_account_name,
+                            containers=[
+                                kubernetes.core.v1.ContainerArgs(
+                                    name=command_name,
+                                    image=app_image,
+                                    command=command_array,
+                                    image_pull_policy=image_pull_policy,
+                                    env=application_deployment_env_vars,
+                                    env_from=application_deployment_envfrom,
+                                )
+                                for (command_name, command_array) in pre_deploy_commands
+                            ],
+                            restart_policy="Never",
+                        ),
+                    ),
+                ),
+                opts=resource_options,
+            )
+            deployment_options = deployment_options.merge(
+                ResourceOptions(depends_on=[_pre_deploy_job])
+            )
+
         _application_deployment = kubernetes.apps.v1.Deployment(
             f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-deployment",
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -459,7 +503,7 @@ class OLApplicationK8s(ComponentResource):
                 ),
                 **extra_deployment_args,
             ),
-            opts=resource_options,
+            opts=deployment_options,
         )
 
         _application_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(

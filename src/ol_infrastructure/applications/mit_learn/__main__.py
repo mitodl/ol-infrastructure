@@ -1442,8 +1442,9 @@ mitlearn_k8s_app = OLApplicationK8s(
         import_uwsgi_config=True,  # Assuming Django app needs uwsgi
         resource_requests={"cpu": "500m", "memory": "1600Mi"},
         resource_limits={"cpu": "1000m", "memory": "1600Mi"},
-        init_migrations=True,  # Assuming Django app needs migrations
+        init_migrations=False,
         init_collectstatic=True,  # Assuming Django app needs collectstatic
+        pre_deploy_commands=[("migrate", ["scripts/heroku-release-phase.sh"])],
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="default",
