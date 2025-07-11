@@ -167,10 +167,7 @@ def mfe_job(
     copy_common_config = ""
     mfe_smoot_design_overrides = ""
 
-    if (
-        open_edx_deployment.deployment_name in ["mitxonline", "xpro"]
-        and OpenEdxMicroFrontend[mfe_name].value == OpenEdxMicroFrontend.learn.value
-    ):
+    if OpenEdxMicroFrontend[mfe_name].value == OpenEdxMicroFrontend.learn.value:
         mfe_smoot_design_overrides = """
         npm pack @mitodl/smoot-design@^6.12.0
         tar -xvzf mitodl-smoot-design*.tgz

@@ -1361,7 +1361,29 @@ consul.Keys(
             value=learn_frontend_domain,
         ),
     ],
-    opts=xpro_consul_opts,
+    opts=mitx_consul_opts,
+)
+
+mitx_staging_consul_opts = get_consul_provider(
+    stack_info=stack_info,
+    consul_address=f"https://consul-mitx-staging-{stack_info.env_suffix}.odl.mit.edu",
+    provider_name=f"consul-provider-mitx-staging-{stack_info.env_suffix}",
+)
+consul.Keys(
+    f"learn-api-domain-consul-key-for-mitx-staging-openedx-{stack_info.env_suffix}",
+    keys=[
+        consul.KeysKeyArgs(
+            path="edxapp/learn-api-domain",
+            delete=False,
+            value=mitlearn_api_domain,
+        ),
+        consul.KeysKeyArgs(
+            path="edxapp/learn-frontend-domain",
+            delete=False,
+            value=learn_frontend_domain,
+        ),
+    ],
+    opts=mitx_staging_consul_opts,
 )
 
 
