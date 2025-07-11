@@ -33,6 +33,7 @@ config:
   - "mitlearn"
   - "mitxonline"
   - "odl-video-service"
+  - "botkube"
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 1000
