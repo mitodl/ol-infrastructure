@@ -81,6 +81,10 @@ plugin_dict = {
         "target_name": "openedx_companion_auth_package",
         "pypi_package_name": "openedx-companion-auth",
     },
+    "src/ol_openedx_chat_xblock": {
+        "target_name": "ol_openedx_chat_xblock_package",
+        "pypi_package_name": "ol-openedx-chat-xblock",
+    },
 }
 
 fragments = []
