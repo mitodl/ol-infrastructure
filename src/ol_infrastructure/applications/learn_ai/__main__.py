@@ -1226,6 +1226,39 @@ consul.Keys(
     opts=mitxonline_consul_opts,
 )
 
+mitx_consul_opts = get_consul_provider(
+    stack_info,
+    consul_address=f"https://consul-mitx-{stack_info.env_suffix}.odl.mit.edu",
+    provider_name=f"consul-provider-mitx-{stack_info.env_suffix}",
+)
+consul.Keys(
+    "learn-api-domain-consul-key-for-mitx-openedx",
+    keys=[
+        consul.KeysKeyArgs(
+            path="edxapp/learn-ai-frontend-domain",
+            delete=False,
+            value=learn_ai_frontend_domain,
+        )
+    ],
+    opts=mitx_consul_opts,
+)
+
+mitx_staging_consul_opts = get_consul_provider(
+    stack_info,
+    consul_address=f"https://consul-mitx-staging-{stack_info.env_suffix}.odl.mit.edu",
+    provider_name=f"consul-provider-mitx-staging-{stack_info.env_suffix}",
+)
+consul.Keys(
+    "learn-api-domain-consul-key-for-mitx-staging-openedx",
+    keys=[
+        consul.KeysKeyArgs(
+            path="edxapp/learn-ai-frontend-domain",
+            delete=False,
+            value=learn_ai_frontend_domain,
+        )
+    ],
+    opts=mitx_staging_consul_opts,
+)
 
 if stack_info.env_suffix != "ci":
     gh_workflow_posthog_project_api_key_env_secret = github.ActionsSecret(
