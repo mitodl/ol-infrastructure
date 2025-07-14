@@ -33,12 +33,12 @@ config:
   - "ecommerce"
   - "learn-ai"
   - "mitlearn"
-  - "mitx-edxapp"
-  - "mitx-staging-edxapp"
+  - "mitx-openedx"
+  - "mitx-staging-openedx"
   - "mitxonline"
-  - "mitxonline-edxapp"
+  - "mitxonline-openedx"
   - "odl-video-service"
-  - "xpro-edxapp"
+  - "xpro-openedx"
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 1000
