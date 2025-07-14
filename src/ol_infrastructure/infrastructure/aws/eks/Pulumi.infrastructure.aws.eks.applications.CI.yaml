@@ -29,12 +29,16 @@ config:
   eks:efs_csi_provisioner: "true"
   eks:gateway_release_channel: "experimental"
   eks:namespaces:
+  - "botkube"
   - "ecommerce"
   - "learn-ai"
   - "mitlearn"
+  - "mitx-edxapp"
+  - "mitx-staging-edxapp"
   - "mitxonline"
+  - "mitxonline-edxapp"
   - "odl-video-service"
-  - "botkube"
+  - "xpro-edxapp"
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 1000
