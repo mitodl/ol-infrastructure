@@ -32,8 +32,6 @@ config:
   - "ecommerce"
   - "learn-ai"
   - "mitlearn"
-  - "mitx-openedx"
-  - "mitx-staging-openedx"
   - "mitxonline"
   - "mitxonline-openedx"
   - "odl-video-service"
