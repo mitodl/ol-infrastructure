@@ -54,7 +54,7 @@ config:
     - infra
     - operations
     - cloud_custodian
-    instance_type: c7a.2xlarge
+    instance_type: m7a.2xlarge
     name: infra
   - auto_scale:
       desired: 2
