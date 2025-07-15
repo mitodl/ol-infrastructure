@@ -51,7 +51,7 @@ repos:
     - src/ol_infrastructure/applications/ocw_site/redirect_dict
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.12.2'
+  rev: 'v0.12.3'
   hooks:
   - id: ruff-format
   - id: ruff
