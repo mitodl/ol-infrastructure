@@ -49,6 +49,7 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
+from ol_infrastructure.applications.edxapp.k8s_resources import create_k8s_resources
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
 from ol_infrastructure.components.services.vault import (
@@ -529,6 +530,8 @@ edxapp_db_security_group = ec2.SecurityGroup(
     f"edxapp-db-access-{stack_info.env_suffix}",
     name_prefix=f"edxapp-db-access-{env_name}-",
     description="Access from Edxapp instances to the associated MariaDB database",
+    # TODO(Mike): Need to figure out how to get the application running in k8s in the apps vpc
+    # network access to this database running in the edxapp vpc.
     ingress=[
         ec2.SecurityGroupIngressArgs(
             security_groups=[
@@ -1832,6 +1835,17 @@ for domain_key, domain_value in edxapp_domains.items():
             zone_id=edxapp_zone_id,
         )
 
+# Actions to take when the the stack is configured to deploy into k8s
+if edxapp_config.get("k8s_deployment"):
+    k8s_resources = create_k8s_resources(
+        stack_info=stack_info,
+        edxapp_config=edxapp_config,
+        network_stack=network_stack,
+        edxapp_db=edxapp_db,
+        aws_config=aws_config,
+        vault_config=Config("vault"),
+        vault_policy=edxapp_vault_policy,
+    )
 
 export(
     "edxapp",
