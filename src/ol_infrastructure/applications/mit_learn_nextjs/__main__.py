@@ -139,6 +139,43 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(),
                         env=env_vars,
                         volume_mounts=[nextjs_build_cache_volume_mount],
+                        liveness_probe=kubernetes.core.v1.ProbeArgs(
+                            http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                                path="/healthcheck/",
+                                port=DEFAULT_NEXTJS_PORT,
+                            ),
+                            initial_delay_seconds=30,  # Wait 30 seconds before first
+                            # probe
+                            period_seconds=30,
+                            failure_threshold=3,  # Consider failed after 3 attempts
+                        ),
+                        # Readiness probe to check if the application is ready to serve
+                        # traffic
+                        readiness_probe=kubernetes.core.v1.ProbeArgs(
+                            http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                                path="/healthcheck/",
+                                port=DEFAULT_NEXTJS_PORT,
+                            ),
+                            initial_delay_seconds=15,  # Wait 15 seconds before first
+                            # probe
+                            period_seconds=15,
+                            failure_threshold=3,  # Consider failed after 3 attempts
+                        ),
+                        # Startup probe to ensure the application is fully initialized
+                        # before other probes start
+                        startup_probe=kubernetes.core.v1.ProbeArgs(
+                            http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                                path="/healthcheck/",
+                                port=DEFAULT_NEXTJS_PORT,
+                            ),
+                            initial_delay_seconds=10,  # Wait 10 seconds before first
+                            # probe
+                            period_seconds=10,  # Probe every 10 seconds
+                            failure_threshold=30,  # Allow up to 5 minutes (30 * 10s)
+                            # for startup
+                            success_threshold=1,
+                            timeout_seconds=5,
+                        ),
                     ),
                 ],
             ),
