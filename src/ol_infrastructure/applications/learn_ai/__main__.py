@@ -1006,7 +1006,7 @@ learn_ai_https_apisix_route = OLApisixRoute(
     k8s_namespace=learn_ai_namespace,
     k8s_labels=k8s_global_labels,
     route_configs=[
-        # Proected route for canvas syllabus agent - requires canvas_token header
+        # Protected route for canvas syllabus agent - requires canvas_token header
         OLApisixRouteConfig(
             route_name="canvas_syllabus_agent",
             priority=20,
