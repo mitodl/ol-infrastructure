@@ -42,6 +42,9 @@ cluster_stack.require_output("namespaces").apply(
 nextjs_config = Config("nextjs")
 
 raw_env_vars = {
+    # Env vars available only on server
+    "MITOL_NOINDEX": nextjs_config.get("mitol_noindex"),
+    # Env vars available on client and server
     "NEXT_PUBLIC_APPZI_URL": nextjs_config.require("appzi_url"),
     "NEXT_PUBLIC_CSRF_COOKIE_NAME": nextjs_config.require("csrf_cookie_name"),
     "NEXT_PUBLIC_EMBEDLY_KEY": nextjs_config.require("embedly_key"),
