@@ -9,6 +9,7 @@ config:
   nextjs:embedly_key:
     secure: v1:1+Ibvcym7D5UMBPn:kQV6cI3kOhR2uGeeQCQdEvp9gYyfIKv5wInPQzzmnaZhMMAjPBDAJIoyx2zREBGB
   nextjs:mitlearn_api_base_url: "https://api.rc.learn.mit.edu"
+  nextjs:mitol_noindex: "true"
   nextjs:mitxonline_base_url: "https://rc.mitxonline.mit.edu"
   nextjs:origin: "https://rc.learn.mit.edu"
   nextjs:posthog_api_host: "https://ph.ol.mit.edu"

@@ -63,7 +63,6 @@ config:
     MITOL_COOKIE_NAME: "learn"
     MITOL_LOG_LEVEL: "INFO"
     MITOL_NEW_USER_LOGIN_URL: "https://learn.mit.edu/onboarding"
-    MITOL_NOINDEX: "false"
     MITOL_SUPPORT_EMAIL: "learn-support@mit.edu" # Need to verify
     MITPE_API_ENABLED: "true"
     OCW_ITERATOR_CHUNK_SIZE: 300
