@@ -141,7 +141,7 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
                         volume_mounts=[nextjs_build_cache_volume_mount],
                         liveness_probe=kubernetes.core.v1.ProbeArgs(
                             http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                                path="/healthcheck/",
+                                path="/healthcheck",
                                 port=DEFAULT_NEXTJS_PORT,
                             ),
                             initial_delay_seconds=30,  # Wait 30 seconds before first
@@ -153,7 +153,7 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
                         # traffic
                         readiness_probe=kubernetes.core.v1.ProbeArgs(
                             http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                                path="/healthcheck/",
+                                path="/healthcheck",
                                 port=DEFAULT_NEXTJS_PORT,
                             ),
                             initial_delay_seconds=15,  # Wait 15 seconds before first
@@ -165,7 +165,7 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
                         # before other probes start
                         startup_probe=kubernetes.core.v1.ProbeArgs(
                             http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                                path="/healthcheck/",
+                                path="/healthcheck",
                                 port=DEFAULT_NEXTJS_PORT,
                             ),
                             initial_delay_seconds=10,  # Wait 10 seconds before first
