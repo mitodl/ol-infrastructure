@@ -10,7 +10,7 @@ config:
     secure: v1:k5VhDKIu3fRgFRZK:uD6fSyGLF3QhKYIbgUJ3/p+3x+fmtQqU4UpuLvJa72UbhDHf1s9t2O2NMQ7492bw
   nextjs:mitlearn_api_base_url: "https://api.learn.mit.edu"
   nextjs:mitol_noindex: "false"
-  nextjs:mitxonline_base_url: "https://mitxonline.mit.edu"
+  nextjs:mitxonline_base_url: "https://api.learn.mit.edu/mitxonline"
   nextjs:origin: "https://learn.mit.edu"
   nextjs:posthog_api_host: "https://ph.ol.mit.edu"
   nextjs:posthog_api_key:

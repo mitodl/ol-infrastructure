@@ -55,6 +55,7 @@ raw_env_vars = {
         "syllabus_endpoint"
     ),
     "NEXT_PUBLIC_MITOL_API_BASE_URL": nextjs_config.require("mitlearn_api_base_url"),
+    "NEXT_PUBLIC_MITX_ONLINE_CSRF_COOKIE_NAME": "csrf_mitxonline",
     "NEXT_PUBLIC_MITX_ONLINE_BASE_URL": nextjs_config.require("mitxonline_base_url"),
     "NEXT_PUBLIC_MITOL_AXIOS_WITH_CREDENTIALS": "true",
     "NEXT_PUBLIC_MITOL_SUPPORT_EMAIL": "mitlearn-support@mit.edu",
