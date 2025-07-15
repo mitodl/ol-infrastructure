@@ -4,12 +4,15 @@ encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAGzwYvKdv8btlpNoW
 config:
   aws:region: us-east-1
   learn_ai:backend_domain: "api-learn-ai-ci.ol.mit.edu"
-  learn_ai:learn_backend_domain: "api.ci.learn.mit.edu"
+  learn_ai:canvas_syllabus_token:
+    secure: v1:gTO7eJWYLyP62wAE:Ha2Tt/EZ+ITP4qrxWJ+IdMvaB77L2EGxCw8tl5qDezhcXZkaslzUKHHDaKwDfLQ2YsHcm/otJyRUWxqCNRwA4wy9aRFrz3EJKzXxOmNnE1c=
+  learn_ai:db_password:
+    secure: v1:LPQWUf68siLqkk30:JHBZ8gREGp0fRcAWH4ER7ExID5d3LVbn8BoFZ8o7tOBj43Jf+Jqh2c9acA/im/p9+W4c15appQNpC1hMHo4+hrIks3UIhC8a8+SV6GzO908=
   learn_ai:env_vars:
     AI_DEFAULT_RECOMMENDATION_MODEL: "openai/gpt-4o-mini"
     AI_DEFAULT_SYLLABUS_MODEL: "openai/gpt-4o-mini"
-    AI_DEFAULT_VIDEO_GPT_MODEL: "openai/gpt-4o-mini"
     AI_DEFAULT_TUTOR_MODEL: "openai/gpt-4o"
+    AI_DEFAULT_VIDEO_GPT_MODEL: "openai/gpt-4o-mini"
     AI_MIT_CONTENTFILE_URL: "https://api.rc.learn.mit.edu/api/v1/contentfiles/"
     AI_MIT_SEARCH_URL: "https://api.rc.learn.mit.edu/api/v0/vector_learning_resources_search/"
     AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
@@ -35,16 +38,15 @@ config:
     SENTRY_TRACES_SAMPLE_RATE: "0.1"
     SESSION_COOKIE_NAME: "session_learn_ai_ci"
     UWSGI_THREADS: "5"
+  learn_ai:frontend_domain: "learn-ai-ci.ol.mit.edu"
   learn_ai:frontend_vars:
     MIT_LEARN_APP_BASE_URL: https://rc.learn.mit.edu/
-    OPENEDX_API_BASE_URL: https://courses.rc.mitxonline.mit.edu/
-    OPENEDX_LOGIN_URL: https://courses.rc.mitxonline.mit.edu/auth/login/ol-oauth2/?auth_entry=login
     MIT_SEARCH_ELASTIC_URL: https://api.learn.mit.edu/api/v1/learning_resources_search/
     MIT_SEARCH_VECTOR_URL: https://api.learn.mit.edu/api/v0/vector_learning_resources_search/
-  learn_ai:frontend_domain: "learn-ai-ci.ol.mit.edu"
-  vault:address: "https://vault-ci.odl.mit.edu"
-  vault_server:env_namespace: "operations.ci"
-  learn_ai:db_password:
-    secure: v1:LPQWUf68siLqkk30:JHBZ8gREGp0fRcAWH4ER7ExID5d3LVbn8BoFZ8o7tOBj43Jf+Jqh2c9acA/im/p9+W4c15appQNpC1hMHo4+hrIks3UIhC8a8+SV6GzO908=
+    OPENEDX_API_BASE_URL: https://courses.rc.mitxonline.mit.edu/
+    OPENEDX_LOGIN_URL: https://courses.rc.mitxonline.mit.edu/auth/login/ol-oauth2/?auth_entry=login
+  learn_ai:learn_backend_domain: "api.ci.learn.mit.edu"
   redis:password:
     secure: v1:ObQfVCLRk72Bn9f3:7EKaqHGnHkYsurz0xWQcX9Cuhc4k0SSXcIIKSgYQnfFSu9uYHbUT0cpsic4M6SYG6ZuFxKXXeaZuLI2QC3s9Feo0oD+SEjetNxCZo0TPot8=
+  vault:address: "https://vault-ci.odl.mit.edu"
+  vault_server:env_namespace: "operations.ci"

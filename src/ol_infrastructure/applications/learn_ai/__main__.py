@@ -894,6 +894,24 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
     k8s_namespace=learn_ai_namespace,
     k8s_labels=k8s_global_labels,
     route_configs=[
+        # Proected route for canvas syllabus agent - requires canvas_token header
+        OLApisixRouteConfig(
+            route_name="canvas_syllabus_agent",
+            priority=20,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="key-auth",
+                    config={
+                        "header": "canvas_token",
+                    },
+                ),
+            ],
+            hosts=[learn_api_domain],
+            paths=["/ai/http/canvas_syllabus_agent/*"],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+            backend_resolve_granularity="service",
+        ),
         # Wildcard route that can use auth but doesn't require it
         OLApisixRouteConfig(
             route_name="passauth",
@@ -988,6 +1006,24 @@ learn_ai_https_apisix_route = OLApisixRoute(
     k8s_namespace=learn_ai_namespace,
     k8s_labels=k8s_global_labels,
     route_configs=[
+        # Proected route for canvas syllabus agent - requires canvas_token header
+        OLApisixRouteConfig(
+            route_name="canvas_syllabus_agent",
+            priority=20,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="key-auth",
+                    config={
+                        "header": "canvas_token",
+                    },
+                ),
+            ],
+            hosts=[learn_ai_api_domain],
+            paths=["/http/canvas_syllabus_agent/*"],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+            backend_resolve_granularity="service",
+        ),
         # Wildcard route that can use auth but doesn't require it
         OLApisixRouteConfig(
             route_name="passauth",
@@ -1082,6 +1118,25 @@ learn_ai_https_apisix_tls = kubernetes.apiextensions.CustomResource(
         "secret": {
             "name": "ol-wildcard-cert",
             "namespace": "operations",
+        },
+    },
+)
+learn_ai_https_apisix_consumer = kubernetes.apiextensions.CustomResource(
+    f"learn-ai-{stack_info.env_suffix}-https-apisix-consumer",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixConsumer",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="canvas-agent",
+        namespace=learn_ai_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        "authParameter": {
+            "keyAuth": {
+                "value": {
+                    "key": learn_ai_config.require("canvas_syllabus_token"),
+                },
+            },
         },
     },
 )
