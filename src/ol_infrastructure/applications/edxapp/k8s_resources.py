@@ -1,11 +1,12 @@
 # ruff: noqa: F841, E501, PLR0913, PLR0915
 import os
+import textwrap
 
 import pulumi
 import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, Output, ResourceOptions, StackReference, export
 
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
@@ -19,8 +20,11 @@ from ol_infrastructure.components.services.cert_manager import (
 )
 from ol_infrastructure.components.services.k8s import OLApisixRoute, OLApisixRouteConfig
 from ol_infrastructure.components.services.vault import (
+    OLVaultK8SDynamicSecretConfig,
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
+    OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
@@ -57,6 +61,20 @@ def create_k8s_resources(
     k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 
     # Verify that the namespace exists in the EKS cluster
+    data_vpc = network_stack.require_output("data_vpc")
+    operations_vpc = network_stack.require_output("operations_vpc")
+    edxapp_target_vpc = (
+        edxapp_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
+    )
+    edxapp_vpc = network_stack.require_output(edxapp_target_vpc)
+
+    # TODO(Mike): Will require special handling for residential clusters
+    k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
+
+    # Verify that the namespace exists in the EKS cluster
+    cluster_stack = StackReference(
+        f"infrastructure.aws.eks.applications.{stack_info.name}"
+    )  # TODO(Mike): add logic for the residential clusters
     namespace = f"{stack_info.env_prefix}-openedx"
     cluster_stack.require_output("namespaces").apply(
         lambda ns: check_cluster_namespace(namespace, ns)
@@ -668,6 +686,90 @@ def create_k8s_resources(
                 backend_service_port="http",
             )
         ],
+    )
+    # Load the database configuration into a secret for the edxapp application
+    db_creds_secret_name = "00-database-credentials-yaml"
+    db_creds_secret = Output.all(
+        address=edxapp_db.db_instance.address,
+        port=edxapp_db.db_instance.port,
+    ).apply(
+        lambda db: OLVaultK8SSecret(
+            f"ol-{stack_info.env_prefix}-edxapp-db-creds-secret-{stack_info.env_suffix}",
+            OLVaultK8SDynamicSecretConfig(
+                name="edxapp-db-creds",
+                namespace=namespace,
+                dest_secret_labels=k8s_global_labels,
+                dest_secret_name=db_creds_secret_name,
+                labels=k8s_global_labels,
+                mount=f"mariadb-{stack_info.env_prefix}",
+                path="creds/edxapp",
+                templates={
+                    "00-database-credentials.yaml": textwrap.dedent(f"""
+                        mysql_creds: &mysql_creds
+                          ENGINE: django.db.backends.mysql
+                          HOST: {db["address"]}
+                          PORT: {db["port"]}
+                          USER: {{{{ get .Secrets "username" }}}}
+                          PASSWORD: {{{{ get .Secrets "password" }}}}
+                    """)
+                },
+                vaultauth=vault_k8s_resources.auth_name,
+            ),
+        ),
+    )
+
+    mongo_db_creds_secret_name = "01-mongodb-credentials-yaml"
+    mongo_db_creds_secret = OLVaultK8SSecret(
+        f"ol-{stack_info.env_prefix}-edxapp-mongo-db-creds-secret-{stack_info.env_suffix}",
+        OLVaultK8SStaticSecretConfig(
+            name="edxapp-mongo-db-creds",
+            namespace=namespace,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=mongo_db_creds_secret_name,
+            labels=k8s_global_labels,
+            mount=f"secret-{stack_info.env_prefix}",
+            mount_type="kv-v1",
+            path="mongodb-edxapp",
+            templates={
+                "01-mongo-db-credentials.yaml": textwrap.dedent("""
+                    mongodb_creds: &mongodb_creds
+                      authsource: admin
+                      host: null # TODO
+                      port: 27017
+                      db: edxapp
+                      replicaSet: null # TODO
+                      user: {{ get .Secrets "username" }}
+                      password: {{ get .Secrets "password" }}
+                      ssl: true
+                """),
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
+    )
+
+    xqueue_secret_name = "21-xqueue-secrets-yaml"
+    xqueue_secret = OLVaultK8SSecret(
+        f"ol-{stack_info.env_prefix}-edxapp-xqueue-secret-{stack_info.env_suffix}",
+        OLVaultK8SStaticSecretConfig(
+            name="edxapp-xqueue-secrets",
+            namespace=namespace,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=xqueue_secret_name,
+            labels=k8s_global_labels,
+            mount=f"secret-{stack_info.env_prefix}",
+            mount_type="kv-v1",
+            path="edx-xqueue",
+            templates={
+                "21-xqueue-secrets.yaml": textwrap.dedent("""
+                    XQUEUE_INTERFACE:
+                      django_auth:
+                        password: {{ get .Secrets "edxapp_password" }}
+                        username: edxapp
+                      url: http://xqueue.service.consul:8040 # TODO
+                """),
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
     )
 
     return {
