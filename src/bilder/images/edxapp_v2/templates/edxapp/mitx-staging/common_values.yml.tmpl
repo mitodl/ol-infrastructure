@@ -68,7 +68,7 @@ XQUEUE_INTERFACE:
 COMMENTS_SERVICE_KEY: {{ .Data.forum_api_key }}
 {{ end }}
 {{ with secret "secret-global/learn_ai" }}
-MIT_LEARN_AI_XBLOCK_CHAT_API_TOKEN: {{ .Data.canvas_syllabus_token }}  # Added for ol_openedx_chat_xblock
+MIT_LEARN_AI_XBLOCK_CHAT_API_TOKEN: {{ .Data.data.canvas_syllabus_token }}  # Added for ol_openedx_chat_xblock
 {{ end }}
 
 DATABASES:
