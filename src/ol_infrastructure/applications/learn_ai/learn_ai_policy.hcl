@@ -36,5 +36,5 @@ path "sys/leases/revoke" {
 }
 
 path "secret-global/learn_ai" {
-  capabiliities = ["read"]
+  capabilities = ["read"]
 }
