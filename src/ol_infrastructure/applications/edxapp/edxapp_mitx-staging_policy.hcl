@@ -43,5 +43,5 @@ path "secret-mitx-staging/mitx-staging-wildcard-certificate" {
 }
 
 path "secret-global/learn_ai" {
-  capabiliities = ["read"]
+  capabilities = ["read"]
 }
