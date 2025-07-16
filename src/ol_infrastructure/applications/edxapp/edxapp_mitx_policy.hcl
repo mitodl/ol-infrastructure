@@ -41,3 +41,7 @@ path "secret-operations/global/github-enterprise-ssh" {
 path "secret-mitx/mitx-wildcard-certificate" {
   capabilities = ["read"]
 }
+
+path "secret-global/learn_ai" {
+  capabiliities = ["read"]
+}

@@ -4,8 +4,6 @@ encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAGzwYvKdv8btlpNoW
 config:
   aws:region: us-east-1
   learn_ai:backend_domain: "api-learn-ai-ci.ol.mit.edu"
-  learn_ai:canvas_syllabus_token:
-    secure: v1:gTO7eJWYLyP62wAE:Ha2Tt/EZ+ITP4qrxWJ+IdMvaB77L2EGxCw8tl5qDezhcXZkaslzUKHHDaKwDfLQ2YsHcm/otJyRUWxqCNRwA4wy9aRFrz3EJKzXxOmNnE1c=
   learn_ai:db_password:
     secure: v1:LPQWUf68siLqkk30:JHBZ8gREGp0fRcAWH4ER7ExID5d3LVbn8BoFZ8o7tOBj43Jf+Jqh2c9acA/im/p9+W4c15appQNpC1hMHo4+hrIks3UIhC8a8+SV6GzO908=
   learn_ai:env_vars:
