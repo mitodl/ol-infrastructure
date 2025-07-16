@@ -1134,7 +1134,11 @@ learn_ai_https_apisix_consumer = kubernetes.apiextensions.CustomResource(
         "authParameter": {
             "keyAuth": {
                 "value": {
-                    "key": learn_ai_config.require("canvas_syllabus_token"),
+                    "key": Output.secret(
+                        read_yaml_secrets(
+                            Path(f"vault/secrets.{stack_info.env_suffix}.yaml"),
+                        )["learn_ai"]["canvas_syllabus_token"]
+                    ),
                 },
             },
         },
