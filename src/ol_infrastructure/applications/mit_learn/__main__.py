@@ -473,7 +473,15 @@ mitlearn_db_security_group = ec2.SecurityGroup(
             # workaround to allow for data integration from the data Kubernetes
             # cluster. (TMM 2025-05-16)
             cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"].apply(
-                lambda pod_cidrs: [*pod_cidrs]
+                lambda pod_cidrs: [
+                    # Grant access from Hightouch for certificate sync
+                    "54.196.30.169/32",
+                    "52.72.201.213/32",
+                    "18.213.226.96/32",
+                    "3.224.126.197/32",
+                    "3.217.26.199/32",
+                    *pod_cidrs,
+                ]
             ),
             description="Allow access over the public internet from Heroku.",
         )
