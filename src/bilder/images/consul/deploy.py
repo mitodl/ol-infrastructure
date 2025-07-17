@@ -8,6 +8,7 @@ from bilder.components.baseline.steps import install_baseline_packages
 from bilder.components.hashicorp.consul.models import (
     Consul,
     ConsulConfig,
+    ConsulLimitConfig,
     ConsulTelemetry,
 )
 from bilder.components.hashicorp.consul.steps import proxy_consul_dns
@@ -53,6 +54,7 @@ consul_configuration = {
         server=True,
         ui=True,
         telemetry=ConsulTelemetry(),
+        limits=ConsulLimitConfig(http_max_conns_per_client=1000),
     )
 }
 
