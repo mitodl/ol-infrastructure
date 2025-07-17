@@ -512,7 +512,7 @@ mitlearn_db_config = OLPostgresDBConfig(
     engine_major_version="15",
     tags=aws_config.tags,
     db_name="mitopen",
-    public_access=False,
+    public_access=True,
     **rds_defaults,
 )
 mitlearn_db_config.parameter_overrides.append(
