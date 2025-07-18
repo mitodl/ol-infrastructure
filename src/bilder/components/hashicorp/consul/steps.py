@@ -11,6 +11,13 @@ from bilder.facts.has_systemd import HasSystemd
 
 @deploy("Set up DNS proxy")
 def proxy_consul_dns():
+    files.line(
+        name="Configure dhclient to always put 127.0.0.1 as the first DNS server.",
+        path="/etc/dhcp/dhclient.conf",
+        line="#prepend domain-name-servers 127.0.0.1;",
+        replace="prepend domain-name-servers 127.0.0.1;",
+        present=True,
+    )
     # Allow hosts that default to using systemd-resolved to properly resolve Consul
     # domains
     if host.get_fact(HasSystemd) and host.get_fact(SystemdStatus).get(
@@ -39,13 +46,6 @@ def proxy_consul_dns():
             packages=["unbound"],
             present=True,
             update=True,
-        )
-        files.line(
-            name="Configure dhclient to always put 127.0.0.1 as the first DNS server.",
-            path="/etc/dhcp/dhclient.conf",
-            line="#prepend domain-name-servers 127.0.0.1;",
-            replace="prepend domain-name-servers 127.0.0.1;",
-            present=True,
         )
         files.put(
             name="Configure Unbound to resolve .consul domains locally",
