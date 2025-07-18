@@ -131,6 +131,7 @@ concourse_config_map = {
         enable_job_auditing=False,
         enable_pipeline_auditing=False,
         enable_resource_auditing=False,
+        enable_rerun_when_worker_disappears=True,
         enable_system_auditing=False,
         enable_team_auditing=False,
         enable_volume_auditing=False,
