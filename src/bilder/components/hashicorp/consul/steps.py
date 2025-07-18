@@ -11,18 +11,25 @@ from bilder.facts.has_systemd import HasSystemd
 
 @deploy("Set up DNS proxy")
 def proxy_consul_dns():
+    apt.packages(
+        name="Install Unbound for DNS proxying",
+        packages=["unbound"],
+        present=True,
+        update=True,
+    )
+    files.line(
+        name="Configure dhclient to always put 127.0.0.1 as the first DNS server.",
+        path="/etc/dhcp/dhclient.conf",
+        line="#prepend domain-name-servers 127.0.0.1;",
+        replace="prepend domain-name-servers 127.0.0.1;",
+        present=True,
+    )
+
     # Allow hosts that default to using systemd-resolved to properly resolve Consul
     # domains
     if host.get_fact(HasSystemd) and host.get_fact(SystemdStatus).get(
         "systemd-resolved.service"
     ):
-        files.line(
-            name="Configure dhclient to always put 127.0.0.1 as the first DNS server.",
-            path="/etc/dhcp/dhclient.conf",
-            line="#prepend domain-name-servers 127.0.0.1;",
-            replace="prepend domain-name-servers 127.0.0.53;",
-            present=True,
-        )
         with tempfile.NamedTemporaryFile(delete=False, mode="w") as resolved_conf:
             resolved_conf.write(
                 "[Resolve]\nDNS=127.0.0.1:8600\nDNSSEC=false\nDomains=~consul"
@@ -40,31 +47,17 @@ def proxy_consul_dns():
             running=True,
             restarted=consul_resolved_config.changed,
         )
-    else:
-        apt.packages(
-            name="Install Unbound for DNS proxying",
-            packages=["unbound"],
-            present=True,
-            update=True,
-        )
-        files.line(
-            name="Configure dhclient to always put 127.0.0.1 as the first DNS server.",
-            path="/etc/dhcp/dhclient.conf",
-            line="#prepend domain-name-servers 127.0.0.1;",
-            replace="prepend domain-name-servers 127.0.0.1;",
-            present=True,
-        )
-        files.put(
-            name="Configure Unbound to resolve .consul domains locally",
-            dest="/etc/unbound/unbound.conf.d/consul.conf",
-            src=str(
-                Path(__file__).resolve().parent.joinpath("files", "unbound_config.conf")
-            ),
-            create_remote_dir=True,
-        )
-        systemd.service(
-            name="Enable Unbound DNS proxy",
-            service="unbound",
-            enabled=True,
-            running=True,
-        )
+    files.put(
+        name="Configure Unbound to resolve .consul domains locally",
+        dest="/etc/unbound/unbound.conf.d/consul.conf",
+        src=str(
+            Path(__file__).resolve().parent.joinpath("files", "unbound_config.conf")
+        ),
+        create_remote_dir=True,
+    )
+    systemd.service(
+        name="Enable Unbound DNS proxy",
+        service="unbound",
+        enabled=True,
+        running=True,
+    )
