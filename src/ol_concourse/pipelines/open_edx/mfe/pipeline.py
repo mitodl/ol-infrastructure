@@ -154,7 +154,15 @@ def mfe_job(
         get=mfe_configs.name,
         trigger=previous_job is None and open_edx.environment_stage != "production",
     )
-
+    branding_overrides = ""
+    if (
+        (open_edx.environment == "mitx" or open_edx.environment == "mitx-staging")
+        and OpenEdxMicroFrontend[mfe_name].value == OpenEdxMicroFrontend.learner_dashboard.value
+    ):
+        branding_overrides = textwrap.dedent(
+            """\
+            npm install @edx/brand@npm:@mitodl/brand-mitol-residential@latest --legacy-peer-deps"""  # noqa: E501
+        )
     translation_overrides = "\n".join(cmd for cmd in mfe.translation_overrides or [])
     if previous_job and mfe_repo.name == previous_job.plan[0].get:
         clone_mfe_repo.passed = [previous_job.name]
@@ -259,6 +267,7 @@ def mfe_job(
                                 apt-get install -q -y python3 python-is-python3 build-essential git
                                 npm install
                                 npm install -g @edx/openedx-atlas
+                                {branding_overrides}
                                 {translation_overrides}
                                 {mfe_smoot_design_overrides}
                                 npm install webpack
