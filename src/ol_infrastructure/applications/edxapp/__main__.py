@@ -1,4 +1,5 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, FIX002
+
 """Provision and deploy the resources needed for an edxapp installation.
 
 - Create S3 buckets required by edxapp
@@ -540,7 +541,7 @@ edxapp_db_security_group = ec2.SecurityGroup(
                 data_vpc["security_groups"]["integrator"],
                 vault_stack.require_output("vault_server")["security_group"],
             ],
-            # TODO: Create Vault security group to act as source of allowed  # noqa: FIX002, TD002
+            # TODO: Create Vault security group to act as source of allowed  # noqa: TD002
             # traffic. (TMM 2021-05-04)
             cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"].apply(
                 lambda pod_cidrs: [*pod_cidrs, edxapp_vpc["cidr"]]
@@ -1842,6 +1843,7 @@ if edxapp_config.get("k8s_deployment"):
         edxapp_config=edxapp_config,
         network_stack=network_stack,
         edxapp_db=edxapp_db,
+        edxapp_cache=edxapp_redis_cache,
         aws_config=aws_config,
         vault_config=Config("vault"),
         vault_policy=edxapp_vault_policy,
