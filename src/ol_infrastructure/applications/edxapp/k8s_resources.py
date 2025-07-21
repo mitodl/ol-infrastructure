@@ -1,6 +1,7 @@
-# ruff: noqa: F841, E501, S105, PLR0913, FIX002
+# ruff: noqa: F841, E501, S105, PLR0913, FIX002, PLR0915, FBT003
 import os
 import textwrap
+from pathlib import Path
 
 import pulumi
 import pulumi_aws as aws
@@ -687,6 +688,9 @@ def create_k8s_resources(
             )
         ],
     )
+    ############################################
+    # Shared configuration for BOTH LMS and CMS
+    ############################################
     # Load the database configuration into a secret for the edxapp application
     db_creds_secret_name = "00-database-credentials-yaml"  # pragma: allowlist secret
     db_creds_secret = Output.all(
@@ -696,7 +700,7 @@ def create_k8s_resources(
         lambda db: OLVaultK8SSecret(
             f"ol-{stack_info.env_prefix}-edxapp-db-creds-secret-{stack_info.env_suffix}",
             OLVaultK8SDynamicSecretConfig(
-                name="edxapp-db-creds",
+                name=db_creds_secret_name,
                 namespace=namespace,
                 dest_secret_labels=k8s_global_labels,
                 dest_secret_name=db_creds_secret_name,
@@ -715,6 +719,7 @@ def create_k8s_resources(
                 },
                 vaultauth=vault_k8s_resources.auth_name,
             ),
+            opts=ResourceOptions(delete_before_replace=True),
         ),
     )
 
@@ -729,7 +734,7 @@ def create_k8s_resources(
         lambda db: OLVaultK8SSecret(
             f"ol-{stack_info.env_prefix}-edxapp-db-connections-secret-{stack_info.env_suffix}",
             OLVaultK8SDynamicSecretConfig(
-                name="edxapp-db-connections",
+                name=db_connections_secret_name,
                 namespace=namespace,
                 dest_secret_labels=k8s_global_labels,
                 dest_secret_name=db_connections_secret_name,
@@ -766,6 +771,7 @@ def create_k8s_resources(
                 },
                 vaultauth=vault_k8s_resources.auth_name,
             ),
+            opts=ResourceOptions(delete_before_replace=True),
         ),
     )
 
@@ -776,7 +782,7 @@ def create_k8s_resources(
     mongo_db_creds_secret = OLVaultK8SSecret(
         f"ol-{stack_info.env_prefix}-edxapp-mongo-db-creds-secret-{stack_info.env_suffix}",
         OLVaultK8SStaticSecretConfig(
-            name="edxapp-mongo-db-creds",
+            name=mongo_db_creds_secret_name,
             namespace=namespace,
             dest_secret_labels=k8s_global_labels,
             dest_secret_name=mongo_db_creds_secret_name,
@@ -799,6 +805,7 @@ def create_k8s_resources(
             },
             vaultauth=vault_k8s_resources.auth_name,
         ),
+        opts=ResourceOptions(delete_before_replace=True),
     )
 
     # Load the MongoDB forum configuration into a secret for the edxapp application
@@ -808,7 +815,7 @@ def create_k8s_resources(
     mongo_db_forum_secret = OLVaultK8SSecret(
         f"ol-{stack_info.env_prefix}-edxapp-mongo-forum-creds-secret-{stack_info.env_suffix}",
         OLVaultK8SStaticSecretConfig(
-            name="edxapp-mongo-forum-creds",
+            name=mongo_db_forum_secret_name,
             namespace=namespace,
             dest_secret_labels=k8s_global_labels,
             dest_secret_name=mongo_db_forum_secret_name,
@@ -831,6 +838,7 @@ def create_k8s_resources(
             },
             vaultauth=vault_k8s_resources.auth_name,
         ),
+        opts=ResourceOptions(delete_before_replace=True),
     )
 
     # Load the Redis configuration and other generic secrets into a secret for the edxapp application
@@ -841,7 +849,7 @@ def create_k8s_resources(
         lambda redis_cache: OLVaultK8SSecret(
             f"ol-{stack_info.env_prefix}-edxapp-general-secret-{stack_info.env_suffix}",
             OLVaultK8SStaticSecretConfig(
-                name="edxapp-general-secrets",
+                name=general_secrets_name,
                 namespace=namespace,
                 dest_secret_labels=k8s_global_labels,
                 dest_secret_name=general_secrets_name,
@@ -895,6 +903,7 @@ def create_k8s_resources(
                 },
                 vaultauth=vault_k8s_resources.auth_name,
             ),
+            opts=ResourceOptions(delete_before_replace=True),
         ),
     )
 
@@ -903,7 +912,7 @@ def create_k8s_resources(
     xqueue_secret_secret = OLVaultK8SSecret(
         f"ol-{stack_info.env_prefix}-edxapp-xqueue-secret-{stack_info.env_suffix}",
         OLVaultK8SStaticSecretConfig(
-            name="edxapp-xqueue-secrets",
+            name=xqueue_secret_name,
             namespace=namespace,
             dest_secret_labels=k8s_global_labels,
             dest_secret_name=xqueue_secret_name,
@@ -922,6 +931,7 @@ def create_k8s_resources(
             },
             vaultauth=vault_k8s_resources.auth_name,
         ),
+        opts=ResourceOptions(delete_before_replace=True),
     )
 
     # Load the forum secrets into a secret for the edxapp application
@@ -929,7 +939,7 @@ def create_k8s_resources(
     forum_secret_secret = OLVaultK8SSecret(
         f"ol-{stack_info.env_prefix}-edxapp-forum-secret-{stack_info.env_suffix}",
         OLVaultK8SStaticSecretConfig(
-            name="edxapp-forum-secrets",
+            name=forum_secret_name,
             namespace=namespace,
             dest_secret_labels=k8s_global_labels,
             dest_secret_name=forum_secret_name,
@@ -943,6 +953,520 @@ def create_k8s_resources(
                     """),
             },
             vaultauth=vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(delete_before_replace=True),
+    )
+
+    # Load general configuration from a file into a configmap
+    general_config_name = "50-general-config-yaml"
+    general_config_map = kubernetes.core.v1.ConfigMap(
+        f"ol-{stack_info.env_prefix}-edxapp-general-config-{stack_info.env_suffix}",
+        metadata={
+            "name": general_config_name,
+            "namespace": namespace,
+            "labels": k8s_global_labels,
+        },
+        data={
+            "50-general-config.yaml": Path(
+                f"files/edxapp/{stack_info.env_prefix}/50-general-config.yaml"
+            ).read_text()
+        },
+    )
+
+    # Misc values needed for the next step
+    course_bucket_name = f"{env_name}-edxapp-courses"
+    grades_bucket_name = f"{env_name}-edxapp-grades"
+    storage_bucket_name = f"{env_name}-edxapp-storage"
+    ses_configuration_set = f"edxapp-{env_name}"
+    opensearch_stack = StackReference(
+        f"infrastructure.aws.opensearch.{stack_info.env_prefix}.{stack_info.name}"
+    )
+
+    # Load environment specific configuration directly from code into a configmap
+    interpolated_config_name = "60-interpolated-config-yaml"
+    interpolated_config_map = Output.all(
+        redis_hostname=edxapp_cache.address,
+        opensearch_hostname=opensearch_stack.require_output("cluster")["endpoint"],
+    ).apply(
+        lambda runtime_config: kubernetes.core.v1.ConfigMap(
+            f"ol-{stack_info.env_prefix}-edxapp-interpolated-config-{stack_info.env_suffix}",
+            metadata={
+                "name": interpolated_config_name,
+                "namespace": namespace,
+                "labels": k8s_global_labels,
+            },
+            data={
+                "60-interpolated-config.yaml": textwrap.dedent(f"""
+                    ALLOWED_HOSTS:
+                    - {edxapp_config.require_object("domains")["lms"]}
+                    - {edxapp_config.require_object("domains")["preview"]}
+                    - {edxapp_config.require_object("domains")["studio"]}
+                    AWS_S3_CUSTOM_DOMAIN: {storage_bucket_name}.s3.amazonaws.com
+                    AWS_STORAGE_BUCKET_NAME: {storage_bucket_name}
+                    AWS_SES_CONFIGURATION_SET: {ses_configuration_set}
+                    BASE_COOKIE_DOMAIN: {edxapp_config.require_object("domains")["lms"]}
+                    BLOCK_STRUCTURES_SETTINGS:
+                      COURSE_PUBLISH_TASK_DELAY: 30
+                      PRUNING_ACTIVE: true  # MODIFIED
+                      TASK_DEFAULT_RETRY_DELAY: 30
+                      TASK_MAX_RETRIES: 5
+                      STORAGE_CLASS: storages.backends.s3boto3.S3Boto3Storage
+                      DIRECTORY_PREFIX: coursestructure/
+                      STORAGE_KWARGS:
+                        bucket_name: {storage_bucket_name}
+                        default_acl: public-read
+                    EMAIL_USE_COURSE_ID_FROM_FOR_BULK: {edxapp_config.get_bool("email_use_course_id_from_for_bulk", False)}
+                    BULK_EMAIL_DEFAULT_FROM_EMAIL: {edxapp_config.get("bulk_email_default_from_email") or edxapp_config.require("sender_email_address")}
+                    CELERY_BROKER_HOSTNAME: {runtime_config["redis_hostname"]}
+                    CMS_BASE: {edxapp_config.require_object("domains")["studio"]}
+                    CONTACT_EMAIL: {edxapp_config.require("sender_email_address")}
+                    CORS_ORIGIN_WHITELIST:
+                    - https://{edxapp_config.require_object("domains")["lms"]}
+                    - https://{edxapp_config.require_object("domains")["studio"]}
+                    - https://{edxapp_config.require_object("domains")["preview"]}
+                    - https://{edxapp_config.require("marketing_domain")}
+                    # - https://{{{{ key "edx/notes-api-host" }}}} # TODO
+                    # - https://{{{{ key "edxapp/learn-ai-frontend-domain" }}}} # TODO
+                    COURSE_IMPORT_EXPORT_BUCKET: {storage_bucket_name}
+                    CROSS_DOMAIN_CSRF_COOKIE_DOMAIN: {edxapp_config.require_object("domains")["lms"]}
+                    CROSS_DOMAIN_CSRF_COOKIE_NAME: {env_name}-edxapp-csrftoken
+                    CSRF_TRUSTED_ORIGINS:  # MODIFIED
+                    - https://{edxapp_config.require_object("domains")["lms"]}
+                    DEFAULT_FEEDBACK_EMAIL: {edxapp_config.require("sender_email_address")}
+                    DEFAULT_FROM_EMAIL: {edxapp_config.require("sender_email_address")}
+                    DISCUSSIONS_MICROFRONTEND_URL: https://{{ key "edxapp/lms-domain" }}/discuss
+                    EDXMKTG_USER_INFO_COOKIE_NAME: {env_name}-edx-user-info
+                    # EDXNOTES_INTERNAL_API: https://{{ key "edx/notes-api-host" }}/api/v1  # TODO
+                    # EDXNOTES_PUBLIC_API: https://{{ key "edx/notes-api-host" }}/api/v1  # TODO
+                    ELASTIC_SEARCH_CONFIG:
+                    - host: {runtime_config["opensearch_hostname"]}
+                      port: 443
+                      use_ssl: true
+                    ELASTIC_SEARCH_CONFIG_ES7:
+                    - host: {runtime_config["opensearch_hostname"]}
+                      port: 443
+                      use_ssl: true
+                    FILE_UPLOAD_STORAGE_BUCKET_NAME: {storage_bucket_name}
+                    FORUM_ELASTIC_SEARCH_CONFIG:
+                    - host: {runtime_config["opensearch_hostname"]}
+                      port: "443"
+                      use_ssl: true
+                    FORUM_MONGODB_DATABASE: "forum"
+                    GITHUB_REPO_ROOT: /openedx/data
+                    GOOGLE_ANALYTICS_ACCOUNT: {edxapp_config.require("google_analytics_id")}
+                    GRADES_DOWNLOAD:
+                      BUCKET: {grades_bucket_name}  # MODIFIED
+                      ROOT_PATH: grades  # MODIFIED
+                      STORAGE_CLASS: django.core.files.storage.S3Storage  # MODIFIED
+                      STORAGE_KWARGS:
+                        location: grades/
+                      STORAGE_TYPE: S3  # MODIFIED
+                    IDA_LOGOUT_URI_LIST:
+                    - https://{edxapp_config.require("marketing_domain")}/logout
+                    - https://{edxapp_config.require_object("domains")["studio"]}/logout
+                    - https://{{ key "edxapp/learn-api-domain" }}/logout  # TODO
+                    LANGUAGE_COOKIE: {env_name}-openedx-language-preference
+                    # MIT_LEARN_AI_API_URL: https://{{ key "edxapp/learn-api-domain" }}/ai  # Added for ol_openedx_chat  # TODO
+                    # MIT_LEARN_API_BASE_URL: https://{{ key "edxapp/learn-api-domain" }}/learn  # Added for ol_openedx_chat  # TODO
+                    # MIT_LEARN_SUMMARY_FLASHCARD_URL: https://{{ key "edxapp/learn-api-domain" }}/learn/api/v1/contentfiles/  # Added for ol_openedx_chat  # TODO
+                    # MIT_LEARN_BASE_URL: https://{{ key "edxapp/learn-frontend-domain" }}  # TODO
+                    MIT_LEARN_LOGO: https://{edxapp_config.require_object("domains")["lms"]}/static/mitxonline/images/mit-learn-logo.svg
+                    LEARNING_MICROFRONTEND_URL: https://{edxapp_config.require_object("domains")["lms"]}/learn
+                    LMS_BASE: {edxapp_config.require_object("domains")["lms"]}
+                    LMS_INTERNAL_ROOT_URL: https://{edxapp_config.require_object("domains")["lms"]}
+                    LMS_ROOT_URL: https://{edxapp_config.require_object("domains")["lms"]}
+                    LOGIN_REDIRECT_WHITELIST:  # MODIFIED
+                    - {edxapp_config.require_object("domains")["studio"]}
+                    - {edxapp_config.require_object("domains")["lms"]}
+                    - {edxapp_config.require_object("domains")["preview"]}
+                    - {edxapp_config.require("marketing_domain")}
+                    LOGO_URL: https://{edxapp_config.require_object("domains")["lms"]}/static/mitxonline/images/logo.svg
+                    LOGO_URL_PNG_FOR_EMAIL: https://{edxapp_config.require_object("domains")["lms"]}/static/mitxonline/images/logo.png
+                    LOGO_TRADEMARK_URL: https://{edxapp_config.require_object("domains")["lms"]}/static/mitxonline/images/mit-logo.svg
+                    MARKETING_SITE_BASE_URL: https://{edxapp_config.require("marketing_domain")}/ # ADDED - to support mitxonline-theme
+                    MARKETING_SITE_CHECKOUT_URL: https://{edxapp_config.require("marketing_domain")}/cart/add/ # ADDED - to support mitxonline checkout
+                    MKTG_URLS:
+                      ROOT: https://{edxapp_config.require("marketing_domain")}/
+                    MKTG_URL_OVERRIDES:
+                      COURSES: https://{edxapp_config.require("marketing_domain")}/
+                      PRIVACY: https://{edxapp_config.require("marketing_domain")}/privacy-policy/
+                      TOS: https://{edxapp_config.require("marketing_domain")}/terms-of-service/
+                      ABOUT: https://{edxapp_config.require("marketing_domain")}/about-us/
+                      HONOR: https://{edxapp_config.require("marketing_domain")}/honor-code/
+                      ACCESSIBILITY: https://accessibility.mit.edu/
+                      CONTACT: https://mitxonline.zendesk.com/hc/en-us/requests/new/
+                      TOS_AND_HONOR: ''
+                    NOTIFICATIONS_DEFAULT_FROM_EMAIL: {edxapp_config.require("bulk_email_default_from_email") or edxapp_config.require("sender_email_address")}
+                    PAYMENT_SUPPORT_EMAIL: {edxapp_config.require("sender_email_address")}
+                    SENTRY_ENVIRONMENT: {env_name}
+                    # Removing the session cookie domain as it is no longer needed for sharing the cookie
+                    # between LMS and Studio (TMM 2021-10-22)
+                    # UPDATE: The session cookie domain appears to still be required for enabling the
+                    # preview subdomain to share authentication with LMS (TMM 2021-12-20)
+                    SESSION_COOKIE_DOMAIN: {".{}".format(edxapp_config.require_object("domains")["lms"].split(".", 1)[-1])}
+                    UNIVERSITY_EMAIL: {edxapp_config.require("sender_email_address")}
+                    ECOMMERCE_PUBLIC_URL_ROOT: https://{edxapp_config.require_object("domains")["lms"]}
+            """),
+            },
+            opts=ResourceOptions(delete_before_replace=True),
+        )
+    )
+
+    ############################################
+    # Configuration for JUST the CMS containers
+    ############################################
+
+    # A secret for JUST CMS containers, not LMS.
+    cms_oauth_secret_name = "70-cms-oauth-credentials-yaml"  # pragma: allowlist secret
+    cms_oauth_secret = OLVaultK8SSecret(
+        f"ol-{stack_info.env_prefix}-edxapp-cms-oauth-secret-{stack_info.env_suffix}",
+        OLVaultK8SStaticSecretConfig(
+            name=cms_oauth_secret_name,
+            namespace=namespace,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=cms_oauth_secret_name,
+            labels=k8s_global_labels,
+            mount=f"secret-{stack_info.env_prefix}",
+            mount_type="kv-v1",
+            path="edxapp",
+            templates={
+                "70-cms-oauth-credentials.yaml": textwrap.dedent("""
+                    SOCIAL_AUTH_EDX_OAUTH2_KEY: {{ (get .Secrets "studio_oauth_client").id }}
+                    SOCIAL_AUTH_EDX_OAUTH2_SECRET: {{ (get .Secrets "studio_oauth_client").secret }}
+                """),
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(delete_before_replace=True),
+    )
+
+    # General configuration items for the CMS application.
+    cms_general_config_name = "71-cms-general-config-yaml"
+    cms_general_config_map = kubernetes.core.v1.ConfigMap(
+        f"ol-{stack_info.env_prefix}-edxapp-cms-general-config-{stack_info.env_suffix}",
+        metadata={
+            "name": cms_general_config_name,
+            "namespace": namespace,
+            "labels": k8s_global_labels,
+        },
+        data={
+            "71-cms-general-config.yaml": Path(
+                f"files/edxapp/{stack_info.env_prefix}/71-cms-general-config.yaml"
+            ).read_text()
+        },
+    )
+
+    # Interpolated configuration items for the CMS application.
+    cms_interpolated_config_name = "72-cms-interpolated-config-yaml"
+    cms_interpolated_config = kubernetes.core.v1.ConfigMap(
+        f"ol-{stack_info.env_prefix}-edxapp-cms-interpolated-config-{stack_info.env_suffix}",
+        metadata={
+            "name": cms_interpolated_config_name,
+            "namespace": namespace,
+            "labels": k8s_global_labels,
+        },
+        data={
+            "72-cms-interpolated-config.yaml": textwrap.dedent(f"""
+                SITE_NAME: {edxapp_config.require_object("domains")["studio"]}
+                SOCIAL_AUTH_EDX_OAUTH2_URL_ROOT: https://{edxapp_config.require_object("domains")["lms"]}
+                SOCIAL_AUTH_EDX_OAUTH2_PUBLIC_URL_ROOT: https://{edxapp_config.require_object("domains")["lms"]}
+                SESSION_COOKIE_NAME: {env_name}-edx-studio-sessionid
+            """)
+        },
+        opts=ResourceOptions(delete_before_replace=True),
+    )
+
+    ############################################
+    # Configuration for JUST the LMS containers
+    ############################################
+
+    # A secret for JUST CMS containers, not LMS.
+    lms_oauth_secret_name = "80-lms-oauth-credentials-yaml"  # pragma: allowlist secret
+    lms_oauth_secret = OLVaultK8SSecret(
+        f"ol-{stack_info.env_prefix}-edxapp-lms-oauth-secret-{stack_info.env_suffix}",
+        OLVaultK8SStaticSecretConfig(
+            name=lms_oauth_secret_name,
+            namespace=namespace,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=lms_oauth_secret_name,
+            labels=k8s_global_labels,
+            mount=f"secret-{stack_info.env_prefix}",
+            mount_type="kv-v1",
+            path="edxapp",
+            templates={
+                "80-lms-oauth-credentials.yaml": textwrap.dedent("""
+                    SOCIAL_AUTH_OAUTH_SECRETS:
+                        ol-oauth2: {{ get .Secrets "mitxonline_oauth_secret" }}
+                """),
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(delete_before_replace=True),
+    )
+
+    # Interpolated configuration items for the CMS application.
+    lms_interpolated_config_name = "82-lms-interpolated-config-yaml"
+    lms_interpolated_config = kubernetes.core.v1.ConfigMap(
+        f"ol-{stack_info.env_prefix}-edxapp-lms-interpolated-config-{stack_info.env_suffix}",
+        metadata={
+            "name": lms_interpolated_config_name,
+            "namespace": namespace,
+            "labels": k8s_global_labels,
+        },
+        data={
+            "82-lms-interpolated-config.yaml": textwrap.dedent(f"""
+                SITE_NAME: {edxapp_config.require_object("domains")["lms"]}
+                SESSION_COOKIE_NAME: {env_name}-edx-lms-sessionid
+            """)
+        },
+        opts=ResourceOptions(delete_before_replace=True),
+    )
+
+    # All of the secrets and configmaps that will be mounted into the edxapp containers
+    # The names are prefixed with numbers to control the order they are concatenated in.
+    cms_edxapp_config_sources = {
+        db_creds_secret_name: db_creds_secret,
+        db_connections_secret_name: db_connections_secret,
+        mongo_db_creds_secret_name: mongo_db_creds_secret,
+        mongo_db_forum_secret_name: mongo_db_forum_secret,
+        general_secrets_name: general_secrets_secret,
+        xqueue_secret_name: xqueue_secret_secret,
+        forum_secret_name: forum_secret_secret,
+        general_config_name: general_config_map,
+        interpolated_config_name: interpolated_config_map,
+        # Just CMS specific resources below this line
+        cms_oauth_secret_name: cms_oauth_secret,
+        cms_general_config_name: cms_general_config_map,
+        cms_interpolated_config_name: cms_interpolated_config,
+    }
+    cms_edxapp_secret_names = [
+        db_creds_secret_name,
+        db_connections_secret_name,
+        mongo_db_creds_secret_name,
+        mongo_db_forum_secret_name,
+        general_secrets_name,
+        xqueue_secret_name,
+        forum_secret_name,
+        # Just CMS specific resources below this line
+        cms_oauth_secret_name,
+    ]
+    cms_edxapp_configmap_names = [
+        general_config_name,
+        interpolated_config_name,
+        # Just CMS specific resources below this line
+        cms_general_config_name,
+        cms_interpolated_config_name,
+    ]
+
+    # Define the volumes that will be mounted into the edxapp containers
+    cms_edxapp_volumes = [
+        kubernetes.core.v1.VolumeArgs(
+            name=secret_name,
+            secret=kubernetes.core.v1.SecretVolumeSourceArgs(secret_name=secret_name),
+        )
+        for secret_name in cms_edxapp_secret_names
+    ]
+    cms_edxapp_volumes.extend(
+        [
+            kubernetes.core.v1.VolumeArgs(
+                name=configmap_name,
+                config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                    name=configmap_name
+                ),
+            )
+            for configmap_name in cms_edxapp_configmap_names
+        ]
+    )
+    cms_edxapp_volumes.append(
+        kubernetes.core.v1.VolumeArgs(
+            name="edxapp-config",
+            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+        )
+    )
+
+    # Define the volume mounts for the init container that aggregates the config files
+    cms_edxapp_init_volume_mounts = [
+        kubernetes.core.v1.VolumeMountArgs(
+            name=source_name,
+            mount_path=f"/openedx/config-sources/{source_name}",
+            read_only=True,
+        )
+        for source_name in cms_edxapp_config_sources
+    ]
+    cms_edxapp_init_volume_mounts.append(
+        kubernetes.core.v1.VolumeMountArgs(
+            name="edxapp-config",
+            mount_path="/openedx/config",
+        )
+    )
+
+    cms_labels = k8s_global_labels | {"ol.mit.edu/component": "edxapp-cms"}
+    cms_deployment = kubernetes.apps.v1.Deployment(
+        f"ol-{stack_info.env_prefix}-edxapp-cms-deployment-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=cms_deployment_name,
+            namespace=namespace,
+            labels=cms_labels,
+        ),
+        spec=kubernetes.apps.v1.DeploymentSpecArgs(
+            replicas=1,
+            selector=kubernetes.meta.v1.LabelSelectorArgs(match_labels=cms_labels),
+            template=kubernetes.core.v1.PodTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=cms_labels),
+                spec=kubernetes.core.v1.PodSpecArgs(
+                    service_account_name=vault_k8s_resources.service_account_name,
+                    volumes=cms_edxapp_volumes,
+                    init_containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="config-aggregator",
+                            image="busybox:1.35",
+                            command=["/bin/sh", "-c"],
+                            args=[
+                                "cat /openedx/config-sources/*/*.yaml > /openedx/config/cms.env.yml"
+                            ],
+                            volume_mounts=cms_edxapp_init_volume_mounts,
+                        )
+                    ],
+                    containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="busybox",  # Placeholder for the actual CMS container
+                            image="busybox:1.35",
+                            command=["/bin/sh", "-c", "sleep infinity"],
+                            volume_mounts=[
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="edxapp-config",
+                                    mount_path="/openedx/config",
+                                )
+                            ],
+                        )
+                    ],
+                ),
+            ),
+        ),
+        opts=pulumi.ResourceOptions(
+            depends_on=list(cms_edxapp_config_sources.values())
+        ),
+    )
+
+    lms_edxapp_config_sources = {
+        db_creds_secret_name: db_creds_secret,
+        db_connections_secret_name: db_connections_secret,
+        mongo_db_creds_secret_name: mongo_db_creds_secret,
+        mongo_db_forum_secret_name: mongo_db_forum_secret,
+        general_secrets_name: general_secrets_secret,
+        xqueue_secret_name: xqueue_secret_secret,
+        forum_secret_name: forum_secret_secret,
+        general_config_name: general_config_map,
+        interpolated_config_name: interpolated_config_map,
+        # Just LMS specific resources below this line
+        lms_oauth_secret_name: lms_oauth_secret,
+        lms_interpolated_config_name: lms_interpolated_config,
+    }
+    lms_edxapp_secret_names = [
+        db_creds_secret_name,
+        db_connections_secret_name,
+        mongo_db_creds_secret_name,
+        mongo_db_forum_secret_name,
+        general_secrets_name,
+        xqueue_secret_name,
+        forum_secret_name,
+        # Just LMS specific resources below this line
+        lms_oauth_secret_name,
+    ]
+    lms_edxapp_configmap_names = [
+        general_config_name,
+        interpolated_config_name,
+        # Just LMS specific resources below this line
+        lms_interpolated_config_name,
+    ]
+
+    # Define the volumes that will be mounted into the edxapp containers
+    lms_edxapp_volumes = [
+        kubernetes.core.v1.VolumeArgs(
+            name=secret_name,
+            secret=kubernetes.core.v1.SecretVolumeSourceArgs(secret_name=secret_name),
+        )
+        for secret_name in lms_edxapp_secret_names
+    ]
+    lms_edxapp_volumes.extend(
+        [
+            kubernetes.core.v1.VolumeArgs(
+                name=configmap_name,
+                config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                    name=configmap_name
+                ),
+            )
+            for configmap_name in lms_edxapp_configmap_names
+        ]
+    )
+    lms_edxapp_volumes.append(
+        kubernetes.core.v1.VolumeArgs(
+            name="edxapp-config",
+            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+        )
+    )
+
+    # Define the volume mounts for the init container that aggregates the config files
+    lms_edxapp_init_volume_mounts = [
+        kubernetes.core.v1.VolumeMountArgs(
+            name=source_name,
+            mount_path=f"/openedx/config-sources/{source_name}",
+            read_only=True,
+        )
+        for source_name in lms_edxapp_config_sources
+    ]
+    lms_edxapp_init_volume_mounts.append(
+        kubernetes.core.v1.VolumeMountArgs(
+            name="edxapp-config",
+            mount_path="/openedx/config",
+        )
+    )
+
+    lms_labels = k8s_global_labels | {"ol.mit.edu/component": "edxapp-lms"}
+    lms_deployment = kubernetes.apps.v1.Deployment(
+        f"ol-{stack_info.env_prefix}-edxapp-lms-deployment-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=lms_deployment_name,
+            namespace=namespace,
+            labels=lms_labels,
+        ),
+        spec=kubernetes.apps.v1.DeploymentSpecArgs(
+            replicas=1,
+            selector=kubernetes.meta.v1.LabelSelectorArgs(match_labels=lms_labels),
+            template=kubernetes.core.v1.PodTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=lms_labels),
+                spec=kubernetes.core.v1.PodSpecArgs(
+                    service_account_name=vault_k8s_resources.service_account_name,
+                    volumes=lms_edxapp_volumes,
+                    init_containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="config-aggregator",
+                            image="busybox:1.35",
+                            command=["/bin/sh", "-c"],
+                            args=[
+                                "cat /openedx/config-sources/*/*.yaml > /openedx/config/lms.env.yml"
+                            ],
+                            volume_mounts=lms_edxapp_init_volume_mounts,
+                        )
+                    ],
+                    containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="busybox",  # Placeholder for the actual LMS container
+                            image="busybox:1.35",
+                            command=["/bin/sh", "-c", "sleep infinity"],
+                            volume_mounts=[
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="edxapp-config",
+                                    mount_path="/openedx/config",
+                                )
+                            ],
+                        )
+                    ],
+                ),
+            ),
+        ),
+        opts=pulumi.ResourceOptions(
+            depends_on=list(lms_edxapp_config_sources.values())
         ),
     )
 
