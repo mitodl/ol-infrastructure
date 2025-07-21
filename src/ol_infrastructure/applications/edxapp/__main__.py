@@ -1840,6 +1840,7 @@ for domain_key, domain_value in edxapp_domains.items():
 if edxapp_config.get("k8s_deployment"):
     k8s_resources = create_k8s_resources(
         stack_info=stack_info,
+        cluster_stack=cluster_stack,
         edxapp_config=edxapp_config,
         network_stack=network_stack,
         edxapp_db=edxapp_db,
