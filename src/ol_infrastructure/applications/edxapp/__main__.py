@@ -60,6 +60,7 @@ from ol_infrastructure.lib.aws.ec2_helper import (
     InstanceTypes,
     default_egress_args,
 )
+from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_records
 from ol_infrastructure.lib.consul import get_consul_provider
@@ -77,6 +78,7 @@ stack_info = parse_stack()
 edxapp_config = Config("edxapp")
 if Config("vault").get("address"):
     setup_vault_provider()
+
 #############
 # Constants #
 #############
@@ -90,6 +92,9 @@ FIVE_MINUTES = 60 * 5
 #####################
 # Stack Information #
 #####################
+cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
+
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
@@ -121,6 +126,7 @@ aws_config = AWSBase(
     }
 )
 consul_security_groups = consul_stack.require_output("security_groups")
+
 consul_provider = get_consul_provider(stack_info)
 fastly_provider = get_fastly_provider()
 openedx_release = (
