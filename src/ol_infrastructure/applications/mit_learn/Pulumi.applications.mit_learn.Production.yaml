@@ -12,8 +12,8 @@ config:
     auth_allowed_redirect_hosts:
     - "draft.ocw.mit.edu"
     - "ocw.mit.edu"
-    - ".mitopen.odl.mit.edu"   # legacy
-    - ".learn.mit.edu"
+    - "mitopen.odl.mit.edu"   # legacy
+    - "learn.mit.edu"
     cors_urls:
     - "https://api.learn.mit.edu"
     - "https://learn.mit.edu"
