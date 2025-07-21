@@ -34,6 +34,7 @@ from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 def create_k8s_resources(
     stack_info: StackInfo,
+    cluster_stack: StackReference,
     edxapp_config: Config,
     network_stack: StackReference,
     edxapp_db: OLAmazonDB,
@@ -59,9 +60,6 @@ def create_k8s_resources(
     k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 
     # Verify that the namespace exists in the EKS cluster
-    cluster_stack = StackReference(
-        f"infrastructure.aws.eks.applications.{stack_info.name}"
-    )  # TODO(Mike): add logic for the residential clusters
     namespace = f"{stack_info.env_prefix}-openedx"
     cluster_stack.require_output("namespaces").apply(
         lambda ns: check_cluster_namespace(namespace, ns)
@@ -649,7 +647,24 @@ def create_k8s_resources(
         opts=ResourceOptions(delete_before_replace=True),
     )
 
-    # All of the secrets and configmaps that will be mounted into the edxapp containers
+    ############################################
+    # uwsgi.ini
+    ############################################
+    uwsgi_ini_config_name = "uwsgi-ini"
+    uwsgi_ini_config_map = kubernetes.core.v1.ConfigMap(
+        f"ol-{stack_info.env_prefix}-edxapp-uwsgi-ini-config-{stack_info.env_suffix}",
+        metadata={
+            "name": uwsgi_ini_config_name,
+            "namespace": namespace,
+            "labels": k8s_global_labels,
+        },
+        data={"uwsgi.ini": Path("files/edxapp/uwsgi.ini").read_text()},
+    )
+
+    ############################################
+    # cms deployment resources
+    ############################################
+    # All of the secrets and configmaps that will be mounted into the edxapp cms containers
     # The names are prefixed with numbers to control the order they are concatenated in.
     cms_edxapp_config_sources = {
         db_creds_secret_name: db_creds_secret,
@@ -710,6 +725,14 @@ def create_k8s_resources(
             empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
         )
     )
+    cms_edxapp_volumes.append(
+        kubernetes.core.v1.VolumeArgs(
+            name=uwsgi_ini_config_name,
+            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                name=uwsgi_ini_config_name
+            ),
+        )
+    )
 
     # Define the volume mounts for the init container that aggregates the config files
     cms_edxapp_init_volume_mounts = [
@@ -763,7 +786,12 @@ def create_k8s_resources(
                                 kubernetes.core.v1.VolumeMountArgs(
                                     name="edxapp-config",
                                     mount_path="/openedx/config",
-                                )
+                                ),
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name=uwsgi_ini_config_name,
+                                    mount_path="/openedx/edx-platform/uwsgi.ini",
+                                    sub_path="uwsgi.ini",
+                                ),
                             ],
                         )
                     ],
@@ -775,6 +803,9 @@ def create_k8s_resources(
         ),
     )
 
+    ############################################
+    # lms deployment resources
+    ############################################
     lms_edxapp_config_sources = {
         db_creds_secret_name: db_creds_secret,
         db_connections_secret_name: db_connections_secret,
@@ -832,6 +863,14 @@ def create_k8s_resources(
             empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
         )
     )
+    lms_edxapp_volumes.append(
+        kubernetes.core.v1.VolumeArgs(
+            name=uwsgi_ini_config_name,
+            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                name=uwsgi_ini_config_name
+            ),
+        )
+    )
 
     # Define the volume mounts for the init container that aggregates the config files
     lms_edxapp_init_volume_mounts = [
@@ -885,7 +924,12 @@ def create_k8s_resources(
                                 kubernetes.core.v1.VolumeMountArgs(
                                     name="edxapp-config",
                                     mount_path="/openedx/config",
-                                )
+                                ),
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name=uwsgi_ini_config_name,
+                                    mount_path="/openedx/edx-platform/uwsgi.ini",
+                                    sub_path="uwsgi.ini",
+                                ),
                             ],
                         )
                     ],
