@@ -140,9 +140,7 @@ def mfe_job(
     mfe_configs = git_repo(
         name=Identifier("mfe-slots-config"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        paths=[
-            f"src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/"
-        ],
+        paths=["src/bridge/settings/openedx/mfe/slot_config/"],
         branch="main",
     )
 
