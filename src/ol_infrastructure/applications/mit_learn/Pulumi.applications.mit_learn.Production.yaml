@@ -37,6 +37,7 @@ config:
   mitlearn:learn_ai_syllabus_endpoint: "https://api.learn.mit.edu/ai/http/syllabus_agent/"
   mitlearn:legacy_api_domain: "api.mitopen.odl.mit.edu"
   mitlearn:legacy_frontend_domain: "mitopen.odl.mit.edu"
+  mitlearn:min_replicas: 4
   mitlearn:nextjs_heroku_domain: "next.learn.mit.edu"
   mitlearn:posthog_proxy: "ph.ol.mit.edu"
   mitlearn:vars:

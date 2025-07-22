@@ -1353,6 +1353,7 @@ mitlearn_k8s_app = OLApplicationK8s(
         k8s_global_labels=k8s_global_labels,
         # Reference all Kubernetes secrets containing environment variables
         env_from_secret_names=secret_names,
+        application_min_replicas=mitlearn_config.get("min_replicas") or 2,
         application_security_group_id=mitlearn_app_security_group.id,
         application_security_group_name=mitlearn_app_security_group.name,
         application_image_repository="mitodl/mit-learn-app",
