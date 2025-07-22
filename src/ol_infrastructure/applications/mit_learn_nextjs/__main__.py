@@ -98,7 +98,7 @@ nextjs_build_cache_pvc = kubernetes.core.v1.PersistentVolumeClaim(
     spec=kubernetes.core.v1.PersistentVolumeClaimSpecArgs(
         access_modes=["ReadWriteMany"],
         resources=kubernetes.core.v1.VolumeResourceRequirementsArgs(
-            requests={"storage": "50Gi"},
+            requests={"storage": "10Gi"},
         ),
         storage_class_name="efs-sc",  # Assumes 'efs-sc' StorageClass is configured
     ),
@@ -144,7 +144,7 @@ mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
                     kubernetes.core.v1.ContainerArgs(
                         name="nextjs-builder-job",
                         image=app_image,
-                        command=["yarn", "build"],
+                        command=["yarn", "build", "--no-lint"],
                         volume_mounts=[efs_volume_mount],
                         image_pull_policy="Always",
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(),
