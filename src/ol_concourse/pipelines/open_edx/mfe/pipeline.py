@@ -161,7 +161,7 @@ def mfe_job(
     mfe_build_dir = Output(name=Identifier("mfe-build"))
     mfe_setup_plan = [clone_mfe_repo]
 
-    slot_config_file = "{open_edx_deployment.deployment_name}/common-mfe-config"
+    slot_config_file = f"{open_edx_deployment.deployment_name}/common-mfe-config"
     copy_common_config = ""
     mfe_smoot_design_overrides = ""
 
