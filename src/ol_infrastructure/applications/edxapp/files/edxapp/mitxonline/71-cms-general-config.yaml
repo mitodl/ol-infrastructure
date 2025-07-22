@@ -1,4 +1,3 @@
----
 # ALTERNATE_WORKER_QUEUES: lms  # Already has a sane default in the code
 COURSE_AUTHORING_MICROFRONTEND_URL: /authoring
 DISCUSSIONS_INCONTEXT_LEARNMORE_URL: https://openedx.atlassian.net/wiki/spaces/COMM/pages/3470655498/Discussions+upgrade+Sidebar+and+new+topic+structure
