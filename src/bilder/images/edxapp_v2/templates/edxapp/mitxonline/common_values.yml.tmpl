@@ -419,7 +419,11 @@ MEDIA_URL: /media/
 MICROSITE_CONFIGURATION: {}
 MIT_BASE_URL: https://mit.edu # Keeping it hardcoded till we change MARKETING_SITE_BASE_URL
 MITX_REDIRECT_ENABLED: True
-MITX_REDIRECT_ALLOW_RE_LIST: ["^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/)", "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler", "^/v1/accounts/bulk_retire_users"]  # ADDED VALUE
+MITX_REDIRECT_ALLOW_RE_LIST:  # ADDED VALUE
+  - "^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/)"
+  - "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"
+  - "^/v1/accounts/bulk_retire_users"
+  - "^/courses/course-v1:.*?/xqueue/.*$"
 MKTG_URLS:
     ROOT: https://{{ key "edxapp/marketing-domain" }}/
 MKTG_URL_LINK_MAP:
