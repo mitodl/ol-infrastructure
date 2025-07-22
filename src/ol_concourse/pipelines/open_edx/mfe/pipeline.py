@@ -163,7 +163,23 @@ def mfe_job(
     mfe_build_dir = Output(name=Identifier("mfe-build"))
     mfe_setup_plan = [clone_mfe_repo]
 
+    slot_config_file = "{open_edx_deployment.deployment_name}/common-mfe-config"
+    copy_common_config = ""
     mfe_smoot_design_overrides = ""
+
+    if OpenEdxMicroFrontend[mfe_name].value == OpenEdxMicroFrontend.learn.value:
+        mfe_smoot_design_overrides = """
+        npm pack @mitodl/smoot-design@^6.12.0
+        tar -xvzf mitodl-smoot-design*.tgz
+        mkdir -p public/static/smoot-design
+        cp package/dist/bundles/* public/static/smoot-design
+        """
+        slot_config_file = "learning-mfe-config"
+        copy_common_config = (
+            f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+            f"{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx "
+            f"{mfe_build_dir.name}/common-mfe-config.env.jsx"
+        )
 
     mfe_setup_steps = [
         f"cp -r {mfe_repo.name}/* {mfe_build_dir.name}",
@@ -173,23 +189,12 @@ def mfe_job(
         ),
         (
             f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
-            f"{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx "
-            f"{mfe_build_dir.name}/common-mfe-config.env.jsx"
+            f"{slot_config_file}.env.jsx "
+            f"{mfe_build_dir.name}/env.config.jsx"
         ),
     ]
-
-    if OpenEdxMicroFrontend[mfe_name].value == OpenEdxMicroFrontend.learn.value:
-        mfe_smoot_design_overrides = """
-        npm pack @mitodl/smoot-design@^6.12.0
-        tar -xvzf mitodl-smoot-design*.tgz
-        mkdir -p public/static/smoot-design
-        cp package/dist/bundles/* public/static/smoot-design
-        """
-        mfe_setup_steps.append(
-            f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
-            f"learning-mfe-config.env.jsx "
-            f"{mfe_build_dir.name}/env.config.jsx"
-        )
+    if copy_common_config:
+        mfe_setup_steps.append(copy_common_config)
 
     # Add styles.scss copy for Residential deployments
     if open_edx_deployment.deployment_name in ["mitx", "mitx-staging"]:
