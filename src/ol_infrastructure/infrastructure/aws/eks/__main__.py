@@ -1196,19 +1196,27 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                         },
                         "nginx_config": {
                             "http": {
-                                "access_log_format": '"$time_local" client=$remote_addr '
+                                "access_log_format": 'time_local="$time_local" '
                                 "body_bytes_sent=$body_bytes_sent "
-                                "referer=$http_referer "
-                                "request_length=$request_length "
+                                "bytes_sent=$bytes_sent "
+                                "client=$remote_addr "
+                                "host=$host "
+                                "remote_addr=$remote_addr "
                                 "request_id=$request_id "
+                                "request_length=$request_length "
+                                "request_method=$request_method "
                                 "request_time=$request_time "
-                                "status=$status bytes_sent=$bytes_sent "
+                                "request_uri=$request_uri "
+                                "status=$status "
                                 "upstream_addr=$upstream_addr "
                                 "upstream_connect_time=$upstream_connect_time "
                                 "upstream_header_time=$upstream_header_time "
                                 "upstream_response_time=$upstream_response_time "
                                 "upstream_status=$upstream_status "
-                                'method=$request_method request="$request"',
+                                'http_referer="$http_referer" '
+                                'http_user_agent="$http_user_agent" '
+                                "method=$request_method "
+                                'request="$request"',
                             },
                             "http_configuration_snippet": textwrap.dedent(
                                 """\
