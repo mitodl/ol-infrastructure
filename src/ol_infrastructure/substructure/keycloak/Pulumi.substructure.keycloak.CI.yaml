@@ -73,6 +73,8 @@ config:
   - "https://api.ci.mitxonline.mit.edu/*"
   keycloak_realm:olapps-mitlearn-client-secret:
     secure: v1:sJuWLKHeep4Qz9cr:YbZNIQoy3Bn1nbpKsCUPNUeEtZJgd+tA5LAU8pDfSKWr2fzvjfMy0XcmO4CR7a3q
+  keycloak_realm:olapps-mitxonline-client-redirect-uris:
+  - "https://ci.mitxonline.mit.edu/account/action/complete*"
   keycloak_realm:olapps-open-discussions-client-redirect-uris: ["https://discussions-ci.odl.mit.edu/*"]
   keycloak_realm:olapps-open-discussions-client-secret:
     secure: v1:uAB+cVrN2bsEepg6:HZazIFvhKkr4xVJ3QN9nU02QG5p6T54aZTkCtqzlS1Y15ceGGU7cK/tmJiIq7YTj

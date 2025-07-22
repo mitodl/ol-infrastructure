@@ -51,6 +51,8 @@ config:
   - "https://learn-ai.ol.mit.edu/*"
   - "https://pay.ol.mit.edu/*"
   - "https://mitxonline.mit.edu/*"
+  keycloak_realm:olapps-mitxonline-client-redirect-uris:
+  - "https://mitxonline.mit.edu/account/action/complete*"
   keycloak_realm:olapps-open-discussions-client-redirect-uris: ["https://open.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-airbyte-redirect-uris: ["https://airbyte.odl.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-dagster-redirect-uris: ["https://pipelines.odl.mit.edu/*"]
