@@ -98,7 +98,7 @@ nextjs_build_cache_pvc = kubernetes.core.v1.PersistentVolumeClaim(
     spec=kubernetes.core.v1.PersistentVolumeClaimSpecArgs(
         access_modes=["ReadWriteMany"],
         resources=kubernetes.core.v1.VolumeResourceRequirementsArgs(
-            requests={"storage": "10Gi"},
+            requests={"storage": "50Gi"},
         ),
         storage_class_name="efs-sc",  # Assumes 'efs-sc' StorageClass is configured
     ),
