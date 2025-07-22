@@ -37,6 +37,7 @@ plugins = [
     "ol_openedx_sentry",
     "ol_social_auth",
     "openedx_companion_auth",
+    "rapid_response_xblock",
 ]
 
 fragments = []
