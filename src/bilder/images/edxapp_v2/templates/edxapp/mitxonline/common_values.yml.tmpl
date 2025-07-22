@@ -423,7 +423,7 @@ MITX_REDIRECT_ALLOW_RE_LIST:  # ADDED VALUE
   - "^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/)"
   - "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"
   - "^/v1/accounts/bulk_retire_users"
-  - "^/courses/course-v1:.*?/xqueue/.*$"
+  - "^/courses/course-v1:.*?/xqueue/.*$"  # TODO (TMM 2025-07-22): Remove this once the xqueue -> submissions migration is complete
 MKTG_URLS:
     ROOT: https://{{ key "edxapp/marketing-domain" }}/
 MKTG_URL_LINK_MAP:
