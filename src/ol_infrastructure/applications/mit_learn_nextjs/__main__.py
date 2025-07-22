@@ -166,7 +166,7 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
         selector=kubernetes.meta.v1.LabelSelectorArgs(
             match_labels=application_labels,
         ),
-        replicas=nextjs_config.get("pod_count") or 2,
+        replicas=nextjs_config.get_int("pod_count") or 2,
         template=kubernetes.core.v1.PodTemplateSpecArgs(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
                 name="mitlearn-nextjs",
