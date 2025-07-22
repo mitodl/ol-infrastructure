@@ -124,8 +124,8 @@ mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="mitlearn-nextjs-build",
         namespace=learn_namespace,
-        labels=k8s_global_labels
-        | {
+        labels={
+            "ol.mit.edu/ou": "mit-learn",
             "ol.mit.edu/job": "nextjs_build",
         },
     ),
