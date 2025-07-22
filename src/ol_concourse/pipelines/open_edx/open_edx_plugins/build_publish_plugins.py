@@ -19,7 +19,7 @@ from ol_concourse.lib.resources import git_repo
 
 pypi_type = pypi_resource()
 # AI: This pipeline builds and publishes multiple Python packages from a single git
-# repository. The build happens via Pants
+# repository. The build happens via uv package manager (https://docs.astral.sh/uv/)
 plugins = [
     "edx_sysadmin",
     "edx_username_changer",
