@@ -794,6 +794,9 @@ olapps_mitxonline_client = keycloak.openid.Client(
     standard_flow_enabled=False,
     implicit_flow_enabled=False,
     service_accounts_enabled=True,
+    valid_redirect_uris=keycloak_realm_config.require_object(
+        "olapps-mitxonline-client-redirect-uris"
+    ),
     opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
 )
 olapps_mitxonline_client_data = vault.generic.Secret(
