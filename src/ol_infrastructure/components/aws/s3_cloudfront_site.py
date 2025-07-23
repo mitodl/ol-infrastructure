@@ -60,7 +60,7 @@ class S3ServerlessSite(ComponentResource):
         site_bucket_name = f"{site_config.site_name}-bucket"
         site_bucket_arn = f"arn:aws:s3:::{site_bucket_name}"
 
-        self.site_bucket = s3.BucketV2(
+        self.site_bucket = s3.Bucket(
             f"{site_config.site_name}-bucket",
             bucket=site_config.bucket_name,
             tags=site_config.tags,
@@ -114,33 +114,33 @@ class S3ServerlessSite(ComponentResource):
             ),
         )
 
-        s3.BucketWebsiteConfigurationV2(
+        s3.BucketWebsiteConfiguration(
             f"{site_bucket_name}-website",
             bucket=self.site_bucket.id,
-            index_document=s3.BucketWebsiteConfigurationV2IndexDocumentArgs(
+            index_document=s3.BucketWebsiteConfigurationIndexDocumentArgs(
                 suffix=site_config.site_index,
             ),
-            error_document=s3.BucketWebsiteConfigurationV2ErrorDocumentArgs(
+            error_document=s3.BucketWebsiteConfigurationErrorDocumentArgs(
                 key="error.html",
             ),
             opts=generic_resource_opts,
         )
 
-        _ = s3.BucketCorsConfigurationV2(
+        _ = s3.BucketCorsConfiguration(
             f"{site_bucket_name}-cors",
             bucket=self.site_bucket.id,
             cors_rules=[
-                s3.BucketCorsConfigurationV2CorsRuleArgs(
+                s3.BucketCorsConfigurationCorsRuleArgs(
                     allowed_methods=["GET", "HEAD"],
                     allowed_origins=["*"],
                 )
             ],
             opts=generic_resource_opts,
         )
-        s3.BucketVersioningV2(
+        s3.BucketVersioning(
             f"{site_bucket_name}-versioning",
             bucket=self.site_bucket.id,
-            versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+            versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
                 status="Enabled"
             ),
             opts=generic_resource_opts,

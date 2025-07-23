@@ -77,7 +77,7 @@ athena_warehouse_workgroup = athena.Workgroup(
 )
 
 warehouse_buckets = []
-data_landing_zone_bucket = s3.BucketV2(
+data_landing_zone_bucket = s3.Bucket(
     "ol_data_lake_landing_zone_bucket",
     bucket=f"ol-data-lake-landing-zone-{stack_info.env_suffix}",
 )
@@ -88,13 +88,13 @@ data_landing_zone_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-s3.BucketServerSideEncryptionConfigurationV2(
+s3.BucketServerSideEncryptionConfiguration(
     "encrypt_ol_data_lake_landing_zone_bucket",
     bucket=data_landing_zone_bucket.id,
     rules=[
-        s3.BucketServerSideEncryptionConfigurationV2RuleArgs(
+        s3.BucketServerSideEncryptionConfigurationRuleArgs(
             bucket_key_enabled=True,
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationV2RuleApplyServerSideEncryptionByDefaultArgs(
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
                 sse_algorithm="aws:kms"
             ),
         )

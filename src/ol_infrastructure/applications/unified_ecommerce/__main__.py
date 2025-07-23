@@ -128,16 +128,16 @@ ol_zone_id = dns_stack.require_output("ol")["id"]
 unified_ecommerce_app_storage_bucket_name = (
     f"ol-mit-unified-ecommerce-{stack_info.env_suffix}"
 )
-unified_ecommerce_app_storage_bucket = s3.BucketV2(
+unified_ecommerce_app_storage_bucket = s3.Bucket(
     f"unified-ecommerce-app-storage-{stack_info.env_suffix}",
     bucket=unified_ecommerce_app_storage_bucket_name,
     tags=aws_config.tags,
 )
 
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     f"unified-ecommerce-app-storage-versioning-{stack_info.env_suffix}",
     bucket=unified_ecommerce_app_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled",
     ),
 )

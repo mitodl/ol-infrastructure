@@ -258,6 +258,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             auto_minor_version_upgrade=True,
             apply_immediately=True,
             backup_retention_period=db_config.backup_days,
+            blue_green_update={"enabled": True},
             copy_tags_to_snapshot=True,
             db_name=db_config.db_name,
             db_subnet_group_name=db_config.subnet_group_name,

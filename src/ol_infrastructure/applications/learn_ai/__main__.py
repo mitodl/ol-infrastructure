@@ -143,16 +143,16 @@ ol_zone_id = dns_stack.require_output("ol")["id"]
 # Frontend storage bucket
 learn_ai_app_storage_bucket_name = f"ol-mit-learn-ai-{stack_info.env_suffix}"
 
-learn_ai_app_storage_bucket = s3.BucketV2(
+learn_ai_app_storage_bucket = s3.Bucket(
     f"learn-ai-app-storage-bucket-{stack_info.env_suffix}",
     bucket=learn_ai_app_storage_bucket_name,
     tags=aws_config.tags,
 )
 
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     f"learn-ai-app-storage-bucket-versioning-{stack_info.env_suffix}",
     bucket=learn_ai_app_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled",
     ),
 )

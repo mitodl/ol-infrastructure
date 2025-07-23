@@ -87,7 +87,7 @@ test_offline_bucket_name = f"ocw-content-offline-test-{stack_info.env_suffix}"
 test_offline_bucket_arn = f"arn:aws:s3:::{test_offline_bucket_name}"
 
 # Draft bucket
-draft_bucket = s3.BucketV2(
+draft_bucket = s3.Bucket(
     draft_bucket_name,
     bucket=draft_bucket_name,
     tags=aws_config.tags,
@@ -99,19 +99,19 @@ draft_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "ol-draft-bucket-versioning",
     bucket=draft_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )
 
-draft_bucket_cors = s3.BucketCorsConfigurationV2(
+draft_bucket_cors = s3.BucketCorsConfiguration(
     "ol-draft-bucket-cors",
     bucket=draft_bucket_name,
     cors_rules=[
-        s3.BucketCorsConfigurationV2CorsRuleArgs(
+        s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_methods=["GET", "HEAD"],
             allowed_origins=["*"],
         )
@@ -152,16 +152,16 @@ s3.BucketPolicy(
 )
 
 # test bucket
-test_bucket = s3.BucketV2(
+test_bucket = s3.Bucket(
     test_bucket_name,
     bucket=test_bucket_name,
     tags=aws_config.tags,
 )
-test_bucket_cors = s3.BucketCorsConfigurationV2(
+test_bucket_cors = s3.BucketCorsConfiguration(
     "ol-test-bucket-cors",
     bucket=test_bucket_name,
     cors_rules=[
-        s3.BucketCorsConfigurationV2CorsRuleArgs(
+        s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_methods=["GET", "HEAD"],
             allowed_origins=["*"],
         )
@@ -174,10 +174,10 @@ test_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "ol-test-bucket-versioning",
     bucket=test_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )
@@ -215,16 +215,16 @@ s3.BucketPolicy(
 )
 
 # live bucket
-live_bucket = s3.BucketV2(
+live_bucket = s3.Bucket(
     live_bucket_name,
     bucket=live_bucket_name,
     tags=aws_config.tags,
 )
-live_bucket_cors = s3.BucketCorsConfigurationV2(
+live_bucket_cors = s3.BucketCorsConfiguration(
     "ol-live-bucket-cors",
     bucket=live_bucket_name,
     cors_rules=[
-        s3.BucketCorsConfigurationV2CorsRuleArgs(
+        s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_methods=["GET", "HEAD"],
             allowed_origins=["*"],
         )
@@ -237,10 +237,10 @@ live_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "ol-live-bucket-versioning",
     bucket=live_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )
@@ -278,16 +278,16 @@ s3.BucketPolicy(
 )
 
 # draft_backup bucket
-draft_backup_bucket = s3.BucketV2(
+draft_backup_bucket = s3.Bucket(
     draft_backup_bucket_name,
     bucket=draft_backup_bucket_name,
     tags=aws_config.tags,
 )
-draft_backup_bucket_cors = s3.BucketCorsConfigurationV2(
+draft_backup_bucket_cors = s3.BucketCorsConfiguration(
     "ol-draft-backup-bucket-cors",
     bucket=draft_backup_bucket_name,
     cors_rules=[
-        s3.BucketCorsConfigurationV2CorsRuleArgs(
+        s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_methods=["GET", "HEAD"],
             allowed_origins=["*"],
         )
@@ -300,10 +300,10 @@ draft_backup_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "ol-draft-backup-bucket-versioning",
     bucket=draft_backup_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )
@@ -341,16 +341,16 @@ s3.BucketPolicy(
 )
 
 # live_backup bucket
-live_backup_bucket = s3.BucketV2(
+live_backup_bucket = s3.Bucket(
     live_backup_bucket_name,
     bucket=live_backup_bucket_name,
     tags=aws_config.tags,
 )
-live_backup_bucket_cors = s3.BucketCorsConfigurationV2(
+live_backup_bucket_cors = s3.BucketCorsConfiguration(
     "ol-live-backup-bucket-cors",
     bucket=live_backup_bucket_name,
     cors_rules=[
-        s3.BucketCorsConfigurationV2CorsRuleArgs(
+        s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_methods=["GET", "HEAD"],
             allowed_origins=["*"],
         )
@@ -363,10 +363,10 @@ live_backup_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "ol-live-backup-bucket-versioning",
     bucket=live_backup_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )
@@ -404,28 +404,28 @@ s3.BucketPolicy(
 )
 
 # draft_backup bucket
-draft_offline_bucket = s3.BucketV2(
+draft_offline_bucket = s3.Bucket(
     draft_offline_bucket_name,
     bucket=draft_offline_bucket_name,
     tags=aws_config.tags,
 )
-draft_offline_bucket_cors = s3.BucketCorsConfigurationV2(
+draft_offline_bucket_cors = s3.BucketCorsConfiguration(
     "ol-draft-offline-bucket-cors",
     bucket=draft_offline_bucket_name,
     cors_rules=[
-        s3.BucketCorsConfigurationV2CorsRuleArgs(
+        s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_methods=["GET", "HEAD"],
             allowed_origins=["*"],
         )
     ],
 )
-draft_offline_bucket_website = s3.BucketWebsiteConfigurationV2(
+draft_offline_bucket_website = s3.BucketWebsiteConfiguration(
     "draft-offline-website",
     bucket=draft_offline_bucket_name,
-    index_document=s3.BucketWebsiteConfigurationV2IndexDocumentArgs(
+    index_document=s3.BucketWebsiteConfigurationIndexDocumentArgs(
         suffix="index.html",
     ),
-    error_document=s3.BucketWebsiteConfigurationV2ErrorDocumentArgs(
+    error_document=s3.BucketWebsiteConfigurationErrorDocumentArgs(
         key="error.html",
     ),
 )
@@ -437,10 +437,10 @@ draft_offline_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "ol-offline-backup-bucket-versioning",
     bucket=draft_offline_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )
@@ -478,27 +478,27 @@ s3.BucketPolicy(
 )
 
 # live_backup bucket
-live_offline_bucket = s3.BucketV2(
+live_offline_bucket = s3.Bucket(
     live_offline_bucket_name,
     bucket=live_offline_bucket_name,
     tags=aws_config.tags,
 )
-live_offline_bucket_website = s3.BucketWebsiteConfigurationV2(
+live_offline_bucket_website = s3.BucketWebsiteConfiguration(
     "live-offline-website",
     bucket=live_offline_bucket_name,
-    index_document=s3.BucketWebsiteConfigurationV2IndexDocumentArgs(
+    index_document=s3.BucketWebsiteConfigurationIndexDocumentArgs(
         suffix="index.html",
     ),
-    error_document=s3.BucketWebsiteConfigurationV2ErrorDocumentArgs(
+    error_document=s3.BucketWebsiteConfigurationErrorDocumentArgs(
         key="error.html",
     ),
 )
 
-live_offline_bucket_cors = s3.BucketCorsConfigurationV2(
+live_offline_bucket_cors = s3.BucketCorsConfiguration(
     "ol-live-offline-bucket-cors",
     bucket=live_offline_bucket_name,
     cors_rules=[
-        s3.BucketCorsConfigurationV2CorsRuleArgs(
+        s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_methods=["GET", "HEAD"],
             allowed_origins=["*"],
         )
@@ -511,10 +511,10 @@ live_offline_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "ol-live-offline-bucket-versioning",
     bucket=live_offline_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )
@@ -552,16 +552,16 @@ s3.BucketPolicy(
 )
 
 # test_backup bucket
-test_offline_bucket = s3.BucketV2(
+test_offline_bucket = s3.Bucket(
     test_offline_bucket_name,
     bucket=test_offline_bucket_name,
     tags=aws_config.tags,
 )
-test_offline_bucket_cors = s3.BucketCorsConfigurationV2(
+test_offline_bucket_cors = s3.BucketCorsConfiguration(
     "ol-test-offline-bucket-cors",
     bucket=test_offline_bucket_name,
     cors_rules=[
-        s3.BucketCorsConfigurationV2CorsRuleArgs(
+        s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_methods=["GET", "HEAD"],
             allowed_origins=["*"],
         )
@@ -574,10 +574,10 @@ test_offline_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "ol-test-offline-bucket-versioning",
     bucket=test_offline_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )

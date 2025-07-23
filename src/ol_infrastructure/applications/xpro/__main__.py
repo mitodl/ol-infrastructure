@@ -52,7 +52,7 @@ aws_config = AWSBase(
 
 # Bucket used to store file uploads from xpro app.
 xpro_storage_bucket_name = f"ol-xpro-app-{stack_info.env_suffix}"
-xpro_storage_bucket = s3.BucketV2(
+xpro_storage_bucket = s3.Bucket(
     f"ol-xpro-app-{stack_info.env_suffix}",
     bucket=xpro_storage_bucket_name,
     tags=aws_config.tags,
@@ -64,10 +64,10 @@ xpro_storage_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "ol-xpro-app-bucket-versioning",
     bucket=xpro_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )

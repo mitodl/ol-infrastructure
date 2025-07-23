@@ -58,7 +58,7 @@ class SFTPServer(ComponentResource):
         generic_resource_opts = ResourceOptions(parent=self).merge(opts)
 
         # Create S3 bucket for SFTP backend
-        self.bucket = s3.BucketV2(
+        self.bucket = s3.Bucket(
             f"{sftp_config.server_name}-sftp-bucket",
             bucket=sftp_config.bucket_name,
             tags=sftp_config.tags,
@@ -66,10 +66,10 @@ class SFTPServer(ComponentResource):
         )
 
         # Enable versioning on the bucket
-        s3.BucketVersioningV2(
+        s3.BucketVersioning(
             f"{sftp_config.server_name}-sftp-bucket-versioning",
             bucket=self.bucket.id,
-            versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+            versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
                 status="Enabled"
             ),
             opts=generic_resource_opts,
