@@ -16,7 +16,7 @@ dependencies = [
     "hvac[parser]>=2.0.0,<3",
     "parliament!=1.6.4",
     "pulumi>=3.39.1,<4",
-    "pulumi-aws>=6.0.0,<7",
+    "pulumi-aws>=7.1,<8",
     "pulumi-fastly>=10,<11",
     "pulumi-github>=6.0.0,<7",
     "pulumi-mailgun>=3.0.0,<4",
@@ -30,7 +30,7 @@ dependencies = [
     "pulumi-keycloak>=6.0.0,<7",
     "pydantic-settings>=2.0.1,<3",
     "pulumiverse-heroku>=1.0.3,<2",
-    "pulumi-eks>=3.8.0,<4",
+    "pulumi-eks>=4,<5",
     "pulumi-aws-native>=1.25.0,<2",
     "packaging>=24.2",
 ]
