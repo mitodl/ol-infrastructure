@@ -42,7 +42,7 @@ class OpenLearningOpenEdxDeployment(Enum):
         deployment_name="xpro",
         env_release_map=[
             EnvRelease("CI", OpenEdxSupportedRelease["teak"]),
-            EnvRelease("QA", OpenEdxSupportedRelease["sumac"]),
+            EnvRelease("QA", OpenEdxSupportedRelease["teak"]),
             EnvRelease("Production", OpenEdxSupportedRelease["sumac"]),
         ],
     )
