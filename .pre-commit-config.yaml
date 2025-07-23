@@ -51,13 +51,13 @@ repos:
     - src/ol_infrastructure/applications/ocw_site/redirect_dict
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.12.3'
+  rev: 'v0.12.4'
   hooks:
   - id: ruff-format
   - id: ruff
     args: [--extend-ignore=D1, --fix]
 - repo: https://github.com/pre-commit/mirrors-mypy
-  rev: v1.16.1
+  rev: v1.17.0
   hooks:
   - id: mypy
     args:
