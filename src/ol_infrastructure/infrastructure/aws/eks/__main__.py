@@ -279,9 +279,11 @@ for index, policy in enumerate(cluster_policy_arns):
 # This keeps the cluster from being 'owned' by a specific person.
 cluster_creation_aws_provider = aws.Provider(
     "cluster-creation-aws-provider",
-    assume_role=aws.ProviderAssumeRoleArgs(
-        role_arn=iam_stack.require_output("eks_cluster_creator_role_arn")
-    ),
+    assume_roles=[
+        aws.ProviderAssumeRoleArgs(
+            role_arn=iam_stack.require_output("eks_cluster_creator_role_arn")
+        )
+    ],
 )
 # Actually make the cluster
 cluster = eks.Cluster(
