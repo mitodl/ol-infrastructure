@@ -835,10 +835,10 @@ requires-dist = [
     { name = "packaging", specifier = ">=24.2" },
     { name = "parliament", specifier = "!=1.6.4" },
     { name = "pulumi", specifier = ">=3.39.1,<4" },
-    { name = "pulumi-aws", specifier = ">=6.0.0,<7" },
+    { name = "pulumi-aws", specifier = ">=7.1,<8" },
     { name = "pulumi-aws-native", specifier = ">=1.25.0,<2" },
     { name = "pulumi-consul", specifier = ">=3.5.0,<4" },
-    { name = "pulumi-eks", specifier = ">=3.8.0,<4" },
+    { name = "pulumi-eks", specifier = ">=4,<5" },
     { name = "pulumi-fastly", specifier = ">=10,<11" },
     { name = "pulumi-github", specifier = ">=6.0.0,<7" },
     { name = "pulumi-keycloak", specifier = ">=6.0.0,<7" },
@@ -1024,16 +1024,16 @@ wheels = [
 
 [[package]]
 name = "pulumi-aws"
-version = "6.83.0"
+version = "7.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "parver" },
     { name = "pulumi" },
     { name = "semver" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ef/c8/d16a58afdab5c4dafb8043a4370c0673c48ae314aea5ac7d1ce4eee2af76/pulumi_aws-6.83.0.tar.gz", hash = "sha256:24ce88ad5bb81eb937935d9e40466e164addef86140a32cac22ed17176812cb7", size = 7839650, upload-time = "2025-06-16T21:58:19.009Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bb/33/55db8b48cd27ff56bda2a2702852df7be5fdeb4ef3ef1f1b7bfaf9add36b/pulumi_aws-7.1.0.tar.gz", hash = "sha256:6e47f5df4ec11efa9c5cdca4caa780b63920fd2ebda57ae8ec2296e647a5ab44", size = 7943572, upload-time = "2025-07-21T23:15:04.507Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/30/0b/3ed17e6fc68d9c0b572c4b259c5e291a8267011c640a9a9bb5a26b596763/pulumi_aws-6.83.0-py3-none-any.whl", hash = "sha256:e61144b9680ae1ebd98daa7bfffce1f646796a9640f9b73119b91e72c26e3bbc", size = 10608060, upload-time = "2025-06-16T21:58:14.969Z" },
+    { url = "https://files.pythonhosted.org/packages/4e/15/72ef181d6f95348381d996592de3ca2f43aeafd714dda2ef00b311acb05f/pulumi_aws-7.1.0-py3-none-any.whl", hash = "sha256:159a6a67904b52c779662af22f082d438f7414f30e3d4a6fe66eac9d09f4ac34", size = 10822587, upload-time = "2025-07-21T23:15:00.685Z" },
 ]
 
 [[package]]
@@ -1066,7 +1066,7 @@ wheels = [
 
 [[package]]
 name = "pulumi-eks"
-version = "3.9.1"
+version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "parver" },
@@ -1075,9 +1075,9 @@ dependencies = [
     { name = "pulumi-kubernetes" },
     { name = "semver" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2b/e3/bbee66003056654b3151092a2f753dea7992cae3710531dda07305c48e0a/pulumi_eks-3.9.1.tar.gz", hash = "sha256:c2a05e63a80080a0241e507c72fece638547e09cdd25507eff5267820bd083f0", size = 89467, upload-time = "2025-05-06T00:09:25.917Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/23/3d/76fa02bc6d17caf31354d155935044bd39c30ef7646275863536adf63f0c/pulumi_eks-4.0.0.tar.gz", hash = "sha256:35609ffc8eded9730cab76929ed2993e02ef0d23ca86f4fadaebde8b283e79d4", size = 90453, upload-time = "2025-07-22T23:05:50.249Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/78/34/cd37b876ba706593bab423cf4f9b235d3db411328d98f807a0b8fc631349/pulumi_eks-3.9.1-py3-none-any.whl", hash = "sha256:6a7e91bc1468444dd0ae3a0c8985673e740f46f338a24c39373f85f160b561c9", size = 98637, upload-time = "2025-05-06T00:09:24.456Z" },
+    { url = "https://files.pythonhosted.org/packages/0b/ba/30a2e4cef380d3a8b8e1b3c82c50eec74c5b3820f43b41ae047b0cc015fc/pulumi_eks-4.0.0-py3-none-any.whl", hash = "sha256:9ead2aaa56d0b3d5374881802a1572696415311035d4ff0d0d7483962d433d74", size = 99763, upload-time = "2025-07-22T23:05:48.504Z" },
 ]
 
 [[package]]
