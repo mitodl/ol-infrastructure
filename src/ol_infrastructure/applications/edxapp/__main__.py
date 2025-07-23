@@ -190,7 +190,7 @@ mongodb_cluster_uri = mongodb_atlas_stack.require_output("atlas_cluster")[
 ##############
 
 edxapp_mfe_bucket_name = f"{env_name}-edxapp-mfe"
-edxapp_mfe_bucket = s3.BucketV2(
+edxapp_mfe_bucket = s3.Bucket(
     "edxapp-mfe-s3-bucket",
     bucket=edxapp_mfe_bucket_name,
     tags=aws_config.tags,
@@ -202,10 +202,10 @@ edxapp_mfe_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "edxapp-mfe-bucket-versioning",
     bucket=edxapp_mfe_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Suspended"
     ),
 )
@@ -238,7 +238,7 @@ s3.BucketPolicy(
         ]
     ),
 )
-s3.BucketCorsConfigurationV2(
+s3.BucketCorsConfiguration(
     "edxapp-mfe-bucket-cors-rules",
     bucket=edxapp_mfe_bucket.id,
     cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
@@ -246,7 +246,7 @@ s3.BucketCorsConfigurationV2(
 
 
 storage_bucket_name = f"{env_name}-edxapp-storage"
-edxapp_storage_bucket = s3.BucketV2(
+edxapp_storage_bucket = s3.Bucket(
     "edxapp-storage-s3-bucket",
     bucket=storage_bucket_name,
     tags=aws_config.tags,
@@ -258,10 +258,10 @@ edxapp_storage_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "edxapp-storage-bucket-versioning",
     bucket=edxapp_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )
@@ -296,11 +296,11 @@ s3.BucketPolicy(
         ]
     ),
 )
-s3.BucketCorsConfigurationV2(
+s3.BucketCorsConfiguration(
     "edxapp-storage-bucket-cors-rules",
     bucket=edxapp_mfe_bucket.id,
     cors_rules=[
-        s3.BucketCorsConfigurationV2CorsRuleArgs(
+        s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_headers=["*"],
             allowed_methods=[
                 "GET",
@@ -315,36 +315,36 @@ s3.BucketCorsConfigurationV2(
 )
 
 course_bucket_name = f"{env_name}-edxapp-courses"
-edxapp_course_bucket = s3.BucketV2(
+edxapp_course_bucket = s3.Bucket(
     "edxapp-courses-s3-bucket",
     bucket=course_bucket_name,
     tags=aws_config.tags,
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "edxapp-course-bucket-versioning",
     bucket=edxapp_course_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Suspended"
     ),
 )
 
 grades_bucket_name = f"{env_name}-edxapp-grades"
-edxapp_grades_bucket = s3.BucketV2(
+edxapp_grades_bucket = s3.Bucket(
     "edxapp-grades-s3-bucket",
     bucket=grades_bucket_name,
     tags=aws_config.tags,
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "edxapp-grades-bucket-versioning",
     bucket=edxapp_grades_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )
 
 
 tracking_bucket_name = f"{env_name}-edxapp-tracking"
-edxapp_tracking_bucket = s3.BucketV2(
+edxapp_tracking_bucket = s3.Bucket(
     "edxapp-tracking-logs-s3-bucket",
     bucket=tracking_bucket_name,
     tags=aws_config.tags,
@@ -361,12 +361,12 @@ edxapp_tracking_bucket_public_access = s3.BucketPublicAccessBlock(
     bucket=edxapp_tracking_bucket.id,
     block_public_policy=True,
 )
-edxapp_tracking_bucket_encryption = s3.BucketServerSideEncryptionConfigurationV2(
+edxapp_tracking_bucket_encryption = s3.BucketServerSideEncryptionConfiguration(
     "edxapp-tracking-logs-s3-bucket-encryption",
     bucket=edxapp_tracking_bucket.id,
     rules=[
-        s3.BucketServerSideEncryptionConfigurationV2RuleArgs(
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationV2RuleApplyServerSideEncryptionByDefaultArgs(
+        s3.BucketServerSideEncryptionConfigurationRuleArgs(
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
                 sse_algorithm="aws:kms",
                 kms_master_key_id=kms_s3_key["id"],
             ),
@@ -374,10 +374,10 @@ edxapp_tracking_bucket_encryption = s3.BucketServerSideEncryptionConfigurationV2
         ),
     ],
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "edxapp-tracking-logs-bucket-versioning",
     bucket=edxapp_tracking_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )

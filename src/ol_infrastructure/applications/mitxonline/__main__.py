@@ -106,7 +106,7 @@ cluster_stack.require_output("namespaces").apply(
 
 # Bucket used to store files from MITx Online app.
 mitxonline_bucket_name = f"ol-mitxonline-app-{stack_info.env_suffix}"
-mitxonline_bucket = s3.BucketV2(
+mitxonline_bucket = s3.Bucket(
     f"mitxonline-{stack_info.env_suffix}",
     bucket=mitxonline_bucket_name,
     tags=aws_config.tags,
@@ -118,10 +118,10 @@ mitxonline_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-mitxonline_bucket_versioning = s3.BucketVersioningV2(
+mitxonline_bucket_versioning = s3.BucketVersioning(
     f"mitxonline-{stack_info.env_suffix}-versioning",
     bucket=mitxonline_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled",
     ),
 )

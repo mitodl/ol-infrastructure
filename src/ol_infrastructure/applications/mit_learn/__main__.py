@@ -140,16 +140,16 @@ cluster_stack.require_output("namespaces").apply(
 # begin legacy block - app bucket config
 #######################################################
 legacy_app_storage_bucket_name = f"ol-mitopen-app-storage-{app_env_suffix}"
-legacy_application_storage_bucket = s3.BucketV2(
+legacy_application_storage_bucket = s3.Bucket(
     f"ol_mitopen_app_storage_bucket_{stack_info.env_suffix}",
     bucket=legacy_app_storage_bucket_name,
     tags=aws_config.tags,
 )
 
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "ol-mitopen-bucket-versioning",
     bucket=legacy_application_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )
@@ -197,16 +197,16 @@ s3.BucketPolicy(
 #######################################################
 
 mitlearn_app_storage_bucket_name = f"ol-mitlearn-app-storage-{app_env_suffix}"
-mitlearn_application_storage_bucket = s3.BucketV2(
+mitlearn_application_storage_bucket = s3.Bucket(
     f"ol_mitlearn_app_storage_bucket_{stack_info.env_suffix}",
     bucket=mitlearn_app_storage_bucket_name,
     tags=aws_config.tags,
 )
 
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "ol-mitlearn-bucket-versioning",
     bucket=mitlearn_application_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )

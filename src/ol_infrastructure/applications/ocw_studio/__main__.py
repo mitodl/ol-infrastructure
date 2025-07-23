@@ -73,7 +73,7 @@ ocw_studio_legacy_markdown_bucket = s3.Bucket(
 
 # Bucket used to store file uploads from ocw-studio app.
 ocw_storage_bucket_name = f"ol-ocw-studio-app-{stack_info.env_suffix}"
-ocw_storage_bucket = s3.BucketV2(
+ocw_storage_bucket = s3.Bucket(
     f"ol-ocw-studio-app-{stack_info.env_suffix}",
     bucket=ocw_storage_bucket_name,
     tags=aws_config.tags,
@@ -85,10 +85,10 @@ ocw_storage_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "ol-ocw-studio-app-bucket-versioning",
     bucket=ocw_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )

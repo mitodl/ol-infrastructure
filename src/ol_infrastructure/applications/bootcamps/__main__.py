@@ -51,7 +51,7 @@ aws_config = AWSBase(
 
 # Bucket used to store file uploads from bootcamps app.
 bootcamps_storage_bucket_name = f"ol-bootcamps-app-{stack_info.env_suffix}"
-bootcamps_storage_bucket = s3.BucketV2(
+bootcamps_storage_bucket = s3.Bucket(
     f"ol-bootcamps-app-{stack_info.env_suffix}",
     bucket=bootcamps_storage_bucket_name,
     tags=aws_config.tags,
@@ -63,10 +63,10 @@ bootcamps_storage_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "ol-bootcamps-app-bucket-versioning",
     bucket=bootcamps_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )

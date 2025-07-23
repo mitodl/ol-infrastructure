@@ -109,7 +109,7 @@ VERSIONS = {
 
 # S3 State Storage for Airbyte logs and system state
 airbyte_bucket_name = f"ol-airbyte-{stack_info.env_suffix}"
-s3.BucketV2(
+s3.Bucket(
     "airbyte-state-storage-bucket",
     bucket=airbyte_bucket_name,
     tags=aws_config.tags,
