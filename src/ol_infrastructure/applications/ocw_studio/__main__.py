@@ -357,7 +357,7 @@ heroku_vars = {
     "OCW_STUDIO_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
     "OCW_STUDIO_DB_CONN_MAX_AGE": 0,
     "OCW_STUDIO_DB_DISABLE_SSL": "True",
-    "OCW_STUDIO_DELETABLE_CONTENT_TYPES": "external-resource,instructor,page,course-collection",
+    "OCW_STUDIO_DELETABLE_CONTENT_TYPES": "external-resource,instructor,page,course-collection,resource",
     "OCW_STUDIO_ENVIRONMENT": env_name,
     "OCW_STUDIO_USE_S3": "True",
     "OCW_WWW_TEST_SLUG": "ocw-ci-test-www",
