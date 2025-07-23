@@ -591,7 +591,6 @@ dagster_instance = ec2.Instance(
 dagster_elastic_ip = ec2.Eip(
     "dagster-instance-elastic-ip",
     instance=dagster_instance.id,
-    vpc=True,
 )
 
 fifteen_minutes = 60 * 15
