@@ -22,3 +22,4 @@ config:
     secure: v1:FVKlsmjuVBFWXhWG:dxpsTB02SGRWkUfDCpmanVKBOQA6EXh6KnnZ8R+nqHsCF/WOBY/SlZMqikOI6CYlYmhCt8T/BAFn2Ps3xzll68R8UXWBIEhQrfkky4ArOGLRC3xRO6MN7bMS5gjenAhzMIgg3g==
   nextjs:sentry_env: "rc"
   nextjs:syllabus_endpoint: "https://api.rc.learn.mit.edu/ai/http/syllabus_agent/"
+  nextjs:optimize_images: "true"

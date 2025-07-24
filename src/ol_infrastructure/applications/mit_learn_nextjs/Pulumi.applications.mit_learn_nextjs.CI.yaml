@@ -22,3 +22,4 @@ config:
     secure: v1:GISrW09cyDNOopo5:3ubNcN1ZOhKreca0xTuBAQ==
   nextjs:sentry_env: "ci"
   nextjs:syllabus_endpoint: "https://api.ci.learn.mit.edu/ai/http/syllabus_agent/"
+  nextjs:optimize_images: "true"
