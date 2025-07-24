@@ -1062,6 +1062,10 @@ traefik_helm_release = kubernetes.helm.v3.Release(
                 "general": {
                     "level": "INFO",
                 },
+                "access": {
+                    "enabled": True,
+                    "format": "json",
+                },
             },
             "resources": {
                 "requests": {
