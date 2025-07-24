@@ -474,6 +474,25 @@ NOTIFICATIONS_DEFAULT_FROM_EMAIL: {{ key "edxapp/bulk-email-default-from-email" 
 NOTIFICATION_TYPE_ICONS: {} # ADDED
 DEFAULT_NOTIFICATION_ICON_URL: '' # ADDED
 OAUTH2_PROVIDER:
+  OAUTH2_VALIDATOR_CLASS: "openedx.core.djangoapps.oauth_dispatch.dot_overrides.validators.EdxOAuth2Validator"
+  REFRESH_TOKEN_EXPIRE_SECONDS: 7776000
+  SCOPES_BACKEND_CLASS: "openedx.core.djangoapps.oauth_dispatch.scopes.ApplicationModelScopes"
+  SCOPES:
+    read: "Read access"
+    write: "Write access"
+    email: "Know your email address"
+    profile: "Know your name and username"
+    certificates:read: "Retrieve your course certificates"
+    grades:read: "Retrieve your grades for your enrolled courses"
+    tpa:read: "Retrieve your third-party authentication username mapping"
+    user_id: "Know your user identifier"
+  DEFAULT_SCOPES:
+    read: "Read access"
+    write: "Write access"
+    email: "Know your email address"
+    profile: "Know your name and username"
+  REQUEST_APPROVAL_PROMPT: "auto_even_if_expired"
+  ERROR_RESPONSE_WITH_SCOPES: true
   ALLOWED_REDIRECT_URI_SCHEMES:
     - "https"
     - "edu.mit.learn.app"
