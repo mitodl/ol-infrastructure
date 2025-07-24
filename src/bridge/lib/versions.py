@@ -11,7 +11,7 @@ OPEN_METADATA_VERSION = "1.8.6"
 OVS_VERSION = "v0.65.1-3-g2630021"
 REDASH_VERSION = "9d273e4"
 # renovate: datasource=github-releases depName=traefik packageName=traefik/traefik
-TRAEFIK_VERSION = "3.4.4"
+TRAEFIK_VERSION = "3.5.0"
 TUTOR_PERMISSIONS_VERSION = "15.3.4"
 # renovate: datasource=github-releases depName=vault packageName=hashicorp/vault
 VAULT_VERSION = "1.20.0"
