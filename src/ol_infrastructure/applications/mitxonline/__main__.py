@@ -473,8 +473,11 @@ mitxonline_k8s_app = OLApplicationK8s(
         import_uwsgi_config=True,
         resource_requests={"cpu": "500m", "memory": "512Mi"},
         resource_limits={"cpu": "1000m", "memory": "1600Mi"},
-        init_migrations=True,
+        init_migrations=False,
         init_collectstatic=True,
+        pre_deploy_commands=[
+            ("migrate", ["python", "manage.py", "migrate", "--noinput"])
+        ],
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="celery",
