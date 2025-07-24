@@ -65,7 +65,7 @@ config:
   edxapp:web_instance_type: general_purpose_xlarge
   edxapp:web_node_capacity: "2"
   edxapp:worker_node_capacity: "2"
-  edxapp:worker_instance_type: "c7a.large"
+  edxapp:worker_instance_type: "m7a.xlarge"
   mongodb:atlas_project_id: 61b72cf6148de8714e671440
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
