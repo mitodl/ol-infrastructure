@@ -128,6 +128,7 @@ class OLApplicationK8sConfig(BaseModel):
             initial_delay_seconds=30,  # Wait 30 seconds before first probe
             period_seconds=30,
             failure_threshold=3,  # Consider failed after 3 attempts
+            timeout_seconds=3,
         ),
         # Readiness probe to check if the application is ready to serve traffic
         "readiness_probe": kubernetes.core.v1.ProbeArgs(
@@ -138,6 +139,7 @@ class OLApplicationK8sConfig(BaseModel):
             initial_delay_seconds=15,  # Wait 15 seconds before first probe
             period_seconds=15,
             failure_threshold=3,  # Consider failed after 3 attempts
+            timeout_seconds=3,
         ),
         # Startup probe to ensure the application is fully initialized before other probes start
         "startup_probe": kubernetes.core.v1.ProbeArgs(
