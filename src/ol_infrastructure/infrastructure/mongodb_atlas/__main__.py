@@ -372,7 +372,7 @@ pulumi.export(
         "privatized_mongo_uri": privatized_mongo_uri,
         "privatized_mongo_uri_with_options": privatized_mongo_uri_with_options,
         "replica_set": atlas_cluster.mongo_uri_with_options.apply(
-            lambda uri: parse_qs(urlparse(uri).query)["replicaSet"][0]
+            lambda uri: parse_qs(urlparse(uri).query).get("replicaSet", [""])[0]
         ),
     },
 )
