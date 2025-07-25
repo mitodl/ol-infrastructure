@@ -360,17 +360,20 @@ consul.Keys(
     ),
 )
 
-
 pulumi.export(
     "atlas_cluster",
     {
         "id": atlas_cluster.cluster_id,
+        "host_string": privatized_mongo_uri.apply(lambda uri: urlparse(uri).netloc),
         "mongo_uri": atlas_cluster.mongo_uri,
         "mongo_uri_with_options": atlas_cluster.mongo_uri_with_options,
         "connection_strings": atlas_cluster.connection_strings,
         "srv_record": atlas_cluster.srv_address,
         "privatized_mongo_uri": privatized_mongo_uri,
         "privatized_mongo_uri_with_options": privatized_mongo_uri_with_options,
+        "replica_set": atlas_cluster.mongo_uri_with_options.apply(
+            lambda uri: parse_qs(urlparse(uri).query).get("replicaSet", [""])[0]
+        ),
     },
 )
 
