@@ -217,7 +217,7 @@ def create_organization_first_broker_login_flows(realm_id: str | pulumi.Output[s
         "organization-first-broker-account-verification-options-flow",
         realm_id=realm_id,
         alias="Organization first broker login Account verification options",
-        description="Method with which to verity the existing account",
+        description="Method with which to verify the existing account",
         provider_id="basic-flow",
         top_level=False,
         built_in=False,
