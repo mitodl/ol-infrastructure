@@ -30,7 +30,7 @@ if "MIT_LEARN_NEXTJS_DOCKER_TAG" not in os.environ:
 MIT_LEARN_NEXTJS_DOCKER_TAG = os.environ["MIT_LEARN_NEXTJS_DOCKER_TAG"]
 
 app_image = cached_image_uri(
-    "mitodl/mit-learn-nextjs-app:{MIT_LEARN_NEXTJS_DOCKER_TAG}"
+    f"mitodl/mit-learn-nextjs-app:{MIT_LEARN_NEXTJS_DOCKER_TAG}"
 )
 
 k8s_global_labels = K8sGlobalLabels(
