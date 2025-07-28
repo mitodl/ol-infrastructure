@@ -399,7 +399,14 @@ class OLApplicationK8s(ComponentResource):
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
                     name=f"{_application_deployment_name}-pre-deploy",
                     namespace=ol_app_k8s_config.application_namespace,
-                    labels=application_labels,
+                    labels=ol_app_k8s_config.k8s_global_labels
+                    | {
+                        "ol.mit.edu/job": "pre-deploy",
+                        "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
+                        "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
+                            truncate_k8s_metanames
+                        ),
+                    },
                 ),
                 spec=kubernetes.batch.v1.JobSpecArgs(
                     # Remove job 30 minutes after completion
