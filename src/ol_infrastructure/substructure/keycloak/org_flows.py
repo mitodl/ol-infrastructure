@@ -4,12 +4,53 @@ import pulumi
 import pulumi_keycloak as keycloak
 
 
+def create_organization_scope(
+    realm_id: str | pulumi.Output[str],
+    realm_name: str,
+    opts: pulumi.ResourceOptions | None = None,
+) -> keycloak.openid.ClientScope:
+    """Create a client scope for organization claims."""
+    single_organization_scope = keycloak.openid.ClientScope(
+        f"{realm_name}_single_organization_scope",
+        realm_id=realm_id,
+        name="organization",
+        description="Additional claims about the organization a subject belongs to",
+        include_in_token_scope=True,
+        consent_screen_text="${organizationScopeConsentText}",
+        opts=opts,
+    )
+    keycloak.GenericProtocolMapper(
+        f"{realm_name}_single_organization_scope_mapper",
+        realm_id=realm_id,
+        client_scope_id=single_organization_scope.id,
+        name="organization",
+        protocol="openid-connect",
+        protocol_mapper="oidc-organization-membership-mapper",
+        config={
+            "access.token.claim": "true",
+            "addOrganizationAttributes": "true",
+            "addOrganizationId": "true",
+            "claim.name": "organization",
+            "id.token.claim": "true",
+            "introspection.token.claim": "true",
+            "jsonType.label": "String",
+            "lightweight.claim": "false",
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+        },
+        opts=opts,
+    )
+    return single_organization_scope
+
+
 def create_organization_browser_flows(
-    realm_id: str | pulumi.Output[str], opts: pulumi.ResourceOptions | None = None
+    realm_id: str | pulumi.Output[str],
+    realm_name: str,
+    opts: pulumi.ResourceOptions | None = None,
 ) -> keycloak.authentication.Flow:
     """Create the authentication flows for an organization-based browser login."""
     organization_browser_flow = keycloak.authentication.Flow(
-        "organization_browser_flow",
+        f"{realm_name}_organization_browser_flow",
         alias="Organization browser",
         realm_id=realm_id,
         provider_id="basic-flow",
@@ -17,7 +58,7 @@ def create_organization_browser_flows(
         opts=opts,
     )
     keycloak.authentication.Execution(
-        "organization_browser_flow_cookie_execution",
+        f"{realm_name}_organization_browser_flow_cookie_execution",
         realm_id=realm_id,
         parent_flow_alias=organization_browser_flow.alias,
         authenticator="auth-cookie",
@@ -26,7 +67,7 @@ def create_organization_browser_flows(
         opts=opts,
     )
     keycloak.authentication.Execution(
-        "organization_browser_flow_spnego_execution",
+        f"{realm_name}_organization_browser_flow_spnego_execution",
         realm_id=realm_id,
         parent_flow_alias=organization_browser_flow.alias,
         authenticator="auth-spnego",
@@ -35,7 +76,7 @@ def create_organization_browser_flows(
         opts=opts,
     )
     keycloak.authentication.Execution(
-        "organization_browser_flow_idp_redirector_execution",
+        f"{realm_name}_organization_browser_flow_idp_redirector_execution",
         realm_id=realm_id,
         parent_flow_alias=organization_browser_flow.alias,
         authenticator="identity-provider-redirector",
@@ -44,7 +85,7 @@ def create_organization_browser_flows(
         opts=opts,
     )
     keycloak.authentication.Execution(
-        "organization_browser_flow_organization_execution",
+        f"{realm_name}_organization_browser_flow_organization_execution",
         realm_id=realm_id,
         parent_flow_alias=organization_browser_flow.alias,
         authenticator="organization",
@@ -53,7 +94,7 @@ def create_organization_browser_flows(
         opts=opts,
     )
     organization_browser_forms_subflow = keycloak.authentication.Subflow(
-        "organization_browser_forms_subflow",
+        f"{realm_name}_organization_browser_forms_subflow",
         alias="Organization browser forms",
         realm_id=realm_id,
         parent_flow_alias=organization_browser_flow.alias,
@@ -63,7 +104,7 @@ def create_organization_browser_flows(
         opts=opts,
     )
     keycloak.authentication.Execution(
-        "organization_browser_forms_has_credential_execution",
+        f"{realm_name}_organization_browser_forms_has_credential_execution",
         realm_id=realm_id,
         parent_flow_alias=organization_browser_forms_subflow.alias,
         authenticator="has-credential-authenticator",
@@ -72,7 +113,7 @@ def create_organization_browser_flows(
         opts=opts,
     )
     keycloak.authentication.Execution(
-        "organization_browser_forms_password_form_execution",
+        f"{realm_name}_organization_browser_forms_password_form_execution",
         realm_id=realm_id,
         parent_flow_alias=organization_browser_forms_subflow.alias,
         authenticator="auth-password-form",
@@ -81,7 +122,7 @@ def create_organization_browser_flows(
         opts=opts,
     )
     organization_browser_conditional_otp_subflow = keycloak.authentication.Subflow(
-        "organization_browser_conditional_otp_subflow",
+        f"{realm_name}_organization_browser_conditional_otp_subflow",
         alias="Organization browser Browser - Conditional OTP",
         realm_id=realm_id,
         parent_flow_alias=organization_browser_forms_subflow.alias,
@@ -91,7 +132,7 @@ def create_organization_browser_flows(
         opts=opts,
     )
     keycloak.authentication.Execution(
-        "organization_browser_conditional_otp_user_configured_execution",
+        f"{realm_name}_organization_browser_conditional_otp_user_configured_execution",
         realm_id=realm_id,
         parent_flow_alias=organization_browser_conditional_otp_subflow.alias,
         authenticator="conditional-user-configured",
@@ -100,7 +141,7 @@ def create_organization_browser_flows(
         opts=opts,
     )
     keycloak.authentication.Execution(
-        "organization_browser_conditional_otp_form_execution",
+        f"{realm_name}_organization_browser_conditional_otp_form_execution",
         realm_id=realm_id,
         parent_flow_alias=organization_browser_conditional_otp_subflow.alias,
         authenticator="auth-otp-form",
@@ -112,11 +153,13 @@ def create_organization_browser_flows(
 
 
 def create_organization_first_broker_login_flows(
-    realm_id: pulumi.Input[str], opts: pulumi.ResourceOptions | None = None
+    realm_id: pulumi.Input[str],
+    realm_name: str,
+    opts: pulumi.ResourceOptions | None = None,
 ) -> keycloak.authentication.Flow:
     """Create authentication flows for the first broker login with an organization."""
     main_flow = keycloak.authentication.Flow(
-        "organization_first_broker_login_flow",
+        f"{realm_name}_organization_first_broker_login_flow",
         alias="Organization first broker login",
         realm_id=realm_id,
         provider_id="basic-flow",
@@ -128,7 +171,7 @@ def create_organization_first_broker_login_flows(
         opts=opts,
     )
     review_profile_execution = keycloak.authentication.Execution(
-        "org_first_broker_login_review_profile_execution",
+        f"{realm_name}_org_first_broker_login_review_profile_execution",
         realm_id=realm_id,
         parent_flow_alias=main_flow.alias,
         authenticator="idp-review-profile",
@@ -137,7 +180,7 @@ def create_organization_first_broker_login_flows(
         opts=opts,
     )
     keycloak.authentication.ExecutionConfig(
-        "org_first_broker_login_review_profile_config",
+        f"{realm_name}_org_first_broker_login_review_profile_config",
         realm_id=realm_id,
         execution_id=review_profile_execution.id,
         alias="Organization first broker login review profile config",
@@ -145,7 +188,7 @@ def create_organization_first_broker_login_flows(
         opts=opts,
     )
     user_creation_or_linking_subflow = keycloak.authentication.Subflow(
-        "org_first_broker_login_user_creation_or_linking_subflow",
+        f"{realm_name}_org_first_broker_login_user_creation_or_linking_subflow",
         alias="Organization first broker login User creation or linking",
         realm_id=realm_id,
         parent_flow_alias=main_flow.alias,
@@ -155,7 +198,7 @@ def create_organization_first_broker_login_flows(
         opts=opts,
     )
     create_user_if_unique_execution = keycloak.authentication.Execution(
-        "org_first_broker_login_create_user_if_unique_execution",
+        f"{realm_name}_org_first_broker_login_create_user_if_unique_execution",
         realm_id=realm_id,
         parent_flow_alias=user_creation_or_linking_subflow.alias,
         authenticator="idp-create-user-if-unique",
@@ -164,7 +207,7 @@ def create_organization_first_broker_login_flows(
         opts=opts,
     )
     keycloak.authentication.ExecutionConfig(
-        "org_first_broker_login_create_user_if_unique_config",
+        f"{realm_name}_org_first_broker_login_create_user_if_unique_config",
         realm_id=realm_id,
         execution_id=create_user_if_unique_execution.id,
         alias="Organization first broker login create unique user config",
@@ -172,7 +215,7 @@ def create_organization_first_broker_login_flows(
         opts=opts,
     )
     handle_existing_account_subflow = keycloak.authentication.Subflow(
-        "org_first_broker_login_handle_existing_account_subflow",
+        f"{realm_name}_org_first_broker_login_handle_existing_account_subflow",
         alias="Organization first broker login Handle Existing Account",
         realm_id=realm_id,
         parent_flow_alias=user_creation_or_linking_subflow.alias,
@@ -182,7 +225,7 @@ def create_organization_first_broker_login_flows(
         opts=opts,
     )
     keycloak.authentication.Execution(
-        "org_first_broker_login_confirm_link_execution",
+        f"{realm_name}_org_first_broker_login_confirm_link_execution",
         realm_id=realm_id,
         parent_flow_alias=handle_existing_account_subflow.alias,
         authenticator="idp-confirm-link",
@@ -191,7 +234,7 @@ def create_organization_first_broker_login_flows(
         opts=opts,
     )
     account_verification_options_subflow = keycloak.authentication.Subflow(
-        "org_first_broker_login_account_verification_options_subflow",
+        f"{realm_name}_org_first_broker_login_account_verification_options_subflow",
         alias="Organization first broker login Account verification options",
         realm_id=realm_id,
         parent_flow_alias=handle_existing_account_subflow.alias,
@@ -201,7 +244,7 @@ def create_organization_first_broker_login_flows(
         opts=opts,
     )
     keycloak.authentication.Execution(
-        "org_first_broker_login_email_verification_execution",
+        f"{realm_name}_org_first_broker_login_email_verification_execution",
         realm_id=realm_id,
         parent_flow_alias=account_verification_options_subflow.alias,
         authenticator="idp-email-verification",
@@ -210,7 +253,7 @@ def create_organization_first_broker_login_flows(
         opts=opts,
     )
     verify_by_reauth_subflow = keycloak.authentication.Subflow(
-        "org_first_broker_login_verify_by_reauth_subflow",
+        f"{realm_name}_org_first_broker_login_verify_by_reauth_subflow",
         alias=(
             "Organization first broker login Verify Existing Account by"
             " Re-authentication"
@@ -223,7 +266,7 @@ def create_organization_first_broker_login_flows(
         opts=opts,
     )
     keycloak.authentication.Execution(
-        "org_first_broker_login_username_password_execution",
+        f"{realm_name}_org_first_broker_login_username_password_execution",
         realm_id=realm_id,
         parent_flow_alias=verify_by_reauth_subflow.alias,
         authenticator="idp-username-password-form",
@@ -232,7 +275,7 @@ def create_organization_first_broker_login_flows(
         opts=opts,
     )
     conditional_otp_subflow = keycloak.authentication.Subflow(
-        "org_first_broker_login_conditional_otp_subflow",
+        f"{realm_name}_org_first_broker_login_conditional_otp_subflow",
         alias="Organization first broker login First broker login - Conditional OTP",
         realm_id=realm_id,
         parent_flow_alias=verify_by_reauth_subflow.alias,
@@ -242,7 +285,7 @@ def create_organization_first_broker_login_flows(
         opts=opts,
     )
     keycloak.authentication.Execution(
-        "org_first_broker_login_conditional_otp_user_configured_execution",
+        f"{realm_name}_org_first_broker_login_conditional_otp_user_configured_execution",
         realm_id=realm_id,
         parent_flow_alias=conditional_otp_subflow.alias,
         authenticator="conditional-user-configured",
@@ -251,7 +294,7 @@ def create_organization_first_broker_login_flows(
         opts=opts,
     )
     keycloak.authentication.Execution(
-        "org_first_broker_login_conditional_otp_form_execution",
+        f"{realm_name}_org_first_broker_login_conditional_otp_form_execution",
         realm_id=realm_id,
         parent_flow_alias=conditional_otp_subflow.alias,
         authenticator="auth-otp-form",
@@ -260,7 +303,7 @@ def create_organization_first_broker_login_flows(
         opts=opts,
     )
     keycloak.authentication.Execution(
-        "org_first_broker_login_add_org_member_execution",
+        f"{realm_name}_org_first_broker_login_add_org_member_execution",
         realm_id=realm_id,
         parent_flow_alias=main_flow.alias,
         authenticator="idp-add-organization-member",

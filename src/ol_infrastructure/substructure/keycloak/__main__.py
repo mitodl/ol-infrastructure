@@ -14,6 +14,7 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 from ol_infrastructure.substructure.keycloak.org_flows import (
     create_organization_browser_flows,
     create_organization_first_broker_login_flows,
+    create_organization_scope,
 )
 
 env_config = Config("environment")
@@ -593,6 +594,7 @@ olapps_unified_ecommerce_client_scope = keycloak.openid.ClientDefaultScopes(
         "roles",
         "web-origins",
         "ol-profile",
+        "organization",
     ],
 )
 olapps_unified_ecommerce_client_roles = keycloak_realm_config.get_object(
@@ -657,6 +659,7 @@ olapps_learn_ai_client_scope = keycloak.openid.ClientDefaultScopes(
         "roles",
         "web-origins",
         "ol-profile",
+        "organization",
     ],
 )
 olapps_learn_ai_client_roles = keycloak_realm_config.get_object(
@@ -723,6 +726,7 @@ if keycloak_realm_config.get("olapps-mitlearn-client-secret"):
             "roles",
             "web-origins",
             "ol-profile",
+            "organization",
         ],
     )
     olapps_mitlearn_client_roles = keycloak_realm_config.get_object(
@@ -1424,7 +1428,7 @@ ol_data_platform_oidc_attribute_importer_identity_provider_mapper = (
 # OLAPPS REALM- First login flow [START]
 # Does not require email verification or confirmation to connect with existing account.
 ol_first_login_flow = create_organization_first_broker_login_flows(
-    ol_apps_realm.id, opts=resource_options
+    ol_apps_realm.id, "olapps", opts=resource_options
 )
 # OL - First login flow [END]
 
@@ -1504,7 +1508,7 @@ ol_registration_flow_binding = keycloak.authentication.Bindings(
 # OL - browser flow [START]
 # username-form -> ol-auth-username-password-form
 ol_browser_flow = create_organization_browser_flows(
-    ol_apps_realm.id, opts=resource_options
+    ol_apps_realm.id, "olapps", opts=resource_options
 )
 # Bind the flow to the olapps realm for browser login.
 ol_apps_authentication_flow_binding = keycloak.authentication.Bindings(
@@ -1515,6 +1519,10 @@ ol_apps_authentication_flow_binding = keycloak.authentication.Bindings(
     opts=resource_options,
 )
 # OL - browser flow [END]
+# Ensure organization scope is present
+ol_apps_org_scope = create_organization_scope(
+    ol_apps_realm.id, "olapps", resource_options
+)
 
 # Touchstone SAML [START]
 ol_apps_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
