@@ -111,4 +111,6 @@ def setup_k8s_provider(
 def cached_image_uri(
     image_repo: str, aws_account_id: str | int = "610119931565"
 ) -> str:
+    if len(image_repo.split("/")) < 2:  # noqa: PLR2004
+        image_repo = f"library/{image_repo}"
     return f"{aws_account_id}.dkr.ecr.us-east-1.amazonaws.com/dockerhub/{image_repo}"
