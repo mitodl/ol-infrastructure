@@ -30,6 +30,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
+from ol_infrastructure.lib.aws.eks_helper import cached_image_uri
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
@@ -226,9 +227,7 @@ class OLApplicationK8s(ComponentResource):
         else:
             app_image = f"{ol_app_k8s_config.application_image_repository}:{ol_app_k8s_config.application_docker_tag}"
         if ol_app_k8s_config.use_pullthrough_cache:
-            app_image = (
-                f"610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/{app_image}"
-            )
+            app_image = cached_image_uri(app_image)
 
         volumes = [
             kubernetes.core.v1.VolumeArgs(
@@ -467,7 +466,7 @@ class OLApplicationK8s(ComponentResource):
                             # nginx container infront of uwsgi
                             kubernetes.core.v1.ContainerArgs(
                                 name="nginx",
-                                image=f"nginx:{NGINX_VERSION}",
+                                image=cached_image_uri(f"nginx:{NGINX_VERSION}"),
                                 ports=[
                                     kubernetes.core.v1.ContainerPortArgs(
                                         container_port=DEFAULT_NGINX_PORT

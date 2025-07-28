@@ -106,3 +106,9 @@ def setup_k8s_provider(
             provider_name,
         )
     )
+
+
+def cached_image_uri(
+    image_repo: str, aws_account_id: str | int = "610119931565"
+) -> str:
+    return f"{aws_account_id}.dkr.ecr.us-east-1.amazonaws.com/dockerhub/{image_repo}"

@@ -13,6 +13,7 @@ from ol_infrastructure.components.aws.eks import (
     OLEKSGatewayRouteConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
+    cached_image_uri,
     check_cluster_namespace,
     setup_k8s_provider,
 )
@@ -28,7 +29,9 @@ if "MIT_LEARN_NEXTJS_DOCKER_TAG" not in os.environ:
     raise OSError(msg)
 MIT_LEARN_NEXTJS_DOCKER_TAG = os.environ["MIT_LEARN_NEXTJS_DOCKER_TAG"]
 
-app_image = f"mitodl/mit-learn-nextjs-app:{MIT_LEARN_NEXTJS_DOCKER_TAG}"
+app_image = cached_image_uri(
+    "mitodl/mit-learn-nextjs-app:{MIT_LEARN_NEXTJS_DOCKER_TAG}"
+)
 
 k8s_global_labels = K8sGlobalLabels(
     service=Services.mit_learn, ou=BusinessUnit.mit_learn, stack=stack_info
