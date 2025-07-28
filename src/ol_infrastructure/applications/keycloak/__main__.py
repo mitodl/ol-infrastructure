@@ -39,6 +39,7 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
 from ol_infrastructure.lib.aws.eks_helper import (
+    cached_image_uri,
     check_cluster_namespace,
     setup_k8s_provider,
 )
@@ -444,7 +445,7 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
     spec={
         "update": {"strategy": "Auto"},
         "instances": keycloak_config.get_int("replicas") or 2,
-        "image": f"610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/keycloak@{KEYCLOAK_DOCKER_DIGEST}",  # noqa: E501
+        "image": cached_image_uri(f"mitodl/keycloak@{KEYCLOAK_DOCKER_DIGEST}"),
         "db": {
             "vendor": "postgres",
             "database": keycloak_db_config.db_name,

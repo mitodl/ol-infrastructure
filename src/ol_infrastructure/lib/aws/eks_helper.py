@@ -6,7 +6,10 @@ from packaging.version import Version
 from pulumi_aws import ec2
 from pulumi_kubernetes import Provider
 
+from ol_infrastructure.lib.aws.aws_helper import AWS_ACCOUNT_ID
+
 eks_client = boto3.client("eks")
+ECR_DOCKERHUB_REGISTRY = f"{AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/dockerhub"
 
 # Like our ec2 practices, allow pods to egress anywhere they want
 default_psg_egress_args = [
