@@ -11,6 +11,6 @@ config:
   opensearch:consul_service_name: 'mitopen-search'
   opensearch:disk_size_gb: "60"
   opensearch:engine_version: "OpenSearch_1.3"
-  opensearch:instance_type: t3.medium.search
+
   opensearch:public_web: "true"
   opensearch:secured_cluster: "true"

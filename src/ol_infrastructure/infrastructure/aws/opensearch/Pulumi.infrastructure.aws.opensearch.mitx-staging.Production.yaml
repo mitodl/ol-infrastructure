@@ -7,4 +7,3 @@ config:
   consul:scheme: https
   environment:business_unit: residential-staging
   environment:target_vpc: residential_mitx_staging_vpc
-  opensearch:instance_type: t3.medium.search

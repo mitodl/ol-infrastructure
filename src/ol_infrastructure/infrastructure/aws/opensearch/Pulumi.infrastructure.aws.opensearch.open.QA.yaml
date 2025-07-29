@@ -11,6 +11,6 @@ config:
   opensearch:disable_consul_components: true
   opensearch:disk_size_gb: "120"
   opensearch:engine_version: "OpenSearch_1.3"
-  opensearch:instance_type: t3.medium.search
+
   opensearch:public_web: "true"
   opensearch:secured_cluster: "true"
