@@ -48,7 +48,7 @@ ci_defaults = {
     "redis": {"instance_type": CacheInstanceTypes.small},
     "opensearch": {
         "instance_type": SearchInstanceTypes.medium.value,
-        "instance_count": 1,
+        "instance_count": 3,
     },
 }
 
