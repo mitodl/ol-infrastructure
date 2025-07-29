@@ -36,10 +36,10 @@ config:
     iam_policies:
     - base
     - ocw
-    instance_type: c7a.2xlarge
+    instance_type: m7a.2xlarge
     name: ocw
   - auto_scale:
-      desired: 5
+      desired: 4
       max: 10
       min: 2
       max_instance_lifetime_seconds: 86400
@@ -54,7 +54,7 @@ config:
     - infra
     - operations
     - cloud_custodian
-    instance_type: m7a.2xlarge
+    instance_type: m7a.4xlarge
     name: infra
   - auto_scale:
       desired: 2
@@ -67,7 +67,7 @@ config:
     iam_policies:
     - base
     - operations
-    instance_type: t3a.xlarge
+    instance_type: m7a.large
     name: generic
   consul:address: https://consul-operations-production.odl.mit.edu
   vault:address: https://vault-production.odl.mit.edu
