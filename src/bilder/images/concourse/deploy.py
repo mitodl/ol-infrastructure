@@ -98,6 +98,7 @@ concourse_config_map = {
             "{{ .Data.data.admin_password }}"
             "{{ end }}"
         ),
+        container_placement_strategy="fewest-build-containers,volume-locality",
         database_user=(
             '{{ with secret "postgres-concourse/creds/app" }}'
             "{{ .Data.username }}"
