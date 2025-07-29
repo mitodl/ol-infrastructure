@@ -42,7 +42,7 @@ config:
     AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     APPZI_URL: ""
-    CANVAS_COURSE_BUCKET_NAME: "ol-data-lake-landing-zone-qa"
+    CANVAS_COURSE_BUCKET_NAME: "ol-data-lake-landing-zone-production"
     CELERY_WORKER_CONCURRENCY: 1
     CSRF_COOKIE_NAME: "learn_rc_csrftoken"
     DEBUG: "false"
