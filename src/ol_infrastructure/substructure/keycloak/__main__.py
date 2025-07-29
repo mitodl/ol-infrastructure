@@ -1525,6 +1525,18 @@ ol_apps_org_scope = create_organization_scope(
 )
 
 # Touchstone SAML [START]
+ol_apps_mit_org = keycloak.organization.Organization(
+    "ol-apps-mit-organization",
+    opts=resource_options,
+    domains=[
+        keycloak.organization.OrganizationDomainArgs(name="mit.edu", verified=True)
+    ],
+    enabled=True,
+    name="MIT",
+    alias="mit",
+    realm=ol_apps_realm.id,
+)
+
 ol_apps_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
     "touchstone-idp",
     realm=ol_apps_realm.id,
@@ -1545,7 +1557,11 @@ ol_apps_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
     want_assertions_signed=True,
     opts=resource_options,
     first_broker_login_flow_alias=ol_first_login_flow.alias,
+    org_domain="mit.edu",
+    organization_id=ol_apps_mit_org.id,
+    org_redirect_mode_email_matches=True,
 )
+
 oidc_attribute_importer_identity_provider_mapper = (
     keycloak.AttributeImporterIdentityProviderMapper(
         "map-touchstone-saml-email-attribute",
