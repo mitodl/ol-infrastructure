@@ -155,7 +155,7 @@ search_domain = aws.opensearch.Domain(
     cluster_config=aws.opensearch.DomainClusterConfigArgs(
         zone_awareness_enabled=True,
         zone_awareness_config=aws.opensearch.DomainClusterConfigZoneAwarenessConfigArgs(
-            availability_zone_count=3
+            availability_zone_count=min(3, cluster_size)
         ),
         instance_count=cluster_size,
         instance_type=cluster_instance_type,
