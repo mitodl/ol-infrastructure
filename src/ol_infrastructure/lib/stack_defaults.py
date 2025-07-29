@@ -48,7 +48,7 @@ ci_defaults = {
     "redis": {"instance_type": CacheInstanceTypes.small},
     "opensearch": {
         "instance_type": SearchInstanceTypes.medium.value,
-        "instance_count": 1,
+        "instance_count": 3,
     },
 }
 
@@ -57,13 +57,4 @@ env_dict = {"ci": ci_defaults, "qa": qa_defaults, "production": production_defau
 
 
 def defaults(stack_info: StackInfo) -> dict[str, Any]:
-    """Provide a single location to dispatch infrastructure defaults based on env.
-
-    :param stack_info: The stack_info object that has been parsed from the Pulumi stack.
-    :type stack_info: StackInfo
-
-    :returns: A dictionary containing the default parameters for a given environment.
-
-    :rtype: Dict[Text, Any]
-    """
     return env_dict[stack_info.env_suffix]
