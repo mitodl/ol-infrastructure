@@ -11,5 +11,5 @@ config:
   opensearch:disable_consul_components: true
   opensearch:disk_size_gb: "120"
   opensearch:engine_version: "OpenSearch_2.19"
-  opensearch:public_web: "false"
+  opensearch:public_web: "true"  # this needs to stay true to avoid recreating
   opensearch:secured_cluster: "true"

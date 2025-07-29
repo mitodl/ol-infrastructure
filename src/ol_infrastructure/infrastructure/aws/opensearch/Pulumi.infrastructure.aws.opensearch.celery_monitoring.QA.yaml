@@ -12,6 +12,5 @@ config:
   opensearch:cluster_size: "3"
   opensearch:disk_size_gb: "60"
   opensearch:engine_version: "OpenSearch_2.19"
-
   opensearch:public_web: "false"
   opensearch:secured_cluster: "true"
