@@ -453,6 +453,9 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
             "database": keycloak_db_config.db_name,
             "port": db_port,
             "host": db_address,
+            "poolMinSize": 30,
+            "poolInitialSize": 30,
+            "poolMaxSize": 30,
             "usernameSecret": {
                 "name": db_creds_secret_name,
                 "key": "username",
