@@ -113,10 +113,10 @@ def create_organization_browser_flows(
         opts=opts,
     )
     keycloak.authentication.Execution(
-        f"{realm_name}_organization_browser_forms_password_form_execution",
+        f"{realm_name}_organization_browser_forms_username_password_form_execution",
         realm_id=realm_id,
         parent_flow_alias=organization_browser_forms_subflow.alias,
-        authenticator="auth-password-form",
+        authenticator="auth-username-password-form",
         requirement="REQUIRED",
         priority=22,
         opts=opts,
@@ -153,7 +153,7 @@ def create_organization_browser_flows(
 
 
 def create_organization_first_broker_login_flows(
-    realm_id: pulumi.Input[str],
+    realm_id: pulumi.Output[str],
     realm_name: str,
     opts: pulumi.ResourceOptions | None = None,
 ) -> keycloak.authentication.Flow:
