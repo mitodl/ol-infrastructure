@@ -167,6 +167,7 @@ concourse_config_map = {
         containerd_dns_server="8.8.8.8",
         containerd_max_containers=0,  # Don't set a limit on the number of containers
         containerd_network_pool="10.250.0.0/16",
+        ephemeral=True,
     ),
 }
 concourse_config: ConcourseWebConfig | ConcourseWorkerConfig = concourse_config_map[
