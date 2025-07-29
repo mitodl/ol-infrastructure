@@ -264,6 +264,8 @@ keycloak_database_security_group = ec2.SecurityGroup(
 rds_defaults = defaults(stack_info)["rds"]
 if stack_info.env_suffix == "qa":
     rds_defaults["instance_size"] = DBInstanceTypes.general_purpose_large.value
+if stack_info.env_suffix == "production":
+    rds_defaults["instance_size"] = DBInstanceTypes.general_purpose_xlarge.value
 
 rds_password = keycloak_config.require("rds_password")
 
