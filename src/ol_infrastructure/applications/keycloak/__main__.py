@@ -479,6 +479,7 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
         "http": {
             "tlsSecret": star_ol_mit_edu_secret_name,
         },
+        "features": {"enabled": ["update-email"]},
         "unsupported": {
             "podTemplate": {
                 "spec": {
