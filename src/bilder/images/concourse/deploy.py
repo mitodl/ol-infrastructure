@@ -144,6 +144,7 @@ concourse_config_map = {
         max_checks_per_second="30",
         enable_across_step=True,
         enable_p2p_volume_streaming=False,
+        peer_address="{{ with node }}{{ .Node.Address }}{{ end }}",
         prometheus_bind_ip=IPv4Address("127.0.0.1"),
         prometheus_bind_port=CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT,
         secret_cache_duration="1m",  # pragma: allowlist secret # noqa: S106
@@ -168,7 +169,7 @@ concourse_config_map = {
         containerd_dns_server="8.8.8.8",
         containerd_max_containers=0,  # Don't set a limit on the number of containers
         containerd_network_pool="10.250.0.0/16",
-        ephemeral=True,
+        ephemeral=False,
     ),
 }
 concourse_config: ConcourseWebConfig | ConcourseWorkerConfig = concourse_config_map[
