@@ -272,6 +272,15 @@ ol_apps_required_action_verify_email = keycloak.RequiredAction(
     opts=resource_options,
 )
 
+ol_apps_required_action_update_email = keycloak.RequiredAction(
+    "ol-apps-update-email",
+    realm_id=ol_apps_realm.realm,
+    alias="UPDATE_EMAIL",
+    default_action=False,
+    enabled=True,
+    opts=resource_options,
+)
+
 ol_apps_required_action_update_password = keycloak.RequiredAction(
     "ol-apps-update-password",
     realm_id=ol_apps_realm.realm,
