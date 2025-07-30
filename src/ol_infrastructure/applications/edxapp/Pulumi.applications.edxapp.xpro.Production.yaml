@@ -6,6 +6,7 @@ config:
   consul:address: https://consul-xpro-production.odl.mit.edu
   edxapp:waffle_flags:
   - ["completion.enable_completion_tracking", "--create", "--superusers", "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_video_uploads_page", "--create", "--everyone"]
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
   - ["course_experience.relative_dates_disable_reset", "--create", "--everyone"]
   - ["course_home.course_home_mfe_progress_tab", "--create", "--everyone"]

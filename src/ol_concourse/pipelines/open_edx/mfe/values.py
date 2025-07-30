@@ -196,6 +196,7 @@ xpro = [
         terms_of_service_url="https://ci.xpro.mit.edu/terms-of-service/",
         trademark_text="© MIT xPRO. All rights reserved except where noted.",
         logo_trademark_url="https://courses-ci.xpro.mit.edu/static/xpro/images/mit-ol-logo.svg",
+        enable_video_upload_page_link_in_content_dropdown="true",
     ),
     OpenEdxVars(
         about_us_url="https://rc.xpro.mit.edu/about-us/",
@@ -216,6 +217,7 @@ xpro = [
         terms_of_service_url="https://rc.xpro.mit.edu/terms-of-service/",
         trademark_text="© MIT xPRO. All rights reserved except where noted.",
         logo_trademark_url="https://courses-rc.xpro.mit.edu/static/xpro/images/mit-ol-logo.svg",
+        enable_video_upload_page_link_in_content_dropdown="true",
     ),
     OpenEdxVars(
         about_us_url="https://xpro.mit.edu/about-us/",
@@ -236,6 +238,7 @@ xpro = [
         terms_of_service_url="https://xpro.mit.edu/terms-of-service/",
         trademark_text="© MIT xPRO. All rights reserved except where noted.",
         logo_trademark_url="https://courses.xpro.mit.edu/static/xpro/images/mit-ol-logo.svg",
+        enable_video_upload_page_link_in_content_dropdown="true",
     ),
 ]
 
