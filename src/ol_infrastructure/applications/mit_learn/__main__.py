@@ -930,6 +930,7 @@ env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
 env_vars = {
     "ALLOWED_HOSTS": '["*"]',
     "AWS_STORAGE_BUCKET_NAME": f"ol-mitlearn-app-storage-{env_name}",
+    "CANVAS_PDF_TRANSCRIPTION_MODEL": "gpt-4o",
     "CORS_ALLOWED_ORIGIN_REGEXES": "['^.+ocw-next.netlify.app$']",
     "CSAIL_BASE_URL": "https://cap.csail.mit.edu/",
     "CSRF_COOKIE_DOMAIN": f".{mitlearn_config.get('frontend_domain')}",
