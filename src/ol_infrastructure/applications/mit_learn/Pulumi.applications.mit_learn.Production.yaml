@@ -73,9 +73,6 @@ config:
     OPENSEARCH_INDEX: "mitlearn"
     OPENSEARCH_SHARD_COUNT: 3
     OPENSEARCH_URL: "https://search-opensearch-mitlearn-producti-qjtnw2dcoampmbtscs3wdfci6y.us-east-1.es.amazonaws.com"
-    PGBOUNCER_DEFAULT_POOL_SIZE: 50
-    PGBOUNER_MAX_CLIENT_CONN: 500
-    PGBOUNER_MIN_POOL_SIZE: 20
     POSTHOG_API_HOST: "https://ph.ol.mit.edu"
     POSTHOG_ENABLED: "true"
     POSTHOG_PROJECT_ID: "63497"
