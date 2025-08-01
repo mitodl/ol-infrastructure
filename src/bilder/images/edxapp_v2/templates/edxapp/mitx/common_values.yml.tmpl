@@ -384,6 +384,26 @@ FINANCIAL_REPORTS:
     ROOT_PATH: sandbox
     STORAGE_TYPE: localfs
 FOOTER_ORGANIZATION_IMAGE: /images/logo.png
+FORUM_SEARCH_BACKEND: "forum.search.es.ElasticsearchBackend"
+
+FORUM_ELASTIC_SEARCH_CONFIG:
+  - host: {{ keyOrDefault "elasticsearch/host" "elasticsearch.service.consul" }}
+    port: "443"
+    use_ssl: true
+
+
+{{ with secret "secret-mitx/mongodb-forum" }}
+FORUM_MONGODB_CLIENT_PARAMETERS:
+  authSource: admin
+  host: {{ keyOrDefault "mongodb/host" "mongodb-master.service.consul" }}
+  port: 27017
+  replicaSet: {{ keyOrDefault "mongodb/replica-set" "rs0" }}
+  username: {{ .Data.username }}
+  password: {{ .Data.password }}
+  ssl: {{ keyOrDefault "mongodb/use-ssl" "false" }}
+{{ end }}
+
+FORUM_MONGODB_DATABASE: "forum"
 GITHUB_REPO_ROOT: /openedx/data
 GOOGLE_ANALYTICS_ACCOUNT: {{ key "edxapp/google-analytics-id" }}
 GRADES_DOWNLOAD:
