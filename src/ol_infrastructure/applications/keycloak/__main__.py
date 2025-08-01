@@ -506,10 +506,6 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
             },
             {"name": "metrics-enabled", "value": "true"},
             {
-                "name": "spi-login--provider",
-                "value": "ol-freemarker",
-            },
-            {
                 "name": "spi-realm-restapi-extension-scim-admin-url-check",
                 "value": "no-context-path",
             },
