@@ -13,7 +13,7 @@ ol-openedx-logging==0.2.0
 ol-openedx-rapid-response-reports==0.3.0
 ol-openedx-sentry==0.2.1
 openedx-scorm-xblock>=19.0.1,<19.1.0
-pip==25.1.1
+pip==25.2
 pydantic-settings==2.10.1
 rapid-response-xblock==0.10.0
 uwsgi==2.0.30
