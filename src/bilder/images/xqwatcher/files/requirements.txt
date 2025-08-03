@@ -1,4 +1,4 @@
-certifi==2025.7.14
+certifi==2025.8.3
 charset-normalizer==3.4.2
 -e git+https://github.com/openedx/codejail.git@4127fc4bd5775cc72aee8d7f0a70e31405e22439#egg=codejail
 dogstatsd-python==0.5.6
