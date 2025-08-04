@@ -73,6 +73,12 @@ def vpc_exports(vpc: OLVPC, peers: list[str] | None = None) -> dict[str, Any]:
             k8s_public_subnet.availability_zone
             for k8s_public_subnet in vpc.k8s_public_subnets
         ]
+        return_value["k8s_nat_gateway_ids"] = [
+            gateway.id for gateway in vpc.k8s_nat_gateways
+        ]
+        return_value["k8s_nat_gateway_public_ips"] = [
+            gateway.public_ip for gateway in vpc.k8s_nat_gateways
+        ]
     return return_value
 
 
