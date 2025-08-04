@@ -256,7 +256,7 @@ atlas_cidr_network_access = atlas.ProjectIpAccessList(
     ).merge(atlas_provider),
 )
 
-k8s_vpc.apply(
+atlas_nat_gateway_ip_access_lists = k8s_vpc.apply(
     lambda vpc_details: [
         atlas.ProjectIpAccessList(
             f"mongo-atlas-nat-gateway-ip-permissions-{i}",
