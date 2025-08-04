@@ -1002,8 +1002,6 @@ traefik_helm_release = kubernetes.helm.v3.Release(
             },
             "commonLabels": k8s_global_labels,
             "tolerations": operations_tolerations,
-            # Debug the traefik by turning off "DaemonSet"
-            # and setting "replcias": 1
             "deployment": {
                 "kind": "Deployment",
                 "podLabels": {
