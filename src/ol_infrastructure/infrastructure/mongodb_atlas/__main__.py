@@ -364,7 +364,15 @@ pulumi.export(
     "atlas_cluster",
     {
         "id": atlas_cluster.cluster_id,
+        # Retain 'host_string' for compatibility with existing stacks that reference it
         "host_string": privatized_mongo_uri.apply(lambda uri: urlparse(uri).netloc),
+        # Same as legacy 'host_string'
+        "private_host_string": privatized_mongo_uri.apply(
+            lambda uri: urlparse(uri).netloc
+        ),
+        "public_host_string": atlas_cluster.mongo_uri.apply(
+            lambda uri: urlparse(uri).netloc
+        ),
         "mongo_uri": atlas_cluster.mongo_uri,
         "mongo_uri_with_options": atlas_cluster.mongo_uri_with_options,
         "connection_strings": atlas_cluster.connection_strings,
