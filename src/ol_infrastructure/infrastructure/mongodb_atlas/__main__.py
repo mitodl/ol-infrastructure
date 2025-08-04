@@ -43,6 +43,9 @@ dagster_stack = pulumi.StackReference(f"applications.dagster.{dagster_env_name}"
 #############
 environment_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 target_vpc = network_stack.require_output(env_config.require("target_vpc"))
+k8s_vpc = network_stack.require_output(
+    env_config.get("target_k8s_vpc") or "applications_vpc"
+)
 dagster_ip = dagster_stack.require_output("dagster_app")["elastic_ip"]
 business_unit = env_config.get("business_unit") or "operations"
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
@@ -251,6 +254,20 @@ atlas_cidr_network_access = atlas.ProjectIpAccessList(
     opts=pulumi.ResourceOptions(
         depends_on=[atlas_aws_network_peer, accept_atlas_network_peer]
     ).merge(atlas_provider),
+)
+
+k8s_vpc.apply(
+    lambda vpc_details: [
+        atlas.ProjectIpAccessList(
+            f"mongo-atlas-nat-gateway-ip-permissions-{i}",
+            project_id=atlas_project.id,
+            cidr_block=f"{ip}/32",
+            opts=pulumi.ResourceOptions(
+                depends_on=[atlas_aws_network_peer, accept_atlas_network_peer]
+            ).merge(atlas_provider),
+        )
+        for i, ip in enumerate(vpc_details.get("k8s_nat_gateway_public_ips", []))
+    ]
 )
 
 aws.ec2.Route(
