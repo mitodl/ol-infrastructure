@@ -54,6 +54,6 @@ config:
       taints: {}
       version:
   eks:traefik_min_replicas: 5
-  eks:treafik_max_replicas: 10
+  eks:traefik_max_replicas: 10
   environment:business_unit: operations
   environment:target_vpc: applications_vpc
