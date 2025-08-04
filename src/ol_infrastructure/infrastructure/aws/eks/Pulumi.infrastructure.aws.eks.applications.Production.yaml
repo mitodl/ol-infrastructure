@@ -21,6 +21,8 @@ config:
   - "api-learn-ai.ol.mit.edu"
   - "api.learn.mit.edu"
   - "api.mitxonline.mit.edu"
+  eks:apisix_min_replicas: "5"
+  eks:apisix_max_replicas: "10"
   eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
   eks:developer_role_kubernetes_groups: ["admin"]
   eks:developer_role_scope: "cluster"
@@ -51,5 +53,7 @@ config:
       tags: {}
       taints: {}
       version:
+  eks:traefik_min_replicas: 5
+  eks:traefik_max_replicas: 10
   environment:business_unit: operations
   environment:target_vpc: applications_vpc

@@ -12,6 +12,8 @@ config:
   eks:apisix_domains:
   - "airbyte.ol.mit.edu"
   eks:apisix_ingress_enabled: "true"
+  eks:apisix_min_replicas: "5"
+  eks:apisix_max_replicas: "10"
   eks:apisix_viewer_key:
     secure: v1:j5+aTOfRBG8QiV+V:C6NTWitDBjV4DkOQGApae7GHK9w1wOFAlS7ACNu/s728A5q1zDWv9E13E2hs0IlAtMnP17KJR0HZjxDlg5fckv2nguEVgNA/d90j1XWlFY8=
   eks:ebs_csi_provisioner: "true"
@@ -35,5 +37,7 @@ config:
       tags: {}
       taints: {}
       version:
+  eks:traefik_min_replicas: 5
+  eks:traefik_max_replicas: 10
   environment:business_unit: data
   environment:target_vpc: data_vpc

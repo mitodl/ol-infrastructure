@@ -9,6 +9,8 @@ config:
   - "odl.mit.edu"
   - ".ol.mit.edu"
   - "ol.mit.edu"
+  eks:apisix_min_replicas: "5"
+  eks:apisix_max_replicas: "10"
   eks:ebs_csi_provisioner: true
   eks:efs_csi_provisioner: true
   eks:gateway_release_channel: "experimental"
@@ -30,3 +32,5 @@ config:
       tags: {}
       taints: {}
       node_group_options: {}
+  eks:traefik_min_replicas: 5
+  eks:traefik_max_replicas: 10
