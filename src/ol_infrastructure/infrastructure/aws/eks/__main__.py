@@ -1013,8 +1013,8 @@ traefik_helm_release = kubernetes.helm.v3.Release(
             },
             "autoscaling": {
                 "enabled": True,
-                "minReplicas": 2,
-                "maxReplicas": 5,
+                "minReplicas": eks_config.get("traefik_min_replicas") or 2,
+                "maxReplicas": eks_config.get("traefik_max_replicas") or 5,
                 "metrics": [
                     {
                         "resource": {
@@ -1208,8 +1208,8 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                     "autoscaling": {
                         "hpa": {
                             "enabled": True,
-                            "minReplicas": "2",
-                            "maxReplicas": "5",
+                            "minReplicas": eks_config.get("apisix_min_replicas") or "2",
+                            "maxReplicas": eks_config.get("apisix_max_replicas") or "5",
                             "targetCPU": "50",
                         },
                     },
