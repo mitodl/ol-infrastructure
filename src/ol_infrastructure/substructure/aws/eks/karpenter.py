@@ -296,7 +296,7 @@ def setup_karpenter(  # noqa: PLR0913
                 {
                     "deviceName": "/dev/xvda",
                     "ebs": {
-                        "volumeSize": "100Gi",
+                        "volumeSize": "1000Gi",
                         "volumeType": "gp3",
                         "iops": 3000,
                         "throughput": 125,
