@@ -221,4 +221,12 @@ if (learningApps.includes(edxMfeAppName)) {
   };
 }
 
+// Override the proctoring info panel 'Review instructions and system requirements' link
+config = {
+  ...config,
+  externalLinkUrlOverrides : {
+    "https://support.edx.org/hc/en-us/sections/115004169247-Taking-Timed-and-Proctored-Exams": "https://mitxonline.zendesk.com/hc/en-us/articles/4418223178651-What-is-the-Proctortrack-Onboarding-Exam",
+  },
+}
+
 export default config;
