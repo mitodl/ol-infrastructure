@@ -152,6 +152,16 @@ search_domain = aws.opensearch.Domain(
     )
     if not cluster_instance_type.startswith("t")
     else None,
+    off_peak_window_options=aws.opensearch.DomainOffPeakWindowOptionsArgs(
+        enabled=True,
+        off_peak_window=aws.opensearch.DomainOffPeakWindowOptionsOffPeakWindowArgs(
+            window_start_time=aws.opensearch.DomainOffPeakWindowOptionsOffPeakWindowWindowStartTimeArgs(
+                hours=0, minutes=0
+            )
+        ),
+    )
+    if not cluster_instance_type.startswith("t")
+    else None,
     cluster_config=aws.opensearch.DomainClusterConfigArgs(
         zone_awareness_enabled=True,
         zone_awareness_config=aws.opensearch.DomainClusterConfigZoneAwarenessConfigArgs(
