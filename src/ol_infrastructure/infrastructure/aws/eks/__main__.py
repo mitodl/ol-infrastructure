@@ -1005,12 +1005,29 @@ traefik_helm_release = kubernetes.helm.v3.Release(
             # Debug the traefik by turning off "DaemonSet"
             # and setting "replcias": 1
             "deployment": {
-                "kind": "DaemonSet",
+                "kind": "Deployment",
                 "podLabels": {
                     # "traffic-gateway-controller-security-group": "True",
                 },
                 "additionalVolumes": [
                     {"name": "plugins"},
+                ],
+            },
+            "autoscaling": {
+                "enabled": True,
+                "minReplicas": 2,
+                "maxReplicas": 5,
+                "metrics": [
+                    {
+                        "resource": {
+                            "name": "cpu",
+                            "target": {
+                                "type": "Utilization",
+                                "averageUtilization": 50,
+                            },
+                        },
+                        "type": "Resource",
+                    }
                 ],
             },
             "additionalVolumeMounts": [
@@ -1189,7 +1206,15 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                             "enabled": True,
                         },
                     },
-                    "useDaemonSet": True,
+                    "useDaemonSet": False,
+                    "autoscaling": {
+                        "hpa": {
+                            "enabled": True,
+                            "minReplicas": "2",
+                            "maxReplicas": "5",
+                            "targetCPU": "50",
+                        },
+                    },
                     "pdb": {
                         "create": False
                     },  # No need for pod disruption budget with daemonset
@@ -1299,7 +1324,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                         },
                         "limits": {
                             "cpu": "50m",
-                            "memory": "100Mi",
+                            "memory": "256Mi",
                         },
                     },
                     # Map controller config under extraConfig
@@ -1330,7 +1355,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                     },
                     "livenessProbe": {
                         "enabled": True,
-                        "initialDelaySeconds": 30,
+                        "initialDelaySeconds": 120,
                         "timeoutSeconds": 5,
                         "periodSeconds": 10,
                         "successThreshold": 1,
@@ -1338,7 +1363,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                     },
                     "readinessProbe": {
                         "enabled": True,
-                        "initialDelaySeconds": 30,
+                        "initialDelaySeconds": 120,
                         "timeoutSeconds": 5,
                         "periodSeconds": 10,
                         "successThreshold": 1,
@@ -1351,7 +1376,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                         },
                         "limits": {
                             "cpu": "100m",
-                            "memory": "200Mi",
+                            "memory": "300Mi",
                         },
                     },
                     # Add auth config if needed based on etcd subchart values
