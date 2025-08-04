@@ -33,7 +33,7 @@ config:
     LOGOUT_REDIRECT_URL: "https://courses.mitxonline.mit.edu/logout"
     MAILGUN_FROM_EMAIL: "MITx Online <no-reply@mail.mitxonline.mit.edu>"
     MAILGUN_SENDER_DOMAIN: "mail.mitxonline.mit.edu"
-    MITOL_APIGATEWAY_DISABLE_MIDDLEWARE: "true"
+    MITOL_APIGATEWAY_DISABLE_MIDDLEWARE: "false"
     MITOL_GOOGLE_SHEETS_DEFERRALS_REQUEST_WORKSHEET_ID: "268521316"
     MITOL_GOOGLE_SHEETS_PROCESSOR_APP_NAME: "MITx Online (production)"
     MITOL_GOOGLE_SHEETS_PROCESS_ONLY_LAST_ROWS_NUM: "30"
