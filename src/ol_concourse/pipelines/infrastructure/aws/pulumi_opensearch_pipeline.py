@@ -11,7 +11,6 @@ app_list = [
     "mitxonline",
     "xpro",
     "open",
-    "mitopen",
     "mitlearn",
     "celery_monitoring",
 ]
