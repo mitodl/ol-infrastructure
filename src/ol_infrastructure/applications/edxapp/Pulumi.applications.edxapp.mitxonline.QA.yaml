@@ -12,6 +12,7 @@ config:
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone",
     "--staff", "--authenticated"]
   - ["course_experience.relative_dates_disable_reset", "--create", "--everyone"]
+  - ["discussions.enable_forum_v2", "--create", "--everyone"]
   - ["discussions.pages_and_resources_mfe", "--create", "--everyone"]
   - ["grades.bulk_management", "--create", "--superusers", "--everyone", "--staff",
     "--authenticated"]
