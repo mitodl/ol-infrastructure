@@ -320,6 +320,7 @@ def create_k8s_resources(
             mount_path="/openedx/config",
         )
     )
+
     cms_labels = k8s_global_labels | {
         "ol.mit.edu/component": "edxapp-cms",
         "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
