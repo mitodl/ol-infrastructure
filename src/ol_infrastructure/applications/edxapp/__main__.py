@@ -36,7 +36,6 @@ from pulumi_aws import (
     route53,
     s3,
     ses,
-    vpc,
 )
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
@@ -122,6 +121,7 @@ mongodb_atlas_stack = StackReference(
 #############
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 target_vpc = edxapp_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
+k8s_vpc = edxapp_config.get("k8s_vpc") or "applications_vpc"
 aws_account = get_caller_identity()
 aws_config = AWSBase(
     tags={
@@ -146,6 +146,9 @@ edxapp_mfe_paths = list(edxapp_mfes.values())
 edxapp_mail_domain = edxapp_config.require("mail_domain")
 edxapp_vpc = network_stack.require_output(target_vpc)
 edxapp_vpc_id = edxapp_vpc["id"]
+k8s_vpc = network_stack.require_output(k8s_vpc)
+k8s_pod_subnet_cidrs = k8s_vpc["k8s_pod_subnet_cidrs"]
+
 data_vpc = network_stack.require_output("data_vpc")
 data_integrator_secgroup = data_vpc["security_groups"]["integrator"]
 
@@ -552,6 +555,13 @@ edxapp_db_security_group = ec2.SecurityGroup(
             to_port=DEFAULT_MYSQL_PORT,
             description="Access to MariaDB from Edxapp web nodes",
         ),
+        ec2.SecurityGroupIngressArgs(
+            cidr_blocks=k8s_pod_subnet_cidrs.apply(lambda pod_cidrs: [*pod_cidrs]),
+            protocol="tcp",
+            from_port=DEFAULT_MYSQL_PORT,
+            to_port=DEFAULT_MYSQL_PORT,
+            description="Access to MariaDB from K8s application pods",
+        ),
     ],
     tags=aws_config.tags,
     vpc_id=edxapp_vpc_id,
@@ -883,6 +893,7 @@ redis_cluster_security_group = ec2.SecurityGroup(
                 edxapp_security_group.id,
                 operations_vpc["security_groups"]["celery_monitoring"],
             ],
+            cidr_blocks=k8s_pod_subnet_cidrs.apply(lambda pod_cidrs: pod_cidrs),
             description="Allow access from edX to Redis for caching and queueing",
         )
     ],
@@ -1840,38 +1851,17 @@ for domain_key, domain_value in edxapp_domains.items():
 # Actions to take when the the stack is configured to deploy into k8s
 if edxapp_config.get("k8s_deployment"):
     k8s_resources = create_k8s_resources(
-        stack_info=stack_info,
-        cluster_stack=cluster_stack,
-        edxapp_config=edxapp_config,
-        network_stack=network_stack,
-        edxapp_db=edxapp_db,
-        edxapp_cache=edxapp_redis_cache,
         aws_config=aws_config,
+        cluster_stack=cluster_stack,
+        edxapp_cache=edxapp_redis_cache,
+        edxapp_config=edxapp_config,
+        edxapp_db=edxapp_db,
+        mongodb_atlas_stack=mongodb_atlas_stack,
+        network_stack=network_stack,
+        stack_info=stack_info,
         vault_config=Config("vault"),
         vault_policy=edxapp_vault_policy,
     )
-
-    # Allows the application running in K8S to access the redis cluster.
-    vpc.SecurityGroupIngressRule(
-        "edxapp-k8s-redis-access",
-        from_port=DEFAULT_REDIS_PORT,
-        to_port=DEFAULT_REDIS_PORT,
-        ip_protocol="tcp",
-        security_group_id=redis_cluster_security_group.id,
-        referenced_security_group_id=k8s_resources["edxapp_k8s_app_security_group_id"],
-        description="Allow access to Redis from the edxapp k8s deployment",
-    )
-    # Allow the application that is running k8s to access the database
-    vpc.SecurityGroupIngressRule(
-        "edxapp-k8s-database-access",
-        from_port=DEFAULT_MYSQL_PORT,
-        to_port=DEFAULT_MYSQL_PORT,
-        ip_protocol="tcp",
-        security_group_id=edxapp_db_security_group.id,
-        referenced_security_group_id=k8s_resources["edxapp_k8s_app_security_group_id"],
-        description="Allow access to Redis from the edxapp k8s deployment",
-    )
-
 
 export(
     "edxapp",
