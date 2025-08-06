@@ -1,15 +1,23 @@
-# ruff: noqa: F841, E501, PLR0913, ERA001
+# ruff: noqa: F841, E501, PLR0913, PLR0915
+import os
+
 import pulumi
 import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 
+from bridge.settings.openedx.types import OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.applications.edxapp.k8s_configmaps import create_k8s_configmaps
 from ol_infrastructure.applications.edxapp.k8s_secrets import create_k8s_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache
 from ol_infrastructure.components.aws.database import OLAmazonDB
+from ol_infrastructure.components.services.cert_manager import (
+    OLCertManagerCert,
+    OLCertManagerCertConfig,
+)
+from ol_infrastructure.components.services.k8s import OLApisixRoute, OLApisixRouteConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
@@ -29,13 +37,14 @@ from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
 def create_k8s_resources(
-    stack_info: StackInfo,
-    cluster_stack: StackReference,
-    edxapp_config: Config,
-    network_stack: StackReference,
-    edxapp_db: OLAmazonDB,
-    edxapp_cache: OLAmazonCache,
     aws_config: AWSBase,
+    cluster_stack: StackReference,
+    edxapp_cache: OLAmazonCache,
+    edxapp_config: Config,
+    edxapp_db: OLAmazonDB,
+    mongodb_atlas_stack: StackReference,
+    network_stack: StackReference,
+    stack_info: StackInfo,
     vault_config: Config,
     vault_policy: vault.Policy,
 ):
@@ -128,13 +137,14 @@ def create_k8s_resources(
     opensearch_hostname = opensearch_stack.require_output("cluster")["endpoint"]
 
     secrets = create_k8s_secrets(
-        stack_info,
-        namespace,
-        k8s_global_labels,
-        vault_k8s_resources,
-        edxapp_db,
-        edxapp_cache,
-        edxapp_config,
+        edxapp_cache=edxapp_cache,
+        edxapp_config=edxapp_config,
+        edxapp_db=edxapp_db,
+        k8s_global_labels=k8s_global_labels,
+        mongodb_atlas_stack=mongodb_atlas_stack,
+        namespace=namespace,
+        stack_info=stack_info,
+        vault_k8s_resources=vault_k8s_resources,
     )
 
     configmaps = create_k8s_configmaps(
@@ -144,6 +154,63 @@ def create_k8s_resources(
         edxapp_config,
         edxapp_cache,
         opensearch_hostname,
+    )
+
+    # Lookup environment vars needed for the deployment
+    if "EDXAPP_DOCKER_IMAGE_DIGEST" not in os.environ:
+        msg = "Environment variable EDXAPP_DOCKER_IMAGE_DIGEST is not set. "
+        raise OSError(msg)
+    EDXAPP_DOCKER_IMAGE_DIGEST = os.environ["EDXAPP_DOCKER_IMAGE_DIGEST"]
+
+    OPENEDX_RELEASE: OpenEdxSupportedRelease = os.environ.get(
+        "OPENEDX_RELEASE", "master"
+    )
+
+    ############################################
+    # Setup an init container that downloads and extracts the staticfiles
+    ############################################
+    edxapp_image = f"610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/edxapp@{EDXAPP_DOCKER_IMAGE_DIGEST}"
+    production_staticfiles_archive_name = (
+        f"staticfiles-production-{EDXAPP_DOCKER_IMAGE_DIGEST}.tar.gz"
+    )
+    nonprod_staticfiles_archive_name = (
+        f"staticfiles-nonprod-{EDXAPP_DOCKER_IMAGE_DIGEST}.tar.gz"
+    )
+    production_staticfiles_url = f"https://ol-eng-artifacts.s3.amazonaws.com/edx-staticfiles/{stack_info.env_prefix}/{OPENEDX_RELEASE}/{production_staticfiles_archive_name}"
+    nonprod_staticfiles_url = f"https://ol-eng-artifacts.s3.amazonaws.com/edx-staticfiles/{stack_info.env_prefix}/{OPENEDX_RELEASE}/{nonprod_staticfiles_archive_name}"
+
+    prod_dl_command = f"wget {production_staticfiles_url} -O /tmp/prod.tar.gz && tar -xf /tmp/prod.tar.gz --strip-components 2 -C /openedx/staticfiles"
+    nonprod_dl_command = f"wget {nonprod_staticfiles_url} -O /tmp/nonprod.tar.gz && tar -xf /tmp/nonprod.tar.gz --strip-components 2 -C /openedx/staticfiles"
+
+    if stack_info.env_suffix == "production":
+        dl_command = prod_dl_command
+    else:
+        dl_command = nonprod_dl_command
+    staticfiles_init_container_command = [
+        "/bin/sh",
+        "-c",
+        f"({dl_command}) || echo 'Could not download staticfiles'",
+    ]
+
+    staticfiles_volumes = [
+        kubernetes.core.v1.VolumeArgs(
+            name="staticfiles",
+            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+        ),
+    ]
+
+    staticfiles_volume_mounts = [
+        kubernetes.core.v1.VolumeMountArgs(
+            name="staticfiles",
+            mount_path="/openedx/staticfiles",
+        ),
+    ]
+
+    staticfiles_init_container = kubernetes.core.v1.ContainerArgs(
+        name="staticfiles-downloader",
+        image="busybox:1.35",
+        command=staticfiles_init_container_command,
+        volume_mounts=staticfiles_volume_mounts,
     )
 
     ############################################
@@ -236,6 +303,7 @@ def create_k8s_resources(
             ),
         )
     )
+    cms_edxapp_volumes.extend(staticfiles_volumes)
 
     # Define the volume mounts for the init container that aggregates the config files
     cms_edxapp_init_volume_mounts = [
@@ -252,7 +320,6 @@ def create_k8s_resources(
             mount_path="/openedx/config",
         )
     )
-
     cms_labels = k8s_global_labels | {
         "ol.mit.edu/component": "edxapp-cms",
         "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
@@ -273,6 +340,7 @@ def create_k8s_resources(
                     service_account_name=vault_k8s_resources.service_account_name,
                     volumes=cms_edxapp_volumes,
                     init_containers=[
+                        staticfiles_init_container,
                         kubernetes.core.v1.ContainerArgs(
                             name="config-aggregator",
                             image="busybox:1.35",
@@ -281,14 +349,12 @@ def create_k8s_resources(
                                 "cat /openedx/config-sources/*/*.yaml > /openedx/config/cms.env.yml"
                             ],
                             volume_mounts=cms_edxapp_init_volume_mounts,
-                        )
+                        ),
                     ],
                     containers=[
                         kubernetes.core.v1.ContainerArgs(
                             name="cms-edxapp",
-                            # command=["/bin/sh", "-c", "sleep infinity"],
-                            # image="busybox:1.35",
-                            image="610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/edxapp:master-mitxonline-36327ff",
+                            image=edxapp_image,
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="SERVICE_VARIANT", value="cms"
@@ -300,6 +366,11 @@ def create_k8s_resources(
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="UWSGI_WORKERS", value="2"
                                 ),
+                            ],
+                            ports=[
+                                kubernetes.core.v1.ContainerPortArgs(
+                                    container_port=8000, name="http"
+                                )
                             ],
                             volume_mounts=[
                                 kubernetes.core.v1.VolumeMountArgs(
@@ -323,6 +394,7 @@ def create_k8s_resources(
                                     mount_path="/openedx/edx-platform/uwsgi.ini",
                                     sub_path="uwsgi.ini",
                                 ),
+                                *staticfiles_volume_mounts,
                             ],
                         )
                     ],
@@ -331,6 +403,26 @@ def create_k8s_resources(
         ),
         opts=pulumi.ResourceOptions(
             depends_on=list(cms_edxapp_config_sources.values())
+        ),
+    )
+    cms_service = kubernetes.core.v1.Service(
+        f"ol-{stack_info.env_prefix}-edxapp-cms-service-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=cms_deployment_name,
+            namespace=namespace,
+            labels=cms_labels,
+        ),
+        spec=kubernetes.core.v1.ServiceSpecArgs(
+            ports=[
+                kubernetes.core.v1.ServicePortArgs(
+                    port=8000,
+                    # 'http' is the name of the port in the deployment podspec
+                    target_port="http",
+                    protocol="TCP",
+                )
+            ],
+            selector=cms_labels,
+            type="ClusterIP",
         ),
     )
 
@@ -420,6 +512,7 @@ def create_k8s_resources(
             ),
         )
     )
+    lms_edxapp_volumes.extend(staticfiles_volumes)
 
     # Define the volume mounts for the init container that aggregates the config files
     lms_edxapp_init_volume_mounts = [
@@ -457,6 +550,7 @@ def create_k8s_resources(
                     service_account_name=vault_k8s_resources.service_account_name,
                     volumes=lms_edxapp_volumes,
                     init_containers=[
+                        staticfiles_init_container,
                         kubernetes.core.v1.ContainerArgs(
                             name="config-aggregator",
                             image="busybox:1.35",
@@ -465,14 +559,12 @@ def create_k8s_resources(
                                 "cat /openedx/config-sources/*/*.yaml > /openedx/config/lms.env.yml"
                             ],
                             volume_mounts=lms_edxapp_init_volume_mounts,
-                        )
+                        ),
                     ],
                     containers=[
                         kubernetes.core.v1.ContainerArgs(
                             name="lms-edxapp",
-                            # image="busybox:1.35",
-                            # command=["/bin/sh", "-c", "sleep infinity"],
-                            image="610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/edxapp:master-mitxonline-36327ff",
+                            image=edxapp_image,
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="SERVICE_VARIANT", value="lms"
@@ -484,6 +576,11 @@ def create_k8s_resources(
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="UWSGI_WORKERS", value="2"
                                 ),
+                            ],
+                            ports=[
+                                kubernetes.core.v1.ContainerPortArgs(
+                                    container_port=8000, name="http"
+                                )
                             ],
                             volume_mounts=[
                                 kubernetes.core.v1.VolumeMountArgs(
@@ -507,6 +604,7 @@ def create_k8s_resources(
                                     mount_path="/openedx/edx-platform/uwsgi.ini",
                                     sub_path="uwsgi.ini",
                                 ),
+                                *staticfiles_volume_mounts,
                             ],
                         )
                     ],
@@ -516,6 +614,60 @@ def create_k8s_resources(
         opts=pulumi.ResourceOptions(
             depends_on=list(lms_edxapp_config_sources.values())
         ),
+    )
+    lms_service = kubernetes.core.v1.Service(
+        f"ol-{stack_info.env_prefix}-edxapp-lms-service-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=lms_deployment_name,
+            namespace=namespace,
+            labels=lms_labels,
+        ),
+        spec=kubernetes.core.v1.ServiceSpecArgs(
+            ports=[
+                kubernetes.core.v1.ServicePortArgs(
+                    name="http",
+                    port=8000,
+                    target_port="http",
+                    protocol="TCP",
+                )
+            ],
+            selector=lms_labels,
+            type="ClusterIP",
+        ),
+    )
+
+    tls_secret_name = "shared-backend-tls-pair"  # noqa: S105  # pragma: allowlist secret
+    cert_manager_certificate = OLCertManagerCert(
+        f"ol-{stack_info.env_prefix}-edxapp-tls-cert-{stack_info.env_suffix}",
+        cert_config=OLCertManagerCertConfig(
+            application_name="edxapp",
+            k8s_namespace=namespace,
+            k8s_labels=k8s_global_labels,
+            create_apisixtls_resource=True,
+            dest_secret_name=tls_secret_name,
+            dns_names=[
+                edxapp_config.require("backend_lms_domain"),
+                edxapp_config.require("backend_studio_domain"),
+                edxapp_config.require("backend_preview_domain"),
+            ],
+        ),
+    )
+
+    lms_apisixroute = OLApisixRoute(
+        name=f"ol-{stack_info.env_prefix}-edxapp-lms-apisix-route-{stack_info.env_suffix}",
+        k8s_namespace=namespace,
+        k8s_labels=k8s_global_labels,
+        route_configs=[
+            OLApisixRouteConfig(
+                route_name="default",
+                priority=0,
+                plugins=[],
+                hosts=[edxapp_config.require("backend_lms_domain")],
+                paths=["/"],
+                backend_service_name=lms_deployment_name,
+                backend_service_port="http",
+            )
+        ],
     )
 
     return {

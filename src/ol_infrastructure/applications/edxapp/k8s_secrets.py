@@ -2,7 +2,7 @@
 import textwrap
 from dataclasses import dataclass
 
-from pulumi import Config, Output, ResourceOptions
+from pulumi import Config, Output, ResourceOptions, StackReference
 
 from ol_infrastructure.components.aws.cache import OLAmazonCache
 from ol_infrastructure.components.aws.database import OLAmazonDB
@@ -39,13 +39,14 @@ class EdxappSecrets:
 
 
 def create_k8s_secrets(
-    stack_info: StackInfo,
-    namespace: str,
-    k8s_global_labels: dict[str, str],
-    vault_k8s_resources: OLVaultK8SResources,
-    edxapp_db: OLAmazonDB,
     edxapp_cache: OLAmazonCache,
     edxapp_config: Config,
+    edxapp_db: OLAmazonDB,
+    k8s_global_labels: dict[str, str],
+    mongodb_atlas_stack: StackReference,
+    namespace: str,
+    stack_info: StackInfo,
+    vault_k8s_resources: OLVaultK8SResources,
 ) -> EdxappSecrets:
     """Create all the k8s secrets needed for edxapp."""
     db_creds_secret_name = "00-database-credentials-yaml"  # pragma: allowlist secret
@@ -133,33 +134,40 @@ def create_k8s_secrets(
     mongo_db_creds_secret_name = (
         "02-mongodb-credentials-yaml"  # pragma: allowlist secret
     )
-    mongo_db_creds_secret = OLVaultK8SSecret(
-        f"ol-{stack_info.env_prefix}-edxapp-mongo-db-creds-secret-{stack_info.env_suffix}",
-        OLVaultK8SStaticSecretConfig(
-            name=mongo_db_creds_secret_name,
-            namespace=namespace,
-            dest_secret_labels=k8s_global_labels,
-            dest_secret_name=mongo_db_creds_secret_name,
-            labels=k8s_global_labels,
-            mount=f"secret-{stack_info.env_prefix}",
-            mount_type="kv-v1",
-            path="mongodb-edxapp",
-            templates={
-                "02-mongo-db-credentials.yaml": textwrap.dedent("""
+    mongo_db_creds_secret = Output.all(
+        replica_set=mongodb_atlas_stack.require_output("atlas_cluster")["replica_set"],
+        host_string=mongodb_atlas_stack.require_output("atlas_cluster")[
+            "public_host_string"
+        ],
+    ).apply(
+        lambda mongodb: OLVaultK8SSecret(
+            f"ol-{stack_info.env_prefix}-edxapp-mongo-db-creds-secret-{stack_info.env_suffix}",
+            OLVaultK8SStaticSecretConfig(
+                name=mongo_db_creds_secret_name,
+                namespace=namespace,
+                dest_secret_labels=k8s_global_labels,
+                dest_secret_name=mongo_db_creds_secret_name,
+                labels=k8s_global_labels,
+                mount=f"secret-{stack_info.env_prefix}",
+                mount_type="kv-v1",
+                path="mongodb-edxapp",
+                templates={
+                    "02-mongo-db-credentials.yaml": textwrap.dedent(f"""
                     mongodb_settings: &mongo_params
                       authsource: admin
-                      host: null # TODO
+                      host: {mongodb["host_string"]}
                       port: 27017
                       db: edxapp
-                      replicaSet: null # TODO
+                      replicaSet: {mongodb["replica_set"]}
                       user: {{ get .Secrets "username" }}
                       password: {{ get .Secrets "password" }}
                       ssl: # TODO
                 """),
-            },
-            vaultauth=vault_k8s_resources.auth_name,
-        ),
-        opts=ResourceOptions(delete_before_replace=True),
+                },
+                vaultauth=vault_k8s_resources.auth_name,
+            ),
+            opts=ResourceOptions(delete_before_replace=True),
+        )
     )
 
     mongo_db_forum_secret_name = (
