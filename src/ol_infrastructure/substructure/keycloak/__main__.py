@@ -1534,6 +1534,7 @@ ol_apps_mit_org = keycloak.organization.Organization(
     enabled=True,
     name="MIT",
     alias="mit",
+    redirect_url=f"https://{keycloak_realm_config.require('learn_domain')}/dashboard/organization/mit",
     realm=ol_apps_realm.id,
 )
 

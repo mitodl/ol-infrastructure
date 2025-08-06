@@ -6,6 +6,7 @@ config:
   keycloak:client_secret:
     secure: v1:mbdWdrtlOrf/yMPw:4cu91sZzAKkYUkyxQBEtClJ49/uRp/f9nuW4uDakdRV7RW57Yf1EIqd71ovo0+TZ
   keycloak:url: https://sso.ol.mit.edu
+  keycloak_realm:learn_domain: learn.mit.edu
   keycloak_realm:captcha_secret_key:
     secure: v1:+2lwPPgixsEOH7Jm:YdY9hefdk89jlxKxSZ0zRDLR9KBur8s1b/RRtWLomgvlGuBQoE4KpVh/s+fl5lshzM+EN+VceaM=
   keycloak_realm:captcha_site_key:
