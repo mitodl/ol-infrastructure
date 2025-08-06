@@ -1299,7 +1299,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                             ),
                             "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags": ",".join(
                                 [
-                                    "f{k}={v}"
+                                    f"{k}={v}"
                                     for k, v in aws_config.merged_tags(
                                         {"Name": f"{cluster_name}-traefik"}
                                     ).items()
