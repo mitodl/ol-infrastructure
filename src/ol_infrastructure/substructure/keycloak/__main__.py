@@ -1,3 +1,5 @@
+"""Keycloak substructure definition."""
+
 import json
 import urllib.request
 from functools import partial
@@ -9,6 +11,11 @@ from pulumi import Config, Output, ResourceOptions
 from bridge.lib.magic_numbers import SECONDS_IN_ONE_DAY
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
+from ol_infrastructure.substructure.keycloak.org_flows import (
+    create_organization_browser_flows,
+    create_organization_first_broker_login_flows,
+    create_organization_scope,
+)
 
 env_config = Config("environment")
 stack_info = parse_stack()
@@ -19,6 +26,7 @@ setup_vault_provider()
 
 
 def fetch_realm_public_key(keycloak_url: str, realm_id: str) -> str:
+    """Fetch the public key for a given Keycloak realm."""
     with urllib.request.urlopen(f"{keycloak_url}/realms/{realm_id}/") as response:  # noqa: S310
         public_key_url_response = json.load(response)
     public_key = public_key_url_response["public_key"]
@@ -182,7 +190,7 @@ ol_apps_realm = keycloak.Realm(
     display_name_html="<b>MIT Learn</b>",
     enabled=True,
     email_theme="ol",
-    login_theme="ol",
+    login_theme="ol-learn",
     duplicate_emails_allowed=False,
     otp_policy=keycloak.RealmOtpPolicyArgs(
         algorithm="HmacSHA256",
@@ -586,6 +594,7 @@ olapps_unified_ecommerce_client_scope = keycloak.openid.ClientDefaultScopes(
         "roles",
         "web-origins",
         "ol-profile",
+        "organization",
     ],
 )
 olapps_unified_ecommerce_client_roles = keycloak_realm_config.get_object(
@@ -650,6 +659,7 @@ olapps_learn_ai_client_scope = keycloak.openid.ClientDefaultScopes(
         "roles",
         "web-origins",
         "ol-profile",
+        "organization",
     ],
 )
 olapps_learn_ai_client_roles = keycloak_realm_config.get_object(
@@ -716,6 +726,7 @@ if keycloak_realm_config.get("olapps-mitlearn-client-secret"):
             "roles",
             "web-origins",
             "ol-profile",
+            "organization",
         ],
     )
     olapps_mitlearn_client_roles = keycloak_realm_config.get_object(
@@ -1185,6 +1196,7 @@ ol_data_platform_openmetadata_client_data = vault.generic.Secret(
 # OL Data Platform Realm - Authentication Flows[START]
 # OL - browser flow [START]
 # username-form -> ol-auth-username-password-form
+
 ol_browser_data_platform_flow = keycloak.authentication.Flow(
     "ol-browser-data-platform-flow",
     realm_id=ol_data_platform_realm.id,
@@ -1415,61 +1427,8 @@ ol_data_platform_oidc_attribute_importer_identity_provider_mapper = (
 
 # OLAPPS REALM- First login flow [START]
 # Does not require email verification or confirmation to connect with existing account.
-ol_touchstone_first_login_flow = keycloak.authentication.Flow(
-    "ol-touchstone-first-login-flow",
-    realm_id=ol_apps_realm.id,
-    alias="ol-first-login-flow",
-    opts=resource_options,
-)
-ol_touchstone_first_login_flow_review_profile = keycloak.authentication.Execution(
-    "ol-touchstone-first-login-flow-review-profile",
-    realm_id=ol_apps_realm.id,
-    parent_flow_alias=ol_touchstone_first_login_flow.alias,
-    authenticator="idp-review-profile",
-    requirement="REQUIRED",
-    opts=resource_options,
-)
-ol_touchstone_first_login_review_profile_config = (
-    keycloak.authentication.ExecutionConfig(
-        "ol-touchstone-first-login-review-profile-config",
-        realm_id=ol_apps_realm.id,
-        execution_id=ol_touchstone_first_login_flow_review_profile.id,
-        alias="review-profile-config",
-        config={
-            "updateProfileOnFirstLogin": "missing",
-        },
-        opts=resource_options,
-    )
-)
-ol_touchstone_user_creation_or_linking_subflow = keycloak.authentication.Subflow(
-    "ol-touchstone-user-creation-or-linking-subflow",
-    realm_id=ol_apps_realm.id,
-    alias="ol-touchstone-first-broker-login-user-creation-or-linking",
-    parent_flow_alias=ol_touchstone_first_login_flow.alias,
-    provider_id="basic-flow",
-    requirement="REQUIRED",
-    opts=resource_options,
-)
-ol_touchstone_user_creation_or_linking_subflow_create_user_if_unique_step = (
-    keycloak.authentication.Execution(
-        "ol-touchstone-create-user-if-unique",
-        realm_id=ol_apps_realm.id,
-        parent_flow_alias=ol_touchstone_user_creation_or_linking_subflow.alias,
-        authenticator="idp-create-user-if-unique",
-        requirement="ALTERNATIVE",
-        opts=resource_options,
-    )
-)
-ol_touchstone_user_creation_or_linking_subflow_automatically_set_existing_user_step = keycloak.authentication.Execution(  # noqa: E501
-    "ol-touchstone-automatically-set-existing-user",
-    realm_id=ol_apps_realm.id,
-    parent_flow_alias=ol_touchstone_user_creation_or_linking_subflow.alias,
-    authenticator="idp-auto-link",
-    requirement="ALTERNATIVE",
-    opts=ResourceOptions(
-        provider=keycloak_provider,
-        depends_on=ol_touchstone_user_creation_or_linking_subflow_create_user_if_unique_step,
-    ),
+ol_first_login_flow = create_organization_first_broker_login_flows(
+    ol_apps_realm.id, "olapps", opts=resource_options
 )
 # OL - First login flow [END]
 
@@ -1548,58 +1507,37 @@ ol_registration_flow_binding = keycloak.authentication.Bindings(
 
 # OL - browser flow [START]
 # username-form -> ol-auth-username-password-form
-ol_browser_flow = keycloak.authentication.Flow(
-    "ol-browser",
-    realm_id=ol_apps_realm.id,
-    alias="ol-browser",
-    opts=resource_options,
-)
-ol_browser_cookie = keycloak.authentication.Execution(
-    "auth-cookie",
-    realm_id=ol_apps_realm.id,
-    parent_flow_alias=ol_browser_flow.alias,
-    authenticator="auth-cookie",
-    requirement="ALTERNATIVE",
-    opts=resource_options,
-)
-ol_browser_flow_forms = keycloak.authentication.Subflow(
-    "ol-browser-forms",
-    realm_id=ol_apps_realm.id,
-    alias="ol-browser forms",
-    parent_flow_alias=ol_browser_flow.alias,
-    provider_id="basic-flow",
-    requirement="ALTERNATIVE",
-    opts=ResourceOptions(
-        provider=keycloak_provider,
-        depends_on=ol_browser_cookie,
-    ),
-)
-ol_browser_flow_username_form = keycloak.authentication.Execution(
-    "auth-username-form",
-    realm_id=ol_apps_realm.id,
-    parent_flow_alias=ol_browser_flow_forms.alias,
-    authenticator="auth-username-form",
-    requirement="REQUIRED",
-    opts=resource_options,
-)
-ol_browser_flow_ol_auth_username_password_form = keycloak.authentication.Execution(
-    "auth-username-password-form",
-    realm_id=ol_apps_realm.id,
-    parent_flow_alias=ol_browser_flow_forms.alias,
-    authenticator="auth-username-password-form",
-    requirement="REQUIRED",
-    opts=resource_options,
+ol_browser_flow = create_organization_browser_flows(
+    ol_apps_realm.id, "olapps", opts=resource_options
 )
 # Bind the flow to the olapps realm for browser login.
-browser_authentication_binding = keycloak.authentication.Bindings(
-    "browserAuthenticationBinding",
+ol_apps_authentication_flow_binding = keycloak.authentication.Bindings(
+    "ol-apps-flow-bindings",
     realm_id=ol_apps_realm.id,
     browser_flow=ol_browser_flow.alias,
+    first_broker_login_flow=ol_first_login_flow.alias,
     opts=resource_options,
 )
 # OL - browser flow [END]
+# Ensure organization scope is present
+ol_apps_org_scope = create_organization_scope(
+    ol_apps_realm.id, "olapps", resource_options
+)
 
 # Touchstone SAML [START]
+ol_apps_mit_org = keycloak.organization.Organization(
+    "ol-apps-mit-organization",
+    opts=resource_options,
+    domains=[
+        keycloak.organization.OrganizationDomainArgs(name="mit.edu", verified=True)
+    ],
+    enabled=True,
+    name="MIT",
+    alias="mit",
+    redirect_url=f"https://{keycloak_realm_config.require('learn_domain')}/dashboard/organization/mit",
+    realm=ol_apps_realm.id,
+)
+
 ol_apps_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
     "touchstone-idp",
     realm=ol_apps_realm.id,
@@ -1619,8 +1557,12 @@ ol_apps_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
     want_assertions_encrypted=True,
     want_assertions_signed=True,
     opts=resource_options,
-    first_broker_login_flow_alias=ol_touchstone_first_login_flow.alias,
+    first_broker_login_flow_alias=ol_first_login_flow.alias,
+    org_domain="mit.edu",
+    organization_id=ol_apps_mit_org.id,
+    org_redirect_mode_email_matches=True,
 )
+
 oidc_attribute_importer_identity_provider_mapper = (
     keycloak.AttributeImporterIdentityProviderMapper(
         "map-touchstone-saml-email-attribute",
@@ -1703,7 +1645,7 @@ if stack_info.env_suffix in ["ci", "qa"]:
         want_assertions_encrypted=True,
         want_assertions_signed=True,
         opts=resource_options,
-        first_broker_login_flow_alias=ol_touchstone_first_login_flow.alias,
+        first_broker_login_flow_alias=ol_first_login_flow.alias,
         hide_on_login_page=False,
         gui_order="60",
     )
@@ -1768,7 +1710,7 @@ if stack_info.env_suffix in ["ci", "qa"]:
         post_binding_authn_request=True,
         force_authn=False,
         principal_type="SUBJECT",
-        first_broker_login_flow_alias=ol_touchstone_first_login_flow.alias,
+        first_broker_login_flow_alias=ol_first_login_flow.alias,
         opts=resource_options,
     )
     oidc_attribute_importer_identity_provider_mapper = (  # type: ignore[assignment]
