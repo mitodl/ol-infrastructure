@@ -27,7 +27,7 @@ const logo = <Logo imageUrl={configData.LOGO_URL} destinationUrl={configData.MAR
 
 let userMenu = [
   {
-    url: `${configData.MARKETING_SITE_BASE_URL}/dashboard`,
+    url: `${process.env.MIT_LEARN_BASE_URL}/dashboard`,
     title: linkTitles.dashboard,
   },
   {
