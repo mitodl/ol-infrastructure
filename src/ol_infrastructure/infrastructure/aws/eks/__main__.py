@@ -1018,8 +1018,8 @@ traefik_helm_release = kubernetes.helm.v3.Release(
             },
             "autoscaling": {
                 "enabled": True,
-                "minReplicas": eks_config.get("traefik_min_replicas") or 2,
-                "maxReplicas": eks_config.get("traefik_max_replicas") or 5,
+                "minReplicas": eks_config.get_int("traefik_min_replicas") or 2,
+                "maxReplicas": eks_config.get_int("traefik_max_replicas") or 5,
                 "metrics": [
                     {
                         "resource": {
