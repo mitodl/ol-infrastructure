@@ -1954,6 +1954,13 @@ aws_load_balancer_controller_service_account = kubernetes.core.v1.ServiceAccount
         },
     ),
     automount_service_account_token=True,
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=cluster,
+        depends_on=[
+            cluster,
+        ],
+    ),
 )
 
 aws_load_balancer_controller_policy = aws.iam.Policy(
