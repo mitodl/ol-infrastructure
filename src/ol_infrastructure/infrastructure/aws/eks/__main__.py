@@ -1117,7 +1117,7 @@ traefik_helm_release = kubernetes.helm.v3.Release(
                         lambda tvpc: ",".join(tvpc["k8s_public_subnet_ids"])
                     ),
                     "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags": ",".join(
-                        ["f{k}={v}" for k, v in aws_config.tags.items()]
+                        [f"{k}={v}" for k, v in aws_config.tags.items()]
                     ),
                 },
             },
@@ -1288,7 +1288,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                             "external-dns.alpha.kubernetes.io/hostname": ",".join(
                                 apisix_domains
                             ),
-                            "service.beta.kubernetes.io/aws-load-balancer-name": f"{cluster_name}-traefik",
+                            "service.beta.kubernetes.io/aws-load-balancer-name": f"{cluster_name}-apisix",
                             "service.beta.kubernetes.io/aws-load-balancer-type": "external",
                             "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
                             "service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
