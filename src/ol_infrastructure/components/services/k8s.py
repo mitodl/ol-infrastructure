@@ -8,9 +8,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import pulumi
-import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
-import pulumi_vault as vault
 from pulumi import ComponentResource, Output, ResourceOptions
 from pydantic import (
     BaseModel,
@@ -28,13 +26,11 @@ from bridge.lib.magic_numbers import (
     MAXIMUM_K8S_NAME_LENGTH,
 )
 from bridge.lib.versions import NGINX_VERSION
-from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import cached_image_uri
-from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
