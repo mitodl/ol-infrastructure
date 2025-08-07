@@ -12,7 +12,7 @@ config:
   eks:apisix_domains:
   - "airbyte.ol.mit.edu"
   eks:apisix_ingress_enabled: "true"
-  eks:apisix_min_replicas: "5"
+  eks:apisix_min_replicas: "3"
   eks:apisix_max_replicas: "10"
   eks:apisix_viewer_key:
     secure: v1:j5+aTOfRBG8QiV+V:C6NTWitDBjV4DkOQGApae7GHK9w1wOFAlS7ACNu/s728A5q1zDWv9E13E2hs0IlAtMnP17KJR0HZjxDlg5fckv2nguEVgNA/d90j1XWlFY8=
