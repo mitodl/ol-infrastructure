@@ -30,6 +30,7 @@ config:
   eks:namespaces:
   - "botkube"
   - "ecommerce"
+  - "jupyter"
   - "learn-ai"
   - "mitlearn"
   - "mitxonline"
