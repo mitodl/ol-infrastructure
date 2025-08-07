@@ -502,7 +502,7 @@ mitxonline_k8s_app = OLApplicationK8s(
                     ),
                 ),
             ),
-            # Scale up when avg usage exceeds: 1800 * 0.8 = 1440 MiB
+            # Scale up when avg usage exceeds: 1800 * 0.8 = 1440 Mi
             kubernetes.autoscaling.v2.MetricSpecArgs(
                 type="Resource",
                 resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
