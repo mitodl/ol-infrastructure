@@ -11,6 +11,7 @@ from string import Template
 import pulumi_consul as consul
 import pulumi_fastly as fastly
 import pulumi_github as github
+import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Alias, Config, InvokeOptions, ResourceOptions, StackReference, export
 from pulumi.output import Output
@@ -1366,8 +1367,6 @@ mitlearn_k8s_app = OLApplicationK8s(
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,  # Assuming Django app needs nginx
         import_uwsgi_config=True,  # Assuming Django app needs uwsgi
-        resource_requests={"cpu": "500m", "memory": "1600Mi"},
-        resource_limits={"cpu": "1000m", "memory": "1600Mi"},
         init_migrations=False,
         init_collectstatic=True,  # Assuming Django app needs collectstatic
         pre_deploy_commands=[("migrate", ["scripts/heroku-release-phase.sh"])],
@@ -1383,7 +1382,31 @@ mitlearn_k8s_app = OLApplicationK8s(
                 redis_password=redis_config.require("password"),
             ),
         ],
-        # Using default resource requests/limits for now
+        resource_requests={"cpu": "500m", "memory": "1800Mi"},
+        resource_limits={"cpu": "1000m", "memory": "1800Mi"},
+        hpa_scaling_metrics=[
+            kubernetes.autoscaling.v2.MetricSpecArgs(
+                type="Resource",
+                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                    name="cpu",
+                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                        type="Utilization",
+                        average_utilization=60,  # Target CPU utilization (60%)
+                    ),
+                ),
+            ),
+            # Scale up when avg usage exceeds: 1800 * 0.8 = 1440 Mi
+            kubernetes.autoscaling.v2.MetricSpecArgs(
+                type="Resource",
+                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                    name="memory",
+                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                        type="Utilization",
+                        average_utilization=80,  # Target memory utilization (80%)
+                    ),
+                ),
+            ),
+        ],
     ),
     opts=ResourceOptions(
         depends_on=[

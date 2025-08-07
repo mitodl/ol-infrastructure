@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 
+import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Alias, Config, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, iam, s3
@@ -471,8 +472,6 @@ mitxonline_k8s_app = OLApplicationK8s(
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,
         import_uwsgi_config=True,
-        resource_requests={"cpu": "500m", "memory": "512Mi"},
-        resource_limits={"cpu": "1000m", "memory": "1600Mi"},
         init_migrations=False,
         init_collectstatic=True,
         pre_deploy_commands=[
@@ -488,6 +487,31 @@ mitxonline_k8s_app = OLApplicationK8s(
                 queue_name="hubspot_sync",
                 redis_host=redis_cache.address,
                 redis_password=redis_config.require("password"),
+            ),
+        ],
+        resource_requests={"cpu": "500m", "memory": "1800Mi"},
+        resource_limits={"cpu": "1000m", "memory": "1800Mi"},
+        hpa_scaling_metrics=[
+            kubernetes.autoscaling.v2.MetricSpecArgs(
+                type="Resource",
+                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                    name="cpu",
+                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                        type="Utilization",
+                        average_utilization=60,  # Target CPU utilization (60%)
+                    ),
+                ),
+            ),
+            # Scale up when avg usage exceeds: 1800 * 0.8 = 1440 Mi
+            kubernetes.autoscaling.v2.MetricSpecArgs(
+                type="Resource",
+                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                    name="memory",
+                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                        type="Utilization",
+                        average_utilization=80,  # Target memory utilization (80%)
+                    ),
+                ),
             ),
         ],
     ),
