@@ -481,8 +481,8 @@ class OLApplicationK8s(ComponentResource):
                                 ],
                                 image_pull_policy="IfNotPresent",
                                 resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                                    requests=ol_app_k8s_config.resource_requests,
-                                    limits=ol_app_k8s_config.resource_limits,
+                                    requests={"cpu": "50m", "memory": "50Mi"},
+                                    limits={"cpu": "50m", "memory": "50Mi"},
                                 ),
                                 volume_mounts=nginx_volume_mounts,
                             ),
