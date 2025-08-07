@@ -2006,9 +2006,7 @@ aws_load_balancer_controller_release = kubernetes.helm.v3.Release(
                 "create": False,
                 "name": aws_lb_controller_service_account_name,
                 "annotations": {
-                    "eks.amazonaws.com/role-arn": aws_load_balancer_controller_role.role.arn.apply(
-                        lambda arn: f"{arn}"
-                    ),
+                    "eks.amazonaws.com/role-arn": aws_load_balancer_controller_role.role.arn,
                 },
             },
             "vpcId": target_vpc["id"],
