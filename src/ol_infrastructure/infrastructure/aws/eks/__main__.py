@@ -1108,7 +1108,7 @@ traefik_helm_release = kubernetes.helm.v3.Release(
                 # automatically and point at every traefik pod.
                 # Ref: https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.4/guide/service/annotations/#subnets
                 "annotations": {
-                    "service.beta.kubernetes.io/aws-load-balancer-name": f"{cluster_name}-apisix",
+                    "service.beta.kubernetes.io/aws-load-balancer-name": f"{cluster_name}-traefik",
                     "service.beta.kubernetes.io/aws-load-balancer-type": "external",
                     "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
                     "service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
