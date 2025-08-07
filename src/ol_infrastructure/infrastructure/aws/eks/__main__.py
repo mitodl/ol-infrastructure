@@ -1925,22 +1925,6 @@ aws_load_balancer_controller_policy_document = {
     ],
 }
 
-aws_load_balancer_controller_parliament_config = {
-    "UNKNOWN_FEDERATION_SOURCE": {"ignore_locations": [{"principal": "federated"}]},
-    "PERMISSIONS_MANAGEMENT_ACTIONS": {"ignore_locations": []},
-    "MALFORMED": {"ignore_locations": []},
-    "RESOURCE_STAR": {"ignore_locations": []},
-    "CREDENTIALS_EXPOSURE": {
-        "ignore_locations": [{"action": "cognito-idp:describeuserpoolclient"}]
-    },
-    "RESOURCE_MISMATCH": {
-        "ignore_locations": [
-            {"action": "elasticloadbalancing:AddTags"},
-            {"action": "elasticloadbalancing:RemoveTags"},
-        ]
-    },
-}
-
 aws_lb_controller_service_account_name = "aws-load-balancer-controller"
 
 aws_load_balancer_controller_role_config = OLEKSTrustRoleConfig(
