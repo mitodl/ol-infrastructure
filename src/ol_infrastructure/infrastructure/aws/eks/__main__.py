@@ -1108,19 +1108,16 @@ traefik_helm_release = kubernetes.helm.v3.Release(
                 # automatically and point at every traefik pod.
                 # Ref: https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.4/guide/service/annotations/#subnets
                 "annotations": {
-                    "service.beta.kubernetes.io/aws-load-balancer-type": "nlb",
+                    "service.beta.kubernetes.io/aws-load-balancer-name": f"{cluster_name}-apisix",
+                    "service.beta.kubernetes.io/aws-load-balancer-type": "external",
                     "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
+                    "service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
                     "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled": "true",
                     "service.beta.kubernetes.io/aws-load-balancer-subnets": target_vpc.apply(
                         lambda tvpc: ",".join(tvpc["k8s_public_subnet_ids"])
                     ),
                     "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags": ",".join(
-                        [
-                            "f{k}={v}"
-                            for k, v in aws_config.merged_tags(
-                                {"Name": f"{cluster_name}-traefik"}
-                            ).items()
-                        ]
+                        ["f{k}={v}" for k, v in aws_config.tags.items()]
                     ),
                 },
             },
@@ -1291,19 +1288,16 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                             "external-dns.alpha.kubernetes.io/hostname": ",".join(
                                 apisix_domains
                             ),
-                            "service.beta.kubernetes.io/aws-load-balancer-type": "nlb",
+                            "service.beta.kubernetes.io/aws-load-balancer-name": f"{cluster_name}-traefik",
+                            "service.beta.kubernetes.io/aws-load-balancer-type": "external",
                             "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
+                            "service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
                             "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled": "true",
                             "service.beta.kubernetes.io/aws-load-balancer-subnets": target_vpc.apply(
                                 lambda tvpc: ",".join(tvpc["k8s_public_subnet_ids"])
                             ),
                             "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags": ",".join(
-                                [
-                                    f"{k}={v}"
-                                    for k, v in aws_config.merged_tags(
-                                        {"Name": f"{cluster_name}-traefik"}
-                                    ).items()
-                                ]
+                                [f"{k}={v}" for k, v in aws_config.tags.items()]
                             ),
                         },
                         # Expose HTTP/HTTPS ports for gateway traffic as per traditional mode docs
