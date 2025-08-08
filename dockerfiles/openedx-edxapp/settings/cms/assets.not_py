@@ -19,7 +19,7 @@ DATABASES = {
     "default": {},
 }
 
-LMS_ROOT_URL = ''
+LMS_ROOT_URL = 'lms.example.com'
 
 derive_settings(__name__)
 
