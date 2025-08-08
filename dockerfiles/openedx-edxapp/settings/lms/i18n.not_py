@@ -14,5 +14,7 @@ DATABASES = {
 
 derive_settings(__name__)
 
+LMS_ROOT_URL = ''
+
 LOCALE_PATHS.append("/openedx/locale/contrib/locale")
 LOCALE_PATHS.append("/openedx/locale/user/locale")
