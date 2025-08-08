@@ -23,6 +23,7 @@ config:
       labels:
         ondemand: true
         node_size: r7a.xlarge
+        ol.mit.edu/core_node: true
       disk_size_gb: 500
       scaling:
         desired: 3

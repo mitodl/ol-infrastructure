@@ -44,6 +44,7 @@ config:
       labels:
         node_size: r7a.xlarge
         ondemand: true
+        ol.mit.edu/core_node: true
       node_group_options: {}
       scaling:
         desired: 3
