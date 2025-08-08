@@ -27,7 +27,7 @@ def create_ol_platform_engineering_realm(
         attributes={
             "business_unit": f"operations-{env_name}",
         },
-        display_name="OL PLatform Engineering",
+        display_name="OL Platform Engineering",
         display_name_html="<b>OL PLatform Engineering</b>",
         enabled=True,
         login_theme="keycloak",
