@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-jupyterhub-application
+runtime: python
+description: MIT OL JupyterHub Service
+backend:
+  url: s3://mitol-pulumi-state/

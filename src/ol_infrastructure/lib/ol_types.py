@@ -58,6 +58,7 @@ class Services(str, Enum):
     ecommerce = "unified-ecommerce"
     edxapp = "edxapp"
     keycloak = "keycloak"
+    jupyterhub = "jupyterhub"
     micromasters = "micromasters"
     mit_learn = "mit-learn"
     mit_open = "open"
