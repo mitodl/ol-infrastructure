@@ -7,7 +7,7 @@ import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions
 
 
-def create_ol_platform_engineering_realm(
+def create_ol_platform_engineering_realm(  # noqa: PLR0913
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     env_name: str,
@@ -44,7 +44,8 @@ def create_ol_platform_engineering_realm(
         reset_password_allowed=True,
         verify_email=True,
         password_policy=(  # noqa: S106 # pragma: allowlist secret
-            "length(30) and forceExpiredPasswordChange(365)  and notUsername and notEmail"
+            "length(30) and forceExpiredPasswordChange(365) "
+            "and notUsername and notEmail"
         ),
         security_defenses=keycloak.RealmSecurityDefensesArgs(
             brute_force_detection=keycloak.RealmSecurityDefensesBruteForceDetectionArgs(

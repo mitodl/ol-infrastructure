@@ -7,7 +7,7 @@ import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions
 
 
-def create_ol_data_platform_realm(
+def create_ol_data_platform_realm(  # noqa: PLR0913
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     env_name: str,
@@ -142,8 +142,8 @@ def create_ol_data_platform_realm(
         ),
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
-    ol_data_platform_superset_client_roles = keycloak_realm_config.get_object(
-        "ol-data-platform-superset-client-roles"
+    ol_data_platform_superset_client_roles = (
+        keycloak_realm_config.get_object("ol-data-platform-superset-client-roles") or []
     )
     ol_data_platform_superset_client_role_refs = {}
     for role in ol_data_platform_superset_client_roles:
@@ -271,8 +271,9 @@ def create_ol_data_platform_realm(
         ),
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
-    ol_data_platform_openmetadata_client_roles = keycloak_realm_config.get_object(
-        "ol-data-platform-openmetadata-client-roles"
+    ol_data_platform_openmetadata_client_roles = (
+        keycloak_realm_config.get_object("ol-data-platform-openmetadata-client-roles")
+        or []
     )
     for role in ol_data_platform_openmetadata_client_roles:
         keycloak.Role(
@@ -396,7 +397,9 @@ def create_ol_data_platform_realm(
     )
     # OL Data Platform - browser flow [END]
     # First login flow [START]
-    # Does not require email verification or confirmation to connect with existing account.
+
+    # Does not require email verification or confirmation to connect with existing
+    # account.
     ol_data_platform_touchstone_first_login_flow = keycloak.authentication.Flow(
         "ol-data-platform-touchstone-first-login-flow",
         realm_id=ol_data_platform_realm.id,
@@ -424,7 +427,7 @@ def create_ol_data_platform_realm(
         },
         opts=resource_options,
     )
-    ol_data_platform_touchstone_user_creation_or_linking_subflow = keycloak.authentication.Subflow(
+    ol_data_platform_touchstone_user_creation_or_linking_subflow = keycloak.authentication.Subflow(  # noqa: E501
         "ol-data-platform-touchstone-user-creation-or-linking-subflow",
         realm_id=ol_data_platform_realm.id,
         alias="ol-data-platform-touchstone-first-broker-login-user-creation-or-linking",

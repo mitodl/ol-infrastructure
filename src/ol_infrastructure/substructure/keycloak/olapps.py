@@ -14,7 +14,7 @@ from ol_infrastructure.substructure.keycloak.org_flows import (
 )
 
 
-def create_olapps_realm(
+def create_olapps_realm(  # noqa: PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     env_name: str,
@@ -324,8 +324,8 @@ def create_olapps_realm(
             "organization",
         ],
     )
-    olapps_unified_ecommerce_client_roles = keycloak_realm_config.get_object(
-        "olapps-unified-ecommerce-client-roles"
+    olapps_unified_ecommerce_client_roles = (
+        keycloak_realm_config.get_object("olapps-unified-ecommerce-client-roles") or []
     )
     for role in olapps_unified_ecommerce_client_roles:
         keycloak.Role(
@@ -389,8 +389,8 @@ def create_olapps_realm(
             "organization",
         ],
     )
-    olapps_learn_ai_client_roles = keycloak_realm_config.get_object(
-        "olapps-learn-ai-client-roles"
+    olapps_learn_ai_client_roles = (
+        keycloak_realm_config.get_object("olapps-learn-ai-client-roles") or []
     )
     for role in olapps_learn_ai_client_roles:
         keycloak.Role(
@@ -572,7 +572,9 @@ def create_olapps_realm(
     # MITXONLINE SCIM [END]
 
     # OLAPPS REALM- First login flow [START]
-    # Does not require email verification or confirmation to connect with existing account.
+
+    # Does not require email verification or confirmation to connect with existing
+    # account.
     ol_first_login_flow = create_organization_first_broker_login_flows(
         ol_apps_realm.id, "olapps", opts=resource_options
     )
