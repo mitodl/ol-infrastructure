@@ -74,7 +74,7 @@ def create_ol_platform_engineering_realm(
                 username=mit_email_username,
             ),
             from_="odl-devops@mit.edu",
-            from_display_name="Identity - OL PLatform Engineering",
+            from_display_name="Identity - OL Platform Engineering",
             host=mit_email_host,
             port="587",
             reply_to="odl-devops@mit.edu",
