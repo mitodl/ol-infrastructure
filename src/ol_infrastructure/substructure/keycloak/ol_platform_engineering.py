@@ -1,4 +1,5 @@
 """Keycloak realm definition for OL Platform Engineering."""
+
 import json
 
 import pulumi_keycloak as keycloak

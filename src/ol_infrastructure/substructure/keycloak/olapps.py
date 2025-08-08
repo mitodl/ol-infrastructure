@@ -1,4 +1,5 @@
 """Keycloak realm definition for OL applications."""
+
 import json
 
 import pulumi_keycloak as keycloak
@@ -633,50 +634,58 @@ def create_olapps_realm(
         org_redirect_mode_email_matches=True,
     )
 
-    keycloak.AttributeImporterIdentityProviderMapper(
-        "map-touchstone-saml-email-attribute",
-        realm=ol_apps_realm.id,
-        attribute_friendly_name="mail",
-        identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
-        user_attribute="email",
-        extra_config={
-            "syncMode": "INHERIT",
-        },
-        opts=resource_options,
-    ),
-    keycloak.AttributeImporterIdentityProviderMapper(
-        "map-touchstone-saml-last-name-attribute",
-        realm=ol_apps_realm.id,
-        attribute_friendly_name="sn",
-        identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
-        user_attribute="lastName",
-        extra_config={
-            "syncMode": "INHERIT",
-        },
-        opts=resource_options,
-    ),
-    keycloak.AttributeImporterIdentityProviderMapper(
-        "map-touchstone-saml-first-name-attribute",
-        realm=ol_apps_realm.id,
-        attribute_friendly_name="givenName",
-        identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
-        user_attribute="firstName",
-        extra_config={
-            "syncMode": "INHERIT",
-        },
-        opts=resource_options,
-    ),
-    keycloak.AttributeImporterIdentityProviderMapper(
-        "map-touchstone-saml-full-name-attribute",
-        realm=ol_apps_realm.id,
-        attribute_friendly_name="displayName",
-        identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
-        user_attribute="fullName",
-        extra_config={
-            "syncMode": "INHERIT",
-        },
-        opts=resource_options,
-    ),
+    (
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-touchstone-saml-email-attribute",
+            realm=ol_apps_realm.id,
+            attribute_friendly_name="mail",
+            identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+            user_attribute="email",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        ),
+    )
+    (
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-touchstone-saml-last-name-attribute",
+            realm=ol_apps_realm.id,
+            attribute_friendly_name="sn",
+            identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+            user_attribute="lastName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        ),
+    )
+    (
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-touchstone-saml-first-name-attribute",
+            realm=ol_apps_realm.id,
+            attribute_friendly_name="givenName",
+            identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+            user_attribute="firstName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        ),
+    )
+    (
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-touchstone-saml-full-name-attribute",
+            realm=ol_apps_realm.id,
+            attribute_friendly_name="displayName",
+            identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+            user_attribute="fullName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        ),
+    )
     keycloak.HardcodedAttributeIdentityProviderMapper(
         "map-touchstone-email-opt-in-attribute",
         name="email-opt-in-default",
@@ -721,28 +730,32 @@ def create_olapps_realm(
                 gui_order="60",
             )
         )
-        keycloak.AttributeImporterIdentityProviderMapper(
-            f"map-fake-touchstone-{stack_info.env_suffix}-saml-email-attribute",
-            realm=ol_apps_realm.id,
-            attribute_name="email",
-            identity_provider_alias=ol_apps_dev_fake_touchstone_ci_identity_provider.alias,
-            user_attribute="email",
-            extra_config={
-                "syncMode": "INHERIT",
-            },
-            opts=resource_options,
-        ),
-        keycloak.AttributeImporterIdentityProviderMapper(
-            f"map-fake-touchstone-{stack_info.env_suffix}-saml-last-name-attribute",
-            realm=ol_apps_realm.id,
-            attribute_name="sn",
-            identity_provider_alias=ol_apps_dev_fake_touchstone_ci_identity_provider.alias,
-            user_attribute="lastName",
-            extra_config={
-                "syncMode": "INHERIT",
-            },
-            opts=resource_options,
-        ),
+        (
+            keycloak.AttributeImporterIdentityProviderMapper(
+                f"map-fake-touchstone-{stack_info.env_suffix}-saml-email-attribute",
+                realm=ol_apps_realm.id,
+                attribute_name="email",
+                identity_provider_alias=ol_apps_dev_fake_touchstone_ci_identity_provider.alias,
+                user_attribute="email",
+                extra_config={
+                    "syncMode": "INHERIT",
+                },
+                opts=resource_options,
+            ),
+        )
+        (
+            keycloak.AttributeImporterIdentityProviderMapper(
+                f"map-fake-touchstone-{stack_info.env_suffix}-saml-last-name-attribute",
+                realm=ol_apps_realm.id,
+                attribute_name="sn",
+                identity_provider_alias=ol_apps_dev_fake_touchstone_ci_identity_provider.alias,
+                user_attribute="lastName",
+                extra_config={
+                    "syncMode": "INHERIT",
+                },
+                opts=resource_options,
+            ),
+        )
         keycloak.AttributeImporterIdentityProviderMapper(
             f"map-fake-touchstone-{stack_info.env_suffix}-saml-first-name-attribute",
             realm=ol_apps_realm.id,
@@ -783,28 +796,32 @@ def create_olapps_realm(
             first_broker_login_flow_alias=ol_first_login_flow.alias,
             opts=resource_options,
         )
-        keycloak.AttributeImporterIdentityProviderMapper(
-            "map-okta-email-attribute",
-            realm=ol_apps_realm.id,
-            attribute_name="email",
-            identity_provider_alias=ol_apps_okta_saml_identity_provider.alias,
-            user_attribute="email",
-            extra_config={
-                "syncMode": "INHERIT",
-            },
-            opts=resource_options,
-        ),
-        keycloak.AttributeImporterIdentityProviderMapper(
-            "map-okta-last-name-attribute",
-            realm=ol_apps_realm.id,
-            attribute_name="lastName",
-            identity_provider_alias=ol_apps_okta_saml_identity_provider.alias,
-            user_attribute="lastName",
-            extra_config={
-                "syncMode": "INHERIT",
-            },
-            opts=resource_options,
-        ),
+        (
+            keycloak.AttributeImporterIdentityProviderMapper(
+                "map-okta-email-attribute",
+                realm=ol_apps_realm.id,
+                attribute_name="email",
+                identity_provider_alias=ol_apps_okta_saml_identity_provider.alias,
+                user_attribute="email",
+                extra_config={
+                    "syncMode": "INHERIT",
+                },
+                opts=resource_options,
+            ),
+        )
+        (
+            keycloak.AttributeImporterIdentityProviderMapper(
+                "map-okta-last-name-attribute",
+                realm=ol_apps_realm.id,
+                attribute_name="lastName",
+                identity_provider_alias=ol_apps_okta_saml_identity_provider.alias,
+                user_attribute="lastName",
+                extra_config={
+                    "syncMode": "INHERIT",
+                },
+                opts=resource_options,
+            ),
+        )
         keycloak.AttributeImporterIdentityProviderMapper(
             "map-okta-first-name-attribute",
             realm=ol_apps_realm.id,
