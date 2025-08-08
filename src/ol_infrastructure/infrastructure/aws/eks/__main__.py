@@ -1223,7 +1223,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                     "autoscaling": {
                         "hpa": {
                             "enabled": True,
-                            "minReplicas": eks_config.get("apisix_min_replicas") or "2",
+                            "minReplicas": eks_config.get("apisix_min_replicas") or "3",
                             "maxReplicas": eks_config.get("apisix_max_replicas") or "5",
                             "targetCPU": "50",
                         },
