@@ -20,7 +20,7 @@ VAULT_VERSION = "1.20.1"
 # renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/helm-charts
 AIRBYTE_CHART_VERSION = "1.7.2"
 # renovate: datasource=docker depName=apisix packageName=registry-1.docker.io/bitnamicharts/apisix
-APISIX_CHART_VERSION = "5.1.0"
+APISIX_CHART_VERSION = "5.1.4"
 # renovate: datasource=helm depName=aws-load-balancer-controller packageName=eks/aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts
 AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION = "1.13.4"
 # renovate: datasource=helm depName=botkube packageName=botkube
