@@ -106,7 +106,6 @@ vault_k8s_resources = OLVaultK8SResources(
     ),
 )
 
-
 # Install the openmetadata helm chart
 # https://github.com/mitodl/ol-infrastructure/issues/2680
 jupyterhub_application = kubernetes.helm.v3.Release(
@@ -166,6 +165,9 @@ jupyterhub_application = kubernetes.helm.v3.Release(
                         "allowed_users": jupyterhub_config.get_object(
                             "allowed_users", default=[]
                         ),
+                    },
+                    "DummyAuthenticator": {
+                        "password": jupyterhub_config.require("shared_password"),
                     },
                     "JupyterHub": {
                         "authenticator_class": "dummy",
