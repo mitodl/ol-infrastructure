@@ -83,7 +83,7 @@ let learningMFEConfig = {
         },
       ]
     },
-    // The unit title slot includes navigation arrow buttons that aren’t needed, 
+    // The unit title slot includes navigation arrow buttons that aren’t needed,
     // so we render a custom unit title component instead.
     'org.openedx.frontend.learning.unit_title.v1': {
       plugins: [
@@ -114,7 +114,7 @@ let learningMFEConfig = {
       ]
     }
   },
-  
+
 };
 
 export default learningMFEConfig;
