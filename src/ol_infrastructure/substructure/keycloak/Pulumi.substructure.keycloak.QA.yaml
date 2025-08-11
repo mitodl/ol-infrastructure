@@ -64,6 +64,7 @@ config:
   keycloak_realm:ol-platform-engineering-vault-redirect-uris:
   - "https://vault-qa.odl.mit.edu/ui/vault/auth/oidc/oidc/callback"
   - "http://localhost:8250/oidc/callback"
+  keycloak_realm:ol-platform-engineering-jupyterhub-redirect-uris: ["https://qa.jupyterhub.ol.mit.edu/*"]
   keycloak_realm:ol-data-platform-superset-redirect-uris: ["https://bi-qa.ol.mit.edu/*"]
   keycloak_realm:ol-data-platform-superset-client-roles:
   - "superset_admin"
