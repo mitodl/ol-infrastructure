@@ -168,6 +168,47 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913
     )
     # AIRBYTE [END] # noqa: ERA001
 
+    # JUPYTERHUB [START] # noqa: ERA001
+    ol_platform_engineering_jupyterhub_client = keycloak.openid.Client(
+        "ol-platform-engineering-jupyterhub-client",
+        name="ol-platform-engineering-jupyterhub-client",
+        realm_id="ol-platform-engineering",
+        client_id="ol-jupyterhub-client",
+        client_secret=keycloak_realm_config.get(
+            "ol-platform-engineering-jupyterhub-client-secret"
+        ),
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        service_accounts_enabled=False,
+        valid_redirect_uris=keycloak_realm_config.get_object(
+            "ol-platform-engineering-jupyterhub-redirect-uris"
+        ),
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    vault.generic.Secret(
+        "ol-platform-engineering-jupyterhub-client-vault-oidc-credentials",
+        path="secret-operations/sso/jupyterhub",
+        data_json=Output.all(
+            url=ol_platform_engineering_jupyterhub_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
+            client_id=ol_platform_engineering_jupyterhub_client.client_id,
+            client_secret=ol_platform_engineering_jupyterhub_client.client_secret,
+            # This is included for the case where we are using traefik-forward-auth.
+            # It requires a random secret value to be present which is independent
+            # of the OAuth credentials.
+            secret=session_secret,
+            realm_id=ol_platform_engineering_jupyterhub_client.realm_id,
+            realm_name="ol-platform-engineering",
+            realm_public_key=ol_platform_engineering_jupyterhub_client.realm_id.apply(
+                lambda realm_id: fetch_realm_public_key_partial(realm_id)
+            ),
+        ).apply(json.dumps),
+    )
+    # JUPYTERHUB [END] # noqa: ERA001
+
     # DAGSTER [START] # noqa: ERA001
     ol_platform_engineering_dagster_client = keycloak.openid.Client(
         "ol-platform-engineering-dagster-client",
