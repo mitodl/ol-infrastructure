@@ -1,6 +1,9 @@
 # ruff: noqa: E501, ERA001
 
+from pathlib import Path
+
 import pulumi_kubernetes as kubernetes
+import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference
 from pulumi_aws import get_caller_identity
 
@@ -10,10 +13,16 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.k8s import (
+    OLApisixOIDCConfig,
+    OLApisixOIDCResources,
     OLApisixRoute,
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+)
+from ol_infrastructure.components.services.vault import (
+    OLVaultK8SResources,
+    OLVaultK8SResourcesConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
@@ -65,6 +74,38 @@ jupyterhub_namespace = "jupyter"
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(jupyterhub_namespace, ns)
 )
+
+# Create vault_k8s_resources to allow jupyter hub to access secrets in vault
+jupyterhub_vault_policy = vault.Policy(
+    f"ol-jupyterhub-vault-policy-{stack_info.env_suffix}",
+    name="jupyterhub",
+    policy=Path(__file__).parent.joinpath("jupyterhub_policy.hcl").read_text(),
+)
+
+jupyterhub_vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
+    f"ol-jupyterhub-vault-k8s-auth-backend-role-{stack_info.env_suffix}",
+    role_name="jupyterhub",
+    backend=cluster_stack.require_output("vault_auth_endpoint"),
+    bound_service_account_names=["*"],
+    bound_service_account_namespaces=[jupyterhub_namespace],
+    token_policies=[jupyterhub_vault_policy.name],
+)
+
+vault_k8s_resources = OLVaultK8SResources(
+    resource_config=OLVaultK8SResourcesConfig(
+        application_name="jupyterhub",
+        namespace=jupyterhub_namespace,
+        labels=k8s_global_labels,
+        vault_address=vault_config.require("address"),
+        vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+        vault_auth_role_name=jupyterhub_vault_k8s_auth_backend_role.role_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[jupyterhub_vault_k8s_auth_backend_role],
+    ),
+)
+
 
 # Install the openmetadata helm chart
 # https://github.com/mitodl/ol-infrastructure/issues/2680
@@ -125,9 +166,6 @@ jupyterhub_application = kubernetes.helm.v3.Release(
                         "allowed_users": jupyterhub_config.get_object(
                             "allowed_users", default=[]
                         ),
-                    },
-                    "DummyAuthenticator": {
-                        "password": jupyterhub_config.require("shared_password"),
                     },
                     "JupyterHub": {
                         "authenticator_class": "dummy",
@@ -220,6 +258,23 @@ cert_manager_certificate = OLCertManagerCert(
     ),
 )
 
+jupyterhub_oidc_resources = OLApisixOIDCResources(
+    f"ol-jupyter-hub-k8s-apisix-olapisixoidcresources-{stack_info.env_suffix}",
+    oidc_config=OLApisixOIDCConfig(
+        application_name="jupyterhub",
+        k8s_labels=application_labels,
+        k8s_namespace=jupyterhub_namespace,
+        oidc_logout_path="hub/logout",
+        oidc_post_logout_redirect_uri=f"https://{jupyterhub_domain}/hub/login",
+        oidc_session_cookie_lifetime=60 * 20160,
+        oidc_use_session_secret=True,
+        oidc_scope="openid email",
+        vault_mount="secret-operations",
+        vault_path="sso/jupyterhub",
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+)
+
 jupyterhub_apisix_route = OLApisixRoute(
     name=f"ol-jupyterhub-k8s-apisix-route-{stack_info.env_suffix}",
     k8s_namespace=jupyterhub_namespace,
@@ -229,6 +284,11 @@ jupyterhub_apisix_route = OLApisixRoute(
             route_name="jupyterhub",
             priority=0,
             shared_plugin_config_name=jupyterhub_shared_plugins.resource_name,
+            plugins=[
+                jupyterhub_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="auth"
+                ),
+            ],
             hosts=[jupyterhub_domain],
             paths=["/*"],
             backend_service_name="proxy-public",
