@@ -12,6 +12,7 @@ from ol_infrastructure.substructure.keycloak.org_flows import (
     create_organization_first_broker_login_flows,
     create_organization_scope,
 )
+from ol_infrastructure.substructure.keycloak.org_sso_helpers import onboard_saml_org
 
 
 def create_olapps_realm(  # noqa: PLR0913, PLR0915
@@ -596,7 +597,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     # OL - browser flow [END]
     # Ensure organization scope is present
     create_organization_scope(ol_apps_realm.id, "olapps", resource_options)
-
+    mitlearn_domain = keycloak_realm_config.require("learn_domain")
     # Touchstone SAML [START]
     ol_apps_mit_org = keycloak.organization.Organization(
         "ol-apps-mit-organization",
@@ -607,7 +608,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         name="MIT",
         alias="mit",
-        redirect_url=f"https://{keycloak_realm_config.require('learn_domain')}/dashboard/organization/mit",
+        redirect_url=f"https://{mitlearn_domain}/dashboard/organization/mit",
         realm=ol_apps_realm.id,
     )
 
@@ -702,6 +703,32 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         },
     )
     # Touchstone SAML [END]
+
+    # B2B Organizations [BEGIN]
+    if stack_info.env_suffix == "production":
+        onboard_saml_org(
+            org_domain="hhchealth.org",
+            org_name="Hartford Health Care",
+            org_alias="HHC",
+            org_saml_metadata_url="https://adfs.hhchealth.org/federationmetadata/2007-06/federationmetadata.xml",
+            keycloak_url=keycloak_url,
+            learn_domain=mitlearn_domain,
+            realm_id=ol_apps_realm.id,
+            first_login_flow=ol_first_login_flow,
+            resource_options=resource_options,
+        )
+        onboard_saml_org(
+            org_domain="ntua.gr",
+            org_name="National Technical University of Athens",
+            org_alias="NTUA",
+            org_saml_metadata_url="https://login.ntua.gr/idp/shibboleth",
+            keycloak_url=keycloak_url,
+            learn_domain=mitlearn_domain,
+            realm_id=ol_apps_realm.id,
+            first_login_flow=ol_first_login_flow,
+            resource_options=resource_options,
+        )
+    # B2B Organizations [END]
 
     if stack_info.env_suffix in ["ci", "qa"]:
         # OL-DEV-FAKE-TOUCHSTONE [START] # noqa: ERA001
