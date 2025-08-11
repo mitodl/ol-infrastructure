@@ -1,3 +1,6 @@
 ---
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAFxDPPQSGV7W2R/+sXnmfHVAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMH8ttUgQyw0c2jKKnAgEQgDsap8dcG9f+5SDTKTMMHaT2ZVqznzxEnjQq61lmxbHagVc0EhSxfeEZT7QFAl+A///dolj/K5RqBIr0Jg==
+config:
+  jupyterhub:shared_password:
+    secure: v1:utJI/U+DtdYl9Jwt:GWCMQMGxYW8eUPD4DLvyX+JmPfxkAFuwT/lzNmG9+ylC8lmzu2Fvs8L0wPIdHJ+gT373Afzg8j3TjYJZQXmX4GEzaMYL6SC88NrCvnK3cPs=
