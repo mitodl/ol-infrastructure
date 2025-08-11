@@ -54,7 +54,7 @@ config:
     secure: v1:xf9mFeIyIWLQbIYk:IY+XjdVmc6Va8WGTwrEN+t3jsyuJJ2b1fD83n2MiDSfUBNxeBoP1Xwd+KGskOLOX
   keycloak_realm:ol-platform-engineering-leek-redirect-uris: ["https://celery-monitoring-ci.odl.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-vault-redirect-uris: ["https://vault-ci.odl.mit.edu/ui/vault/auth/oidc/oidc/callback"]
-  keycloak_realm:ol-platform-engineering-jupyterhub-redirect-uris: ["https://ci.jupyterhub.ol.mit.edu/*"]
+  keycloak_realm:ol-platform-engineering-jupyterhub-redirect-uris: ["https://ci.jupyter.ol.mit.edu/*"]
   keycloak_realm:olapps-learn-ai-client-roles: ["https://api-learn-ai-ci.ol.mit.edu/*"]
   keycloak_realm:olapps-learn-ai-client-secret:
     secure: v1:hJQd4Gnpww6vFMI8:ScX791cNeXk1iWO0j/4uXMzfFivtTkhFWPCXkhJIbwIC/Jb5zaiFO591c25Ri64+
