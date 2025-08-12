@@ -634,6 +634,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         org_domain="mit.edu",
         organization_id=ol_apps_mit_org.id,
         org_redirect_mode_email_matches=True,
+        hide_on_login_page=True,
     )
 
     (
