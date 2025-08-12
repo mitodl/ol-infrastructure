@@ -2,6 +2,7 @@
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAFqnCOCAZSgyF1ZWf0UadNJAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMo8Vlyuwrp1ocOIPzAgEQgDtuHDo3PpUPnI8Ld39Bq5dR9m0mnxpqjeqfAWopoZssGhgjoG9CfYrqTNsw4qr8fHcnvtAHzJoKzyDD4w==
 config:
+  binderhub:domain: "ci.binder.ol.mit.edu"
   jupyterhub:domain: "ci.jupyter.ol.mit.edu"
   jupyterhub:admin_users:
   - "Ardiea"
