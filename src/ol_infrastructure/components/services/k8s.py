@@ -776,7 +776,7 @@ class OLApisixRouteConfig(BaseModel):
     hosts: list[str] = []
     paths: list[str] = []
     backend_service_name: str | None = None
-    backend_service_port: str | None = None
+    backend_service_port: str | NonNegativeInt | None = None
     # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_route/#service-resolution-granularity
     backend_resolve_granularity: Literal["endpoint", "service"] = "service"
     upstream: str | None = None
@@ -803,7 +803,7 @@ class OLApisixRouteConfig(BaseModel):
         """Ensure that either upstream or backend service details are provided, not both."""
         upstream: str | None = self.upstream
         backend_service_name: str | None = self.backend_service_name
-        backend_service_port: str | None = self.backend_service_port
+        backend_service_port: str | NonNegativeInt | None = self.backend_service_port
 
         if upstream is not None:
             if backend_service_name is not None or backend_service_port is not None:
