@@ -23,6 +23,7 @@ config:
   - "ci.mitxonline.mit.edu"
   - "api.ci.mitxonline.mit.edu"
   - "ci.jupyter.ol.mit.edu"
+  - "ci.binder.ol.mit.edu"
   eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
   eks:developer_role_kubernetes_groups: ["admin"]
   eks:developer_role_scope: "cluster"
