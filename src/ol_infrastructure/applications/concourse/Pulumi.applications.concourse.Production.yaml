@@ -63,7 +63,7 @@ config:
       max_instance_lifetime_seconds: 86400
     aws_tags:
       OU: operations
-    disk_size_gb: 100
+    disk_size_gb: 500
     iam_policies:
     - base
     - operations
