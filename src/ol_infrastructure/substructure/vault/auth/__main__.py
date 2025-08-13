@@ -3,9 +3,9 @@ from pathlib import Path
 
 from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import get_caller_identity, iam
-from pulumi_vault import AuthBackend, AuthBackendTuneArgs, Policy, aws, jwt
+from pulumi_vault import AuthBackend, AuthBackendTuneArgs, Policy, aws, github, jwt
 
-from bridge.lib.magic_numbers import EIGHT_HOURS_SECONDS
+from bridge.lib.magic_numbers import EIGHT_HOURS_SECONDS, ONE_MONTH_SECONDS
 from ol_infrastructure.lib.ol_types import AWSBase, Environment
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -46,6 +46,15 @@ for env in Environment:
         f"vault-aws-auth-backend-client-configuration-{env.value}",
         backend=vault_aws_auth.path,
     )
+
+vault_github_auth = github.AuthBackend(
+    "vault-github-auth-backend",
+    organization="mitodl",
+    description="GitHub Auth mount in a Vault server",
+    token_no_default_policy=True,
+    token_ttl=ONE_MONTH_SECONDS,
+    token_max_ttl=ONE_MONTH_SECONDS * 6,
+)
 
 # Enable OIDC auth method and configure it with Keycloak
 vault_oidc_keycloak_auth = jwt.AuthBackend(
