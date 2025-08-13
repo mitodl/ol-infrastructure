@@ -16,6 +16,7 @@ config:
     AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_PROMPT_CACHE_FUNCTION: "ai_chatbots.utils.get_django_cache"
+    CANVAS_TUTOR_DEMO_RUN_READABLE_IDS: ["14566-kaleba:20211202+canvas"]
     CELERY_TASK_ALWAYS_EAGER: "false"
     CSRF_ALLOWED_ORIGINS: '["https://learn-ai-ci.ol.mit.edu", "https://api-learn-ai-ci.ol.mit.edu"]'
     CSRF_TRUSTED_ORIGINS: '["https://learn-ai-ci.ol.mit.edu", "https://api-learn-ai-ci.ol.mit.edu"]'
@@ -31,6 +32,7 @@ config:
     NODE_ENV: "development"
     OPENTELEMETRY_ENABLED: "true"
     OPENTELEMETRY_ENDPOINT: "grafana-alloy.operations.svc.cluster.local:4317"
+    PROBLEM_SET_URL: https://api.rc.learn.mit.edu/api/v0/tutor/problems/
     SENTRY_LOG_LEVEL: "ERROR"
     SENTRY_PROFILES_SAMPLE_RATE: "0.1"
     SENTRY_TRACES_SAMPLE_RATE: "0.1"
