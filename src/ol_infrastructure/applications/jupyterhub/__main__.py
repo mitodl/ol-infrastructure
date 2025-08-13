@@ -170,7 +170,6 @@ binderhub_oidc_resources = OLApisixOIDCResources(
         vaultauth=vault_k8s_resources.auth_name,
     ),
 )
-
 apisix_route = OLApisixRoute(
     name=f"ol-jupyterhub-k8s-apisix-route-{stack_info.env_suffix}",
     k8s_namespace=namespace,
@@ -189,6 +188,7 @@ apisix_route = OLApisixRoute(
             paths=["/*"],
             backend_service_name="proxy-public",
             backend_service_port="http",
+            websocket=True,
         ),
         OLApisixRouteConfig(
             route_name="binderhub",
@@ -203,6 +203,7 @@ apisix_route = OLApisixRoute(
             paths=["/*"],
             backend_service_name="binder",
             backend_service_port=80,
+            websocket=True,
         ),
     ],
     opts=ResourceOptions(
@@ -285,6 +286,9 @@ binderhub_application = kubernetes.helm.v3.Release(
                 },
                 "hub": {
                     "config": {
+                        "BinderSpawner": {
+                            "auth_enabled": True,
+                        },
                         "Authenticator": {
                             "admin_users": jupyterhub_config.get_object(
                                 "admin_users", default=[]
@@ -338,6 +342,14 @@ binderhub_application = kubernetes.helm.v3.Release(
                     # Below is similar but not the same as k8s resource declarations.
                     # These are on a PER-USER-BASIS, so they can quickly grow with lots of
                     # users. Numbers are conservative to start with.
+                    "allowPrivilegeEscalation": True,
+                    "cmd": [
+                        "jupyterhub-singleuser",
+                    ],
+                    "startTimeout": 600,
+                    "networkPolicy": {
+                        "enabled": False,
+                    },
                     "memory": {
                         "limit": "1G",
                         "guarantee": "256M",
