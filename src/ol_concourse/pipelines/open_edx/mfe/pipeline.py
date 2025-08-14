@@ -168,7 +168,7 @@ def mfe_job(
     )
 
     translation_overrides = "\n".join(cmd for cmd in mfe.translation_overrides or [])
-    if previous_job and mfe_repo.name == previous_job.plan[0].get:
+    if previous_job:
         clone_mfe_repo.passed = [previous_job.name]
         clone_mfe_configs.passed = [previous_job.name]
 
@@ -179,7 +179,6 @@ def mfe_job(
         gh_issue_trigger_step = GetStep(
             get=github_issue_resource_name_for_trigger,
             trigger=True,
-            passed=[previous_job.name] if previous_job else None,
         )
         mfe_setup_plan.append(gh_issue_trigger_step)
 
