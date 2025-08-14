@@ -310,7 +310,9 @@ def mfe_job(
     # GitHub Issue resource for success notification
     gh_issues_post = github_issues(
         auth_method="token",
-        name=Identifier(f"github-issues-{mfe_name}-{open_edx.environment_stage}-post"),
+        name=Identifier(
+            f"github-issues-{mfe_name}-{open_edx.environment_stage.lower()}-post"
+        ),
         repository=GH_ISSUES_DEFAULT_REPOSITORY,
         issue_title_template=(
             f"[bot] MFE {mfe_name} deployed to {open_edx.environment_stage} "
@@ -400,7 +402,7 @@ def mfe_pipeline(
             gh_issues_trigger = github_issues(
                 auth_method="token",
                 name=Identifier(
-                    f"github-issues-{mfe_app_name}-{edx_var.environment_stage}-trigger"
+                    f"github-issues-{mfe_app_name}-{edx_var.environment_stage.lower()}-trigger"
                 ),
                 repository=GH_ISSUES_DEFAULT_REPOSITORY,
                 issue_title_template=(
