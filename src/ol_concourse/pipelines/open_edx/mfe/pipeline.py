@@ -396,13 +396,29 @@ def mfe_pipeline(
                 prev_job,
                 github_issue_resource_name_for_trigger=github_issue_trigger_name,
             )
+            # The trigger resource for the next stage of the deployment pipeline.
+            gh_issues_trigger = github_issues(
+                auth_method="token",
+                name=Identifier(
+                    f"github-issues-{mfe_app_name}-{edx_var.environment_stage}-trigger"
+                ),
+                repository=GH_ISSUES_DEFAULT_REPOSITORY,
+                issue_title_template=(
+                    f"[bot] MFE {mfe_app_name} deployed to {edx_var.environment_stage} "
+                    f"for {deployment.deployment_name}"
+                ),
+                issue_prefix=(
+                    f"[bot] MFE {mfe_app_name} deployed to {edx_var.environment_stage} "
+                    f"for {deployment.deployment_name}"
+                ),
+                issue_state="closed",
+            )
+            mfe_fragment.resources.append(gh_issues_trigger)
             fragments[mfe_app_name].append(mfe_fragment)
 
             # Update the last GitHub issue resource name for this MFE for the next
             # environment
-            last_gh_issue_resource_name_per_mfe[mfe_app_name] = Identifier(
-                f"github-issues-{mfe_app_name}-{edx_var.environment_stage}-post"
-            )
+            last_gh_issue_resource_name_per_mfe[mfe_app_name] = gh_issues_trigger.name
 
     combined_fragments = PipelineFragment.combine_fragments(
         *chain.from_iterable(fragments.values()),
