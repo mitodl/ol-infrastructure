@@ -1,3 +1,5 @@
+"""Concourse pipeline jobs for infrastructure provisioning and management."""
+
 from collections.abc import Iterable
 from copy import deepcopy
 from pathlib import Path
@@ -195,8 +197,10 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901, PLR0912
                 auth_method="token",
                 name=Identifier(f"github-issues-{stack_name.lower()}-post"),
                 repository=github_issue_repository or GH_ISSUES_DEFAULT_REPOSITORY,
-                issue_title_template=f"[bot] Pulumi {project_name} {stack_name} deployed.",  # noqa: E501
-                issue_prefix=f"[bot] Pulumi {project_name} {stack_name} deployed.",
+                issue_title_template=(
+                    f"[bot] Pulumi {project_name} {stack_name} deployed."
+                ),
+                issue_prefix=(f"[bot] Pulumi {project_name} {stack_name} deployed."),
                 issue_state="open",
             )
 
@@ -341,7 +345,10 @@ def pulumi_job(  # noqa: PLR0913
                     inputs=[Input(name=pulumi_code.name)],
                     outputs=[aws_creds_path],
                     run=Command(
-                        path=f"{pulumi_code.name}/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh"
+                        path=(
+                            f"{pulumi_code.name}/pipelines/infrastructure/scripts/"
+                            "generate_aws_config_from_instance_profile.sh"
+                        )
                     ),
                 ),
             ),

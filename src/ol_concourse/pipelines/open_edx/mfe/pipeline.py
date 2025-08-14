@@ -1,11 +1,14 @@
+"""Concourse pipeline for building and deploying Open edX Micro-Frontends (MFEs)."""
+
 import sys
 import textwrap
 from collections import defaultdict
-from itertools import chain, product
+from itertools import chain
 from typing import Literal
 
 from pydantic import BaseModel
 
+from bridge.settings.github.team_members import DEVOPS_MIT
 from bridge.settings.openedx.accessors import fetch_applications_by_type
 from bridge.settings.openedx.types import (
     DeploymentEnvRelease,
@@ -32,11 +35,14 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from ol_concourse.lib.resource_types import rclone
-from ol_concourse.lib.resources import git_repo
+from ol_concourse.lib.resource_types import github_issues_resource, rclone
+from ol_concourse.lib.resources import git_repo, github_issues
+from ol_concourse.pipelines.constants import GH_ISSUES_DEFAULT_REPOSITORY
 
 
 class OpenEdxVars(BaseModel):
+    """Open edX environment variables for MFE configuration."""
+
     about_us_url: str | None = None
     accessibility_url: str | None = None
     account_settings_url: str | None = None
@@ -68,6 +74,7 @@ class OpenEdxVars(BaseModel):
 
     @property
     def release_name(self) -> OpenEdxSupportedRelease:
+        """Return the Open edX release name for the current environment stage."""
         return OpenLearningOpenEdxDeployment.get_item(
             self.deployment_name
         ).release_by_env(self.environment_stage)
@@ -76,6 +83,7 @@ class OpenEdxVars(BaseModel):
 def mfe_params(
     open_edx: OpenEdxVars, mfe: OpenEdxApplicationVersion
 ) -> dict[str, str | None]:
+    """Generate MFE-specific parameters for the build process."""
     learning_mfe_path = OpenEdxMicroFrontend.learn.path
     discussion_mfe_path = OpenEdxMicroFrontend.discussion.path
     return {
@@ -91,7 +99,9 @@ def mfe_params(
         "CSRF_TOKEN_API_PATH": "/csrf/api/v1/token",
         "DISPLAY_FEEDBACK_WIDGET": open_edx.display_feedback_widget,
         "ENABLE_CERTIFICATE_PAGE": open_edx.enable_certificate_page,
-        "DISCUSSIONS_MFE_BASE_URL": f"https://{open_edx.lms_domain}/{discussion_mfe_path}",
+        "DISCUSSIONS_MFE_BASE_URL": (
+            f"https://{open_edx.lms_domain}/{discussion_mfe_path}"
+        ),
         "FAVICON_URL": open_edx.favicon_url,
         "HONOR_CODE_URL": open_edx.honor_code_url,
         "LANGUAGE_PREFERENCE_COOKIE_NAME": (
@@ -120,7 +130,9 @@ def mfe_params(
         "TERMS_OF_SERVICE_URL": open_edx.terms_of_service_url,
         "TRADEMARK_TEXT": open_edx.trademark_text,
         "USER_INFO_COOKIE_NAME": f"{open_edx.environment}-edx-user-info",
-        "ENABLE_VIDEO_UPLOAD_PAGE_LINK_IN_CONTENT_DROPDOWN": open_edx.enable_video_upload_page_link_in_content_dropdown,  # noqa: E501
+        "ENABLE_VIDEO_UPLOAD_PAGE_LINK_IN_CONTENT_DROPDOWN": (
+            open_edx.enable_video_upload_page_link_in_content_dropdown
+        ),
         "PARAGON_THEME_URLS": "{}",
     }
 
@@ -130,7 +142,9 @@ def mfe_job(
     mfe: OpenEdxApplicationVersion,
     open_edx_deployment: DeploymentEnvRelease,
     previous_job: Job | None = None,
+    github_issue_resource_name_for_trigger: Identifier | None = None,
 ) -> PipelineFragment:
+    """Generate a Concourse job for building and deploying a single MFE."""
     mfe_name = mfe.application.value
     mfe_repo = git_repo(
         name=Identifier(f"mfe-app-{mfe_name}"),
@@ -158,8 +172,18 @@ def mfe_job(
         clone_mfe_repo.passed = [previous_job.name]
         clone_mfe_configs.passed = [previous_job.name]
 
+    mfe_setup_plan = [clone_mfe_repo, clone_mfe_configs]
+
+    # Add GitHub issue trigger if provided
+    if github_issue_resource_name_for_trigger:
+        gh_issue_trigger_step = GetStep(
+            get=github_issue_resource_name_for_trigger,
+            trigger=True,
+            passed=[previous_job.name] if previous_job else None,
+        )
+        mfe_setup_plan.append(gh_issue_trigger_step)
+
     mfe_build_dir = Output(name=Identifier("mfe-build"))
-    mfe_setup_plan = [clone_mfe_repo]
 
     slot_config_file = f"{open_edx_deployment.deployment_name}/common-mfe-config"
     copy_common_config = ""
@@ -204,8 +228,7 @@ def mfe_job(
     # Join all commands with newlines
     mfe_setup_command = textwrap.dedent("\n".join(mfe_setup_steps))
 
-    mfe_setup_plan += [
-        clone_mfe_configs,
+    mfe_setup_plan.append(
         TaskStep(
             task=Identifier("merge-mfe-and-configs"),
             config=TaskConfig(
@@ -222,7 +245,7 @@ def mfe_job(
                 ),
             ),
         ),
-    ]
+    )
 
     mfe_build_plan = [
         TaskStep(
@@ -253,15 +276,15 @@ def mfe_job(
                         # Ensure that webpack is installed (TMM 2023-06-27)
                         textwrap.dedent(
                             f"""\
-                                apt-get update
-                                apt-get install -q -y python3 python-is-python3 build-essential git
-                                npm install
-                                npm install -g @edx/openedx-atlas
-                                {translation_overrides}
-                                {mfe_smoot_design_overrides}
-                                npm install webpack
-                                NODE_ENV=production npm run build
-                                """  # noqa: E501
+                            apt-get update
+                            apt-get install -q -y python3 python-is-python3 build-essential git
+                            npm install
+                            npm install -g @edx/openedx-atlas
+                            {translation_overrides}
+                            {mfe_smoot_design_overrides}
+                            npm install webpack
+                            NODE_ENV=production npm run build
+                            """  # noqa: E501
                         ),
                     ],
                 ),
@@ -274,25 +297,67 @@ def mfe_job(
                 "destination": [
                     {
                         "command": "sync",
-                        "dir": f"s3-remote:{open_edx.environment}-edxapp-mfe/{mfe.application.path}/",  # noqa: E501
+                        "dir": (
+                            f"s3-remote:{open_edx.environment}-edxapp-mfe/"
+                            f"{mfe.application.path}/"
+                        ),
                     }
                 ],
             },
         ),
     ]
 
+    # GitHub Issue resource for success notification
+    gh_issues_post = github_issues(
+        auth_method="token",
+        name=Identifier(f"github-issues-{mfe_name}-{open_edx.environment_stage}-post"),
+        repository=GH_ISSUES_DEFAULT_REPOSITORY,
+        issue_title_template=(
+            f"[bot] MFE {mfe_name} deployed to {open_edx.environment_stage} "
+            f"for {open_edx_deployment.deployment_name}"
+        ),
+        issue_prefix=(
+            f"[bot] MFE {mfe_name} deployed to {open_edx.environment_stage} "
+            f"for {open_edx_deployment.deployment_name}"
+        ),
+        issue_state="open",
+    )
+
+    default_github_issue_labels = [
+        "product:infrastructure",
+        "DevOps",
+        "pipeline-workflow",
+    ]
+    if open_edx.environment_stage.lower() == "ci":
+        default_github_issue_labels.append("promotion-to-qa")
+    elif open_edx.environment_stage.lower() == "qa":
+        default_github_issue_labels.append("promotion-to-production")
+    elif open_edx.environment_stage.lower() == "production":
+        default_github_issue_labels.append("finalized-deployment")
+    # PutStep to create the GitHub issue on success
+    create_gh_issue = PutStep(
+        put=gh_issues_post.name,
+        params={
+            "labels": default_github_issue_labels,
+            "assignees": DEVOPS_MIT,
+        },
+    )
+
     mfe_job_definition = Job(
         name=Identifier(f"compile-and-deploy-mfe-{mfe_name}-to-{open_edx.environment}"),
         plan=mfe_setup_plan + mfe_build_plan,
+        on_success=create_gh_issue,
     )
     return PipelineFragment(
-        resources=[mfe_repo, mfe_configs], jobs=[mfe_job_definition]
+        resources=[mfe_repo, mfe_configs, gh_issues_post],
+        jobs=[mfe_job_definition],
     )
 
 
 def mfe_pipeline(
     deployment_name: OpenEdxDeploymentName, release_name: OpenEdxSupportedRelease
 ) -> Pipeline:
+    """Generate a Concourse pipeline for building and deploying Open edX MFEs."""
     deployment = OpenLearningOpenEdxDeployment.get_item(deployment_name)
     mfes = fetch_applications_by_type(release_name, deployment_name, "MFE")
     fragments: dict[str, list[PipelineFragment]] = defaultdict(list)
@@ -302,18 +367,52 @@ def mfe_pipeline(
         for edx_var in deployments[deployment_name]
         if edx_var.environment_stage in deploy_envs
     ]
-    for edx_var, mfe in product(edx_vars, mfes):
-        try:
-            prev_job = fragments.get(mfe.application, [])[-1].jobs[0]
-        except IndexError:
+
+    # Sort edx_vars by environment_stage to ensure correct chaining order
+    # (e.g., dev -> qa -> prod)
+    sorted_edx_vars = sorted(
+        edx_vars, key=lambda x: deploy_envs.index(x.environment_stage)
+    )
+
+    last_gh_issue_resource_name_per_mfe: dict[str, Identifier | None] = defaultdict(
+        lambda: None
+    )
+
+    for edx_var in sorted_edx_vars:
+        for mfe in mfes:
+            mfe_app_name = mfe.application.value
             prev_job = None
-        mfe_fragment = mfe_job(edx_var, mfe, deployment, prev_job)
-        fragments[mfe.application].append(mfe_fragment)
+            github_issue_trigger_name = last_gh_issue_resource_name_per_mfe[
+                mfe_app_name
+            ]
+
+            if fragments.get(mfe_app_name):
+                prev_job = fragments[mfe_app_name][-1].jobs[0]
+
+            mfe_fragment = mfe_job(
+                edx_var,
+                mfe,
+                deployment,
+                prev_job,
+                github_issue_resource_name_for_trigger=github_issue_trigger_name,
+            )
+            fragments[mfe_app_name].append(mfe_fragment)
+
+            # Update the last GitHub issue resource name for this MFE for the next
+            # environment
+            last_gh_issue_resource_name_per_mfe[mfe_app_name] = Identifier(
+                f"github-issues-{mfe_app_name}-{edx_var.environment_stage}-post"
+            )
+
     combined_fragments = PipelineFragment.combine_fragments(
         *chain.from_iterable(fragments.values()),
     )
     return Pipeline(
-        resource_types=[rclone(), *combined_fragments.resource_types],
+        resource_types=[
+            rclone(),
+            github_issues_resource(),
+            *combined_fragments.resource_types,
+        ],
         resources=[
             Resource(
                 name=Identifier("mfe-app-bucket"),
