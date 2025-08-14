@@ -26,7 +26,7 @@ def onboard_saml_org(  # noqa: PLR0913
         opts=resource_options,
     )
 
-    keycloak.saml.IdentityProvider(
+    org_idp = keycloak.saml.IdentityProvider(
         f"ol-apps-{org_alias}-saml-idp",
         alias=f"{org_alias}",
         display_name=org_name,
@@ -44,4 +44,60 @@ def onboard_saml_org(  # noqa: PLR0913
         trust_email=True,
         validate_signature=True,
         opts=resource_options,
+    )
+    keycloak.AttributeImporterIdentityProviderMapper(
+        f"map-{org_alias}-saml-email-attribute",
+        realm=realm_id,
+        attribute_friendly_name="mail",
+        identity_provider_alias=org_idp.alias,
+        user_attribute="email",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
+    )
+    keycloak.AttributeImporterIdentityProviderMapper(
+        f"map-{org_alias}-saml-last-name-attribute",
+        realm=realm_id,
+        attribute_friendly_name="sn",
+        identity_provider_alias=org_idp.alias,
+        user_attribute="lastName",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
+    )
+    keycloak.AttributeImporterIdentityProviderMapper(
+        f"map-{org_alias}-saml-first-name-attribute",
+        realm=realm_id,
+        attribute_friendly_name="givenName",
+        identity_provider_alias=org_idp.alias,
+        user_attribute="firstName",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
+    )
+    keycloak.AttributeImporterIdentityProviderMapper(
+        f"map-{org_alias}-saml-full-name-attribute",
+        realm=realm_id,
+        attribute_friendly_name="displayName",
+        identity_provider_alias=org_idp.alias,
+        user_attribute="fullName",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
+    )
+    keycloak.HardcodedAttributeIdentityProviderMapper(
+        f"map-{org_alias}-email-opt-in-attribute",
+        name="email-opt-in-default",
+        realm=realm_id,
+        identity_provider_alias=org_idp.alias,
+        attribute_name="emailOptIn",
+        attribute_value="1",
+        user_session=False,
+        extra_config={
+            "syncMode": "INHERIT",
+        },
     )
