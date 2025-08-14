@@ -20,9 +20,10 @@ def onboard_saml_org(  # noqa: PLR0913
         ],
         enabled=True,
         name=org_name,
-        alias=org_alias,
-        redirect_url=f"https://{learn_domain}/dashboard/organization/{org_alias}",
+        alias=org_alias.lower(),
+        redirect_url=f"https://{learn_domain}/dashboard/organization/{org_alias.lower()}",
         realm=realm_id,
+        attributes={"slug": org_alias},
         opts=resource_options,
     )
 
