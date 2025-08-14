@@ -17,7 +17,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
 )
-from bridge.lib.versions import AIRBYTE_CHART_VERSION
+from bridge.lib.versions import AIRBYTE_CHART_VERSION, AIRBYTE_VERSION
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.eks import (
@@ -673,12 +673,14 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
         namespace=airbyte_namespace,
         cleanup_on_fail=True,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-            repo="https://airbytehq.github.io/helm-charts",
+            repo="https://airbytehq.github.io/charts",
         ),
         values={
+            "version": AIRBYTE_VERSION,
             "global": {
                 "image": {
-                    "registry": "610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub"
+                    "registry": "610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub",  # noqa: E501
+                    "tag": AIRBYTE_VERSION,
                 },
                 "airbyteUrl": f"https://{airbyte_config.require('web_host_domain')}",
                 "serviceAccountName": airbyte_service_account_name,
@@ -690,7 +692,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                     "userSecretKey": "DATABASE_USER",  # pragma: allowlist secret
                     "passwordSecretKey": "DATABASE_PASSWORD",  # pragma: allowlist secret  # noqa: E501
                     "host": db_address,
-                    "database": db_name,
+                    "name": db_name,
                     "port": DEFAULT_POSTGRES_PORT,
                     "jdbcUrl": connection_string,
                 },
@@ -707,7 +709,8 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                     },
                 },
                 "secretsManager": {
-                    "type": "awsSecretManager",
+                    "enabled": True,
+                    "type": "AWS_SECRET_MANAGER",
                     "awsSecretManager": {
                         "region": "us-east-1",
                         "authenticationType": "instanceProfile",
@@ -721,6 +724,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                     }
                 },
             },
+            "postgresql": {"enabled": False},
             "serviceAccount": {
                 "create": True,
                 "name": airbyte_service_account_name,
@@ -731,30 +735,16 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                 },
             },
             "webapp": {
-                "enabled": True,
-                "replicaCount": 1,
-                "podAnnotations": {},
-                "podLabels": k8s_global_labels,
-                "resources": default_resources_definition,
-                "ingress": {
-                    "enabled": False,
-                },
-            },
-            "pod-sweeper": {
-                "enabled": True,
-                "podLabels": k8s_global_labels,
-                "resources": default_resources_definition,
+                "enabled": False,
             },
             "server": {
                 "enabled": True,
                 "replicaCount": 2,
+                "deploymentStrategyType": "RollingUpdate",
                 "podLabels": k8s_global_labels,
                 "resources": default_resources_definition,
-                "log": {
-                    "level": "DEBUG",
-                },
+                "httpIdleTimeout": "20m",
                 "extraEnv": [  # How long to attempt new source schema discovery
-                    {"name": "HTTP_IDLE_TIMEOUT", "value": "20m"},
                     {"name": "READ_TIMEOUT", "value": "30m"},
                 ],
             },
@@ -764,7 +754,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                 "podLabels": k8s_global_labels,
                 "resources": default_resources_definition,
             },
-            "workload-launcher": {
+            "workloadLauncher": {
                 "enabled": True,
                 "replicaCount": 1,
                 "podLabels": k8s_global_labels,
@@ -773,7 +763,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
             "metrics": {
                 "enabled": False,
             },
-            "airbyte-bootloader": {
+            "airbyteBootloader": {
                 "enabled": True,
                 "podLabels": k8s_global_labels,
                 "resources": default_resources_definition,
@@ -786,12 +776,6 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                 "replicaCount": 1,
                 "podLabels": k8s_global_labels,
                 "resources": default_resources_definition,
-            },
-            "temporal-ui": {
-                "enabled": False,
-            },
-            "postgresql": {
-                "enabled": False,
             },
             "cron": {
                 "enabled": True,
@@ -876,9 +860,9 @@ gateway_config = OLEKSGatewayConfig(
         # Some of the info here is sourced from the helm chart
         # Calls to /v1/* get basic-auth in front of them
         OLEKSGatewayRouteConfig(
-            backend_service_name="airbyte-airbyte-webapp-svc",
+            backend_service_name="airbyte-airbyte-server-svc",
             backend_service_namespace=airbyte_namespace,
-            backend_service_port=80,
+            backend_service_port=8001,
             name="airbyte-https-v1",
             listener_name="https-api",
             hostnames=[airbyte_config.require("api_host_domain")],
@@ -904,9 +888,9 @@ gateway_config = OLEKSGatewayConfig(
         ),
         # All other calls get forward-auth
         OLEKSGatewayRouteConfig(
-            backend_service_name="airbyte-airbyte-webapp-svc",
+            backend_service_name="airbyte-airbyte-server-svc",
             backend_service_namespace=airbyte_namespace,
-            backend_service_port=80,
+            backend_service_port=8001,
             name="airbyte-https-root",
             listener_name="https-web",
             hostnames=[airbyte_config.require("web_host_domain")],
