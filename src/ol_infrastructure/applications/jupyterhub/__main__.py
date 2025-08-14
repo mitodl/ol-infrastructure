@@ -135,8 +135,8 @@ shared_cert_manager_certificate = OLCertManagerCert(
     ),
 )
 
-jupyterhub_oidc_resources = OLApisixOIDCResources(
-    f"ol-jupyterhub-k8s-apisix-olapisixoidcresources-{stack_info.env_suffix}",
+oidc_resources = OLApisixOIDCResources(
+    f"ol-k8s-apisix-olapisixoidcresources-{stack_info.env_suffix}",
     oidc_config=OLApisixOIDCConfig(
         application_name="jupyterhub",
         k8s_labels=application_labels,
@@ -153,23 +153,6 @@ jupyterhub_oidc_resources = OLApisixOIDCResources(
     ),
 )
 
-binderhub_oidc_resources = OLApisixOIDCResources(
-    f"ol-binderhub-k8s-apisix-olapisixoidcresources-{stack_info.env_suffix}",
-    oidc_config=OLApisixOIDCConfig(
-        application_name="binderhub",
-        k8s_labels=application_labels,
-        k8s_namespace=namespace,
-        oidc_logout_path="/logout",
-        # There is no hookied in logout so this doesn't matter ATM
-        oidc_post_logout_redirect_uri=f"https://{binderhub_domain}/",
-        oidc_session_cookie_lifetime=60 * 20160,
-        oidc_use_session_secret=True,
-        oidc_scope="openid email",
-        vault_mount="secret-operations",
-        vault_path="sso/jupyterhub",
-        vaultauth=vault_k8s_resources.auth_name,
-    ),
-)
 apisix_route = OLApisixRoute(
     name=f"ol-jupyterhub-k8s-apisix-route-{stack_info.env_suffix}",
     k8s_namespace=namespace,
@@ -180,9 +163,7 @@ apisix_route = OLApisixRoute(
             priority=0,
             shared_plugin_config_name=shared_apisix_plugins.resource_name,
             plugins=[
-                jupyterhub_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="auth"
-                ),
+                oidc_resources.get_full_oidc_plugin_config(unauth_action="auth"),
             ],
             hosts=[jupyterhub_domain],
             paths=["/*"],
@@ -195,9 +176,7 @@ apisix_route = OLApisixRoute(
             priority=1,
             shared_plugin_config_name=shared_apisix_plugins.resource_name,
             plugins=[
-                binderhub_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="auth"
-                ),
+                oidc_resources.get_full_oidc_plugin_config(unauth_action="auth"),
             ],
             hosts=[binderhub_domain],
             paths=["/*"],
@@ -297,9 +276,10 @@ binderhub_application = kubernetes.helm.v3.Release(
                                 "allowed_users", default=[]
                             ),
                         },
-                        "DummyAuthenticator": {
-                            "password": jupyterhub_config.require("shared_password"),
-                        },
+                        # Uncomment to set the password from config.
+                        # "DummyAuthenticator": {
+                        #     "password": jupyterhub_config.require("shared_password"),
+                        # },
                         "JupyterHub": {
                             "authenticator_class": "dummy",
                         },
