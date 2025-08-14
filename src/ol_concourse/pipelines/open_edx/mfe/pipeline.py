@@ -380,7 +380,7 @@ def mfe_pipeline(
         lambda: None
     )
 
-    for edx_var in sorted_edx_vars:
+    for index, edx_var in enumerate(sorted_edx_vars):
         for mfe in mfes:
             mfe_app_name = mfe.application.value
             prev_job = None
@@ -399,28 +399,28 @@ def mfe_pipeline(
                 github_issue_resource_name_for_trigger=github_issue_trigger_name,
             )
             # The trigger resource for the next stage of the deployment pipeline.
-            gh_issues_trigger = github_issues(
-                auth_method="token",
-                name=Identifier(
-                    f"github-issues-{mfe_app_name}-{edx_var.environment_stage.lower()}-trigger"
-                ),
-                repository=GH_ISSUES_DEFAULT_REPOSITORY,
-                issue_title_template=(
+            if index < len(sorted_edx_vars) - 1:
+                issue_title = (
                     f"[bot] MFE {mfe_app_name} deployed to {edx_var.environment_stage} "
                     f"for {deployment.deployment_name}"
-                ),
-                issue_prefix=(
-                    f"[bot] MFE {mfe_app_name} deployed to {edx_var.environment_stage} "
-                    f"for {deployment.deployment_name}"
-                ),
-                issue_state="closed",
-            )
-            mfe_fragment.resources.append(gh_issues_trigger)
+                )
+                gh_issues_trigger = github_issues(
+                    auth_method="token",
+                    name=Identifier(
+                        f"github-issues-{mfe_app_name}-{edx_var.environment_stage.lower()}-trigger"
+                    ),
+                    repository=GH_ISSUES_DEFAULT_REPOSITORY,
+                    issue_title_template=issue_title,
+                    issue_prefix=issue_title,
+                    issue_state="closed",
+                )
+                mfe_fragment.resources.append(gh_issues_trigger)
+                # Update the last GitHub issue resource name for this MFE for the next
+                # environment
+                last_gh_issue_resource_name_per_mfe[mfe_app_name] = (
+                    gh_issues_trigger.name
+                )
             fragments[mfe_app_name].append(mfe_fragment)
-
-            # Update the last GitHub issue resource name for this MFE for the next
-            # environment
-            last_gh_issue_resource_name_per_mfe[mfe_app_name] = gh_issues_trigger.name
 
     combined_fragments = PipelineFragment.combine_fragments(
         *chain.from_iterable(fragments.values()),
