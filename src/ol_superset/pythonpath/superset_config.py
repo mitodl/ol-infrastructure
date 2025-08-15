@@ -80,6 +80,7 @@ JWT_PUBLIC_KEY = oidc_creds["realm_public_key"]
 # https://superset.apache.org/docs/installation/configuring-superset#mapping-ldap-or-oauth-groups-to-superset-roles
 AUTH_ROLES_MAPPING = {
     "superset_admin": ["Admin"],
+    "superset_researcher": ["Alpha", "sql_lab"],
     "superset_alpha": ["Alpha"],
     "superset_gamma": ["Gamma"],
 }

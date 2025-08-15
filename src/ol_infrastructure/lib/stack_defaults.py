@@ -12,6 +12,7 @@ production_defaults = {
         "instance_size": DBInstanceTypes.general_purpose_large.value,
         "read_replica": OLReplicaDBConfig(),
         "monitoring_profile_name": "production",
+        "use_blue_green": True,
     },
     "redis": {"instance_type": CacheInstanceTypes.high_mem_large},
     "opensearch": {

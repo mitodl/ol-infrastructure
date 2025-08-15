@@ -190,6 +190,17 @@ def create_ol_data_platform_realm(  # noqa: PLR0913
     )
 
     keycloak.Role(
+        "ol-data-platform-eng-researcher-role",
+        realm_id=ol_data_platform_realm.id,
+        name="ol-eng-researcher",
+        description="OL Engineering Researcher role - maps to superset_researcher",
+        composite_roles=[
+            ol_data_platform_superset_client_role_refs["superset_researcher"].id
+        ],
+        opts=resource_options,
+    )
+
+    keycloak.Role(
         "ol-data-platform-eng-developer-role",
         realm_id=ol_data_platform_realm.id,
         name="ol-eng-developer",

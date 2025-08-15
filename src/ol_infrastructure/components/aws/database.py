@@ -66,26 +66,27 @@ class OLDBConfig(AWSBase):
     engine: str
     engine_full_version: str | None = None
     engine_major_version: str | int | None = None
-    instance_name: str  # The name of the RDS instance
-    password: SecretStr
-    parameter_overrides: list[dict[str, str | bool | int | float]]
-    port: PositiveInt
-    subnet_group_name: str | pulumi.Output[str]
-    security_groups: list[SecurityGroup]
     backup_days: conint(ge=0, le=MAX_BACKUP_DAYS, strict=True) = 30  # type: ignore  # noqa: PGH003
     db_name: str | None = None  # The name of the database schema to create
+    instance_name: str  # The name of the RDS instance
     instance_size: str = DBInstanceTypes.general_purpose_large.value
     # Set to allow for storage autoscaling. Default to 1 TB
     max_storage: PositiveInt | None = 1000
+    monitoring_profile_name: str
     multi_az: bool = True
+    parameter_overrides: list[dict[str, str | bool | int | float]]
+    password: SecretStr
+    port: PositiveInt
     prevent_delete: bool = True
     public_access: bool = False
-    take_final_snapshot: bool = True
+    read_replica: OLReplicaDBConfig | None = None
+    security_groups: list[SecurityGroup]
     storage: PositiveInt = PositiveInt(50)
     storage_type: StorageType = StorageType.ssd
-    username: str = "oldevops"
-    read_replica: OLReplicaDBConfig | None = None
-    monitoring_profile_name: str
+    subnet_group_name: str | pulumi.Output[str]
+    take_final_snapshot: bool = True
+    use_blue_green: bool = False
+    username: str = "oldevops"  # The name of the admin user for the instance
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("engine")
@@ -258,7 +259,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             auto_minor_version_upgrade=True,
             apply_immediately=True,
             backup_retention_period=db_config.backup_days,
-            blue_green_update={"enabled": True},
+            blue_green_update={"enabled": db_config.use_blue_green},
             copy_tags_to_snapshot=True,
             db_name=db_config.db_name,
             db_subnet_group_name=db_config.subnet_group_name,

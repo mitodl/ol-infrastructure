@@ -831,11 +831,11 @@ keda_release = kubernetes.helm.v3.Release(
                 "operator": {
                     "requests": {
                         "cpu": "100m",
-                        "memory": "100Mi",
+                        "memory": "200Mi",
                     },
                     "limits": {
                         "cpu": "200m",
-                        "memory": "200Mi",
+                        "memory": "400Mi",
                     },
                 },
                 "metricServer": {
