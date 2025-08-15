@@ -1,6 +1,13 @@
 import pulumi
 import pulumi_keycloak as keycloak
 
+from ol_infrastructure.substructure.keycloak.saml_helpers import (
+    SAML_FRIENDLY_NAMES,
+    extract_saml_metadata,
+    generate_pulumi_args_dict,
+    get_saml_attribute_mappers,
+)
+
 
 def create_org_for_learn(  # noqa: PLR0913
     org_domains: list[str],
@@ -41,78 +48,51 @@ def onboard_saml_org(  # noqa: PLR0913
         org_domains, org_name, org_alias, learn_domain, realm_id, resource_options
     )
 
+    saml_args = generate_pulumi_args_dict(extract_saml_metadata(org_saml_metadata_url))
+
     org_idp = keycloak.saml.IdentityProvider(
         f"ol-apps-{org_alias}-saml-idp",
-        alias=f"{org_alias}",
+        alias=org_alias.lower(),
         display_name=org_name,
         entity_id=f"{keycloak_url}/realms/olapps",
         first_broker_login_flow_alias=first_login_flow.alias,
         hide_on_login_page=True,
+        name_id_policy_format="Unspecified",
         org_domain="ANY",
         org_redirect_mode_email_matches=True,
         organization_id=org.id,
         post_binding_authn_request=True,
         post_binding_response=True,
         realm=realm_id,
-        single_sign_on_service_url=org_saml_metadata_url,
         sync_mode="IMPORT",
         trust_email=True,
         validate_signature=True,
         opts=resource_options,
-    )
-    keycloak.AttributeImporterIdentityProviderMapper(
-        f"map-{org_alias}-saml-email-attribute",
-        realm=realm_id,
-        attribute_friendly_name="mail",
-        identity_provider_alias=org_idp.alias,
-        user_attribute="email",
         extra_config={
-            "syncMode": "INHERIT",
+            "metadataDescriptorUrl": org_saml_metadata_url,
+            "useMetadataDescriptorUrl": True,
         },
-        opts=resource_options,
+        **saml_args,
     )
-    keycloak.AttributeImporterIdentityProviderMapper(
-        f"map-{org_alias}-saml-last-name-attribute",
-        realm=realm_id,
-        attribute_friendly_name="sn",
-        identity_provider_alias=org_idp.alias,
-        user_attribute="lastName",
-        extra_config={
-            "syncMode": "INHERIT",
-        },
-        opts=resource_options,
-    )
-    keycloak.AttributeImporterIdentityProviderMapper(
-        f"map-{org_alias}-saml-first-name-attribute",
-        realm=realm_id,
-        attribute_friendly_name="givenName",
-        identity_provider_alias=org_idp.alias,
-        user_attribute="firstName",
-        extra_config={
-            "syncMode": "INHERIT",
-        },
-        opts=resource_options,
-    )
-    keycloak.AttributeImporterIdentityProviderMapper(
-        f"map-{org_alias}-saml-full-name-attribute",
-        realm=realm_id,
-        attribute_friendly_name="displayName",
-        identity_provider_alias=org_idp.alias,
-        user_attribute="fullName",
-        extra_config={
-            "syncMode": "INHERIT",
-        },
-        opts=resource_options,
-    )
-    keycloak.HardcodedAttributeIdentityProviderMapper(
-        f"map-{org_alias}-email-opt-in-attribute",
-        name="email-opt-in-default",
-        realm=realm_id,
-        identity_provider_alias=org_idp.alias,
-        attribute_name="emailOptIn",
-        attribute_value="1",
-        user_session=False,
-        extra_config={
-            "syncMode": "INHERIT",
-        },
-    )
+    mappers = get_saml_attribute_mappers(org_saml_metadata_url, org_alias.lower())
+    for attr, args in mappers.items():
+        keycloak.AttributeImporterIdentityProviderMapper(
+            f"map-{org_alias}-saml-{attr}-attribute",
+            realm=realm_id,
+            identity_provider_alias=org_idp.alias,
+            **args,
+        )
+    if not mappers:
+        for attr, friendly_names in SAML_FRIENDLY_NAMES.items():
+            for friendly_name in friendly_names:
+                keycloak.AttributeImporterIdentityProviderMapper(
+                    f"map-{org_alias}-saml-{friendly_name}-attribute",
+                    realm=realm_id,
+                    attribute_friendly_name=friendly_name,
+                    identity_provider_alias=org_idp.alias,
+                    user_attribute=attr,
+                    extra_config={
+                        "syncMode": "INHERIT",
+                    },
+                    opts=resource_options,
+                )
