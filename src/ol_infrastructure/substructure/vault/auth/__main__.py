@@ -115,7 +115,9 @@ admin_role = jwt.AuthBackendRole(
     bound_audiences=[keycloak_config.get("client_id")],
     user_claim="sub",
     role_type="oidc",
-    bound_claims={"realm_access.roles": ["vault-admins"]},
+    bound_claims={
+        "realm_access.roles": "vault-admins"
+    },  # Format as list with colon separator
 )
 
 # Raft Backup policy definition

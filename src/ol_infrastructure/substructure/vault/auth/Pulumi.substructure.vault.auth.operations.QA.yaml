@@ -3,5 +3,6 @@ secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QFzY83grwDl2j3SfPszWX9YAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMsVTgcfVNq2+zW4N7AgEQgDvBFpGhK5J8vpesVM8UNfA3Mhizo8/pT6FS3ty7JvQo3u3SLy4JFCVWhhMeeR1AdyjYIb23Y+/ATwUJsg==
 config:
   aws:region: us-east-1
+  keycloak:client_id: ol-vault-client
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
