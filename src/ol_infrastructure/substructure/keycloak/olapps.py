@@ -12,7 +12,10 @@ from ol_infrastructure.substructure.keycloak.org_flows import (
     create_organization_first_broker_login_flows,
     create_organization_scope,
 )
-from ol_infrastructure.substructure.keycloak.org_sso_helpers import onboard_saml_org
+from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
+    create_org_for_learn,
+    onboard_saml_org,
+)
 
 
 def create_olapps_realm(  # noqa: PLR0913, PLR0915
@@ -699,7 +702,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     # B2B Organizations [BEGIN]
     if stack_info.env_suffix == "production":
         onboard_saml_org(
-            org_domain="hhchealth.org",
+            org_domains=["hhchealth.org"],
             org_name="Hartford Health Care",
             org_alias="HHC",
             org_saml_metadata_url="https://adfs.hhchealth.org/federationmetadata/2007-06/federationmetadata.xml",
@@ -710,7 +713,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
             resource_options=resource_options,
         )
         onboard_saml_org(
-            org_domain="ntua.gr",
+            org_domains=["ntua.gr"],
             org_name="National Technical University of Athens",
             org_alias="NTUA",
             org_saml_metadata_url="https://login.ntua.gr/idp/shibboleth",
@@ -718,6 +721,14 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
             learn_domain=mitlearn_domain,
             realm_id=ol_apps_realm.id,
             first_login_flow=ol_first_login_flow,
+            resource_options=resource_options,
+        )
+        create_org_for_learn(
+            org_domains=["ttt-example.edu"],
+            org_name="Train the Trainer",
+            org_alias="TTT",
+            learn_domain=mitlearn_domain,
+            realm_id=ol_apps_realm.id,
             resource_options=resource_options,
         )
     # B2B Organizations [END]
