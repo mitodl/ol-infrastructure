@@ -66,6 +66,7 @@ config:
   - "superset_admin"
   - "superset_alpha"
   - "superset_gamma"
+  - "superset_researcher"
   keycloak_realm:ol-data-platform-openmetadata-redirect-uris: ["https://data.ol.mit.edu/*"]
   keycloak_realm:ol-data-platform-openmetadata-client-roles:
   - "open_metadata_admin"
