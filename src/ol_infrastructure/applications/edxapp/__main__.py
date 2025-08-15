@@ -1081,6 +1081,7 @@ consul_kv_data = {
     "ses-mail-domain": edxapp_mail_domain,
     "session-cookie-domain": ".{}".format(edxapp_domains["lms"].split(".", 1)[-1]),
     "studio-domain": edxapp_domains["studio"],
+    "mit-learn-base-url": edxapp_config.get("mit_learn_base_url") or "",
     "waffle_flags.yaml": waffle_flags_yaml_content,
 }
 consul.Keys(
