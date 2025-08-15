@@ -20,6 +20,8 @@ config:
   - "api-pay-ci.ol.mit.edu"
   - "api-learn-ai-ci.ol.mit.edu"
   - "api.ci.learn.mit.edu"
+  - "nb.ci.learn.mit.edu"
+  - "binder.ci.learn.mit.edu"
   - "ci.mitxonline.mit.edu"
   - "api.ci.mitxonline.mit.edu"
   eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"

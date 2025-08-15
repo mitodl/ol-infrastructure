@@ -20,6 +20,8 @@ config:
   - "api-pay.ol.mit.edu"
   - "api-learn-ai.ol.mit.edu"
   - "api.learn.mit.edu"
+  - "nb.learn.mit.edu"
+  - "binder.learn.mit.edu"
   - "api.mitxonline.mit.edu"
   eks:apisix_min_replicas: "5"
   eks:apisix_max_replicas: "10"

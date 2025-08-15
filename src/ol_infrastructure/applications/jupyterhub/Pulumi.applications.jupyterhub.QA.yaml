@@ -1,0 +1,15 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHjZAY5LtmRWGljev0oiDGn0jR5cRwD4IVXCn50TW5i0qQE2MbaMHwWMskzdnFWfe+hsAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMmpzhOokScVcdXhTYAgEQgDvk9g7JDDlwSixjXqkRqrZ8yAPaarOUw+Y6yHmjFiT/4hi8SSh2nEWa19MEqMTP4PaZWlgmpT9tS5avnA==
+config:
+  jupyterhub:binderhub_domain: "binder.rc.learn.mit.edu"
+  jupyterhub:target_vpc: "applications_vpc"
+  jupyterhub:business_unit: "mit-learn"
+  jupyterhub:domain: "nb.rc.learn.mit.edu"
+  jupyterhub:admin_users:
+  - "admin"
+  aws:region: us-east-1
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa
+  jupyterhub:shared_password:
+    secure: v1:6jn5qRWKDbtbGB9M:VA+J7wwlJM6aw+nrn6gSU3+ndpxXRYDIWwi7x9NuNMxY8CfCesxQuoczRu04L0PhPC8f5qbDnWkF/PB9huub1feGkETJkr8EAr0b3CpGeDo=
