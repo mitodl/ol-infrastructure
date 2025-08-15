@@ -9,6 +9,7 @@ const authoringAppID = "authoring";
 const href = window.location.href.toLowerCase();
 const isLearnCourse = ["course-v1:uai_", "course-v1:mit_et"].some(key => href.includes(key));
 const accessibilityURL = process.env.ACCESSIBILITY_URL || 'https://accessibility.mit.edu/';
+const contactUsURL = "mailto:learn-support@mit.edu";
 const linkTitles = {
   dashboard: "Dashboard",
   profile: "Profile",
@@ -19,11 +20,12 @@ const linkTitles = {
   honorCode: "Honor Code",
   termsOfService: "Terms of Service",
   accessibility: "Accessibility",
+  contactUs: "Contact Us",
 };
 
-const copyRightText = `${configData.SITE_NAME.replace(/\b(CI|QA|Staging)\b/g, "").trim()}. All rights reserved.`;
+const copyRightText = "Massachusetts Institute of Technology";
 
-const logo = <Logo imageUrl={configData.LOGO_URL} destinationUrl={configData.MARKETING_SITE_BASE_URL} />;
+const logo = <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={process.env.MIT_BASE_URL} />;
 
 let userMenu = [
   {
@@ -61,24 +63,20 @@ if (!isLearnCourse) {
 
 const footerLegalLinks = [
     {
-      url: `${configData.MARKETING_SITE_BASE_URL}/about-us/`,
+      url: `${configData.MIT_LEARN_BASE_URL}/about-us/`,
       title: linkTitles.aboutUs,
     },
     {
-      url: `${configData.MARKETING_SITE_BASE_URL}/privacy-policy/`,
-      title: linkTitles.privacyPolicy,
-    },
-    {
-      url: `${configData.MARKETING_SITE_BASE_URL}/honor-code/`,
-      title: linkTitles.honorCode,
-    },
-    {
-      url: `${configData.MARKETING_SITE_BASE_URL}/terms-of-service/`,
+      url: `${configData.MIT_LEARN_BASE_URL}/terms-of-service/`,
       title: linkTitles.termsOfService,
     },
     {
       url: accessibilityURL,
       title: linkTitles.accessibility,
+    },
+    {
+      url: contactUsURL,
+      title: linkTitles.contactUs,
     },
   ];
 
