@@ -3,5 +3,6 @@ secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgHMcinUhvpJwflJ5KejtBOWAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMODbbvES6ckIWuTimAgEQgDvnTU2Amj87I7ZqPLdtXKzBk1z1wSby3i1IIurRXOyBzcPwPXmW4WQKCu3HPx+1ha9F+Cdpb4BwVuLyKg==
 config:
   aws:region: us-east-1
+  keycloak:client_id: ol-vault-client
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
