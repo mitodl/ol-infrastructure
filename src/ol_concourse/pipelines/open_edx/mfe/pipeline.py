@@ -71,6 +71,7 @@ class OpenEdxVars(BaseModel):
     enable_video_upload_page_link_in_content_dropdown: (
         Literal["true", "false"] | None
     ) = None
+    enable_jumpnav: Literal["true", "false"] | None = None
 
     @property
     def release_name(self) -> OpenEdxSupportedRelease:
@@ -134,6 +135,7 @@ def mfe_params(
             open_edx.enable_video_upload_page_link_in_content_dropdown
         ),
         "PARAGON_THEME_URLS": "{}",
+        "ENABLE_JUMPNAV": open_edx.enable_jumpnav,
     }
 
 
