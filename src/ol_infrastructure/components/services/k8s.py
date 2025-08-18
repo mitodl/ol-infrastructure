@@ -155,6 +155,7 @@ class OLApplicationK8sConfig(BaseModel):
             timeout_seconds=5,
         ),
     }
+    web_pdb_minimum: NonNegativeInt | str = 1
 
     # See https://www.pulumi.com/docs/reference/pkg/python/pulumi/#pulumi.Output.from_input
     # for docs. This unwraps the value so Pydantic can store it in the config class.
@@ -512,6 +513,23 @@ class OLApplicationK8s(ComponentResource):
                 **extra_deployment_args,
             ),
             opts=deployment_options,
+        )
+
+        # Pod Disruption Budget to ensure at least one web application pod is available.
+        _application_pdb = kubernetes.policy.v1.PodDisruptionBudget(
+            f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-pdb",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name=f"{_application_deployment_name}-pdb",
+                namespace=ol_app_k8s_config.application_namespace,
+                labels=application_labels,
+            ),
+            spec=kubernetes.policy.v1.PodDisruptionBudgetSpecArgs(
+                min_available=ol_app_k8s_config.web_pdb_minimum,
+                selector=kubernetes.meta.v1.LabelSelectorArgs(
+                    match_labels=application_labels,
+                ),
+            ),
+            opts=resource_options,
         )
 
         _application_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
