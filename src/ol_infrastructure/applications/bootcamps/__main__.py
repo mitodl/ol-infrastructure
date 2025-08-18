@@ -257,7 +257,7 @@ heroku_vars = {
 }
 
 sensitive_heroku_vars = {
-    "CYBERSOURCE_ACCESS_KEY": bootcamps_vault_secrets["cybersource"]["access_key"],
+    "CYBERSOURCE_ACCESS_KEY": "",
     "CYBERSOURCE_INQUIRY_LOG_NACL_ENCRYPTION_KEY": bootcamps_vault_secrets[
         "cybersource"
     ]["inquiry_public_encryption_key"],
