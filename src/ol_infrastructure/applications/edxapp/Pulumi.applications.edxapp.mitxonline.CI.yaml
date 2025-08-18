@@ -85,4 +85,3 @@ config:
   mongodb:atlas_project_id: 6196c37185012b5319a42e16
   edxapp:edx_xqueue_secrets:
     secure: v1:dh6OMi07yWRUJk/B:uoUEEYflcgbAADKASHNMkuuyocGFon9KU/bwQj7hcfKXlv3iXYqyTcwD5D2rCRxKnWPvckSAvA4JR9sqhJ0DbIIH/4BkFApJ5XrBKjhUD6S7iACp/pLwjymlaXF5/OhAKdyNcByi2VdrB800oHww3BfhvltrD+2CW5pgGnYv/7+HEMtC7HvzWO2Npe/rZQQebBKK0yGvtg==
-  edxapp:mit_learn_base_url: https://ci.learn.mit.edu
