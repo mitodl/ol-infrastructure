@@ -263,6 +263,8 @@ mitxonline_db_security_group = ec2.SecurityGroup(
 db_defaults = {**defaults(stack_info)["rds"]}
 if stack_info.name == "QA":
     db_defaults["instance_size"] = DBInstanceTypes.general_purpose_large
+if stack_info.name == "Production":
+    db_defaults["instance_size"] = DBInstanceTypes.general_purpose_xlarge
 
 db_instance_name = f"mitxonline-{stack_info.env_suffix}-app-db"
 mitxonline_db_config = OLPostgresDBConfig(
