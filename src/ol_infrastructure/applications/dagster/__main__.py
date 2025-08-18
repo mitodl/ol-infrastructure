@@ -315,10 +315,9 @@ dagster_db_security_group = ec2.SecurityGroup(
 
 rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["monitoring_profile_name"] = "disabled"
-
+rds_defaults["use_blue_green"] = False
 dagster_db_config = OLPostgresDBConfig(
     db_name="dagster",
-    engine_major_version="16",
     instance_name=f"ol-etl-db-{stack_info.env_suffix}",
     max_storage=1000,
     password=get_config("dagster:db_password"),

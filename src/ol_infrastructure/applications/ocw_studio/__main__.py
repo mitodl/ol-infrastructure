@@ -250,7 +250,8 @@ ocw_studio_db_security_group = ec2.SecurityGroup(
     ),
     vpc_id=apps_vpc["id"],
 )
-
+rds_defaults = defaults(stack_info)["rds"]
+rds_defaults["use_blue_green"] = False
 ocw_studio_db_config = OLPostgresDBConfig(
     instance_name=f"ocw-studio-db-applications-{stack_info.env_suffix}",
     password=ocw_studio_config.require("db_password"),
@@ -260,7 +261,7 @@ ocw_studio_db_config = OLPostgresDBConfig(
     tags=aws_config.tags,
     db_name="ocw_studio",
     public_access=True,
-    **defaults(stack_info)["rds"],
+    **rds_defaults,
 )
 ocw_studio_db_config.parameter_overrides.append(
     {"name": "password_encryption", "value": "md5"}
@@ -275,7 +276,7 @@ ocw_studio_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_admin_username=ocw_studio_db_config.username,
     db_admin_password=ocw_studio_db_config.password.get_secret_value(),
     db_host=ocw_studio_db.db_instance.address,
-    **defaults(stack_info)["rds"],
+    **rds_defaults,
 )
 ocw_studio_vault_backend = OLVaultDatabaseBackend(ocw_studio_vault_backend_config)
 

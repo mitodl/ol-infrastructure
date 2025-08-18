@@ -330,6 +330,8 @@ superset_db_security_group = ec2.SecurityGroup(
     tags=aws_config.merged_tags({"Name": f"superset-rds-{superset_env}"}),
     vpc_id=data_vpc["id"],
 )
+rds_defaults = defaults(stack_info)["rds"]
+rds_defaults["use_blue_green"] = False
 superset_db_config = OLPostgresDBConfig(
     instance_name=f"ol-superset-db-{stack_info.env_suffix}",
     password=superset_config.require("db_password"),
@@ -338,7 +340,7 @@ superset_db_config = OLPostgresDBConfig(
     engine_major_version="16",
     tags=aws_config.tags,
     db_name="superset",
-    **defaults(stack_info)["rds"],
+    **rds_defaults,
 )
 superset_db = OLAmazonDB(superset_db_config)
 

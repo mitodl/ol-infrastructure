@@ -471,7 +471,7 @@ rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["instance_size"] = (
     airbyte_config.get("db_instance_size") or rds_defaults["instance_size"]
 )
-
+rds_defaults["use_blue_green"] = False
 rds_password = airbyte_config.require("rds_password")
 
 airbyte_db_config = OLPostgresDBConfig(

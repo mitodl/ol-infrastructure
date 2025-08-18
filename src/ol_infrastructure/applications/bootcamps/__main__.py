@@ -184,7 +184,8 @@ bootcamps_db_security_group = ec2.SecurityGroup(
     ),
     vpc_id=apps_vpc["id"],
 )
-
+rds_defaults = defaults(stack_info)["rds"]
+rds_defaults["use_blue_green"] = False
 bootcamps_db_config = OLPostgresDBConfig(
     instance_name=f"bootcamps-db-applications-{stack_info.env_suffix}",
     password=bootcamps_config.require("db_password"),
@@ -194,7 +195,7 @@ bootcamps_db_config = OLPostgresDBConfig(
     tags=aws_config.tags,
     db_name="bootcamps",
     public_access=True,
-    **defaults(stack_info)["rds"],
+    **rds_defaults,
 )
 bootcamps_db_config.parameter_overrides.append(
     {"name": "password_encryption", "value": "md5"}
@@ -207,7 +208,7 @@ bootcamps_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_admin_username=bootcamps_db_config.username,
     db_admin_password=bootcamps_db_config.password.get_secret_value(),
     db_host=bootcamps_db.db_instance.address,
-    **defaults(stack_info)["rds"],
+    **rds_defaults,
 )
 bootcamps_vault_backend = OLVaultDatabaseBackend(bootcamps_vault_backend_config)
 

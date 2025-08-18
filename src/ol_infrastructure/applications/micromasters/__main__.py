@@ -140,7 +140,8 @@ micromasters_db_security_group = ec2.SecurityGroup(
     ),
     vpc_id=micromasters_vpc["id"],
 )
-
+rds_defaults = defaults(stack_info)["rds"]
+rds_defaults["use_blue_green"] = False
 micromasters_db_config = OLPostgresDBConfig(
     instance_name=f"micromasters-{stack_info.env_suffix}-app-db",
     password=micromasters_config.require("db_password"),
@@ -150,7 +151,7 @@ micromasters_db_config = OLPostgresDBConfig(
     db_name="micromasters",
     engine_major_version="13",
     public_access=True,
-    **defaults(stack_info)["rds"],
+    **rds_defaults,
 )
 micromasters_db_config.parameter_overrides.append(
     {"name": "password_encryption", "value": "md5"}

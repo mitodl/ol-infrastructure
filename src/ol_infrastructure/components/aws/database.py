@@ -151,7 +151,7 @@ class OLPostgresDBConfig(OLDBConfig):
     """Configuration container to specify settings specific to Postgres."""
 
     engine: str = "postgres"
-    engine_major_version: str | int = "16"
+    engine_major_version: str | int = "17"
     port: PositiveInt = PositiveInt(5432)
     parameter_overrides: list[dict[str, str | bool | int | float]] = [  # noqa: RUF012
         {"name": "client_encoding", "value": "UTF-8"},

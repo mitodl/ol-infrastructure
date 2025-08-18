@@ -123,7 +123,7 @@ rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["instance_size"] = (
     open_metadata_config.get("db_instance_size") or DBInstanceTypes.small.value
 )
-
+rds_defaults["use_blue_green"] = False
 open_metadata_db_config = OLPostgresDBConfig(
     instance_name=f"open-metadata-db-{stack_info.env_suffix}",
     password=open_metadata_config.get("db_password"),
@@ -131,10 +131,9 @@ open_metadata_db_config = OLPostgresDBConfig(
     security_groups=[open_metadata_database_security_group],
     storage=open_metadata_config.get("db_capacity")
     or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
-    engine_major_version="16",
     tags=aws_config.tags,
     db_name="open_metadata",
-    **defaults(stack_info)["rds"],
+    **rds_defaults,
 )
 open_metadata_db = OLAmazonDB(open_metadata_db_config)
 
