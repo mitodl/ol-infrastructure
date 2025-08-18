@@ -907,7 +907,24 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
                 ),
             ],
             hosts=[learn_api_domain],
-            paths=["/ai/http/canvas_*"],
+            paths=["/ai/http/canvas_syllabus_agent/*"],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+            backend_resolve_granularity="service",
+        ),
+        OLApisixRouteConfig(
+            route_name="canvas_tutor_agent",
+            priority=20,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="key-auth",
+                    config={
+                        "header": "canvas_token",
+                    },
+                ),
+            ],
+            hosts=[learn_api_domain],
+            paths=["/ai/http/canvas_tutor_agent/*"],
             backend_service_name=learn_ai_app_k8s.application_lb_service_name,
             backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",
