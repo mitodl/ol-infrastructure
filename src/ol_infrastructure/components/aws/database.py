@@ -244,7 +244,16 @@ class OLAmazonDB(pulumi.ComponentResource):
                 db_config.engine_version != current_db_state["EngineVersion"],
                 db_config.multi_az != current_db_state["MultiAZ"],
                 db_config.storage_type != current_db_state["StorageType"],
-                db_config.instance_size != current_db_state["DBInstanceClass"],
+        if (
+            db_config.use_blue_green
+            and current_db_state
+            and any(
+                (
+                    db_config.engine_version != current_db_state.get("EngineVersion"),
+                    db_config.multi_az != current_db_state.get("MultiAZ"),
+                    db_config.storage_type != current_db_state.get("StorageType"),
+                    db_config.instance_size != current_db_state.get("DBInstanceClass"),
+                )
             )
         ):
             turn_off_deletion_protection(current_db_state["DBInstanceIdentifier"])
