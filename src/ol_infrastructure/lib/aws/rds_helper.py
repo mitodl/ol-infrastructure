@@ -106,4 +106,13 @@ def turn_off_deletion_protection(db_identifier: str):
         DBInstanceIdentifier=db_identifier,
         ApplyImmediately=True,
         DeletionProtection=False,
-    )
+    try:
+        rds_client.modify_db_instance(
+            DBInstanceIdentifier=db_identifier,
+            ApplyImmediately=True,
+            DeletionProtection=False,
+        )
+    except rds_client.exceptions.DBInstanceNotFoundFault:
+        raise ValueError(f"DB instance '{db_identifier}' not found.")
+    except rds_client.exceptions.InvalidDBInstanceStateFault:
+        raise RuntimeError(f"DB instance '{db_identifier}' is in an invalid state for modification.")
