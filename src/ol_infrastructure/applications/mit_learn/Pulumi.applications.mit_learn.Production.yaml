@@ -79,8 +79,8 @@ config:
     POSTHOG_TIMEOUT_MS: 1000
     QDRANT_HOST: "https://0567dbd5-d68d-4d9e-8c41-954ef5de90ae.us-east-1-0.aws.cloud.qdrant.io"
     SEE_API_ENABLED: "true"
-    SENTRY_PROFILES_SAMPLE_RATE: 1
-    SENTRY_TRACES_SAMPLE_RATE: 1
+    SENTRY_PROFILES_SAMPLE_RATE: "0.1"
+    SENTRY_TRACES_SAMPLE_RATE: "0.1"
     SESSION_COOKIE_NAME: "session_mitlearn"
     SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT: "https://sso.ol.mit.edu/realms/olapps"
     TIKA_SERVER_ENDPOINT: "https://tika-production.odl.mit.edu"
