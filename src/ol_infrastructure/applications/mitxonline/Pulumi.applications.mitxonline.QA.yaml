@@ -32,6 +32,8 @@ config:
     OPENEDX_SOCIAL_LOGIN_PATH: "/auth/login/ol-oauth2/?auth_entry=login"
     SENTRY_LOG_LEVEL: "ERROR"
     SESSION_COOKIE_NAME: "session_mitxonline_rc"
+    UAI_FROM_EMAIL: "MIT Learn <noreply@learn.mit.edu>"
+    MIT_LEARN_DASHBOARD_URL: "https://learn.mit.edu/dashboard"
   mitxonline:db_password:
     secure: v1:72AVczMFP7U0adTg:qiVKioH1VjNf38HfLkNIZsCdc8RqKs0bkaou+fU6SSRK9W4kbS1do2PwdD3JWYlc37eojd+sdAL8npp+tyEeQ66q5mHmWDQK3WlqgdWbf8G41fizyMwoy2AQdZmtZtJe40IoeqaSX3ntfJvhI0uP7YWmpge4G9e6KMNBmhZ0wl0T6qHU4z180aId1ZpjCM4=
   vault:address: https://vault-qa.odl.mit.edu
