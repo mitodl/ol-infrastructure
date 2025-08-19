@@ -20,12 +20,29 @@ class CourseImageInfo:
     repo_uri: str
     image_name: str
 
+
 # Used to make a parameterized pipeline which builds and publishes the image from GH to ECR
 courses = [
-    CourseImageInfo(course_name="course_deep_learning_foundations_and_applications", repo_uri="git@github.mit.edu:ol-notebooks-qa/course_deep_learning_foundations_and_applications.git", image_name="deep_learning_foundations_and_applications"),
-    CourseImageInfo(course_name="supervised_learning_fundamentals", repo_uri="git@github.mit.edu:ol-notebooks-qa/course_supervised_learning_fundamentals.git", image_name="supervised_learning_fundamentals"),
-    CourseImageInfo(course_name="introduction_to_data_analytics_and_machine_learning", repo_uri="git@github.mit.edu:ol-notebooks-qa/course_introduction_to_data_analytics_and_machine_learning.git", image_name="introduction_to_data_analytics_and_machine_learning"),
-    CourseImageInfo(course_name="clustering_and_descriptive_ai", repo_uri="git@github.mit.edu:ol-notebooks-qa/course_clustering_and_descriptive_ai.git", image_name="clustering_and_descriptive_ai"),
+    CourseImageInfo(
+        course_name="course_deep_learning_foundations_and_applications",
+        repo_uri="git@github.mit.edu:ol-notebooks-qa/course_deep_learning_foundations_and_applications.git",
+        image_name="deep_learning_foundations_and_applications",
+    ),
+    CourseImageInfo(
+        course_name="supervised_learning_fundamentals",
+        repo_uri="git@github.mit.edu:ol-notebooks-qa/course_supervised_learning_fundamentals.git",
+        image_name="supervised_learning_fundamentals",
+    ),
+    CourseImageInfo(
+        course_name="introduction_to_data_analytics_and_machine_learning",
+        repo_uri="git@github.mit.edu:ol-notebooks-qa/course_introduction_to_data_analytics_and_machine_learning.git",
+        image_name="introduction_to_data_analytics_and_machine_learning",
+    ),
+    CourseImageInfo(
+        course_name="clustering_and_descriptive_ai",
+        repo_uri="git@github.mit.edu:ol-notebooks-qa/course_clustering_and_descriptive_ai.git",
+        image_name="clustering_and_descriptive_ai",
+    ),
 ]
 
 # TODO: This has been tested using a personal ssh key provisioned w/o a password. No safe way to include in the PR though.
