@@ -9,15 +9,13 @@ const authoringAppID = "authoring";
 const href = window.location.href.toLowerCase();
 const isLearnCourse = ["course-v1:uai_", "course-v1:mit_et"].some(key => href.includes(key));
 const accessibilityURL = process.env.ACCESSIBILITY_URL || 'https://accessibility.mit.edu/';
-const contactUsURL = "mailto:learn-support@mit.edu";
+const contactUsURL = process.env.CONTACT_URL || "mailto:learn-support@mit.edu";
 const linkTitles = {
   dashboard: "Dashboard",
   profile: "Profile",
   account: "Settings",
   logout: "Sign Out",
   aboutUs: "About Us",
-  privacyPolicy: "Privacy Policy",
-  honorCode: "Honor Code",
   termsOfService: "Terms of Service",
   accessibility: "Accessibility",
   contactUs: "Contact Us",
@@ -25,7 +23,7 @@ const linkTitles = {
 
 const copyRightText = "Massachusetts Institute of Technology";
 
-const logo = <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={process.env.MIT_BASE_URL} />;
+const logo = <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={"https://web.mit.edu/"} />;
 
 let userMenu = [
   {
@@ -63,11 +61,11 @@ if (!isLearnCourse) {
 
 const footerLegalLinks = [
     {
-      url: `${configData.MIT_LEARN_BASE_URL}/about-us/`,
+      url: `${process.env.MIT_LEARN_BASE_URL}/about`,
       title: linkTitles.aboutUs,
     },
     {
-      url: `${configData.MIT_LEARN_BASE_URL}/terms-of-service/`,
+      url: `${process.env.MIT_LEARN_BASE_URL}/terms`,
       title: linkTitles.termsOfService,
     },
     {
