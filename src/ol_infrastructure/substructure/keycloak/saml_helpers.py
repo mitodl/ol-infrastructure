@@ -236,19 +236,7 @@ def get_saml_attribute_mappers(  # noqa: C901
             for candidate in saml_attribute_candidates:
                 if (
                     root.find(
-                        f".//saml:AttributeStatement/saml:Attribute[@Name='{candidate}']",
-                        namespaces,
-                    )
-                    is not None
-                    or root.find(
-                        ".//md:AttributeConsumingService/md:RequestedAttribute"
-                        f"[@Name='{candidate}']",
-                        namespaces,
-                    )
-                    is not None
-                    or root.find(
-                        ".//md:AttributeConsumingService/md:RequestedAttribute"
-                        f"[@FriendlyName='{candidate}']",
+                        f".//md:IDPSSODescriptor/saml:Attribute='{candidate}']",
                         namespaces,
                     )
                     is not None
