@@ -61,7 +61,17 @@ def extract_saml_metadata(metadata_url: str) -> dict[str, str | None]:
     """
     try:
         with urlopen(metadata_url) as metadata_file:  # noqa: S310
-            tree = ET.parse(metadata_file)  # noqa: S314
+        # Validate URL scheme
+        parsed_url = urlparse(metadata_url)
+        if parsed_url.scheme != "https":
+            raise ValueError("Only HTTPS URLs are allowed for SAML metadata.")
+        # Set timeout and limit response size
+        MAX_METADATA_SIZE = 5 * 1024 * 1024  # 5MB
+        with urlopen(metadata_url, timeout=10) as metadata_file:  # noqa: S310
+            metadata_bytes = metadata_file.read(MAX_METADATA_SIZE + 1)
+            if len(metadata_bytes) > MAX_METADATA_SIZE:
+                raise ValueError("SAML metadata file is too large.")
+            tree = ET.ElementTree(ET.fromstring(metadata_bytes))  # noqa: S314
             root = tree.getroot()
 
             # Define namespaces
