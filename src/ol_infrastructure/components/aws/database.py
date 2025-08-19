@@ -239,11 +239,6 @@ class OLAmazonDB(pulumi.ComponentResource):
         # for successful completion of the blue/green update process. Currently it is
         # timing out at 1 hour, so we should likely allow for up to at least 3 hours
         # before timing out, with a configurable parameter for the maximum timeout.
-        if db_config.use_blue_green and any(
-            (
-                db_config.engine_version != current_db_state["EngineVersion"],
-                db_config.multi_az != current_db_state["MultiAZ"],
-                db_config.storage_type != current_db_state["StorageType"],
         if (
             db_config.use_blue_green
             and current_db_state
