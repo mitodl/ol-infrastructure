@@ -157,7 +157,16 @@ def get_saml_attribute_mappers(  # noqa: C901, PLR0912
     """
     try:
         with urlopen(metadata_url) as metadata_file:  # noqa: S310
-            tree = ET.parse(metadata_file)  # noqa: S314
+        # Validate HTTPS URL
+        if not metadata_url.lower().startswith("https://"):
+            raise ValueError("SAML metadata URL must use HTTPS.")
+        # Limit response size to 10 MB
+        MAX_METADATA_SIZE = 10 * 1024 * 1024  # 10 MB
+        with urlopen(metadata_url) as metadata_file:  # noqa: S310
+            metadata_bytes = metadata_file.read(MAX_METADATA_SIZE + 1)
+            if len(metadata_bytes) > MAX_METADATA_SIZE:
+                raise ValueError("SAML metadata response too large.")
+            tree = ET.parse(io.BytesIO(metadata_bytes))  # noqa: S314
             root = tree.getroot()
             namespaces = {
                 "md": "urn:oasis:names:tc:SAML:2.0:metadata",
