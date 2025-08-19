@@ -28,7 +28,8 @@ courses = [
     CourseImageInfo(course_name="clustering_and_descriptive_ai", repo_uri="git@github.mit.edu:ol-notebooks-qa/course_clustering_and_descriptive_ai.git", image_name="clustering_and_descriptive_ai"),
 ]
 
-# TODO: This needs to use
+# TODO: This has been tested using a personal ssh key provisioned w/o a password. No safe way to include in the PR though.
+# TODO: Needs to use proper ssh key for github.mit.edu.
 course_repository = ssh_git_repo(
     name=Identifier("course_name"),
     uri="((course_repo))",
@@ -38,6 +39,7 @@ course_repository = ssh_git_repo(
 
 # Shouldn't need the AWS account ID as it'll infer it from the host's creds. Docs are a bit squiggy,
 # but the hope is that setting aws_region should allow it to construct the ECR hostname from the account ID and region.
+# TODO: This is untested, as we don't yet have an ECR repo set up for testing.
 course_image = Resource(
     name=Identifier("course_image"),
     type="registry-image",
