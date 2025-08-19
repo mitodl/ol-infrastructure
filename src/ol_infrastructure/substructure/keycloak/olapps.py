@@ -12,6 +12,12 @@ from ol_infrastructure.substructure.keycloak.org_flows import (
     create_organization_first_broker_login_flows,
     create_organization_scope,
 )
+from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
+    OrgConfig,
+    SamlIdpConfig,
+    create_org_for_learn,
+    onboard_saml_org,
+)
 
 
 def create_olapps_realm(  # noqa: PLR0913, PLR0915
@@ -596,7 +602,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     # OL - browser flow [END]
     # Ensure organization scope is present
     create_organization_scope(ol_apps_realm.id, "olapps", resource_options)
-
+    mitlearn_domain = keycloak_realm_config.require("learn_domain")
     # Touchstone SAML [START]
     ol_apps_mit_org = keycloak.organization.Organization(
         "ol-apps-mit-organization",
@@ -607,7 +613,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         name="MIT",
         alias="mit",
-        redirect_url=f"https://{keycloak_realm_config.require('learn_domain')}/dashboard/organization/mit",
+        redirect_url=f"https://{mitlearn_domain}/dashboard/organization/mit",
         realm=ol_apps_realm.id,
     )
 
@@ -637,57 +643,49 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         hide_on_login_page=True,
     )
 
-    (
-        keycloak.AttributeImporterIdentityProviderMapper(
-            "map-touchstone-saml-email-attribute",
-            realm=ol_apps_realm.id,
-            attribute_friendly_name="mail",
-            identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
-            user_attribute="email",
-            extra_config={
-                "syncMode": "INHERIT",
-            },
-            opts=resource_options,
-        ),
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "map-touchstone-saml-email-attribute",
+        realm=ol_apps_realm.id,
+        attribute_friendly_name="mail",
+        identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+        user_attribute="email",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
     )
-    (
-        keycloak.AttributeImporterIdentityProviderMapper(
-            "map-touchstone-saml-last-name-attribute",
-            realm=ol_apps_realm.id,
-            attribute_friendly_name="sn",
-            identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
-            user_attribute="lastName",
-            extra_config={
-                "syncMode": "INHERIT",
-            },
-            opts=resource_options,
-        ),
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "map-touchstone-saml-last-name-attribute",
+        realm=ol_apps_realm.id,
+        attribute_friendly_name="sn",
+        identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+        user_attribute="lastName",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
     )
-    (
-        keycloak.AttributeImporterIdentityProviderMapper(
-            "map-touchstone-saml-first-name-attribute",
-            realm=ol_apps_realm.id,
-            attribute_friendly_name="givenName",
-            identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
-            user_attribute="firstName",
-            extra_config={
-                "syncMode": "INHERIT",
-            },
-            opts=resource_options,
-        ),
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "map-touchstone-saml-first-name-attribute",
+        realm=ol_apps_realm.id,
+        attribute_friendly_name="givenName",
+        identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+        user_attribute="firstName",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
     )
-    (
-        keycloak.AttributeImporterIdentityProviderMapper(
-            "map-touchstone-saml-full-name-attribute",
-            realm=ol_apps_realm.id,
-            attribute_friendly_name="displayName",
-            identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
-            user_attribute="fullName",
-            extra_config={
-                "syncMode": "INHERIT",
-            },
-            opts=resource_options,
-        ),
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "map-touchstone-saml-full-name-attribute",
+        realm=ol_apps_realm.id,
+        attribute_friendly_name="displayName",
+        identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+        user_attribute="fullName",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
     )
     keycloak.HardcodedAttributeIdentityProviderMapper(
         "map-touchstone-email-opt-in-attribute",
@@ -702,6 +700,48 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         },
     )
     # Touchstone SAML [END]
+
+    # B2B Organizations [BEGIN]
+    if stack_info.env_suffix == "production":
+        onboard_saml_org(
+            SamlIdpConfig(
+                org_domains=["hhchealth.org"],
+                org_name="Hartford Health Care",
+                org_alias="HHC",
+                org_saml_metadata_url="https://adfs.hhchealth.org/federationmetadata/2007-06/federationmetadata.xml",
+                keycloak_url=keycloak_url,
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                principal_type="ATTRIBUTE",
+                principal_attribute="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+            )
+        )
+        onboard_saml_org(
+            SamlIdpConfig(
+                org_domains=["ntua.gr"],
+                org_name="National Technical University of Athens",
+                org_alias="NTUA",
+                org_saml_metadata_url="https://login.ntua.gr/idp/shibboleth",
+                keycloak_url=keycloak_url,
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+            )
+        )
+        create_org_for_learn(
+            OrgConfig(
+                org_domains=["ttt-example.edu"],
+                org_name="Train the Trainer",
+                org_alias="TTT",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            )
+        )
+    # B2B Organizations [END]
 
     if stack_info.env_suffix in ["ci", "qa"]:
         # OL-DEV-FAKE-TOUCHSTONE [START] # noqa: ERA001
