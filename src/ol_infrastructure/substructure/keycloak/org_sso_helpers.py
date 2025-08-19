@@ -67,7 +67,7 @@ def create_org_for_learn(org_config: OrgConfig) -> keycloak.organization.Organiz
 
 def onboard_saml_org(
     saml_config: SamlIdpConfig,
-):
+) -> None:
     org = create_org_for_learn(saml_config)
 
     saml_args = generate_pulumi_args_dict(
