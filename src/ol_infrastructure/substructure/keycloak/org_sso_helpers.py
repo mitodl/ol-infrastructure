@@ -19,12 +19,18 @@ class NameIdFormat(str, Enum):
     persistent = "Persistent"
 
 
+class AttributeFormat(str, Enum):
+    basic = "ATTRIBUTE_FORMAT_BASIC"
+    uri = "ATTRIBUTE_FORMAT_URI"
+
+
 class OrgConfig(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     org_domains: list[str]
     org_name: str
     org_alias: str
     learn_domain: str
+    attribute_format: AttributeFormat = AttributeFormat.basic
     realm_id: str | pulumi.Output[str]
     resource_options: pulumi.ResourceOptions
 
@@ -36,6 +42,7 @@ class SamlIdpConfig(OrgConfig):
     name_id_format: NameIdFormat = NameIdFormat.unspecified
     principal_type: Literal["SUBJECT", "ATTRIBUTE"] = "SUBJECT"
     principal_attribute: str | None = None
+    mapper_attribute_format: AttributeFormat = AttributeFormat.basic
 
     @model_validator(mode="after")
     def ensure_principal_types(self):
@@ -120,6 +127,7 @@ def onboard_saml_org(
                     user_attribute=attr,
                     extra_config={
                         "syncMode": "INHERIT",
+                        "attribute.name.format": saml_config.mapper_attribute_format,
                     },
                     opts=saml_config.resource_options,
                 )
