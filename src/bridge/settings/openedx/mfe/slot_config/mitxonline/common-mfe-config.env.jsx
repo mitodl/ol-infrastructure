@@ -23,7 +23,7 @@ const linkTitles = {
 
 const copyRightText = "Massachusetts Institute of Technology";
 
-const logo = <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={"https://web.mit.edu/"} />;
+const logo = <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={process.env.MIT_BASE_URL} />;
 
 let userMenu = [
   {

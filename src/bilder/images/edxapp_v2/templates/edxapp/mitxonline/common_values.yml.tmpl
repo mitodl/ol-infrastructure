@@ -430,12 +430,10 @@ MKTG_URL_LINK_MAP:
     TOS: tos
     ABOUT: about
     ACCESSIBILITY: accessibility
-    CONTACT: contact
 MKTG_URL_OVERRIDES:
-    TOS: https://{{ key "edxapp/learn-frontend-domain" }}/about
-    ABOUT: https://{{ key "edxapp/learn-frontend-domain" }}/terms
+    TOS: https://{{ key "edxapp/learn-frontend-domain" }}/terms
+    ABOUT: https://{{ key "edxapp/learn-frontend-domain" }}/about
     ACCESSIBILITY: https://accessibility.mit.edu/
-    CONTACT: VALUE_SET_IN_SITE_CONFIGURATION
 MOBILE_STORE_URLS: {}
 ########################################################################################
 # Previously assumed to be unnecessary config as it duplicates code from               #
@@ -570,6 +568,7 @@ STATIC_URL_BASE: /static/
 STATIC_ROOT_BASE: /openedx/staticfiles/
 STUDIO_NAME: Studio
 STUDIO_SHORT_NAME: Studio
+SUPPORT_SITE_LINK: https://mitxonline.zendesk.com/hc/
 SYSADMIN_DEFAULT_BRANCH: live
 SYSTEM_WIDE_ROLE_CLASSES: []
 TECH_SUPPORT_EMAIL: odl-devops@mit.edu  # MODIFIED
