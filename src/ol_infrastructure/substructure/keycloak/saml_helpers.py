@@ -53,7 +53,7 @@ def extract_saml_metadata(metadata_url: str) -> dict[str, str | None]:
     Extract relevant information from a SAML IdP metadata XML file.
 
     Args:
-        metadata_file (str): Path to the SAML IdP metadata XML file.
+        metadata_url (str): The URL of the SAML IdP metadata XML file.
 
     Returns:
         dict: A dictionary containing the extracted metadata attributes,
