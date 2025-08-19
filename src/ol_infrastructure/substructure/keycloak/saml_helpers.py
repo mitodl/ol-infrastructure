@@ -60,7 +60,6 @@ def extract_saml_metadata(metadata_url: str) -> dict[str, str | None]:
               or None if parsing fails.
     """
     try:
-        with urlopen(metadata_url) as metadata_file:  # noqa: S310
         # Validate URL scheme
         parsed_url = urlparse(metadata_url)
         if parsed_url.scheme != "https":
