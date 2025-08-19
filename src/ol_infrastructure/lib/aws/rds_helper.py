@@ -102,6 +102,14 @@ def get_rds_instance(instance_name: str) -> dict[str, str]:
 
 
 def turn_off_deletion_protection(db_identifier: str):
+    """
+    Disable deletion protection for the specified RDS database instance.
+
+    :param db_identifier: The identifier of the RDS database instance.
+    :type db_identifier: str
+
+    :raises botocore.exceptions.ClientError: If the AWS API call fails or the instance does not exist.
+    """
     rds_client.modify_db_instance(
         DBInstanceIdentifier=db_identifier,
         ApplyImmediately=True,
