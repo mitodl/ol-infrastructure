@@ -1,6 +1,9 @@
+import io
 import xml.etree.ElementTree as ET
 from collections.abc import Collection
 from urllib.request import urlopen
+
+from urlllib.parse import urlparse
 
 SAML_FRIENDLY_NAMES = {
     "firstName": [
@@ -63,15 +66,17 @@ def extract_saml_metadata(metadata_url: str) -> dict[str, str | None]:
         # Validate URL scheme
         parsed_url = urlparse(metadata_url)
         if parsed_url.scheme != "https":
-            raise ValueError("Only HTTPS URLs are allowed for SAML metadata.")
+            msg = "Only HTTPS URLs are allowed for SAML metadata."
+            raise ValueError(msg)
         # Set timeout and limit response size
         MAX_METADATA_SIZE = 5 * 1024 * 1024  # 5MB
         with urlopen(metadata_url, timeout=10) as metadata_file:  # noqa: S310
             metadata_bytes = metadata_file.read(MAX_METADATA_SIZE + 1)
             if len(metadata_bytes) > MAX_METADATA_SIZE:
-                raise ValueError("SAML metadata file is too large.")
+                msg = "SAML metadata file is too large."
+                raise ValueError(msg)
             tree = ET.ElementTree(ET.fromstring(metadata_bytes))  # noqa: S314
-            root = tree.getroot()
+            root = tree.getroot() or ET.Element(tag="")
 
             # Define namespaces
             namespaces = {
@@ -108,8 +113,6 @@ def extract_saml_metadata(metadata_url: str) -> dict[str, str | None]:
             }
 
     except ET.ParseError:
-        return {}
-    except (ET.ParseError, ValueError):
         return {}
 
 
@@ -156,24 +159,24 @@ def get_saml_attribute_mappers(  # noqa: C901, PLR0912
 
     """
     try:
-        with urlopen(metadata_url) as metadata_file:  # noqa: S310
         # Validate HTTPS URL
         if not metadata_url.lower().startswith("https://"):
-            raise ValueError("SAML metadata URL must use HTTPS.")
+            msg = "SAML metadata URL must use HTTPS."
+            raise ValueError(msg)
         # Limit response size to 10 MB
         MAX_METADATA_SIZE = 10 * 1024 * 1024  # 10 MB
         with urlopen(metadata_url) as metadata_file:  # noqa: S310
             metadata_bytes = metadata_file.read(MAX_METADATA_SIZE + 1)
             if len(metadata_bytes) > MAX_METADATA_SIZE:
-                raise ValueError("SAML metadata response too large.")
+                msg = "SAML metadata response too large."
+                raise ValueError(msg)
             tree = ET.parse(io.BytesIO(metadata_bytes))  # noqa: S314
             root = tree.getroot()
             namespaces = {
                 "md": "urn:oasis:names:tc:SAML:2.0:metadata",
                 "saml": "urn:oasis:names:tc:SAML:2.0:assertion",
             }
-    except ET.ParseError:
-        return {}
+
     except ET.ParseError:
         return {}
 
