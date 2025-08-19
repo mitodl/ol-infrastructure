@@ -60,6 +60,8 @@ config:
     SESSION_COOKIE_NAME: "session_mitxonline"
     UWSGI_ENABLE_THREADS: "1"
     UWSGI_THREADS: "25"
+    MIT_LEARN_FROM_EMAIL: "MIT Learn <mitlearn-support@mit.edu>"
+    MIT_LEARN_DASHBOARD_URL: "https://learn.mit.edu/dashboard"
   redis:password:
     secure: v1:yvRUeBECxXQn0EuQ:CzfHq2P7kQGgULkRI7EFThTAnZyxq4uLvCTAdCYWpgvKl6Hwir6Gfk6UgU//ceOEKXrLVw6mRf34oWU=
   vault:address: https://vault-production.odl.mit.edu
