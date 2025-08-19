@@ -256,7 +256,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 turn_off_deletion_protection(db_instance_identifier)
             else:
                 pulumi.log.warn(
-                    "Could not turn off deletion protection: DBInstanceIdentifier is None."
+                    "Could not turn off deletion protection: DBInstanceIdentifier is None."  # noqa: E501
                 )
             deletion_protection_for_primary = False
             custom_timeouts = pulumi.CustomTimeouts(
