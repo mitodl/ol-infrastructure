@@ -11,7 +11,7 @@ from ol_concourse.lib.models.pipeline import (
     PutStep,
     Resource,
 )
-from ol_concourse.lib.resources import git_repo, ssh_git_repo
+from ol_concourse.lib.resources import ssh_git_repo
 
 
 @dataclasses.dataclass
