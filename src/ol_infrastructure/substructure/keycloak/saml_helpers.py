@@ -110,7 +110,7 @@ def extract_saml_metadata(metadata_url: str) -> dict[str, str | None]:
 
     except ET.ParseError:
         return {}
-    except Exception:  # noqa: BLE001
+    except (ET.ParseError, ValueError):
         return {}
 
 
