@@ -99,3 +99,11 @@ def get_rds_instance(instance_name: str) -> dict[str, str]:
     except rds_client.exceptions.DBInstanceNotFoundFault:
         db_instance = {}
     return db_instance
+
+
+def turn_off_deletion_protection(db_identifier: str):
+    rds_client.modify_db_instance(
+        DBInstanceIdentifier=db_identifier,
+        ApplyImmediately=True,
+        DeletionProtection=False,
+    )

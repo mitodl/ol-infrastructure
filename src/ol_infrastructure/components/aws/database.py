@@ -36,6 +36,7 @@ from ol_infrastructure.lib.aws.rds_helper import (
     get_rds_instance,
     max_minor_version,
     parameter_group_family,
+    turn_off_deletion_protection,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 
@@ -86,6 +87,7 @@ class OLDBConfig(AWSBase):
     subnet_group_name: str | pulumi.Output[str]
     take_final_snapshot: bool = True
     use_blue_green: bool = False
+    blue_green_timeout_minutes: PositiveInt = PositiveInt(180)
     username: str = "oldevops"  # The name of the admin user for the instance
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -213,8 +215,51 @@ class OLAmazonDB(pulumi.ComponentResource):
         primary_parameter_group_family = replica_parameter_group_family = (
             parameter_group_family(db_config.engine, db_config.engine_version)
         )
+        current_db_state = get_rds_instance(db_config.instance_name)
+        deletion_protection_for_primary = db_config.prevent_delete
+
+        # There are a handful of cases that will trigger a blue/green update when that
+        # is enabled. Those include:
+        # - DB Engine Version: Upgrading or downgrading the major or minor version of
+        #   your database engine (e.g., changing from PostgreSQL 14 to 15).
+        # - DB Instance Class: Modifying the compute and memory capacity of your
+        #   instance.
+        # - Storage Configuration: Changing the allocated storage size or storage type
+        #   (e.g., from gp2 to gp3).
+        # - DB Parameter Group: Applying changes to database parameters that require a
+        #   restart or are not dynamically applied.
+        # - Option Group: Modifying options associated with your database instance.
+        # - Multi-AZ Configuration: Enabling or disabling Multi-AZ for your instance.
+
+        # If the current state of the database differs from the configured values for
+        # those attributes it will result in starting a blue/green update. In those
+        # cases the deletion protection should be disabled, as this will prevent the
+        # blue/green deployment from being cleaned up by Pulumi when it is complete. The
+        # ResourceOptions will also need to be updated to increase the timeouts to allow
+        # for successful completion of the blue/green update process. Currently it is
+        # timing out at 1 hour, so we should likely allow for up to at least 3 hours
+        # before timing out, with a configurable parameter for the maximum timeout.
+        if db_config.use_blue_green and any(
+            (
+                db_config.engine_version != current_db_state["EngineVersion"],
+                db_config.multi_az != current_db_state["MultiAZ"],
+                db_config.storage_type != current_db_state["StorageType"],
+                db_config.instance_size != current_db_state["DBInstanceClass"],
+            )
+        ):
+            turn_off_deletion_protection(current_db_state["DBInstanceIdentifier"])
+            deletion_protection_for_primary = False
+            custom_timeouts = pulumi.CustomTimeouts(
+                create=f"{db_config.blue_green_timeout_minutes}m",
+                update=f"{db_config.blue_green_timeout_minutes}m",
+                delete=f"{db_config.blue_green_timeout_minutes}m",
+            )
+            resource_options = pulumi.ResourceOptions.merge(
+                resource_options,
+                pulumi.ResourceOptions(custom_timeouts=custom_timeouts),
+            )
+
         if db_config.read_replica:
-            current_db_state = get_rds_instance(db_config.instance_name)
             replica_identifier = f"{db_config.instance_name}-replica"
             current_replica_state = get_rds_instance(replica_identifier)
             if (
@@ -263,7 +308,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             copy_tags_to_snapshot=True,
             db_name=db_config.db_name,
             db_subnet_group_name=db_config.subnet_group_name,
-            deletion_protection=db_config.prevent_delete,
+            deletion_protection=deletion_protection_for_primary,
             engine=db_config.engine,
             engine_version=primary_engine_version,
             final_snapshot_identifier=(
