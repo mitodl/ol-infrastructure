@@ -166,7 +166,7 @@ def get_saml_attribute_mappers(  # noqa: C901, PLR0912
             }
     except ET.ParseError:
         return {}
-    except Exception:  # noqa: BLE001
+    except ET.ParseError:
         return {}
 
     attribute_mapping_candidates = {
