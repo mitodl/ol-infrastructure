@@ -115,6 +115,7 @@ def onboard_saml_org(
             realm=saml_config.realm_id,
             identity_provider_alias=org_idp.alias,
             **args,
+            opts=saml_config.resource_options,
         )
     if not mappers:
         for attr, friendly_names in SAML_FRIENDLY_NAMES.items():
