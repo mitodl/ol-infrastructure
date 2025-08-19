@@ -245,6 +245,8 @@ def create_mitxonline_k8s_secrets(
                 "OPENEDX_API_CLIENT_SECRET": '{{ index .Secrets "open-edx-api-client" "client-secret" }}',
                 "OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID": '{{ index .Secrets "open-edx-retirement-service-worker" "client-id" }}',
                 "OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET": '{{ index .Secrets "open-edx-retirement-service-worker" "client-secret" }}',
+                "OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID": '{{ index .Secrets "open-edx-courses-service-worker" "client-id" }}',
+                "OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET": '{{ index .Secrets "open-edx-courses-service-worker" "client-secret" }}',
                 "OPENEDX_SERVICE_WORKER_API_TOKEN": '{{ index .Secrets "open-edx-service-worker" "api-token" }}',
                 "OPEN_EXCHANGE_RATES_APP_ID": '{{ index .Secrets "open-exchange-rates" "app-id" }}',
                 "POSTHOG_API_TOKEN": '{{ index .Secrets "posthog" "api-token" }}',
