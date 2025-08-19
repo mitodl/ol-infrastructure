@@ -34,8 +34,8 @@ config:
     OPENTELEMETRY_ENDPOINT: "grafana-alloy.operations.svc.cluster.local:4317"
     PROBLEM_SET_URL: https://api.rc.learn.mit.edu/api/v0/tutor/problems/
     SENTRY_LOG_LEVEL: "ERROR"
-    SENTRY_PROFILES_SAMPLE_RATE: "0.1"
-    SENTRY_TRACES_SAMPLE_RATE: "0.1"
+    SENTRY_PROFILES_SAMPLE_RATE: "0"
+    SENTRY_TRACES_SAMPLE_RATE: "0"
     SESSION_COOKIE_NAME: "session_learn_ai_ci"
     UWSGI_THREADS: "5"
   learn_ai:frontend_domain: "learn-ai-ci.ol.mit.edu"

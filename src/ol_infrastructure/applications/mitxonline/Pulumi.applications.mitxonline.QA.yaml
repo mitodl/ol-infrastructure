@@ -48,8 +48,8 @@ config:
     OPENTELEMETRY_ENABLED: "true"
     OPENTELEMETRY_ENDPOINT: "http://grafana-alloy.operations.svc.cluster.local:4318/v1/traces"
     SENTRY_LOG_LEVEL: "ERROR"
-    SENTRY_PROFILES_SAMPLE_RATE: "1.0"
-    SENTRY_TRACES_SAMPLE_RATE: "1.0"
+    SENTRY_PROFILES_SAMPLE_RATE: "0.25"
+    SENTRY_TRACES_SAMPLE_RATE: "0.25"
     SESSION_COOKIE_NAME: "session_mitxonline_rc"
   redis:password:
     secure: v1:rFyMZ8hojMNVgkJb:YmQuqHaePqYVtbE4nJXFupDfowZvdjH6AXsKOPJpGgWCdXFrOy9zzNDu2zCiMFkXPVRc1iobr/au9viSl7GZX4f7lw==
