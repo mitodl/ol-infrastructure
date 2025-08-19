@@ -153,20 +153,18 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         realm_id=ol_apps_realm.realm,
         attributes=[
             keycloak.RealmUserProfileAttributeArgs(
-                name="username",
-                display_name="${username}",
+                name="fullName",
+                display_name="${fullName}",
                 validators=[
                     keycloak.RealmUserProfileAttributeValidatorArgs(
                         name="length",
-                        config={"min": "3", "max": "255"},
+                        config={"max": "512"},
                     ),
                     keycloak.RealmUserProfileAttributeValidatorArgs(
-                        name="username-prohibited-characters", config={}
-                    ),
-                    keycloak.RealmUserProfileAttributeValidatorArgs(
-                        name="up-username-not-idn-homograph", config={}
+                        name="person-name-prohibited-characters", config={}
                     ),
                 ],
+                required_for_roles=["user"],
                 permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
                     views=["admin", "user"], edits=["admin", "user"]
                 ),
@@ -190,18 +188,20 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 ),
             ),
             keycloak.RealmUserProfileAttributeArgs(
-                name="fullName",
-                display_name="${fullName}",
+                name="username",
+                display_name="${username}",
                 validators=[
                     keycloak.RealmUserProfileAttributeValidatorArgs(
                         name="length",
-                        config={"max": "512"},
+                        config={"min": "3", "max": "255"},
                     ),
                     keycloak.RealmUserProfileAttributeValidatorArgs(
-                        name="person-name-prohibited-characters", config={}
+                        name="username-prohibited-characters", config={}
+                    ),
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="up-username-not-idn-homograph", config={}
                     ),
                 ],
-                required_for_roles=["user"],
                 permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
                     views=["admin", "user"], edits=["admin", "user"]
                 ),
