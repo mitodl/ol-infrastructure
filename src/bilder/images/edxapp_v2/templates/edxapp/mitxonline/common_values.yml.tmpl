@@ -394,6 +394,7 @@ UAI_COURSE_KEY_FORMATS:
   - course-v1:uai_
   - course-v1:mit_et
 MIT_LEARN_LOGO: https://{{ key "edxapp/lms-domain" }}/static/mitxonline/images/mit-learn-logo.svg"
+MITOL_SUPPORT_EMAIL: "learn-support@mit.edu"
 LEARNER_PORTAL_URL_ROOT: https://learner-portal-localhost:18000
 LEARNER_HOME_MICROFRONTEND_URL: '/dashboard/'
 LEARNING_MICROFRONTEND_URL: https://{{ key "edxapp/lms-domain" }}/learn
@@ -428,20 +429,14 @@ MKTG_URLS:
     ROOT: https://{{ key "edxapp/marketing-domain" }}/
 MKTG_URL_LINK_MAP:
     TOS: tos
-    HONOR: honor
     ABOUT: about
-    PRIVACY: privacy
     ACCESSIBILITY: accessibility
-    HELP_CENTER: help-center
+    CONTACT: contact
 MKTG_URL_OVERRIDES:
-    COURSES: https://{{ key "edxapp/marketing-domain" }}/
-    PRIVACY: https://{{ key "edxapp/marketing-domain" }}/privacy-policy/
-    TOS: https://{{ key "edxapp/marketing-domain" }}/terms-of-service/
-    ABOUT: https://{{ key "edxapp/marketing-domain" }}/about-us/
-    HONOR: https://{{ key "edxapp/marketing-domain" }}/honor-code/
+    TOS: https://{{ key "edxapp/learn-frontend-domain" }}/about
+    ABOUT: https://{{ key "edxapp/learn-frontend-domain" }}/terms
     ACCESSIBILITY: https://accessibility.mit.edu/
-    CONTACT: https://mitxonline.zendesk.com/hc/en-us/requests/new/
-    TOS_AND_HONOR: ''
+    CONTACT: VALUE_SET_IN_SITE_CONFIGURATION
 MOBILE_STORE_URLS: {}
 ########################################################################################
 # Previously assumed to be unnecessary config as it duplicates code from               #
@@ -576,7 +571,6 @@ STATIC_URL_BASE: /static/
 STATIC_ROOT_BASE: /openedx/staticfiles/
 STUDIO_NAME: Studio
 STUDIO_SHORT_NAME: Studio
-SUPPORT_SITE_LINK: https://mitxonline.zendesk.com/hc/
 SYSADMIN_DEFAULT_BRANCH: live
 SYSTEM_WIDE_ROLE_CLASSES: []
 TECH_SUPPORT_EMAIL: odl-devops@mit.edu  # MODIFIED
