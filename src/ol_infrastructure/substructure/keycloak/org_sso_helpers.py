@@ -1,5 +1,9 @@
+from enum import Enum
+from typing import Literal
+
 import pulumi
 import pulumi_keycloak as keycloak
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from ol_infrastructure.substructure.keycloak.saml_helpers import (
     SAML_FRIENDLY_NAMES,
@@ -9,76 +13,99 @@ from ol_infrastructure.substructure.keycloak.saml_helpers import (
 )
 
 
-def create_org_for_learn(  # noqa: PLR0913
-    org_domains: list[str],
-    org_name: str,
-    org_alias: str,
-    learn_domain: str,
-    realm_id: str | pulumi.Output[str],
-    resource_options: pulumi.ResourceOptions,
-) -> keycloak.organization.Organization:
+class NameIdFormat(str, Enum):
+    unspecified = "Unspecified"
+    email = "Email"
+    persistent = "Persistent"
+
+
+class OrgConfig(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    org_domains: list[str]
+    org_name: str
+    org_alias: str
+    learn_domain: str
+    realm_id: str | pulumi.Output[str]
+    resource_options: pulumi.ResourceOptions
+
+
+class SamlIdpConfig(OrgConfig):
+    org_saml_metadata_url: str
+    keycloak_url: str
+    first_login_flow: keycloak.authentication.Flow
+    name_id_format: NameIdFormat = NameIdFormat.unspecified
+    principal_type: Literal["SUBJECT", "ATTRIBUTE"] = "SUBJECT"
+    principal_attribute: str | None = None
+
+    @model_validator(mode="after")
+    def ensure_principal_types(self):
+        if self.principal_type == "ATTRIBUTE" and self.principal_attribute is None:
+            msg = (
+                "If using an attribute as the principal type you must set the "
+                "principal attribute."
+            )
+            raise ValueError(msg)
+        return self
+
+
+def create_org_for_learn(org_config: OrgConfig) -> keycloak.organization.Organization:
     return keycloak.organization.Organization(
-        f"ol-apps-{org_alias}-organization",
+        f"ol-apps-{org_config.org_alias}-organization",
         domains=[
             keycloak.organization.OrganizationDomainArgs(name=org_domain, verified=True)
-            for org_domain in org_domains
+            for org_domain in org_config.org_domains
         ],
         enabled=True,
-        name=org_name,
-        alias=org_alias.lower(),
-        redirect_url=f"https://{learn_domain}/dashboard/organization/{org_alias.lower()}",
-        realm=realm_id,
-        attributes={"slug": org_alias},
-        opts=resource_options,
+        name=org_config.org_name,
+        alias=org_config.org_alias.lower(),
+        redirect_url=f"https://{org_config.learn_domain}/dashboard/organization/{org_config.org_alias.lower()}",
+        realm=org_config.realm_id,
+        attributes={"slug": org_config.org_alias},
+        opts=org_config.resource_options,
     )
 
 
-def onboard_saml_org(  # noqa: PLR0913
-    org_domains: list[str],
-    org_name: str,
-    org_alias: str,
-    org_saml_metadata_url: str,
-    keycloak_url: str,
-    learn_domain: str,
-    realm_id: str | pulumi.Output[str],
-    first_login_flow: pulumi.Output[keycloak.authentication.Flow],
-    resource_options: pulumi.ResourceOptions,
+def onboard_saml_org(
+    saml_config: SamlIdpConfig,
 ):
-    org = create_org_for_learn(
-        org_domains, org_name, org_alias, learn_domain, realm_id, resource_options
+    org = create_org_for_learn(saml_config)
+
+    saml_args = generate_pulumi_args_dict(
+        extract_saml_metadata(saml_config.org_saml_metadata_url)
     )
-
-    saml_args = generate_pulumi_args_dict(extract_saml_metadata(org_saml_metadata_url))
-
+    mappers = get_saml_attribute_mappers(
+        saml_config.org_saml_metadata_url, saml_config.org_alias.lower()
+    )
     org_idp = keycloak.saml.IdentityProvider(
-        f"ol-apps-{org_alias}-saml-idp",
-        alias=org_alias.lower(),
-        display_name=org_name,
-        entity_id=f"{keycloak_url}/realms/olapps",
-        first_broker_login_flow_alias=first_login_flow.alias,
+        f"ol-apps-{saml_config.org_alias}-saml-idp",
+        alias=saml_config.org_alias.lower(),
+        display_name=saml_config.org_name,
+        entity_id=f"{saml_config.keycloak_url}/realms/olapps",
+        first_broker_login_flow_alias=saml_config.first_login_flow.alias,
         hide_on_login_page=True,
-        name_id_policy_format="Unspecified",
+        name_id_policy_format=saml_config.name_id_format,
         org_domain="ANY",
         org_redirect_mode_email_matches=True,
         organization_id=org.id,
         post_binding_authn_request=True,
         post_binding_response=True,
-        realm=realm_id,
+        principal_type=saml_config.principal_type,
+        principal_attribute=saml_config.principal_attribute,
+        realm=saml_config.realm_id,
         sync_mode="IMPORT",
         trust_email=True,
         validate_signature=True,
-        opts=resource_options,
+        opts=saml_config.resource_options,
         extra_config={
-            "metadataDescriptorUrl": org_saml_metadata_url,
+            "metadataDescriptorUrl": saml_config.org_saml_metadata_url,
             "useMetadataDescriptorUrl": True,
         },
         **saml_args,
     )
-    mappers = get_saml_attribute_mappers(org_saml_metadata_url, org_alias.lower())
     for attr, args in mappers.items():
         keycloak.AttributeImporterIdentityProviderMapper(
-            f"map-{org_alias}-saml-{attr}-attribute",
-            realm=realm_id,
+            f"map-{saml_config.org_alias}-saml-{attr}-attribute",
+            realm=saml_config.realm_id,
             identity_provider_alias=org_idp.alias,
             **args,
         )
@@ -86,13 +113,13 @@ def onboard_saml_org(  # noqa: PLR0913
         for attr, friendly_names in SAML_FRIENDLY_NAMES.items():
             for friendly_name in friendly_names:
                 keycloak.AttributeImporterIdentityProviderMapper(
-                    f"map-{org_alias}-saml-{friendly_name}-attribute",
-                    realm=realm_id,
+                    f"map-{saml_config.org_alias}-saml-{friendly_name}-attribute",
+                    realm=saml_config.realm_id,
                     attribute_friendly_name=friendly_name,
                     identity_provider_alias=org_idp.alias,
                     user_attribute=attr,
                     extra_config={
                         "syncMode": "INHERIT",
                     },
-                    opts=resource_options,
+                    opts=saml_config.resource_options,
                 )

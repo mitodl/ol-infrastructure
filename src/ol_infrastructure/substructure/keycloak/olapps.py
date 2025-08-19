@@ -13,6 +13,8 @@ from ol_infrastructure.substructure.keycloak.org_flows import (
     create_organization_scope,
 )
 from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
+    OrgConfig,
+    SamlIdpConfig,
     create_org_for_learn,
     onboard_saml_org,
 )
@@ -702,34 +704,42 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     # B2B Organizations [BEGIN]
     if stack_info.env_suffix == "production":
         onboard_saml_org(
-            org_domains=["hhchealth.org"],
-            org_name="Hartford Health Care",
-            org_alias="HHC",
-            org_saml_metadata_url="https://adfs.hhchealth.org/federationmetadata/2007-06/federationmetadata.xml",
-            keycloak_url=keycloak_url,
-            learn_domain=mitlearn_domain,
-            realm_id=ol_apps_realm.id,
-            first_login_flow=ol_first_login_flow,
-            resource_options=resource_options,
+            SamlIdpConfig(
+                org_domains=["hhchealth.org"],
+                org_name="Hartford Health Care",
+                org_alias="HHC",
+                org_saml_metadata_url="https://adfs.hhchealth.org/federationmetadata/2007-06/federationmetadata.xml",
+                keycloak_url=keycloak_url,
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                principal_type="ATTRIBUTE",
+                principal_attribute="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+            )
         )
         onboard_saml_org(
-            org_domains=["ntua.gr"],
-            org_name="National Technical University of Athens",
-            org_alias="NTUA",
-            org_saml_metadata_url="https://login.ntua.gr/idp/shibboleth",
-            keycloak_url=keycloak_url,
-            learn_domain=mitlearn_domain,
-            realm_id=ol_apps_realm.id,
-            first_login_flow=ol_first_login_flow,
-            resource_options=resource_options,
+            SamlIdpConfig(
+                org_domains=["ntua.gr"],
+                org_name="National Technical University of Athens",
+                org_alias="NTUA",
+                org_saml_metadata_url="https://login.ntua.gr/idp/shibboleth",
+                keycloak_url=keycloak_url,
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+            )
         )
         create_org_for_learn(
-            org_domains=["ttt-example.edu"],
-            org_name="Train the Trainer",
-            org_alias="TTT",
-            learn_domain=mitlearn_domain,
-            realm_id=ol_apps_realm.id,
-            resource_options=resource_options,
+            OrgConfig(
+                org_domains=["ttt-example.edu"],
+                org_name="Train the Trainer",
+                org_alias="TTT",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            )
         )
     # B2B Organizations [END]
 
