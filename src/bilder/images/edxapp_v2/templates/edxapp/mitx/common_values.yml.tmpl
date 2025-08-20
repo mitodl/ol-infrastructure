@@ -441,6 +441,7 @@ LOG_DIR: /openedx/data/var/log/edx
 LOGO_URL: https://{{ key "edxapp/lms-domain" }}/static/mitx/images/logo.svg
 LOGO_URL_PNG_FOR_EMAIL: https://{{ key "edxapp/lms-domain" }}/static/mitx/images/logo.png
 LOGO_TRADEMARK_URL: https://{{ key "edxapp/lms-domain" }}/static/mitx/images/mit-ol-logo.svg
+LTI_AGGREGATE_SCORE_PASSBACK_DELAY: 300 # Sync every 5 minutes
 MIT_LEARN_AI_API_URL: https://{{ key "edxapp/learn-api-domain" }}/ai  # Added for ol_openedx_chat
 MIT_LEARN_API_BASE_URL: https://{{ key "edxapp/learn-api-domain" }}/learn  # Added for ol_openedx_chat
 MIT_LEARN_SUMMARY_FLASHCARD_URL: https://{{ key "edxapp/learn-api-domain" }}/learn/api/v1/contentfiles/  # Added for ol_openedx_chat
