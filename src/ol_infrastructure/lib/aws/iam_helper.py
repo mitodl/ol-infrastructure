@@ -9,6 +9,7 @@ IAM_POLICY_VERSION = "2012-10-17"
 
 ADMIN_USERNAMES = [
     "cpatti",
+    "dansubak",
     "ferdial",
     "ichuang",
     "mas48",
