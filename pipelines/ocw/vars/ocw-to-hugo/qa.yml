@@ -1,5 +1,4 @@
 ---
 open-learning-course-data-bucket: open-learning-course-data-rc
 ol-ocw-studio-app-bucket: ol-ocw-studio-app-qa
-ocw-studio-import-bucket: ocw-to-hugo-output-qa
 branch: release-candidate

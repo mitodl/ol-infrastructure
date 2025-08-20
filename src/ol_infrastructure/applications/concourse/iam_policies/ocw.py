@@ -26,8 +26,6 @@ policy_definition = {
             "Resource": [
                 "arn:aws:s3:::ocw-content*",
                 "arn:aws:s3:::ocw-content*/*",
-                "arn:aws:s3:::ocw-to-hugo-output*",
-                "arn:aws:s3:::ocw-to-hugo-output*/*",
             ],
         },
         {
