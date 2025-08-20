@@ -87,7 +87,7 @@ class OLDBConfig(AWSBase):
     subnet_group_name: str | pulumi.Output[str]
     take_final_snapshot: bool = True
     use_blue_green: bool = False
-    blue_green_timeout_minutes: PositiveInt = PositiveInt(180)
+    blue_green_timeout_minutes: PositiveInt = PositiveInt(60 * 8)
     username: str = "oldevops"  # The name of the admin user for the instance
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
