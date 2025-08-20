@@ -267,7 +267,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 pulumi.ResourceOptions(custom_timeouts=custom_timeouts),
             )
 
-        if db_config.read_replica and not db_config.use_blue_green:
+        if db_config.read_replica:
             replica_identifier = f"{db_config.instance_name}-replica"
             current_replica_state = get_rds_instance(replica_identifier)
             if (
@@ -280,6 +280,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 )
                 and engine_major_version(db_config.engine_version)
                 == engine_major_version(current_db_state["EngineVersion"])
+                and not db_config.use_blue_green
             ):
                 # Keep the primary engine version pinned while the replica is upgraded
                 # first.
