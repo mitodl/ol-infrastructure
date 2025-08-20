@@ -72,6 +72,7 @@ create_ol_platform_engineering_realm(
     keycloak_provider,
     keycloak_url,
     env_name,
+    stack_info,
     mit_email_password,
     mit_email_username,
     mit_email_host,
