@@ -29,7 +29,7 @@ let learningMFEConfig = {
 }
 
 // Configure the Breadcrumbs old behaviour in MITx Online Learning MFE
-if (getConfig().SITE_NAME.includes("MITx Online")) {
+if (process.env.DEPLOYMENT_NAME.includes("mitxonline")) {
   learningMFEConfig.pluginSlots = {
       ...config.pluginSlots,
       // Render the CourseBreadcrumbs component in the course_breadcrumbs slot
