@@ -51,7 +51,7 @@ course_repository = ssh_git_repo(
     name=Identifier("course_name"),
     uri="((course_repo))",
     branch="main",
-    private_key="((github_enterprise_ssh_key))",
+    private_key="((ol_notebooks_private_ssh_key))",
 )
 
 # Shouldn't need the AWS account ID as it'll infer it from the host's creds. Docs are a bit squiggy,
