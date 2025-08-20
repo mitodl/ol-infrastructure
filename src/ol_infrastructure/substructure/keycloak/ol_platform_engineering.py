@@ -38,7 +38,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913
         account_theme="keycloak.v3",
         admin_theme="keycloak.v2",
         login_theme="keycloak.v2",
-        email_them="keycloak",
+        email_theme="keycloak",
         registration_email_as_username=True,
         login_with_email_allowed=True,
         duplicate_emails_allowed=False,
