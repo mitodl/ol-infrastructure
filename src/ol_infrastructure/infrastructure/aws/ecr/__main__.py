@@ -110,7 +110,7 @@ aws.ecr.PullThroughCacheRule(
 )
 
 ecr_private_repository = aws.ecr.Repository(
-    "aws-ecr-private-repository", name="ol-ecr-private"
+    "aws-ecr-private-repository", name="ol-course-notebooks"
 )
 
 ecr_private_repository_policy = aws.ecr.RepositoryPolicy(
