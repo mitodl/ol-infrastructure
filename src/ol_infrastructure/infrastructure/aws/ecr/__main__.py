@@ -108,3 +108,11 @@ aws.ecr.PullThroughCacheRule(
     ecr_repository_prefix="dockerhub",
     credential_arn=dockerhub_credential.arn,
 )
+
+ecr_private_repository = aws.ecr.Repository(
+    "aws-ecr-private-repository",
+    name="ol-ecr-private")
+
+ecr_private_repository_policy =  aws.ecr.RepositoryPolicy("aws-ecr-private-repository-policy",
+    repository=ecr_private_repository.name,
+    policy=ecr_policy.json)
