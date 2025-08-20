@@ -156,10 +156,11 @@ class OLPostgresDBConfig(OLDBConfig):
     engine_major_version: str | int = "17"
     port: PositiveInt = PositiveInt(5432)
     parameter_overrides: list[dict[str, str | bool | int | float]] = [  # noqa: RUF012
-        {"name": "client_encoding", "value": "UTF-8"},
-        {"name": "timezone", "value": "UTC"},
-        {"name": "rds.force_ssl", "value": 1},
         {"name": "autovacuum", "value": 1},
+        {"name": "client_encoding", "value": "UTF-8"},
+        {"name": "rds.force_ssl", "value": 1},
+        {"name": "rds.logical_replication", "value": 1},
+        {"name": "timezone", "value": "UTC"},
     ]
 
 
