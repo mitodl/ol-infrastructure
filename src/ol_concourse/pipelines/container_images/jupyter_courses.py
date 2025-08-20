@@ -45,8 +45,6 @@ courses = [
     ),
 ]
 
-# TODO: This has been tested using a personal ssh key provisioned w/o a password. No safe way to include in the PR though.
-# TODO: Needs to use proper ssh key for github.mit.edu.
 course_repository = ssh_git_repo(
     name=Identifier("course_name"),
     uri="((course_repo))",
