@@ -55,8 +55,8 @@ class SamlIdpConfig(OrgConfig):
         return self
 
 
-def create_org_for_learn(org_config: OrgConfig) -> keycloak.organization.Organization:
-    return keycloak.organization.Organization(
+def create_org_for_learn(org_config: OrgConfig) -> keycloak.Organization:
+    return keycloak.Organization(
         f"ol-apps-{org_config.org_alias}-organization",
         domains=[
             keycloak.organization.OrganizationDomainArgs(name=org_domain, verified=True)

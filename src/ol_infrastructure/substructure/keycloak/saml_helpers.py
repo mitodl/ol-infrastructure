@@ -147,7 +147,7 @@ def generate_pulumi_args_dict(metadata: dict[str, str]) -> dict[str, str]:
     return args_dict
 
 
-def get_saml_attribute_mappers(  # noqa: C901
+def get_saml_attribute_mappers(
     metadata_url: str, idp_alias: str
 ) -> dict[str, dict[str, Collection[str]]]:
     """Parse SAML metadata to find attributes that can be used for attribute mappers.
@@ -172,77 +172,26 @@ def get_saml_attribute_mappers(  # noqa: C901
         "saml": "urn:oasis:names:tc:SAML:2.0:assertion",
     }
 
-    attribute_mapping_candidates = {
-        "email": [
-            "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
-            "urn:oid:0.9.2342.19200300.100.1.3",
-            "email",
-            "mail",
-        ],
-        "firstName": [
-            "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname",
-            "urn:oid:2.5.4.42",
-            "givenName",
-            "firstName",
-        ],
-        "lastName": [
-            "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
-            "urn:oid:2.5.4.4",
-            "lastName",
-            "sn",
-            "surname",
-        ],
-        "fullName": [
-            # ADFS "Name" claim for display name
-            "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
-            "displayName",  # Common FriendlyName
-        ],
-        "username": [
-            "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
-            "urn:oasis:names:tc:SAML:attribute-def:uid",
-            "sAMAccountName",
-            "NameID",
-            "username",
-        ],
-    }
-
     common_friendly_names = SAML_FRIENDLY_NAMES
     mappers = {}
 
     for (
         keycloak_user_attribute,
-        saml_attribute_candidates,
-    ) in attribute_mapping_candidates.items():
+        friendly_name_candidates,
+    ) in common_friendly_names.items():
         found_attribute_name = None
 
         # Check for matching Friendly Name first
-        if keycloak_user_attribute in common_friendly_names:
-            friendly_name_candidates = common_friendly_names[keycloak_user_attribute]
-            for candidate in friendly_name_candidates:
-                # Look for any attribute tag with a matching FriendlyName
-                attribute_element = root.find(
-                    f".//*[@FriendlyName='{candidate}']", namespaces
-                )
-                if attribute_element is not None:
-                    found_attribute_name = attribute_element.get("Name")
-                    if (
-                        not found_attribute_name
-                    ):  # Sometimes only FriendlyName is present
-                        found_attribute_name = candidate
-                    break  # Found a match, stop searching friendly names
-
-        # If not found, try by attribute name from candidates
-        if not found_attribute_name:
-            for candidate in saml_attribute_candidates:
-                if (
-                    root.find(
-                        f".//md:IDPSSODescriptor/saml:Attribute='{candidate}']",
-                        namespaces,
-                    )
-                    is not None
-                ):
+        for candidate in friendly_name_candidates:
+            # Look for any attribute tag with a matching FriendlyName
+            attribute_element = root.find(
+                f".//*[@FriendlyName='{candidate}']", namespaces
+            )
+            if attribute_element is not None:
+                found_attribute_name = attribute_element.get("Name")
+                if not found_attribute_name:  # Sometimes only FriendlyName is present
                     found_attribute_name = candidate
-                    break
+                break  # Found a match, stop searching friendly names
 
         if found_attribute_name:
             mappers[found_attribute_name] = {

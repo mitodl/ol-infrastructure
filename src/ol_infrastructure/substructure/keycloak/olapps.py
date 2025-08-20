@@ -613,6 +613,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         name="MIT",
         alias="mit",
+        attributes={"slug": "MIT"},
         redirect_url=f"https://{mitlearn_domain}/dashboard/organization/mit",
         realm=ol_apps_realm.id,
     )
@@ -702,6 +703,17 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     # Touchstone SAML [END]
 
     # B2B Organizations [BEGIN]
+    create_org_for_learn(
+        OrgConfig(
+            org_domains=["moira-mit.edu"],
+            org_name="MIT Moira",
+            org_alias="moira",
+            learn_domain=mitlearn_domain,
+            realm_id=ol_apps_realm.id,
+            resource_options=resource_options,
+        )
+    )
+
     if stack_info.env_suffix == "production":
         onboard_saml_org(
             SamlIdpConfig(
@@ -733,7 +745,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         )
         create_org_for_learn(
             OrgConfig(
-                org_domains=["ttt-example.edu"],
+                org_domains=["ttt-mit.edu"],
                 org_name="Train the Trainer",
                 org_alias="TTT",
                 learn_domain=mitlearn_domain,
@@ -741,6 +753,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 resource_options=resource_options,
             )
         )
+
     # B2B Organizations [END]
 
     if stack_info.env_suffix in ["ci", "qa"]:
