@@ -264,7 +264,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 pulumi.ResourceOptions(custom_timeouts=custom_timeouts),
             )
 
-        if db_config.read_replica:
+        if db_config.read_replica and not db_config.use_blue_green:
             replica_identifier = f"{db_config.instance_name}-replica"
             current_replica_state = get_rds_instance(replica_identifier)
             if (
