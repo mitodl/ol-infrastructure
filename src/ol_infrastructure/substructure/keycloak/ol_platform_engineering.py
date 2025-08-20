@@ -358,7 +358,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913
         opts=resource_options,
     )
     ol_browser_platform_engineering_passkey_flow = keycloak.authentication.Subflow(
-        "ol-browser-data-platform-passkey-flow",
+        "ol-browser-platform-engineering-passkey-flow",
         realm_id=ol_platform_engineering_realm.id,
         alias="ol-browser-platform-engineering-passkey-flow",
         parent_flow_alias=ol_browser_platform_engineering_flow.alias,
