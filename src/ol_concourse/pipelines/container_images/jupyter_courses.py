@@ -21,7 +21,8 @@ class CourseImageInfo:
     image_name: str
 
 
-# Used to make a parameterized pipeline which builds and publishes the image from GH to ECR
+# Used to make a parameterized pipeline which builds
+# and publishes the image from GH to ECR
 courses = [
     CourseImageInfo(
         course_name="course_deep_learning_foundations_and_applications",
@@ -52,8 +53,8 @@ course_repository = ssh_git_repo(
     private_key="((github.ol_notebooks_private_ssh_key))",
 )
 
-# Shouldn't need the AWS account ID as it'll infer it from the host's creds. Docs are a bit squiggy,
-# but the hope is that setting aws_region should allow it to construct the ECR hostname from the account ID and region.
+#This infers the ECR url from the AWS account,
+#the region and the repository name
 course_image = Resource(
     name=Identifier("course_image"),
     type="registry-image",
