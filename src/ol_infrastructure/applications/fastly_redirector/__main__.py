@@ -55,12 +55,16 @@ ol_redirect_service = fastly.ServiceVcl(
     ],
     snippets=[
         {
-            "content": Path("snippets/recv_redirects.vcl").read_text(),
+            "content": Path(__file__)
+            .parent.joinpath("snippets/recv_redirects.vcl")
+            .read_text(),
             "name": "recvRedirects",
             "type": "recv",
         },
         {
-            "content": Path("snippets/route_redirects.vcl").read_text(),
+            "content": Path(__file__)
+            .parent.joinpath("snippets/route_redirects.vcl")
+            .read_text(),
             "name": "routeRedirects",
             "type": "error",
         },
@@ -76,7 +80,9 @@ if stack_info.env_suffix == "production":
                 (d.dictionary_id for d in dicts if d.name == "redirects"), None
             )
         ),
-        items=json.loads(Path("ovs_redirect_dict.json").read_text()),
+        items=json.loads(
+            Path(__file__).parent.joinpath("ovs_redirect_dict.json").read_text()
+        ),
         service_id=ol_redirect_service.id,
         opts=pulumi.ResourceOptions(protect=True).merge(fastly_provider),
     )
