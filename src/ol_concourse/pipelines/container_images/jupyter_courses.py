@@ -53,8 +53,8 @@ course_repository = ssh_git_repo(
     private_key="((github.ol_notebooks_private_ssh_key))",
 )
 
-#This infers the ECR url from the AWS account,
-#the region and the repository name
+# This infers the ECR url from the AWS account,
+# the region and the repository name
 course_image = Resource(
     name=Identifier("course_image"),
     type="registry-image",
