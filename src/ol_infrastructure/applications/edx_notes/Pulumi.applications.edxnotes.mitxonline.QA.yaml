@@ -10,7 +10,7 @@ config:
     max: 2
     min: 1
   edxnotes:business_unit: mitxonline
-  edxnotes:dns_zone: mitxonline
+  edxnotes:dns_zone: learn
   edxnotes:domain: notes.rc.learn.mit.edu
   edxnotes:target_vpc: mitxonline_vpc
   vault:address: https://vault-qa.odl.mit.edu
