@@ -44,6 +44,8 @@ config:
     OPENTELEMETRY_ENDPOINT: "http://grafana-alloy.operations.svc.cluster.local:4318/v1/traces"
     SENTRY_LOG_LEVEL: "ERROR"
     SESSION_COOKIE_NAME: "session_mitxonline_ci"
+    MIT_LEARN_FROM_EMAIL: "MIT Learn <mitlearn-support@mit.edu>"
+    MIT_LEARN_DASHBOARD_URL: "https://learn.mit.edu/dashboard"
   redis:password:
     secure: v1:N1ZyKKPiMa/DaKYH:Y8NIcmgFnBBjTIUkT6PeefRnINIjVI/MMmX8IXKfxF5bLfMjRT/6dG8eYwMtHFSRMn+Kb1ZEJod3oqiSeMdeidttL4LPKK0=
   vault:address: https://vault-ci.odl.mit.edu

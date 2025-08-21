@@ -51,6 +51,8 @@ config:
     SENTRY_PROFILES_SAMPLE_RATE: "0.25"
     SENTRY_TRACES_SAMPLE_RATE: "0.25"
     SESSION_COOKIE_NAME: "session_mitxonline_rc"
+    MIT_LEARN_FROM_EMAIL: "MIT Learn <mitlearn-support@mit.edu>"
+    MIT_LEARN_DASHBOARD_URL: "https://learn.mit.edu/dashboard"
   redis:password:
     secure: v1:rFyMZ8hojMNVgkJb:YmQuqHaePqYVtbE4nJXFupDfowZvdjH6AXsKOPJpGgWCdXFrOy9zzNDu2zCiMFkXPVRc1iobr/au9viSl7GZX4f7lw==
   vault:address: https://vault-qa.odl.mit.edu
