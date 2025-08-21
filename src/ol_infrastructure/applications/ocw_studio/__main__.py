@@ -62,15 +62,6 @@ aws_account = get_caller_identity()
 
 # Create S3 buckets
 
-# Bucket used to store output from ocw-to-hugo which is markdown files rendered from
-# legacy OCW Plone content.
-ocw_to_hugo_bucket_name = f"ocw-to-hugo-output-{stack_info.env_suffix}"
-ocw_studio_legacy_markdown_bucket = s3.Bucket(
-    f"ocw-to-hugo-output-{stack_info.env_suffix}",
-    bucket=ocw_to_hugo_bucket_name,
-    tags=aws_config.tags,
-)
-
 # Bucket used to store file uploads from ocw-studio app.
 ocw_storage_bucket_name = f"ol-ocw-studio-app-{stack_info.env_suffix}"
 ocw_storage_bucket = s3.Bucket(
@@ -143,17 +134,6 @@ ocw_studio_iam_policy = iam.Policy(
                     "Effect": "Allow",
                     "Action": "s3:ListAllMyBuckets",
                     "Resource": "*",
-                },
-                {
-                    "Effect": "Allow",
-                    "Action": [
-                        "s3:ListBucket*",
-                        "s3:GetObject*",
-                    ],
-                    "Resource": [
-                        f"arn:aws:s3:::{ocw_to_hugo_bucket_name}",
-                        f"arn:aws:s3:::{ocw_to_hugo_bucket_name}/*",
-                    ],
                 },
                 {
                     "Effect": "Allow",
