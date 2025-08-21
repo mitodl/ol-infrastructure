@@ -1,0 +1,11 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAFUqc+t5s6+UczAijv7WGgGAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMs4G3sqpYrUkDArNdAgEQgDvSzjURsxvdceQNK3ebaLhsot8EB+w8VBUrR+kgNkIPx39yInWAr/0Peqsk8fryI8SoqpylgKBNfcTvqQ==
+config:
+  redirects:domains:
+  - amps.odl.mit.edu
+  - chalkradiopodcast.com
+  - chalkradiopodcast.net
+  - chalkradiopodcast.org
+  - mitxpro.mit.edu
+  - starcellbio.mit.edu
