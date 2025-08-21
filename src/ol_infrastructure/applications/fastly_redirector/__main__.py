@@ -68,7 +68,12 @@ ol_redirect_service = fastly.ServiceVcl(
 
 ol_redirect_service_redirects_dictionary = fastly.ServiceDictionaryItems(
     "ol-redirect-service-redirects-dictionary",
-    dictionary_id="2RrrErg8FFT8whP6ngPDGx",
+    dictionary_id=ol_redirect_service.dictionaries.apply(
+        lambda dicts: next(
+            (d["id"] for d in dicts if d["name"] == "redirects"),
+            None
+        )
+    ),
     items={
         "/": "301|keep|https://docs.google.com/forms/d/e/1FAIpQLSdvkI2cPG1iMM4gN_KyKem4fNLh4irWzrmjX-JhcFXa51su5g/viewform?fbzx=2658557852628862500",
         "/courses/6/6.045/2015spring/L01/MIT-6.045-lec-mit-0000-2015apr07-0929-L01/": "301|keep|https://video.odl.mit.edu/videos/65da1d1388ce400983c9447f75883760/?start=278",
