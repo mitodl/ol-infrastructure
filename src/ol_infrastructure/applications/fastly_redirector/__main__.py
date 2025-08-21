@@ -69,10 +69,7 @@ ol_redirect_service = fastly.ServiceVcl(
 ol_redirect_service_redirects_dictionary = fastly.ServiceDictionaryItems(
     "ol-redirect-service-redirects-dictionary",
     dictionary_id=ol_redirect_service.dictionaries.apply(
-        lambda dicts: next(
-            (d["id"] for d in dicts if d["name"] == "redirects"),
-            None
-        )
+        lambda dicts: next((d["id"] for d in dicts if d["name"] == "redirects"), None)
     ),
     items={
         "/": "301|keep|https://docs.google.com/forms/d/e/1FAIpQLSdvkI2cPG1iMM4gN_KyKem4fNLh4irWzrmjX-JhcFXa51su5g/viewform?fbzx=2658557852628862500",
