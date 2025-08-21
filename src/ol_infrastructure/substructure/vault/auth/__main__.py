@@ -3,7 +3,14 @@ from pathlib import Path
 
 from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import get_caller_identity, iam
-from pulumi_vault import AuthBackend, AuthBackendTuneArgs, Policy, aws, github, jwt
+from pulumi_vault import (
+    AuthBackend,
+    AuthBackendTuneArgs,
+    Policy,
+    aws,
+    github,
+    jwt,
+)
 
 from bridge.lib.magic_numbers import EIGHT_HOURS_SECONDS, ONE_MONTH_SECONDS
 from ol_infrastructure.lib.ol_types import AWSBase, Environment
@@ -19,7 +26,7 @@ aws_config = AWSBase(tags={"OU": "operations", "Environment": stack_info.name})
 aws_account = get_caller_identity()
 
 if Config("vault_server").get("env_namespace"):
-    setup_vault_provider()
+    setup_vault_provider(skip_child_token=True)
 
 # Generic AWS backend
 vault_aws_auth = AuthBackend(
@@ -78,6 +85,12 @@ developer_policy = Policy(
     .read_text(),
 )
 
+github.Team(
+    "vault-github-auth-developer",
+    team="vault-developer-access",
+    policies=[developer_policy.name],
+)
+
 # Admin policy definition
 admin_policy = Policy(
     "admin-policy",
@@ -85,6 +98,10 @@ admin_policy = Policy(
     policy=Path(__file__)
     .parent.parent.joinpath("policies/admin/admin.hcl")
     .read_text(),
+)
+
+github.Team(
+    "vault-github-auth-devops", team="vault-devops-access", policies=[admin_policy.name]
 )
 
 # Configure OIDC developer role
@@ -115,9 +132,7 @@ admin_role = jwt.AuthBackendRole(
     bound_audiences=[keycloak_config.get("client_id")],
     user_claim="sub",
     role_type="oidc",
-    bound_claims={
-        "realm_access.roles": "vault-admins"
-    },  # Format as list with colon separator
+    bound_claims={"roles": "ol-eng-admin, vault-admins"},
 )
 
 # Raft Backup policy definition

@@ -260,45 +260,45 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913
     # LEEK [END] # noqa: ERA001
 
     # VAULT [START] # noqa: ERA001
-    if keycloak_realm_config.get("ol-platform-engineering-vault-client-secret"):
-        ol_platform_engineering_vault_client = keycloak.openid.Client(
-            "ol-platform-engineering-vault-client",
-            name="ol-platform-engineering-vault-client",
-            realm_id="ol-platform-engineering",
-            client_id="ol-vault-client",
-            client_secret=keycloak_realm_config.get(
-                "ol-platform-engineering-vault-client-secret"
+    ol_platform_engineering_vault_client = keycloak.openid.Client(
+        "ol-platform-engineering-vault-client",
+        name="ol-platform-engineering-vault-client",
+        realm_id="ol-platform-engineering",
+        client_id="ol-vault-client",
+        client_secret=keycloak_realm_config.get(
+            "ol-platform-engineering-vault-client-secret"
+        ),
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        service_accounts_enabled=False,
+        valid_redirect_uris=keycloak_realm_config.get_object(
+            "ol-platform-engineering-vault-redirect-uris"
+        ),
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    vault.generic.Secret(
+        "ol-platform-engineering-vault-client-vault-oidc-credentials",
+        path="secret-operations/sso/vault",
+        data_json=Output.all(
+            url=ol_platform_engineering_vault_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
             ),
-            enabled=True,
-            access_type="CONFIDENTIAL",
-            standard_flow_enabled=True,
-            implicit_flow_enabled=False,
-            service_accounts_enabled=False,
-            valid_redirect_uris=keycloak_realm_config.get_object(
-                "ol-platform-engineering-vault-redirect-uris"
+            client_id=ol_platform_engineering_vault_client.client_id,
+            client_secret=ol_platform_engineering_vault_client.client_secret,
+            # This is included for the case where we are using traefik-forward-auth.
+            # It requires a random secret value to be present which is independent
+            # of the OAuth credentials.
+            secret=session_secret,
+            realm_id=ol_platform_engineering_vault_client.realm_id,
+            realm_name="ol-platform-engineering",
+            realm_public_key=ol_platform_engineering_vault_client.realm_id.apply(
+                lambda realm_id: fetch_realm_public_key_partial(realm_id)
             ),
-            opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
-        )
-        vault.generic.Secret(
-            "ol-platform-engineering-vault-client-vault-oidc-credentials",
-            path="secret-operations/sso/vault",
-            data_json=Output.all(
-                url=ol_platform_engineering_vault_client.realm_id.apply(
-                    lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
-                ),
-                client_id=ol_platform_engineering_vault_client.client_id,
-                client_secret=ol_platform_engineering_vault_client.client_secret,
-                # This is included for the case where we are using traefik-forward-auth.
-                # It requires a random secret value to be present which is independent
-                # of the OAuth credentials.
-                secret=session_secret,
-                realm_id=ol_platform_engineering_vault_client.realm_id,
-                realm_name="ol-platform-engineering",
-                realm_public_key=ol_platform_engineering_vault_client.realm_id.apply(
-                    lambda realm_id: fetch_realm_public_key_partial(realm_id)
-                ),
-            ).apply(json.dumps),
-        )
+        ).apply(json.dumps),
+    )
+
     # VAULT [END] # noqa: ERA001
 
     # OL Platform Engineering Realm - Authentication Flows[START]
