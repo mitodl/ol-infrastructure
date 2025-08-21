@@ -308,7 +308,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913
     ol_browser_platform_engineering_flow = keycloak.authentication.Flow(
         "ol-browser-platform-engineering-flow",
         realm_id=ol_platform_engineering_realm.id,
-        alias="ol-browser-data-platform-flow",
+        alias="ol-browser-platform-engineering-flow",
         opts=resource_options,
     )
     keycloak.authentication.Execution(
@@ -332,7 +332,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913
     ol_browser_platform_engineering_flow_org = keycloak.authentication.Subflow(
         "ol-browser-platform-engineering-flow-org",
         realm_id=ol_platform_engineering_realm.id,
-        alias="ol-browser-data-platform-flow-org",
+        alias="ol-browser-platform-engineering-flow-org",
         parent_flow_alias=ol_browser_platform_engineering_flow.alias,
         provider_id="basic-flow",
         requirement="ALTERNATIVE",
