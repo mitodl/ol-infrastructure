@@ -10,6 +10,11 @@ path "sys/capabilities-self" {
   capabilities = ["read", "update"]
 }
 
+# List secret mounts to see them in UI
+path "secret-*" {
+  capabilities = ["list"]
+}
+
 # Read/List all secrets at secret-* mounts
 path "secret-*/*" {
   capabilities = ["read", "list"]
