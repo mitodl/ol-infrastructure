@@ -107,25 +107,22 @@ def fastly_certificate_validation_records(
 ) -> list[route53.Record]:
     records_array = []
     for index, challenge in enumerate(validation_options):
-        records_array.append(
-            route53.Record(
-                f"fastly-cert-validation-route53-record-{index}",
-                name=challenge.record_name,
-                zone_id=lookup_zone_id_from_domain(challenge.record_name),
-                type=challenge.record_type,
-                records=[challenge.record_value],
-                ttl=FIVE_MINUTES,
-                allow_overwrite=True,
-                opts=opts,
+        if zone_id := lookup_zone_id_from_domain(challenge.record_name):
+            records_array.append(
+                route53.Record(
+                    f"fastly-cert-validation-route53-record-{index}",
+                    name=challenge.record_name,
+                    zone_id=zone_id,
+                    type=challenge.record_type,
+                    records=[challenge.record_value],
+                    ttl=FIVE_MINUTES,
+                    allow_overwrite=True,
+                    opts=opts,
+                )
             )
-        )
     return records_array
 
 
 def is_root_domain(domain: str) -> bool:
     zones = zone_id_map()
-    try:
-        zones[domain]
-    except KeyError:
-        return False
-    return True
+    return domain in zones
