@@ -60,8 +60,8 @@ course_image = Resource(
     type="registry-image",
     icon="docker",
     source={
-        "repository": "ol-course-notebooks/((image_name))",
-        "tag": "latest",
+        "repository": "ol-course-notebooks",
+        "tag": "((image_name))",
         "aws_region": "us-east-1",
     },
 )
