@@ -47,8 +47,8 @@ config:
     MIT_LEARN_APP_BASE_URL: https://learn.mit.edu/
     MIT_SEARCH_ELASTIC_URL: https://api.learn.mit.edu/api/v1/learning_resources_search/
     MIT_SEARCH_VECTOR_URL: https://api.learn.mit.edu/api/v0/vector_learning_resources_search/
-    OPENEDX_API_BASE_URL: https://courses.mitxonline.mit.edu/
-    OPENEDX_LOGIN_URL: https://courses.mitxonline.mit.edu/auth/login/ol-oauth2/?auth_entry=login
+    OPENEDX_API_BASE_URL: https://courses.learn.mit.edu/
+    OPENEDX_LOGIN_URL: https://courses.learn.mit.edu/auth/login/ol-oauth2/?auth_entry=login
   learn_ai:learn_backend_domain: "api.learn.mit.edu"
   redis:password:
     secure: v1:txrMWRvWLuyLZ9jG:RANFRu7iGA96qnc47SdQjrwTOS5Lz96n4Vdt6CK9vyb6FreKon4+qyLlk7P+dBS+T0lN7H6bvC1F38zIOA==

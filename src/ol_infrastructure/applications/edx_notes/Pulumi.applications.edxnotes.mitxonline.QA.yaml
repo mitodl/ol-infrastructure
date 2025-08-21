@@ -4,14 +4,14 @@ encryptedkey: AQICAHi7xhTkB8tf1ObyPMxDhODJja4Mn4jyIo32zZVlOiZPFgHMxGt/KjhBHNA7kH
 config:
   aws:region: us-east-1
   consul:address: https://consul-mitxonline-qa.odl.mit.edu
-  edxnotes:acm_cert_domain: 'notes.rc.mitxonline.mit.edu'
+  edxnotes:acm_cert_domain: 'notes.rc.learn.mit.edu'
   edxnotes:auto_scale:
     desired: 1
     max: 2
     min: 1
   edxnotes:business_unit: mitxonline
   edxnotes:dns_zone: mitxonline
-  edxnotes:domain: notes.rc.mitxonline.mit.edu
+  edxnotes:domain: notes.rc.learn.mit.edu
   edxnotes:target_vpc: mitxonline_vpc
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
