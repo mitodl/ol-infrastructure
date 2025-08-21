@@ -110,15 +110,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913
         events_listeners=["jboss-logging"],
     )
 
-    keycloak.RequiredAction(
-        "ol-platform-engineering-verify_email",
-        realm_id=ol_platform_engineering_realm.realm,
-        alias="VERIFY_EMAIL",
-        default_action=True,
-        enabled=True,
-        opts=resource_options,
-    )
-
     # Create realm roles for ol-platform-engineering
     keycloak.Role(
         "ol-platform-engineering-admin-role",
