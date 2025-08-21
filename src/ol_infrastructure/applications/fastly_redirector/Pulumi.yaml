@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-Fastly Redirect Service-application
+runtime: python
+description: Fastly service for managing arbitrary redirects in a serverless fashion
+backend:
+  url: s3://mitol-pulumi-state/
