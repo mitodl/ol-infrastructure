@@ -54,7 +54,6 @@ course_repository = ssh_git_repo(
 
 # Shouldn't need the AWS account ID as it'll infer it from the host's creds. Docs are a bit squiggy,
 # but the hope is that setting aws_region should allow it to construct the ECR hostname from the account ID and region.
-# TODO: This is untested, as we don't yet have an ECR repo set up for testing.
 course_image = Resource(
     name=Identifier("course_image"),
     type="registry-image",
