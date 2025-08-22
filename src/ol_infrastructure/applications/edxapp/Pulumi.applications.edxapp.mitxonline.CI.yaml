@@ -54,8 +54,8 @@ config:
   edxapp:dns_zone: learn
   edxapp:domains:
     lms: courses.ci.learn.mit.edu
-    preview: preview.ci.learn.mit.edu
-    studio: studio.ci.learn.mit.edu
+    preview: preview.courses.ci.learn.mit.edu
+    studio: studio.courses.ci.learn.mit.edu
   edxapp:marketing_domain: ci.learn.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:+8kgTH+x98kC+Lxc:bW03E5mk8wRB+FxZYtj06FPx/MEJuEiKO5ekaDTZKmqmfklisVhidp0fhX+So2Eygf/Aiyqp5L03RCzA8k7I4ZmlNss19//pdGgBDwa3HAbw
