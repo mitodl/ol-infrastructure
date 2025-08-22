@@ -39,7 +39,7 @@ config:
     OPENEDX_COURSE_BASE_URL: "https://courses.ci.learn.mit.edu/learn/course/"
     OPENEDX_OAUTH_PROVIDER: "ol-oauth2"
     OPENEDX_SOCIAL_LOGIN_PATH: "/auth/login/ol-oauth2/?auth_entry=login"
-    OPENEDX_STUDIO_API_BASE_URL: "https://studio.ci.learn.mit.edu"
+    OPENEDX_STUDIO_API_BASE_URL: "https://studio.courses.ci.learn.mit.edu"
     OPENTELEMETRY_ENABLED: "true"
     OPENTELEMETRY_ENDPOINT: "http://grafana-alloy.operations.svc.cluster.local:4318/v1/traces"
     SENTRY_LOG_LEVEL: "ERROR"
