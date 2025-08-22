@@ -58,6 +58,7 @@ class OpenEdxVars(BaseModel):
     lms_domain: str
     logo_url: str
     marketing_site_domain: str
+    mit_base_url: str | None = None
     mit_learn_base_url: str | None = None
     plugin_slot_config_file_map: dict[str, str] | None = None
     privacy_policy_url: str | None = None
@@ -118,6 +119,7 @@ def mfe_params(
         "LOGO_URL": open_edx.logo_url,
         "LOGO_WHITE_URL": open_edx.logo_url,
         "MARKETING_SITE_BASE_URL": f"https://{open_edx.marketing_site_domain}",
+        "MIT_BASE_URL": open_edx.mit_base_url,
         "MIT_LEARN_BASE_URL": open_edx.mit_learn_base_url or "",
         "ORDER_HISTORY_URL": None,  # Intentionally left blank to turn off a menu entry
         "PRIVACY_POLICY_URL": open_edx.privacy_policy_url,

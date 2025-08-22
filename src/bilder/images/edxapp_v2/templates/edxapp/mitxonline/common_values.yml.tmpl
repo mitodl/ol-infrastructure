@@ -416,7 +416,7 @@ MARKETING_SITE_CHECKOUT_URL: https://{{ key "edxapp/marketing-domain" }}/cart/ad
 MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within the bucket. No leading / allowed
 MEDIA_URL: /media/
 MICROSITE_CONFIGURATION: {}
-MIT_BASE_URL: https://mit.edu # Keeping it hardcoded till we change MARKETING_SITE_BASE_URL
+MIT_BASE_URL: https://web.mit.edu # Keeping it hardcoded till we change MARKETING_SITE_BASE_URL
 MITX_REDIRECT_ENABLED: True
 MITX_REDIRECT_ALLOW_RE_LIST:  # ADDED VALUE
   - "^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/)"
@@ -427,20 +427,12 @@ MKTG_URLS:
     ROOT: https://{{ key "edxapp/marketing-domain" }}/
 MKTG_URL_LINK_MAP:
     TOS: tos
-    HONOR: honor
     ABOUT: about
-    PRIVACY: privacy
     ACCESSIBILITY: accessibility
-    HELP_CENTER: help-center
 MKTG_URL_OVERRIDES:
-    COURSES: https://{{ key "edxapp/marketing-domain" }}/
-    PRIVACY: https://{{ key "edxapp/marketing-domain" }}/privacy-policy/
-    TOS: https://{{ key "edxapp/marketing-domain" }}/terms-of-service/
-    ABOUT: https://{{ key "edxapp/marketing-domain" }}/about-us/
-    HONOR: https://{{ key "edxapp/marketing-domain" }}/honor-code/
+    TOS: https://{{ key "edxapp/learn-frontend-domain" }}/terms
+    ABOUT: https://{{ key "edxapp/learn-frontend-domain" }}/about
     ACCESSIBILITY: https://accessibility.mit.edu/
-    CONTACT: https://mitxonline.zendesk.com/hc/en-us/requests/new/
-    TOS_AND_HONOR: ''
 MOBILE_STORE_URLS: {}
 ########################################################################################
 # Previously assumed to be unnecessary config as it duplicates code from               #
