@@ -21,7 +21,7 @@ path "secret-*/*" {
 }
 
 # Add details to support KVv2
-path "secret-*/metadata/" {
+path "secret-*/metadata/*" {
   capabilities = ["list", "read"]
 }
 
