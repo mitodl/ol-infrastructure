@@ -20,6 +20,15 @@ path "secret-*/*" {
   capabilities = ["read", "list"]
 }
 
+# Add details to support KVv2
+path "secret-*/metadata/" {
+  capabilities = ["list", "read"]
+}
+
+path "secret-*/data/*" {
+  capabilities = ["list", "read"]
+}
+
 # Scratch space for developers
 path "secret-sandbox/*" {
   capabilities = ["create", "read", "update", "delete", "list"]
