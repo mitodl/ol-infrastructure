@@ -10,23 +10,13 @@ path "sys/capabilities-self" {
   capabilities = ["read", "update"]
 }
 
-# List secret mounts to see them in UI
-path "secret-*" {
+# Read/List secret mounts to see them in UI
+path "+" {
   capabilities = ["list"]
 }
 
-# Read/List all secrets at secret-* mounts
-path "secret-*/*" {
+path "secret-*" {
   capabilities = ["read", "list"]
-}
-
-# Add details to support KVv2
-path "secret-*/metadata/*" {
-  capabilities = ["list", "read"]
-}
-
-path "secret-*/data/*" {
-  capabilities = ["list", "read"]
 }
 
 # Scratch space for developers
@@ -45,20 +35,11 @@ path "aws-mitx/*" {
   capabilities = ["read", "list"]
 }
 
-# Read MariaDB readonly creds
-path "mariadb-*" {
+# Read Database readonly creds
+path "+/creds/" {
   capabilities = ["list"]
 }
 
-path "mariadb-*/creds/readonly" {
-  capabilities = ["read"]
-}
-
-# Generate Postgres readonly creds
-path "postgres-*" {
-  capabilities = ["list"]
-}
-
-path "postgres-*/creds/readonly" {
-  capabilities = ["read"]
+path "+/creds/readonly" {
+  capabilities = ["read", "list"]
 }
