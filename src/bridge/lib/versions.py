@@ -7,7 +7,7 @@ CONSUL_VERSION = "1.21.4"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
 KEYCLOAK_VERSION = "26.3.3"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
-OPEN_METADATA_VERSION = "1.9.0"
+OPEN_METADATA_VERSION = "1.9.1"
 OVS_VERSION = "v0.65.1-3-g2630021"
 REDASH_VERSION = "9d273e4"
 # renovate: datasource=github-releases depName=traefik packageName=traefik/traefik
