@@ -119,6 +119,7 @@ if stack_info.env_suffix == "production":
             Path(__file__).parent.joinpath("ovs_redirect_dict.json").read_text()
         ),
         service_id=ol_redirect_service.id,
+        manage_items=True,
         opts=fastly_opts,
     )
 
@@ -134,6 +135,7 @@ if redirect_domain_map:
         dictionary_id=domain_redirects_dict_id,
         items=redirect_domain_map,
         service_id=ol_redirect_service.id,
+        manage_items=True,
         opts=fastly_opts,
     )
 

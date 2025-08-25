@@ -1,5 +1,4 @@
 # ruff: noqa: E501
-
 """Provision and deploy the resources needed for an edxapp installation.
 
 - Create S3 buckets required by edxapp
@@ -24,6 +23,7 @@ import pulumi_mongodbatlas as atlas
 import pulumi_vault as vault
 import yaml
 from pulumi import Alias, Config, Output, ResourceOptions, StackReference, export
+from pulumi.invoke import InvokeOptions
 from pulumi_aws import (
     acm,
     autoscaling,
@@ -62,7 +62,10 @@ from ol_infrastructure.lib.aws.ec2_helper import (
 )
 from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
-from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_records
+from ol_infrastructure.lib.aws.route53_helper import (
+    acm_certificate_validation_records,
+    fastly_certificate_validation_records,
+)
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
@@ -1774,6 +1777,31 @@ edxapp_fastly_service = fastly.ServiceVcl(
             s3_iam_role=fastly_access_logging_iam_role["role_arn"],
         ),
     ],
+    opts=fastly_provider,
+)
+
+tls_configuration = fastly.get_tls_configuration(
+    default=False,
+    name="TLS v1.3",
+    tls_protocols=["1.2", "1.3"],
+    opts=InvokeOptions(provider=fastly_provider.provider),
+)
+
+edxapp_fastly_tls = fastly.TlsSubscription(
+    f"fastl-{stack_info.env_prefix}-{stack_info.env_suffix}-tls-subscription",
+    # valid values are certainly, lets-encrypt, or globalsign
+    certificate_authority="certainly",
+    domains=edxapp_fastly_service.domains,
+    # Retrieved from 0https://manage.fastly.com/network/tls-configurations
+    configuration_id=tls_configuration.id,
+    opts=fastly_provider,
+)
+
+edxapp_fastly_tls.managed_dns_challenges.apply(fastly_certificate_validation_records)
+
+validated_tls_subscription = fastly.TlsSubscriptionValidation(
+    "ol-redirect-service-tls-subscription-validation",
+    subscription_id=edxapp_fastly_tls.id,
     opts=fastly_provider,
 )
 
