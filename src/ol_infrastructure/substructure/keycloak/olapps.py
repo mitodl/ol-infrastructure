@@ -35,6 +35,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     """Create the OL Apps realm and all of its resources."""
     resource_options = ResourceOptions(provider=keycloak_provider)
     keycloak_realm_config = Config("keycloak_realm")
+    captcha_domain = "www.recaptcha.net"
     ol_apps_realm = keycloak.Realm(
         "olapps",
         access_code_lifespan="30m",
@@ -77,12 +78,12 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
             ),
             headers=keycloak.RealmSecurityDefensesHeadersArgs(
                 content_security_policy=(
-                    "frame-src 'self' https://www.google.com; frame-ancestors 'self'; object-src 'none';"  # noqa: E501
+                    f"frame-src 'self' https://{captcha_domain}; frame-ancestors 'self'; object-src 'none';"  # noqa: E501
                 ),
                 content_security_policy_report_only="",
                 strict_transport_security="max-age=31536000; includeSubDomains",
                 x_content_type_options="nosniff",
-                x_frame_options="https://www.google.com",
+                x_frame_options=f"https://{captcha_domain}",
                 x_robots_tag="none",
                 x_xss_protection="1; mode=block",
             ),
