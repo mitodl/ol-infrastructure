@@ -4,6 +4,7 @@ encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgHMcinUhvpJwflJ5K
 config:
   aws:region: us-east-1
   keycloak:client_id: ol-vault-client
+  keycloak:url: https://sso.ol.mit.edu
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   keycloak:client_secret:
