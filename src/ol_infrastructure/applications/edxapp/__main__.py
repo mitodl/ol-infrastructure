@@ -958,6 +958,7 @@ edxapp_ses_verification_record = route53.Record(
     zone_id=edxapp_zone_id,
     name=edxapp_ses_domain_identity.id.apply("_amazonses.{}".format),
     type="TXT",
+    allow_overwrite=True,
     ttl=FIVE_MINUTES,
     records=[edxapp_ses_domain_identity.verification_token],
 )
@@ -983,6 +984,7 @@ edxapp_ses_domain_mail_from_mx = route53.Record(
     zone_id=edxapp_zone_id,
     name=edxapp_mail_from_domain.mail_from_domain,
     type="MX",
+    allow_overwrite=True,
     ttl=FIVE_MINUTES,
     records=["10 feedback-smtp.us-east-1.amazonses.com"],
 )
@@ -991,6 +993,7 @@ ses_domain_mail_from_txt = route53.Record(
     zone_id=edxapp_zone_id,
     name=edxapp_mail_from_domain.mail_from_domain,
     type="TXT",
+    allow_overwrite=True,
     ttl=FIVE_MINUTES,
     records=["v=spf1 include:amazonses.com -all"],
 )
@@ -1006,6 +1009,7 @@ for loop_counter in range(3):
         ),
         type="CNAME",
         ttl=FIVE_MINUTES,
+        allow_overwrite=True,
         records=[
             edxapp_ses_domain_dkim.dkim_tokens[loop_counter].apply(
                 "{}.dkim.amazonses.com".format
@@ -1783,6 +1787,7 @@ for domain_key, domain_value in edxapp_domains.items():
             name=domain_value,
             type="CNAME",
             ttl=FIVE_MINUTES,
+            allow_overwrite=True,
             records=[dns_override or "j.sni.global.fastly.net"],
             zone_id=edxapp_zone_id,
         )
@@ -1792,6 +1797,7 @@ for domain_key, domain_value in edxapp_domains.items():
             name=domain_value,
             type="CNAME",
             ttl=FIVE_MINUTES,
+            allow_overwrite=True,
             records=[dns_override or web_lb.dns_name],
             zone_id=edxapp_zone_id,
         )
