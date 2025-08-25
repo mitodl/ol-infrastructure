@@ -1,0 +1,8 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHjZAY5LtmRWGljev0oiDGn0jR5cRwD4IVXCn50TW5i0qQFSkUGhcZwydkD0n98hqqo2AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMEgmUHqetZgjmDp9lAgEQgDtZ8AkddoBSxJpsgZtMkX7TFlU1i6JhkZuiMyTvaZKk8FZ/xqrliIsETRo5sFsavp1pZ78Oc8Fitx8Kpw==
+config:
+  redirects:domains:
+    courses.rc.mitxonline.mit.edu: courses.rc.learn.mit.edu
+    preview.rc.mitxonline.mit.edu: preview.courses.rc.learn.mit.edu
+    studio.rc.mitxonline.mit.edu: studio.courses.rc.learn.mit.edu

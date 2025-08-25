@@ -19,7 +19,35 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 stack_info = parse_stack()
 redirect_config = Config("redirects")
 fastly_provider = get_fastly_provider()
-redirect_domains: list[str] = redirect_config.require_object("domains")
+# Ensure we always have a ResourceOptions object for opts usage (typing convenience)
+fastly_opts = (
+    fastly_provider
+    if isinstance(fastly_provider, pulumi.ResourceOptions)
+    else pulumi.ResourceOptions(provider=fastly_provider)
+)
+"""Fastly redirector service
+
+Now supports a domain->target mapping provided via Pulumi config.  The previous
+configuration accepted a list of domains in `redirects:domains`.  Update your
+stack config so that `redirects:domains` is now an object/map whose keys are
+source domains and values are fully-qualified target origins (including
+scheme).  Paths and query parameters from the original request will be
+preserved when performing the redirect.
+
+Backward compatibility: if the value is still a list, we fall back to the old
+behaviour (no automatic host redirects) so existing stacks won't break until
+their config is updated.
+"""
+
+_domains_config = redirect_config.require_object("domains")
+redirect_domain_map: dict[str, str]
+redirect_domains: list[str]
+if isinstance(_domains_config, dict):  # new behaviour
+    redirect_domain_map = _domains_config  # {source_host: target_base_url}
+    redirect_domains = list(redirect_domain_map.keys())
+else:  # legacy list behaviour
+    redirect_domain_map = {}
+    redirect_domains = list(_domains_config)
 ol_redirect_service = fastly.ServiceVcl(
     "ol-redirect-service",
     backends=[
@@ -34,7 +62,10 @@ ol_redirect_service = fastly.ServiceVcl(
         }
     ],
     comment="Managed by Pulumi",
-    dictionaries=[fastly.ServiceVclDictionaryArgs(name="redirects")],
+    dictionaries=[
+        fastly.ServiceVclDictionaryArgs(name="redirects"),  # path level redirects
+        fastly.ServiceVclDictionaryArgs(name="domain_redirects"),  # host -> target
+    ],
     domains=[fastly.ServiceVclDomainArgs(name=domain) for domain in redirect_domains],
     headers=[
         {
@@ -69,22 +100,40 @@ ol_redirect_service = fastly.ServiceVcl(
             "type": "error",
         },
     ],
-    opts=pulumi.ResourceOptions(protect=True).merge(fastly_provider),
+    # fastly_provider is already a ResourceOptions wrapper; add protect flag
+    opts=fastly_opts.merge(pulumi.ResourceOptions(protect=True)),
 )
 
 if stack_info.env_suffix == "production":
+    # Existing path-based redirect dictionary (unchanged semantics)
+    redirects_dict_id = ol_redirect_service.dictionaries.apply(
+        lambda dicts: str(
+            next(d.dictionary_id for d in (dicts or []) if d.name == "redirects")
+        )
+    )
     ol_redirect_service_redirects_dictionary = fastly.ServiceDictionaryItems(
         "ol-redirect-service-redirects-dictionary",
-        dictionary_id=ol_redirect_service.dictionaries.apply(
-            lambda dicts: next(
-                (d.dictionary_id for d in dicts if d.name == "redirects"), None
-            )
-        ),
+        dictionary_id=redirects_dict_id,
         items=json.loads(
             Path(__file__).parent.joinpath("ovs_redirect_dict.json").read_text()
         ),
         service_id=ol_redirect_service.id,
-        opts=pulumi.ResourceOptions(protect=True).merge(fastly_provider),
+        opts=fastly_opts,
+    )
+
+# New domain redirect dictionary (created whenever mapping provided)
+if redirect_domain_map:
+    domain_redirects_dict_id = ol_redirect_service.dictionaries.apply(
+        lambda dicts: str(
+            next(d.dictionary_id for d in (dicts or []) if d.name == "domain_redirects")
+        )
+    )
+    ol_redirect_service_domain_redirects_dictionary = fastly.ServiceDictionaryItems(
+        "ol-redirect-service-domain-redirects-dictionary",
+        dictionary_id=domain_redirects_dict_id,
+        items=redirect_domain_map,
+        service_id=ol_redirect_service.id,
+        opts=fastly_opts,
     )
 
 ol_redirect_service_tls = fastly.TlsSubscription(
@@ -94,17 +143,29 @@ ol_redirect_service_tls = fastly.TlsSubscription(
     domains=[
         domain for domain in redirect_domains if lookup_zone_id_from_domain(domain)
     ],
-    opts=fastly_provider,
+    # Retrieved from 0https://manage.fastly.com/network/tls-configurations
+    configuration_id="suMnBjWyh1mWp9YNm4ZYWg0",  # TLS 1.3
+    opts=fastly_opts,
 )
 
 ol_redirect_service_tls.managed_dns_challenges.apply(
-    fastly_certificate_validation_records
+    lambda challenges: fastly_certificate_validation_records(
+        [
+            fastly.TlsSubscriptionManagedDnsChallengeArgs(
+                record_name=str(ch.record_name),
+                record_type=str(ch.record_type),
+                record_value=str(ch.record_value),
+            )
+            for ch in challenges
+            if getattr(ch, "record_name", None)
+        ]
+    )
 )
 
 validated_tls_subscription = fastly.TlsSubscriptionValidation(
     "ol-redirect-service-tls-subscription-validation",
     subscription_id=ol_redirect_service_tls.id,
-    opts=fastly_provider,
+    opts=fastly_opts,
 )
 
 for domain in redirect_domains:
