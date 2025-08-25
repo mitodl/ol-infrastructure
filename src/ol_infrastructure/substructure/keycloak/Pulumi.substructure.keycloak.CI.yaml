@@ -17,11 +17,11 @@ config:
   keycloak_realm:mailgun_email_host:
     secure: v1:8LLyqC9bLn6dTXXQ:nNUP8Bn+ZqusE217zh1meR6lnKGSANyj0rnm1sV9EBY=
   keycloak_realm:mailgun_email_password:
-    secure: v1:JRiodO1fWLv1IAPx:zm2Al89X4yUVGovfr/fBeYS6I+spaSg57O4tupWCpV5Y9LZaVWM2FQiYnYqfD6Xbo6jZY9r9LXBgfpHKMQsSsFPS
+    secure: v1:Q1qs87fsI80+VKVX:qKnnYV+NGFLSXrw9AnZMmXTYR0fcZwZt6tyOmjbSkkbg/GbWifxHV0dZq6LLOToyWL9vd0V2MW+30/3qiGlrMVuk
   keycloak_realm:mailgun_email_username:
-    secure: v1:aZhc78XLTR2yCiwQ:ze3jK8+CPKzGylm407RCzwOSF1BfvonpOxWQ9AHCmvnuq4IORX9sIioq+qyqTemIdA==
+    secure: v1:Rr5PVj/iu8fpE9mp:n7wV9oTlV4wniJIe34Gh8ZdRLu/z6B/DXUaJUhQpOmcudJn/6kXZBzii8H2QRX4zAEwX7fLG
   keycloak_realm:mailgun_reply_to_address:
-    secure: v1:cBw6X4FMORcu2oBA:C9Rf5NAHjZxAPDzYqqlSpoiIcok/ts0jDy/0wm6Qwo/FrfbmDTLS70hSAX/oWJw=
+    secure: v1:2r3ZIC0MaVZSaogs:Da50V7RUHHycLjVR/qLCkuWHH+i1VTDWcGDO32IRRXtkv8G8ciUL49ojA82hmHyi79qNmsbV
   keycloak_realm:mit_email_host:
     secure: v1:g/O/970/vy0X7+t7:L+xeJCsFiE3gq3xLjt0z9rE7pDjJpIe7Xl6NyAjHTyM=
   keycloak_realm:mit_email_password:
