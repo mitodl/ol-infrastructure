@@ -3,6 +3,6 @@ secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAHnsgAjsUvy8GRCix9pn0dqAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQME58diuy8utPZ07ZoAgEQgDuJzF7v9pgzPxP7EN6E2jtcbFvaxtZUJC+YtEKsX+9c/2zyjGGRVOak99ii/EY4Z2AA7EJZ0sOqL3GFIw==
 config:
   redirects:domains:
-    courses.ci.mitxonline.mit.edu: courses.ci.learn.mit.edu
-    preview.ci.mitxonline.mit.edu: preview.courses.ci.learn.mit.edu
-    studio.ci.mitxonline.mit.edu: studio.courses.ci.learn.mit.edu
+    courses.ci.mitxonline.mit.edu: https://courses.ci.learn.mit.edu
+    preview.ci.mitxonline.mit.edu: https://preview.courses.ci.learn.mit.edu
+    studio.ci.mitxonline.mit.edu: https://studio.courses.ci.learn.mit.edu

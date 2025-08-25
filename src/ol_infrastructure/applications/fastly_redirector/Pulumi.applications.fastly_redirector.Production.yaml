@@ -9,6 +9,6 @@ config:
     chalkradiopodcast.org: https://chalk-radio.simplecast.com
     mitxpro.mit.edu: https://credentials.mitxpro.mit.edu
     starcellbio.mit.edu: https://github.com/starteam/starcellbio_html
-    # courses.mitxonline.mit.edu: courses.learn.mit.edu
-    # preview.mitxonline.mit.edu: preview.learn.mit.edu
-    # studio.mitxonline.mit.edu: studio.learn.mit.edu
+    courses.mitxonline.mit.edu: https://courses.learn.mit.edu
+    preview.mitxonline.mit.edu: https://preview.courses.learn.mit.edu
+    studio.mitxonline.mit.edu: https://studio.courses.learn.mit.edu

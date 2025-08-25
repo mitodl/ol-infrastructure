@@ -1788,10 +1788,12 @@ tls_configuration = fastly.get_tls_configuration(
 )
 
 edxapp_fastly_tls = fastly.TlsSubscription(
-    f"fastl-{stack_info.env_prefix}-{stack_info.env_suffix}-tls-subscription",
+    f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-tls-subscription",
     # valid values are certainly, lets-encrypt, or globalsign
     certificate_authority="certainly",
-    domains=edxapp_fastly_service.domains,
+    domains=edxapp_fastly_service.domains.apply(
+        lambda domains: [domain.name for domain in domains]
+    ),
     # Retrieved from 0https://manage.fastly.com/network/tls-configurations
     configuration_id=tls_configuration.id,
     opts=fastly_provider,

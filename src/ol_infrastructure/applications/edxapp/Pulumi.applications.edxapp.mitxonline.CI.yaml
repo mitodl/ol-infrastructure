@@ -56,7 +56,7 @@ config:
     lms: courses.ci.learn.mit.edu
     preview: preview.courses.ci.learn.mit.edu
     studio: studio.courses.ci.learn.mit.edu
-  edxapp:marketing_domain: ci.learn.mit.edu
+  edxapp:marketing_domain: ci.mitxonline.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:+8kgTH+x98kC+Lxc:bW03E5mk8wRB+FxZYtj06FPx/MEJuEiKO5ekaDTZKmqmfklisVhidp0fhX+So2Eygf/Aiyqp5L03RCzA8k7I4ZmlNss19//pdGgBDwa3HAbw
   edxapp:enable_notes: "True"
@@ -71,7 +71,7 @@ config:
   edxapp:elb_healthcheck_interval: '30'
   edxapp:mail_domain: edxapp-mail.ci.learn.mit.edu
   edxapp:proctortrack_url: https://preproduction.verificient.com
-  edxapp:sender_email_address: mitxonline-support+ci@mit.edu
+  edxapp:sender_email_address: learn-support+ci@mit.edu
   edxapp:bulk_email_default_from_email: no-reply@edxapp-mail.ci.learn.mit.edu
   mongodb:admin_password:
     secure: v1:lC3eiftPkXDB9eI/:PxRgffKu9kJjB78ijeLeJgS3fSC0kT80n5GurGDVELGh80RHA31t/VW/4EgwSK00ZlAkCYVKyNSgsDNMwkMzbOP20YcRKvp46olDgdo0Yk2Krou4BzBax5/9
