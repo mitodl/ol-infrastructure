@@ -3,12 +3,12 @@ secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAFUqc+t5s6+UczAijv7WGgGAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMs4G3sqpYrUkDArNdAgEQgDvSzjURsxvdceQNK3ebaLhsot8EB+w8VBUrR+kgNkIPx39yInWAr/0Peqsk8fryI8SoqpylgKBNfcTvqQ==
 config:
   redirects:domains:
-    amps.odl.mit.edu: video.odl.mit.edu
-    chalkradiopodcast.com: chalk-radio.simplecast.com
-    chalkradiopodcast.net: chalk-radio.simplecast.com
-    chalkradiopodcast.org: chalk-radio.simplecast.com
-    mitxpro.mit.edu: credentials.mitxpro.mit.edu
-    starcellbio.mit.edu: github.com/starteam/starcellbio_html
+    amps.odl.mit.edu: https://video.odl.mit.edu
+    chalkradiopodcast.com: https://chalk-radio.simplecast.com
+    chalkradiopodcast.net: https://chalk-radio.simplecast.com
+    chalkradiopodcast.org: https://chalk-radio.simplecast.com
+    mitxpro.mit.edu: https://credentials.mitxpro.mit.edu
+    starcellbio.mit.edu: https://github.com/starteam/starcellbio_html
     # courses.mitxonline.mit.edu: courses.learn.mit.edu
     # preview.mitxonline.mit.edu: preview.learn.mit.edu
     # studio.mitxonline.mit.edu: studio.learn.mit.edu

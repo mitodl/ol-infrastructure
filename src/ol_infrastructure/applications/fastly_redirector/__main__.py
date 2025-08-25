@@ -4,6 +4,7 @@ from pathlib import Path
 import pulumi
 import pulumi_fastly as fastly
 from pulumi import Config
+from pulumi.invoke import InvokeOptions
 from pulumi_aws import route53
 
 from bridge.lib.constants import FASTLY_A_TLS_1_3, FASTLY_CNAME_TLS_1_3
@@ -136,6 +137,13 @@ if redirect_domain_map:
         opts=fastly_opts,
     )
 
+tls_configuration = fastly.get_tls_configuration(
+    default=False,
+    name="TLS v1.3",
+    tls_protocols=["1.2", "1.3"],
+    opts=InvokeOptions(provider=fastly_opts.provider),
+)
+
 ol_redirect_service_tls = fastly.TlsSubscription(
     "ol-redirect-service-tls-subscription",
     # valid values are certainly, lets-encrypt, or globalsign
@@ -144,22 +152,12 @@ ol_redirect_service_tls = fastly.TlsSubscription(
         domain for domain in redirect_domains if lookup_zone_id_from_domain(domain)
     ],
     # Retrieved from 0https://manage.fastly.com/network/tls-configurations
-    configuration_id="suMnBjWyh1mWp9YNm4ZYWg0",  # TLS 1.3
+    configuration_id=tls_configuration.id,
     opts=fastly_opts,
 )
 
 ol_redirect_service_tls.managed_dns_challenges.apply(
-    lambda challenges: fastly_certificate_validation_records(
-        [
-            fastly.TlsSubscriptionManagedDnsChallengeArgs(
-                record_name=str(ch.record_name),
-                record_type=str(ch.record_type),
-                record_value=str(ch.record_value),
-            )
-            for ch in challenges
-            if getattr(ch, "record_name", None)
-        ]
-    )
+    fastly_certificate_validation_records
 )
 
 validated_tls_subscription = fastly.TlsSubscriptionValidation(
@@ -176,7 +174,11 @@ for domain in redirect_domains:
             f"fastly-target-for-domain-{domain}",
             name=domain,
             type=record_type,
-            records=[str(record) for record in record_map[record_type]],
+            records=[
+                record.record_value
+                for record in tls_configuration.dns_records
+                if record.record_type == record_type and record.region == "global"
+            ],
             allow_overwrite=True,
             ttl=FIVE_MINUTES,
             zone_id=zone_id,
