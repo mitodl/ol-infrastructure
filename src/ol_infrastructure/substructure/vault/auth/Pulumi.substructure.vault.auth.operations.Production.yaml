@@ -6,3 +6,5 @@ config:
   keycloak:client_id: ol-vault-client
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
+  keycloak:client_secret:
+    secure: v1:ChrEdHcQZ8oSjtmw:sDvL8qAgCJOLHP7Byz4TKprqv4IsKOjRDeXFPgiQAdNwQhQm2DQO84+Au2JFNEYC
