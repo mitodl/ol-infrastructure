@@ -1,0 +1,15 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAFqnCOCAZSgyF1ZWf0UadNJAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMo8Vlyuwrp1ocOIPzAgEQgDtuHDo3PpUPnI8Ld39Bq5dR9m0mnxpqjeqfAWopoZssGhgjoG9CfYrqTNsw4qr8fHcnvtAHzJoKzyDD4w==
+config:
+  jupyterhub:binderhub_domain: "binder.ci.learn.mit.edu"
+  jupyterhub:target_vpc: "applications_vpc"
+  jupyterhub:business_unit: "mit-learn"
+  jupyterhub:domain: "nb.ci.learn.mit.edu"
+  jupyterhub:admin_users:
+  - "admin"
+  aws:region: us-east-1
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
+  jupyterhub:shared_password:
+    secure: v1:sKBL3tBJ/EGDkmrt:5sJUBSl6ehXuwdMvMpwILzdsvHkycmXCUt43ru1SsO9sePH9WQNlVy6giJ1Y2wXiYu9dQx9NfGYb+Nnk4t7T90Gjz5Ouc2NKGT05rKuDMjk=

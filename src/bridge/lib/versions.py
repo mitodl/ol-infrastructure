@@ -4,6 +4,8 @@ CONCOURSE_VERSION = "7.14.1"
 CONSUL_TEMPLATE_VERSION = "0.41.1"
 # renovate: datasource=github-releases depName=consul packageName=hashicorp/consul
 CONSUL_VERSION = "1.21.4"
+# renovate: datasource=pypi depName=jupyterhub packageName=jupyterhub
+JUPYTERHUB_VERSION = "5.3.0"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
 KEYCLOAK_VERSION = "26.3.3"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
@@ -53,3 +55,5 @@ NGINX_VERSION = "1.29.1"
 PROMETHEUS_OPERATOR_CRD_VERSION = "v0.85.0"
 # renovate: datasource=github-releases depName=keycloak-k8s-resources packageName=keycloak/keycloak-k8s-resources
 KEYCLOAK_OPERATOR_CRD_VERSION = "26.2.4"
+# renovate: datasource=helm depName=jupyterhub packageName=jupyterhub registryUrl=https://hub.jupyter.org/helm-chart
+JUPYTERHUB_CHART_VERSION = "4.2.0"

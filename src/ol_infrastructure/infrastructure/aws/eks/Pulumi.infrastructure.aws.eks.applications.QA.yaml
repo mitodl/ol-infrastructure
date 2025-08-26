@@ -20,6 +20,8 @@ config:
   - "api-pay-qa.ol.mit.edu"
   - "api-learn-ai-qa.ol.mit.edu"
   - "api.rc.learn.mit.edu"
+  - "nb.rc.learn.mit.edu"
+  - "binder.rc.learn.mit.edu"
   - "api.rc.mitxonline.mit.edu"
   eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
   eks:developer_role_kubernetes_groups: ["admin"]
