@@ -77,7 +77,7 @@ ol_redirect_service = fastly.ServiceVcl(
             "type": "response",
         }
     ],
-    name="ol-redirect-service",
+    name=f"ol-redirect-service-{stack_info.env_suffix}",
     request_settings=[
         {
             "force_ssl": True,

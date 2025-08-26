@@ -3,18 +3,18 @@ declare local var.last_path_part STRING;
 if (req.http.host == "certificates.mitxpro.mit.edu") {
   if (req.url.path ~ "^/credentials/(.*?)$") {
     set req.http.cert_redirect = "https://certificates.mitxpro.mit.edu/program/" + re.group.1 + ".pdf";
-    error 602 req.http.cert_redirect;
+    error 603 req.http.cert_redirect;
   }
 }
 
 if (req.http.host == "mitxpro.mit.edu") {
   if (req.url.path ~ "^/credentials/(.*?)/(.*?)$") {
     set req.http.cert_redirect = "https://certificates.mitxpro.mit.edu/program/" + re.group.2 + ".pdf";
-    error 602 req.http.cert_redirect;
+    error 603 req.http.cert_redirect;
   }
   if (req.url.path ~ "^/certificates/(.*)$") {
     set req.http.cert_redirect = "https://certificates.mitxpro.mit.edu/course/" + re.group.1 + ".pdf";
-    error 602 req.http.cert_redirect;
+    error 603 req.http.cert_redirect;
   }
   error 601 req.http.host;
 }
@@ -32,7 +32,7 @@ if (var.domain_target) {
     set var.final_host_redirect = var.final_host_redirect + "?" + req.url.qs;
   }
   set req.http.redirect_dict = var.final_host_redirect;
-  error 301 req.http.redirect_dict;
+  error 601 req.http.redirect_dict;
 }
 
 /*
@@ -59,7 +59,7 @@ if (var.redirect ~ "^([0-9]{3})\|([^|]*)\|(.*)$") {
   set req.http.redirect_dict = var.location;
 
 
-  error 301 req.http.redirect_dict;
+  error 601 req.http.redirect_dict;
 }
 
 # Redirect bare directory names to add a trailing slash
@@ -70,6 +70,6 @@ if (req.url.path ~ "/([^/]+)$") {               // ends with non-slash character
     if (std.strlen(req.url.qs) > 0) {
       set req.http.slash_header = req.http.slash_header + "?" + req.url.qs;
     }
-    error 301 req.http.slash_header;
+    error 601 req.http.slash_header;
   }
 }
