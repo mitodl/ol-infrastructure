@@ -112,7 +112,7 @@ shared_apisix_plugins = OLApisixSharedPlugins(
     plugin_config=OLApisixSharedPluginsConfig(
         application_name="jupyterhub",
         resource_suffix="ol-shared-plugins",
-        k8s_namespace=jupyterhub_namespace,
+        k8s_namespace=namespace,
         k8s_labels=application_labels,
         enable_defaults=True,
     ),
