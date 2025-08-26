@@ -85,6 +85,6 @@ config:
     UWSGI_WORKERS: 3
   redis:password:
     secure: v1:eRydfkAj/y5E7anM:QZ33gRMPZ7DDG3TrvAbuZk+6zliItTLKf4zuBgwEzpliRDnnxA/FoKMjRf4IB1uFLDH4Bb/n5sUxUj+s4fXlRuZt/jxA66eNBg==
-  redis:instance_type: "cache.t4g.medium"
+  redis:instance_type: "cache.m6g.large"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
