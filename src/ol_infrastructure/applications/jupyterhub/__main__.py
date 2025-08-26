@@ -7,7 +7,6 @@ import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, ResourceOptions, StackReference
 from pulumi_aws import get_caller_identity
 
-from bridge.lib.versions import JUPYTERHUB_CHART_VERSION
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,

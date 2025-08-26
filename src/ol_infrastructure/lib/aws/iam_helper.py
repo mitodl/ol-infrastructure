@@ -21,6 +21,7 @@ ADMIN_USERNAMES = [
 
 EKS_ADMIN_USERNAMES = [
     "cpatti",
+    "dansubak",
     "mas48",
     "qhoque",
     "shaidar",
