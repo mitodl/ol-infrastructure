@@ -5,15 +5,13 @@ from pathlib import Path
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, ResourceOptions, StackReference
-from pulumi_aws import get_caller_identity, ec2
+from pulumi_aws import ec2, get_caller_identity
 
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
-    DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
 )
-from ol_infrastructure.components.aws.database import OLPostgresDBConfig, OLAmazonDB
-
+from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
@@ -27,9 +25,12 @@ from ol_infrastructure.components.services.k8s import (
     OLApisixSharedPluginsConfig,
 )
 from ol_infrastructure.components.services.vault import (
+    OLVaultDatabaseBackend,
+    OLVaultK8SDynamicSecretConfig,
     OLVaultK8SResources,
-    OLVaultK8SResourcesConfig, OLVaultPostgresDatabaseConfig, OLVaultDatabaseBackend, OLVaultK8SDynamicSecretConfig,
+    OLVaultK8SResourcesConfig,
     OLVaultK8SSecret,
+    OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
@@ -43,7 +44,7 @@ from ol_infrastructure.lib.ol_types import (
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
-from ol_infrastructure.lib.vault import setup_vault_provider, postgres_role_statements
+from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 
 setup_vault_provider()
 stack_info = parse_stack()
@@ -130,7 +131,8 @@ jupyterhub_db_security_group = ec2.SecurityGroup(
 jupyterhub_db_config = OLPostgresDBConfig(
     instance_name=f"jupyterhub-db-{stack_info.env_suffix}",
     password=rds_password,
-    storage=jupyterhub_config.get("db_capacity") or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
+    storage=jupyterhub_config.get("db_capacity")
+    or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
     subnet_group_name=apps_vpc["rds_subnet"],
     security_groups=[jupyterhub_db_security_group],
     parameter_overrides=[{"name": "rds.force_ssl", "value": 0}],
@@ -393,9 +395,7 @@ binderhub_application = kubernetes.helm.v3.Release(
                             "authenticator_class": "tmp",
                         },
                     },
-                    "db": {
-                        "type": "postgresql"
-                    },
+                    "db": {"type": "postgresql"},
                     "resources": {
                         "requests": {
                             "cpu": "100m",
