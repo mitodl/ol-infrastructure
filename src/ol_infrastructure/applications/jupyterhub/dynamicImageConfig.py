@@ -160,5 +160,7 @@ class TmpAuthenticator(Authenticator):
         ref: https://github.com/jupyterhub/jupyterhub/blob/4.0.0/jupyterhub/handlers/login.py#L118-L147
         """
         return url_path_join(base_url, "tmplogin")
+
+
 c.JupyterHub.authenticator_class = TmpAuthenticator
 c.Authenticator.allow_all = True
