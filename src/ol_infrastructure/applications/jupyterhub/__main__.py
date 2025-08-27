@@ -264,7 +264,9 @@ binderhub_application = kubernetes.helm.v3.Release(
                 },
                 "hub": {
                     "extraConfig": {
-                        "dynamicImageConfig.py" : Path(__file__).parent.joinpath("dynamicImageConfig.py").read_text()
+                        "dynamicImageConfig.py": Path(__file__)
+                        .parent.joinpath("dynamicImageConfig.py")
+                        .read_text()
                     },
                     "config": {
                         "BinderSpawner": {
