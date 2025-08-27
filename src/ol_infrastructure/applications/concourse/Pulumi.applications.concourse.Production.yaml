@@ -57,8 +57,8 @@ config:
     instance_type: m7a.4xlarge
     name: infra
   - auto_scale:
-      desired: 2
-      max: 3
+      desired: 4
+      max: 6
       min: 2
       max_instance_lifetime_seconds: 86400
     aws_tags:
