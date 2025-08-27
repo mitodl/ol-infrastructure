@@ -263,6 +263,9 @@ binderhub_application = kubernetes.helm.v3.Release(
                     },
                 },
                 "hub": {
+                    "extraConfig": {
+                        "dynamicImageConfig.py" : Path(__file__).parent.joinpath("dynamicImageConfig.py").read_text()
+                    },
                     "config": {
                         "BinderSpawner": {
                             "auth_enabled": True,
@@ -321,6 +324,10 @@ binderhub_application = kubernetes.helm.v3.Release(
                     # Below is similar but not the same as k8s resource declarations.
                     # These are on a PER-USER-BASIS, so they can quickly grow with lots of
                     # users. Numbers are conservative to start with.
+                    "image": {
+                        "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
+                        "tag": "clustering_and_descriptive_ai",
+                    },
                     "allowPrivilegeEscalation": True,
                     "cmd": [
                         "jupyterhub-singleuser",
