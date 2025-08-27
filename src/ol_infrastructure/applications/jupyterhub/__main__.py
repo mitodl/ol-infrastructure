@@ -227,6 +227,13 @@ binderhub_application = kubernetes.helm.v3.Release(
                 "enabled": False,
             },
             "jupyterhub": {
+                "cull": {
+                    "enabled": True,
+                    "every": 300,
+                    "timeout": 900,
+                    "maxAge": 14400,
+                    "users": True,
+                },
                 "proxy": {
                     "service": {
                         "type": "NodePort",
