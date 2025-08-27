@@ -115,6 +115,24 @@ if (process.env.DEPLOYMENT_NAME?.includes("mitxonline")) {
             },
           },
         ]
+      },
+      'org.openedx.frontend.learning.course_outline_sidebar_trigger.v1': {
+        keepDefault: false,
+        plugins: [
+          {
+            op: PLUGIN_OPERATIONS.Hide,
+            widgetId: 'default_trigger',
+          },
+        ]
+      },
+      'org.openedx.frontend.learning.course_outline_mobile_sidebar_trigger.v1': {
+        keepDefault: false,
+        plugins: [
+          {
+            op: PLUGIN_OPERATIONS.Hide,
+            widgetId: 'default_trigger',
+          },
+        ]
       }
   };
 }
