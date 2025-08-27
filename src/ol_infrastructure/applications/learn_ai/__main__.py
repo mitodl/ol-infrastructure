@@ -732,7 +732,6 @@ learn_ai_app_k8s = OLApplicationK8s(
         project_root=Path(__file__).parent,
         application_config=learn_ai_config.require_object("env_vars") or {},
         application_name="learn-ai",
-        application_replicas=3 if stack_info.env_suffix == "production" else 1,
         application_namespace=learn_ai_namespace,
         application_lb_service_name="learn-ai-webapp",
         application_lb_service_port_name="http",
@@ -748,6 +747,7 @@ learn_ai_app_k8s = OLApplicationK8s(
         application_service_account_name=learn_ai_service_account.metadata.name,
         application_image_repository="mitodl/learn-ai-app",
         application_docker_tag=LEARN_AI_DOCKER_TAG,
+        application_min_replicas=learn_ai_config.get("min_replicas") or 2,
         application_cmd_array=[
             "uvicorn",
             "main.asgi:application",
@@ -777,6 +777,29 @@ learn_ai_app_k8s = OLApplicationK8s(
                 redis_host=redis_cache.address,
                 redis_database_index="1",
                 redis_password=redis_config.require("password"),
+            ),
+        ],
+        hpa_scaling_metrics=[
+            kubernetes.autoscaling.v2.MetricSpecArgs(
+                type="Resource",
+                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                    name="cpu",
+                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                        type="Utilization",
+                        average_utilization=60,  # Target CPU utilization (60%)
+                    ),
+                ),
+            ),
+            # Scale up when avg usage exceeds: 1800 * 0.8 = 1440 Mi
+            kubernetes.autoscaling.v2.MetricSpecArgs(
+                type="Resource",
+                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                    name="memory",
+                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                        type="Utilization",
+                        average_utilization=80,  # Target memory utilization (80%)
+                    ),
+                ),
             ),
         ],
     ),
