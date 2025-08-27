@@ -5,7 +5,14 @@ from pathlib import Path
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, ResourceOptions, StackReference
-from pulumi_aws import get_caller_identity
+from pulumi_aws import get_caller_identity, ec2
+
+from bridge.lib.magic_numbers import (
+    AWS_RDS_DEFAULT_DATABASE_CAPACITY,
+    DEFAULT_HTTPS_PORT,
+    DEFAULT_POSTGRES_PORT,
+)
+from ol_infrastructure.components.aws.database import OLPostgresDBConfig, OLAmazonDB
 
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -21,7 +28,8 @@ from ol_infrastructure.components.services.k8s import (
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
-    OLVaultK8SResourcesConfig,
+    OLVaultK8SResourcesConfig, OLVaultPostgresDatabaseConfig, OLVaultDatabaseBackend, OLVaultK8SDynamicSecretConfig,
+    OLVaultK8SSecret,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
@@ -34,10 +42,12 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
-from ol_infrastructure.lib.vault import setup_vault_provider
+from ol_infrastructure.lib.stack_defaults import defaults
+from ol_infrastructure.lib.vault import setup_vault_provider, postgres_role_statements
 
 setup_vault_provider()
 stack_info = parse_stack()
+env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
 jupyterhub_config = Config("jupyterhub")
 binderhub_config = Config("binderhub")
@@ -54,6 +64,10 @@ k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 aws_config = AWSBase(
     tags={"OU": BusinessUnit.mit_learn, "Environment": stack_info.env_suffix}
 )
+
+target_vpc_name = jupyterhub_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
+target_vpc = network_stack.require_output(target_vpc_name)
+target_vpc_id = target_vpc["id"]
 
 vault_config = Config("vault")
 setup_vault_provider(stack_info)
@@ -75,6 +89,68 @@ namespace = "jupyter"
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(namespace, ns)
 )
+
+
+rds_defaults = defaults(stack_info)["rds"]
+print(rds_defaults)
+rds_defaults["instance_size"] = (
+    jupyterhub_config.get("db_instance_size") or rds_defaults["instance_size"]
+)
+rds_defaults["use_blue_green"] = False
+rds_password = jupyterhub_config.require("rds_password")
+
+jupyterhub_db_security_group = ec2.SecurityGroup(
+    f"jupyterhub-db-security-group-{env_name}",
+    name=f"jupyterhub-db-{target_vpc_name}-{env_name}",
+    description="Access from jupyterhub to its own postgres database.",
+    ingress=[
+        ec2.SecurityGroupIngressArgs(
+            security_groups=[
+                vault_stack.require_output("vault_server")["security_group"],
+            ],
+            cidr_blocks=[target_vpc["cidr"]],
+            protocol="tcp",
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
+            description="Access to Postgres from jupyterhub nodes.",
+        ),
+        ec2.SecurityGroupIngressArgs(
+            cidr_blocks=k8s_pod_subnet_cidrs,
+            description="Allow k8s cluster ipblocks to talk to DB",
+            from_port=DEFAULT_POSTGRES_PORT,
+            protocol="tcp",
+            security_groups=[],
+            to_port=DEFAULT_POSTGRES_PORT,
+        ),
+    ],
+    tags=aws_config.tags,
+    vpc_id=target_vpc_id,
+)
+
+jupyterhub_db_config = OLPostgresDBConfig(
+    instance_name=f"jupyterhub-db-{stack_info.env_suffix}",
+    password=rds_password,
+    storage=jupyterhub_config.get("db_capacity") or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
+    subnet_group_name=apps_vpc["rds_subnet"],
+    security_groups=[jupyterhub_db_security_group],
+    parameter_overrides=[{"name": "rds.force_ssl", "value": 0}],
+    engine_major_version="16",
+    tags=aws_config.tags,
+    db_name="jupyterhub",
+    **rds_defaults,
+)
+jupyterhub_db = OLAmazonDB(jupyterhub_db_config)
+
+jupyterhub_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
+    db_name=jupyterhub_db_config.db_name,
+    mount_point=f"{jupyterhub_db_config.engine}-juptyerhub",
+    db_admin_username=jupyterhub_db_config.username,
+    db_admin_password=rds_password,
+    db_host=jupyterhub_db.db_instance.address,
+    role_statements=postgres_role_statements,
+)
+jupyterhub_db_vault_backend = OLVaultDatabaseBackend(jupyterhub_db_vault_backend_config)
+jupyterhub_creds_secret_name = "jupyterhub-db-creds"  # noqa: S105  # pragma: allowlist secret
 
 # Create vault_k8s_resources to allow jupyter hub to access secrets in vault
 jupyterhub_vault_policy = vault.Policy(
@@ -106,6 +182,26 @@ vault_k8s_resources = OLVaultK8SResources(
         depends_on=[jupyterhub_vault_k8s_auth_backend_role],
     ),
 )
+
+app_db_creds_dynamic_secret_config = OLVaultK8SDynamicSecretConfig(
+    name="jupyterhub-app-db-creds",
+    dest_secret_labels=k8s_global_labels,
+    dest_secret_name=jupyterhub_creds_secret_name,
+    exclude_raw=True,
+    labels=k8s_global_labels,
+    mount=jupyterhub_db_vault_backend_config.mount_point,
+    namespace=namespace,
+    path="creds/app",
+    templates={
+        "DATABASE_URL": f'postgres://{{{{ get .Secrets "username" }}}}:{{{{ get .Secrets "password" }}}}@jupyterhub-db-{stack_info.env_suffix}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:{DEFAULT_POSTGRES_PORT}/jupyterhub'
+    },
+    vaultauth=vault_k8s_resources.auth_name,
+)
+app_db_creds_dynamic_secret = OLVaultK8SSecret(
+    "jupyterhub-app-db-creds-vaultdynamicsecret",
+    resource_config=app_db_creds_dynamic_secret_config,
+)
+
 
 shared_apisix_plugins = OLApisixSharedPlugins(
     name="ol-jupyterhub-external-service-apisix-plugins",
@@ -298,9 +394,7 @@ binderhub_application = kubernetes.helm.v3.Release(
                         },
                     },
                     "db": {
-                        "pvc": {
-                            "storage": "10Gi",
-                        }
+                        "type": "postgresql"
                     },
                     "resources": {
                         "requests": {
@@ -373,6 +467,13 @@ binderhub_application = kubernetes.helm.v3.Release(
                 },
             },
             "imageBuilderType": "dind",
+            "envFrom": [
+                {
+                    "secretRef": {
+                        "name": jupyterhub_creds_secret_name,
+                    },
+                }
+            ],
         },
         skip_await=False,
     ),
