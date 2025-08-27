@@ -93,7 +93,6 @@ cluster_stack.require_output("namespaces").apply(
 
 
 rds_defaults = defaults(stack_info)["rds"]
-print(rds_defaults)
 rds_defaults["instance_size"] = (
     jupyterhub_config.get("db_instance_size") or rds_defaults["instance_size"]
 )
