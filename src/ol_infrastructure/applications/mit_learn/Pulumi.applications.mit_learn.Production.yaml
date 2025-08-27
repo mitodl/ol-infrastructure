@@ -41,7 +41,6 @@ config:
   mitlearn:nextjs_heroku_domain: "next.learn.mit.edu"
   mitlearn:posthog_proxy: "ph.ol.mit.edu"
   mitlearn:vars:
-    AI_CITED_PROMPTS: '["syllabus_canvas"]'
     AI_MIT_SYLLABUS_URL: "https://api.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.learn.mit.edu/api/v0/vector_content_files_search/"
     APPZI_URL: "https://w.appzi.io/w.js?token=Q2pSI"

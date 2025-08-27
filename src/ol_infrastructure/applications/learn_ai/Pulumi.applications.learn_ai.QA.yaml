@@ -7,6 +7,7 @@ config:
   learn_ai:db_password:
     secure: v1:moKYAbHsHOnTUrEk:4OgRBNFXT0WKrz1KaKZDhQxT09dA36jN4+q/SO0IIAemTSiwGqrXbXn+r5dFlGrr24S+VGtiyNXSVKts+j/TgKS33FTo86OX2saBDrL4dFo=
   learn_ai:env_vars:
+    AI_CITED_PROMPTS: '["syllabus", "syllabus_canvas"]'
     AI_DEBUG: "true"
     AI_DEFAULT_RECOMMENDATION_MODEL: "openai/gpt-4o-mini"
     AI_DEFAULT_SYLLABUS_MODEL: "openai/gpt-4o-mini"
