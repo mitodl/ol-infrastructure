@@ -406,6 +406,10 @@ redis_cluster_security_group = ec2.SecurityGroup(
     vpc_id=apps_vpc["id"],
     tags=aws_config.tags,
 )
+redis_defaults = defaults(stack_info)["redis"]
+redis_defaults["instance_type"] = (
+    redis_config.get("instance_type") or redis_defaults["instance_type"]
+)
 redis_cache_config = OLAmazonRedisConfig(
     encrypt_transit=True,
     auth_token=redis_config.require("password"),
@@ -421,7 +425,7 @@ redis_cache_config = OLAmazonRedisConfig(
     subnet_group=apps_vpc["elasticache_subnet"],
     security_groups=[redis_cluster_security_group.id],
     tags=aws_config.tags,
-    **defaults(stack_info)["redis"],
+    **redis_defaults,
 )
 redis_cache = OLAmazonCache(
     redis_cache_config,

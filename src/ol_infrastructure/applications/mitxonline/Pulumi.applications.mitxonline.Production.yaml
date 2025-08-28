@@ -64,5 +64,6 @@ config:
     MIT_LEARN_DASHBOARD_URL: "https://learn.mit.edu/dashboard"
   redis:password:
     secure: v1:yvRUeBECxXQn0EuQ:CzfHq2P7kQGgULkRI7EFThTAnZyxq4uLvCTAdCYWpgvKl6Hwir6Gfk6UgU//ceOEKXrLVw6mRf34oWU=
+  redis:instance_type: cache.r7g.xlarge
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
