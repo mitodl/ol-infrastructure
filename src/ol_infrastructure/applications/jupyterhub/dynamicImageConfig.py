@@ -25,4 +25,3 @@ class QueryStringKubeSpawner(KubeSpawner):
 
 c.JupyterHub.spawner_class = QueryStringKubeSpawner  # noqa: F821 # type: ignore[name-defined]
 c.Authenticator.allow_all = True  # noqa: F821 # type: ignore[name-defined]
-
