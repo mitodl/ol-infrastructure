@@ -269,6 +269,8 @@ binderhub_application = kubernetes.helm.v3.Release(
                         },
                     },
                 },
+                # extraConfig is executed as python at the end of the JH config. For more details see
+                # https://z2jh.jupyter.org/en/latest/administrator/advanced.html#hub-extraconfig
                 "hub": {
                     "extraConfig": {
                         "dynamicImageConfig.py": Path(__file__)
