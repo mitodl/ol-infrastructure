@@ -42,6 +42,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913
         registration_email_as_username=True,
         login_with_email_allowed=True,
         duplicate_emails_allowed=False,
+        organizations_enabled=True,
         realm="ol-platform-engineering",
         reset_password_allowed=False,
         verify_email=False,
