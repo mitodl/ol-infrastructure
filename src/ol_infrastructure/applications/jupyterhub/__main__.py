@@ -292,7 +292,7 @@ binderhub_application = kubernetes.helm.v3.Release(
                         #     "password": jupyterhub_config.require("shared_password"),
                         # },
                         "JupyterHub": {
-                            "authenticator_class": "dummy",
+                            "authenticator_class": "tmp",
                         },
                     },
                     "db": {
