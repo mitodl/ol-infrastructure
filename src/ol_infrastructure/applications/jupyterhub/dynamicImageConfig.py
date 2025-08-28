@@ -1,5 +1,6 @@
 from kubespawner import KubeSpawner
 
+
 class QueryStringKubeSpawner(KubeSpawner):
     def start(self):
         image_base = (
@@ -18,5 +19,6 @@ class QueryStringKubeSpawner(KubeSpawner):
                 self.image = image_base.format(course)
         return super().start()
 
-c.JupyterHub.spawner_class = QueryStringKubeSpawner # noqa: F821
-c.Authenticator.allow_all = True # noqa: F821
+
+c.JupyterHub.spawner_class = QueryStringKubeSpawner  # noqa: F821
+c.Authenticator.allow_all = True  # noqa: F821
