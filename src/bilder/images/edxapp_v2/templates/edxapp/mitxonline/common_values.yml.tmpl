@@ -67,6 +67,10 @@ XQUEUE_INTERFACE:
 COMMENTS_SERVICE_KEY: {{ .Data.forum_api_key }}
 {{ end }}
 
+{{ with secret "secret-global/learn_ai" }}
+MIT_LEARN_AI_XBLOCK_CHAT_API_TOKEN: {{ .Data.data.canvas_syllabus_token }}  # Added for ol_openedx_chat_xblock
+{{ end }}
+
 DATABASES:
   default:
     ATOMIC_REQUESTS: true
@@ -244,6 +248,7 @@ CREDIT_PROVIDER_SECRET_KEYS: {}
 CROSS_DOMAIN_CSRF_COOKIE_DOMAIN: {{ key "edxapp/lms-domain" }}  # MODIFIED
 CROSS_DOMAIN_CSRF_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edxapp-csrftoken  # MODIFIED
 CSRF_COOKIE_SECURE: true  # MODIFIED
+CSRF_COOKIE_SAMESITE: 'None'
 CSRF_TRUSTED_ORIGINS:  # MODIFIED
   - https://{{ key "edxapp/lms-domain" }}
 DASHBOARD_COURSE_LIMIT: null
@@ -316,7 +321,7 @@ FEATURES:
     ENABLE_GIT_AUTO_EXPORT: true  # ADDED KEY
     ENABLE_GRADE_DOWNLOADS: true
     ENABLE_INSTRUCTOR_ANALYTICS: false
-    ENABLE_LTI_PROVIDER: false
+    ENABLE_LTI_PROVIDER: true  # modified
     ENABLE_MKTG_SITE: true
     ENABLE_MOBILE_REST_API: true
     ENABLE_NEW_BULK_EMAIL_EXPERIENCE: true  # ADDED KEY
@@ -551,6 +556,11 @@ SERVER_EMAIL: odl-devops@mit.edu # MODIFIED
 # between LMS and Studio (TMM 2021-10-22)
 # UPDATE: The session cookie domain appears to still be required for enabling the
 # preview subdomain to share authentication with LMS (TMM 2021-12-20)
+
+# Adding session cookie settings for LTI config
+# https://docs.openedx.org/en/latest/site_ops/install_configure_run_guide/configuration/lti/configure_lti.html#configure-the-tool-consumer
+SESSION_COOKIE_SAMESITE: 'None'
+SESSION_COOKIE_SAMESITE_FORCE_ALL: true
 SESSION_COOKIE_DOMAIN: {{ key "edxapp/session-cookie-domain" }}  # MODIFIED
 SESSION_COOKIE_SECURE: true # MODIFIED
 SESSION_SAVE_EVERY_REQUEST: false
@@ -596,7 +606,8 @@ WIKI_ENABLED: true
 XBLOCK_FS_STORAGE_BUCKET: null
 XBLOCK_FS_STORAGE_PREFIX: null
 XBLOCK_SETTINGS: {}
-X_FRAME_OPTIONS: DENY
+# Needed for showing pages in Canvas via LTI
+X_FRAME_OPTIONS: "ALLOW-FROM canvas.mit.edu"
 YOUTUBE_API_KEY: null
 ZENDESK_API_KEY: ''
 ZENDESK_CUSTOM_FIELDS: {}
