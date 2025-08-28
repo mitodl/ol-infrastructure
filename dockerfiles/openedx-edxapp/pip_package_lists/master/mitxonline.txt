@@ -18,6 +18,7 @@ wheel==0.45.1
 
 # Experimental Plugins for AI features
 ol-openedx-chat
+ol-openedx-chat-xblock
 
 # Allow for copying courses to children to support UAI
 ol-openedx-course-sync
