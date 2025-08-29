@@ -5,7 +5,7 @@ config:
   binderhub:domain: "binder.ci.learn.mit.edu"
   jupyterhub:target_vpc: "applications_vpc"
   jupyterhub:rds_password: # This MUST be changed, it's reusing the shared PW
-    secure: v1:sKBL3tBJ/EGDkmrt:5sJUBSl6ehXuwdMvMpwILzdsvHkycmXCUt43ru1SsO9sePH9WQNlVy6giJ1Y2wXiYu9dQx9NfGYb+Nnk4t7T90Gjz5Ouc2NKGT05rKuDMjk=
+    secure: v1:ae+uadhbZC0VnnI5:p0QKNNy8xscV8K69VTTcLIca6BfvEoarQ4ZsRsa2pGAGoU3IDDe48fJVCYvVLwDvufpvbLUnR88MJP4=
   jupyterhub:business_unit: "mit-learn"
   jupyterhub:domain: "nb.ci.learn.mit.edu"
   jupyterhub:admin_users:
