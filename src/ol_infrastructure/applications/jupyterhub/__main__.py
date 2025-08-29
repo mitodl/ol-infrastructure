@@ -132,10 +132,8 @@ jupyterhub_db_config = OLPostgresDBConfig(
     password=rds_password,
     storage=jupyterhub_config.get("db_capacity")
     or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
-    subnet_group_name=apps_vpc["rds_subnet"],
+    subnet_group_name=target_vpc["rds_subnet"],
     security_groups=[jupyterhub_db_security_group],
-    parameter_overrides=[{"name": "rds.force_ssl", "value": 0}],
-    engine_major_version="16",
     tags=aws_config.tags,
     db_name="jupyterhub",
     **rds_defaults,
