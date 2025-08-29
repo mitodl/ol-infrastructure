@@ -8,7 +8,6 @@ from pulumi import Config, InvokeOptions, ResourceOptions, StackReference
 from pulumi_aws import ec2, get_caller_identity
 
 from bridge.lib.magic_numbers import (
-    AWS_RDS_DEFAULT_DATABASE_CAPACITY,
     DEFAULT_POSTGRES_PORT,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
@@ -130,8 +129,6 @@ jupyterhub_db_security_group = ec2.SecurityGroup(
 jupyterhub_db_config = OLPostgresDBConfig(
     instance_name=f"jupyterhub-db-{stack_info.env_suffix}",
     password=rds_password,
-    storage=jupyterhub_config.get("db_capacity")
-    or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
     subnet_group_name=target_vpc["rds_subnet"],
     security_groups=[jupyterhub_db_security_group],
     tags=aws_config.tags,
