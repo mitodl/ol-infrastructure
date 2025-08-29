@@ -415,6 +415,12 @@ LOG_DIR: /openedx/data/var/log/ed/openedx/data/var/log/edx
 LOGO_URL: https://{{ key "edxapp/lms-domain" }}/static/mitxonline/images/logo.svg
 LOGO_URL_PNG_FOR_EMAIL: https://{{ key "edxapp/lms-domain" }}/static/mitxonline/images/logo.png
 LOGO_TRADEMARK_URL: https://{{ key "edxapp/lms-domain" }}/static/mitxonline/images/mit-logo.svg
+MIT_LEARN_AI_API_URL: https://{{ key "edxapp/learn-api-domain" }}/ai  # Added for ol_openedx_chat
+MIT_LEARN_API_BASE_URL: https://{{ key "edxapp/learn-api-domain" }}/learn  # Added for ol_openedx_chat
+MIT_LEARN_SUMMARY_FLASHCARD_URL: https://{{ key "edxapp/learn-api-domain" }}/learn/api/v1/contentfiles/  # Added for ol_openedx_chat
+MIT_LEARN_AI_XBLOCK_CHAT_API_URL: https://{{ key "edxapp/learn-api-domain" }}/ai/http/canvas_syllabus_agent/  # Added for ol_openedx_chat_xblock
+MIT_LEARN_AI_XBLOCK_TUTOR_CHAT_API_URL: https://{{ key "edxapp/learn-api-domain" }}/ai/http/canvas_tutor_agent/  # Added for ol_openedx_chat_xblock
+MIT_LEARN_AI_XBLOCK_PROBLEM_SET_LIST_URL: https://{{ key "edxapp/learn-api-domain" }}/ai/api/v0/problem_set_list  # Added for ol_openedx_chat_xblock
 MAINTENANCE_BANNER_TEXT: Sample banner message
 MARKETING_SITE_BASE_URL: https://{{ key "edxapp/marketing-domain" }}/ # ADDED - to support mitxonline-theme
 MARKETING_SITE_CHECKOUT_URL: https://{{ key "edxapp/marketing-domain" }}/cart/add/ # ADDED - to support mitxonline checkout
