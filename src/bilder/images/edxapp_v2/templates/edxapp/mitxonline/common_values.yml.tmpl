@@ -424,7 +424,7 @@ MICROSITE_CONFIGURATION: {}
 MIT_BASE_URL: https://web.mit.edu # Keeping it hardcoded till we change MARKETING_SITE_BASE_URL
 MITX_REDIRECT_ENABLED: True
 MITX_REDIRECT_ALLOW_RE_LIST:  # ADDED VALUE
-  - "^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/)"
+  - "^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/|lti_provider)"
   - "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"
   - "^/v1/accounts/bulk_retire_users"
   - "^/courses/course-v1:.*?/xqueue/.*$"  # TODO (TMM 2025-07-22): Remove this once the xqueue -> submissions migration is complete
