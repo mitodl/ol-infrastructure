@@ -389,7 +389,7 @@ binderhub_application = kubernetes.helm.v3.Release(
                             "authenticator_class": "tmp",
                         },
                     },
-                    "db": {"type": "postgresql"},
+                    "db": {"type": "postgres", "url": "$(DATABASE_URL)"},
                     "resources": {
                         "requests": {
                             "cpu": "100m",
@@ -461,17 +461,22 @@ binderhub_application = kubernetes.helm.v3.Release(
                 },
             },
             "imageBuilderType": "dind",
-            "envFrom": [
+            "extraEnv": [
                 {
-                    "secretRef": {
-                        "name": jupyterhub_creds_secret_name,
-                    },
+                    "DATABASE_URL": {
+                        "valueFrom": {
+                            "secretRef": {
+                                "name": jupyterhub_creds_secret_name,
+                                "key": "DATABASE_URL",
+                            }
+                        }
+                    }
                 }
             ],
         },
         skip_await=False,
     ),
     opts=ResourceOptions(
-        delete_before_replace=True,
+        delete_before_replace=True, depends_on=[app_db_creds_dynamic_secret]
     ),
 )
