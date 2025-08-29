@@ -26,7 +26,7 @@ class QueryStringKubeSpawner(KubeSpawner):
                 self.image = image_base.format(course)
                 # If we don't have a notebook, don't muck with default_url
                 # This falls back to the tree view in Jupyterhub if not specified
-                if notebook:
+                if notebook and notebook.endswith(".ipynb"):
                     self.default_url = f"/notebooks/{notebook}"
         return super().start()
 
