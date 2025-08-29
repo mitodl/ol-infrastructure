@@ -18,8 +18,16 @@ class QueryStringKubeSpawner(KubeSpawner):
         )
         if self.handler:
             course = self.handler.get_query_argument("course", "").lower()
+            # Notebook is case sensitive, and special characters
+            # with query string meaning must be URL encoded i.e.
+            # notebook=Assignment_2_Prediction_with_LogReg_%26_CART_%26_XGBoost.ipynb
+            notebook = self.handler.get_query_argument("notebook", "")
             if course in KNOWN_COURSES:
                 self.image = image_base.format(course)
+                # If we don't have a notebook, don't muck with default_url
+                # This falls back to the tree view in Jupyterhub if not specified
+                if notebook and notebook.endswith(".ipynb"):
+                    self.default_url = f"/notebooks/{notebook}"
         return super().start()
 
 
