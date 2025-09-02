@@ -205,7 +205,7 @@ if (learningApps.includes(edxMfeAppName)) {
   };
 }
 
-const CustomcertificateStatus = (widget) => {
+const CustomCertificateStatus = (widget) => {
   const { RenderWidget } = widget;
 
   // Only modify widgets for "notAvailable_certificate_status"
@@ -225,12 +225,11 @@ const CustomcertificateStatus = (widget) => {
       ...RenderWidget.props.children.slice(2),
     ];
 
-    const newWidgetRender = React.cloneElement(
+    widget.RenderWidget = React.cloneElement(
       RenderWidget,
       RenderWidget.props,
       ...newChildren
     );
-    widget.RenderWidget = newWidgetRender;
   }
   return widget;
 };
@@ -242,7 +241,7 @@ if (edxMfeAppName === "learning") {
       {
         op: PLUGIN_OPERATIONS.Modify,
         widgetId: "default_contents",
-        fn: CustomcertificateStatus,
+        fn: CustomCertificateStatus,
       },
     ],
   };
