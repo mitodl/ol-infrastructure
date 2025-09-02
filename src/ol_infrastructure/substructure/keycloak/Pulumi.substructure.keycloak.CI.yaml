@@ -55,8 +55,8 @@ config:
   keycloak_realm:ol-platform-engineering-leek-redirect-uris: ["https://celery-monitoring-ci.odl.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-vault-redirect-uris: ["https://vault-ci.odl.mit.edu/ui/vault/auth/oidc/oidc/callback"]
   keycloak_realm:ol-platform-engineering-jupyterhub-redirect-uris:
-  - "https://nb.ci.learn.mit.edu/*"
-  - "https://binder.ci.learn.mit.edu/*"
+  - "https://nb.ci.ol.mit.edu/*"
+  - "https://binder.ci.ol.mit.edu/*"
   keycloak_realm:olapps-learn-ai-client-roles: ["https://api-learn-ai-ci.ol.mit.edu/*"]
   keycloak_realm:olapps-learn-ai-client-secret:
     secure: v1:hJQd4Gnpww6vFMI8:ScX791cNeXk1iWO0j/4uXMzfFivtTkhFWPCXkhJIbwIC/Jb5zaiFO591c25Ri64+
@@ -68,6 +68,8 @@ config:
   - "https://learn-ai-ci.ol.mit.edu/*"
   - "https://pay-ci.ol.mit.edu/*"
   - "https://ci.mitxonline.mit.edu/*"
+  - "https://nb.ci.learn.mit.edu/*"
+  - "https://binder.ci.learn.mit.edu/*"
   keycloak_realm:olapps-mitlearn-client-redirect-uris:
   - "https://api.ci.learn.mit.edu/*"
   - "https://ci.learn.mit.edu/*"
@@ -77,6 +79,8 @@ config:
   - "https://pay-ci.ol.mit.edu/*"
   - "https://ci.mitxonline.mit.edu/*"
   - "https://api.ci.mitxonline.mit.edu/*"
+  - "https://nb.ci.learn.mit.edu/*"
+  - "https://binder.ci.learn.mit.edu/*"
   keycloak_realm:olapps-mitlearn-client-secret:
     secure: v1:sJuWLKHeep4Qz9cr:YbZNIQoy3Bn1nbpKsCUPNUeEtZJgd+tA5LAU8pDfSKWr2fzvjfMy0XcmO4CR7a3q
   keycloak_realm:olapps-mitxonline-client-redirect-uris:
