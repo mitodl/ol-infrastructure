@@ -33,7 +33,7 @@ config:
     NODE_ENV: "development"
     OPENTELEMETRY_ENABLED: "true"
     OPENTELEMETRY_ENDPOINT: "grafana-alloy.operations.svc.cluster.local:4317"
-    PROBLEM_SET_URL: https://api.rc.learn.mit.edu/api/v0/tutor/problems/
+    PROBLEM_SET_URL: https://api.ci.learn.mit.edu/api/v0/tutor/problems/
     SENTRY_LOG_LEVEL: "ERROR"
     SENTRY_PROFILES_SAMPLE_RATE: "0"
     SENTRY_TRACES_SAMPLE_RATE: "0"
@@ -41,11 +41,11 @@ config:
     UWSGI_THREADS: "5"
   learn_ai:frontend_domain: "learn-ai-ci.ol.mit.edu"
   learn_ai:frontend_vars:
-    MIT_LEARN_APP_BASE_URL: https://rc.learn.mit.edu/
+    MIT_LEARN_APP_BASE_URL: https://ci.learn.mit.edu/
     MIT_SEARCH_ELASTIC_URL: https://api.learn.mit.edu/api/v1/learning_resources_search/
     MIT_SEARCH_VECTOR_URL: https://api.learn.mit.edu/api/v0/vector_learning_resources_search/
-    OPENEDX_API_BASE_URL: https://courses.rc.mitxonline.mit.edu/
-    OPENEDX_LOGIN_URL: https://courses.rc.mitxonline.mit.edu/auth/login/ol-oauth2/?auth_entry=login
+    OPENEDX_API_BASE_URL: https://courses.ci.learn.mit.edu/
+    OPENEDX_LOGIN_URL: https://courses.ci.learn.mit.edu/auth/login/ol-oauth2/?auth_entry=login
   learn_ai:learn_backend_domain: "api.ci.learn.mit.edu"
   redis:password:
     secure: v1:ObQfVCLRk72Bn9f3:7EKaqHGnHkYsurz0xWQcX9Cuhc4k0SSXcIIKSgYQnfFSu9uYHbUT0cpsic4M6SYG6ZuFxKXXeaZuLI2QC3s9Feo0oD+SEjetNxCZo0TPot8=

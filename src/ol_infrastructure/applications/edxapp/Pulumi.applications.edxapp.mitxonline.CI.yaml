@@ -51,11 +51,11 @@ config:
   edxapp:business_unit: mitxonline
   edxapp:db_password:
     secure: v1:nTKkM6zA0wbJaq3T:LyxTy566zTW65zkQLLKsFGmCIPmPRB1rkXcsAg37hI+EUTX07XfX5TkpfdyBBRdntiLJ7odzNss=
-  edxapp:dns_zone: mitxonline
+  edxapp:dns_zone: learn
   edxapp:domains:
-    lms: courses.ci.mitxonline.mit.edu
-    preview: preview.ci.mitxonline.mit.edu
-    studio: studio.ci.mitxonline.mit.edu
+    lms: courses.ci.learn.mit.edu
+    preview: preview.courses.ci.learn.mit.edu
+    studio: studio.courses.ci.learn.mit.edu
   edxapp:marketing_domain: ci.mitxonline.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:+8kgTH+x98kC+Lxc:bW03E5mk8wRB+FxZYtj06FPx/MEJuEiKO5ekaDTZKmqmfklisVhidp0fhX+So2Eygf/Aiyqp5L03RCzA8k7I4ZmlNss19//pdGgBDwa3HAbw
@@ -69,10 +69,10 @@ config:
     ora_grading: ora-grading
   edxapp:google_analytics_id: ""
   edxapp:elb_healthcheck_interval: '30'
-  edxapp:mail_domain: edxapp-mail.ci.mitxonline.mit.edu
+  edxapp:mail_domain: edxapp-mail.ci.learn.mit.edu
   edxapp:proctortrack_url: https://preproduction.verificient.com
-  edxapp:sender_email_address: mitxonline-support+ci@mit.edu
-  edxapp:bulk_email_default_from_email: no-reply@edxapp-mail.ci.mitxonline.mit.edu
+  edxapp:sender_email_address: mitlearn-support+ci@mit.edu
+  edxapp:bulk_email_default_from_email: no-reply@edxapp-mail.ci.learn.mit.edu
   mongodb:admin_password:
     secure: v1:lC3eiftPkXDB9eI/:PxRgffKu9kJjB78ijeLeJgS3fSC0kT80n5GurGDVELGh80RHA31t/VW/4EgwSK00ZlAkCYVKyNSgsDNMwkMzbOP20YcRKvp46olDgdo0Yk2Krou4BzBax5/9
   vault:address: https://vault-ci.odl.mit.edu
