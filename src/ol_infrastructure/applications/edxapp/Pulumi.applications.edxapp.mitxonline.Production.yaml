@@ -51,11 +51,11 @@ config:
   edxapp:db_password:
     secure: v1:Za4LI6RKfAW7jLJh:hlthF86wmGH6VSiBHgehE8mY11hDfOUK/uYZADbodhCVuS8RSXoCoHtrRrBDNMXunQmHLABw4SM=
   edxapp:db_version: "10.11"
-  edxapp:dns_zone: mitxonline
+  edxapp:dns_zone: learn
   edxapp:domains:
-    lms: courses.mitxonline.mit.edu
-    preview: preview.mitxonline.mit.edu
-    studio: studio.mitxonline.mit.edu
+    lms: courses.learn.mit.edu
+    preview: preview.courses.learn.mit.edu
+    studio: studio.courses.learn.mit.edu
   edxapp:marketing_domain: mitxonline.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:qzfe99Jb8n0TnEQS:Y6fSOS8lksj7WvED+V7kCtV7arDtwx7184Fw330Mwh9JDHW72rVd8y7Nm0fF8ANCcFCwDV5EwSU2Fcc+X47NHDOLCOQv16lyB6jWOF2mTr/veRax6MbXY9NlLmsfp9EBQesDCitULbkz9hyHcHT3GPI=
@@ -68,11 +68,11 @@ config:
     learning: learn
     ora_grading: ora-grading
   edxapp:google_analytics_id: UA-5145472-48
-  edxapp:mail_domain: edxapp-mail.mitxonline.mit.edu
+  edxapp:mail_domain: edxapp-mail.learn.mit.edu
   edxapp:proctortrack_url: https://testing.verificient.com
-  edxapp:sender_email_address: mitxonline-support@mit.edu
+  edxapp:sender_email_address: learn-support@mit.edu
   edxapp:email_use_course_id_from_for_bulk: "True"
-  edxapp:bulk_email_default_from_email: no-reply@edxapp-mail.mitxonline.mit.edu
+  edxapp:bulk_email_default_from_email: no-reply@edxapp-mail.learn.mit.edu
   edxapp:framework: "earthly"
   edxapp:web_node_capacity: "9"
   edxapp:worker_node_capacity: "5"
