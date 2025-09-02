@@ -13,3 +13,5 @@ config:
   vault_server:env_namespace: operations.qa
   jupyterhub:shared_password:
     secure: v1:6jn5qRWKDbtbGB9M:VA+J7wwlJM6aw+nrn6gSU3+ndpxXRYDIWwi7x9NuNMxY8CfCesxQuoczRu04L0PhPC8f5qbDnWkF/PB9huub1feGkETJkr8EAr0b3CpGeDo=
+  jupyterhub:rds_password:
+    secure: v1:azvoUOJDNjEzqmDX:CVO6sIlnFR6uTjq/5mK2kHhIh7DAAR3D6FXX4HkcTAdhyZwBhAhU9c4RikJvIhyPLUqJDZELr7dZzp0=
