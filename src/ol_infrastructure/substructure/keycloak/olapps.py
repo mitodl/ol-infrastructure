@@ -742,6 +742,12 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
+                attribute_map={
+                    "email": "mail",
+                    "firstName": "MedName",
+                    "lastName": "sn",
+                    "fullName": "cn",
+                },
             )
         )
         create_org_for_learn(

@@ -42,7 +42,8 @@ class SamlIdpConfig(OrgConfig):
     name_id_format: NameIdFormat = NameIdFormat.unspecified
     principal_type: Literal["SUBJECT", "ATTRIBUTE"] = "SUBJECT"
     principal_attribute: str | None = None
-    mapper_attribute_format: AttributeFormat = AttributeFormat.basic
+    mapper_attribute_format: AttributeFormat = AttributeFormat.uri
+    attribute_map: dict[str, str] | None = None
 
     @model_validator(mode="after")
     def ensure_principal_types(self):
@@ -81,7 +82,9 @@ def onboard_saml_org(
         extract_saml_metadata(saml_config.org_saml_metadata_url)
     )
     mappers = get_saml_attribute_mappers(
-        saml_config.org_saml_metadata_url, saml_config.org_alias.lower()
+        saml_config.org_saml_metadata_url,
+        saml_config.org_alias.lower(),
+        saml_config.attribute_map,
     )
     org_idp = keycloak.saml.IdentityProvider(
         f"ol-apps-{saml_config.org_alias}-saml-idp",

@@ -148,7 +148,7 @@ def generate_pulumi_args_dict(metadata: dict[str, str]) -> dict[str, str]:
 
 
 def get_saml_attribute_mappers(
-    metadata_url: str, idp_alias: str
+    metadata_url: str, idp_alias: str, attribute_map: dict[str, str] | None = None
 ) -> dict[str, dict[str, Collection[str]]]:
     """Parse SAML metadata to find attributes that can be used for attribute mappers.
 
@@ -174,6 +174,19 @@ def get_saml_attribute_mappers(
 
     common_friendly_names = SAML_FRIENDLY_NAMES
     mappers = {}
+
+    if attribute_map:
+        for mapped_attribute, friendly_name in attribute_map.items():
+            mappers[mapped_attribute] = {
+                "name": f"{idp_alias}-{mapped_attribute}-mapper",
+                "attribute_friendly_name": friendly_name,
+                "user_attribute": mapped_attribute,
+                "extra_config": {
+                    "syncMode": "INHERIT",
+                    "attribute.name.format": "ATTRIBUTE_FORMAT_URI",
+                },
+            }
+        return mappers
 
     for (
         keycloak_user_attribute,
