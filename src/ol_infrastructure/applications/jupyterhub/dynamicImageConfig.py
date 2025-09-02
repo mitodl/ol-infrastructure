@@ -1,3 +1,5 @@
+import os
+
 from kubespawner import KubeSpawner
 
 
@@ -33,3 +35,4 @@ class QueryStringKubeSpawner(KubeSpawner):
 
 c.JupyterHub.spawner_class = QueryStringKubeSpawner  # type: ignore[name-defined] # noqa: F821
 c.Authenticator.allow_all = True  # type: ignore[name-defined] # noqa: F821
+c.JupyterHub.db_url = os.environ["DATABASE_URL"]  # type: ignore[name-defined] # noqa: F821

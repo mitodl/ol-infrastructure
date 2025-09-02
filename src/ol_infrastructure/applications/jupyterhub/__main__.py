@@ -139,7 +139,7 @@ jupyterhub_db = OLAmazonDB(jupyterhub_db_config)
 
 jupyterhub_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=jupyterhub_db_config.db_name,
-    mount_point=f"{jupyterhub_db_config.engine}-juptyerhub",
+    mount_point=f"{jupyterhub_db_config.engine}-jupyterhub",
     db_admin_username=jupyterhub_db_config.username,
     db_admin_password=rds_password,
     db_host=jupyterhub_db.db_instance.address,
@@ -189,7 +189,7 @@ app_db_creds_dynamic_secret_config = OLVaultK8SDynamicSecretConfig(
     namespace=namespace,
     path="creds/app",
     templates={
-        "DATABASE_URL": f'postgres://{{{{ get .Secrets "username" }}}}:{{{{ get .Secrets "password" }}}}@jupyterhub-db-{stack_info.env_suffix}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:{DEFAULT_POSTGRES_PORT}/jupyterhub'
+        "DATABASE_URL": f'postgresql://{{{{ get .Secrets "username" }}}}:{{{{ get .Secrets "password" }}}}@jupyterhub-db-{stack_info.env_suffix}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:{DEFAULT_POSTGRES_PORT}/jupyterhub'
     },
     vaultauth=vault_k8s_resources.auth_name,
 )
@@ -364,6 +364,17 @@ binderhub_application = kubernetes.helm.v3.Release(
                 # extraConfig is executed as python at the end of the JH config. For more details see
                 # https://z2jh.jupyter.org/en/latest/administrator/advanced.html#hub-extraconfig
                 "hub": {
+                    "extraEnv": [
+                        {
+                            "name": "DATABASE_URL",
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "name": jupyterhub_creds_secret_name,
+                                    "key": "DATABASE_URL",
+                                }
+                            },
+                        }
+                    ],
                     "extraConfig": {
                         "dynamicImageConfig.py": Path(__file__)
                         .parent.joinpath("dynamicImageConfig.py")
@@ -389,7 +400,7 @@ binderhub_application = kubernetes.helm.v3.Release(
                             "authenticator_class": "tmp",
                         },
                     },
-                    "db": {"type": "postgres", "url": "$(DATABASE_URL)"},
+                    "db": {"type": "postgres"},
                     "resources": {
                         "requests": {
                             "cpu": "100m",
@@ -461,18 +472,6 @@ binderhub_application = kubernetes.helm.v3.Release(
                 },
             },
             "imageBuilderType": "dind",
-            "extraEnv": [
-                {
-                    "DATABASE_URL": {
-                        "valueFrom": {
-                            "secretRef": {
-                                "name": jupyterhub_creds_secret_name,
-                                "key": "DATABASE_URL",
-                            }
-                        }
-                    }
-                }
-            ],
         },
         skip_await=False,
     ),
