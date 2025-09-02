@@ -47,11 +47,15 @@ config:
   - "https://pay.ol.mit.edu/*"
   - "https://mitxonline.mit.edu/*"
   - "https://api.mitxonline.mit.edu/*"
+  - "https://nb.learn.mit.edu/*"
+  - "https://binder.learn.mit.edu/*"
   keycloak_realm:olapps-mitlearn-client-roles:
   - "https://learn.mit.edu/*"
   - "https://learn-ai.ol.mit.edu/*"
   - "https://pay.ol.mit.edu/*"
   - "https://mitxonline.mit.edu/*"
+  - "https://nb.learn.mit.edu/*"
+  - "https://binder.learn.mit.edu/*"
   keycloak_realm:olapps-mitxonline-client-redirect-uris:
   - "https://mitxonline.mit.edu/account/action/complete*"
   keycloak_realm:olapps-open-discussions-client-redirect-uris: ["https://open.mit.edu/*"]
@@ -62,8 +66,8 @@ config:
   - "https://vault-production.odl.mit.edu/ui/vault/auth/oidc/oidc/callback"
   - "http://localhost:8250/oidc/callback"
   keycloak_realm:ol-platform-engineering-jupyterhub-redirect-uris:
-  - "https://nb.learn.mit.edu/*"
-  - "https://binder.learn.mit.edu/*"
+  - "https://nb.ol.mit.edu/*"
+  - "https://binder.ol.mit.edu/*"
   keycloak_realm:ol-data-platform-superset-redirect-uris: ["https://bi.ol.mit.edu/*"]
   keycloak_realm:ol-data-platform-superset-client-roles:
   - "superset_admin"
