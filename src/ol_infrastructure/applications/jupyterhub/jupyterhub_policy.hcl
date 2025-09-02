@@ -4,3 +4,7 @@ path "secret-operations/sso/jupyterhub/*" {
 path "secret-operations/sso/jupyterhub" {
   capabilities = ["read"]
 }
+
+path "postgres-jupyterhub/creds/app" {
+  capabilities = ["read"]
+}
