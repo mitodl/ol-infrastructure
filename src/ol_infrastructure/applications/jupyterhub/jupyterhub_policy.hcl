@@ -1,7 +1,7 @@
-path "secret-operations/sso/jupyterhub/*" {
+path "secret-operations/sso/mitlearn/*" {
   capabilities = ["read"]
 }
-path "secret-operations/sso/jupyterhub" {
+path "secret-operations/sso/mitlearn" {
   capabilities = ["read"]
 }
 

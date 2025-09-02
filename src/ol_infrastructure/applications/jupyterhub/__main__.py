@@ -239,7 +239,7 @@ oidc_resources = OLApisixOIDCResources(
         oidc_use_session_secret=True,
         oidc_scope="openid email",
         vault_mount="secret-operations",
-        vault_path="sso/jupyterhub",
+        vault_path="sso/mitlearn",
         vaultauth=vault_k8s_resources.auth_name,
     ),
 )
