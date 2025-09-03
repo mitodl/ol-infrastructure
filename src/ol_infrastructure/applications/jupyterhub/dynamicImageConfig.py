@@ -24,8 +24,14 @@ class QueryStringKubeSpawner(KubeSpawner):
             # with query string meaning must be URL encoded i.e.
             # notebook=Assignment_2_Prediction_with_LogReg_%26_CART_%26_XGBoost.ipynb
             notebook = self.handler.get_query_argument("notebook", "")
-            if course in KNOWN_COURSES:
-                self.image = image_base.format(course)
+            tag = self.handler.get_query_argument("tag", "").lower()
+            if course in KNOWN_COURSES or tag:
+                # Specifying tag will let you effectively
+                # reference anything in the ECR registry
+                # Is this an issue? If so, we should gate it to QA/CI envs or remove it.
+                self.image = (
+                    image_base.format(tag) if tag else image_base.format(course)
+                )
                 # If we don't have a notebook, don't muck with default_url
                 # This falls back to the tree view in Jupyterhub if not specified
                 if notebook and notebook.endswith(".ipynb"):
