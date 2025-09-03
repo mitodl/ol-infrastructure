@@ -1,5 +1,3 @@
-# ruff: noqa: E501
-
 from pathlib import Path
 
 import pulumi
@@ -12,6 +10,7 @@ from ol_infrastructure.lib.aws.ec2_helper import DiskTypes, default_egress_args
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.stack_defaults import defaults
 
 SEARCH_DOMAIN_NAME_MAX_LENGTH = 28
 
@@ -50,8 +49,13 @@ environment_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 target_vpc = network_stack.require_output(env_config.require("target_vpc"))
 business_unit = env_config.get("business_unit") or "operations"
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
-cluster_size = search_config.get_int("cluster_size") or 3
-cluster_instance_type = search_config.get("instance_type") or "t3.medium.search"
+cluster_defaults = defaults(stack_info)["opensearch"]
+cluster_size = (
+    search_config.get_int("cluster_size") or cluster_defaults["instance_count"]
+)
+cluster_instance_type = (
+    search_config.get("instance_type") or cluster_defaults["instance_type"]
+)
 disk_size = search_config.get_int("disk_size_gb") or 30
 is_public_web = search_config.get_bool("public_web") or False
 is_secured_cluster = search_config.get_bool("secured_cluster") or False
@@ -148,6 +152,16 @@ search_domain = aws.opensearch.Domain(
     )
     if not cluster_instance_type.startswith("t")
     else None,
+    off_peak_window_options=aws.opensearch.DomainOffPeakWindowOptionsArgs(
+        enabled=True,
+        off_peak_window=aws.opensearch.DomainOffPeakWindowOptionsOffPeakWindowArgs(
+            window_start_time=aws.opensearch.DomainOffPeakWindowOptionsOffPeakWindowWindowStartTimeArgs(
+                hours=0, minutes=0
+            )
+        ),
+    )
+    if not cluster_instance_type.startswith("t")
+    else None,
     cluster_config=aws.opensearch.DomainClusterConfigArgs(
         zone_awareness_enabled=True,
         zone_awareness_config=aws.opensearch.DomainClusterConfigZoneAwarenessConfigArgs(
@@ -164,6 +178,9 @@ search_domain = aws.opensearch.Domain(
     tags=aws_config.merged_tags({"Name": f"{environment_name}-opensearch-cluster"}),
     opts=pulumi.ResourceOptions(
         delete_before_replace=True,
+    ),
+    software_update_options=aws.opensearch.DomainSoftwareUpdateOptionsArgs(
+        auto_software_update_enabled=True
     ),
     **conditional_kwargs,
 )

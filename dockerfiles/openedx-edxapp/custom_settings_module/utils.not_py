@@ -1,0 +1,263 @@
+"""
+Utilities for working with Pydantic settings models.
+
+This module provides helper functions for loading, validating, and converting
+between the new Pydantic settings models and Django settings.
+"""
+
+import json
+import os
+from pathlib import Path
+from typing import Any, TypeVar, Union
+
+from .models import (
+    CmsRuntimeSettings,
+    EnvironmentType,
+    LmsRuntimeSettings,
+    RuntimeType,
+    SharedSettings,
+)
+
+T = TypeVar("T", bound=SharedSettings)
+
+
+def detect_runtime() -> RuntimeType:
+    """
+    Detect whether we're running in LMS or CMS context.
+
+    Returns:
+        RuntimeType: The detected runtime type
+    """
+    # Try to detect from environment variable first
+    runtime = os.environ.get("OPENEDX_RUNTIME")
+    if runtime:
+        try:
+            return RuntimeType(runtime.lower())
+        except ValueError:
+            pass
+
+    # Fall back to detecting from Python module context
+    import sys
+
+    if "cms" in sys.modules:
+        return RuntimeType.CMS
+    elif "lms" in sys.modules:
+        return RuntimeType.LMS
+
+    # Default to LMS if we can't detect
+    return RuntimeType.LMS
+
+
+def detect_environment() -> EnvironmentType:
+    """
+    Detect the current environment from various indicators.
+
+    Returns:
+        EnvironmentType: The detected environment
+    """
+    # Check environment variable
+    env = os.environ.get("OPENEDX_ENV", os.environ.get("DJANGO_ENV"))
+    if env:
+        try:
+            return EnvironmentType(env.lower())
+        except ValueError:
+            pass
+
+    # Check for debug mode
+    if os.environ.get("DEBUG", "").lower() in ("true", "1", "yes"):
+        return EnvironmentType.DEVELOPMENT
+
+    # Default to development
+    return EnvironmentType.DEVELOPMENT
+
+
+def load_settings_from_env(
+    runtime: RuntimeType = None,
+) -> Union[LmsRuntimeSettings, CmsRuntimeSettings]:
+    """
+    Load settings from environment variables.
+
+    Args:
+        runtime: The runtime type (LMS or CMS). If None, will be auto-detected.
+
+    Returns:
+        Configured settings instance for the specified runtime
+    """
+    if runtime is None:
+        runtime = detect_runtime()
+
+    if runtime == RuntimeType.LMS:
+        return LmsRuntimeSettings()
+    else:
+        return CmsRuntimeSettings()
+
+
+def load_settings_from_file(
+    file_path: Union[str, Path], runtime: RuntimeType = None
+) -> Union[LmsRuntimeSettings, CmsRuntimeSettings]:
+    """
+    Load settings from a JSON or YAML configuration file.
+
+    Args:
+        file_path: Path to the configuration file
+        runtime: The runtime type (LMS or CMS). If None, will be auto-detected.
+
+    Returns:
+        Configured settings instance for the specified runtime
+    """
+    if runtime is None:
+        runtime = detect_runtime()
+
+    file_path = Path(file_path)
+
+    if file_path.suffix.lower() == ".json":
+        with open(file_path) as f:
+            config_data = json.load(f)
+    elif file_path.suffix.lower() in (".yml", ".yaml"):
+        try:
+            import yaml
+
+            with open(file_path) as f:
+                config_data = yaml.safe_load(f)
+        except ImportError:
+            raise ImportError("PyYAML is required to load YAML configuration files")
+    else:
+        raise ValueError(f"Unsupported file format: {file_path.suffix}")
+
+    if runtime == RuntimeType.LMS:
+        return LmsRuntimeSettings(**config_data)
+    else:
+        return CmsRuntimeSettings(**config_data)
+
+
+def settings_to_django_dict(settings: SharedSettings) -> dict[str, Any]:
+    """
+    Convert Pydantic settings to a Django settings dictionary.
+
+    Args:
+        settings: The Pydantic settings instance
+
+    Returns:
+        Dictionary compatible with Django settings
+    """
+    django_settings = {}
+
+    # Convert each settings group
+    for field_name, field_value in settings.model_dump().items():
+        if isinstance(field_value, dict):
+            # Flatten nested settings with appropriate prefixes
+            for key, value in field_value.items():
+                django_settings[key] = value
+        else:
+            django_settings[field_name.upper()] = field_value
+
+    return django_settings
+
+
+def validate_settings(settings: SharedSettings) -> None:
+    """
+    Perform comprehensive validation of settings.
+
+    Args:
+        settings: The settings instance to validate
+
+    Raises:
+        ValueError: If validation fails
+    """
+    # Environment-specific validations
+    if settings.environment == EnvironmentType.PRODUCTION:
+        if settings.django.DEBUG:
+            raise ValueError("DEBUG must be False in production")
+        if settings.security.SECRET_KEY == "dev key":  # pragma: allowlist secret
+            raise ValueError("SECRET_KEY must be changed in production")
+        if not settings.security.SECURE_SSL_REDIRECT:
+            print("Warning: SECURE_SSL_REDIRECT should be True in production")
+
+    # Security validations
+    if settings.security.SECRET_KEY and len(settings.security.SECRET_KEY) < 32:
+        raise ValueError("SECRET_KEY should be at least 32 characters long")
+
+    # Email validations
+    if settings.email.EMAIL_USE_TLS and settings.email.EMAIL_USE_SSL:
+        raise ValueError("EMAIL_USE_TLS and EMAIL_USE_SSL cannot both be True")
+
+
+def merge_settings(base: T, overrides: dict[str, Any]) -> T:
+    """
+    Merge override values into base settings.
+
+    Args:
+        base: Base settings instance
+        overrides: Dictionary of override values
+
+    Returns:
+        New settings instance with overrides applied
+    """
+    base_dict = base.model_dump()
+
+    # Deep merge the overrides
+    def deep_merge(
+        base_dict: dict[str, Any], overrides: dict[str, Any]
+    ) -> dict[str, Any]:
+        for key, value in overrides.items():
+            if (
+                key in base_dict
+                and isinstance(base_dict[key], dict)
+                and isinstance(value, dict)
+            ):
+                base_dict[key] = deep_merge(base_dict[key], value)
+            else:
+                base_dict[key] = value
+        return base_dict
+
+    merged_dict = deep_merge(base_dict, overrides)
+    return type(base)(**merged_dict)
+
+
+def export_settings_template(
+    runtime: RuntimeType = RuntimeType.LMS, format: str = "json"
+) -> str:
+    """
+    Export a template configuration file with default values.
+
+    Args:
+        runtime: The runtime type to generate template for
+        format: Output format ('json' or 'yaml')
+
+    Returns:
+        Template configuration as a string
+    """
+    if runtime == RuntimeType.LMS:
+        settings = LmsRuntimeSettings()
+    else:
+        settings = CmsRuntimeSettings()
+
+    config_dict = settings.model_dump()
+
+    if format.lower() == "json":
+        return json.dumps(config_dict, indent=2, default=str)
+    elif format.lower() in ("yaml", "yml"):
+        try:
+            import yaml
+
+            return yaml.dump(config_dict, default_flow_style=False, sort_keys=True)
+        except ImportError:
+            raise ImportError("PyYAML is required to export YAML configuration")
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+
+
+# Convenience functions for common operations
+def get_lms_settings() -> LmsRuntimeSettings:
+    """Get LMS settings from environment."""
+    return load_settings_from_env(RuntimeType.LMS)
+
+
+def get_cms_settings() -> CmsRuntimeSettings:
+    """Get CMS settings from environment."""
+    return load_settings_from_env(RuntimeType.CMS)
+
+
+def get_current_settings() -> Union[LmsRuntimeSettings, CmsRuntimeSettings]:
+    """Get settings for the current runtime context."""
+    return load_settings_from_env()

@@ -26,6 +26,7 @@ config:
     "--everyone"]
   - ["contentstore.new_studio_mfe.use_new_updates_page", "--create", "--superusers",
     "--everyone"]
+  - ["discussions.enable_forum_v2", "--deactivate"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
   - ["grades.bulk_management", "--create", "--superusers", "--everyone"]
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
@@ -43,6 +44,7 @@ config:
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["studio.library_authoring_mfe", "--deactivate"]
+  - ["legacy_studio.certificates", "--create", "--everyone"]
   edxapp:business_unit: residential
   edxapp:db_password:
     secure: v1:xglzNDR1j+CDTk3s:4TyRALK3e/ncPRhuFTUQQqRBSTwyrCWWcTn/Y6G9XjG+ms/biXjoKbleFdMo0omPC83nGiI5mBc=

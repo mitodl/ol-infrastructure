@@ -18,7 +18,6 @@ Required On Input:
 """
 
 from enum import Enum, unique
-from typing import Optional
 
 import pulumi
 from pulumi.resource import ResourceOptions
@@ -73,27 +72,27 @@ class OLApplicationLoadBalancedFargateConfig(AWSBase):
     # Name of ECS Fargate service
     service_name: str
     # Block for configuring access logs written to S3 bucket
-    access_log: Optional[LoadBalancerAccessLogsArgs] = None
+    access_log: LoadBalancerAccessLogsArgs | None = None
     # Determines whether ECS Fargate service will have public IP or not
     assign_public_ip: bool = False
     # If enabled, circuit breaker will automatically roll Service back to last
     # successful deployment, if error occurs during deployment
     deployment_circuit_breaker_enabled: bool = False
     # ECS cluster that will be parent of ECS Service. Will be created if not provided
-    cluster: Optional[Cluster] = None
+    cluster: Cluster | None = None
     # Desired count for number of tasks on ECS Service
     desired_count: PositiveInt = PositiveInt(1)
     # Domain name for the load balancer. Eg- api.some-service.com
-    domain_name: Optional[str]
+    domain_name: str | None
     # Route 53 hosted zone. Eg- some-service.com
-    zone_name: Optional[str] = None
+    zone_name: str | None = None
     # Seconds to ignore failing load balancer health checks on newly created tasks
     health_check_grace_period_seconds: PositiveInt = PositiveInt(60)
     # Port load balancer listener will be available on. HTTP defaults to 80, HTTPS
     # defaults to 443
-    listener_port: Optional[PositiveInt]
+    listener_port: PositiveInt | None
     # Pre-built load balancer to use, if needed
-    load_balancer: Optional[LoadBalancer] = None
+    load_balancer: LoadBalancer | None = None
     # Name of load balancer
     load_balancer_name: str
     # Max amount, as percentage, of running tasks that can run during a deployment
@@ -127,12 +126,12 @@ class OLApplicationLoadBalancedFargateConfig(AWSBase):
     # Security groups associated with the service and tasks
     security_groups: list[SecurityGroup]
     # List of subnet ids to attach to load balancer
-    subnets: Optional[list[str]]
+    subnets: list[str] | None
     # VPC service will be deployed into. Service and tasks will be deployed into public
     # subnets, from this VPC
     vpc_id: pulumi.Output[str]
     # List of action blocks for listener
-    default_actions: Optional[list[ListenerDefaultActionArgs]] = None
+    default_actions: list[ListenerDefaultActionArgs] | None = None
     # Type of Deployment Controller used for service and tasks. Only ECS supported
     _deployment_controller: DeploymentControllerTypes = DeploymentControllerTypes.ecs
     # Lastest Fargate version will always be used
@@ -148,7 +147,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
     def __init__(
         self,
         config: OLApplicationLoadBalancedFargateConfig,
-        opts: Optional[pulumi.ResourceOptions] = None,
+        opts: pulumi.ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:infrastructure:aws:ecs:OLALBFargatService", config.name, None, opts

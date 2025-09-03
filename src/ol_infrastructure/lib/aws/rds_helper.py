@@ -99,3 +99,26 @@ def get_rds_instance(instance_name: str) -> dict[str, str]:
     except rds_client.exceptions.DBInstanceNotFoundFault:
         db_instance = {}
     return db_instance
+
+
+def turn_off_deletion_protection(db_identifier: str):
+    """Disable deletion protection for the specified RDS database instance.
+
+    :param db_identifier: The identifier of the RDS database instance.
+    :type db_identifier: str
+
+    :raises botocore.exceptions.ClientError: If the AWS API call fails or the instance
+    does not exist.
+    """
+    try:
+        rds_client.modify_db_instance(
+            DBInstanceIdentifier=db_identifier,
+            ApplyImmediately=True,
+            DeletionProtection=False,
+        )
+    except rds_client.exceptions.DBInstanceNotFoundFault as e:
+        msg = f"DB instance '{db_identifier}' not found."
+        raise ValueError(msg) from e
+    except rds_client.exceptions.InvalidDBInstanceStateFault as e:
+        msg = f"DB instance '{db_identifier}' is in an invalid state for modification."
+        raise RuntimeError(msg) from e

@@ -1,4 +1,4 @@
-# ruff: noqa: E501, CPY001
+# ruff: noqa: E501
 """Create the infrastructure and services needed to support the OCW Studio application.
 
 - Create a Redis instance in AWS Elasticache
@@ -62,18 +62,9 @@ aws_account = get_caller_identity()
 
 # Create S3 buckets
 
-# Bucket used to store output from ocw-to-hugo which is markdown files rendered from
-# legacy OCW Plone content.
-ocw_to_hugo_bucket_name = f"ocw-to-hugo-output-{stack_info.env_suffix}"
-ocw_studio_legacy_markdown_bucket = s3.Bucket(
-    f"ocw-to-hugo-output-{stack_info.env_suffix}",
-    bucket=ocw_to_hugo_bucket_name,
-    tags=aws_config.tags,
-)
-
 # Bucket used to store file uploads from ocw-studio app.
 ocw_storage_bucket_name = f"ol-ocw-studio-app-{stack_info.env_suffix}"
-ocw_storage_bucket = s3.BucketV2(
+ocw_storage_bucket = s3.Bucket(
     f"ol-ocw-studio-app-{stack_info.env_suffix}",
     bucket=ocw_storage_bucket_name,
     tags=aws_config.tags,
@@ -85,10 +76,10 @@ ocw_storage_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "ol-ocw-studio-app-bucket-versioning",
     bucket=ocw_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )
@@ -143,17 +134,6 @@ ocw_studio_iam_policy = iam.Policy(
                     "Effect": "Allow",
                     "Action": "s3:ListAllMyBuckets",
                     "Resource": "*",
-                },
-                {
-                    "Effect": "Allow",
-                    "Action": [
-                        "s3:ListBucket*",
-                        "s3:GetObject*",
-                    ],
-                    "Resource": [
-                        f"arn:aws:s3:::{ocw_to_hugo_bucket_name}",
-                        f"arn:aws:s3:::{ocw_to_hugo_bucket_name}/*",
-                    ],
                 },
                 {
                     "Effect": "Allow",
@@ -250,7 +230,8 @@ ocw_studio_db_security_group = ec2.SecurityGroup(
     ),
     vpc_id=apps_vpc["id"],
 )
-
+rds_defaults = defaults(stack_info)["rds"]
+rds_defaults["use_blue_green"] = False
 ocw_studio_db_config = OLPostgresDBConfig(
     instance_name=f"ocw-studio-db-applications-{stack_info.env_suffix}",
     password=ocw_studio_config.require("db_password"),
@@ -260,7 +241,7 @@ ocw_studio_db_config = OLPostgresDBConfig(
     tags=aws_config.tags,
     db_name="ocw_studio",
     public_access=True,
-    **defaults(stack_info)["rds"],
+    **rds_defaults,
 )
 ocw_studio_db_config.parameter_overrides.append(
     {"name": "password_encryption", "value": "md5"}
@@ -275,7 +256,7 @@ ocw_studio_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_admin_username=ocw_studio_db_config.username,
     db_admin_password=ocw_studio_db_config.password.get_secret_value(),
     db_host=ocw_studio_db.db_instance.address,
-    **defaults(stack_info)["rds"],
+    **rds_defaults,
 )
 ocw_studio_vault_backend = OLVaultDatabaseBackend(ocw_studio_vault_backend_config)
 
@@ -357,7 +338,7 @@ heroku_vars = {
     "OCW_STUDIO_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
     "OCW_STUDIO_DB_CONN_MAX_AGE": 0,
     "OCW_STUDIO_DB_DISABLE_SSL": "True",
-    "OCW_STUDIO_DELETABLE_CONTENT_TYPES": "external-resource,instructor,page,course-collection",
+    "OCW_STUDIO_DELETABLE_CONTENT_TYPES": "external-resource,instructor,page,course-collection,resource",
     "OCW_STUDIO_ENVIRONMENT": env_name,
     "OCW_STUDIO_USE_S3": "True",
     "OCW_WWW_TEST_SLUG": "ocw-ci-test-www",

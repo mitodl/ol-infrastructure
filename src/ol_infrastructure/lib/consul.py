@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Union
 
 import pulumi
 import pulumi_consul as consul
@@ -13,7 +12,7 @@ def get_consul_provider(
     wrap_in_pulumi_options: bool = True,  # noqa: FBT001, FBT002
     consul_address: str | None = None,
     provider_name: str = "consul-provider",
-) -> Union[consul.Provider, pulumi.ResourceOptions]:
+) -> consul.Provider | pulumi.ResourceOptions:
     consul_config = pulumi.Config("consul")
     consul_provider = consul.Provider(
         provider_name,

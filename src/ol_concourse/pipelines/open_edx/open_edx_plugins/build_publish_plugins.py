@@ -10,137 +10,86 @@ from ol_concourse.lib.models.pipeline import (
     Output,
     Pipeline,
     Platform,
-    PutStep,
     RegistryImage,
     TaskConfig,
     TaskStep,
 )
 from ol_concourse.lib.resource_types import pypi_resource
-from ol_concourse.lib.resources import git_repo, pypi
+from ol_concourse.lib.resources import git_repo
 
 pypi_type = pypi_resource()
-
-plugin_dict = {
-    "src/edx_sysadmin": {
-        "target_name": "edx_sysadmin_package",
-        "pypi_package_name": "edx-sysadmin",
-    },
-    "src/edx_username_changer": {
-        "target_name": "edx_username_changer_package",
-        "pypi_package_name": "edx-username-changer",
-    },
-    "src/ol_openedx_canvas_integration": {
-        "target_name": "canvas_integration_package",
-        "pypi_package_name": "ol-openedx-canvas-integration",
-    },
-    "src/ol_openedx_chat": {
-        "target_name": "ol_openedx_chat_package",
-        "pypi_package_name": "ol-openedx-chat",
-    },
-    "src/ol_openedx_checkout_external": {
-        "target_name": "checkout_external_package",
-        "pypi_package_name": "ol-openedx-checkout-external",
-    },
-    "src/ol_openedx_course_export": {
-        "target_name": "course_export_package",
-        "pypi_package_name": "ol-openedx-course-export",
-    },
-    "src/ol_openedx_course_structure_api": {
-        "target_name": "course_structure_api_package",
-        "pypi_package_name": "ol-openedx-course-structure-api",
-    },
-    "src/ol_openedx_course_sync": {
-        "target_name": "ol_openedx_course_sync_package",
-        "pypi_package_name": "ol-openedx-course-sync",
-    },
-    "src/ol_openedx_git_auto_export": {
-        "target_name": "edx_git_auto_export",
-        "pypi_package_name": "ol-openedx-git-auto-export",
-    },
-    "src/ol_openedx_logging": {
-        "target_name": "logging_package",
-        "pypi_package_name": "ol-openedx-logging",
-    },
-    "src/ol_openedx_otel_monitoring": {
-        "target_name": "otel_monitoring_package",
-        "pypi_package_name": "ol-openedx-otel-monitoring",
-    },
-    "src/ol_openedx_rapid_response_reports": {
-        "target_name": "rapid_response_plugin_dist",
-        "pypi_package_name": "ol-openedx-rapid-response-reports",
-    },
-    "src/ol_openedx_sentry": {
-        "target_name": "sentry_package",
-        "pypi_package_name": "ol-openedx-sentry",
-    },
-    "src/ol_social_auth": {
-        "target_name": "ol_social_auth_package",
-        "pypi_package_name": "ol-social-auth",
-    },
-    "src/openedx_companion_auth": {
-        "target_name": "openedx_companion_auth_package",
-        "pypi_package_name": "openedx-companion-auth",
-    },
-}
+# AI: This pipeline builds and publishes multiple Python packages from a single git
+# repository. The build happens via uv package manager (https://docs.astral.sh/uv/)
+plugins = [
+    "edx_sysadmin",
+    "edx_username_changer",
+    "ol_openedx_canvas_integration",
+    "ol_openedx_chat",
+    "ol_openedx_chat_xblock",
+    "ol_openedx_checkout_external",
+    "ol_openedx_course_export",
+    "ol_openedx_course_structure_api",
+    "ol_openedx_course_sync",
+    "ol_openedx_git_auto_export",
+    "ol_openedx_logging",
+    "ol_openedx_otel_monitoring",
+    "ol_openedx_rapid_response_reports",
+    "ol_openedx_sentry",
+    "ol_social_auth",
+    "openedx_companion_auth",
+    "rapid_response_xblock",
+]
 
 fragments = []
-for path, config in plugin_dict.items():
+for plugin in plugins:
     plugin_git_repo = git_repo(
-        Identifier(f"{config['target_name']}-repo"),
+        Identifier(f"{plugin}-repo"),
         uri="https://github.com/mitodl/open-edx-plugins",
-        paths=[path],
-        check_every="1h",
+        paths=[f"src/{plugin}"],
+        check_every="15m",
     )
 
-    plugin_pypi = pypi(
-        Identifier(f"{config['target_name']}-pypi-package"),
-        package_name=config["pypi_package_name"],
-        username="((pypi_creds.username))",
-        password="((pypi_creds.password))",  # noqa: S106
-    )
     build_job = Job(
-        name=f"build-{config['target_name']}",
+        name=Identifier(f"build-{plugin}"),
         plan=[
             GetStep(
                 get=plugin_git_repo.name,
                 trigger=True,
             ),
             TaskStep(
-                task=Identifier(f"pants-package-{config['target_name']}"),
+                task=Identifier("run-build"),
                 config=TaskConfig(
                     platform=Platform.linux,
                     image_resource=AnonymousResource(
                         type=REGISTRY_IMAGE,
-                        source=RegistryImage(repository="python", tag="3.9"),
+                        source=RegistryImage(
+                            repository="ghcr.io/astral-sh/uv", tag="debian-slim"
+                        ),
                     ),
                     inputs=[Input(name=plugin_git_repo.name)],
                     outputs=[Output(name=plugin_git_repo.name)],
+                    params={
+                        "TWINE_USERNAME": "((pypi_creds.username))",
+                        "TWINE_PASSWORD": "((pypi_creds.password))",
+                    },
                     run=Command(
                         path="sh",
                         args=[
                             "-exc",
                             f"""
-                                cd {plugin_git_repo.name};
-                                ./pants package {path}:{config["target_name"]};
+                            cd {plugin_git_repo.name};
+                            uv build --package {plugin};
+                            uvx twine check dist/*
+                            uvx twine upload --skip-existing --non-interactive dist/*
                             """,
                         ],
                     ),
                 ),
             ),
-            PutStep(
-                put=plugin_pypi.name,
-                inputs=[
-                    plugin_git_repo.name
-                ],  # This errors when wrapped in Input() like it should be ?
-                params={
-                    "glob": f"{plugin_git_repo.name}/dist/{config['pypi_package_name']}-*.tar.gz",  # noqa: E501
-                },
-            ),
         ],
     )
     fragment = PipelineFragment(
-        resource_types=[pypi_type],
-        resources=[plugin_git_repo, plugin_pypi],
+        resources=[plugin_git_repo],
         jobs=[build_job],
     )
     fragments.append(fragment)

@@ -6,10 +6,12 @@ config:
   consul:address: https://consul-xpro-qa.odl.mit.edu
   edxapp:waffle_flags:
   - ["completion.enable_completion_tracking", "--create", "--superusers", "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_video_uploads_page", "--create", "--everyone"]
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
   - ["course_experience.relative_dates_disable_reset", "--create", "--everyone"]
   - ["course_home.course_home_mfe_progress_tab", "--create", "--everyone"]
   - ["courseware.courseware_mfe", "--create", "--superusers", "--everyone"]
+  - ["discussions.enable_forum_v2", "--deactivate"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
   - ["effort_estimation.disabled", "--create", "--superusers", "--everyone"]
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
@@ -24,6 +26,7 @@ config:
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["studio.library_authoring_mfe", "--deactivate"]
+  - ["legacy_studio.certificates", "--create", "--everyone"]
   edxapp:business_unit: mitxpro
   edxapp:db_password:
     secure: v1:+Bcw4dSZUPqWY2cL:g/KKgzrmRlgx2SOuOOB4grCveVaNv5mZVuuFrpGgAGwKEussIqUWTBnFJknEdJ4Hjf5Jw/1W560=

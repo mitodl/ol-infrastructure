@@ -1,4 +1,4 @@
-from typing import Literal, Union
+from typing import Literal
 
 from pulumi import Config, StackReference
 from pulumi_aws import route53
@@ -16,7 +16,7 @@ aws_tags = AWSBase(tags={"OU": BusinessUnit.xpro, "Environment": "xpro"}).tags
 
 def xpro_partner_record(
     subdomain: str,
-    record: Union[list[str], str],
+    record: list[str] | str,
     record_type: Literal["A", "CNAME"] = "A",
 ) -> route53.Record:
     name_base = "{}.xpro.mit.edu".format
@@ -42,7 +42,7 @@ xpro_partner_record(
 
 xpro_partner_record(
     "globalalumni",
-    record="108.128.56.156",
+    record="54.72.183.79",
 )
 
 xpro_partner_record(

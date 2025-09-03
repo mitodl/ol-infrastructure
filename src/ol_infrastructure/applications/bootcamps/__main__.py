@@ -51,7 +51,7 @@ aws_config = AWSBase(
 
 # Bucket used to store file uploads from bootcamps app.
 bootcamps_storage_bucket_name = f"ol-bootcamps-app-{stack_info.env_suffix}"
-bootcamps_storage_bucket = s3.BucketV2(
+bootcamps_storage_bucket = s3.Bucket(
     f"ol-bootcamps-app-{stack_info.env_suffix}",
     bucket=bootcamps_storage_bucket_name,
     tags=aws_config.tags,
@@ -63,10 +63,10 @@ bootcamps_storage_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "ol-bootcamps-app-bucket-versioning",
     bucket=bootcamps_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )
@@ -184,7 +184,8 @@ bootcamps_db_security_group = ec2.SecurityGroup(
     ),
     vpc_id=apps_vpc["id"],
 )
-
+rds_defaults = defaults(stack_info)["rds"]
+rds_defaults["use_blue_green"] = False
 bootcamps_db_config = OLPostgresDBConfig(
     instance_name=f"bootcamps-db-applications-{stack_info.env_suffix}",
     password=bootcamps_config.require("db_password"),
@@ -194,7 +195,7 @@ bootcamps_db_config = OLPostgresDBConfig(
     tags=aws_config.tags,
     db_name="bootcamps",
     public_access=True,
-    **defaults(stack_info)["rds"],
+    **rds_defaults,
 )
 bootcamps_db_config.parameter_overrides.append(
     {"name": "password_encryption", "value": "md5"}
@@ -207,7 +208,7 @@ bootcamps_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_admin_username=bootcamps_db_config.username,
     db_admin_password=bootcamps_db_config.password.get_secret_value(),
     db_host=bootcamps_db.db_instance.address,
-    **defaults(stack_info)["rds"],
+    **rds_defaults,
 )
 bootcamps_vault_backend = OLVaultDatabaseBackend(bootcamps_vault_backend_config)
 
@@ -247,7 +248,6 @@ heroku_vars = {
     "FEATURE_ENABLE_CERTIFICATE_USER_VIEW": "True",
     "FEATURE_SOCIAL_AUTH_API": "True",
     "FEATURE_CMS_HOME_PAGE": "True",
-    "HUBSPOT_PIPELINE_ID": "75e28846-ad0d-4be2-a027-5e1da6590b98",
     "JOBMA_LINK_EXPIRATION_DAYS": 13,
     "MAX_FILE_UPLOAD_MB": 10,
     "NODE_MODULES_CACHE": "False",
@@ -258,7 +258,7 @@ heroku_vars = {
 }
 
 sensitive_heroku_vars = {
-    "CYBERSOURCE_ACCESS_KEY": bootcamps_vault_secrets["cybersource"]["access_key"],
+    "CYBERSOURCE_ACCESS_KEY": "",
     "CYBERSOURCE_INQUIRY_LOG_NACL_ENCRYPTION_KEY": bootcamps_vault_secrets[
         "cybersource"
     ]["inquiry_public_encryption_key"],
@@ -272,9 +272,6 @@ sensitive_heroku_vars = {
     "JOBMA_ACCESS_TOKEN": bootcamps_vault_secrets["jobma"]["access_token"],
     "JOBMA_WEBHOOK_ACCESS_TOKEN": bootcamps_vault_secrets["jobma"][
         "webhook_access_token"
-    ],
-    "MITOL_HUBSPOT_API_PRIVATE_TOKEN": bootcamps_vault_secrets["hubspot"][
-        "api_private_token"
     ],
     "NOVOED_API_KEY": bootcamps_vault_secrets["novoed"]["api_key"],
     "NOVOED_API_SECRET": bootcamps_vault_secrets["novoed"]["api_secret"],

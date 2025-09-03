@@ -7,12 +7,20 @@ config:
     secure: v1:vEeGgZVBjWBklqb3:FWrkz0af0N+bAW/Faye1raC5aSL7fJwcJgBk3DtWmQCZ95k1v8pRzMyGmPG6FQ10Q2VWNMS0yBO4PMZVp7bSIRz18OiCPwmfVv5wa347Fms=
   mitxonline:domain: "api.ci.mitxonline.mit.edu"
   mitxonline:k8s_deploy: "true"
+  mitxonline:learn_backend_domain: "api.ci.learn.mit.edu"
   mitxonline:vars:
     AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-ci"
+    CORS_ALLOWED_ORIGINS: "https://ci.mitxonline.mit.edu,https://ci.learn.mit.edu"
+    CSRF_TRUSTED_ORIGINS: "https://ci.mitxonline.mit.edu,https://ci.learn.mit.edu"
+    CSRF_COOKIE_DOMAIN: ".ci.mitxonline.mit.edu"
+    CSRF_COOKIE_NAME: csrf_mitxonline
     CRON_COURSE_CERTIFICATES_HOURS: "18"
     GA_TRACKING_ID: "UA-5145472-46"
     GTM_TRACKING_ID: "GTM-TW97MNR"
-    LOGOUT_REDIRECT_URL: "https://courses-ci.mitxonline.mit.edu/logout" # Points to RC
+    KEYCLOAK_BASE_URL: "https://sso-ci.ol.mit.edu"
+    KEYCLOAK_CLIENT_ID: "ol-mitxonline-client"
+    KEYCLOAK_REALM_NAME: "olapps"
+    LOGOUT_REDIRECT_URL: "https://courses.ci.learn.mit.edu/logout"
     MAILGUN_FROM_EMAIL: "MITx Online <no-reply@mitxonline-ci-mail.mitxonline.mit.edu>"
     MAILGUN_SENDER_DOMAIN: "mitxonline-ci-mail.mitxonline.mit.edu"
     MITOL_APIGATEWAY_DISABLE_MIDDLEWARE: "false"
@@ -27,13 +35,17 @@ config:
     MITX_ONLINE_ENVIRONMENT: "rc"
     MITX_ONLINE_LOG_LEVEL: "INFO"
     MITX_ONLINE_SECURE_SSL_HOST: "ci.mitxonline.mit.edu"
-    OPENEDX_API_BASE_URL: "https://courses-ci.mitxonline.mit.edu" # Points to RC
+    OPENEDX_API_BASE_URL: "https://courses.ci.learn.mit.edu"
+    OPENEDX_COURSE_BASE_URL: "https://courses.ci.learn.mit.edu/learn/course/"
     OPENEDX_OAUTH_PROVIDER: "ol-oauth2"
     OPENEDX_SOCIAL_LOGIN_PATH: "/auth/login/ol-oauth2/?auth_entry=login"
+    OPENEDX_STUDIO_API_BASE_URL: "https://studio.courses.ci.learn.mit.edu"
     OPENTELEMETRY_ENABLED: "true"
-    OPENTELEMETRY_ENDPOINT: "http://grafana-alloy.operations.svc.cluster.local:4318"
+    OPENTELEMETRY_ENDPOINT: "http://grafana-alloy.operations.svc.cluster.local:4318/v1/traces"
     SENTRY_LOG_LEVEL: "ERROR"
     SESSION_COOKIE_NAME: "session_mitxonline_ci"
+    MIT_LEARN_FROM_EMAIL: "MIT Learn <mitlearn-support@mit.edu>"
+    MIT_LEARN_DASHBOARD_URL: "https://learn.mit.edu/dashboard"
   redis:password:
     secure: v1:N1ZyKKPiMa/DaKYH:Y8NIcmgFnBBjTIUkT6PeefRnINIjVI/MMmX8IXKfxF5bLfMjRT/6dG8eYwMtHFSRMn+Kb1ZEJod3oqiSeMdeidttL4LPKK0=
   vault:address: https://vault-ci.odl.mit.edu

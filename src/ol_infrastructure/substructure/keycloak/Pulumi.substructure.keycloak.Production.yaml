@@ -6,6 +6,7 @@ config:
   keycloak:client_secret:
     secure: v1:mbdWdrtlOrf/yMPw:4cu91sZzAKkYUkyxQBEtClJ49/uRp/f9nuW4uDakdRV7RW57Yf1EIqd71ovo0+TZ
   keycloak:url: https://sso.ol.mit.edu
+  keycloak_realm:learn_domain: learn.mit.edu
   keycloak_realm:captcha_secret_key:
     secure: v1:+2lwPPgixsEOH7Jm:YdY9hefdk89jlxKxSZ0zRDLR9KBur8s1b/RRtWLomgvlGuBQoE4KpVh/s+fl5lshzM+EN+VceaM=
   keycloak_realm:captcha_site_key:
@@ -15,11 +16,11 @@ config:
   keycloak_realm:mailgun_email_host:
     secure: v1:sSbWnWxXFSf0IGt0:WFZOoW1b6Z1R2Dp9LKF/f1NARkWwNvX36muNnzAkDOw=
   keycloak_realm:mailgun_email_password:
-    secure: v1:szLW/8z8wFWWoKg5:1P+ydXEaokdzXZ/b7hYEStrR3q9bMB//UH2FhlU116O7OXdg9CUZ0em9OaLi1jCVjoBc0zOQJYVq8DZVD785yE4G
+    secure: v1:Z394Rc+yPbMCUsb9:0kewxu6+m84UqLCLigI9cvpoxAVnDdcUrBahnO9LoRK5BzEFBiNOlA0AixXm7E+9zdkqUrHhXXyjcDIH92EQX+a3
   keycloak_realm:mailgun_email_username:
-    secure: v1:j07wuh/TTLkO473J:NZ/98PovITQ5SjTXJV2gF7L4J8FMMNKlk+aboNb64u46GgBZ09wtrHeRUuU=
+    secure: v1:5w5wCAajSx21ApSQ:agy6ciGHka3Lrwhgz2z33+hT1nnYdkw9Txz9/uQVFmTBgKaqyB1yA+KJoo5jKL5PiRBi
   keycloak_realm:mailgun_reply_to_address:
-    secure: v1:k6AjXnlCnWLqwVhx:NHhS0Yt9Flc/vc0hcLJmfuE/CNCe92U8WbllT/KyyeouZ8UO8bAJSCTLp5Q=
+    secure: v1:vUKJHL4PM4I0XV+2:bvEaAvXcTji7V7KSg5Wv7hZYR806koU//70NsXvPvUoBI+KwDtd32+ykdS6DwlmyS2yv
   keycloak_realm:mit_email_host:
     secure: v1:1gyJ6yq3akZxkYYu:EEHQNf1bF5ScW9XFFDcW932EQZOK2wWm48OBftAr1SE=
   keycloak_realm:mit_email_password:
@@ -46,23 +47,33 @@ config:
   - "https://pay.ol.mit.edu/*"
   - "https://mitxonline.mit.edu/*"
   - "https://api.mitxonline.mit.edu/*"
+  - "https://nb.learn.mit.edu/*"
+  - "https://binder.learn.mit.edu/*"
   keycloak_realm:olapps-mitlearn-client-roles:
   - "https://learn.mit.edu/*"
   - "https://learn-ai.ol.mit.edu/*"
   - "https://pay.ol.mit.edu/*"
   - "https://mitxonline.mit.edu/*"
+  - "https://nb.learn.mit.edu/*"
+  - "https://binder.learn.mit.edu/*"
+  keycloak_realm:olapps-mitxonline-client-redirect-uris:
+  - "https://mitxonline.mit.edu/account/action/complete*"
   keycloak_realm:olapps-open-discussions-client-redirect-uris: ["https://open.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-airbyte-redirect-uris: ["https://airbyte.odl.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-dagster-redirect-uris: ["https://pipelines.odl.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-leek-redirect-uris: ["https://celery-monitoring.odl.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-vault-redirect-uris:
-  - "https://vault.odl.mit.edu/ui/vault/auth/oidc/oidc/callback"
+  - "https://vault-production.odl.mit.edu/ui/vault/auth/oidc/oidc/callback"
   - "http://localhost:8250/oidc/callback"
+  keycloak_realm:ol-platform-engineering-jupyterhub-redirect-uris:
+  - "https://nb.ol.mit.edu/*"
+  - "https://binder.ol.mit.edu/*"
   keycloak_realm:ol-data-platform-superset-redirect-uris: ["https://bi.ol.mit.edu/*"]
   keycloak_realm:ol-data-platform-superset-client-roles:
   - "superset_admin"
   - "superset_alpha"
   - "superset_gamma"
+  - "superset_researcher"
   keycloak_realm:ol-data-platform-openmetadata-redirect-uris: ["https://data.ol.mit.edu/*"]
   keycloak_realm:ol-data-platform-openmetadata-client-roles:
   - "open_metadata_admin"

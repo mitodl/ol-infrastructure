@@ -66,7 +66,6 @@ config:
     MITOL_COOKIE_NAME: "learn-ci"
     MITOL_LOG_LEVEL: "INFO"
     MITOL_NEW_USER_LOGIN_URL: "https://ci.learn.mit.edu/onboarding"
-    MITOL_NOINDEX: "true"
     OPENTELEMETRY_ENABLED: "true"
     OPENTELEMETRY_ENDPOINT: "http://grafana-alloy.operations.svc.cluster.local:4318/v1/traces"
     MITOL_SUPPORT_EMAIL: "odl-learn-ci-support@mit.edu" # Need to verify
@@ -76,16 +75,13 @@ config:
     OPENSEARCH_INDEX: "mitlearn-ci"
     OPENSEARCH_SHARD_COUNT: 2
     OPENSEARCH_URL: "https://search-opensearch-mitlearn-ci-q7fuxrc2j26me44ymcftz3ahba.us-east-1.es.amazonaws.com"
-    PGBOUNCER_DEFAULT_POOL_SIZE: 50
-    PGBOUNER_MAX_CLIENT_CONN: 500
-    PGBOUNER_MIN_POOL_SIZE: 20
     POSTHOG_API_HOST: "https://ph.ol.mit.edu"
     POSTHOG_ENABLED: "true"
     POSTHOG_PROJECT_ID: "86325"
     POSTHOG_TIMEOUT_MS: 1000
     SEE_API_ENABLED: "true"
-    SENTRY_PROFILES_SAMPLE_RATE: 1
-    SENTRY_TRACES_SAMPLE_RATE: 1
+    SENTRY_PROFILES_SAMPLE_RATE: 0
+    SENTRY_TRACES_SAMPLE_RATE: "0"
     SESSION_COOKIE_NAME: "session_mitlearn_ci"
     SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT:
     TIKA_SERVER_ENDPOINT: "https://tika-ci.odl.mit.edu"

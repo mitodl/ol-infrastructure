@@ -67,6 +67,10 @@ XQUEUE_INTERFACE:
 COMMENTS_SERVICE_KEY: {{ .Data.forum_api_key }}
 {{ end }}
 
+{{ with secret "secret-global/learn_ai" }}
+MIT_LEARN_AI_XBLOCK_CHAT_API_TOKEN: {{ .Data.data.canvas_syllabus_token }}  # Added for ol_openedx_chat_xblock
+{{ end }}
+
 DATABASES:
   default:
     ATOMIC_REQUESTS: true
@@ -244,6 +248,7 @@ CREDIT_PROVIDER_SECRET_KEYS: {}
 CROSS_DOMAIN_CSRF_COOKIE_DOMAIN: {{ key "edxapp/lms-domain" }}  # MODIFIED
 CROSS_DOMAIN_CSRF_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edxapp-csrftoken  # MODIFIED
 CSRF_COOKIE_SECURE: true  # MODIFIED
+CSRF_COOKIE_SAMESITE: 'None'
 CSRF_TRUSTED_ORIGINS:  # MODIFIED
   - https://{{ key "edxapp/lms-domain" }}
 DASHBOARD_COURSE_LIMIT: null
@@ -316,7 +321,7 @@ FEATURES:
     ENABLE_GIT_AUTO_EXPORT: true  # ADDED KEY
     ENABLE_GRADE_DOWNLOADS: true
     ENABLE_INSTRUCTOR_ANALYTICS: false
-    ENABLE_LTI_PROVIDER: false
+    ENABLE_LTI_PROVIDER: true  # modified
     ENABLE_MKTG_SITE: true
     ENABLE_MOBILE_REST_API: true
     ENABLE_NEW_BULK_EMAIL_EXPERIENCE: true  # ADDED KEY
@@ -390,9 +395,11 @@ MIT_LEARN_AI_API_URL: https://{{ key "edxapp/learn-api-domain" }}/ai  # Added fo
 MIT_LEARN_API_BASE_URL: https://{{ key "edxapp/learn-api-domain" }}/learn  # Added for ol_openedx_chat
 MIT_LEARN_SUMMARY_FLASHCARD_URL: https://{{ key "edxapp/learn-api-domain" }}/learn/api/v1/contentfiles/  # Added for ol_openedx_chat
 MIT_LEARN_BASE_URL: https://{{ key "edxapp/learn-frontend-domain" }}
+MIT_LEARN_AI_XBLOCK_CHAT_API_URL: https://{{ key "edxapp/learn-api-domain" }}/ai/http/canvas_syllabus_agent/  # Added for ol_openedx_chat_xblock
+MIT_LEARN_AI_XBLOCK_TUTOR_CHAT_API_URL: https://{{ key "edxapp/learn-api-domain" }}/ai/http/canvas_tutor_agent/  # Added for ol_openedx_chat_xblock
+MIT_LEARN_AI_XBLOCK_PROBLEM_SET_LIST_URL: https://{{ key "edxapp/learn-api-domain" }}/ai/api/v0/problem_set_list  # Added for ol_openedx_chat_xblock
 UAI_COURSE_KEY_FORMATS:
   - course-v1:uai_
-  - course-v1:mit_et
 MIT_LEARN_LOGO: https://{{ key "edxapp/lms-domain" }}/static/mitxonline/images/mit-learn-logo.svg"
 LEARNER_PORTAL_URL_ROOT: https://learner-portal-localhost:18000
 LEARNER_HOME_MICROFRONTEND_URL: '/dashboard/'
@@ -417,27 +424,23 @@ MARKETING_SITE_CHECKOUT_URL: https://{{ key "edxapp/marketing-domain" }}/cart/ad
 MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within the bucket. No leading / allowed
 MEDIA_URL: /media/
 MICROSITE_CONFIGURATION: {}
-MIT_BASE_URL: https://mit.edu # Keeping it hardcoded till we change MARKETING_SITE_BASE_URL
+MIT_BASE_URL: https://web.mit.edu # Keeping it hardcoded till we change MARKETING_SITE_BASE_URL
 MITX_REDIRECT_ENABLED: True
-MITX_REDIRECT_ALLOW_RE_LIST: ["^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/)", "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler", "^/v1/accounts/bulk_retire_users"]  # ADDED VALUE
+MITX_REDIRECT_ALLOW_RE_LIST:  # ADDED VALUE
+  - "^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/|lti_provider)"
+  - "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"
+  - "^/v1/accounts/bulk_retire_users"
+  - "^/courses/course-v1:.*?/xqueue/.*$"  # TODO (TMM 2025-07-22): Remove this once the xqueue -> submissions migration is complete
 MKTG_URLS:
     ROOT: https://{{ key "edxapp/marketing-domain" }}/
 MKTG_URL_LINK_MAP:
     TOS: tos
-    HONOR: honor
     ABOUT: about
-    PRIVACY: privacy
     ACCESSIBILITY: accessibility
-    HELP_CENTER: help-center
 MKTG_URL_OVERRIDES:
-    COURSES: https://{{ key "edxapp/marketing-domain" }}/
-    PRIVACY: https://{{ key "edxapp/marketing-domain" }}/privacy-policy/
-    TOS: https://{{ key "edxapp/marketing-domain" }}/terms-of-service/
-    ABOUT: https://{{ key "edxapp/marketing-domain" }}/about-us/
-    HONOR: https://{{ key "edxapp/marketing-domain" }}/honor-code/
+    TOS: https://{{ key "edxapp/learn-frontend-domain" }}/terms
+    ABOUT: https://{{ key "edxapp/learn-frontend-domain" }}/about
     ACCESSIBILITY: https://accessibility.mit.edu/
-    CONTACT: https://mitxonline.zendesk.com/hc/en-us/requests/new/
-    TOS_AND_HONOR: ''
 MOBILE_STORE_URLS: {}
 ########################################################################################
 # Previously assumed to be unnecessary config as it duplicates code from               #
@@ -469,15 +472,39 @@ MODULESTORE:
 NOTIFICATIONS_DEFAULT_FROM_EMAIL: {{ key "edxapp/bulk-email-default-from-email" }} # ADDED
 NOTIFICATION_TYPE_ICONS: {} # ADDED
 DEFAULT_NOTIFICATION_ICON_URL: '' # ADDED
+OAUTH2_PROVIDER:
+  OAUTH2_VALIDATOR_CLASS: "openedx.core.djangoapps.oauth_dispatch.dot_overrides.validators.EdxOAuth2Validator"
+  REFRESH_TOKEN_EXPIRE_SECONDS: 7776000
+  SCOPES_BACKEND_CLASS: "openedx.core.djangoapps.oauth_dispatch.scopes.ApplicationModelScopes"
+  SCOPES:
+    read: "Read access"
+    write: "Write access"
+    email: "Know your email address"
+    profile: "Know your name and username"
+    certificates:read: "Retrieve your course certificates"
+    grades:read: "Retrieve your grades for your enrolled courses"
+    tpa:read: "Retrieve your third-party authentication username mapping"
+    user_id: "Know your user identifier"
+  DEFAULT_SCOPES:
+    read: "Read access"
+    write: "Write access"
+    email: "Know your email address"
+    profile: "Know your name and username"
+  REQUEST_APPROVAL_PROMPT: "auto_even_if_expired"
+  ERROR_RESPONSE_WITH_SCOPES: true
+  ALLOWED_REDIRECT_URI_SCHEMES:
+    - "https"
+    - "edu.mit.learn.app"
+OL_OPENEDX_COURSE_SYNC_SERVICE_WORKER_USERNAME: studio_worker # ADDED for ol_openedx_course_sync
 ORA2_FILE_PREFIX: mitxonline/ora2  # MODIFIED
 PARTNER_SUPPORT_EMAIL: ''
 PASSWORD_POLICY_COMPLIANCE_ROLLOUT_CONFIG:
     ENFORCE_COMPLIANCE_ON_LOGIN: false
 PASSWORD_RESET_SUPPORT_LINK: ''
 PAYMENT_SUPPORT_EMAIL: {{ key "edxapp/sender-email-address" }}  # MODIFIED
-PLATFORM_DESCRIPTION: MITx Online # MODIFIED
+PLATFORM_DESCRIPTION: MIT Learn # MODIFIED
 PLATFORM_FACEBOOK_ACCOUNT: http://www.facebook.com/YourPlatformFacebookAccount
-PLATFORM_NAME: MITx Online  # MODIFIED
+PLATFORM_NAME: MIT Learn  # MODIFIED
 PLATFORM_TWITTER_ACCOUNT: '@YourPlatformTwitterAccount'
 POLICY_CHANGE_GRADES_ROUTING_KEY: edx.lms.core.default
 PRESS_EMAIL: support@mitxonline.mit.edu # MODIFIED
@@ -532,6 +559,11 @@ SERVER_EMAIL: odl-devops@mit.edu # MODIFIED
 # between LMS and Studio (TMM 2021-10-22)
 # UPDATE: The session cookie domain appears to still be required for enabling the
 # preview subdomain to share authentication with LMS (TMM 2021-12-20)
+
+# Adding session cookie settings for LTI config
+# https://docs.openedx.org/en/latest/site_ops/install_configure_run_guide/configuration/lti/configure_lti.html#configure-the-tool-consumer
+SESSION_COOKIE_SAMESITE: 'None'
+SESSION_COOKIE_SAMESITE_FORCE_ALL: true
 SESSION_COOKIE_DOMAIN: {{ key "edxapp/session-cookie-domain" }}  # MODIFIED
 SESSION_COOKIE_SECURE: true # MODIFIED
 SESSION_SAVE_EVERY_REQUEST: false
@@ -577,7 +609,8 @@ WIKI_ENABLED: true
 XBLOCK_FS_STORAGE_BUCKET: null
 XBLOCK_FS_STORAGE_PREFIX: null
 XBLOCK_SETTINGS: {}
-X_FRAME_OPTIONS: DENY
+# Needed for showing pages in Canvas via LTI
+X_FRAME_OPTIONS: "ALLOW-FROM canvas.mit.edu"
 YOUTUBE_API_KEY: null
 ZENDESK_API_KEY: ''
 ZENDESK_CUSTOM_FIELDS: {}

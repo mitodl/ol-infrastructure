@@ -5,6 +5,6 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-mitxonline-production.odl.mit.edu
   consul:scheme: https
-  opensearch:instance_type: t3.medium.search
+
   environment:business_unit: mitxonline
   environment:target_vpc: mitxonline_vpc

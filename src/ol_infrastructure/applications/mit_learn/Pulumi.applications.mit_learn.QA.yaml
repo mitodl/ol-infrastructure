@@ -42,10 +42,11 @@ config:
     AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     APPZI_URL: ""
+    CANVAS_COURSE_BUCKET_NAME: "ol-data-lake-landing-zone-production"
     CELERY_WORKER_CONCURRENCY: 1
     CSRF_COOKIE_NAME: "learn_rc_csrftoken"
     DEBUG: "false"
-    EDX_LEARNING_COURSE_BUCKET_NAME: "edxorg-qa-edxapp-courses"
+    EDX_LEARNING_COURSE_BUCKET_NAME: "edxorg-production-edxapp-courses"
     ENABLE_INFINITE_CORRIDOR: "true"
     GA_G_TRACKING_ID: ""
     GA_TRACKING_ID: ""
@@ -61,7 +62,6 @@ config:
     MITOL_COOKIE_NAME: "learn-rc"
     MITOL_LOG_LEVEL: "INFO"
     MITOL_NEW_USER_LOGIN_URL: "https://rc.learn.mit.edu/onboarding"
-    MITOL_NOINDEX: "true"
     MITOL_SUPPORT_EMAIL: "odl-learn-rc-support@mit.edu" # Need to verify
     MITPE_API_ENABLED: "true"
     OCW_ITERATOR_CHUNK_SIZE: 300
@@ -71,16 +71,13 @@ config:
     OPENSEARCH_INDEX: "mitlearn-rc"
     OPENSEARCH_SHARD_COUNT: 2
     OPENSEARCH_URL: "https://search-opensearch-mitlearn-qa-254ozvoip3e2ywfx5lsch5w2uu.us-east-1.es.amazonaws.com"
-    PGBOUNCER_DEFAULT_POOL_SIZE: 50
-    PGBOUNER_MAX_CLIENT_CONN: 500
-    PGBOUNER_MIN_POOL_SIZE: 20
     POSTHOG_API_HOST: "https://ph.ol.mit.edu"
     POSTHOG_ENABLED: "true"
     POSTHOG_PROJECT_ID: "86325"
     POSTHOG_TIMEOUT_MS: 1000
     SEE_API_ENABLED: "true"
-    SENTRY_PROFILES_SAMPLE_RATE: 1
-    SENTRY_TRACES_SAMPLE_RATE: 1
+    SENTRY_PROFILES_SAMPLE_RATE: "0.25"
+    SENTRY_TRACES_SAMPLE_RATE: "0.25"
     SESSION_COOKIE_NAME: "session_mitlearn_rc"
     SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT:
     TIKA_SERVER_ENDPOINT: "https://tika-qa.odl.mit.edu"
@@ -88,6 +85,6 @@ config:
     UWSGI_WORKERS: 3
   redis:password:
     secure: v1:eRydfkAj/y5E7anM:QZ33gRMPZ7DDG3TrvAbuZk+6zliItTLKf4zuBgwEzpliRDnnxA/FoKMjRf4IB1uFLDH4Bb/n5sUxUj+s4fXlRuZt/jxA66eNBg==
-  redis:instance_type: "cache.t4g.medium"
+  redis:instance_type: "cache.m6g.large"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa

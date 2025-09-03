@@ -269,6 +269,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                             get=edx_registry_image_resource.name,
                             trigger=True,
                             passed=[earthly_build_job.name],
+                            params={"skip_download": True},
                         ),
                         GetStep(
                             get=theme_git_resource.name,

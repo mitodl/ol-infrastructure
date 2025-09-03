@@ -6,7 +6,7 @@ This includes:
 """
 
 import re
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, Union
 
 import pulumi
 from pulumi_aws import elasticache
@@ -29,17 +29,17 @@ from ol_infrastructure.lib.aws.elasticache_helper import (
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 
-PulumiString = Union[str, pulumi.Output[str]]
+PulumiString = Union[str | pulumi.Output[str]]  # noqa: UP007
 MAX_MEMCACHED_CLUSTER_SIZE = 20
 
 
 class OLAmazonCacheConfig(AWSBase):
-    encrypt_transit: Optional[bool] = None
-    encrypted: Optional[bool] = None
-    auth_token: Optional[str] = None
-    shard_count: Optional[int] = None
-    kms_key_id: Optional[str] = None
-    snapshot_retention_days: Optional[int] = None
+    encrypt_transit: bool | None = None
+    encrypted: bool | None = None
+    auth_token: str | None = None
+    shard_count: int | None = None
+    kms_key_id: str | None = None
+    snapshot_retention_days: int | None = None
     auto_upgrade: bool = True  # Automatically perform ugprades of minor versions
     apply_immediately: bool = True
     cluster_description: str
@@ -49,12 +49,12 @@ class OLAmazonCacheConfig(AWSBase):
     instance_type: str
     monitoring_profile_name: str = "ci"
     num_instances: PositiveInt = PositiveInt(3)
-    parameter_overrides: Optional[dict[str, Any]] = None
+    parameter_overrides: dict[str, Any] | None = None
     port: int
     security_groups: list[PulumiString]
-    subnet_group: Union[
-        str, pulumi.Output[str]
-    ]  # the name of the subnet group created in the OLVPC component
+    subnet_group: (
+        str | pulumi.Output[str]
+    )  # the name of the subnet group created in the OLVPC component
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("engine")
@@ -91,11 +91,11 @@ class OLAmazonCacheConfig(AWSBase):
 class OLAmazonRedisConfig(OLAmazonCacheConfig):
     cluster_mode_enabled: bool
     encrypt_transit: bool = True
-    auth_token: Optional[PulumiString] = None
+    auth_token: PulumiString | None = None
     encrypted: bool = True
     engine: Literal["redis", "valkey"] = "valkey"
     engine_version: str = "8.0"
-    kms_key_id: Optional[PulumiString] = None
+    kms_key_id: PulumiString | None = None
     num_instances: conint(ge=1, le=5) = 1  # type: ignore  # noqa: PGH003
     shard_count: PositiveInt = PositiveInt(1)
     port: PositiveInt = PositiveInt(DEFAULT_REDIS_PORT)
@@ -104,8 +104,8 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
     @field_validator("auth_token")
     @classmethod
     def is_auth_token_valid(
-        cls, auth_token: Optional[str], info: ValidationInfo
-    ) -> Optional[str]:
+        cls, auth_token: str | None, info: ValidationInfo
+    ) -> str | None:
         encrypt_transit = info.data["encrypt_transit"]
         min_token_length = 16
         max_token_length = 128
@@ -157,8 +157,8 @@ class OLAmazonMemcachedConfig(OLAmazonCacheConfig):
 class OLAmazonCache(pulumi.ComponentResource):
     def __init__(
         self,
-        cache_config: Union[OLAmazonRedisConfig, OLAmazonMemcachedConfig],
-        opts: Optional[pulumi.ResourceOptions] = None,
+        cache_config: OLAmazonRedisConfig | OLAmazonMemcachedConfig,
+        opts: pulumi.ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:infrastructure:aws:elasticache:OLAmazonCache",

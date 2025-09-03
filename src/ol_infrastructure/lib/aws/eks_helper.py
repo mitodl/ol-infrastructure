@@ -1,5 +1,4 @@
 from functools import lru_cache, partial
-from typing import Optional
 
 import boto3
 import pulumi
@@ -7,7 +6,10 @@ from packaging.version import Version
 from pulumi_aws import ec2
 from pulumi_kubernetes import Provider
 
+from ol_infrastructure.lib.aws.aws_helper import AWS_ACCOUNT_ID
+
 eks_client = boto3.client("eks")
+ECR_DOCKERHUB_REGISTRY = f"{AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/dockerhub"
 
 # Like our ec2 practices, allow pods to egress anywhere they want
 default_psg_egress_args = [
@@ -72,7 +74,7 @@ def get_cluster_version(*, use_default: bool = True) -> str:
 @lru_cache
 def get_k8s_provider(
     kubeconfig: str,
-    provider_name: Optional[str],
+    provider_name: str | None,
 ):
     return Provider(
         provider_name or "k8s-provider",
@@ -82,7 +84,7 @@ def get_k8s_provider(
 
 def set_k8s_provider(
     kubeconfig: str,
-    provider_name: Optional[str],
+    provider_name: str | None,
     resource_args: pulumi.ResourceTransformationArgs,
 ) -> pulumi.ResourceTransformationResult:
     if resource_args.type_.split(":")[0] == "kubernetes":
@@ -98,7 +100,7 @@ def set_k8s_provider(
 
 def setup_k8s_provider(
     kubeconfig: str,
-    provider_name: Optional[str] = None,
+    provider_name: str | None = None,
 ):
     pulumi.runtime.register_stack_transformation(
         partial(
@@ -107,3 +109,11 @@ def setup_k8s_provider(
             provider_name,
         )
     )
+
+
+def cached_image_uri(
+    image_repo: str, aws_account_id: str | int = "610119931565"
+) -> str:
+    if len(image_repo.split("/")) < 2:  # noqa: PLR2004
+        image_repo = f"library/{image_repo}"
+    return f"{aws_account_id}.dkr.ecr.us-east-1.amazonaws.com/dockerhub/{image_repo}"

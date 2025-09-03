@@ -3,7 +3,6 @@ import os
 from functools import partial
 from ipaddress import IPv4Address
 from pathlib import Path
-from typing import Union
 
 import yaml
 from pyinfra import host
@@ -99,6 +98,7 @@ concourse_config_map = {
             "{{ .Data.data.admin_password }}"
             "{{ end }}"
         ),
+        container_placement_strategy="fewest-build-containers,volume-locality",
         database_user=(
             '{{ with secret "postgres-concourse/creds/app" }}'
             "{{ .Data.username }}"
@@ -132,6 +132,7 @@ concourse_config_map = {
         enable_job_auditing=False,
         enable_pipeline_auditing=False,
         enable_resource_auditing=False,
+        enable_rerun_when_worker_disappears=True,
         enable_system_auditing=False,
         enable_team_auditing=False,
         enable_volume_auditing=False,
@@ -143,6 +144,7 @@ concourse_config_map = {
         max_checks_per_second="30",
         enable_across_step=True,
         enable_p2p_volume_streaming=False,
+        peer_address="{{ with node }}{{ .Node.Address }}{{ end }}",
         prometheus_bind_ip=IPv4Address("127.0.0.1"),
         prometheus_bind_port=CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT,
         secret_cache_duration="1m",  # pragma: allowlist secret # noqa: S106
@@ -167,11 +169,12 @@ concourse_config_map = {
         containerd_dns_server="8.8.8.8",
         containerd_max_containers=0,  # Don't set a limit on the number of containers
         containerd_network_pool="10.250.0.0/16",
+        ephemeral=False,
     ),
 }
-concourse_config: Union[ConcourseWebConfig, ConcourseWorkerConfig] = (
-    concourse_config_map[node_type]()
-)
+concourse_config: ConcourseWebConfig | ConcourseWorkerConfig = concourse_config_map[
+    node_type
+]()
 vault_template_map = {
     CONCOURSE_WEB_NODE_TYPE: [
         partial(

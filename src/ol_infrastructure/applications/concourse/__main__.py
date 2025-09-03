@@ -316,18 +316,6 @@ concourse_worker_security_group = ec2.SecurityGroup(
     f"concourse-worker-security-group-{stack_info.env_suffix}",
     name=f"concourse-worker-operations-{stack_info.env_suffix}",
     description="Access control for Concourse worker servers",
-    ingress=[
-        ec2.SecurityGroupIngressArgs(
-            self=True,
-            from_port=0,
-            to_port=MAXIMUM_PORT_NUMBER,
-            protocol="tcp",
-            description=(
-                "Allow Concourse workers to connect to all other concourse workers for"
-                " p2p streaming."
-            ),
-        )
-    ],
     egress=default_egress_args,
     vpc_id=ops_vpc_id,
 )
@@ -362,6 +350,20 @@ ec2.SecurityGroupRule(
     type="ingress",
 )
 
+ec2.SecurityGroupRule(
+    "concourse-worker-peer-ingress",
+    security_group_id=concourse_worker_security_group.id,
+    type="ingress",
+    protocol="tcp",
+    self=True,
+    from_port=0,
+    to_port=MAXIMUM_PORT_NUMBER,
+    description=(
+        "Allow Concourse workers to connect to all other concourse workers for"
+        " p2p streaming."
+    ),
+)
+
 # Create security group for Concourse Postgres database
 concourse_db_security_group = ec2.SecurityGroup(
     f"concourse-db-access-{stack_info.env_suffix}",
@@ -392,6 +394,7 @@ rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["instance_size"] = (
     concourse_config.get("db_instance_size") or rds_defaults["instance_size"]
 )
+rds_defaults["use_blue_green"] = False
 concourse_db_config = OLPostgresDBConfig(
     instance_name=f"concourse-db-{stack_info.env_suffix}",
     password=concourse_config.require("db_password"),

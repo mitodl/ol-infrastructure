@@ -3,7 +3,14 @@ from pathlib import Path
 
 from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import get_caller_identity, iam
-from pulumi_vault import AuthBackend, AuthBackendTuneArgs, Policy, aws, github
+from pulumi_vault import (
+    AuthBackend,
+    AuthBackendTuneArgs,
+    Policy,
+    aws,
+    github,
+    jwt,
+)
 
 from bridge.lib.magic_numbers import EIGHT_HOURS_SECONDS, ONE_MONTH_SECONDS
 from ol_infrastructure.lib.ol_types import AWSBase, Environment
@@ -12,13 +19,14 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 
 vault_config = Config("vault")
 stack_info = parse_stack()
+keycloak_config = Config("keycloak")
 
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 aws_config = AWSBase(tags={"OU": "operations", "Environment": stack_info.name})
 aws_account = get_caller_identity()
 
 if Config("vault_server").get("env_namespace"):
-    setup_vault_provider()
+    setup_vault_provider(skip_child_token=True)
 
 # Generic AWS backend
 vault_aws_auth = AuthBackend(
@@ -46,7 +54,6 @@ for env in Environment:
         backend=vault_aws_auth.path,
     )
 
-# GitHub auth backend
 vault_github_auth = github.AuthBackend(
     "vault-github-auth-backend",
     organization="mitodl",
@@ -56,26 +63,77 @@ vault_github_auth = github.AuthBackend(
     token_max_ttl=ONE_MONTH_SECONDS * 6,
 )
 
-policy_folder = (Path(__file__).resolve()).parent.parent.joinpath("policies/github/")
-for hcl_file in policy_folder.iterdir():
-    if "software_engineer.hcl" in hcl_file.name:
-        software_engineer_policy_file = open(hcl_file).read()  # noqa: PTH123
-        software_engineer_policy = Policy(
-            "github-auth-software-engineer", policy=software_engineer_policy_file
-        )
-        for team in ["vault-developer-access"]:
-            vault_github_auth_team = github.Team(
-                f"vault-github-auth-{team}",
-                team=team,
-                policies=[software_engineer_policy],
-            )
-    if "admin.hcl" in hcl_file.name:
-        devops_policy_file = open(hcl_file).read()  # noqa: PTH123
-        devops_policy = Policy("github-auth-devops", policy=devops_policy_file)
-        for team in ["vault-devops-access"]:
-            vault_github_auth_team = github.Team(
-                f"vault-github-auth-{team}", team=team, policies=[devops_policy]
-            )
+# Enable OIDC auth method and configure it with Keycloak
+vault_oidc_keycloak_auth = jwt.AuthBackend(
+    "vault-oidc-keycloak-backend",
+    path="oidc",
+    type="oidc",
+    description="OIDC auth Keycloak integration for vault client",
+    oidc_discovery_url=f"{keycloak_config.get('url')}/realms/ol-platform-engineering",
+    oidc_client_id=keycloak_config.get("client_id"),
+    oidc_client_secret=keycloak_config.get("client_secret"),
+    default_role="developer",
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
+# Developer policy definition
+developer_policy = Policy(
+    "developer-policy",
+    name="developer",
+    policy=Path(__file__)
+    .parent.parent.joinpath("policies/developer/developer.hcl")
+    .read_text(),
+)
+
+github.Team(
+    "vault-github-auth-developer",
+    team="vault-developer-access",
+    policies=[developer_policy.name],
+)
+
+# Admin policy definition
+admin_policy = Policy(
+    "admin-policy",
+    name="admin",
+    policy=Path(__file__)
+    .parent.parent.joinpath("policies/admin/admin.hcl")
+    .read_text(),
+)
+
+github.Team(
+    "vault-github-auth-devops", team="vault-devops-access", policies=[admin_policy.name]
+)
+
+# Configure OIDC developer role
+developer_role = jwt.AuthBackendRole(
+    "developer-role",
+    backend=vault_oidc_keycloak_auth.path,
+    role_name="developer",
+    token_policies=[developer_policy.name],
+    allowed_redirect_uris=[
+        "http://localhost:8250/oidc/callback",
+        f"{vault_config.get('address')}/ui/vault/auth/oidc/oidc/callback",
+    ],
+    bound_audiences=[keycloak_config.get("client_id")],
+    user_claim="sub",
+    role_type="oidc",
+)
+
+# Configure OIDC admin role
+admin_role = jwt.AuthBackendRole(
+    "admin-role",
+    backend=vault_oidc_keycloak_auth.path,
+    role_name="admin",
+    token_policies=[admin_policy.name],
+    allowed_redirect_uris=[
+        "http://localhost:8250/oidc/callback",
+        f"{vault_config.get('address')}/ui/vault/auth/oidc/oidc/callback",
+    ],
+    bound_audiences=[keycloak_config.get("client_id")],
+    user_claim="sub",
+    role_type="oidc",
+    bound_claims={"roles": "admin, vault-admins"},
+)
 
 # Raft Backup policy definition
 raft_backup_policy = Policy(

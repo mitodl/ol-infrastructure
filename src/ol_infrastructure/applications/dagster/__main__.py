@@ -12,7 +12,7 @@ import base64
 import json
 import textwrap
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 import pulumi_consul as consul
 import pulumi_vault as vault
@@ -73,7 +73,7 @@ s3_tracking_logs_buckets = [
     f"{edxapp_deployment}-{stack_info.env_suffix}-edxapp-tracking"
     for edxapp_deployment in ("mitxonline", "mitx", "mitx-staging", "xpro")
 ]
-dagster_s3_permissions: list[dict[str, Union[str, list[str]]]] = [
+dagster_s3_permissions: list[dict[str, str | list[str]]] = [
     {
         "Effect": "Allow",
         "Action": "s3:ListAllMyBuckets",
@@ -157,7 +157,7 @@ dagster_s3_permissions: list[dict[str, Union[str, list[str]]]] = [
     },
 ]
 
-athena_permissions: list[dict[str, Union[str, list[str]]]] = [
+athena_permissions: list[dict[str, str | list[str]]] = [
     {
         "Effect": "Allow",
         "Action": [
@@ -315,10 +315,9 @@ dagster_db_security_group = ec2.SecurityGroup(
 
 rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["monitoring_profile_name"] = "disabled"
-
+rds_defaults["use_blue_green"] = False
 dagster_db_config = OLPostgresDBConfig(
     db_name="dagster",
-    engine_major_version="16",
     instance_name=f"ol-etl-db-{stack_info.env_suffix}",
     max_storage=1000,
     password=get_config("dagster:db_password"),
@@ -591,7 +590,6 @@ dagster_instance = ec2.Instance(
 dagster_elastic_ip = ec2.Eip(
     "dagster-instance-elastic-ip",
     instance=dagster_instance.id,
-    vpc=True,
 )
 
 fifteen_minutes = 60 * 15

@@ -7,6 +7,7 @@ config:
   keycloak:client_secret:
     secure: v1:P5o6ZpkbE58s9kqg:3oS/Yeorg1vpIZpYY1lV5BB74lSeWYG/xq48RQEfwEkXzL4dtuvvngurcikRH3mn
   keycloak:url: https://sso-ci.ol.mit.edu
+  keycloak_realm:learn_domain: ci.learn.mit.edu
   keycloak_realm:captcha_secret_key:
     secure: v1:S79qKq0yt6l+G950:rCDu52HiOU8wzfIEDjZSYT1s21IFMRnBdiVNqjg3ireUcjBlafXXEmrNbBIrK9HmGm7YlwexNIg=
   keycloak_realm:captcha_site_key:
@@ -16,11 +17,11 @@ config:
   keycloak_realm:mailgun_email_host:
     secure: v1:8LLyqC9bLn6dTXXQ:nNUP8Bn+ZqusE217zh1meR6lnKGSANyj0rnm1sV9EBY=
   keycloak_realm:mailgun_email_password:
-    secure: v1:JRiodO1fWLv1IAPx:zm2Al89X4yUVGovfr/fBeYS6I+spaSg57O4tupWCpV5Y9LZaVWM2FQiYnYqfD6Xbo6jZY9r9LXBgfpHKMQsSsFPS
+    secure: v1:Q1qs87fsI80+VKVX:qKnnYV+NGFLSXrw9AnZMmXTYR0fcZwZt6tyOmjbSkkbg/GbWifxHV0dZq6LLOToyWL9vd0V2MW+30/3qiGlrMVuk
   keycloak_realm:mailgun_email_username:
-    secure: v1:aZhc78XLTR2yCiwQ:ze3jK8+CPKzGylm407RCzwOSF1BfvonpOxWQ9AHCmvnuq4IORX9sIioq+qyqTemIdA==
+    secure: v1:Rr5PVj/iu8fpE9mp:n7wV9oTlV4wniJIe34Gh8ZdRLu/z6B/DXUaJUhQpOmcudJn/6kXZBzii8H2QRX4zAEwX7fLG
   keycloak_realm:mailgun_reply_to_address:
-    secure: v1:cBw6X4FMORcu2oBA:C9Rf5NAHjZxAPDzYqqlSpoiIcok/ts0jDy/0wm6Qwo/FrfbmDTLS70hSAX/oWJw=
+    secure: v1:2r3ZIC0MaVZSaogs:Da50V7RUHHycLjVR/qLCkuWHH+i1VTDWcGDO32IRRXtkv8G8ciUL49ojA82hmHyi79qNmsbV
   keycloak_realm:mit_email_host:
     secure: v1:g/O/970/vy0X7+t7:L+xeJCsFiE3gq3xLjt0z9rE7pDjJpIe7Xl6NyAjHTyM=
   keycloak_realm:mit_email_password:
@@ -39,6 +40,7 @@ config:
   - "superset_admin"
   - "superset_alpha"
   - "superset_gamma"
+  - "superset_researcher"
   keycloak_realm:ol-data-platform-superset-client-secret:
     secure: v1:Ow95HN9yKnXBg5jX:CUoA/qBSeUF2w0FNYlEnC5OyvP8sg7S3efyvrX8J10Q8T16oxlO3MF3ROByGk12G
   keycloak_realm:ol-data-platform-superset-redirect-uris: ["https://bi-ci.ol.mit.edu/*"]
@@ -51,6 +53,10 @@ config:
   keycloak_realm:ol-platform-engineering-leek-client-secret:
     secure: v1:xf9mFeIyIWLQbIYk:IY+XjdVmc6Va8WGTwrEN+t3jsyuJJ2b1fD83n2MiDSfUBNxeBoP1Xwd+KGskOLOX
   keycloak_realm:ol-platform-engineering-leek-redirect-uris: ["https://celery-monitoring-ci.odl.mit.edu/*"]
+  keycloak_realm:ol-platform-engineering-vault-redirect-uris: ["https://vault-ci.odl.mit.edu/ui/vault/auth/oidc/oidc/callback"]
+  keycloak_realm:ol-platform-engineering-jupyterhub-redirect-uris:
+  - "https://nb.ci.ol.mit.edu/*"
+  - "https://binder.ci.ol.mit.edu/*"
   keycloak_realm:olapps-learn-ai-client-roles: ["https://api-learn-ai-ci.ol.mit.edu/*"]
   keycloak_realm:olapps-learn-ai-client-secret:
     secure: v1:hJQd4Gnpww6vFMI8:ScX791cNeXk1iWO0j/4uXMzfFivtTkhFWPCXkhJIbwIC/Jb5zaiFO591c25Ri64+
@@ -62,6 +68,8 @@ config:
   - "https://learn-ai-ci.ol.mit.edu/*"
   - "https://pay-ci.ol.mit.edu/*"
   - "https://ci.mitxonline.mit.edu/*"
+  - "https://nb.ci.learn.mit.edu/*"
+  - "https://binder.ci.learn.mit.edu/*"
   keycloak_realm:olapps-mitlearn-client-redirect-uris:
   - "https://api.ci.learn.mit.edu/*"
   - "https://ci.learn.mit.edu/*"
@@ -71,8 +79,12 @@ config:
   - "https://pay-ci.ol.mit.edu/*"
   - "https://ci.mitxonline.mit.edu/*"
   - "https://api.ci.mitxonline.mit.edu/*"
+  - "https://nb.ci.learn.mit.edu/*"
+  - "https://binder.ci.learn.mit.edu/*"
   keycloak_realm:olapps-mitlearn-client-secret:
     secure: v1:sJuWLKHeep4Qz9cr:YbZNIQoy3Bn1nbpKsCUPNUeEtZJgd+tA5LAU8pDfSKWr2fzvjfMy0XcmO4CR7a3q
+  keycloak_realm:olapps-mitxonline-client-redirect-uris:
+  - "https://ci.mitxonline.mit.edu/account/action/complete*"
   keycloak_realm:olapps-open-discussions-client-redirect-uris: ["https://discussions-ci.odl.mit.edu/*"]
   keycloak_realm:olapps-open-discussions-client-secret:
     secure: v1:uAB+cVrN2bsEepg6:HZazIFvhKkr4xVJ3QN9nU02QG5p6T54aZTkCtqzlS1Y15ceGGU7cK/tmJiIq7YTj

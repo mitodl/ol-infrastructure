@@ -330,6 +330,8 @@ superset_db_security_group = ec2.SecurityGroup(
     tags=aws_config.merged_tags({"Name": f"superset-rds-{superset_env}"}),
     vpc_id=data_vpc["id"],
 )
+rds_defaults = defaults(stack_info)["rds"]
+rds_defaults["use_blue_green"] = False
 superset_db_config = OLPostgresDBConfig(
     instance_name=f"ol-superset-db-{stack_info.env_suffix}",
     password=superset_config.require("db_password"),
@@ -338,7 +340,7 @@ superset_db_config = OLPostgresDBConfig(
     engine_major_version="16",
     tags=aws_config.tags,
     db_name="superset",
-    **defaults(stack_info)["rds"],
+    **rds_defaults,
 )
 superset_db = OLAmazonDB(superset_db_config)
 
@@ -609,8 +611,8 @@ superset_web_auto_scale_config = superset_config.get_object("web_auto_scale") or
 superset_web_asg_config = OLAutoScaleGroupConfig(
     asg_name=f"superset-web-{superset_env}",
     aws_config=aws_config,
-    health_check_grace_period=120,
-    instance_refresh_warmup=120,
+    health_check_grace_period=300,
+    instance_refresh_warmup=300,
     desired_size=superset_web_auto_scale_config["desired"],
     min_size=superset_web_auto_scale_config["min"],
     max_size=superset_web_auto_scale_config["max"],

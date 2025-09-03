@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 
+import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Alias, Config, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, iam, s3
@@ -106,7 +107,7 @@ cluster_stack.require_output("namespaces").apply(
 
 # Bucket used to store files from MITx Online app.
 mitxonline_bucket_name = f"ol-mitxonline-app-{stack_info.env_suffix}"
-mitxonline_bucket = s3.BucketV2(
+mitxonline_bucket = s3.Bucket(
     f"mitxonline-{stack_info.env_suffix}",
     bucket=mitxonline_bucket_name,
     tags=aws_config.tags,
@@ -118,10 +119,10 @@ mitxonline_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-mitxonline_bucket_versioning = s3.BucketVersioningV2(
+mitxonline_bucket_versioning = s3.BucketVersioning(
     f"mitxonline-{stack_info.env_suffix}-versioning",
     bucket=mitxonline_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled",
     ),
 )
@@ -262,6 +263,8 @@ mitxonline_db_security_group = ec2.SecurityGroup(
 db_defaults = {**defaults(stack_info)["rds"]}
 if stack_info.name == "QA":
     db_defaults["instance_size"] = DBInstanceTypes.general_purpose_large
+if stack_info.name == "Production":
+    db_defaults["instance_size"] = DBInstanceTypes.general_purpose_xlarge
 
 db_instance_name = f"mitxonline-{stack_info.env_suffix}-app-db"
 mitxonline_db_config = OLPostgresDBConfig(
@@ -273,6 +276,7 @@ mitxonline_db_config = OLPostgresDBConfig(
     tags=aws_config.tags,
     db_name="mitxonline",
     public_access=False,
+    blue_green_timeout_minutes=60 * 6,  # 6 hours
     **db_defaults,
 )
 mitxonline_db_config.parameter_overrides.append(
@@ -402,6 +406,10 @@ redis_cluster_security_group = ec2.SecurityGroup(
     vpc_id=apps_vpc["id"],
     tags=aws_config.tags,
 )
+redis_defaults = defaults(stack_info)["redis"]
+redis_defaults["instance_type"] = (
+    redis_config.get("instance_type") or redis_defaults["instance_type"]
+)
 redis_cache_config = OLAmazonRedisConfig(
     encrypt_transit=True,
     auth_token=redis_config.require("password"),
@@ -417,7 +425,7 @@ redis_cache_config = OLAmazonRedisConfig(
     subnet_group=apps_vpc["elasticache_subnet"],
     security_groups=[redis_cluster_security_group.id],
     tags=aws_config.tags,
-    **defaults(stack_info)["redis"],
+    **redis_defaults,
 )
 redis_cache = OLAmazonCache(
     redis_cache_config,
@@ -471,20 +479,47 @@ mitxonline_k8s_app = OLApplicationK8s(
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,
         import_uwsgi_config=True,
-        resource_requests={"cpu": "500m", "memory": "512Mi"},
-        resource_limits={"cpu": "1000m", "memory": "1024Mi"},
-        init_migrations=True,
+        init_migrations=False,
         init_collectstatic=True,
+        pre_deploy_commands=[
+            ("migrate", ["python", "manage.py", "migrate", "--noinput"])
+        ],
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="celery",
                 redis_host=redis_cache.address,
                 redis_password=redis_config.require("password"),
+                resource_requests={"cpu": "500m", "memory": "2Gi"},
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="hubspot_sync",
                 redis_host=redis_cache.address,
                 redis_password=redis_config.require("password"),
+            ),
+        ],
+        resource_requests={"cpu": "500m", "memory": "1800Mi"},
+        resource_limits={"cpu": "1000m", "memory": "1800Mi"},
+        hpa_scaling_metrics=[
+            kubernetes.autoscaling.v2.MetricSpecArgs(
+                type="Resource",
+                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                    name="cpu",
+                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                        type="Utilization",
+                        average_utilization=60,  # Target CPU utilization (60%)
+                    ),
+                ),
+            ),
+            # Scale up when avg usage exceeds: 1800 * 0.8 = 1440 Mi
+            kubernetes.autoscaling.v2.MetricSpecArgs(
+                type="Resource",
+                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                    name="memory",
+                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                        type="Utilization",
+                        average_utilization=80,  # Target memory utilization (80%)
+                    ),
+                ),
             ),
         ],
     ),
@@ -629,6 +664,8 @@ mitxonline_apisix_route_direct = OLApisixRoute(
     ),
 )
 
+learn_api_domain = mitxonline_config.require("learn_backend_domain")  # New domain
+
 mitxonline_apisix_route_prefix = OLApisixRoute(
     name=f"mitxonline-apisix-route-prefixed-{stack_info.env_suffix}",
     k8s_namespace=mitxonline_namespace,
@@ -637,7 +674,7 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="passauth",
             priority=10,
-            hosts=[api_domain],
+            hosts=[learn_api_domain],
             paths=[f"/{api_path_prefix}/*"],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             plugins=[
@@ -653,7 +690,7 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="logout-redirect",
             priority=10,
-            hosts=[api_domain],
+            hosts=[learn_api_domain],
             paths=[f"/{api_path_prefix}/logout/oidc/*"],
             plugins=[
                 OLApisixPluginConfig(name="redirect", config={"uri": "/logout/oidc"}),
@@ -666,7 +703,7 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="reqauth",
             priority=10,
-            hosts=[api_domain],
+            hosts=[learn_api_domain],
             paths=[
                 f"/{api_path_prefix}/login/",
                 f"/{api_path_prefix}/login/oidc*",

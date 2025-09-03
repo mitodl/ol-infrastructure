@@ -17,6 +17,7 @@ config:
     "--everyone"]
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
   - ["course_home.course_home_mfe_progress_tab", "--create", "--everyone"]
+  - ["discussions.enable_forum_v2", "--deactivate"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
   - ["grades.bulk_management", "--create", "--superusers", "--everyone"]
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
@@ -32,6 +33,7 @@ config:
     "--everyone"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
+  - ["legacy_studio.certificates", "--create", "--everyone"]
   edxapp:business_unit: residential-staging
   edxapp:db_password:
     secure: "v1:ZB90id7gJ0z4NB/r:S3dGQ6OhdFOl1VdJ8cMOyLTc1L/T36F3ULUBvwMi5XOpyCbRDSyPhxb1DXZQ75DMS8R54Qa8pYE="

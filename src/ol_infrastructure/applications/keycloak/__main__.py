@@ -1,5 +1,3 @@
-# ruff: noqa: ERA001
-
 """The complete state needed to provision Keycloak running on Docker."""
 
 import json
@@ -41,9 +39,11 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
 from ol_infrastructure.lib.aws.eks_helper import (
+    cached_image_uri,
     check_cluster_namespace,
     setup_k8s_provider,
 )
+from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.consul import consul_key_helper, get_consul_provider
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
@@ -262,6 +262,10 @@ keycloak_database_security_group = ec2.SecurityGroup(
 
 # Database
 rds_defaults = defaults(stack_info)["rds"]
+if stack_info.env_suffix == "qa":
+    rds_defaults["instance_size"] = DBInstanceTypes.general_purpose_large.value
+if stack_info.env_suffix == "production":
+    rds_defaults["instance_size"] = DBInstanceTypes.general_purpose_xlarge.value
 
 rds_password = keycloak_config.require("rds_password")
 
@@ -443,12 +447,15 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
     spec={
         "update": {"strategy": "Auto"},
         "instances": keycloak_config.get_int("replicas") or 2,
-        "image": f"610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/keycloak@{KEYCLOAK_DOCKER_DIGEST}",  # noqa: E501
+        "image": cached_image_uri(f"mitodl/keycloak@{KEYCLOAK_DOCKER_DIGEST}"),
         "db": {
             "vendor": "postgres",
             "database": keycloak_db_config.db_name,
             "port": db_port,
             "host": db_address,
+            "poolMinSize": 30,
+            "poolInitialSize": 30,
+            "poolMaxSize": 30,
             "usernameSecret": {
                 "name": db_creds_secret_name,
                 "key": "username",
@@ -468,9 +475,29 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
                 "memory": keycloak_config.get("memory_limit") or "1Gi",
             },
         },
-        "startOptimized": False,
+        "startOptimized": True,
         "http": {
             "tlsSecret": star_ol_mit_edu_secret_name,
+        },
+        "unsupported": {
+            "podTemplate": {
+                "spec": {
+                    "containers": [
+                        {
+                            "env": [
+                                {
+                                    "name": "QUARKUS_HTTP_LIMITS_MAX_HEADER_SIZE",
+                                    "value": "128k",
+                                },
+                                {
+                                    "name": "QUARKUS_HTTP_LIMITS_MAX_HEADER_LIST_SIZE",
+                                    "value": "32768",
+                                },
+                            ]
+                        }
+                    ]
+                }
+            },
         },
         "additionalOptions": [
             {
@@ -478,10 +505,6 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
                 "value": "true",
             },
             {"name": "metrics-enabled", "value": "true"},
-            {
-                "name": "spi-login-provider",
-                "value": "ol-freemarker",
-            },
             {
                 "name": "spi-realm-restapi-extension-scim-admin-url-check",
                 "value": "no-context-path",

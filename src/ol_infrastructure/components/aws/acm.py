@@ -1,5 +1,4 @@
 from functools import partial
-from typing import Optional
 
 from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_aws import acm
@@ -14,8 +13,8 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 class ACMCertificateConfig(BaseModel):
     certificate_domain: str
-    alternative_names: Optional[list[str]] = None
-    certificate_zone_id: Optional[Output[str] | str] = None
+    alternative_names: list[str] | None = None
+    certificate_zone_id: Output[str] | str | None = None
     certificate_tags: dict[str, str]
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -26,7 +25,7 @@ class ACMCertificate(ComponentResource):
         self,
         name: str,
         cert_config: ACMCertificateConfig,
-        opts: Optional[ResourceOptions] = None,
+        opts: ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:infrastructure:aws:acm:ACMCertificate",

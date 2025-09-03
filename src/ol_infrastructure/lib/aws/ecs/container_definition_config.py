@@ -1,4 +1,4 @@
-from typing import Annotated, Optional
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt
 
@@ -10,7 +10,7 @@ def build_container_log_options(
     service_name: str,
     task_name: str,
     stack_info: StackInfo,
-    container_name: Optional[str] = None,
+    container_name: str | None = None,
 ) -> dict[str, str]:
     return {
         "awslogs-group": f"ecs/{service_name}/{task_name}/{stack_info.env_suffix}/",
@@ -43,8 +43,8 @@ class OLContainerLogConfig(BaseModel):
     # "logentries", "splunk", "syslog", "awsfirelens"
     log_driver: str
     # Options to pass to log config
-    options: Optional[dict[str, str]] = None
-    secret_options: Optional[list[Secret]] = None
+    options: dict[str, str] | None = None
+    secret_options: list[Secret] | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -59,7 +59,7 @@ class OLFargateContainerDefinitionConfig(BaseModel):
         ),
     ]
     memory: Annotated[
-        Optional[PositiveInt],
+        PositiveInt | None,
         Field(
             description=(
                 "Memory reserved for this container. "
@@ -79,7 +79,7 @@ class OLFargateContainerDefinitionConfig(BaseModel):
         ),
     ]
     memory_reservation: Annotated[
-        Optional[PositiveInt],
+        PositiveInt | None,
         Field(
             description="Soft limit of memory to reserve for the container",
             parameter_name="memoryReservation",
@@ -93,14 +93,14 @@ class OLFargateContainerDefinitionConfig(BaseModel):
         ),
     ] = PositiveInt(DEFAULT_HTTP_PORT)
     command: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         Field(
             description="The command that is passed to the container",
             parameter_name="command",
         ),
     ] = None
     cpu: Annotated[
-        Optional[PositiveInt],
+        PositiveInt | None,
         Field(
             description="Number of cpu units reserved for container",
             parameter_name="cpu",
@@ -117,21 +117,21 @@ class OLFargateContainerDefinitionConfig(BaseModel):
         ),
     ] = False
     environment: Annotated[
-        Optional[dict[str, str]],
+        dict[str, str] | None,
         Field(
             description="Environment variables to pass to container",
             parameter_name="environment",
         ),
     ] = None
     secrets: Annotated[
-        Optional[list[Secret]],
+        list[Secret] | None,
         Field(
             description="Secrets that will be exposed to your container",
             parameter_name="secrets",
         ),
     ] = None
     log_configuration: Annotated[
-        Optional[OLContainerLogConfig],
+        OLContainerLogConfig | None,
         Field(
             description="Configuration for setting up log outputs for this container",
             parameter_name="logConfiguration",
@@ -157,7 +157,7 @@ class OLFargateContainerDefinitionConfig(BaseModel):
         ),
     ] = False
     volumes_from: Annotated[
-        Optional[list[dict[str, str]]],
+        list[dict[str, str]] | None,
         Field(
             description=(
                 "Allow for mounting paths betwen containers. Useful for rendering "

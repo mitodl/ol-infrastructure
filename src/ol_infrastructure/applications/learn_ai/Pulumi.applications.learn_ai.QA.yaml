@@ -4,22 +4,24 @@ encryptedkey: AQICAHgQW+3bag/cl2fPG3dPdqAPbfcsZuwI7rETXZsx85HRpgF0G1SpXqAgEVHrcC
 config:
   aws:region: us-east-1
   learn_ai:backend_domain: "api-learn-ai-qa.ol.mit.edu"
-  learn_ai:learn_backend_domain: "api.rc.learn.mit.edu"
   learn_ai:db_password:
     secure: v1:moKYAbHsHOnTUrEk:4OgRBNFXT0WKrz1KaKZDhQxT09dA36jN4+q/SO0IIAemTSiwGqrXbXn+r5dFlGrr24S+VGtiyNXSVKts+j/TgKS33FTo86OX2saBDrL4dFo=
   learn_ai:env_vars:
+    AI_CITED_PROMPTS: '["syllabus", "syllabus_canvas"]'
     AI_DEBUG: "true"
     AI_DEFAULT_RECOMMENDATION_MODEL: "openai/gpt-4o-mini"
     AI_DEFAULT_SYLLABUS_MODEL: "openai/gpt-4o-mini"
-    AI_DEFAULT_VIDEO_GPT_MODEL: "openai/gpt-4o-mini"
     AI_DEFAULT_TUTOR_MODEL: "openai/gpt-4o"
+    AI_DEFAULT_VIDEO_GPT_MODEL: "openai/gpt-4o-mini"
     AI_MIT_CONTENTFILE_URL: "https://api.rc.learn.mit.edu/api/v1/contentfiles/"
-    AI_MIT_SEARCH_URL: "https://api.rc.learn.mit.edu/api/v0/vector_learning_resources_search/"
     AI_MIT_SEARCH_DETAIL_URL: "https://rc.learn.mit.edu/?resource="
+    AI_MIT_SEARCH_URL: "https://api.rc.learn.mit.edu/api/v0/vector_learning_resources_search/"
     AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_PROMPT_CACHE_FUNCTION: "ai_chatbots.utils.get_django_cache"
     CELERY_TASK_ALWAYS_EAGER: "false"
+    CANVAS_SYLLABUS_DEMO_READABLE_IDS: ["14566-kaleba:20211202", "34642-15.095_FA25"]
+    CANVAS_TUTOR_DEMO_RUN_READABLE_IDS: ["14566-kaleba:20211202+canvas", "34642-15.095_FA25+canvas"]
     CSRF_ALLOWED_ORIGINS: '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qa.ol.mit.edu",
       "https://rc.learn.mit.edu", "https://api.rc.learn.mit.edu"]'
     CSRF_TRUSTED_ORIGINS: '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qa.ol.mit.edu",
@@ -37,23 +39,24 @@ config:
     OPENTELEMETRY_ENABLED: "true"
     OPENTELEMETRY_ENDPOINT: "grafana-alloy.operations.svc.cluster.local:4317"
     POSTHOG_API_HOST: "https://app.posthog.com"
-    POSTHOG_ENABLED: "true"
     POSTHOG_ENABLE_SESSION_RECORDING: "true"
+    POSTHOG_ENABLED: "true"
     POSTHOG_PROJECT_ID: "86325"
     POSTHOG_TIMEOUT_MS: "1000"
+    PROBLEM_SET_URL: https://api.rc.learn.mit.edu/api/v0/tutor/problems/
     SENTRY_LOG_LEVEL: "ERROR"
     SENTRY_PROFILES_SAMPLE_RATE: "0.1"
     SENTRY_TRACES_SAMPLE_RATE: "0.1"
     SESSION_COOKIE_NAME: "session_learn_ai_rc"
     UWSGI_THREADS: "5"
+  learn_ai:frontend_domain: "learn-ai-qa.ol.mit.edu"
   learn_ai:frontend_vars:
     MIT_LEARN_APP_BASE_URL: https://rc.learn.mit.edu/
-    OPENEDX_API_BASE_URL: https://courses-qa.mitxonline.mit.edu/
-    OPENEDX_LOGIN_URL: https://courses-qa.mitxonline.mit.edu/auth/login/ol-oauth2/?auth_entry=login
     MIT_SEARCH_ELASTIC_URL: https://api.learn.mit.edu/api/v1/learning_resources_search/
     MIT_SEARCH_VECTOR_URL: https://api.learn.mit.edu/api/v0/vector_learning_resources_search/
-
-  learn_ai:frontend_domain: "learn-ai-qa.ol.mit.edu"
+    OPENEDX_API_BASE_URL: https://courses.rc.learn.mit.edu/
+    OPENEDX_LOGIN_URL: https://courses.rc.learn.mit.edu/auth/login/ol-oauth2/?auth_entry=login
+  learn_ai:learn_backend_domain: "api.rc.learn.mit.edu"
   redis:password:
     secure: v1:j1q4KgePVUsaaySb:EhUqxWBezBKe6Ck1o/gqlX68GBnrZZQdmUCscl5aPok1j6jJWKSRO89XfV+6dWJaCMhqHA==
   vault:address: "https://vault-qa.odl.mit.edu"

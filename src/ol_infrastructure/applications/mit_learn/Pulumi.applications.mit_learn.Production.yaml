@@ -12,8 +12,8 @@ config:
     auth_allowed_redirect_hosts:
     - "draft.ocw.mit.edu"
     - "ocw.mit.edu"
-    - ".mitopen.odl.mit.edu"   # legacy
-    - ".learn.mit.edu"
+    - "mitopen.odl.mit.edu"   # legacy
+    - "learn.mit.edu"
     cors_urls:
     - "https://api.learn.mit.edu"
     - "https://learn.mit.edu"
@@ -37,12 +37,14 @@ config:
   mitlearn:learn_ai_syllabus_endpoint: "https://api.learn.mit.edu/ai/http/syllabus_agent/"
   mitlearn:legacy_api_domain: "api.mitopen.odl.mit.edu"
   mitlearn:legacy_frontend_domain: "mitopen.odl.mit.edu"
-  mitlearn:nextjs_heroku_domain: "mitopen-production-nextjs-6b0d663f9110.herokuapp.com"
+  mitlearn:min_replicas: 4
+  mitlearn:nextjs_heroku_domain: "next.learn.mit.edu"
   mitlearn:posthog_proxy: "ph.ol.mit.edu"
   mitlearn:vars:
     AI_MIT_SYLLABUS_URL: "https://api.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.learn.mit.edu/api/v0/vector_content_files_search/"
     APPZI_URL: "https://w.appzi.io/w.js?token=Q2pSI"
+    CANVAS_COURSE_BUCKET_NAME: "ol-data-lake-landing-zone-production"
     CELERY_WORKER_CONCURRENCY: 1
     CSRF_COOKIE_NAME: "learn_csrftoken"
     DEBUG: "false"
@@ -62,7 +64,6 @@ config:
     MITOL_COOKIE_NAME: "learn"
     MITOL_LOG_LEVEL: "INFO"
     MITOL_NEW_USER_LOGIN_URL: "https://learn.mit.edu/onboarding"
-    MITOL_NOINDEX: "false"
     MITOL_SUPPORT_EMAIL: "learn-support@mit.edu" # Need to verify
     MITPE_API_ENABLED: "true"
     OCW_ITERATOR_CHUNK_SIZE: 300
@@ -72,17 +73,14 @@ config:
     OPENSEARCH_INDEX: "mitlearn"
     OPENSEARCH_SHARD_COUNT: 3
     OPENSEARCH_URL: "https://search-opensearch-mitlearn-producti-qjtnw2dcoampmbtscs3wdfci6y.us-east-1.es.amazonaws.com"
-    PGBOUNCER_DEFAULT_POOL_SIZE: 50
-    PGBOUNER_MAX_CLIENT_CONN: 500
-    PGBOUNER_MIN_POOL_SIZE: 20
     POSTHOG_API_HOST: "https://ph.ol.mit.edu"
     POSTHOG_ENABLED: "true"
     POSTHOG_PROJECT_ID: "63497"
     POSTHOG_TIMEOUT_MS: 1000
     QDRANT_HOST: "https://0567dbd5-d68d-4d9e-8c41-954ef5de90ae.us-east-1-0.aws.cloud.qdrant.io"
     SEE_API_ENABLED: "true"
-    SENTRY_PROFILES_SAMPLE_RATE: 1
-    SENTRY_TRACES_SAMPLE_RATE: 1
+    SENTRY_PROFILES_SAMPLE_RATE: "0.25"
+    SENTRY_TRACES_SAMPLE_RATE: "0.25"
     SESSION_COOKIE_NAME: "session_mitlearn"
     SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT: "https://sso.ol.mit.edu/realms/olapps"
     TIKA_SERVER_ENDPOINT: "https://tika-production.odl.mit.edu"

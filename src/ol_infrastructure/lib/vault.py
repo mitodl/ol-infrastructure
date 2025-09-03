@@ -1,4 +1,4 @@
-# ruff: noqa: E501, S604
+# ruff: noqa: E501
 """Creation and revocation statements used for Vault role definitions."""
 
 # These strings are passed through the `.format` method so the variables that need to remain in the template
@@ -9,7 +9,6 @@ from enum import Enum
 from functools import lru_cache, partial
 from pathlib import Path
 from string import Template
-from typing import Optional
 
 import pulumi
 import pulumi_vault
@@ -313,8 +312,8 @@ class VaultPKIKeyTypeBits(int, Enum):
 def get_vault_provider(
     vault_address: str,
     vault_env_namespace: str,
-    provider_name: Optional[str] = None,
-    skip_child_token: Optional[bool] = None,
+    provider_name: str | None = None,
+    skip_child_token: bool | None = None,  # noqa: FBT001
 ) -> pulumi.ResourceTransformationResult:
     pulumi_vault_creds = read_yaml_secrets(
         Path().joinpath(
@@ -342,7 +341,7 @@ def set_vault_provider(
     vault_address: str,
     vault_env_namespace: str,
     resource_args: pulumi.ResourceTransformationArgs,
-    skip_child_token: Optional[bool] = None,
+    skip_child_token: bool | None = None,  # noqa: FBT001
 ) -> pulumi.ResourceTransformationResult:
     if resource_args.type_.split(":")[0] == "vault":
         resource_args.opts.provider = get_vault_provider(
@@ -357,9 +356,9 @@ def set_vault_provider(
 
 
 def setup_vault_provider(
-    stack_info: Optional[StackInfo] = None,
+    stack_info: StackInfo | None = None,
     *,
-    skip_child_token: Optional[bool] = None,
+    skip_child_token: bool | None = None,
 ):
     if stack_info:
         vault_address = f"https://vault-{stack_info.env_suffix}.odl.mit.edu"

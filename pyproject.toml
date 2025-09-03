@@ -16,12 +16,12 @@ dependencies = [
     "hvac[parser]>=2.0.0,<3",
     "parliament!=1.6.4",
     "pulumi>=3.39.1,<4",
-    "pulumi-aws>=6.0.0,<7",
-    "pulumi-fastly>=9,<10",
+    "pulumi-aws>=7.1,<8",
+    "pulumi-fastly>=10,<11",
     "pulumi-github>=6.0.0,<7",
     "pulumi-mailgun>=3.0.0,<4",
     "pulumi-tls>=5.0.0,<6",
-    "pulumi-vault>=6.0.0,<7",
+    "pulumi-vault>=7,<8",
     "pulumi_consul>=3.5.0,<4",
     "pydantic>=2,<3",
     "pyinfra~=3.0",
@@ -30,7 +30,7 @@ dependencies = [
     "pulumi-keycloak>=6.0.0,<7",
     "pydantic-settings>=2.0.1,<3",
     "pulumiverse-heroku>=1.0.3,<2",
-    "pulumi-eks>=3.8.0,<4",
+    "pulumi-eks>=4,<5",
     "pulumi-aws-native>=1.25.0,<2",
     "packaging>=24.2",
 ]
@@ -47,7 +47,7 @@ dev = [
     "pre-commit>=4.0.0,<5",
     "pytest>=8.0.0,<9",
     "pytest-testinfra>=10.0.0,<11",
-    "ruff>=0.11,<1",
+    "ruff>=0.12,<1",
 ]
 
 [tool.hatch.build.targets.sdist]
@@ -176,7 +176,6 @@ lint.ignore = [
     "RET508",
     "SIM115",
     "TD003",  # Don't require issue links for TODO comments
-    "UP007"
 ]
 lint.typing-modules = ["colour.hints"]
 

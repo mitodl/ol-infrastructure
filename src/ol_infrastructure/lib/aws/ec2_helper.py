@@ -4,7 +4,6 @@ from enum import Enum, unique
 from functools import lru_cache
 from ipaddress import IPv4Network
 from types import FunctionType
-from typing import Optional, Union
 
 import boto3
 import pulumi
@@ -12,7 +11,7 @@ from botocore.exceptions import ClientError
 from pulumi_aws import ec2
 
 ec2_client = boto3.client("ec2")
-AWSFilterType = list[dict[str, Union[str, list[str]]]]
+AWSFilterType = list[dict[str, str | list[str]]]
 
 default_egress_args = [
     ec2.SecurityGroupEgressArgs(
@@ -109,7 +108,7 @@ def _conditional_import(
     filters: AWSFilterType,
     attributes_key: str,
     attribute_id_key: str,
-    change_attributes_ignored: Optional[list[str]] = None,
+    change_attributes_ignored: list[str] | None = None,
 ) -> tuple[pulumi.ResourceOptions, str]:
     """Determine whether to import an existing AWS resource into Pulumi.
 

@@ -1,4 +1,4 @@
-# ruff: noqa: ERA001, C416, E501, CPY001, D103, D101
+# ruff: noqa: ERA001, E501
 """
 This is a service components that replaces a number of "boilerplate" kubernetes
 calls we currently make into one convenient callable package.
@@ -30,6 +30,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
+from ol_infrastructure.lib.aws.eks_helper import cached_image_uri
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
@@ -88,7 +89,7 @@ class OLApplicationK8sConfig(BaseModel):
                 name="cpu",
                 target=kubernetes.autoscaling.v2.MetricTargetArgs(
                     type="Utilization",
-                    average_utilization=80,  # Target CPU utilization (80%)
+                    average_utilization=60,  # Target CPU utilization (60%)
                 ),
             ),
         ),
@@ -98,7 +99,7 @@ class OLApplicationK8sConfig(BaseModel):
                 name="memory",  # Memory utilization as the scaling metric
                 target=kubernetes.autoscaling.v2.MetricTargetArgs(
                     type="Utilization",
-                    average_utilization=80,  # Target memory utilization (80%)
+                    average_utilization=60,  # Target memory utilization (60%)
                 ),
             ),
         ),
@@ -114,6 +115,10 @@ class OLApplicationK8sConfig(BaseModel):
     init_migrations: bool = Field(default=True)
     init_collectstatic: bool = Field(default=True)
     celery_worker_configs: list[OLApplicationK8sCeleryWorkerConfig] = []
+    pre_deploy_commands: list[tuple[str, list[str]]] | None = Field(
+        default=None,
+        description="A tuple of <job_name>, <job_command_array> for executing prior to the deployment updating",
+    )
     probe_configs: dict[str, kubernetes.core.v1.ProbeArgs] = {
         # Liveness probe to check if the application is still running
         "liveness_probe": kubernetes.core.v1.ProbeArgs(
@@ -124,6 +129,7 @@ class OLApplicationK8sConfig(BaseModel):
             initial_delay_seconds=30,  # Wait 30 seconds before first probe
             period_seconds=30,
             failure_threshold=3,  # Consider failed after 3 attempts
+            timeout_seconds=3,
         ),
         # Readiness probe to check if the application is ready to serve traffic
         "readiness_probe": kubernetes.core.v1.ProbeArgs(
@@ -134,6 +140,7 @@ class OLApplicationK8sConfig(BaseModel):
             initial_delay_seconds=15,  # Wait 15 seconds before first probe
             period_seconds=15,
             failure_threshold=3,  # Consider failed after 3 attempts
+            timeout_seconds=3,
         ),
         # Startup probe to ensure the application is fully initialized before other probes start
         "startup_probe": kubernetes.core.v1.ProbeArgs(
@@ -148,6 +155,7 @@ class OLApplicationK8sConfig(BaseModel):
             timeout_seconds=5,
         ),
     }
+    web_pdb_minimum: NonNegativeInt | str = 1
 
     # See https://www.pulumi.com/docs/reference/pkg/python/pulumi/#pulumi.Output.from_input
     # for docs. This unwraps the value so Pydantic can store it in the config class.
@@ -180,7 +188,7 @@ class OLApplicationK8s(ComponentResource):
     Main K8s component resource class
     """
 
-    def __init__(  # noqa: C901, PLR0912
+    def __init__(  # noqa: C901, PLR0912, PLR0915
         self,
         ol_app_k8s_config: OLApplicationK8sConfig,
         opts: ResourceOptions | None = None,
@@ -195,6 +203,7 @@ class OLApplicationK8s(ComponentResource):
             opts=opts,
         )
         resource_options = ResourceOptions(parent=self)
+        deployment_options = ResourceOptions(parent=self)
 
         extra_deployment_args: dict[str, int] = {}
         # If we have ANY metrics args, then we use HPA and don't pass replicas to the deployment
@@ -219,9 +228,7 @@ class OLApplicationK8s(ComponentResource):
         else:
             app_image = f"{ol_app_k8s_config.application_image_repository}:{ol_app_k8s_config.application_docker_tag}"
         if ol_app_k8s_config.use_pullthrough_cache:
-            app_image = (
-                f"610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/{app_image}"
-            )
+            app_image = cached_image_uri(app_image)
 
         volumes = [
             kubernetes.core.v1.VolumeArgs(
@@ -338,27 +345,31 @@ class OLApplicationK8s(ComponentResource):
                 )
             )
 
+        image_pull_policy = ol_app_k8s_config.image_pull_policy
+        if ol_app_k8s_config.application_docker_tag.lower() == "latest":
+            image_pull_policy = "Always"
+
         init_containers = []
-        if ol_app_k8s_config.init_collectstatic:
+        if ol_app_k8s_config.init_migrations:
             init_containers.append(
                 # Run database migrations at startup
                 kubernetes.core.v1.ContainerArgs(
                     name="migrate",
                     image=app_image,
                     command=["python3", "manage.py", "migrate", "--noinput"],
-                    image_pull_policy="IfNotPresent",
+                    image_pull_policy=image_pull_policy,
                     env=application_deployment_env_vars,
                     env_from=application_deployment_envfrom,
                 )
             )
 
-        if ol_app_k8s_config.init_migrations:
+        if ol_app_k8s_config.init_collectstatic:
             init_containers.append(
                 kubernetes.core.v1.ContainerArgs(
                     name="collectstatic",
                     image=app_image,
                     command=["python3", "manage.py", "collectstatic", "--noinput"],
-                    image_pull_policy="IfNotPresent",
+                    image_pull_policy=image_pull_policy,
                     env=application_deployment_env_vars,
                     env_from=application_deployment_envfrom,
                     volume_mounts=[
@@ -379,13 +390,55 @@ class OLApplicationK8s(ComponentResource):
             ),
         }
 
-        image_pull_policy = ol_app_k8s_config.image_pull_policy
-        if ol_app_k8s_config.application_docker_tag.lower() == "latest":
-            image_pull_policy = "Always"
-
         _application_deployment_name = truncate_k8s_metanames(
             f"{ol_app_k8s_config.application_name}-app"
         )
+
+        if pre_deploy_commands := ol_app_k8s_config.pre_deploy_commands:
+            _pre_deploy_job = kubernetes.batch.v1.Job(
+                f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-job",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=f"{_application_deployment_name}-pre-deploy",
+                    namespace=ol_app_k8s_config.application_namespace,
+                    labels=ol_app_k8s_config.k8s_global_labels
+                    | {
+                        "ol.mit.edu/job": "pre-deploy",
+                        "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
+                        "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
+                            truncate_k8s_metanames
+                        ),
+                    },
+                ),
+                spec=kubernetes.batch.v1.JobSpecArgs(
+                    # Remove job 30 minutes after completion
+                    ttl_seconds_after_finished=60 * 30,
+                    template=kubernetes.core.v1.PodTemplateSpecArgs(
+                        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                            labels=application_labels,
+                        ),
+                        spec=kubernetes.core.v1.PodSpecArgs(
+                            service_account_name=ol_app_k8s_config.application_service_account_name,
+                            containers=[
+                                kubernetes.core.v1.ContainerArgs(
+                                    name=command_name,
+                                    image=app_image,
+                                    command=command_array,
+                                    image_pull_policy=image_pull_policy,
+                                    env=application_deployment_env_vars,
+                                    env_from=application_deployment_envfrom,
+                                )
+                                for (command_name, command_array) in pre_deploy_commands
+                            ],
+                            restart_policy="Never",
+                        ),
+                    ),
+                ),
+                opts=resource_options,
+            )
+            deployment_options = deployment_options.merge(
+                ResourceOptions(depends_on=[_pre_deploy_job])
+            )
+
         _application_deployment = kubernetes.apps.v1.Deployment(
             f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-deployment",
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -402,7 +455,7 @@ class OLApplicationK8s(ComponentResource):
                 strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
                     type="RollingUpdate",
                     rolling_update=kubernetes.apps.v1.RollingUpdateDeploymentArgs(
-                        max_surge=0,
+                        max_surge="50%",
                         max_unavailable=1,
                     ),
                 ),
@@ -421,7 +474,7 @@ class OLApplicationK8s(ComponentResource):
                             # nginx container infront of uwsgi
                             kubernetes.core.v1.ContainerArgs(
                                 name="nginx",
-                                image=f"nginx:{NGINX_VERSION}",
+                                image=cached_image_uri(f"nginx:{NGINX_VERSION}"),
                                 ports=[
                                     kubernetes.core.v1.ContainerPortArgs(
                                         container_port=DEFAULT_NGINX_PORT
@@ -429,8 +482,8 @@ class OLApplicationK8s(ComponentResource):
                                 ],
                                 image_pull_policy="IfNotPresent",
                                 resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                                    requests=ol_app_k8s_config.resource_requests,
-                                    limits=ol_app_k8s_config.resource_limits,
+                                    requests={"cpu": "50m", "memory": "50Mi"},
+                                    limits={"cpu": "50m", "memory": "50Mi"},
                                 ),
                                 volume_mounts=nginx_volume_mounts,
                             ),
@@ -458,6 +511,23 @@ class OLApplicationK8s(ComponentResource):
                     ),
                 ),
                 **extra_deployment_args,
+            ),
+            opts=deployment_options,
+        )
+
+        # Pod Disruption Budget to ensure at least one web application pod is available.
+        _application_pdb = kubernetes.policy.v1.PodDisruptionBudget(
+            f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-pdb",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name=f"{_application_deployment_name}-pdb",
+                namespace=ol_app_k8s_config.application_namespace,
+                labels=application_labels,
+            ),
+            spec=kubernetes.policy.v1.PodDisruptionBudgetSpecArgs(
+                min_available=ol_app_k8s_config.web_pdb_minimum,
+                selector=kubernetes.meta.v1.LabelSelectorArgs(
+                    match_labels=application_labels,
+                ),
             ),
             opts=resource_options,
         )
@@ -706,7 +776,7 @@ class OLApisixRouteConfig(BaseModel):
     hosts: list[str] = []
     paths: list[str] = []
     backend_service_name: str | None = None
-    backend_service_port: str | None = None
+    backend_service_port: str | NonNegativeInt | None = None
     # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_route/#service-resolution-granularity
     backend_resolve_granularity: Literal["endpoint", "service"] = "service"
     upstream: str | None = None
@@ -733,7 +803,7 @@ class OLApisixRouteConfig(BaseModel):
         """Ensure that either upstream or backend service details are provided, not both."""
         upstream: str | None = self.upstream
         backend_service_name: str | None = self.backend_service_name
-        backend_service_port: str | None = self.backend_service_port
+        backend_service_port: str | NonNegativeInt | None = self.backend_service_port
 
         if upstream is not None:
             if backend_service_name is not None or backend_service_port is not None:
@@ -828,7 +898,7 @@ class OLApisixOIDCConfig(BaseModel):
     oidc_logout_path: str = "/logout/oidc"
     oidc_post_logout_redirect_uri: str = "/"
     oidc_renew_access_token_on_expiry: bool = True
-    oidc_scope: str = "openid profile email"
+    oidc_scope: str = "openid profile email organization"
     oidc_session_contents: dict[str, bool] = {
         "access_token": True,
         "enc_id_token": True,
@@ -1079,3 +1149,43 @@ class OLApisixExternalUpstream(pulumi.ComponentResource):
                 opts=resource_options,
             )
         )
+
+
+class OLTraefikMiddleware(pulumi.ComponentResource):
+    """
+    Generic component for creating Traefik Middleware custom resources.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        middleware_name: str,
+        namespace: str,
+        spec: dict[str, Any],
+        opts: pulumi.ResourceOptions | None = None,
+    ):
+        """Initialize the OLTraefikMiddleware component resource."""
+        super().__init__(
+            "ol:infrastructure:services:k8s:OLTraefikMiddleware", name, None, opts
+        )
+        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)
+
+        self.traefik_middleware = kubernetes.apiextensions.CustomResource(
+            f"OLTraefikMiddleware-{name}",
+            api_version="traefik.io/v1alpha1",
+            kind="Middleware",
+            metadata={
+                "name": middleware_name,
+                "namespace": namespace,
+            },
+            spec=spec,
+            opts=resource_options,
+        )
+        self.gateway_filter = {
+            "type": "ExtensionRef",
+            "extensionRef": {
+                "group": "traefik.io",
+                "kind": "Middleware",
+                "name": middleware_name,
+            },
+        }

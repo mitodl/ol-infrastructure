@@ -111,13 +111,22 @@ collected:
     && mkdir -p /openedx/config ./lms/envs/mitol ./cms/envs/mitol
   COPY settings/lms.env.yml /openedx/config/lms.env.yml
   COPY settings/cms.env.yml /openedx/config/cms.env.yml
+
   COPY settings/lms/assets.not_py /openedx/edx-platform/lms/envs/mitol/assets.py
   COPY settings/lms/i18n.not_py /openedx/edx-platform/lms/envs/mitol/i18n.py
+
   COPY settings/cms/assets.not_py /openedx/edx-platform/cms/envs/mitol/assets.py
   COPY settings/cms/i18n.not_py /openedx/edx-platform/cms/envs/mitol/i18n.py
+
+  COPY custom_settings_module/lms_settings.not_py /openedx/edx-platform/lms/envs/lms_settings.py
+  COPY custom_settings_module/cms_settings.not_py /openedx/edx-platform/cms/envs/cms_settings.py
+  COPY custom_settings_module/models.not_py /openedx/edx-platform/openedx/core/djangoapps/settings/models.py
+  COPY custom_settings_module/utils.not_py /openedx/edx-platform/openedx/core/djangoapps/settings/utils.py
+
   COPY settings/set_waffle_flags.not_py /openedx/edx-platform/set_waffle_flags.py
   COPY settings/process_scheduled_emails.not_py /openedx/edx-platform/process_scheduled_emails.py
   COPY settings/saml_pull.not_py /openedx/edx-platform/saml_pull.py
+
   ENV REVISION_CFG /openedx/config/revisions.yml
   ENV LMS_CFG /openedx/config/lms.env.yml
   ENV CMS_CFG /openedx/config/cms.env.yml

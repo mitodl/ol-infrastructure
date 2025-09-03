@@ -1,3 +1,5 @@
+"""Pulumi program for deploying the MIT Learn Next.js application to Kubernetes."""
+
 import os
 
 import pulumi_kubernetes as kubernetes
@@ -11,6 +13,7 @@ from ol_infrastructure.components.aws.eks import (
     OLEKSGatewayRouteConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
+    cached_image_uri,
     check_cluster_namespace,
     setup_k8s_provider,
 )
@@ -26,7 +29,9 @@ if "MIT_LEARN_NEXTJS_DOCKER_TAG" not in os.environ:
     raise OSError(msg)
 MIT_LEARN_NEXTJS_DOCKER_TAG = os.environ["MIT_LEARN_NEXTJS_DOCKER_TAG"]
 
-app_image = f"mitodl/mit-learn-nextjs-app:{MIT_LEARN_NEXTJS_DOCKER_TAG}"
+app_image = cached_image_uri(
+    f"mitodl/mit-learn-nextjs-app:{MIT_LEARN_NEXTJS_DOCKER_TAG}"
+)
 
 k8s_global_labels = K8sGlobalLabels(
     service=Services.mit_learn, ou=BusinessUnit.mit_learn, stack=stack_info
@@ -42,6 +47,10 @@ cluster_stack.require_output("namespaces").apply(
 nextjs_config = Config("nextjs")
 
 raw_env_vars = {
+    # Env vars available only on server
+    "MITOL_NOINDEX": nextjs_config.get("mitol_noindex"),
+    "OPTIMIZE_IMAGES": nextjs_config.get("optimize_images"),
+    # Env vars available on client and server
     "NEXT_PUBLIC_APPZI_URL": nextjs_config.require("appzi_url"),
     "NEXT_PUBLIC_CSRF_COOKIE_NAME": nextjs_config.require("csrf_cookie_name"),
     "NEXT_PUBLIC_EMBEDLY_KEY": nextjs_config.require("embedly_key"),
@@ -52,6 +61,7 @@ raw_env_vars = {
         "syllabus_endpoint"
     ),
     "NEXT_PUBLIC_MITOL_API_BASE_URL": nextjs_config.require("mitlearn_api_base_url"),
+    "NEXT_PUBLIC_MITX_ONLINE_CSRF_COOKIE_NAME": "csrf_mitxonline",
     "NEXT_PUBLIC_MITX_ONLINE_BASE_URL": nextjs_config.require("mitxonline_base_url"),
     "NEXT_PUBLIC_MITOL_AXIOS_WITH_CREDENTIALS": "true",
     "NEXT_PUBLIC_MITOL_SUPPORT_EMAIL": "mitlearn-support@mit.edu",
@@ -61,8 +71,8 @@ raw_env_vars = {
     "NEXT_PUBLIC_POSTHOG_PROJECT_ID": nextjs_config.require("posthog_project_id"),
     "NEXT_PUBLIC_SENTRY_DSN": nextjs_config.require("sentry_dsn"),
     "NEXT_PUBLIC_SENTRY_ENV": nextjs_config.require("sentry_env"),
-    "NEXT_PUBLIC_SENTRY_PROFILES_SAMPLE_RATE": "1",
-    "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE": "1",
+    "NEXT_PUBLIC_SENTRY_PROFILES_SAMPLE_RATE": "0.25",
+    "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE": "0.25",
     "NEXT_PUBLIC_SITE_NAME": "MIT Learn",
     "NEXT_PUBLIC_VERSION": MIT_LEARN_NEXTJS_DOCKER_TAG,
 }
@@ -80,16 +90,76 @@ application_labels = k8s_global_labels | {
     "ol.mit.edu/service": "nextjs",
 }
 
-# Define the volume for shared build cache
-nextjs_build_cache_volume = kubernetes.core.v1.VolumeArgs(
-    name="nextjs-build-cache",
-    empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+# Define the Persistent Volume Claim for shared build cache on EFS
+nextjs_pvc_name = "nextjs-build-cache-efs"
+nextjs_build_cache_pvc = kubernetes.core.v1.PersistentVolumeClaim(
+    f"mit-learn-nextjs-{stack_info.name}-pvc",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=nextjs_pvc_name,
+        namespace=learn_namespace,
+        labels=application_labels,
+    ),
+    spec=kubernetes.core.v1.PersistentVolumeClaimSpecArgs(
+        access_modes=["ReadWriteMany"],
+        resources=kubernetes.core.v1.VolumeResourceRequirementsArgs(
+            requests={"storage": "10Gi"},
+        ),
+        storage_class_name="efs-sc",  # Assumes 'efs-sc' StorageClass is configured
+    ),
 )
 
-# Define the volume mount for the shared build cache
-nextjs_build_cache_volume_mount = kubernetes.core.v1.VolumeMountArgs(
-    name="nextjs-build-cache",
+# Define the volume to be used by the deployment and job
+efs_volume = kubernetes.core.v1.VolumeArgs(
+    name=nextjs_pvc_name,
+    persistent_volume_claim=kubernetes.core.v1.PersistentVolumeClaimVolumeSourceArgs(
+        claim_name=nextjs_pvc_name,
+    ),
+)
+
+# Define the volume mount for the EFS volume
+efs_volume_mount = kubernetes.core.v1.VolumeMountArgs(
+    name=nextjs_pvc_name,
     mount_path="/app/frontends/main/.next",
+)
+
+# Kubernetes Job to build the NextJS application and store output on EFS
+mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
+    f"mit-learn-nextjs-{stack_info.name}-build-job",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="mitlearn-nextjs-build",
+        namespace=learn_namespace,
+        labels=k8s_global_labels
+        | {
+            "ol.mit.edu/job": "nextjs_build",
+        },
+    ),
+    spec=kubernetes.batch.v1.JobSpecArgs(
+        template=kubernetes.core.v1.PodTemplateSpecArgs(
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                labels=k8s_global_labels
+                | {
+                    "ol.mit.edu/job": "nextjs_build",
+                },
+            ),
+            spec=kubernetes.core.v1.PodSpecArgs(
+                restart_policy="Never",
+                volumes=[efs_volume],
+                containers=[
+                    kubernetes.core.v1.ContainerArgs(
+                        name="nextjs-builder-job",
+                        image=app_image,
+                        command=["yarn", "build", "--no-lint"],
+                        volume_mounts=[efs_volume_mount],
+                        image_pull_policy="Always",
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(),
+                        env=env_vars,
+                    ),
+                ],
+            ),
+        ),
+        backoff_limit=3,  # Allow retries for transient failures
+    ),
+    opts=ResourceOptions(parent=nextjs_build_cache_pvc),
 )
 
 mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
@@ -103,6 +173,7 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
         selector=kubernetes.meta.v1.LabelSelectorArgs(
             match_labels=application_labels,
         ),
+        replicas=nextjs_config.get_int("pod_count") or 2,
         template=kubernetes.core.v1.PodTemplateSpecArgs(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
                 name="mitlearn-nextjs",
@@ -111,19 +182,9 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
             ),
             spec=kubernetes.core.v1.PodSpecArgs(
                 volumes=[
-                    nextjs_build_cache_volume,
+                    efs_volume,  # Use the EFS volume
                 ],
-                init_containers=[
-                    kubernetes.core.v1.ContainerArgs(
-                        name="nextjs-builder",
-                        image=app_image,
-                        command=["yarn", "build"],
-                        volume_mounts=[nextjs_build_cache_volume_mount],
-                        image_pull_policy="Always",
-                        resources=kubernetes.core.v1.ResourceRequirementsArgs(),
-                        env=env_vars,
-                    ),
-                ],
+                # init_containers removed, build is now handled by a separate Job
                 dns_policy="ClusterFirst",
                 containers=[
                     kubernetes.core.v1.ContainerArgs(
@@ -138,7 +199,41 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
                         image_pull_policy="Always",
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(),
                         env=env_vars,
-                        volume_mounts=[nextjs_build_cache_volume_mount],
+                        volume_mounts=[efs_volume_mount],  # Mount EFS volume
+                        liveness_probe=kubernetes.core.v1.ProbeArgs(
+                            tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
+                                port=DEFAULT_NEXTJS_PORT,
+                            ),
+                            initial_delay_seconds=30,  # Wait 30 seconds before first
+                            # probe
+                            period_seconds=30,
+                            failure_threshold=3,  # Consider failed after 3 attempts
+                        ),
+                        # Readiness probe to check if the application is ready to serve
+                        # traffic
+                        readiness_probe=kubernetes.core.v1.ProbeArgs(
+                            tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
+                                port=DEFAULT_NEXTJS_PORT,
+                            ),
+                            initial_delay_seconds=15,  # Wait 15 seconds before first
+                            # probe
+                            period_seconds=15,
+                            failure_threshold=3,  # Consider failed after 3 attempts
+                        ),
+                        # Startup probe to ensure the application is fully initialized
+                        # before other probes start
+                        startup_probe=kubernetes.core.v1.ProbeArgs(
+                            tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
+                                port=DEFAULT_NEXTJS_PORT,
+                            ),
+                            initial_delay_seconds=10,  # Wait 10 seconds before first
+                            # probe
+                            period_seconds=10,  # Probe every 10 seconds
+                            failure_threshold=30,  # Allow up to 5 minutes (30 * 10s)
+                            # for startup
+                            success_threshold=1,
+                            timeout_seconds=5,
+                        ),
                     ),
                 ],
             ),
@@ -146,6 +241,7 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
+        depends_on=[mit_learn_nextjs_build_job],  # Ensure build job runs first
     ),
 )
 

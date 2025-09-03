@@ -1,4 +1,4 @@
-# ruff: noqa: ERA001, TD003, TD002, TD004 FIX002, E501
+# ruff: noqa: ERA001, TD002, TD004, FIX002, E501
 """Pulumi program for deploying an EKS cluster."""
 
 # Misc Ref: https://docs.aws.amazon.com/eks/latest/userguide/associate-service-account-role.html
@@ -16,6 +16,7 @@ import pulumi_vault as vault
 from pulumi import Alias, Config, Output, ResourceOptions, StackReference, export
 
 from bridge.lib.magic_numbers import (
+    AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
     DEFAULT_EFS_PORT,
     GRAFANA_ALLOY_DEFAULT_LISTENER_PORT,
     GRAFANA_ALLOY_OTEL_GRPC_PORT,
@@ -24,6 +25,7 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.lib.versions import (
     APISIX_CHART_VERSION,
+    AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION,
     CERT_MANAGER_CHART_VERSION,
     EBS_CSI_DRIVER_VERSION,
     EFS_CSI_DRIVER_VERSION,
@@ -34,7 +36,10 @@ from bridge.lib.versions import (
     VAULT_SECRETS_OPERATOR_CHART_VERSION,
 )
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
-from ol_infrastructure.lib.aws.eks_helper import get_cluster_version
+from ol_infrastructure.lib.aws.eks_helper import (
+    ECR_DOCKERHUB_REGISTRY,
+    get_cluster_version,
+)
 from ol_infrastructure.lib.aws.iam_helper import (
     EKS_ADMIN_USERNAMES,
     IAM_POLICY_VERSION,
@@ -82,6 +87,9 @@ namespaces = eks_config.get_object("namespaces") or []
 # Centralize version numbers
 VERSIONS = {
     "APISIX_CHART": os.environ.get("APISIX_CHART", APISIX_CHART_VERSION),
+    "AWS_LOAD_BALANCER_CONTROLLER_CHART": os.environ.get(
+        "AWS_LOAD_BALANCER_CONTROLLER_CHART", AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION
+    ),
     "CERT_MANAGER_CHART": os.environ.get(
         "CERT_MANAGER_CHART", CERT_MANAGER_CHART_VERSION
     ),
@@ -279,9 +287,11 @@ for index, policy in enumerate(cluster_policy_arns):
 # This keeps the cluster from being 'owned' by a specific person.
 cluster_creation_aws_provider = aws.Provider(
     "cluster-creation-aws-provider",
-    assume_role=aws.ProviderAssumeRoleArgs(
-        role_arn=iam_stack.require_output("eks_cluster_creator_role_arn")
-    ),
+    assume_roles=[
+        aws.ProviderAssumeRoleArgs(
+            role_arn=iam_stack.require_output("eks_cluster_creator_role_arn")
+        )
+    ],
 )
 # Actually make the cluster
 cluster = eks.Cluster(
@@ -487,6 +497,9 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
             instance_profile=node_instance_profile,
             labels=ng_config["labels"] or {},
             node_security_group=node_group_sec_group.security_group,
+            node_root_volume_size=ng_config["disk_size_gb"] or 250,
+            node_root_volume_delete_on_termination=True,
+            node_root_volume_type="gp3",
             cluster_ingress_rule=node_group_sec_group.security_group_rule,
             desired_capacity=ng_config["scaling"]["desired"] or 3,
             max_size=ng_config["scaling"]["max"] or 5,
@@ -993,18 +1006,34 @@ traefik_helm_release = kubernetes.helm.v3.Release(
         values={
             "image": {
                 "pullPolicy": "Always",
+                "registry": f"{ECR_DOCKERHUB_REGISTRY}/library",
             },
             "commonLabels": k8s_global_labels,
             "tolerations": operations_tolerations,
-            # Debug the traefik by turning off "DaemonSet"
-            # and setting "replcias": 1
             "deployment": {
-                "kind": "DaemonSet",
+                "kind": "Deployment",
                 "podLabels": {
                     # "traffic-gateway-controller-security-group": "True",
                 },
                 "additionalVolumes": [
                     {"name": "plugins"},
+                ],
+            },
+            "autoscaling": {
+                "enabled": True,
+                "minReplicas": eks_config.get_int("traefik_min_replicas") or 2,
+                "maxReplicas": eks_config.get_int("traefik_max_replicas") or 5,
+                "metrics": [
+                    {
+                        "resource": {
+                            "name": "cpu",
+                            "target": {
+                                "type": "Utilization",
+                                "averageUtilization": 50,
+                            },
+                        },
+                        "type": "Resource",
+                    }
                 ],
             },
             "additionalVolumeMounts": [
@@ -1060,6 +1089,10 @@ traefik_helm_release = kubernetes.helm.v3.Release(
                 "general": {
                     "level": "INFO",
                 },
+                "access": {
+                    "enabled": True,
+                    "format": "json",
+                },
             },
             "resources": {
                 "requests": {
@@ -1083,11 +1116,18 @@ traefik_helm_release = kubernetes.helm.v3.Release(
                 # automatically and point at every traefik pod.
                 # Ref: https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.4/guide/service/annotations/#subnets
                 "annotations": {
-                    "service.beta.kubernetes.io/aws-load-balancer-type": "nlb",
-                    "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "instance",
+                    "service.beta.kubernetes.io/aws-load-balancer-name": f"{cluster_name}-traefik"[
+                        :AWS_LOAD_BALANCER_NAME_MAX_LENGTH
+                    ],
+                    "service.beta.kubernetes.io/aws-load-balancer-type": "external",
+                    "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
+                    "service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
                     "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled": "true",
                     "service.beta.kubernetes.io/aws-load-balancer-subnets": target_vpc.apply(
                         lambda tvpc: ",".join(tvpc["k8s_public_subnet_ids"])
+                    ),
+                    "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags": ",".join(
+                        [f"{k}={v}" for k, v in aws_config.tags.items()]
                     ),
                 },
             },
@@ -1147,14 +1187,15 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                 "image": {
                     "pullPolicy": "Always",
                     # Assuming default Bitnami registry/repository is okay
-                    "registry": "610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub",
+                    "registry": ECR_DOCKERHUB_REGISTRY,
                 },
                 "global": {
                     "security": {"allowInsecureImages": True},
+                    "imageRegistry": ECR_DOCKERHUB_REGISTRY,
                 },
                 "volumePermissions": {
                     "image": {
-                        "registry": "610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub",
+                        "registry": ECR_DOCKERHUB_REGISTRY,
                     },
                 },
                 # --- Data Plane (Gateway) ---
@@ -1178,7 +1219,15 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                             "enabled": True,
                         },
                     },
-                    "useDaemonSet": True,
+                    "useDaemonSet": False,
+                    "autoscaling": {
+                        "hpa": {
+                            "enabled": True,
+                            "minReplicas": eks_config.get("apisix_min_replicas") or "3",
+                            "maxReplicas": eks_config.get("apisix_max_replicas") or "5",
+                            "targetCPU": "50",
+                        },
+                    },
                     "pdb": {
                         "create": False
                     },  # No need for pod disruption budget with daemonset
@@ -1196,19 +1245,27 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                         },
                         "nginx_config": {
                             "http": {
-                                "access_log_format": '"$time_local" client=$remote_addr '
+                                "access_log_format": 'time_local="$time_local" '
                                 "body_bytes_sent=$body_bytes_sent "
-                                "referer=$http_referer "
-                                "request_length=$request_length "
+                                "bytes_sent=$bytes_sent "
+                                "client=$remote_addr "
+                                "host=$host "
+                                "remote_addr=$remote_addr "
                                 "request_id=$request_id "
+                                "request_length=$request_length "
+                                "request_method=$request_method "
                                 "request_time=$request_time "
-                                "status=$status bytes_sent=$bytes_sent "
+                                "request_uri=$request_uri "
+                                "status=$status "
                                 "upstream_addr=$upstream_addr "
                                 "upstream_connect_time=$upstream_connect_time "
                                 "upstream_header_time=$upstream_header_time "
                                 "upstream_response_time=$upstream_response_time "
                                 "upstream_status=$upstream_status "
-                                'method=$request_method request="$request"',
+                                'http_referer="$http_referer" '
+                                'http_user_agent="$http_user_agent" '
+                                "method=$request_method "
+                                'request="$request"',
                             },
                             "http_configuration_snippet": textwrap.dedent(
                                 """\
@@ -1241,11 +1298,18 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                             "external-dns.alpha.kubernetes.io/hostname": ",".join(
                                 apisix_domains
                             ),
-                            "service.beta.kubernetes.io/aws-load-balancer-type": "nlb",
-                            "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "instance",
+                            "service.beta.kubernetes.io/aws-load-balancer-name": f"{cluster_name}-apisix"[
+                                :AWS_LOAD_BALANCER_NAME_MAX_LENGTH
+                            ],
+                            "service.beta.kubernetes.io/aws-load-balancer-type": "external",
+                            "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
+                            "service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
                             "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled": "true",
                             "service.beta.kubernetes.io/aws-load-balancer-subnets": target_vpc.apply(
                                 lambda tvpc: ",".join(tvpc["k8s_public_subnet_ids"])
+                            ),
+                            "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags": ",".join(
+                                [f"{k}={v}" for k, v in aws_config.tags.items()]
                             ),
                         },
                         # Expose HTTP/HTTPS ports for gateway traffic as per traditional mode docs
@@ -1280,7 +1344,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                         },
                         "limits": {
                             "cpu": "50m",
-                            "memory": "100Mi",
+                            "memory": "256Mi",
                         },
                     },
                     # Map controller config under extraConfig
@@ -1303,7 +1367,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                     "enabled": True,
                     "tolerations": operations_tolerations,
                     "image": {
-                        "registry": "610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub",
+                        "registry": ECR_DOCKERHUB_REGISTRY,
                     },
                     "persistence": {
                         "enabled": True,
@@ -1311,7 +1375,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                     },
                     "livenessProbe": {
                         "enabled": True,
-                        "initialDelaySeconds": 30,
+                        "initialDelaySeconds": 120,
                         "timeoutSeconds": 5,
                         "periodSeconds": 10,
                         "successThreshold": 1,
@@ -1319,7 +1383,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                     },
                     "readinessProbe": {
                         "enabled": True,
-                        "initialDelaySeconds": 30,
+                        "initialDelaySeconds": 120,
                         "timeoutSeconds": 5,
                         "periodSeconds": 10,
                         "successThreshold": 1,
@@ -1332,7 +1396,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                         },
                         "limits": {
                             "cpu": "100m",
-                            "memory": "200Mi",
+                            "memory": "300Mi",
                         },
                     },
                     # Add auth config if needed based on etcd subchart values
@@ -1366,7 +1430,7 @@ external_dns_parliament_config = {
     "UNKNOWN_FEDERATION_SOURCE": {"ignore_locations": [{"principal": "federated"}]},
     "PERMISSIONS_MANAGEMENT_ACTIONS": {"ignore_locations": []},
     "MALFORMED": {"ignore_lcoations": []},
-    "RESOURCE_STAR": {"ignore_lcoations": []},
+    "RESOURCE_STAR": {"ignore_locations": []},
 }
 external_dns_role_config = OLEKSTrustRoleConfig(
     account_id=aws_account.account_id,
@@ -1635,6 +1699,336 @@ cert_manager_release = kubernetes.helm.v3.Release(
         provider=k8s_provider,
         parent=operations_namespace,
         depends_on=[cluster, node_groups[0]],
+        delete_before_replace=True,
+    ),
+)
+
+############################################################
+# Install and configure AWS Load Balancer Controller
+############################################################
+# Ref: https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.13.4/deploy/
+# Ref: https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.13.4/docs/install/iam_policy.json
+
+aws_load_balancer_controller_policy_document = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": ["iam:CreateServiceLinkedRole"],
+            "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "iam:AWSServiceName": "elasticloadbalancing.amazonaws.com"
+                }
+            },
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ec2:DescribeAccountAttributes",
+                "ec2:DescribeAddresses",
+                "ec2:DescribeAvailabilityZones",
+                "ec2:DescribeInternetGateways",
+                "ec2:DescribeVpcs",
+                "ec2:DescribeVpcPeeringConnections",
+                "ec2:DescribeSubnets",
+                "ec2:DescribeSecurityGroups",
+                "ec2:DescribeInstances",
+                "ec2:DescribeNetworkInterfaces",
+                "ec2:DescribeTags",
+                "ec2:GetCoipPoolUsage",
+                "ec2:DescribeCoipPools",
+                "ec2:GetSecurityGroupsForVpc",
+                "ec2:DescribeIpamPools",
+                "ec2:DescribeRouteTables",
+                "elasticloadbalancing:DescribeLoadBalancers",
+                "elasticloadbalancing:DescribeLoadBalancerAttributes",
+                "elasticloadbalancing:DescribeListeners",
+                "elasticloadbalancing:DescribeListenerCertificates",
+                "elasticloadbalancing:DescribeSSLPolicies",
+                "elasticloadbalancing:DescribeRules",
+                "elasticloadbalancing:DescribeTargetGroups",
+                "elasticloadbalancing:DescribeTargetGroupAttributes",
+                "elasticloadbalancing:DescribeTargetHealth",
+                "elasticloadbalancing:DescribeTags",
+                "elasticloadbalancing:DescribeTrustStores",
+                "elasticloadbalancing:DescribeListenerAttributes",
+                "elasticloadbalancing:DescribeCapacityReservation",
+            ],
+            "Resource": "*",
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "cognito-idp:DescribeUserPoolClient",
+                "acm:ListCertificates",
+                "acm:DescribeCertificate",
+                "iam:ListServerCertificates",
+                "iam:GetServerCertificate",
+                "waf-regional:GetWebACL",
+                "waf-regional:GetWebACLForResource",
+                "waf-regional:AssociateWebACL",
+                "waf-regional:DisassociateWebACL",
+                "wafv2:GetWebACL",
+                "wafv2:GetWebACLForResource",
+                "wafv2:AssociateWebACL",
+                "wafv2:DisassociateWebACL",
+                "shield:GetSubscriptionState",
+                "shield:DescribeProtection",
+                "shield:CreateProtection",
+                "shield:DeleteProtection",
+            ],
+            "Resource": "*",
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ec2:AuthorizeSecurityGroupIngress",
+                "ec2:RevokeSecurityGroupIngress",
+            ],
+            "Resource": "*",
+        },
+        {"Effect": "Allow", "Action": ["ec2:CreateSecurityGroup"], "Resource": "*"},
+        {
+            "Effect": "Allow",
+            "Action": ["ec2:CreateTags"],
+            "Resource": "arn:aws:ec2:*:*:security-group/*",
+            "Condition": {
+                "StringEquals": {"ec2:CreateAction": "CreateSecurityGroup"},
+                "Null": {"aws:RequestTag/elbv2.k8s.aws/cluster": "false"},
+            },
+        },
+        {
+            "Effect": "Allow",
+            "Action": ["ec2:CreateTags", "ec2:DeleteTags"],
+            "Resource": "arn:aws:ec2:*:*:security-group/*",
+            "Condition": {
+                "Null": {
+                    "aws:RequestTag/elbv2.k8s.aws/cluster": "true",
+                    "aws:ResourceTag/elbv2.k8s.aws/cluster": "false",
+                }
+            },
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ec2:AuthorizeSecurityGroupIngress",
+                "ec2:RevokeSecurityGroupIngress",
+                "ec2:DeleteSecurityGroup",
+            ],
+            "Resource": "*",
+            "Condition": {"Null": {"aws:ResourceTag/elbv2.k8s.aws/cluster": "false"}},
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:CreateLoadBalancer",
+                "elasticloadbalancing:CreateTargetGroup",
+            ],
+            "Resource": "*",
+            "Condition": {"Null": {"aws:RequestTag/elbv2.k8s.aws/cluster": "false"}},
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:CreateListener",
+                "elasticloadbalancing:DeleteListener",
+                "elasticloadbalancing:CreateRule",
+                "elasticloadbalancing:DeleteRule",
+            ],
+            "Resource": "*",
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:AddTags",
+                "elasticloadbalancing:RemoveTags",
+            ],
+            "Resource": [
+                "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
+                "arn:aws:elasticloadbalancing:*:*:loadbalancer/net/*/*",
+                "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*",
+            ],
+            "Condition": {
+                "Null": {
+                    "aws:RequestTag/elbv2.k8s.aws/cluster": "true",
+                    "aws:ResourceTag/elbv2.k8s.aws/cluster": "false",
+                }
+            },
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:AddTags",
+                "elasticloadbalancing:RemoveTags",
+            ],
+            "Resource": [
+                "arn:aws:elasticloadbalancing:*:*:listener/net/*/*/*",
+                "arn:aws:elasticloadbalancing:*:*:listener/app/*/*/*",
+                "arn:aws:elasticloadbalancing:*:*:listener-rule/net/*/*/*",
+                "arn:aws:elasticloadbalancing:*:*:listener-rule/app/*/*/*",
+            ],
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:ModifyLoadBalancerAttributes",
+                "elasticloadbalancing:SetIpAddressType",
+                "elasticloadbalancing:SetSecurityGroups",
+                "elasticloadbalancing:SetSubnets",
+                "elasticloadbalancing:DeleteLoadBalancer",
+                "elasticloadbalancing:ModifyTargetGroup",
+                "elasticloadbalancing:ModifyTargetGroupAttributes",
+                "elasticloadbalancing:DeleteTargetGroup",
+                "elasticloadbalancing:ModifyListenerAttributes",
+                "elasticloadbalancing:ModifyCapacityReservation",
+                "elasticloadbalancing:ModifyIpPools",
+            ],
+            "Resource": "*",
+            "Condition": {"Null": {"aws:ResourceTag/elbv2.k8s.aws/cluster": "false"}},
+        },
+        {
+            "Effect": "Allow",
+            "Action": ["elasticloadbalancing:AddTags"],
+            "Resource": [
+                "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
+                "arn:aws:elasticloadbalancing:*:*:loadbalancer/net/*/*",
+                "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*",
+            ],
+            "Condition": {
+                "StringEquals": {
+                    "elasticloadbalancing:CreateAction": [
+                        "CreateTargetGroup",
+                        "CreateLoadBalancer",
+                    ]
+                },
+                "Null": {"aws:RequestTag/elbv2.k8s.aws/cluster": "false"},
+            },
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:RegisterTargets",
+                "elasticloadbalancing:DeregisterTargets",
+            ],
+            "Resource": "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:SetWebAcl",
+                "elasticloadbalancing:ModifyListener",
+                "elasticloadbalancing:AddListenerCertificates",
+                "elasticloadbalancing:RemoveListenerCertificates",
+                "elasticloadbalancing:ModifyRule",
+                "elasticloadbalancing:SetRulePriorities",
+            ],
+            "Resource": "*",
+        },
+    ],
+}
+
+aws_lb_controller_service_account_name = "aws-load-balancer-controller"
+
+aws_load_balancer_controller_role_config = OLEKSTrustRoleConfig(
+    account_id=aws_account.account_id,
+    cluster_name=cluster_name,
+    cluster_identities=cluster.eks_cluster.identities,
+    description="Trust role for allowing the AWS Load Balancer Controller to manage ALBs/NLBs.",
+    policy_operator="StringEquals",
+    role_name=aws_lb_controller_service_account_name,
+    service_account_identifier="system:serviceaccount:kube-system:aws-load-balancer-controller",
+    tags=aws_config.tags,
+)
+aws_load_balancer_controller_role = OLEKSTrustRole(
+    f"{cluster_name}-aws-load-balancer-controller-trust-role",
+    role_config=aws_load_balancer_controller_role_config,
+    opts=ResourceOptions(parent=cluster, depends_on=cluster),
+)
+
+aws_load_balancer_controller_service_account = kubernetes.core.v1.ServiceAccount(
+    "aws-lb-controller-service-account",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=aws_lb_controller_service_account_name,
+        namespace="kube-system",
+        labels=k8s_global_labels,
+        annotations={
+            "eks.amazonaws.com/role-arn": aws_load_balancer_controller_role.role.arn
+        },
+    ),
+    automount_service_account_token=True,
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=cluster,
+        depends_on=[
+            cluster,
+        ],
+    ),
+)
+
+aws_load_balancer_controller_policy = aws.iam.Policy(
+    f"{cluster_name}-aws-load-balancer-controller-policy",
+    name=f"{cluster_name}-aws-load-balancer-controller-policy",
+    path=f"/ol-infrastructure/eks/{cluster_name}/",
+    policy=json.dumps(
+        aws_load_balancer_controller_policy_document,
+    ),
+    opts=ResourceOptions(parent=aws_load_balancer_controller_role, depends_on=cluster),
+)
+aws.iam.RolePolicyAttachment(
+    f"{cluster_name}-aws-load-balancer-controller-attachment",
+    policy_arn=aws_load_balancer_controller_policy.arn,
+    role=aws_load_balancer_controller_role.role.id,
+    opts=ResourceOptions(parent=aws_load_balancer_controller_role),
+)
+
+aws_load_balancer_controller_release = kubernetes.helm.v3.Release(
+    f"{cluster_name}-aws-load-balancer-controller-helm-release",
+    kubernetes.helm.v3.ReleaseArgs(
+        name="aws-load-balancer-controller",
+        chart="aws-load-balancer-controller",
+        version=VERSIONS["AWS_LOAD_BALANCER_CONTROLLER_CHART"],
+        namespace="kube-system",
+        cleanup_on_fail=True,
+        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+            repo="https://aws.github.io/eks-charts",
+        ),
+        values={
+            "clusterName": cluster_name,
+            "enableCertManager": True,
+            "serviceAccount": {
+                "create": False,
+                "name": aws_lb_controller_service_account_name,
+                "annotations": {
+                    "eks.amazonaws.com/role-arn": aws_load_balancer_controller_role.role.arn,
+                },
+            },
+            "vpcId": target_vpc["id"],
+            "region": aws.get_region().name,
+            "podLabels": k8s_global_labels,
+            "tolerations": operations_tolerations,
+            "resources": {
+                "requests": {
+                    "cpu": "100m",
+                    "memory": "128Mi",
+                },
+                "limits": {
+                    "cpu": "200m",
+                    "memory": "256Mi",
+                },
+            },
+        },
+        skip_await=False,
+    ),
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=cluster,
+        depends_on=[
+            cluster,
+            node_groups[0],
+            aws_load_balancer_controller_role,
+            aws_load_balancer_controller_policy,
+        ],
         delete_before_replace=True,
     ),
 )

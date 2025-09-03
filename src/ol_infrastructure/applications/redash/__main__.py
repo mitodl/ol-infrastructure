@@ -184,7 +184,8 @@ redash_db_security_group = ec2.SecurityGroup(
     tags=aws_config.merged_tags({"Name": f"redash-db-access-{redash_environment}"}),
     vpc_id=data_vpc["id"],
 )
-
+rds_defaults = defaults(stack_info)["rds"]
+rds_defaults["use_blue_green"] = False
 redash_db_config = OLPostgresDBConfig(
     instance_name=f"redash-db-{redash_environment}",
     password=redash_config.require("db_password"),
@@ -193,7 +194,7 @@ redash_db_config = OLPostgresDBConfig(
     engine_major_version="16",
     tags=aws_config.tags,
     db_name="redash",
-    **defaults(stack_info)["rds"],
+    **rds_defaults,
 )
 redash_db = OLAmazonDB(redash_db_config)
 

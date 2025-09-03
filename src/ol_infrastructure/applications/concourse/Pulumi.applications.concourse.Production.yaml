@@ -11,7 +11,7 @@ config:
     secure: v1:MVLu2ciX/IoD8sgo:Jgmo9VuyRaTNqVBdX0vQtBmI2cMQ5dbrSJ6AWReAw9mh6BRFs4M3mWdOlLha7P2FJz1i+zyiy4z8s0/LHvYtJBDJuvDvn6OEAt58zF+F1LMyr3k3+H7/Vryg
   concourse:target_vpc: operations_vpc
   concourse:web_auto_scale:
-    desired: 5
+    desired: 6
     max: 8
     min: 3
     max_instance_lifetime_seconds: 86400
@@ -20,10 +20,10 @@ config:
   - base
   - ocw
   - operations
-  concourse:web_instance_type: general_purpose_large
+  concourse:web_instance_type: general_purpose_xlarge
   concourse:workers:
   - auto_scale:
-      desired: 5
+      desired: 6
       max: 8
       min: 3
       max_instance_lifetime_seconds: 86400
@@ -36,10 +36,10 @@ config:
     iam_policies:
     - base
     - ocw
-    instance_type: c7a.2xlarge
+    instance_type: m7a.2xlarge
     name: ocw
   - auto_scale:
-      desired: 5
+      desired: 4
       max: 10
       min: 2
       max_instance_lifetime_seconds: 86400
@@ -54,20 +54,20 @@ config:
     - infra
     - operations
     - cloud_custodian
-    instance_type: c7a.2xlarge
+    instance_type: m7a.4xlarge
     name: infra
   - auto_scale:
-      desired: 2
-      max: 3
+      desired: 4
+      max: 6
       min: 2
       max_instance_lifetime_seconds: 86400
     aws_tags:
       OU: operations
-    disk_size_gb: 100
+    disk_size_gb: 500
     iam_policies:
     - base
     - operations
-    instance_type: t3a.xlarge
+    instance_type: m7a.xlarge
     name: generic
   consul:address: https://consul-operations-production.odl.mit.edu
   vault:address: https://vault-production.odl.mit.edu

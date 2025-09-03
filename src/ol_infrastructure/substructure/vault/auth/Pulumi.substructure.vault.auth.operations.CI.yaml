@@ -3,5 +3,9 @@ secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHjEYf3gV5ZTnviCJcHwGnUuLzld5EuYumgMrRde6bvXUgHnEKoH/HHNeuyosZZH+FkpAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMZjx9+eW38YmA0QkAAgEQgDvWxPcPuoEVefEumvub2BucB8UCfgdAq6wvYx2DsnqyeKKenMfEpqlH64Mvs1+UAXVXMDLA3aagCpqwBA==
 config:
   aws:region: us-east-1
+  keycloak:client_id: ol-vault-client
+  keycloak:url: https://sso-ci.ol.mit.edu
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
+  keycloak:client_secret:
+    secure: v1:aE0wVblOwLTwq+ks:w7D5VO8dwgSMTTyfEomPR1z8sm0h8t2lbkb5XMji+40cVbkcCR3tjMxInrV2QmGH

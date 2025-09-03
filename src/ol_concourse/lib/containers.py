@@ -1,5 +1,3 @@
-from typing import Optional
-
 from ol_concourse.lib.jobs.infrastructure import Output
 from ol_concourse.lib.models.pipeline import (
     Cache,
@@ -13,8 +11,8 @@ from ol_concourse.lib.models.pipeline import (
 
 def container_build_task(
     inputs: list[Input],
-    build_parameters: Optional[dict[str, str]],
-    build_args: Optional[list[str]] = None,
+    build_parameters: dict[str, str] | None,
+    build_args: list[str] | None = None,
 ) -> TaskStep:
     return TaskStep(
         task=Identifier("build-container-image"),

@@ -1,5 +1,4 @@
 """Create the resources needed to run a airbyte server.  # noqa: D200"""
-# ruff: noqa: UP042, CPY001, D100, ERA001, D102
 
 import json
 import os
@@ -110,7 +109,7 @@ VERSIONS = {
 
 # S3 State Storage for Airbyte logs and system state
 airbyte_bucket_name = f"ol-airbyte-{stack_info.env_suffix}"
-s3.BucketV2(
+s3.Bucket(
     "airbyte-state-storage-bucket",
     bucket=airbyte_bucket_name,
     tags=aws_config.tags,
@@ -472,7 +471,7 @@ rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["instance_size"] = (
     airbyte_config.get("db_instance_size") or rds_defaults["instance_size"]
 )
-
+rds_defaults["use_blue_green"] = False
 rds_password = airbyte_config.require("rds_password")
 
 airbyte_db_config = OLPostgresDBConfig(

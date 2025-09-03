@@ -1,4 +1,4 @@
-# ruff: noqa: TD003, ERA001, FIX002, E501
+# ruff: noqa: ERA001, FIX002, E501
 
 import base64
 import json
@@ -11,6 +11,7 @@ from string import Template
 import pulumi_consul as consul
 import pulumi_fastly as fastly
 import pulumi_github as github
+import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Alias, Config, InvokeOptions, ResourceOptions, StackReference, export
 from pulumi.output import Output
@@ -140,16 +141,16 @@ cluster_stack.require_output("namespaces").apply(
 # begin legacy block - app bucket config
 #######################################################
 legacy_app_storage_bucket_name = f"ol-mitopen-app-storage-{app_env_suffix}"
-legacy_application_storage_bucket = s3.BucketV2(
+legacy_application_storage_bucket = s3.Bucket(
     f"ol_mitopen_app_storage_bucket_{stack_info.env_suffix}",
     bucket=legacy_app_storage_bucket_name,
     tags=aws_config.tags,
 )
 
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "ol-mitopen-bucket-versioning",
     bucket=legacy_application_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )
@@ -197,16 +198,16 @@ s3.BucketPolicy(
 #######################################################
 
 mitlearn_app_storage_bucket_name = f"ol-mitlearn-app-storage-{app_env_suffix}"
-mitlearn_application_storage_bucket = s3.BucketV2(
+mitlearn_application_storage_bucket = s3.Bucket(
     f"ol_mitlearn_app_storage_bucket_{stack_info.env_suffix}",
     bucket=mitlearn_app_storage_bucket_name,
     tags=aws_config.tags,
 )
 
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "ol-mitlearn-bucket-versioning",
     bucket=mitlearn_application_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )
@@ -473,7 +474,15 @@ mitlearn_db_security_group = ec2.SecurityGroup(
             # workaround to allow for data integration from the data Kubernetes
             # cluster. (TMM 2025-05-16)
             cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"].apply(
-                lambda pod_cidrs: [*pod_cidrs]
+                lambda pod_cidrs: [
+                    # Grant access from Hightouch for certificate sync
+                    "54.196.30.169/32",
+                    "52.72.201.213/32",
+                    "18.213.226.96/32",
+                    "3.224.126.197/32",
+                    "3.217.26.199/32",
+                    *pod_cidrs,
+                ]
             ),
             description="Allow access over the public internet from Heroku.",
         )
@@ -504,7 +513,7 @@ mitlearn_db_config = OLPostgresDBConfig(
     engine_major_version="15",
     tags=aws_config.tags,
     db_name="mitopen",
-    public_access=False,
+    public_access=True,
     **rds_defaults,
 )
 mitlearn_db_config.parameter_overrides.append(
@@ -922,6 +931,7 @@ env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
 env_vars = {
     "ALLOWED_HOSTS": '["*"]',
     "AWS_STORAGE_BUCKET_NAME": f"ol-mitlearn-app-storage-{env_name}",
+    "CANVAS_PDF_TRANSCRIPTION_MODEL": "gpt-4o",
     "CORS_ALLOWED_ORIGIN_REGEXES": "['^.+ocw-next.netlify.app$']",
     "CSAIL_BASE_URL": "https://cap.csail.mit.edu/",
     "CSRF_COOKIE_DOMAIN": f".{mitlearn_config.get('frontend_domain')}",
@@ -1138,135 +1148,7 @@ mit_learn_posthog_proxy = mitlearn_config.require("posthog_proxy")
 gh_repo = github.get_repository(
     full_name="mitodl/mit-learn", opts=InvokeOptions(provider=github_provider)
 )
-gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"ol_mitopen_gh_workflow_api_base_env_var-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"API_BASE_{env_var_suffix}",
-    value=f"https://{mitlearn_api_domain}/learn",
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_posthog_proxy_url_env_var = github.ActionsVariable(
-    f"ol_mitopen_gh_workflow_posthog_proxy_url_env_var-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"POSTHOG_API_HOST_{env_var_suffix}",
-    value=f"https://{mit_learn_posthog_proxy}",
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_accesskey_id_env_secret = github.ActionsSecret(
-    f"ol_mitopen_gh_workflow_accesskey_id_env_secret-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"AWS_ACCESS_KEY_ID_{env_var_suffix}",
-    plaintext_value=gh_workflow_accesskey.id,
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_secretaccesskey_env_secret = github.ActionsSecret(
-    f"ol_mitopen_gh_workflow_secretaccesskey_env_secret-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"AWS_SECRET_ACCESS_KEY_{env_var_suffix}",
-    plaintext_value=gh_workflow_accesskey.secret,
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_embedlykey_env_secret = github.ActionsSecret(
-    f"ol_mitopen_gh_workflow_embedlykey_env_secret-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"EMBEDLY_KEY_{env_var_suffix}",
-    plaintext_value=secret_operations_global_embedly.data.apply(
-        lambda data: "{}".format(data["key"])
-    ),
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_nextjs_fastly_api_key_env_secret = github.ActionsSecret(
-    f"ol_mitopen_gh_workflow_nextjs_fastly_api_key_env_secret-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"FASTLY_API_KEY_{env_var_suffix}_NEXTJS",  # pragma: allowlist secret
-    plaintext_value=mitlearn_vault_secrets["fastly"]["api_key"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_fastly_service_id_env_secret = github.ActionsSecret(
-    f"ol_mitopen_gh_workflow_fastly_service_id_env_secret-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"FASTLY_SERVICE_ID_{env_var_suffix}_NEXTJS",  # pragma: allowlist secret
-    plaintext_value=mitlearn_fastly_service.id,
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_sentry_dsn_env_secret = github.ActionsSecret(
-    f"ol_mitopen_gh_workflow_sentry_dsn_env_secret-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"SENTRY_DSN_{env_var_suffix}",
-    plaintext_value=mitlearn_vault_secrets["sentry_dsn"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-# not really secret, just easier this way
-gh_workflow_posthog_project_id_env_secret = github.ActionsSecret(
-    f"ol_mitopen_gh_workflow_posthog_project_id-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"POSTHOG_PROJECT_ID_{env_var_suffix}",
-    plaintext_value=env_vars["POSTHOG_PROJECT_ID"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_posthog_project_api_key_env_secret = github.ActionsSecret(
-    f"ol_mitopen_gh_workflow_posthog_project_api_key-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"POSTHOG_PROJECT_API_KEY_{env_var_suffix}",
-    plaintext_value=mitlearn_vault_secrets["posthog"]["project_api_key"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_environment_env_secret = github.ActionsSecret(
-    f"ol_mitopen_gh_workflow_environment_env_secret-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"MITOL_ENVIRONMENT_{env_var_suffix}",
-    plaintext_value=stack_info.env_suffix,
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_csrf_cookie_name_env_secret = github.ActionsSecret(
-    f"ol_mitopen_csrf_cookie_name-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"CSRF_COOKIE_NAME_{env_var_suffix}",
-    plaintext_value=env_vars["CSRF_COOKIE_NAME"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_appzi_url_env_secret = github.ActionsSecret(
-    f"ol_mitopen_appzi_url-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"APPZI_URL_{env_var_suffix}",
-    plaintext_value=env_vars["APPZI_URL"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_sentry_traces_sample_rate = github.ActionsSecret(
-    f"ol_mitopen_sentry_traces_sample_rate-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"SENTRY_TRACES_SAMPLE_RATE_{env_var_suffix}",
-    plaintext_value=env_vars["SENTRY_TRACES_SAMPLE_RATE"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_sentry_profiles_sample_rate = github.ActionsSecret(
-    f"ol_mitopen_sentry_profiles_sample_rate-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"SENTRY_PROFILES_SAMPLE_RATE_{env_var_suffix}",
-    plaintext_value=env_vars["SENTRY_PROFILES_SAMPLE_RATE"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_learn_ai_recommendation_endpoint_env_secret = github.ActionsSecret(
-    f"ol_mitopen_gh_workflow_learn_ai_recommendation_endpoint-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"LEARN_AI_RECOMMENDATION_ENDPOINT_{env_var_suffix}",
-    plaintext_value=f"{mitlearn_config.get('learn_ai_recommendation_endpoint')}",
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_learn_ai_syllabus_endpoint_env_secret = github.ActionsSecret(
-    f"ol_mitopen_gh_workflow_learn_ai_syllabus_endpoint-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"LEARN_AI_SYLLABUS_ENDPOINT_{env_var_suffix}",
-    plaintext_value=f"{mitlearn_config.get('learn_ai_syllabus_endpoint')}",
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_learn_api_logout_env_secret = github.ActionsSecret(
-    f"ol_mitopen_gh_workflow_mitol_api_logout_suffix-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"MITOL_API_LOGOUT_SUFFIX_{env_var_suffix}",
-    plaintext_value=env_vars["MITOL_API_LOGOUT_SUFFIX"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
+
 
 application_labels = k8s_global_labels | {
     "ol.mit.edu/application": "learn",
@@ -1297,7 +1179,6 @@ cert_manager_certificate = OLCertManagerCert(
     ),
 )
 
-# This now goes outside the conditional since we have a CI environment now.
 xpro_consul_opts = get_consul_provider(
     stack_info=stack_info,
     consul_address=f"https://consul-xpro-{stack_info.env_suffix}.odl.mit.edu",
@@ -1342,6 +1223,51 @@ consul.Keys(
     ],
     opts=mitxonline_consul_opts,
 )
+
+mitx_consul_opts = get_consul_provider(
+    stack_info=stack_info,
+    consul_address=f"https://consul-mitx-{stack_info.env_suffix}.odl.mit.edu",
+    provider_name=f"consul-provider-mitx-{stack_info.env_suffix}",
+)
+consul.Keys(
+    f"learn-api-domain-consul-key-for-mitx-openedx-{stack_info.env_suffix}",
+    keys=[
+        consul.KeysKeyArgs(
+            path="edxapp/learn-api-domain",
+            delete=False,
+            value=mitlearn_api_domain,
+        ),
+        consul.KeysKeyArgs(
+            path="edxapp/learn-frontend-domain",
+            delete=False,
+            value=learn_frontend_domain,
+        ),
+    ],
+    opts=mitx_consul_opts,
+)
+
+mitx_staging_consul_opts = get_consul_provider(
+    stack_info=stack_info,
+    consul_address=f"https://consul-mitx-staging-{stack_info.env_suffix}.odl.mit.edu",
+    provider_name=f"consul-provider-mitx-staging-{stack_info.env_suffix}",
+)
+consul.Keys(
+    f"learn-api-domain-consul-key-for-mitx-staging-openedx-{stack_info.env_suffix}",
+    keys=[
+        consul.KeysKeyArgs(
+            path="edxapp/learn-api-domain",
+            delete=False,
+            value=mitlearn_api_domain,
+        ),
+        consul.KeysKeyArgs(
+            path="edxapp/learn-frontend-domain",
+            delete=False,
+            value=learn_frontend_domain,
+        ),
+    ],
+    opts=mitx_staging_consul_opts,
+)
+
 
 # Redis / Elasticache
 # only for applications deployed in k8s
@@ -1429,6 +1355,7 @@ mitlearn_k8s_app = OLApplicationK8s(
         k8s_global_labels=k8s_global_labels,
         # Reference all Kubernetes secrets containing environment variables
         env_from_secret_names=secret_names,
+        application_min_replicas=mitlearn_config.get("min_replicas") or 2,
         application_security_group_id=mitlearn_app_security_group.id,
         application_security_group_name=mitlearn_app_security_group.name,
         application_image_repository="mitodl/mit-learn-app",
@@ -1440,10 +1367,9 @@ mitlearn_k8s_app = OLApplicationK8s(
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,  # Assuming Django app needs nginx
         import_uwsgi_config=True,  # Assuming Django app needs uwsgi
-        resource_requests={"cpu": "500m", "memory": "1600Mi"},
-        resource_limits={"cpu": "1000m", "memory": "1600Mi"},
-        init_migrations=True,  # Assuming Django app needs migrations
+        init_migrations=False,
         init_collectstatic=True,  # Assuming Django app needs collectstatic
+        pre_deploy_commands=[("migrate", ["scripts/heroku-release-phase.sh"])],
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="default",
@@ -1456,7 +1382,31 @@ mitlearn_k8s_app = OLApplicationK8s(
                 redis_password=redis_config.require("password"),
             ),
         ],
-        # Using default resource requests/limits for now
+        resource_requests={"cpu": "500m", "memory": "1800Mi"},
+        resource_limits={"cpu": "1000m", "memory": "1800Mi"},
+        hpa_scaling_metrics=[
+            kubernetes.autoscaling.v2.MetricSpecArgs(
+                type="Resource",
+                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                    name="cpu",
+                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                        type="Utilization",
+                        average_utilization=60,  # Target CPU utilization (60%)
+                    ),
+                ),
+            ),
+            # Scale up when avg usage exceeds: 1800 * 0.8 = 1440 Mi
+            kubernetes.autoscaling.v2.MetricSpecArgs(
+                type="Resource",
+                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                    name="memory",
+                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                        type="Utilization",
+                        average_utilization=80,  # Target memory utilization (80%)
+                    ),
+                ),
+            ),
+        ],
     ),
     opts=ResourceOptions(
         depends_on=[

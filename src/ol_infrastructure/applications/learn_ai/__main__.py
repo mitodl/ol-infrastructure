@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ERA001
+# ruff: noqa: E501
 import base64
 import json
 import mimetypes
@@ -143,16 +143,16 @@ ol_zone_id = dns_stack.require_output("ol")["id"]
 # Frontend storage bucket
 learn_ai_app_storage_bucket_name = f"ol-mit-learn-ai-{stack_info.env_suffix}"
 
-learn_ai_app_storage_bucket = s3.BucketV2(
+learn_ai_app_storage_bucket = s3.Bucket(
     f"learn-ai-app-storage-bucket-{stack_info.env_suffix}",
     bucket=learn_ai_app_storage_bucket_name,
     tags=aws_config.tags,
 )
 
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     f"learn-ai-app-storage-bucket-versioning-{stack_info.env_suffix}",
     bucket=learn_ai_app_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled",
     ),
 )
@@ -732,7 +732,6 @@ learn_ai_app_k8s = OLApplicationK8s(
         project_root=Path(__file__).parent,
         application_config=learn_ai_config.require_object("env_vars") or {},
         application_name="learn-ai",
-        application_replicas=3 if stack_info.env_suffix == "production" else 1,
         application_namespace=learn_ai_namespace,
         application_lb_service_name="learn-ai-webapp",
         application_lb_service_port_name="http",
@@ -748,6 +747,7 @@ learn_ai_app_k8s = OLApplicationK8s(
         application_service_account_name=learn_ai_service_account.metadata.name,
         application_image_repository="mitodl/learn-ai-app",
         application_docker_tag=LEARN_AI_DOCKER_TAG,
+        application_min_replicas=learn_ai_config.get("min_replicas") or 2,
         application_cmd_array=[
             "uvicorn",
             "main.asgi:application",
@@ -777,6 +777,29 @@ learn_ai_app_k8s = OLApplicationK8s(
                 redis_host=redis_cache.address,
                 redis_database_index="1",
                 redis_password=redis_config.require("password"),
+            ),
+        ],
+        hpa_scaling_metrics=[
+            kubernetes.autoscaling.v2.MetricSpecArgs(
+                type="Resource",
+                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                    name="cpu",
+                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                        type="Utilization",
+                        average_utilization=60,  # Target CPU utilization (60%)
+                    ),
+                ),
+            ),
+            # Scale up when avg usage exceeds: 1800 * 0.8 = 1440 Mi
+            kubernetes.autoscaling.v2.MetricSpecArgs(
+                type="Resource",
+                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                    name="memory",
+                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                        type="Utilization",
+                        average_utilization=80,  # Target memory utilization (80%)
+                    ),
+                ),
             ),
         ],
     ),
@@ -894,6 +917,24 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
     k8s_namespace=learn_ai_namespace,
     k8s_labels=k8s_global_labels,
     route_configs=[
+        # Protected route for canvas syllabus agent - requires canvas_token header
+        OLApisixRouteConfig(
+            route_name="canvas_syllabus_agent",
+            priority=20,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="key-auth",
+                    config={
+                        "header": "canvas_token",
+                    },
+                ),
+            ],
+            hosts=[learn_api_domain],
+            paths=["/ai/http/canvas_*"],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+            backend_resolve_granularity="service",
+        ),
         # Wildcard route that can use auth but doesn't require it
         OLApisixRouteConfig(
             route_name="passauth",
@@ -988,6 +1029,24 @@ learn_ai_https_apisix_route = OLApisixRoute(
     k8s_namespace=learn_ai_namespace,
     k8s_labels=k8s_global_labels,
     route_configs=[
+        # Protected route for canvas syllabus agent - requires canvas_token header
+        OLApisixRouteConfig(
+            route_name="canvas_syllabus_agent",
+            priority=20,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="key-auth",
+                    config={
+                        "header": "canvas_token",
+                    },
+                ),
+            ],
+            hosts=[learn_ai_api_domain],
+            paths=["/http/canvas_*"],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+            backend_resolve_granularity="service",
+        ),
         # Wildcard route that can use auth but doesn't require it
         OLApisixRouteConfig(
             route_name="passauth",
@@ -1082,6 +1141,29 @@ learn_ai_https_apisix_tls = kubernetes.apiextensions.CustomResource(
         "secret": {
             "name": "ol-wildcard-cert",
             "namespace": "operations",
+        },
+    },
+)
+learn_ai_https_apisix_consumer = kubernetes.apiextensions.CustomResource(
+    f"learn-ai-{stack_info.env_suffix}-https-apisix-consumer",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixConsumer",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="canvas-agent",
+        namespace=learn_ai_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        "authParameter": {
+            "keyAuth": {
+                "value": {
+                    "key": Output.secret(
+                        read_yaml_secrets(
+                            Path(f"vault/secrets.{stack_info.env_suffix}.yaml"),
+                        )["learn_ai"]["canvas_syllabus_token"]
+                    ),
+                },
+            },
         },
     },
 )
@@ -1226,6 +1308,39 @@ consul.Keys(
     opts=mitxonline_consul_opts,
 )
 
+mitx_consul_opts = get_consul_provider(
+    stack_info,
+    consul_address=f"https://consul-mitx-{stack_info.env_suffix}.odl.mit.edu",
+    provider_name=f"consul-provider-mitx-{stack_info.env_suffix}",
+)
+consul.Keys(
+    "learn-api-domain-consul-key-for-mitx-openedx",
+    keys=[
+        consul.KeysKeyArgs(
+            path="edxapp/learn-ai-frontend-domain",
+            delete=False,
+            value=learn_ai_frontend_domain,
+        )
+    ],
+    opts=mitx_consul_opts,
+)
+
+mitx_staging_consul_opts = get_consul_provider(
+    stack_info,
+    consul_address=f"https://consul-mitx-staging-{stack_info.env_suffix}.odl.mit.edu",
+    provider_name=f"consul-provider-mitx-staging-{stack_info.env_suffix}",
+)
+consul.Keys(
+    "learn-api-domain-consul-key-for-mitx-staging-openedx",
+    keys=[
+        consul.KeysKeyArgs(
+            path="edxapp/learn-ai-frontend-domain",
+            delete=False,
+            value=learn_ai_frontend_domain,
+        )
+    ],
+    opts=mitx_staging_consul_opts,
+)
 
 if stack_info.env_suffix != "ci":
     gh_workflow_posthog_project_api_key_env_secret = github.ActionsSecret(

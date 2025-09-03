@@ -109,7 +109,7 @@ vault_configuration = VaultAgentConfig(
         method=VaultAutoAuthMethod(
             type="aws",
             mount_path="auth/aws",
-            config=VaultAutoAuthAWS(role="superset-server"),
+            config=VaultAutoAuthAWS(role="superset"),
         ),
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
     ),

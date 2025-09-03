@@ -1,0 +1,17 @@
+from openedx.core.djangoapps.settings.models import RuntimeType
+from openedx.core.djangoapps.settings.utils import (
+    load_settings_from_file,
+    settings_to_django_dict,
+    validate_settings,
+)
+
+lms_settings = load_settings_from_file("/openedx/config/lms.env.yml", RuntimeType.LMS)
+
+try:
+    validate_settings(lms_settings)
+    print("Settings validation passed!")
+except ValueError as e:
+    print(f"Settings validation error: {e}")
+
+django_settings = settings_to_django_dict(lms_settings)
+globals().update(django_settings)

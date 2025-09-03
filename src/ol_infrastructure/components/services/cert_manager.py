@@ -1,6 +1,4 @@
-# ruff: noqa: E501
-
-from typing import Literal, Optional
+from typing import Literal
 
 import pulumi
 import pulumi_kubernetes as kubernetes
@@ -55,7 +53,7 @@ class OLCertManagerCert(pulumi.ComponentResource):
         self,
         name: str,
         cert_config: OLCertManagerCertConfig,
-        opts: Optional[pulumi.ResourceOptions] = None,
+        opts: pulumi.ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:infrastructure.services.cert_manager:OLCertManagerCert",

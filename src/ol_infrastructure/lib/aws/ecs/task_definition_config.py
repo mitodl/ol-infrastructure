@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pulumi import Output
 from pydantic import BaseModel, ConfigDict, PositiveInt
 
@@ -20,10 +18,10 @@ class OLFargateTaskDefinitionConfig(BaseModel):
     # - retrieving image from private ECR repository
     # - task definition is referencing sensitive data using SecretsManager and/or
     #   Parameter Store
-    execution_role_arn: Optional[Output[str]] = None
+    execution_role_arn: Output[str] | None = None
     # ARN of IAM role used for task execution role. Your code will assume this role to
     # make calls to other AWS services
-    task_execution_role_arn: Optional[Output[str]] = None
+    task_execution_role_arn: Output[str] | None = None
     # CPU allotment for task definition
     cpu: PositiveInt = PositiveInt(ONE_GIGAHERTZ / 4)
     # Memory allotment for task definition

@@ -10,7 +10,6 @@ This includes:
 """  # noqa: E501
 
 from enum import Enum
-from typing import Optional, Union
 
 import pulumi
 from pulumi_aws import rds
@@ -37,6 +36,7 @@ from ol_infrastructure.lib.aws.rds_helper import (
     get_rds_instance,
     max_minor_version,
     parameter_group_family,
+    turn_off_deletion_protection,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 
@@ -57,7 +57,7 @@ class OLReplicaDBConfig(BaseModel):
     instance_size: str = DBInstanceTypes.medium
     storage_type: StorageType = StorageType.ssd
     public_access: bool = False
-    security_groups: Optional[list[SecurityGroup]] = None
+    security_groups: list[SecurityGroup] | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -65,28 +65,30 @@ class OLDBConfig(AWSBase):
     """Configuration object for defining the interface to create an RDS instance with sane defaults."""  # noqa: E501
 
     engine: str
-    engine_full_version: Optional[str] = None
-    engine_major_version: Optional[str | int] = None
-    instance_name: str  # The name of the RDS instance
-    password: SecretStr
-    parameter_overrides: list[dict[str, Union[str, bool, int, float]]]
-    port: PositiveInt
-    subnet_group_name: Union[str, pulumi.Output[str]]
-    security_groups: list[SecurityGroup]
+    engine_full_version: str | None = None
+    engine_major_version: str | int | None = None
     backup_days: conint(ge=0, le=MAX_BACKUP_DAYS, strict=True) = 30  # type: ignore  # noqa: PGH003
-    db_name: Optional[str] = None  # The name of the database schema to create
+    db_name: str | None = None  # The name of the database schema to create
+    instance_name: str  # The name of the RDS instance
     instance_size: str = DBInstanceTypes.general_purpose_large.value
     # Set to allow for storage autoscaling. Default to 1 TB
-    max_storage: Optional[PositiveInt] = 1000
+    max_storage: PositiveInt | None = 1000
+    monitoring_profile_name: str
     multi_az: bool = True
+    parameter_overrides: list[dict[str, str | bool | int | float]]
+    password: SecretStr
+    port: PositiveInt
     prevent_delete: bool = True
     public_access: bool = False
-    take_final_snapshot: bool = True
+    read_replica: OLReplicaDBConfig | None = None
+    security_groups: list[SecurityGroup]
     storage: PositiveInt = PositiveInt(50)
     storage_type: StorageType = StorageType.ssd
-    username: str = "oldevops"
-    read_replica: Optional[OLReplicaDBConfig] = None
-    monitoring_profile_name: str
+    subnet_group_name: str | pulumi.Output[str]
+    take_final_snapshot: bool = True
+    use_blue_green: bool = False
+    blue_green_timeout_minutes: PositiveInt = PositiveInt(60 * 8)
+    username: str = "oldevops"  # The name of the admin user for the instance
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("engine")
@@ -151,13 +153,16 @@ class OLPostgresDBConfig(OLDBConfig):
     """Configuration container to specify settings specific to Postgres."""
 
     engine: str = "postgres"
-    engine_major_version: str | int = "16"
+    engine_major_version: str | int = "17"
     port: PositiveInt = PositiveInt(5432)
-    parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [  # noqa: RUF012
-        {"name": "client_encoding", "value": "UTF-8"},
-        {"name": "timezone", "value": "UTC"},
-        {"name": "rds.force_ssl", "value": 1},
+    parameter_overrides: list[dict[str, str | bool | int | float]] = [  # noqa: RUF012
         {"name": "autovacuum", "value": 1},
+        {"name": "client_encoding", "value": "UTF-8"},
+        {"name": "rds.force_ssl", "value": 1},
+        # TMM 2025-08-20: This should be true, but will require manual intervention
+        # across our fleet of instances to get configured.
+        # {"name": "rds.logical_replication", "value": 1},  # noqa: ERA001
+        {"name": "timezone", "value": "UTC"},
     ]
 
 
@@ -167,7 +172,7 @@ class OLMariaDBConfig(OLDBConfig):
     engine: str = "mariadb"
     engine_major_version: str | int = "11.4"
     port: PositiveInt = PositiveInt(3306)
-    parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [  # noqa: RUF012
+    parameter_overrides: list[dict[str, str | bool | int | float]] = [  # noqa: RUF012
         {"name": "character_set_client", "value": "utf8mb4"},
         {"name": "character_set_connection", "value": "utf8mb4"},
         {"name": "character_set_database", "value": "utf8mb4"},
@@ -184,7 +189,7 @@ class OLAmazonDB(pulumi.ComponentResource):
     """Component to create an RDS instance with sane defaults and manage associated resources."""  # noqa: E501
 
     def __init__(
-        self, db_config: OLDBConfig, opts: Optional[pulumi.ResourceOptions] = None
+        self, db_config: OLDBConfig, opts: pulumi.ResourceOptions | None = None
     ):
         """Create an RDS instance, parameter group, and optionally read replica.
 
@@ -213,8 +218,56 @@ class OLAmazonDB(pulumi.ComponentResource):
         primary_parameter_group_family = replica_parameter_group_family = (
             parameter_group_family(db_config.engine, db_config.engine_version)
         )
+        current_db_state = get_rds_instance(db_config.instance_name)
+        deletion_protection_for_primary = db_config.prevent_delete
+
+        # There are a handful of cases that will trigger a blue/green update when that
+        # is enabled. Those include:
+        # - DB Engine Version: Upgrading or downgrading the major or minor version of
+        #   your database engine (e.g., changing from PostgreSQL 14 to 15).
+        # - DB Instance Class: Modifying the compute and memory capacity of your
+        #   instance.
+        # - Storage Configuration: Changing the allocated storage size or storage type
+        #   (e.g., from gp2 to gp3).
+        # - DB Parameter Group: Applying changes to database parameters that require a
+        #   restart or are not dynamically applied.
+        # - Option Group: Modifying options associated with your database instance.
+        # - Multi-AZ Configuration: Enabling or disabling Multi-AZ for your instance.
+
+        # If the current state of the database differs from the configured values for
+        # those attributes it will result in starting a blue/green update. In those
+        # cases the deletion protection should be disabled, as this will prevent the
+        # blue/green deployment from being cleaned up by Pulumi when it is complete. The
+        # ResourceOptions will also need to be updated to increase the timeouts to allow
+        # for successful completion of the blue/green update process. Currently it is
+        # timing out at 1 hour, so we should likely allow for up to at least 3 hours
+        # before timing out, with a configurable parameter for the maximum timeout.
+        if (
+            db_config.use_blue_green
+            and current_db_state
+            and any(
+                (
+                    db_config.engine_version != current_db_state.get("EngineVersion"),
+                    db_config.multi_az != current_db_state.get("MultiAZ"),
+                    db_config.storage_type != current_db_state.get("StorageType"),
+                    db_config.instance_size != current_db_state.get("DBInstanceClass"),
+                )
+            )
+        ):
+            db_instance_identifier = current_db_state.get("DBInstanceIdentifier")
+            turn_off_deletion_protection(db_instance_identifier)
+            deletion_protection_for_primary = False
+            custom_timeouts = pulumi.CustomTimeouts(
+                create=f"{db_config.blue_green_timeout_minutes}m",
+                update=f"{db_config.blue_green_timeout_minutes}m",
+                delete=f"{db_config.blue_green_timeout_minutes}m",
+            )
+            resource_options = pulumi.ResourceOptions.merge(
+                resource_options,
+                pulumi.ResourceOptions(custom_timeouts=custom_timeouts),
+            )
+
         if db_config.read_replica:
-            current_db_state = get_rds_instance(db_config.instance_name)
             replica_identifier = f"{db_config.instance_name}-replica"
             current_replica_state = get_rds_instance(replica_identifier)
             if (
@@ -227,6 +280,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 )
                 and engine_major_version(db_config.engine_version)
                 == engine_major_version(current_db_state["EngineVersion"])
+                and not db_config.use_blue_green
             ):
                 # Keep the primary engine version pinned while the replica is upgraded
                 # first.
@@ -259,10 +313,11 @@ class OLAmazonDB(pulumi.ComponentResource):
             auto_minor_version_upgrade=True,
             apply_immediately=True,
             backup_retention_period=db_config.backup_days,
+            blue_green_update={"enabled": db_config.use_blue_green},
             copy_tags_to_snapshot=True,
             db_name=db_config.db_name,
             db_subnet_group_name=db_config.subnet_group_name,
-            deletion_protection=db_config.prevent_delete,
+            deletion_protection=deletion_protection_for_primary,
             engine=db_config.engine,
             engine_version=primary_engine_version,
             final_snapshot_identifier=(

@@ -1,3 +1,5 @@
+import django
+django.setup()
 from django.core import management
 
 from random import uniform

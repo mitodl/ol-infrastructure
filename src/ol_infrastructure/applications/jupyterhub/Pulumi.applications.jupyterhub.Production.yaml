@@ -1,0 +1,15 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAFxDPPQSGV7W2R/+sXnmfHVAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMH8ttUgQyw0c2jKKnAgEQgDsap8dcG9f+5SDTKTMMHaT2ZVqznzxEnjQq61lmxbHagVc0EhSxfeEZT7QFAl+A///dolj/K5RqBIr0Jg==
+config:
+  binderhub:domain: "binder.learn.mit.edu"
+  jupyterhub:target_vpc: "applications_vpc"
+  jupyterhub:business_unit: "mit-learn"
+  jupyterhub:domain: nb.learn.mit.edu
+  jupyterhub:admin_users:
+  - "admin"
+  aws:region: us-east-1
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production
+  jupyterhub:shared_password:
+    secure: v1:utJI/U+DtdYl9Jwt:GWCMQMGxYW8eUPD4DLvyX+JmPfxkAFuwT/lzNmG9+ylC8lmzu2Fvs8L0wPIdHJ+gT373Afzg8j3TjYJZQXmX4GEzaMYL6SC88NrCvnK3cPs=

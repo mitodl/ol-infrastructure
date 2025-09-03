@@ -7,25 +7,32 @@ config:
   consul:http_auth:
     secure: v1:RNlPmxc0q/5pq3c8:pXsI73JRWV2rdfxwCJGDunjn6a3qOEmhJzSJ+Y0sIRe3DyRYcAGIkwtlCdkeS1+pY8YFsZlSSUJbzKC03ZwZXkSwcOqsnEcIjTkJ4xLCfHYQx0eXF9SvWXshLMHpDRK1yQ==
   consul:scheme: https
-  heroku:app_id:
-    secure: v1:pR0Rve/LoKSnrjSl:KTPyUma7Q6HO2ZEv/n7cqwwBtjXviC+xTEL2EYAGIxZ/72itycpuOKhemhvfpb83E0/O5w==
   mitxonline:db_password:
     secure: v1:1SGxkH66kKNXMVc0:P9FztYdyzfxIrapGHU3pD5gz9ZkW6Of/zTqhaZf4O+L+Y8yAbcissYxogKfyDMxSJYSSUxI12K0=
   mitxonline:domain: "api.mitxonline.mit.edu"
   mitxonline:k8s_deploy: "true"
+  mitxonline:learn_backend_domain: "api.learn.mit.edu"
   mitxonline:vars:
     AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-production"
+    CORS_ALLOWED_ORIGINS: "https://mitxonline.mit.edu,https://learn.mit.edu"
+    CSRF_TRUSTED_ORIGINS: "https://mitxonline.mit.edu,https://learn.mit.edu"
+    CSRF_COOKIE_DOMAIN: "mitxonline.mit.edu"
+    CSRF_COOKIE_NAME: csrf_mitxonline
     CRON_COURSE_CERTIFICATES_HOURS: "18"
-    CRON_PROCESS_REFUND_REQUESTS_MINUTES": "*/5"
+    CRON_PROCESS_REFUND_REQUESTS_MINUTES: "*/5"
+    DISABLE_USER_REPAIR_TASK: "true"
     FEATURE_ENABLE_ADDL_PROFILE_FIELDS: "true"
     FEATURE_ENABLE_UPGRADE_DIALOG: "true"
     GA_TRACKING_ID: "UA-5145472-48"
     GTM_TRACKING_ID: "GTM-M47BLXN"
+    KEYCLOAK_BASE_URL: "https://sso.ol.mit.edu"
+    KEYCLOAK_CLIENT_ID: "ol-mitxonline-client"
+    KEYCLOAK_REALM_NAME: "olapps"
     HUBSPOT_MAX_CONCURRENT_TASKS: "2"
     LOGOUT_REDIRECT_URL: "https://courses.mitxonline.mit.edu/logout"
     MAILGUN_FROM_EMAIL: "MITx Online <no-reply@mail.mitxonline.mit.edu>"
     MAILGUN_SENDER_DOMAIN: "mail.mitxonline.mit.edu"
-    MITOL_APIGATEWAY_DISABLE_MIDDLEWARE: "true"
+    MITOL_APIGATEWAY_DISABLE_MIDDLEWARE: "false"
     MITOL_GOOGLE_SHEETS_DEFERRALS_REQUEST_WORKSHEET_ID: "268521316"
     MITOL_GOOGLE_SHEETS_PROCESSOR_APP_NAME: "MITx Online (production)"
     MITOL_GOOGLE_SHEETS_PROCESS_ONLY_LAST_ROWS_NUM: "30"
@@ -41,17 +48,22 @@ config:
     MITX_ONLINE_LOG_LEVEL: "INFO"
     MITX_ONLINE_SECURE_SSL_HOST: "mitxonline.mit.edu"
     OPENEDX_API_BASE_URL: "https://courses.mitxonline.mit.edu"
+    OPENEDX_COURSE_BASE_URL: "https://courses.mitxonline.mit.edu/learn/course/"
     OPENEDX_OAUTH_PROVIDER: "ol-oauth2"
     OPENEDX_SOCIAL_LOGIN_PATH: "/auth/login/ol-oauth2/?auth_entry=login"
+    OPENEDX_STUDIO_API_BASE_URL: "https://studio.mitxonline.mit.edu"
     OPENTELEMETRY_ENABLED: "true"
-    OPENTELEMETRY_ENDPOINT: "http://grafana-alloy.operations.svc.cluster.local:4318"
+    OPENTELEMETRY_ENDPOINT: "http://grafana-alloy.operations.svc.cluster.local:4318/v1/traces"
     SENTRY_LOG_LEVEL: "ERROR"
-    SENTRY_PROFILES_SAMPLE_RATE: "1.0"
-    SENTRY_TRACES_SAMPLE_RATE: "1.0"
+    SENTRY_PROFILES_SAMPLE_RATE: "0.25"
+    SENTRY_TRACES_SAMPLE_RATE: "0.25"
     SESSION_COOKIE_NAME: "session_mitxonline"
     UWSGI_ENABLE_THREADS: "1"
     UWSGI_THREADS: "25"
+    MIT_LEARN_FROM_EMAIL: "MIT Learn <mitlearn-support@mit.edu>"
+    MIT_LEARN_DASHBOARD_URL: "https://learn.mit.edu/dashboard"
   redis:password:
     secure: v1:yvRUeBECxXQn0EuQ:CzfHq2P7kQGgULkRI7EFThTAnZyxq4uLvCTAdCYWpgvKl6Hwir6Gfk6UgU//ceOEKXrLVw6mRf34oWU=
+  redis:instance_type: cache.r7g.2xlarge
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

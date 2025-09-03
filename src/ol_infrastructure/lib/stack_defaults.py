@@ -2,6 +2,7 @@ from typing import Any
 
 from ol_infrastructure.components.aws.database import OLReplicaDBConfig
 from ol_infrastructure.lib.aws.cache_helper import CacheInstanceTypes
+from ol_infrastructure.lib.aws.opensearch_helper import SearchInstanceTypes
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
@@ -13,6 +14,10 @@ production_defaults = {
         "monitoring_profile_name": "production",
     },
     "redis": {"instance_type": CacheInstanceTypes.high_mem_large},
+    "opensearch": {
+        "instance_type": SearchInstanceTypes.high_mem_regular.value,
+        "instance_count": 3,
+    },
 }
 
 qa_defaults = {
@@ -25,6 +30,10 @@ qa_defaults = {
         "monitoring_profile_name": "qa",
     },
     "redis": {"instance_type": CacheInstanceTypes.small},
+    "opensearch": {
+        "instance_type": SearchInstanceTypes.medium.value,
+        "instance_count": 3,
+    },
 }
 
 ci_defaults = {
@@ -37,6 +46,10 @@ ci_defaults = {
         "monitoring_profile_name": "ci",
     },
     "redis": {"instance_type": CacheInstanceTypes.small},
+    "opensearch": {
+        "instance_type": SearchInstanceTypes.medium.value,
+        "instance_count": 3,
+    },
 }
 
 

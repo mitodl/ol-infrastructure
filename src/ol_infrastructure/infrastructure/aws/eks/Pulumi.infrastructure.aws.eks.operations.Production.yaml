@@ -9,6 +9,8 @@ config:
   - "odl.mit.edu"
   - ".ol.mit.edu"
   - "ol.mit.edu"
+  eks:apisix_min_replicas: "3"
+  eks:apisix_max_replicas: "10"
   eks:ebs_csi_provisioner: true
   eks:efs_csi_provisioner: true
   eks:gateway_release_channel: "experimental"
@@ -21,6 +23,7 @@ config:
       labels:
         ondemand: true
         node_size: r7a.xlarge
+        ol.mit.edu/core_node: true
       disk_size_gb: 500
       scaling:
         desired: 3
@@ -30,3 +33,5 @@ config:
       tags: {}
       taints: {}
       node_group_options: {}
+  eks:traefik_min_replicas: 5
+  eks:traefik_max_replicas: 10

@@ -109,6 +109,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
         name=Identifier("ol-spi"),
         owner="mitodl",
         repository="ol-keycloak",
+        check_frequency="1h",
     )
 
     ol_keycloakify = github_release(

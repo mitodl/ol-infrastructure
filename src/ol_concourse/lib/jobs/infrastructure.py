@@ -1,7 +1,8 @@
+"""Concourse pipeline jobs for infrastructure provisioning and management."""
+
 from collections.abc import Iterable
 from copy import deepcopy
 from pathlib import Path
-from typing import Optional, Union
 
 from bridge.settings.github.team_members import DEVOPS_MIT
 from ol_concourse.lib.constants import REGISTRY_IMAGE
@@ -36,10 +37,10 @@ def packer_jobs(  # noqa: PLR0913
     dependencies: list[GetStep],
     image_code: Resource,
     packer_template_path: str = "src/bilder/images/.",
-    node_types: Optional[Iterable[str]] = None,
-    packer_vars: Optional[dict[str, str]] = None,
-    env_vars_from_files: Optional[dict[str, str]] = None,
-    extra_packer_params: Optional[dict[str, str]] = None,
+    node_types: Iterable[str] | None = None,
+    packer_vars: dict[str, str] | None = None,
+    env_vars_from_files: dict[str, str] | None = None,
+    extra_packer_params: dict[str, str] | None = None,
     job_name_suffix: str = "",
 ) -> PipelineFragment:
     """Generate a pipeline fragment for building EC2 AMIs with Packer.
@@ -146,15 +147,13 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901, PLR0912
     project_name: str,
     project_source_path: Path,
     enable_github_issue_resource: bool = True,  # noqa: FBT001, FBT002
-    custom_dependencies: Optional[dict[int, list[GetStep]]] = None,
-    dependencies: Optional[list[GetStep]] = None,
-    additional_post_steps: Optional[
-        dict[int, list[Union[GetStep, PutStep, TaskStep]]]
-    ] = None,
-    github_issue_assignees: Optional[list[str]] = None,
-    github_issue_labels: Optional[list[str]] = None,
-    github_issue_repository: Optional[str] = None,
-    additional_env_vars: Optional[dict[str, str]] = None,
+    custom_dependencies: dict[int, list[GetStep]] | None = None,
+    dependencies: list[GetStep] | None = None,
+    additional_post_steps: dict[int, list[GetStep | PutStep | TaskStep]] | None = None,
+    github_issue_assignees: list[str] | None = None,
+    github_issue_labels: list[str] | None = None,
+    github_issue_repository: str | None = None,
+    additional_env_vars: dict[str, str] | None = None,
 ) -> PipelineFragment:
     """Create a chained sequence of jobs for running Pulumi tasks.
 
@@ -190,6 +189,7 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901, PLR0912
                 "deployed.",
                 issue_prefix=f"[bot] Pulumi {project_name} {stack_name} deployed.",
                 issue_state="closed",
+                poll_frequency="15m",
             )
 
         if enable_github_issue_resource:
@@ -197,8 +197,10 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901, PLR0912
                 auth_method="token",
                 name=Identifier(f"github-issues-{stack_name.lower()}-post"),
                 repository=github_issue_repository or GH_ISSUES_DEFAULT_REPOSITORY,
-                issue_title_template=f"[bot] Pulumi {project_name} {stack_name} deployed.",  # noqa: E501
-                issue_prefix=f"[bot] Pulumi {project_name} {stack_name} deployed.",
+                issue_title_template=(
+                    f"[bot] Pulumi {project_name} {stack_name} deployed."
+                ),
+                issue_prefix=(f"[bot] Pulumi {project_name} {stack_name} deployed."),
                 issue_state="open",
             )
 
@@ -292,10 +294,10 @@ def pulumi_job(  # noqa: PLR0913
     stack_name: str,
     project_name: str,
     project_source_path: Path,
-    dependencies: Optional[list[GetStep]] = None,
-    additional_post_steps: Optional[list[Union[GetStep, PutStep, TaskStep]]] = None,
-    previous_job: Optional[Job] = None,
-    additional_env_vars: Optional[dict[str, str]] = None,
+    dependencies: list[GetStep] | None = None,
+    additional_post_steps: list[GetStep | PutStep | TaskStep] | None = None,
+    previous_job: Job | None = None,
+    additional_env_vars: dict[str, str] | None = None,
 ) -> PipelineFragment:
     """Create a job definition for running a Pulumi task.
 
@@ -343,7 +345,10 @@ def pulumi_job(  # noqa: PLR0913
                     inputs=[Input(name=pulumi_code.name)],
                     outputs=[aws_creds_path],
                     run=Command(
-                        path=f"{pulumi_code.name}/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh"
+                        path=(
+                            f"{pulumi_code.name}/pipelines/infrastructure/scripts/"
+                            "generate_aws_config_from_instance_profile.sh"
+                        )
                     ),
                 ),
             ),

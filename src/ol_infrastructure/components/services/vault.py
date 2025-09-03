@@ -12,12 +12,12 @@ import json
 import textwrap
 from enum import Enum
 from string import Template
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal
 
 import pulumi_kubernetes as kubernetes
 from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_aws.acmpca import Certificate, CertificateValidityArgs
-from pulumi_vault import Mount, aws, database, pkisecret
+from pulumi_vault import Mount, aws, database, generic, pkisecret
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from bridge.lib.magic_numbers import (
@@ -68,10 +68,10 @@ class OLVaultDatabaseConfig(BaseModel):
     db_admin_username: str
     db_admin_password: str
     verify_connection: bool = True
-    db_host: Union[str, Output[str]]
+    db_host: str | Output[str]
     max_ttl: int = ONE_MONTH_SECONDS * 6
     default_ttl: int = ONE_MONTH_SECONDS * 3
-    connection_options: Optional[dict[str, str]] = None
+    connection_options: dict[str, str] | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -114,8 +114,8 @@ class OLVaultDatabaseBackend(ComponentResource):
 
     def __init__(
         self,
-        db_config: Union[OLVaultMysqlDatabaseConfig, OLVaultPostgresDatabaseConfig],
-        opts: Optional[ResourceOptions] = None,
+        db_config: OLVaultMysqlDatabaseConfig | OLVaultPostgresDatabaseConfig,
+        opts: ResourceOptions | None = None,
     ):
         super().__init__(
             f"ol:services:Vault:DatabaseBackend:{db_config.db_type}",
@@ -206,9 +206,9 @@ class OLVaultDatabaseBackend(ComponentResource):
 
     def format_connection_string(
         self, db_config: OLVaultDatabaseConfig
-    ) -> Union[Output[str], str]:
+    ) -> Output[str] | str:
         if isinstance(db_config.db_host, Output):
-            connection_url: Union[str, Output[str]] = db_config.db_host.apply(
+            connection_url: str | Output[str] = db_config.db_host.apply(
                 lambda host: db_config.db_connection.format_map(
                     {
                         "db_port": db_config.db_port,
@@ -253,7 +253,7 @@ class OLVaultAWSSecretsEngine(ComponentResource):
     def __init__(
         self,
         engine_config: OLVaultAWSSecretsEngineConfig,
-        opts: Optional[ResourceOptions] = None,
+        opts: ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:services:Vault:AWSSecretsEngine", engine_config.app_name, None, opts
@@ -307,7 +307,7 @@ class OLVaultPKIIntermediateCABackend(ComponentResource):
     def __init__(
         self,
         backend_config: OLVaultPKIIntermediateCABackendConfig,
-        opts: Optional[ResourceOptions] = None,
+        opts: ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:services:Vault:PKI:IntermediateCABackend",
@@ -424,7 +424,7 @@ class OLVaultPKIIntermediateEnvBackend(ComponentResource):
     def __init__(
         self,
         backend_config: OLVaultPKIIntermediateEnvBackendConfig,
-        opts: Optional[ResourceOptions] = None,
+        opts: ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:services:Vault:PKI:IntermediateEnvBackendConfig",
@@ -575,7 +575,7 @@ class OLVaultPKIIntermediateRole(ComponentResource):
     def __init__(
         self,
         role_config: OLVaultPKIIntermediateRoleConfig,
-        opts: Optional[ResourceOptions] = None,
+        opts: ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:services:Vault:PKI:IntermediateRoleConfig",
@@ -622,10 +622,10 @@ class OLVaultPKIIntermediateRole(ComponentResource):
 # TODO: @Ardiea expand to include support for transformationRefs  # noqa: FIX002, TD002
 # https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
 class OLVaultK8SSecretConfig(BaseModel):
-    annotations: Optional[dict[str, str]] = None
-    dest_secret_annotations: Optional[dict[str, str]] = None
+    annotations: dict[str, str] | None = None
+    dest_secret_annotations: dict[str, str] | None = None
     dest_secret_create: bool = True
-    dest_secret_labels: Optional[dict[str, str]] = None
+    dest_secret_labels: dict[str, str] | None = None
     dest_secret_name: str
     dest_secret_overwrite: bool = True
     # Ref: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
@@ -635,23 +635,21 @@ class OLVaultK8SSecretConfig(BaseModel):
         "kubernetes.io/ssh-auth",
         "kubernetes.io/basic-auth",
     ] = "Opaque"  # noqa: S105
-    exclude_raw: Optional[bool] = True
-    excludes: Optional[list[str]] = [".*"]
-    includes: Optional[list[str]] = []
+    exclude_raw: bool | None = True
+    excludes: list[str] | None = [".*"]
+    includes: list[str] | None = []
     kind: str
-    labels: Optional[dict[str, str]] = None
+    labels: dict[str, str] | None = None
     mount: str | Output[str]
-    mount_type: Optional[Literal["kv-v1", "kv-v2"]] = None
+    mount_type: Literal["kv-v1", "kv-v2"] | None = None
     name: str
-    refresh_after: Optional[str] = None
+    refresh_after: str | None = None
     # TODO: @Ardiea Add support for multiple restart targets  # noqa: FIX002, TD002
-    restart_target_kind: Optional[Literal["Deployment", "DaemonSet", "StatefulSet"]] = (
-        None
-    )
-    restart_target_name: Optional[str] = None
+    restart_target_kind: Literal["Deployment", "DaemonSet", "StatefulSet"] | None = None
+    restart_target_name: str | None = None
     namespace: str
     path: str
-    templates: Optional[dict[str, Union[str, Output[str]]]] = None
+    templates: dict[str, str | Output[str]] | None = None
     vaultauth: str
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -667,8 +665,9 @@ class OLVaultK8SSecretConfig(BaseModel):
 
 class OLVaultK8SStaticSecretConfig(OLVaultK8SSecretConfig):
     kind: str = "VaultStaticSecret"
-    refresh_after: Optional[str] = "1h"
+    refresh_after: str | None = "1h"
     mount_type: Literal["kv-v1", "kv-v2"] = "kv-v2"
+    contents: dict[str, Any] | None = None
 
     @field_validator("kind")
     @classmethod
@@ -696,7 +695,7 @@ class OLVaultK8SSecret(ComponentResource):
         self,
         name: str,
         resource_config: OLVaultK8SSecretConfig,
-        opts: Optional[ResourceOptions] = None,
+        opts: ResourceOptions | None = None,
     ):
         super().__init__(
             f"ol:services:Vault:K8S:{resource_config.kind}",
@@ -750,9 +749,18 @@ class OLVaultK8SSecret(ComponentResource):
                 transformation_block["templates"][name] = {"text": str(text)}
             secret_def["spec"]["destination"]["transformation"] = transformation_block
 
-        if resource_config.kind == "VaultStaticSecret":
+        if isinstance(resource_config, OLVaultK8SStaticSecretConfig):
             secret_def["spec"]["type"] = str(resource_config.mount_type)
             secret_def["spec"]["refreshAfter"] = resource_config.refresh_after
+            if resource_config.contents:
+                generic.Secret(
+                    f"{resource_config.name}-vault-static-secret",
+                    opts=resource_opts,
+                    data_json=json.dumps(resource_config.contents),
+                    path=Output.from_input(resource_config.mount).apply(
+                        lambda mount: f"{mount}/{resource_config.path}"
+                    ),
+                )
 
         self.vault_secret_resource = kubernetes.yaml.v2.ConfigGroup(
             f"OLVaultK8SSecret-{resource_config.namespace}-{resource_config.name}",
@@ -762,13 +770,13 @@ class OLVaultK8SSecret(ComponentResource):
 
 
 class OLVaultK8SResourcesConfig(BaseModel):
-    annotations: Optional[dict[str, str]] = None
+    annotations: dict[str, str] | None = None
     application_name: str
-    labels: Optional[dict[str, str]] = None
+    labels: dict[str, str] | None = None
     namespace: str
     vault_address: str
-    vault_auth_endpoint: Union[str, Output[str]]
-    vault_auth_role_name: Union[str, Output[str]]
+    vault_auth_endpoint: str | Output[str]
+    vault_auth_role_name: str | Output[str]
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -780,7 +788,7 @@ class OLVaultK8SResources(ComponentResource):
     def __init__(
         self,
         resource_config: OLVaultK8SResourcesConfig,
-        opts: Optional[ResourceOptions] = None,
+        opts: ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:services:Vault:K8S:ResourcesConfig",

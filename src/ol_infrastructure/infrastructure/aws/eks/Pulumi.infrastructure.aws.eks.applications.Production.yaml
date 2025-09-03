@@ -20,7 +20,11 @@ config:
   - "api-pay.ol.mit.edu"
   - "api-learn-ai.ol.mit.edu"
   - "api.learn.mit.edu"
+  - "nb.learn.mit.edu"
+  - "binder.learn.mit.edu"
   - "api.mitxonline.mit.edu"
+  eks:apisix_min_replicas: "5"
+  eks:apisix_max_replicas: "10"
   eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
   eks:developer_role_kubernetes_groups: ["admin"]
   eks:developer_role_scope: "cluster"
@@ -28,12 +32,15 @@ config:
   eks:efs_csi_provisioner: "true"
   eks:gateway_release_channel: "experimental"
   eks:namespaces:
+  - "botkube"
   - "ecommerce"
+  - "jupyter"
   - "learn-ai"
   - "mitlearn"
   - "mitxonline"
+  - "mitxonline-openedx"
   - "odl-video-service"
-  - "botkube"
+  - "xpro-openedx"
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 1000
@@ -41,6 +48,7 @@ config:
       labels:
         node_size: r7a.xlarge
         ondemand: true
+        ol.mit.edu/core_node: true
       node_group_options: {}
       scaling:
         desired: 4
@@ -49,5 +57,7 @@ config:
       tags: {}
       taints: {}
       version:
+  eks:traefik_min_replicas: 5
+  eks:traefik_max_replicas: 10
   environment:business_unit: operations
   environment:target_vpc: applications_vpc

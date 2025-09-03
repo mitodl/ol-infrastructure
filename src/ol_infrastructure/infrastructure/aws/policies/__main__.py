@@ -76,7 +76,7 @@ odl_zone_route53_policy = iam.Policy(
     description="Grant permissions to create Route53 records in the odl zone",
 )
 
-app_route53_zones = ["mitx", "mitxonline", "xpro", "ocw", "ol"]
+app_route53_zones = ["mitx", "mitxonline", "xpro", "ocw", "ol", "learn"]
 app_route53_policies = {}
 for zone in app_route53_zones:
     zone_id = dns_stack.require_output(zone)["id"]

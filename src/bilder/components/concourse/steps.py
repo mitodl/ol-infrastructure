@@ -1,7 +1,6 @@
 import logging
 import tempfile
 from pathlib import Path
-from typing import Union
 
 import httpx
 from pyinfra import host
@@ -195,7 +194,7 @@ def _install_resource_types(concourse_config: ConcourseWorkerConfig):
 
 @deploy("Configure Concourse")
 def configure_concourse(
-    concourse_config: Union[ConcourseWebConfig, ConcourseWorkerConfig],
+    concourse_config: ConcourseWebConfig | ConcourseWorkerConfig,
 ):
     concourse_env_file = files.template(
         name="Create Concourse environment file",
@@ -228,7 +227,7 @@ def configure_concourse(
 
 @deploy("Register and enable Concourse service")
 def register_concourse_service(
-    concourse_config: Union[ConcourseWebConfig, ConcourseWorkerConfig],
+    concourse_config: ConcourseWebConfig | ConcourseWorkerConfig,
     restart=False,  # noqa: FBT002
 ):
     # Create Systemd unit to manage Concourse service

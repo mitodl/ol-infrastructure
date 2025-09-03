@@ -1,4 +1,4 @@
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal
 
 from ol_concourse.lib.models.pipeline import Duration, Identifier, Resource
 from ol_concourse.lib.models.resource import Git
@@ -9,10 +9,10 @@ def git_repo(  # noqa: PLR0913
     uri: str,
     branch: str = "main",
     check_every: str = "60s",
-    paths: Optional[list[str]] = None,
-    depth: Optional[int] = None,
+    paths: list[str] | None = None,
+    depth: int | None = None,
     fetch_tags: bool = False,  # noqa: FBT001, FBT002
-    tag_regex: Optional[str] = None,
+    tag_regex: str | None = None,
     **kwargs,
 ) -> Resource:
     return Resource(
@@ -37,7 +37,7 @@ def ssh_git_repo(
     uri: str,
     private_key: str,
     branch: str = "main",
-    paths: Optional[list[str]] = None,
+    paths: list[str] | None = None,
 ) -> Resource:
     return Resource(
         name=name,
@@ -54,8 +54,9 @@ def github_release(  # noqa: PLR0913
     owner: str,
     repository: str,
     github_token: str = "((github.public_repo_access_token))",  # noqa: S107
-    tag_filter: Optional[str] = None,
-    order_by: Optional[Literal["time", "version"]] = None,
+    tag_filter: str | None = None,
+    order_by: Literal["time", "version"] | None = None,
+    check_frequency="24h",
 ) -> Resource:
     """Generate a github-release resource for the given owner/repository.
 
@@ -89,7 +90,7 @@ def github_release(  # noqa: PLR0913
         name=name,
         type="github-release",
         icon="github",
-        check_every="24h",
+        check_every=check_frequency,
         source=release_config,
     )
 
@@ -99,16 +100,16 @@ def github_issues(  # noqa: PLR0913
     repository: str,
     issue_prefix: str,
     auth_method: Literal["token", "app"] = "token",
-    gh_host: Optional[str] = "https://github.mit.edu/api/v3",
+    gh_host: str | None = "https://github.mit.edu/api/v3",
     access_token: str = "((github.issues_resource_access_token))",  # noqa: S107
-    app_id: Optional[str] = None,
-    app_installation_id: Optional[str] = None,
-    private_ssh_key: Optional[str] = None,
+    app_id: str | None = None,
+    app_installation_id: str | None = None,
+    private_ssh_key: str | None = None,
     issue_state: Literal["open", "closed"] = "closed",
-    labels: Optional[list[str]] = None,
-    assignees: Optional[list[str]] = None,
-    issue_title_template: Optional[str] = None,
-    issue_body_template: Optional[str] = None,
+    labels: list[str] | None = None,
+    assignees: list[str] | None = None,
+    issue_title_template: str | None = None,
+    issue_body_template: str | None = None,
     poll_frequency: Duration = Duration("60m"),
 ) -> Resource:
     """Generate a github-issue resource for the given owner/repository.
@@ -173,7 +174,7 @@ def hashicorp_release(name: Identifier, project: str) -> Resource:
 
 def amazon_ami(
     name: Identifier,
-    filters: dict[str, Union[str, bool]],
+    filters: dict[str, str | bool],
     region: str = "us-east-1",
 ) -> Resource:
     return Resource(
@@ -229,10 +230,10 @@ def pypi(
 
 def schedule(
     name: Identifier,
-    interval: Optional[str] = None,
-    start: Optional[str] = None,
-    stop: Optional[str] = None,
-    days: Optional[list[str]] = None,
+    interval: str | None = None,
+    start: str | None = None,
+    stop: str | None = None,
+    days: list[str] | None = None,
 ) -> Resource:
     return Resource(
         name=name,
@@ -250,10 +251,10 @@ def schedule(
 def registry_image(  # noqa: PLR0913
     name: Identifier,
     image_repository: str,
-    image_tag: Optional[str] = "latest",
-    variant: Optional[str] = None,
-    tag_regex: Optional[str] = None,
-    sort_by_creation: bool | None = None,
+    image_tag: str | None = "latest",
+    variant: str | None = None,
+    tag_regex: str | None = None,
+    sort_by_creation: bool | None = None,  # noqa: FBT001
     username=None,
     password=None,
     check_every: str | None = None,
@@ -308,13 +309,13 @@ def git_semver(  # noqa: PLR0913
     uri: str,
     branch: str,
     file: str,
-    private_key: Optional[str] = None,
-    username: Optional[str] = None,
-    password: Optional[str] = None,
-    git_user: Optional[str] = None,
-    depth: Optional[int] = None,
+    private_key: str | None = None,
+    username: str | None = None,
+    password: str | None = None,
+    git_user: str | None = None,
+    depth: int | None = None,
     skip_ssl_verification: bool = False,  # noqa: FBT001, FBT002
-    commit_message: Optional[str] = None,
+    commit_message: str | None = None,
     initial_version: str = "0.0.0",
 ) -> Resource:
     return Resource(

@@ -1,5 +1,4 @@
 # ruff: noqa: E501
-
 """Provision and deploy the resources needed for an edxapp installation.
 
 - Create S3 buckets required by edxapp
@@ -24,6 +23,7 @@ import pulumi_mongodbatlas as atlas
 import pulumi_vault as vault
 import yaml
 from pulumi import Alias, Config, Output, ResourceOptions, StackReference, export
+from pulumi.invoke import InvokeOptions
 from pulumi_aws import (
     acm,
     autoscaling,
@@ -60,8 +60,12 @@ from ol_infrastructure.lib.aws.ec2_helper import (
     InstanceTypes,
     default_egress_args,
 )
+from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
-from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_records
+from ol_infrastructure.lib.aws.route53_helper import (
+    acm_certificate_validation_records,
+    fastly_certificate_validation_records,
+)
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
@@ -77,6 +81,7 @@ stack_info = parse_stack()
 edxapp_config = Config("edxapp")
 if Config("vault").get("address"):
     setup_vault_provider()
+
 #############
 # Constants #
 #############
@@ -90,6 +95,9 @@ FIVE_MINUTES = 60 * 5
 #####################
 # Stack Information #
 #####################
+cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
+
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
@@ -121,6 +129,7 @@ aws_config = AWSBase(
     }
 )
 consul_security_groups = consul_stack.require_output("security_groups")
+
 consul_provider = get_consul_provider(stack_info)
 fastly_provider = get_fastly_provider()
 openedx_release = (
@@ -184,7 +193,7 @@ mongodb_cluster_uri = mongodb_atlas_stack.require_output("atlas_cluster")[
 ##############
 
 edxapp_mfe_bucket_name = f"{env_name}-edxapp-mfe"
-edxapp_mfe_bucket = s3.BucketV2(
+edxapp_mfe_bucket = s3.Bucket(
     "edxapp-mfe-s3-bucket",
     bucket=edxapp_mfe_bucket_name,
     tags=aws_config.tags,
@@ -196,10 +205,10 @@ edxapp_mfe_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "edxapp-mfe-bucket-versioning",
     bucket=edxapp_mfe_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Suspended"
     ),
 )
@@ -232,7 +241,7 @@ s3.BucketPolicy(
         ]
     ),
 )
-s3.BucketCorsConfigurationV2(
+s3.BucketCorsConfiguration(
     "edxapp-mfe-bucket-cors-rules",
     bucket=edxapp_mfe_bucket.id,
     cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
@@ -240,7 +249,7 @@ s3.BucketCorsConfigurationV2(
 
 
 storage_bucket_name = f"{env_name}-edxapp-storage"
-edxapp_storage_bucket = s3.BucketV2(
+edxapp_storage_bucket = s3.Bucket(
     "edxapp-storage-s3-bucket",
     bucket=storage_bucket_name,
     tags=aws_config.tags,
@@ -252,10 +261,10 @@ edxapp_storage_bucket_ownership_controls = s3.BucketOwnershipControls(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "edxapp-storage-bucket-versioning",
     bucket=edxapp_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )
@@ -290,11 +299,11 @@ s3.BucketPolicy(
         ]
     ),
 )
-s3.BucketCorsConfigurationV2(
+s3.BucketCorsConfiguration(
     "edxapp-storage-bucket-cors-rules",
     bucket=edxapp_mfe_bucket.id,
     cors_rules=[
-        s3.BucketCorsConfigurationV2CorsRuleArgs(
+        s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_headers=["*"],
             allowed_methods=[
                 "GET",
@@ -309,36 +318,36 @@ s3.BucketCorsConfigurationV2(
 )
 
 course_bucket_name = f"{env_name}-edxapp-courses"
-edxapp_course_bucket = s3.BucketV2(
+edxapp_course_bucket = s3.Bucket(
     "edxapp-courses-s3-bucket",
     bucket=course_bucket_name,
     tags=aws_config.tags,
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "edxapp-course-bucket-versioning",
     bucket=edxapp_course_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Suspended"
     ),
 )
 
 grades_bucket_name = f"{env_name}-edxapp-grades"
-edxapp_grades_bucket = s3.BucketV2(
+edxapp_grades_bucket = s3.Bucket(
     "edxapp-grades-s3-bucket",
     bucket=grades_bucket_name,
     tags=aws_config.tags,
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "edxapp-grades-bucket-versioning",
     bucket=edxapp_grades_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )
 
 
 tracking_bucket_name = f"{env_name}-edxapp-tracking"
-edxapp_tracking_bucket = s3.BucketV2(
+edxapp_tracking_bucket = s3.Bucket(
     "edxapp-tracking-logs-s3-bucket",
     bucket=tracking_bucket_name,
     tags=aws_config.tags,
@@ -355,12 +364,12 @@ edxapp_tracking_bucket_public_access = s3.BucketPublicAccessBlock(
     bucket=edxapp_tracking_bucket.id,
     block_public_policy=True,
 )
-edxapp_tracking_bucket_encryption = s3.BucketServerSideEncryptionConfigurationV2(
+edxapp_tracking_bucket_encryption = s3.BucketServerSideEncryptionConfiguration(
     "edxapp-tracking-logs-s3-bucket-encryption",
     bucket=edxapp_tracking_bucket.id,
     rules=[
-        s3.BucketServerSideEncryptionConfigurationV2RuleArgs(
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationV2RuleApplyServerSideEncryptionByDefaultArgs(
+        s3.BucketServerSideEncryptionConfigurationRuleArgs(
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
                 sse_algorithm="aws:kms",
                 kms_master_key_id=kms_s3_key["id"],
             ),
@@ -368,10 +377,10 @@ edxapp_tracking_bucket_encryption = s3.BucketServerSideEncryptionConfigurationV2
         ),
     ],
 )
-s3.BucketVersioningV2(
+s3.BucketVersioning(
     "edxapp-tracking-logs-bucket-versioning",
     bucket=edxapp_tracking_bucket.id,
-    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
         status="Enabled"
     ),
 )
@@ -952,6 +961,7 @@ edxapp_ses_verification_record = route53.Record(
     zone_id=edxapp_zone_id,
     name=edxapp_ses_domain_identity.id.apply("_amazonses.{}".format),
     type="TXT",
+    allow_overwrite=True,
     ttl=FIVE_MINUTES,
     records=[edxapp_ses_domain_identity.verification_token],
 )
@@ -977,6 +987,7 @@ edxapp_ses_domain_mail_from_mx = route53.Record(
     zone_id=edxapp_zone_id,
     name=edxapp_mail_from_domain.mail_from_domain,
     type="MX",
+    allow_overwrite=True,
     ttl=FIVE_MINUTES,
     records=["10 feedback-smtp.us-east-1.amazonses.com"],
 )
@@ -985,6 +996,7 @@ ses_domain_mail_from_txt = route53.Record(
     zone_id=edxapp_zone_id,
     name=edxapp_mail_from_domain.mail_from_domain,
     type="TXT",
+    allow_overwrite=True,
     ttl=FIVE_MINUTES,
     records=["v=spf1 include:amazonses.com -all"],
 )
@@ -1000,6 +1012,7 @@ for loop_counter in range(3):
         ),
         type="CNAME",
         ttl=FIVE_MINUTES,
+        allow_overwrite=True,
         records=[
             edxapp_ses_domain_dkim.dkim_tokens[loop_counter].apply(
                 "{}.dkim.amazonses.com".format
@@ -1767,6 +1780,33 @@ edxapp_fastly_service = fastly.ServiceVcl(
     opts=fastly_provider,
 )
 
+tls_configuration = fastly.get_tls_configuration(
+    default=False,
+    name="TLS v1.3",
+    tls_protocols=["1.2", "1.3"],
+    opts=InvokeOptions(provider=fastly_provider.provider),
+)
+
+edxapp_fastly_tls = fastly.TlsSubscription(
+    f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-tls-subscription",
+    # valid values are certainly, lets-encrypt, or globalsign
+    certificate_authority="certainly",
+    domains=edxapp_fastly_service.domains.apply(
+        lambda domains: [domain.name for domain in domains]
+    ),
+    # Retrieved from 0https://manage.fastly.com/network/tls-configurations
+    configuration_id=tls_configuration.id,
+    opts=fastly_provider,
+)
+
+edxapp_fastly_tls.managed_dns_challenges.apply(fastly_certificate_validation_records)
+
+validated_tls_subscription = fastly.TlsSubscriptionValidation(
+    "ol-redirect-service-tls-subscription-validation",
+    subscription_id=edxapp_fastly_tls.id,
+    opts=fastly_provider,
+)
+
 
 # Create Route53 DNS records for Edxapp web nodes
 for domain_key, domain_value in edxapp_domains.items():
@@ -1777,6 +1817,7 @@ for domain_key, domain_value in edxapp_domains.items():
             name=domain_value,
             type="CNAME",
             ttl=FIVE_MINUTES,
+            allow_overwrite=True,
             records=[dns_override or "j.sni.global.fastly.net"],
             zone_id=edxapp_zone_id,
         )
@@ -1786,6 +1827,7 @@ for domain_key, domain_value in edxapp_domains.items():
             name=domain_value,
             type="CNAME",
             ttl=FIVE_MINUTES,
+            allow_overwrite=True,
             records=[dns_override or web_lb.dns_name],
             zone_id=edxapp_zone_id,
         )

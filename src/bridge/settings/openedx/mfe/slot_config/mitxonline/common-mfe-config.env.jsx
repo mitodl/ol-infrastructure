@@ -7,23 +7,23 @@ const currentYear = new Date().getFullYear();
 const edxMfeAppName = configData.APP_ID;
 const authoringAppID = "authoring";
 const href = window.location.href.toLowerCase();
-const isLearnCourse = ["course-v1:uai_", "course-v1:mit_et"].some(key => href.includes(key));
+const isLearnCourse = ["course-v1:uai_"].some(key => href.includes(key));
 const accessibilityURL = process.env.ACCESSIBILITY_URL || 'https://accessibility.mit.edu/';
+const contactUsURL = process.env.CONTACT_URL || "mailto:learn-support@mit.edu";
 const linkTitles = {
   dashboard: "Dashboard",
   profile: "Profile",
   account: "Settings",
   logout: "Sign Out",
   aboutUs: "About Us",
-  privacyPolicy: "Privacy Policy",
-  honorCode: "Honor Code",
   termsOfService: "Terms of Service",
   accessibility: "Accessibility",
+  contactUs: "Contact Us",
 };
 
-const copyRightText = `${configData.SITE_NAME.replace(/\b(CI|QA|Staging)\b/g, "").trim()}. All rights reserved.`;
+const copyRightText = "Massachusetts Institute of Technology";
 
-const logo = <Logo imageUrl={configData.LOGO_URL} destinationUrl={configData.MARKETING_SITE_BASE_URL} />;
+const logo = <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={process.env.MIT_BASE_URL} />;
 
 let userMenu = [
   {
@@ -61,24 +61,20 @@ if (!isLearnCourse) {
 
 const footerLegalLinks = [
     {
-      url: `${configData.MARKETING_SITE_BASE_URL}/about-us/`,
+      url: `${process.env.MIT_LEARN_BASE_URL}/about`,
       title: linkTitles.aboutUs,
     },
     {
-      url: `${configData.MARKETING_SITE_BASE_URL}/privacy-policy/`,
-      title: linkTitles.privacyPolicy,
-    },
-    {
-      url: `${configData.MARKETING_SITE_BASE_URL}/honor-code/`,
-      title: linkTitles.honorCode,
-    },
-    {
-      url: `${configData.MARKETING_SITE_BASE_URL}/terms-of-service/`,
+      url: `${process.env.MIT_LEARN_BASE_URL}/terms`,
       title: linkTitles.termsOfService,
     },
     {
       url: accessibilityURL,
       title: linkTitles.accessibility,
+    },
+    {
+      url: contactUsURL,
+      title: linkTitles.contactUs,
     },
   ];
 
@@ -172,6 +168,10 @@ const footerSlotConfig = {
 let config = {
   ...process.env,
   pluginSlots: footerSubSlotsConfig,
+  // Override the proctoring info panel 'Review instructions and system requirements' link
+  externalLinkUrlOverrides : {
+    "https://support.edx.org/hc/en-us/sections/115004169247-Taking-Timed-and-Proctored-Exams": "https://mitxonline.zendesk.com/hc/en-us/articles/4418223178651-What-is-the-Proctortrack-Onboarding-Exam",
+  },
 };
 
 // Additional plugin config based on MFE

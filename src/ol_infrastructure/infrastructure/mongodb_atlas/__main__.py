@@ -43,6 +43,9 @@ dagster_stack = pulumi.StackReference(f"applications.dagster.{dagster_env_name}"
 #############
 environment_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 target_vpc = network_stack.require_output(env_config.require("target_vpc"))
+k8s_vpc = network_stack.require_output(
+    env_config.get("target_k8s_vpc") or "applications_vpc"
+)
 dagster_ip = dagster_stack.require_output("dagster_app")["elastic_ip"]
 business_unit = env_config.get("business_unit") or "operations"
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
@@ -253,6 +256,20 @@ atlas_cidr_network_access = atlas.ProjectIpAccessList(
     ).merge(atlas_provider),
 )
 
+atlas_nat_gateway_ip_access_lists = k8s_vpc.apply(
+    lambda vpc_details: [
+        atlas.ProjectIpAccessList(
+            f"mongo-atlas-nat-gateway-ip-permissions-{i}",
+            project_id=atlas_project.id,
+            cidr_block=f"{ip}/32",
+            opts=pulumi.ResourceOptions(
+                depends_on=[atlas_aws_network_peer, accept_atlas_network_peer]
+            ).merge(atlas_provider),
+        )
+        for i, ip in enumerate(vpc_details.get("k8s_nat_gateway_public_ips", []))
+    ]
+)
+
 aws.ec2.Route(
     "mongo-atlas-network-route",
     route_table_id=target_vpc["route_table_id"],
@@ -360,17 +377,28 @@ consul.Keys(
     ),
 )
 
-
 pulumi.export(
     "atlas_cluster",
     {
         "id": atlas_cluster.cluster_id,
+        # Retain 'host_string' for compatibility with existing stacks that reference it
+        "host_string": privatized_mongo_uri.apply(lambda uri: urlparse(uri).netloc),
+        # Same as legacy 'host_string'
+        "private_host_string": privatized_mongo_uri.apply(
+            lambda uri: urlparse(uri).netloc
+        ),
+        "public_host_string": atlas_cluster.mongo_uri.apply(
+            lambda uri: urlparse(uri).netloc
+        ),
         "mongo_uri": atlas_cluster.mongo_uri,
         "mongo_uri_with_options": atlas_cluster.mongo_uri_with_options,
         "connection_strings": atlas_cluster.connection_strings,
         "srv_record": atlas_cluster.srv_address,
         "privatized_mongo_uri": privatized_mongo_uri,
         "privatized_mongo_uri_with_options": privatized_mongo_uri_with_options,
+        "replica_set": atlas_cluster.mongo_uri_with_options.apply(
+            lambda uri: parse_qs(urlparse(uri).query).get("replicaSet", [""])[0]
+        ),
     },
 )
 

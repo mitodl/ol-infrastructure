@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ERA001, PLR0913, S106
+# ruff: noqa: E501, PLR0913, S106
 """
 Manage Kubernetes secrets for the MITx Online application using Vault.
 
@@ -6,7 +6,7 @@ This module defines functions to create Kubernetes secrets required by the MITx 
 application by fetching data from various Vault secret backends (static KV and dynamic).
 """
 
-from typing import Any, Union
+from typing import Any
 
 import pulumi_kubernetes as kubernetes
 from pulumi import ResourceOptions
@@ -134,7 +134,7 @@ def create_mitxonline_k8s_secrets(
     openedx_environment: str,
     redis_password: str,
     redis_cache: OLAmazonCache,
-) -> tuple[list[str], list[Union[OLVaultK8SSecret, kubernetes.core.v1.Secret]]]:
+) -> tuple[list[str], list[OLVaultK8SSecret | kubernetes.core.v1.Secret]]:
     """
     Create all Kubernetes secrets required by the MITx Online application.
 
@@ -156,7 +156,7 @@ def create_mitxonline_k8s_secrets(
     """
     secret_names: list[str] = []
     secret_resources: list[
-        Union[OLVaultK8SSecret, kubernetes.core.v1.Secret]
+        OLVaultK8SSecret | kubernetes.core.v1.Secret
     ] = []  # Keep track of resources if needed later
 
     vaultauth = vault_k8s_resources.auth_name
@@ -245,6 +245,8 @@ def create_mitxonline_k8s_secrets(
                 "OPENEDX_API_CLIENT_SECRET": '{{ index .Secrets "open-edx-api-client" "client-secret" }}',
                 "OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID": '{{ index .Secrets "open-edx-retirement-service-worker" "client-id" }}',
                 "OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET": '{{ index .Secrets "open-edx-retirement-service-worker" "client-secret" }}',
+                "OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID": '{{ index .Secrets "open-edx-courses-service-worker" "client-id" }}',
+                "OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET": '{{ index .Secrets "open-edx-courses-service-worker" "client-secret" }}',
                 "OPENEDX_SERVICE_WORKER_API_TOKEN": '{{ index .Secrets "open-edx-service-worker" "api-token" }}',
                 "OPEN_EXCHANGE_RATES_APP_ID": '{{ index .Secrets "open-exchange-rates" "app-id" }}',
                 "POSTHOG_API_TOKEN": '{{ index .Secrets "posthog" "api-token" }}',

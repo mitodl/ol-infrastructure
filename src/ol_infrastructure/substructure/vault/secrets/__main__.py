@@ -71,45 +71,6 @@ if "QA" in stack_info.name:
         data_json=json.dumps(mitopen_vault_secrets),
     )
 
-    # Enable OIDC auth method and configure it with Keycloak
-    vault_oidc_keycloak_auth = vault.jwt.AuthBackend(
-        "vault-oidc-keycloak-backend",
-        path="oidc",
-        type="oidc",
-        description="OIDC auth Keycloak integration for use with dev vault client cli",
-        oidc_discovery_url=f"{keycloak_config.get('url')}/realms/ol-platform-engineering",
-        oidc_client_id=f"{keycloak_config.get('client_id')}",
-        oidc_client_secret=f"{keycloak_config.get('client_secret')}",
-        default_role="local-developer",
-        opts=ResourceOptions(delete_before_replace=True),
-    )
-
-    # Local Developer policy definition
-    local_developer_policy = vault.Policy(
-        "local-developer-policy",
-        name="local-developer",
-        policy=(Path(__file__).resolve())
-        .parent.parent.joinpath("policies/developer/local_developer_policy.hcl")
-        .read_text(),
-    )
-
-    # Configure OIDC role
-    local_dev_role = vault.jwt.AuthBackendRole(
-        "local-dev-role",
-        backend=vault_oidc_keycloak_auth.path,
-        role_name="local-dev",
-        token_policies=[
-            local_developer_policy.name,
-        ],
-        allowed_redirect_uris=[
-            "http://localhost:8250/oidc/callback",
-            f"{vault_config.get('address')}/ui/vault/auth/oidc/oidc/callback",
-        ],
-        bound_audiences=[keycloak_config.get("client_id")],
-        user_claim="sub",
-        role_type="oidc",
-    )
-
 vault.kv.SecretV2(
     f"grafana-vault-secrets-{stack_info.env_suffix}",
     name="grafana",

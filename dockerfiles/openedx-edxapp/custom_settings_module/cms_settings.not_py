@@ -1,0 +1,17 @@
+from openedx.core.djangoapps.settings.models import RuntimeType
+from openedx.core.djangoapps.settings.utils import (
+    load_settings_from_file,
+    settings_to_django_dict,
+    validate_settings,
+)
+
+cms_settings = load_settings_from_file("/openedx/config/cms.env.yml", RuntimeType.CMS)
+
+try:
+    validate_settings(cms_settings)
+    print("Settings validation passed!")
+except ValueError as e:
+    print(f"Settings validation error: {e}")
+
+django_settings = settings_to_django_dict(cms_settings)
+globals().update(django_settings)

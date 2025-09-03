@@ -17,7 +17,7 @@ class OpenLearningOpenEdxDeployment(Enum):
             # features as they land. (TMM 2025-05-20)
             EnvRelease("CI", OpenEdxSupportedRelease["master"]),
             EnvRelease("QA", OpenEdxSupportedRelease["teak"]),
-            EnvRelease("Production", OpenEdxSupportedRelease["sumac"]),
+            EnvRelease("Production", OpenEdxSupportedRelease["teak"]),
         ],
     )
     mitx_staging = DeploymentEnvRelease(
@@ -27,7 +27,7 @@ class OpenLearningOpenEdxDeployment(Enum):
             # features as they land. (TMM 2025-05-20)
             EnvRelease("CI", OpenEdxSupportedRelease["master"]),
             EnvRelease("QA", OpenEdxSupportedRelease["teak"]),
-            EnvRelease("Production", OpenEdxSupportedRelease["sumac"]),
+            EnvRelease("Production", OpenEdxSupportedRelease["teak"]),
         ],
     )
     mitxonline = DeploymentEnvRelease(
@@ -42,7 +42,7 @@ class OpenLearningOpenEdxDeployment(Enum):
         deployment_name="xpro",
         env_release_map=[
             EnvRelease("CI", OpenEdxSupportedRelease["teak"]),
-            EnvRelease("QA", OpenEdxSupportedRelease["sumac"]),
+            EnvRelease("QA", OpenEdxSupportedRelease["teak"]),
             EnvRelease("Production", OpenEdxSupportedRelease["sumac"]),
         ],
     )

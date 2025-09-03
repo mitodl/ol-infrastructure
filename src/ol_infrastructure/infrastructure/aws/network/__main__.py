@@ -10,7 +10,7 @@ network being created, while also importing the remaining 3 subnets.  If only 3 
 were specified then one of the existing networks would not be managed with Pulumi.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 from pulumi import Config, export
 from pulumi_aws import ec2
@@ -25,7 +25,7 @@ from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
-def vpc_exports(vpc: OLVPC, peers: Optional[list[str]] = None) -> dict[str, Any]:
+def vpc_exports(vpc: OLVPC, peers: list[str] | None = None) -> dict[str, Any]:
     """Create a consistent structure for VPC stack exports.
 
     :param vpc: The VPC whose data you would like to export
@@ -72,6 +72,12 @@ def vpc_exports(vpc: OLVPC, peers: Optional[list[str]] = None) -> dict[str, Any]
         return_value["k8s_public_subnet_zones"] = [
             k8s_public_subnet.availability_zone
             for k8s_public_subnet in vpc.k8s_public_subnets
+        ]
+        return_value["k8s_nat_gateway_ids"] = [
+            gateway.id for gateway in vpc.k8s_nat_gateways
+        ]
+        return_value["k8s_nat_gateway_public_ips"] = [
+            gateway.public_ip for gateway in vpc.k8s_nat_gateways
         ]
     return return_value
 
@@ -525,4 +531,9 @@ operations_to_xpro_peer = OLVPCPeeringConnection(
     f"ol-operations-{stack_info.env_suffix}-to-mitxpro-{stack_info.env_suffix}-vpc-peer",
     operations_vpc,
     xpro_vpc,
+)
+applications_to_mitx_conline_peer = OLVPCPeeringConnection(
+    f"ol-applications-{stack_info.env_suffix}-to-mitx-online-{stack_info.env_suffix}-vpc-peer",
+    applications_vpc,
+    mitx_online_vpc,
 )

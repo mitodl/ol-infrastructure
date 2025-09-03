@@ -1,4 +1,4 @@
-# ruff: noqa: E501 S608
+# ruff: noqa: E501
 import json
 import re
 
@@ -226,6 +226,7 @@ def setup_karpenter(  # noqa: PLR0913
                     ],
                     # Configure interruption handling
                     "interruptionQueue": karpenter_interruption_queue.name,
+                    "featureGates": {"spotToSpotConsolidation": True},
                 },
             },
         ),
@@ -295,7 +296,7 @@ def setup_karpenter(  # noqa: PLR0913
                 {
                     "deviceName": "/dev/xvda",
                     "ebs": {
-                        "volumeSize": "100Gi",
+                        "volumeSize": "1000Gi",
                         "volumeType": "gp3",
                         "iops": 3000,
                         "throughput": 125,

@@ -1,7 +1,7 @@
 """Resource Component for AWS MediaConvert"""
 
 import json
-from typing import Any, Optional
+from typing import Any
 
 from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_aws import cloudwatch, get_caller_identity, iam, mediaconvert, sns
@@ -39,7 +39,7 @@ class OLMediaConvert(ComponentResource):
     def __init__(
         self,
         config: MediaConvertConfig,
-        opts: Optional[ResourceOptions] = None,
+        opts: ResourceOptions | None = None,
     ):
         """Create an instance of the OLMediaConvert component resource"""
 
