@@ -416,6 +416,30 @@ binderhub_application = kubernetes.helm.v3.Release(
                     },
                 },
                 "prePuller": {
+                    "continuous": {
+                        "enabled": True,
+                    },
+                    "hook": {
+                        "enabled": True,
+                    },
+                    "extraImages": {
+                        "clustering-and-descriptive-ai": {
+                            "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
+                            "tag": "clustering_and_descriptive_ai",
+                        },
+                        "deep-learning-foundations-and-applications": {
+                            "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
+                            "tag": "deep_learning_foundations_and_applications",
+                        },
+                        "introduction-to-data-analytics-and-machine-learning": {
+                            "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
+                            "tag": "introduction_to_data_analytics_and_machine_learning",
+                        },
+                        "supervised-learning-fundamentals": {
+                            "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
+                            "tag": "supervised_learning_fundamentals",
+                        },
+                    },
                     "resources": {
                         "requests": {
                             "cpu": "10m",
@@ -425,7 +449,7 @@ binderhub_application = kubernetes.helm.v3.Release(
                             "cpu": "10m",
                             "memory": "10Mi",
                         },
-                    }
+                    },
                 },
                 "singleuser": {
                     # This is where we would do our own notebook image
