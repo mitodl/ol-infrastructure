@@ -438,6 +438,17 @@ binderhub_application = kubernetes.helm.v3.Release(
                         "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
                         "tag": "clustering_and_descriptive_ai",
                     },
+                    "nodeSelector": {
+                        "ol.mit.edu/gpu_node": "true",
+                    },
+                    "extraTolerations": [
+                        {
+                            "key": "ol.mit.edu/gpu_node",
+                            "operator": "Equal",
+                            "value": "true",
+                            "effect": "NoSchedule",
+                        }
+                    ],
                     "allowPrivilegeEscalation": True,
                     "cmd": [
                         "jupyterhub-singleuser",
