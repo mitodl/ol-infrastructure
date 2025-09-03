@@ -54,7 +54,7 @@ config:
   edxapp:dns_zone: learn
   edxapp:domains:
     lms: courses.mitxonline.mit.edu
-    preview: preview.mitxonline.learn.mit.edu
+    preview: preview.mitxonline.mit.edu
     studio: studio.mitxonline.mit.edu
   edxapp:marketing_domain: mitxonline.mit.edu
   edxapp:edx_forum_secrets:
