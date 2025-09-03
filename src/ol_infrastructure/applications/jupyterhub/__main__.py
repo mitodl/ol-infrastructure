@@ -145,7 +145,9 @@ jupyterhub_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_host=jupyterhub_db.db_instance.address,
     role_statements=postgres_role_statements,
 )
-jupyterhub_db_vault_backend = OLVaultDatabaseBackend(jupyterhub_db_vault_backend_config)
+jupyterhub_db_vault_backend = OLVaultDatabaseBackend(
+    jupyterhub_db_vault_backend_config, opts=ResourceOptions(depends_on=[jupyterhub_db])
+)
 jupyterhub_creds_secret_name = "jupyterhub-db-creds"  # noqa: S105  # pragma: allowlist secret
 
 # Create vault_k8s_resources to allow jupyter hub to access secrets in vault
@@ -196,6 +198,7 @@ app_db_creds_dynamic_secret_config = OLVaultK8SDynamicSecretConfig(
 app_db_creds_dynamic_secret = OLVaultK8SSecret(
     "jupyterhub-app-db-creds-vaultdynamicsecret",
     resource_config=app_db_creds_dynamic_secret_config,
+    opts=ResourceOptions(depends_on=jupyterhub_db_vault_backend),
 )
 
 
