@@ -423,6 +423,8 @@ binderhub_application = kubernetes.helm.v3.Release(
                         "enabled": True,
                     },
                     "extraImages": {
+                        # The object keys here are used for RFC 1123 names of init containers.
+                        # No underscores are allowed
                         "clustering-and-descriptive-ai": {
                             "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
                             "tag": "clustering_and_descriptive_ai",
