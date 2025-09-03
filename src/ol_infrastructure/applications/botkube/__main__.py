@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import pulumi
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, log
@@ -54,21 +55,12 @@ k8s_global_labels = K8sGlobalLabels(
 
 # Begin vault hoo-ha.
 botkube_vault_secrets = read_yaml_secrets(
-    Path(f"botkube/secrets.{stack_info.env_suffix}.yaml"),
-)
-
-botkube_vault_mount = vault.Mount(
-    f"botkube-secrets-mount-{stack_info.env_suffix}",
-    path="secret-botkube",
-    type="kv-v2",
-    options={"version": "2"},
-    description="Secrets for the learn ai application.",
-    opts=ResourceOptions(delete_before_replace=True),
+    Path(f"botkube/secrets.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml"),
 )
 
 botkube_static_vault_secrets = vault.generic.Secret(
-    f"botkube-secrets-{stack_info.env_suffix}",
-    path=botkube_vault_mount.path.apply("{}/secrets".format),
+    f"botkube-secrets-operations-{stack_info.env_suffix}",
+    path=f"secret-operations/botkube/{stack_info.env_prefix}",
     data_json=json.dumps(botkube_vault_secrets),
 )
 
@@ -115,9 +107,9 @@ static_secrets = OLVaultK8SSecret(
         labels=k8s_global_labels,
         dest_secret_name=static_secrets_name,
         dest_secret_labels=k8s_global_labels,
-        mount="secret-botkube",
-        mount_type="kv-v2",
-        path="secrets",
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path=f"botkube/{stack_info.env_prefix}",
         includes=["*"],
         excludes=[],
         exclude_raw=True,
@@ -219,5 +211,8 @@ botkube_application = kubernetes.helm.v3.Release(
             ],
         },
         skip_await=False,
+    ),
+    opts=pulumi.ResourceOptions(
+        depends_on=[static_secrets],
     ),
 )

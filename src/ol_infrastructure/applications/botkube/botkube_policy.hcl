@@ -1,6 +1,6 @@
 path "secret-botkube/*" {
   capabilities = ["read"]
 }
-path "secret-botkube" {
+path "secret-operations/botkube/*" {
   capabilities = ["list", "read"]
 }

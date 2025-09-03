@@ -1,3 +1,7 @@
 ---
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAGrFRQC8IWTNAtchCaBk3fwAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMPzR+glIUdjciDq9oAgEQgDtWmtkkVSVQ/405MUrZBafftytcYnkkHCdoRyaLzSESiVThGBXu6x4XJbBclXePs0NTSw80i+VvVvI2tw==
+config:
+  vault:address: vault-ci.odl.mit.edu
+  slack:channel_name: '#botkube-operations-ci'
+  vpc: operations
