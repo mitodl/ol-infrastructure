@@ -206,6 +206,13 @@ def mfe_job(
             f"{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx "
             f"{mfe_build_dir.name}/common-mfe-config.env.jsx"
         )
+    elif OpenEdxMicroFrontend[mfe_name].value == OpenEdxMicroFrontend.course_authoring.value:
+        slot_config_file = "authoring-mfe-config"
+        copy_common_config = (
+            f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+            f"{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx "
+            f"{mfe_build_dir.name}/common-mfe-config.env.jsx"
+        )
 
     mfe_setup_steps = [
         f"cp -r {mfe_repo.name}/* {mfe_build_dir.name}",
