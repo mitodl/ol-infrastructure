@@ -458,8 +458,8 @@ binderhub_application = kubernetes.helm.v3.Release(
                         "enabled": False,
                     },
                     "memory": {
-                        "limit": "1G",
-                        "guarantee": "256M",
+                        "limit": "4G",
+                        "guarantee": "1G",
                     },
                     "cpu": {
                         "limit": 1,

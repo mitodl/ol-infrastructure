@@ -889,3 +889,63 @@ keda_security_group_policy = kubernetes.apiextensions.CustomResource(
     },
     opts=ResourceOptions(depends_on=keda_release, provider=k8s_provider),
 )
+
+nvidia_k8s_device_plugin_release = kubernetes.helm.v3.Release(
+    f"{cluster_name}-nvidia-k8s-device-plugin-helm-release",
+    kubernetes.helm.v3.ReleaseArgs(
+        name="nvidia-device-plugin",
+        chart="nvidia-device-plugin",
+        version="0.17.3",
+        namespace="operations",
+        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+            repo="https://nvidia.github.io/k8s-device-plugin"
+        ),
+        cleanup_on_fail=True,
+        skip_await=True,
+        values={
+            "affinity": {
+                "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                        "nodeSelectorTerms": [
+                            {
+                                "matchExpressions": [
+                                    {
+                                        "key": "ol.mit.edu/gpu_node",
+                                        "operator": "In",
+                                        "values": ["true"],
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+            "tolerations": [
+                {
+                    "key": "ol.mit.edu/gpu_node",
+                    "operator": "Equal",
+                    "value": "true",
+                    "effect": "NoSchedule",
+                }
+            ],
+            "gfd": {
+                "enabled": False,
+            },
+            "resources": {
+                "requests": {
+                    "cpu": "100m",
+                    "memory": "100Mi",
+                },
+                "limits": {
+                    "cpu": "200m",
+                    "memory": "200Mi",
+                },
+            },
+        },
+    ),
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=k8s_provider,
+        delete_before_replace=True,
+    ),
+)
