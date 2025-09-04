@@ -147,6 +147,19 @@ botkube_application = kubernetes.helm.v3.Release(
         values={
             "commonLabels": k8s_global_labels,
             "sources": {},
+            "executors": {
+                "tools": {
+                    "botkube/kubectl": {"enabled": True},
+                },
+            },
+            "plugins": {
+                "repositories": {
+                    "botkube": {
+                        "url": "https://github.com/kubeshop/botkube/releases/download/v1.14.0/plugins-index.yaml"
+                    },
+                    "repo-name": {"url": "https://example.com/plugins-index.yaml"},
+                },
+            },
             "communications": {
                 "default-group": {
                     "socketSlack": {
@@ -155,16 +168,8 @@ botkube_application = kubernetes.helm.v3.Release(
                             "default": {
                                 "name": f"#{slack_channel}",
                                 "bindings": {
-                                    "plugins": {
-                                        "repositories": {
-                                            "botkube": {
-                                                "url": "https://github.com/kubeshop/botkube/releases/download/v1.14.0/plugins-index.yaml"
-                                            },
-                                        },
-                                    },
                                     "executors": [
                                         "k8s-default-tools",
-                                        "kubectl-global",
                                     ],
                                     "sources": [
                                         "k8s-err-events",
@@ -175,13 +180,6 @@ botkube_application = kubernetes.helm.v3.Release(
                         },
                     },
                 },
-            },
-            "plugins": {
-                "repositories": {
-                    "botkube": {
-                        "url": f"https://github.com/kubeshop/botkube/releases/download/{BOTKUBE_CHART_VERSION}/plugins-index.yaml"
-                    }
-                }
             },
             "extraEnv": [
                 {"name": "LOG_LEVEL_SOURCE_BOTKUBE_KUBERNETES", "value": "debug"},
