@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference
+from pulumi import Config, ResourceOptions, StackReference, log
 
 from bridge.lib.versions import BOTKUBE_CHART_VERSION
 from bridge.secrets.sops import read_yaml_secrets
@@ -28,6 +28,7 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 stack_info = parse_stack()
+log.info(f"{stack_info=}")
 setup_vault_provider(stack_info)
 
 botkube_config = Config("config_botkube")
@@ -38,13 +39,15 @@ opensearch_stack = StackReference(
 opensearch_cluster = opensearch_stack.require_output("cluster")
 opensearch_cluster_endpoint = opensearch_cluster["endpoint"]
 
-cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
-
+cluster_stack = StackReference(
+    f"infrastructure.aws.eks.{stack_info.env_prefix}.{stack_info.name}"
+)
+setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 aws_config = AWSBase(
     tags={"OU": BusinessUnit.operations, "Environment": Environment.operations},
 )
 
-botkube_namespace = "operations"
+botkube_namespace = "botkube"
 
 k8s_global_labels = K8sGlobalLabels(
     service=Services.botkube,
@@ -54,21 +57,12 @@ k8s_global_labels = K8sGlobalLabels(
 
 # Begin vault hoo-ha.
 botkube_vault_secrets = read_yaml_secrets(
-    Path(f"botkube/secrets.{stack_info.env_suffix}.yaml"),
-)
-
-botkube_vault_mount = vault.Mount(
-    f"botkube-secrets-mount-{stack_info.env_suffix}",
-    path="secret-botkube",
-    type="kv-v2",
-    options={"version": "2"},
-    description="Secrets for the learn ai application.",
-    opts=ResourceOptions(delete_before_replace=True),
+    Path(f"botkube/secrets.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml"),
 )
 
 botkube_static_vault_secrets = vault.generic.Secret(
-    f"botkube-secrets-{stack_info.env_suffix}",
-    path=botkube_vault_mount.path.apply("{}/secrets".format),
+    f"botkube-secrets-operations-{stack_info.env_suffix}",
+    path=f"secret-operations/botkube/{stack_info.env_prefix}",
     data_json=json.dumps(botkube_vault_secrets),
 )
 
@@ -115,9 +109,9 @@ static_secrets = OLVaultK8SSecret(
         labels=k8s_global_labels,
         dest_secret_name=static_secrets_name,
         dest_secret_labels=k8s_global_labels,
-        mount="secret-botkube",
-        mount_type="kv-v2",
-        path="secrets",
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path=f"botkube/{stack_info.env_prefix}",
         includes=["*"],
         excludes=[],
         exclude_raw=True,
@@ -125,18 +119,18 @@ static_secrets = OLVaultK8SSecret(
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
-        parent=vault_k8s_resources,
         depends_on=[botkube_static_vault_secrets],
     ),
 )
 # end Vault hoo-ha
 
-
-setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
-
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(botkube_namespace, ns)
 )
+
+slack_channel = Config("slack").require("channel_name")
+
+log.info(f"Botkube Slack channel name: {slack_channel}")
 
 # Install the botkube helm chart
 botkube_application = kubernetes.helm.v3.Release(
@@ -152,30 +146,14 @@ botkube_application = kubernetes.helm.v3.Release(
         ),
         values={
             "commonLabels": k8s_global_labels,
-            "sources": {
-                "k8s-deployment-events": {
-                    "enabled": True,
-                    "type": "kubernetes",
-                    "kubernetes": {
-                        "resources": [{"type": "v1/events", "events": ["create"]}],
-                        "filters": {
-                            "eventTypes": ["Normal"],
-                            "objectAnnotations": {},
-                            "reason": {
-                                "include": ["ScalingReplicaSet", "SuccessfulCreate"]
-                            },
-                            "involvedObject": {"kinds": ["Deployment", "ReplicaSet"]},
-                        },
-                    },
-                },
-            },
+            "sources": {},
             "communications": {
                 "default-group": {
                     "socketSlack": {
                         "enabled": True,
                         "channels": {
                             "default": {
-                                "name": "#botkube-ci",
+                                "name": f"#{slack_channel}",
                                 "bindings": {
                                     "executors": ["k8s-default-tools"],
                                     "sources": [
@@ -187,6 +165,13 @@ botkube_application = kubernetes.helm.v3.Release(
                         },
                     },
                 },
+            },
+            "plugins": {
+                "repositories": {
+                    "botkube": {
+                        "url": f"https://github.com/kubeshop/botkube/releases/download/{BOTKUBE_CHART_VERSION}/plugins-index.yaml"
+                    }
+                }
             },
             "extraEnv": [
                 {"name": "LOG_LEVEL_SOURCE_BOTKUBE_KUBERNETES", "value": "debug"},
@@ -215,5 +200,8 @@ botkube_application = kubernetes.helm.v3.Release(
             ],
         },
         skip_await=False,
+    ),
+    opts=ResourceOptions(
+        depends_on=[static_secrets],
     ),
 )
