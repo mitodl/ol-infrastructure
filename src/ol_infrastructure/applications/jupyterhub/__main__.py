@@ -45,8 +45,8 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 
-setup_vault_provider()
 stack_info = parse_stack()
+setup_vault_provider(stack_info)
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
 jupyterhub_config = Config("jupyterhub")
@@ -70,7 +70,6 @@ target_vpc = network_stack.require_output(target_vpc_name)
 target_vpc_id = target_vpc["id"]
 
 vault_config = Config("vault")
-setup_vault_provider(stack_info)
 
 k8s_global_labels = K8sGlobalLabels(
     service=Services.jupyterhub,
