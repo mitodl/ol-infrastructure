@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
 
-import pulumi
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, log
@@ -29,6 +28,7 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 stack_info = parse_stack()
+log.info(f"{stack_info=}")
 setup_vault_provider(stack_info)
 
 botkube_config = Config("config_botkube")
@@ -212,7 +212,7 @@ botkube_application = kubernetes.helm.v3.Release(
         },
         skip_await=False,
     ),
-    opts=pulumi.ResourceOptions(
+    opts=ResourceOptions(
         depends_on=[static_secrets],
     ),
 )
