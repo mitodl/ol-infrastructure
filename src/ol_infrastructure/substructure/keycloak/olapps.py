@@ -733,10 +733,10 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         )
         onboard_saml_org(
             SamlIdpConfig(
-                org_domains=["ntua.gr"],
+                org_domains=["ntua.gr", "mail.ntua.gr"],
                 org_name="National Technical University of Athens",
                 org_alias="NTUA",
-                org_saml_metadata_url="https://login.ntua.gr/idp/shibboleth",
+                org_saml_metadata_url="https://login.ntua.gr/metadata-signed.xml",
                 keycloak_url=keycloak_url,
                 learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,
@@ -744,7 +744,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 resource_options=resource_options,
                 attribute_map={
                     "email": "mail",
-                    "firstName": "MedName",
+                    "firstName": "givenName",
                     "lastName": "sn",
                     "fullName": "cn",
                 },
