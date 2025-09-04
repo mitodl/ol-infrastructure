@@ -166,6 +166,13 @@ botkube_application = kubernetes.helm.v3.Release(
                     },
                 },
             },
+            "plugins": {
+                "repositories": {
+                    "botkube": {
+                        "url": f"https://github.com/kubeshop/botkube/releases/download/{BOTKUBE_CHART_VERSION}/plugins-index.yaml"
+                    }
+                }
+            },
             "extraEnv": [
                 {"name": "LOG_LEVEL_SOURCE_BOTKUBE_KUBERNETES", "value": "debug"},
                 {
