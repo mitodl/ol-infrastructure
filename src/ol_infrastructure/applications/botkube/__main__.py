@@ -155,7 +155,17 @@ botkube_application = kubernetes.helm.v3.Release(
                             "default": {
                                 "name": f"#{slack_channel}",
                                 "bindings": {
-                                    "executors": ["k8s-default-tools"],
+                                    "plugins": {
+                                        "repositories": {
+                                            "botkube": {
+                                                "url": "https://github.com/kubeshop/botkube/releases/download/v1.14.0/plugins-index.yaml"
+                                            },
+                                        },
+                                    },
+                                    "executors": [
+                                        "k8s-default-tools",
+                                        "kubectl-global",
+                                    ],
                                     "sources": [
                                         "k8s-err-events",
                                         "k8s-recommendation-events",
