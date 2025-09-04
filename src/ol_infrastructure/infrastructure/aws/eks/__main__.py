@@ -451,7 +451,6 @@ k8s_provider = kubernetes.Provider(
 
 # Loop through the node group definitions and add them to the cluster
 node_groups = []
-node_group_security_groups = []
 for ng_name, ng_config in eks_config.require_object("nodegroups").items():
     taint_list = {}
     for taint_name, taint_config in ng_config["taints"].items() or {}:
@@ -466,7 +465,6 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
         vpc_id=target_vpc["id"],
         tags=aws_config.tags,
     )
-    node_group_security_groups.append(node_group_sec_group)
     # Even though this is in the loop, it will only export the first one (the 'core nodes')
     export("node_group_security_group_id", node_group_sec_group.security_group.id)
 
