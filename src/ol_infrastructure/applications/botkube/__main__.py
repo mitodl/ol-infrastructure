@@ -39,8 +39,10 @@ opensearch_stack = StackReference(
 opensearch_cluster = opensearch_stack.require_output("cluster")
 opensearch_cluster_endpoint = opensearch_cluster["endpoint"]
 
-cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
-
+cluster_stack = StackReference(
+    f"infrastructure.aws.eks.{stack_info.env_prefix}.{stack_info.name}"
+)
+setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 aws_config = AWSBase(
     tags={"OU": BusinessUnit.operations, "Environment": Environment.operations},
 )
@@ -117,14 +119,10 @@ static_secrets = OLVaultK8SSecret(
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
-        parent=vault_k8s_resources,
         depends_on=[botkube_static_vault_secrets],
     ),
 )
 # end Vault hoo-ha
-
-
-setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(botkube_namespace, ns)
@@ -148,23 +146,7 @@ botkube_application = kubernetes.helm.v3.Release(
         ),
         values={
             "commonLabels": k8s_global_labels,
-            "sources": {
-                "k8s-deployment-events": {
-                    "enabled": True,
-                    "type": "kubernetes",
-                    "kubernetes": {
-                        "resources": [{"type": "v1/events", "events": ["create"]}],
-                        "filters": {
-                            "eventTypes": ["Normal"],
-                            "objectAnnotations": {},
-                            "reason": {
-                                "include": ["ScalingReplicaSet", "SuccessfulCreate"]
-                            },
-                            "involvedObject": {"kinds": ["Deployment", "ReplicaSet"]},
-                        },
-                    },
-                },
-            },
+            "sources": {},
             "communications": {
                 "default-group": {
                     "socketSlack": {

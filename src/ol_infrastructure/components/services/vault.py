@@ -704,7 +704,7 @@ class OLVaultK8SSecret(ComponentResource):
             opts,
         )
 
-        resource_opts = ResourceOptions.merge(ResourceOptions(parent=self), opts)
+        resource_opts = (opts or ResourceOptions()).merge(ResourceOptions(parent=self))
 
         secret_def: dict[str, Any] = {
             "apiVersion": "secrets.hashicorp.com/v1beta1",
