@@ -18,9 +18,6 @@ from pulumi import Alias, Config, Output, ResourceOptions, StackReference, expor
 from bridge.lib.magic_numbers import (
     AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
     DEFAULT_EFS_PORT,
-    GRAFANA_ALLOY_DEFAULT_LISTENER_PORT,
-    GRAFANA_ALLOY_OTEL_GRPC_PORT,
-    GRAFANA_ALLOY_OTEL_HTTP_PORT,
     IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
 )
 from bridge.lib.versions import (
@@ -438,6 +435,7 @@ node_instance_profile = aws.iam.InstanceProfile(
     role=node_role.name,
     path=f"/ol-infrastructure/eks/{cluster_name}/",
 )
+export("node_instance_profile", node_instance_profile.id)
 export("node_role_arn", value=node_role.arn)
 
 # Initalize the k8s pulumi provider
@@ -467,6 +465,9 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
         vpc_id=target_vpc["id"],
         tags=aws_config.tags,
     )
+    # Even though this is in the loop, it will only export the first one (the 'core nodes')
+    export("node_group_security_group_id", node_group_sec_group.security_group.id)
+
     node_groups.append(
         eks.NodeGroupV2(
             f"{cluster_name}-eks-nodegroup-{ng_name}",
@@ -492,6 +493,7 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
                     tags=aws_config.tags,
                 ),
             ],
+            gpu=ng_config.get("gpu") or False,
             min_refresh_percentage=eks_config.get_int("min_refresh_interval") or 75,
             instance_type=ng_config["instance_type"],
             instance_profile=node_instance_profile,
@@ -508,57 +510,15 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
             opts=ResourceOptions(parent=cluster, depends_on=cluster),
         )
     )
-    export("node_group_security_group_id", node_group_sec_group.security_group.id)
-    export("node_instance_profile", node_instance_profile.id)
 
-    allow_tcp_dns_ingress = aws.ec2.SecurityGroupRule(
-        f"{cluster_name}-eks-nodegroup-{ng_name}-tcp-dns-ingress",
+    allow_all_ingress_from_pod_cidrs = aws.ec2.SecurityGroupRule(
+        f"{cluster_name}-eks-nodegroup-{ng_name}-all-ingress-from-pod-cidrs",
         type="ingress",
-        description="Allow DNS traffic on TCP",
+        description="Allow all traffic from pod CIDRs",
         security_group_id=node_group_sec_group.security_group.id,
-        protocol=aws.ec2.ProtocolType.TCP,
-        from_port=53,
-        to_port=53,
-        cidr_blocks=pod_ip_blocks,
-    )
-    allow_udp_dns_ingress = aws.ec2.SecurityGroupRule(
-        f"{cluster_name}-eks-nodegroup-{ng_name}-udp-dns-ingress",
-        type="ingress",
-        description="Allow DNS traffic on UDP",
-        security_group_id=node_group_sec_group.security_group.id,
-        protocol=aws.ec2.ProtocolType.UDP,
-        from_port=53,
-        to_port=53,
-        cidr_blocks=pod_ip_blocks,
-    )
-    allow_tcp_alloy_otel_grpc_ingress = aws.ec2.SecurityGroupRule(
-        f"{cluster_name}-eks-nodegroup-{ng_name}-tcp-alloy-otel-grpc-ingress",
-        type="ingress",
-        description="Allow Alloy OTEL gRPC traffic on TCP",
-        security_group_id=node_group_sec_group.security_group.id,
-        protocol=aws.ec2.ProtocolType.TCP,
-        from_port=GRAFANA_ALLOY_OTEL_GRPC_PORT,
-        to_port=GRAFANA_ALLOY_OTEL_GRPC_PORT,
-        cidr_blocks=pod_ip_blocks,
-    )
-    allow_tcp_alloy_otel_http_ingress = aws.ec2.SecurityGroupRule(
-        f"{cluster_name}-eks-nodegroup-{ng_name}-tcp-alloy-otel-http-ingress",
-        type="ingress",
-        description="Allow Alloy OTEL HTTP traffic on TCP",
-        security_group_id=node_group_sec_group.security_group.id,
-        protocol=aws.ec2.ProtocolType.TCP,
-        from_port=GRAFANA_ALLOY_OTEL_HTTP_PORT,
-        to_port=GRAFANA_ALLOY_OTEL_HTTP_PORT,
-        cidr_blocks=pod_ip_blocks,
-    )
-    allow_tcp_alloy_default_listener_ingress = aws.ec2.SecurityGroupRule(
-        f"{cluster_name}-eks-nodegroup-{ng_name}-tcp-alloy-default-listener-ingress",
-        type="ingress",
-        description="Allow Alloy default listener traffic on TCP",
-        security_group_id=node_group_sec_group.security_group.id,
-        protocol=aws.ec2.ProtocolType.TCP,
-        from_port=GRAFANA_ALLOY_DEFAULT_LISTENER_PORT,
-        to_port=GRAFANA_ALLOY_DEFAULT_LISTENER_PORT,
+        protocol="-1",
+        from_port=0,
+        to_port=0,
         cidr_blocks=pod_ip_blocks,
     )
 
