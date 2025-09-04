@@ -419,9 +419,6 @@ binderhub_application = kubernetes.helm.v3.Release(
                     "continuous": {
                         "enabled": True,
                     },
-                    "hook": {
-                        "enabled": True,
-                    },
                     "extraImages": {
                         # The object keys here are used for RFC 1123 names of init containers.
                         # No underscores are allowed
