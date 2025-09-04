@@ -86,6 +86,8 @@ SITE_NAME: {{ key "edxapp/lms-domain" }}  # MODIFIED
 SESSION_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edx-lms-sessionid  # MODIFIED
 THIRD_PARTY_AUTH_BACKENDS:
 - common.djangoapps.third_party_auth.saml.SAMLAuthBackend
+- common.djangoapps.third_party_auth.lti.LTIAuthBackend
+THIRD_PARTY_AUTH_SAML_FETCH_PERIOD_HOURS: 24 # ADDED - Sets the frequency for Celery Beat to refresh the SAML metadata
 TRACKING_SEGMENTIO_WEBHOOK_SECRET: ''
 VERIFY_STUDENT:
     DAYS_GOOD_FOR: 365
