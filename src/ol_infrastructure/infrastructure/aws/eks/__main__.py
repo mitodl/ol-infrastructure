@@ -494,7 +494,7 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
                 ),
             ],
             gpu=ng_config.get("gpu") or False,
-            min_refresh_percentage=eks_config.get_int("min_refresh_interval") or 75,
+            min_refresh_percentage=eks_config.get_int("min_refresh_percentage") or 90,
             instance_type=ng_config["instance_type"],
             instance_profile=node_instance_profile,
             labels=ng_config["labels"] or {},
