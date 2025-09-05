@@ -53,8 +53,8 @@ config:
       node_group_options: {}
       scaling:
         desired: 4
-        max: 5
-        min: 2
+        max: 8
+        min: 4
       tags: {}
       taints: {}
       version:
