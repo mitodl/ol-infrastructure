@@ -10,6 +10,7 @@ from pulumi import Output, ResourceOptions, StackReference
 from bridge.lib.magic_numbers import AWS_EVENT_TARGET_GROUP_NAME_MAX_LENGTH
 from bridge.lib.versions import KARPENTER_CHART_VERSION
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
+from ol_infrastructure.lib.aws.ec2_helper import InstanceClasses, InstanceTypes
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.substructure.aws.eks.karpenter_iam import (
@@ -403,7 +404,14 @@ def setup_karpenter(  # noqa: PLR0913
                         {
                             "key": "karpenter.k8s.aws/instance-family",
                             "operator": "In",
-                            "values": ["m7a", "m7i", "r7a", "r7i", "c7a", "c7i"],
+                            "values": [
+                                InstanceClasses.general_purpose_amd,
+                                InstanceClasses.general_purpose_intel,
+                                InstanceClasses.memory_optimized_amd,
+                                InstanceClasses.memory_optimized_intel,
+                                InstanceClasses.compute_optimized_amd,
+                                InstanceClasses.compute_optimized_intel,
+                            ],
                         },
                         {
                             "key": "kubernetes.io/arch",
@@ -479,7 +487,10 @@ def setup_karpenter(  # noqa: PLR0913
                         {
                             "key": "node.kubernetes.io/instance-type",
                             "operator": "In",
-                            "values": ["g4dn.xlarge", "g4dn.2xlarge"],
+                            "values": [
+                                InstanceTypes.gpu_xlarge,
+                                InstanceTypes.gpu_2xlarge,
+                            ],
                         },
                         {
                             "key": "kubernetes.io/arch",
