@@ -49,7 +49,6 @@ config:
         node_size: r7a.xlarge
         ondemand: true
         ol.mit.edu/core_node: true
-        ol.mit.edu/gpu_node: false
       node_group_options: {}
       scaling:
         desired: 4
@@ -57,23 +56,6 @@ config:
         min: 2
       tags: {}
       taints: {}
-      version:
-    gpu-worker-xlarge:
-      disk_size_gb: 1000
-      instance_type: "g4dn.xlarge"
-      gpu: true
-      labels:
-        node_size: g4dn.xlarge
-        ondemand: true
-        ol.mit.edu/core_node: false
-        ol.mit.edu/gpu_node: true
-      node_group_options: {}
-      scaling:
-        desired: 1
-        max: 2
-        min: 1
-      tags: {}
-      taints: {"ol.mit.edu/gpu_node": {value: "true", effect: "NoSchedule"}}
       version:
   eks:traefik_min_replicas: 5
   eks:traefik_max_replicas: 10
