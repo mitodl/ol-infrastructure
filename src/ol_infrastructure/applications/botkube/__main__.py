@@ -148,7 +148,7 @@ botkube_application = kubernetes.helm.v3.Release(
             "commonLabels": k8s_global_labels,
             "sources": {},
             "executors": {
-                "tools": {
+                "k8s-default-tools": {
                     "botkube/kubectl": {"enabled": True},
                 },
             },
@@ -157,7 +157,6 @@ botkube_application = kubernetes.helm.v3.Release(
                     "botkube": {
                         "url": "https://github.com/kubeshop/botkube/releases/download/v1.14.0/plugins-index.yaml"
                     },
-                    "repo-name": {"url": "https://example.com/plugins-index.yaml"},
                 },
             },
             "communications": {
