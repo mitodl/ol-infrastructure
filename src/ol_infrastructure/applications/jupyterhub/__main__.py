@@ -350,7 +350,16 @@ binderhub_application = kubernetes.helm.v3.Release(
                     },
                 },
                 "scheduling": {
+                    "podPriority": {"enabled": True},
+                    "userPlaceholder": {
+                        "enabled": True,
+                        "replicas": jupyterhub_config.get_int(
+                            "user_placeholder_replicas"
+                        )
+                        or 4,
+                    },
                     "userScheduler": {
+                        "enabled": True,
                         "resources": {
                             "requests": {
                                 "cpu": "100m",
