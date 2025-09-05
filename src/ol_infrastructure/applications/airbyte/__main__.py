@@ -750,13 +750,13 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
             },
             "worker": {
                 "enabled": True,
-                "replicaCount": 2,
+                "hpa": {"enabled": True},
                 "podLabels": k8s_global_labels,
                 "resources": default_resources_definition,
             },
             "workloadLauncher": {
                 "enabled": True,
-                "replicaCount": 1,
+                "hpa": {"enabled": True},
                 "podLabels": k8s_global_labels,
                 "resources": default_resources_definition,
             },
