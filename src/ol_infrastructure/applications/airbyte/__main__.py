@@ -17,7 +17,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
 )
-from bridge.lib.versions import AIRBYTE_CHART_VERSION, AIRBYTE_VERSION
+from bridge.lib.versions import AIRBYTE_CHART_VERSION
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.eks import (
@@ -676,11 +676,9 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
             repo="https://airbytehq.github.io/charts",
         ),
         values={
-            "version": AIRBYTE_VERSION,
             "global": {
                 "image": {
                     "registry": "610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub",  # noqa: E501
-                    "tag": AIRBYTE_VERSION,
                 },
                 "airbyteUrl": f"https://{airbyte_config.require('web_host_domain')}",
                 "serviceAccountName": airbyte_service_account_name,
