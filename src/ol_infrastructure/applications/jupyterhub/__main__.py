@@ -470,7 +470,6 @@ binderhub_application = kubernetes.helm.v3.Release(
                     # users. Numbers are conservative to start with.
                     "extraFiles": {
                         "menu_override": {
-                            # "mountPath": '/home/jovyan/.jupyter/overrides.json',
                             "mountPath": "/opt/conda/share/jupyter/lab/settings/overrides.json",
                             "stringData": Path(__file__)
                             .parent.joinpath("menu_override.json")
