@@ -1,0 +1,165 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAG3BJCgOlTMmF3wtMbR35uZAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM1XoeLE2NkrUyaTehAgEQgDsUryy/1VSjR7ZwWHz+H1T9xCR/vyozM7W0u7SWvpYDLQcvS3PHOmTzhaMS9gVvC0dTMT7h27uFZdsBEw==
+config:
+  starburst:client_id:
+    secure: v1:4Yo/Pq0kEG/cl8PL:QYZi6f+k7FHcydvoA4nnd02DA0aoVukEhT1lM7kXMuM=
+  starburst:client_secret:
+    secure: v1:1EDjfEvo53OOyg2O:exn1dPV+F5w34QEbpxRZmP/vnxQimmA8tAgwLTRIN1JeXLPd3kqjVZY+nJGmnAx1
+  starburst:domain: mitol.galaxy.starburst.io
+  starburst:roles:
+    ol_platform_admin:
+      description: "Full administrative access to all data and platform resources"
+      clusters: ["ol-data-interactive", "ol-data-lake-production"]
+      base_privileges:
+      - privilege: "CreateSchema"
+        entity_kind: "Catalog"
+        catalog_name: "ol_warehouse"
+      - privilege: "CreateRole"
+        entity_kind: "Account"
+      - privilege: "GrantRole"
+        entity_kind: "Account"
+      - privilege: "CreateUser"
+        entity_kind: "Account"
+      - privilege: "CreateCatalog"
+        entity_kind: "Account"
+      data_access:
+      - domain: "raw"
+        privilege: "Select"
+      - domain: "raw"
+        privilege: "Insert"
+      - domain: "raw"
+        privilege: "Update"
+      - domain: "raw"
+        privilege: "Delete"
+      - domain: "staging"
+        privilege: "Select"
+      - domain: "staging"
+        privilege: "Insert"
+      - domain: "staging"
+        privilege: "Update"
+      - domain: "staging"
+        privilege: "Delete"
+      - domain: "intermediate"
+        privilege: "Select"
+      - domain: "intermediate"
+        privilege: "Insert"
+      - domain: "intermediate"
+        privilege: "Update"
+      - domain: "intermediate"
+        privilege: "Delete"
+      - domain: "marts"
+        privilege: "Select"
+      - domain: "marts"
+        privilege: "Insert"
+      - domain: "marts"
+        privilege: "Update"
+      - domain: "marts"
+        privilege: "Delete"
+      - domain: "dimensional"
+        privilege: "Select"
+      - domain: "dimensional"
+        privilege: "Insert"
+      - domain: "dimensional"
+        privilege: "Update"
+      - domain: "dimensional"
+        privilege: "Delete"
+    ol_data_engineer:
+      description: "Data engineering role with write access to staging/intermediate\
+        \ data and read access to production data"
+      clusters: ["ol-data-interactive", "ol-data-lake-production"]
+      base_privileges:
+      - privilege: "CreateSchema"
+        entity_kind: "Catalog"
+        catalog_name: "ol_warehouse"
+      - privilege: "CreateTable"
+        entity_kind: "Schema"
+      - privilege: "CreateView"
+        entity_kind: "Schema"
+      data_access:
+      - domain: "raw"
+        privilege: "Select"
+      - domain: "staging"
+        privilege: "Select"
+      - domain: "staging"
+        privilege: "Insert"
+      - domain: "staging"
+        privilege: "Update"
+      - domain: "staging"
+        privilege: "Delete"
+      - domain: "intermediate"
+        privilege: "Select"
+      - domain: "intermediate"
+        privilege: "Insert"
+      - domain: "intermediate"
+        privilege: "Update"
+      - domain: "intermediate"
+        privilege: "Delete"
+      - domain: "marts"
+        privilege: "Select"
+      - domain: "dimensional"
+        privilege: "Select"
+    ol_data_analyst:
+      description: "Data analyst role with read access to staging, intermediate, and\
+        \ production data"
+      clusters: ["ol-data-interactive", "ol-data-lake-production"]
+      base_privileges:
+      - privilege: "CreateView"
+        entity_kind: "Schema"
+      data_access:
+      - domain: "staging"
+        privilege: "Select"
+      - domain: "intermediate"
+        privilege: "Select"
+      - domain: "marts"
+        privilege: "Select"
+      - domain: "dimensional"
+        privilege: "Select"
+    ol_researcher:
+      description: "Research role with broad read access and ML capabilities for academic\
+        \ research"
+      clusters: ["ol-data-interactive", "ol-data-lake-production"]
+      base_privileges:
+      - privilege: "CreateAiModel"
+        entity_kind: "Account"
+      - privilege: "Execute"
+        entity_kind: "Function"
+      - privilege: "CreateView"
+        entity_kind: "Schema"
+      - privilege: "CreateTable"
+        entity_kind: "Schema"
+      data_access:
+      - domain: "raw"
+        privilege: "Select"
+      - domain: "staging"
+        privilege: "Select"
+      - domain: "intermediate"
+        privilege: "Select"
+      - domain: "marts"
+        privilege: "Select"
+      - domain: "dimensional"
+        privilege: "Select"
+    ol_instructor:
+      description: "Instructor role with limited read access to educational datasets\
+        \ and sample data"
+      clusters: ["ol-data-interactive", "ol-data-lake-production"]
+      base_privileges:
+      - privilege: "CreateView"
+        entity_kind: "Schema"
+      data_access:
+      - domain: "marts"
+        privilege: "Select"
+      - domain: "dimensional"
+        privilege: "Select"
+    ol_business_analyst:
+      description: "Business analyst role with read access to production marts and\
+        \ key business metrics"
+      clusters: ["ol-data-interactive", "ol-data-lake-production"]
+      base_privileges:
+      - privilege: "CreateView"
+        entity_kind: "Schema"
+      data_access:
+      - domain: "marts"
+        privilege: "Select"
+      - domain: "dimensional"
+        privilege: "Select"
