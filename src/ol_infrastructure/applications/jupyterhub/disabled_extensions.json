@@ -1,0 +1,6 @@
+{
+   "disabledExtensions": {
+         "@jupyterlab/debugger-extension": true,
+         "nbdime-jupyterlab": true
+   }
+}

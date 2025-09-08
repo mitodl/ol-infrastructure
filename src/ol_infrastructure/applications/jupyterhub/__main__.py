@@ -475,7 +475,13 @@ binderhub_application = kubernetes.helm.v3.Release(
                             "stringData": Path(__file__)
                             .parent.joinpath("menu_override.json")
                             .read_text(),
-                        }
+                        },
+                        "disabled_extensions": {
+                            "mountPath": "/home/jovyan/.jupyter/labconfig/page_config.json",
+                            "stringData": Path(__file__)
+                            .parent.joinpath("disabled_extensions.json")
+                            .read_text(),
+                        },
                     },
                     "image": {
                         "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
