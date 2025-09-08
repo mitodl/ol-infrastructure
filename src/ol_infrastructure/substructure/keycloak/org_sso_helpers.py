@@ -17,6 +17,7 @@ class NameIdFormat(str, Enum):
     unspecified = "Unspecified"
     email = "Email"
     persistent = "Persistent"
+    transient = "Transient"
 
 
 class AttributeFormat(str, Enum):
@@ -40,7 +41,7 @@ class SamlIdpConfig(OrgConfig):
     keycloak_url: str
     first_login_flow: keycloak.authentication.Flow
     name_id_format: NameIdFormat = NameIdFormat.unspecified
-    principal_type: Literal["SUBJECT", "ATTRIBUTE"] = "SUBJECT"
+    principal_type: Literal["SUBJECT", "ATTRIBUTE", "FRIENDLY_ATTRIBUTE"] = "SUBJECT"
     principal_attribute: str | None = None
     mapper_attribute_format: AttributeFormat = AttributeFormat.uri
     attribute_map: dict[str, str] | None = None
