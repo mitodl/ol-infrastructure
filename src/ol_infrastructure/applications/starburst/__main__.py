@@ -357,29 +357,36 @@ def generate_role_definitions(
         # Add data access privileges based on domains
         for data_access in role_config.get("data_access", []):
             domain = data_access["domain"]
-            privilege_type = data_access["privilege"]
+            privilege_types = data_access.get("privileges", [])
+
+            if not privilege_types:
+                pulumi.log.warn(
+                    f"No privileges found for domain '{domain}' in role '{role_name}'"
+                )
+                continue
 
             # Get schemas for this domain
             schemas = data_domains.get(domain, [])
 
             for schema in schemas:
-                if privilege_type == "Select":
-                    privilege_def = {
-                        "privilege": privilege_type,
-                        "entity_kind": "Column",
-                        "schema_name": schema,
-                        "table_name": "*",
-                        "column_name": "*",
-                    }
-                else:
-                    privilege_def = {
-                        "privilege": privilege_type,
-                        "entity_kind": "Table",
-                        "schema_name": schema,
-                        "table_name": "*",
-                    }
+                for privilege_type in privilege_types:
+                    if privilege_type == "Select":
+                        privilege_def = {
+                            "privilege": privilege_type,
+                            "entity_kind": "Column",
+                            "schema_name": schema,
+                            "table_name": "*",
+                            "column_name": "*",
+                        }
+                    else:
+                        privilege_def = {
+                            "privilege": privilege_type,
+                            "entity_kind": "Table",
+                            "schema_name": schema,
+                            "table_name": "*",
+                        }
 
-                privileges.append(privilege_def)
+                    privileges.append(privilege_def)
 
         roles[role_name] = {
             "description": role_config.get("description", ""),

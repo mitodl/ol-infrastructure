@@ -25,45 +25,16 @@ config:
         entity_kind: "Account"
       data_access:
       - domain: "raw"
-        privilege: "Select"
-      - domain: "raw"
-        privilege: "Insert"
-      - domain: "raw"
-        privilege: "Update"
-      - domain: "raw"
-        privilege: "Delete"
+        privileges: ["Select", "Insert", "Update", "Delete"]
       - domain: "staging"
-        privilege: "Select"
-      - domain: "staging"
-        privilege: "Insert"
-      - domain: "staging"
-        privilege: "Update"
-      - domain: "staging"
-        privilege: "Delete"
+        privileges: ["Select", "Insert", "Update", "Delete"]
       - domain: "intermediate"
-        privilege: "Select"
-      - domain: "intermediate"
-        privilege: "Insert"
-      - domain: "intermediate"
-        privilege: "Update"
-      - domain: "intermediate"
-        privilege: "Delete"
+        privileges: ["Select", "Insert", "Update", "Delete"]
       - domain: "marts"
-        privilege: "Select"
-      - domain: "marts"
-        privilege: "Insert"
-      - domain: "marts"
-        privilege: "Update"
-      - domain: "marts"
-        privilege: "Delete"
+        privileges: ["Select", "Insert", "Update", "Delete"]
       - domain: "dimensional"
-        privilege: "Select"
-      - domain: "dimensional"
-        privilege: "Insert"
-      - domain: "dimensional"
-        privilege: "Update"
-      - domain: "dimensional"
-        privilege: "Delete"
+        privileges: ["Select", "Insert", "Update", "Delete"]
+
     ol_data_engineer:
       description: "Data engineering role with write access to staging/intermediate\
         \ data and read access to production data"
@@ -78,27 +49,16 @@ config:
         entity_kind: "Schema"
       data_access:
       - domain: "raw"
-        privilege: "Select"
+        privileges: ["Select"]
       - domain: "staging"
-        privilege: "Select"
-      - domain: "staging"
-        privilege: "Insert"
-      - domain: "staging"
-        privilege: "Update"
-      - domain: "staging"
-        privilege: "Delete"
+        privileges: ["Select", "Insert", "Update", "Delete"]
       - domain: "intermediate"
-        privilege: "Select"
-      - domain: "intermediate"
-        privilege: "Insert"
-      - domain: "intermediate"
-        privilege: "Update"
-      - domain: "intermediate"
-        privilege: "Delete"
+        privileges: ["Select", "Insert", "Update", "Delete"]
       - domain: "marts"
-        privilege: "Select"
+        privileges: ["Select"]
       - domain: "dimensional"
-        privilege: "Select"
+        privileges: ["Select"]
+
     ol_data_analyst:
       description: "Data analyst role with read access to staging, intermediate, and\
         \ production data"
@@ -108,13 +68,14 @@ config:
         entity_kind: "Schema"
       data_access:
       - domain: "staging"
-        privilege: "Select"
+        privileges: ["Select"]
       - domain: "intermediate"
-        privilege: "Select"
+        privileges: ["Select"]
       - domain: "marts"
-        privilege: "Select"
+        privileges: ["Select"]
       - domain: "dimensional"
-        privilege: "Select"
+        privileges: ["Select"]
+
     ol_researcher:
       description: "Research role with broad read access and ML capabilities for academic\
         \ research"
@@ -130,15 +91,16 @@ config:
         entity_kind: "Schema"
       data_access:
       - domain: "raw"
-        privilege: "Select"
+        privileges: ["Select"]
       - domain: "staging"
-        privilege: "Select"
+        privileges: ["Select"]
       - domain: "intermediate"
-        privilege: "Select"
+        privileges: ["Select"]
       - domain: "marts"
-        privilege: "Select"
+        privileges: ["Select"]
       - domain: "dimensional"
-        privilege: "Select"
+        privileges: ["Select"]
+
     ol_instructor:
       description: "Instructor role with limited read access to educational datasets\
         \ and sample data"
@@ -148,9 +110,10 @@ config:
         entity_kind: "Schema"
       data_access:
       - domain: "marts"
-        privilege: "Select"
+        privileges: ["Select"]
       - domain: "dimensional"
-        privilege: "Select"
+        privileges: ["Select"]
+
     ol_business_analyst:
       description: "Business analyst role with read access to production marts and\
         \ key business metrics"
@@ -160,6 +123,6 @@ config:
         entity_kind: "Schema"
       data_access:
       - domain: "marts"
-        privilege: "Select"
+        privileges: ["Select"]
       - domain: "dimensional"
-        privilege: "Select"
+        privileges: ["Select"]
