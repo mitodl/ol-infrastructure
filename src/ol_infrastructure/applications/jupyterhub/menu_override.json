@@ -1,0 +1,103 @@
+{
+  "@jupyterlab/mainmenu-extension:plugin": {
+  "menus": [
+    {
+      "id": "jp-mainmenu-tabs",
+      "disabled": true
+    },
+    {
+      "id": "jp-mainmenu-file",
+      "disabled": true
+    },
+    {
+      "id": "jp-mainmenu-edit",
+      "disabled": true
+    },
+    {
+      "id": "jp-mainmenu-view",
+      "disabled": true
+    },
+    {
+      "id": "jp-mainmenu-run",
+      "disabled": true
+    },
+    {
+      "id": "jp-mainmenu-kernel",
+      "disabled": true
+    },
+    {
+      "id": "jp-mainmenu-git",
+      "disabled": true
+    },
+    {
+      "id": "jp-mainmenu-settings",
+      "disabled": true
+    },
+    {
+      "id": "jp-mainmenu-help",
+      "disabled": true
+    }
+  ]
+  },
+  "@jupyterlab/notebook-extension:panel" : {
+    "toolbar": [
+        {
+            "name": "save",
+            "disabled": true
+        },
+        {
+            "name": "insert",
+            "disabled": true
+        },
+        {
+            "name": "cut",
+            "disabled": true
+        },
+        {
+            "name": "copy",
+            "disabled": true
+        },
+        {
+            "name": "paste",
+            "disabled": true
+        },
+        {
+            "name": "interrupt",
+            "disabled": true
+        },
+        {
+            "name": "restart",
+            "disabled": true
+        },
+        {
+            "name": "restart-and-run",
+            "disabled": true
+        },
+        {
+            "name": "cellType",
+            "disabled": true
+        },
+        {
+            "name": "spacer",
+            "disabled": true
+        },
+        {
+            "name": "interfaceSwitcher",
+            "disabled": true
+        },
+        {
+            "name": "kernelName",
+            "disabled": true
+        },
+        {
+            "name": "executionProgress",
+            "disabled": true
+        },
+        {
+            "name": "scrollbar",
+            "disabled": true
+        }
+    ]
+  }
+
+}
