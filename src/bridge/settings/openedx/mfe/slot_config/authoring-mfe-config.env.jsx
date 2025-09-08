@@ -4,10 +4,10 @@ import config from './common-mfe-config.env.jsx';
 // Listen for messages from xBlock Asides to trigger a course refresh when Aside state changes.
 // Uses localStorage and the StorageEvent to notify the authoring MFE to refresh the course data.
 window.addEventListener("message", function (event) {
-  // Optional: check origin
   if (event.origin !== configData.STUDIO_BASE_URL) return;
 
   if (event.data?.type === "COURSE_REFRESH_TRIGGER") {
+    // Authoring MFE listens for changes to this key to trigger a refresh of the course data.
     const storageKey = 'courseRefreshTriggerOnComponentEditSave';
     localStorage.setItem(storageKey, Date.now());
 
