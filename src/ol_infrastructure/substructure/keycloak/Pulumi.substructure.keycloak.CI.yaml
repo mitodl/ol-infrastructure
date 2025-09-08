@@ -53,7 +53,8 @@ config:
   keycloak_realm:ol-platform-engineering-leek-client-secret:
     secure: v1:xf9mFeIyIWLQbIYk:IY+XjdVmc6Va8WGTwrEN+t3jsyuJJ2b1fD83n2MiDSfUBNxeBoP1Xwd+KGskOLOX
   keycloak_realm:ol-platform-engineering-leek-redirect-uris: ["https://celery-monitoring-ci.odl.mit.edu/*"]
-  keycloak_realm:ol-platform-engineering-vault-redirect-uris: ["https://vault-ci.odl.mit.edu/ui/vault/auth/oidc/oidc/callback"]
+  keycloak_realm:ol-platform-engineering-vault-redirect-uris: ["https://vault-ci.odl.mit.edu/ui/vault/auth/oidc/oidc/callback",
+    "http://localhost:8250/oidc/callback"]
   keycloak_realm:ol-platform-engineering-jupyterhub-redirect-uris:
   - "https://nb.ci.ol.mit.edu/*"
   - "https://binder.ci.ol.mit.edu/*"
