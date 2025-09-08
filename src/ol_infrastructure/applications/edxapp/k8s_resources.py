@@ -76,6 +76,11 @@ def create_k8s_resources(
     # Look up what what release to deploy for this stack
     release_info = OpenLearningOpenEdxDeployment.get_item(stack_info.env_prefix)
 
+    opensearch_stack = StackReference(
+        f"infrastructure.aws.opensearch.{stack_info.env_prefix}.{stack_info.name}"
+    )
+    opensearch_hostname = opensearch_stack.require_output("cluster")["endpoint"]
+
     # Configure reusable global labels
     k8s_global_labels = K8sGlobalLabels(
         service=Services.edxapp,
@@ -141,11 +146,6 @@ def create_k8s_resources(
         },
         opts=pulumi.ResourceOptions(depends_on=[edxapp_k8s_app_security_group]),
     )
-
-    opensearch_stack = StackReference(
-        f"infrastructure.aws.opensearch.{stack_info.env_prefix}.{stack_info.name}"
-    )
-    opensearch_hostname = opensearch_stack.require_output("cluster")["endpoint"]
 
     secrets = create_k8s_secrets(
         edxapp_cache=edxapp_cache,
@@ -683,10 +683,6 @@ def create_k8s_resources(
     ############################################
     # Shared configuration for BOTH LMS and CMS
     ############################################
-    opensearch_stack = StackReference(
-        f"infrastructure.aws.opensearch.{stack_info.env_prefix}.{stack_info.name}"
-    )
-    opensearch_hostname = opensearch_stack.require_output("cluster")["endpoint"]
 
     secrets = create_k8s_secrets(
         stack_info,
