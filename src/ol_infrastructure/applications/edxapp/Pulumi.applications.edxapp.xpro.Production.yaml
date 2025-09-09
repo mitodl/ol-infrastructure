@@ -30,7 +30,7 @@ config:
   edxapp:business_unit: mitxpro
   edxapp:db_password:
     secure: v1:U83x0i6WAndxuOLK:XsAILALTGbtjCqGJllcqg3EaOM0FF/SNmuiMAK2r3E9X5joW26kjOQzYUcKr0slkHBv8RUEr3xA=
-  edxapp:db_version: 10.11
+  edxapp:db_use_blue_green: true
   edxapp:dns_zone: xpro
   edxapp:default_module_class: xmodule.hidden_block.HiddenBlock
   edxapp:domains:
