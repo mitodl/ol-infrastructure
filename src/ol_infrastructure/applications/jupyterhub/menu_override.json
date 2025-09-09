@@ -1,115 +1,140 @@
 {
   "@jupyterlab/mainmenu-extension:plugin": {
-  "menus": [
-    {
-      "id": "jp-mainmenu-file",
-      "disabled": false,
-      "items": [
-        {
-          "command": "hub:logout",
-          "disabled": true
-        },
-        {
-          "command": "hub:control-panel",
-          "disabled": true
-        }
-      ]
-    },
-    {
-      "id": "jp-mainmenu-tabs",
-      "disabled": true
-    },
-    {
-      "id": "jp-mainmenu-edit",
-      "disabled": true
-    },
-    {
-      "id": "jp-mainmenu-view",
-      "disabled": true
-    },
-    {
-      "id": "jp-mainmenu-run",
-      "disabled": false,
-      "items": [
-        {
-          "command": "runmenu:restart-and-run-all",
-          "disabled": true
-        }
-      ]
-    },
-    {
-      "id": "jp-mainmenu-kernel",
-      "disabled": true
-    },
-    {
-      "id": "jp-mainmenu-git",
-      "disabled": true
-    },
-    {
-      "id": "jp-mainmenu-settings",
-      "disabled": true
-    },
-    {
-      "id": "jp-mainmenu-help",
-      "disabled": true
-    }
-  ]
+    "menus": [
+      {
+        "id": "jp-mainmenu-file",
+        "disabled": false,
+        "items": [
+          {
+            "command": "hub:logout",
+            "disabled": true
+          },
+          {
+            "command": "hub:control-panel",
+            "disabled": true
+          }
+        ]
+      },
+      {
+        "id": "jp-mainmenu-tabs",
+        "disabled": true
+      },
+      {
+        "id": "jp-mainmenu-edit",
+        "disabled": true
+      },
+      {
+        "id": "jp-mainmenu-view",
+        "disabled": true
+      },
+      {
+        "id": "jp-mainmenu-run",
+        "disabled": false,
+        "items": [
+          {
+            "command": "runmenu:restart-and-run-all",
+            "disabled": true
+          },
+          {
+            "type": "submenu",
+            "rank": 1010,
+            "disabled": true,
+            "submenu": {
+              "id": "jp-runmenu-change-cell-type",
+              "label": "Cell Type",
+              "items": [
+                {
+                  "command": "notebook:change-cell-to-code",
+                  "rank": 0,
+                  "disabled": true
+                },
+                {
+                  "command": "notebook:change-cell-to-markdown",
+                  "rank": 0,
+                  "disabled": true
+                },
+                {
+                  "command": "notebook:change-cell-to-raw",
+                  "rank": 0,
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "jp-mainmenu-kernel",
+        "disabled": true
+      },
+      {
+        "id": "jp-mainmenu-git",
+        "disabled": true
+      },
+      {
+        "id": "jp-mainmenu-settings",
+        "disabled": true
+      },
+      {
+        "id": "jp-mainmenu-help",
+        "disabled": true
+      }
+    ]
   },
-  "@jupyterlab/notebook-extension:panel" : {
+  "@jupyterlab/notebook-extension:panel": {
     "toolbar": [
-        {
-            "name": "insert",
-            "disabled": true
-        },
-        {
-            "name": "cut",
-            "disabled": true
-        },
-        {
-            "name": "copy",
-            "disabled": true
-        },
-        {
-            "name": "paste",
-            "disabled": true
-        },
-        {
-            "name": "interrupt",
-            "disabled": true
-        },
-        {
-            "name": "restart",
-            "disabled": true
-        },
-        {
-            "name": "restart-and-run",
-            "disabled": true
-        },
-        {
-            "name": "cellType",
-            "disabled": true
-        },
-        {
-            "name": "spacer",
-            "disabled": true
-        },
-        {
-            "name": "interfaceSwitcher",
-            "disabled": true
-        },
-        {
-            "name": "kernelName",
-            "disabled": true
-        },
-        {
-            "name": "executionProgress",
-            "disabled": true
-        },
-        {
-            "name": "scrollbar",
-            "disabled": true
-        }
+      {
+        "name": "insert",
+        "disabled": true
+      },
+      {
+        "name": "cut",
+        "disabled": true
+      },
+      {
+        "name": "copy",
+        "disabled": true
+      },
+      {
+        "name": "paste",
+        "disabled": true
+      },
+      {
+        "name": "interrupt",
+        "disabled": true
+      },
+      {
+        "name": "restart",
+        "disabled": true
+      },
+      {
+        "name": "restart-and-run",
+        "disabled": true
+      },
+      {
+        "name": "cellType",
+        "disabled": true
+      },
+      {
+        "name": "spacer",
+        "disabled": true
+      },
+      {
+        "name": "interfaceSwitcher",
+        "disabled": true
+      },
+      {
+        "name": "kernelName",
+        "disabled": true
+      },
+      {
+        "name": "executionProgress",
+        "disabled": true
+      },
+      {
+        "name": "scrollbar",
+        "disabled": true
+      }
     ]
   }
-
 }
