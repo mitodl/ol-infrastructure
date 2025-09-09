@@ -147,6 +147,9 @@ botkube_application = kubernetes.helm.v3.Release(
         values={
             "commonLabels": k8s_global_labels,
             "sources": {},
+            "settings": {
+                "clusterName": "applications-ci",
+            },
             "communications": {
                 "default-group": {
                     "socketSlack": {
