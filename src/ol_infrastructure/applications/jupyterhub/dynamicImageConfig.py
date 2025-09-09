@@ -32,6 +32,20 @@ class QueryStringKubeSpawner(KubeSpawner):
                 self.image = (
                     image_base.format(tag) if tag else image_base.format(course)
                 )
+                if course == "deep_learning_foundations_and_applications":
+                    # This course requires a GPU, so we are adding a node affinity
+                    # rule to schedule the pod on a node with a GPU.
+                    self.node_affinity_required = [
+                        {
+                            "matchExpressions": [
+                                {
+                                    "key": "ol.mit.edu/gpu_node",
+                                    "operator": "In",
+                                    "values": ["true"],
+                                }
+                            ]
+                        }
+                    ]
                 # If we don't have a notebook, don't muck with default_url
                 # This falls back to the tree view in Jupyterhub if not specified
                 if notebook and notebook.endswith(".ipynb"):
