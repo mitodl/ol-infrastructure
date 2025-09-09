@@ -326,29 +326,41 @@ def _build_base_privileges(
     entity_kind = base_privilege_group["entity_kind"]
     privilege_list = base_privilege_group.get("privileges", [])
 
-    # Handle additional properties like catalog_name
+    # Handle additional properties
     additional_props = {
         k: v
         for k, v in base_privilege_group.items()
-        if k not in ["entity_kind", "privileges"]
+        if k not in ["entity_kind", "privileges", "catalogs"]
     }
 
-    for privilege_config in privilege_list:
-        # Handle both old format (string) and new format (dict with grant)
-        if isinstance(privilege_config, str):
-            privilege_name = privilege_config
-            grant_option = False
-        else:
-            privilege_name = privilege_config["name"]
-            grant_option = privilege_config.get("grant", False)
+    # Handle multiple catalogs
+    if "catalogs" in base_privilege_group:
+        catalogs = base_privilege_group["catalogs"]
+    elif "catalog_name" in base_privilege_group:
+        catalogs = [base_privilege_group["catalog_name"]]
+    else:
+        catalogs = [None]  # No catalog specified
 
-        privilege_def = {
-            "privilege": privilege_name,
-            "entity_kind": entity_kind,
-            "grant_option": grant_option,
-            **additional_props,
-        }
-        privileges.append(privilege_def)
+    for catalog in catalogs:
+        catalog_props = additional_props.copy()
+        if catalog:
+            catalog_props["catalog_name"] = catalog
+
+        for privilege_config in privilege_list:
+            if isinstance(privilege_config, str):
+                privilege_name = privilege_config
+                grant_option = False
+            else:
+                privilege_name = privilege_config["name"]
+                grant_option = privilege_config.get("grant", False)
+
+            privilege_def = {
+                "privilege": privilege_name,
+                "entity_kind": entity_kind,
+                "grant_option": grant_option,
+                **catalog_props,
+            }
+            privileges.append(privilege_def)
 
     return privileges
 
