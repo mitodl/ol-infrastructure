@@ -890,8 +890,8 @@ for purpose in ("draft", "live", "test"):
                 type="recv",
             ),
             fastly.ServiceVclSnippetArgs(
-                content=snippets_dir.joinpath("strip_cookies.vcl").read_text(),
-                name="Strip cookies.",
+                content=snippets_dir.joinpath("strip_cookies_and_authorization.vcl").read_text(),
+                name="Strip cookies and authorization.",
                 type="recv",
             ),
         ],
