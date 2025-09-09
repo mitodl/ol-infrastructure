@@ -54,7 +54,8 @@ config:
         desired: 3
         max: 5
         min: 2
-      tags: {}
+      tags:
+        cluster: applications-ci
       taints: {}
       version:
     gpu-worker-xlarge:
@@ -71,7 +72,9 @@ config:
         desired: 1
         max: 2
         min: 1
-      tags: {}
+      tags:
+        cluster: applications-ci
+        gpu: "true"
       taints: {"ol.mit.edu/gpu_node": {value: "true", effect: "NoSchedule"}}
       version:
 
