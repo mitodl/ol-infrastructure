@@ -10,113 +10,319 @@ config:
   starburst:roles:
     ol_platform_admin:
       description: "Full administrative access to all data and platform resources"
-      clusters: ["ol-data-interactive", "ol-data-lake-production"]
+      clusters:
+      - name: "ol-data-interactive"
+        privileges:
+        - name: "UseCluster"
+          grant: true
+        - name: "MonitorCluster"
+          grant: false
+        - name: "EnableDisableCluster"
+          grant: true
+      - name: "ol-data-lake-production"
+        privileges:
+        - name: "UseCluster"
+          grant: true
+        - name: "MonitorCluster"
+          grant: true
+        - name: "EnableDisableCluster"
+          grant: false
       base_privileges:
       - entity_kind: "Account"
-        privileges: ["CreateRole", "GrantRole", "CreateUser", "CreateCatalog", "CreateAiModel"]
+        privileges:
+        - name: "ApplyTag"
+          grant: true
+        - name: "CreateAiModel"
+          grant: true
+        - name: "CreateCatalog"
+          grant: true
+        - name: "CreateCluster"
+          grant: true
+        - name: "CreateRole"
+          grant: true
+        - name: "CreateTag"
+          grant: true
+        - name: "CreateUser"
+          grant: true
+        - name: "ManageBilling"
+          grant: false
+        - name: "ManageIngestStreams"
+          grant: true
+        - name: "ManageNotifications"
+          grant: true
+        - name: "ManageOauthClient"
+          grant: false
+        - name: "ManageQueryRoutingRules"
+          grant: true
+        - name: "ManageSecurity"
+          grant: false
+        - name: "ManageServiceAccount"
+          grant: true
+        - name: "ManageSso"
+          grant: false
+        - name: "SsoUserPasswordLogin"
+          grant: false
+        - name: "ViewAllDataLineage"
+          grant: true
+        - name: "ViewAllQueryHistory"
+          grant: true
+        - name: "ViewAuditLog"
+          grant: false
+        - name: "ViewPublicOauthClient"
+          grant: true
       - entity_kind: "Catalog"
         catalog_name: "ol_warehouse"
-        privileges: ["CreateSchema"]
+        privileges:
+        - name: "CreateSchema"
+          grant: true
       - entity_kind: "Schema"
-        privileges: ["CreateTable", "CreateView"]
+        privileges:
+        - name: "CreateTable"
+          grant: true
+        - name: "CreateView"
+          grant: true
       - entity_kind: "Function"
-        privileges: ["Execute"]
+        privileges:
+        - name: "Execute"
+          grant: true
       data_access:
       - domain: "raw"
-        privileges: ["Select", "Insert", "Update", "Delete"]
+        privileges:
+        - name: "Select"
+          grant: true
+        - name: "Insert"
+          grant: false
+        - name: "Update"
+          grant: false
+        - name: "Delete"
+          grant: false
       - domain: "staging"
-        privileges: ["Select", "Insert", "Update", "Delete"]
+        privileges:
+        - name: "Select"
+          grant: true
+        - name: "Insert"
+          grant: true
+        - name: "Update"
+          grant: true
+        - name: "Delete"
+          grant: true
       - domain: "intermediate"
-        privileges: ["Select", "Insert", "Update", "Delete"]
+        privileges:
+        - name: "Select"
+          grant: true
+        - name: "Insert"
+          grant: true
+        - name: "Update"
+          grant: true
+        - name: "Delete"
+          grant: true
       - domain: "marts"
-        privileges: ["Select", "Insert", "Update", "Delete"]
+        privileges:
+        - name: "Select"
+          grant: true
+        - name: "Insert"
+          grant: false
+        - name: "Update"
+          grant: false
+        - name: "Delete"
+          grant: false
       - domain: "dimensional"
-        privileges: ["Select", "Insert", "Update", "Delete"]
+        privileges:
+        - name: "Select"
+          grant: true
+        - name: "Insert"
+          grant: false
+        - name: "Update"
+          grant: false
+        - name: "Delete"
+          grant: false
 
     ol_data_engineer:
       description: "Data engineering role with write access to staging/intermediate\
-        \ data and read access to production data"
-      clusters: ["ol-data-interactive", "ol-data-lake-production"]
+        \ data"
+      clusters:
+      - name: "ol-data-interactive"
+        privileges:
+        - name: "UseCluster"
+          grant: true
+        - name: "MonitorCluster"
+          grant: false
+      - name: "ol-data-lake-production"
+        privileges:
+        - name: "UseCluster"
+          grant: false
+        - name: "MonitorCluster"
+          grant: false
       base_privileges:
       - entity_kind: "Catalog"
         catalog_name: "ol_warehouse"
-        privileges: ["CreateSchema"]
+        privileges:
+        - name: "CreateSchema"
+          grant: false
       - entity_kind: "Schema"
-        privileges: ["CreateTable", "CreateView"]
+        privileges:
+        - name: "CreateTable"
+          grant: true
+        - name: "CreateView"
+          grant: true
       data_access:
       - domain: "raw"
-        privileges: ["Select"]
+        privileges:
+        - name: "Select"
+          grant: false
       - domain: "staging"
-        privileges: ["Select", "Insert", "Update", "Delete"]
+        privileges:
+        - name: "Select"
+          grant: true
+        - name: "Insert"
+          grant: true
+        - name: "Update"
+          grant: true
+        - name: "Delete"
+          grant: true
       - domain: "intermediate"
-        privileges: ["Select", "Insert", "Update", "Delete"]
+        privileges:
+        - name: "Select"
+          grant: true
+        - name: "Insert"
+          grant: true
+        - name: "Update"
+          grant: true
+        - name: "Delete"
+          grant: true
       - domain: "marts"
-        privileges: ["Select"]
+        privileges:
+        - name: "Select"
+          grant: false
       - domain: "dimensional"
-        privileges: ["Select"]
+        privileges:
+        - name: "Select"
+          grant: false
 
     ol_data_analyst:
-      description: "Data analyst role with read access to staging, intermediate, and\
-        \ production data"
-      clusters: ["ol-data-interactive", "ol-data-lake-production"]
+      description: "Data analyst role with read access to data"
+      clusters:
+      - name: "ol-data-interactive"
+        privileges:
+        - name: "UseCluster"
+          grant: false
+      - name: "ol-data-lake-production"
+        privileges:
+        - name: "UseCluster"
+          grant: false
       base_privileges:
       - entity_kind: "Schema"
-        privileges: ["CreateView"]
+        privileges:
+        - name: "CreateView"
+          grant: false
       data_access:
       - domain: "staging"
-        privileges: ["Select"]
+        privileges:
+        - name: "Select"
+          grant: false
       - domain: "intermediate"
-        privileges: ["Select"]
+        privileges:
+        - name: "Select"
+          grant: false
       - domain: "marts"
-        privileges: ["Select"]
+        privileges:
+        - name: "Select"
+          grant: false
       - domain: "dimensional"
-        privileges: ["Select"]
+        privileges:
+        - name: "Select"
+          grant: false
 
     ol_researcher:
-      description: "Research role with broad read access and ML capabilities for academic\
-        \ research"
-      clusters: ["ol-data-interactive", "ol-data-lake-production"]
+      description: "Research role with ML capabilities"
+      clusters:
+      - name: "ol-data-interactive"
+        privileges:
+        - name: "UseCluster"
+          grant: false
+        - name: "MonitorCluster"
+          grant: false
+      - name: "ol-data-lake-production"
+        privileges:
+        - name: "UseCluster"
+          grant: false
       base_privileges:
       - entity_kind: "Account"
-        privileges: ["CreateAiModel"]
+        privileges:
+        - name: "CreateAiModel"
+          grant: false
       - entity_kind: "Schema"
-        privileges: ["CreateView", "CreateTable"]
+        privileges:
+        - name: "CreateView"
+          grant: false
+        - name: "CreateTable"
+          grant: false
       - entity_kind: "Function"
-        privileges: ["Execute"]
+        privileges:
+        - name: "Execute"
+          grant: false
       data_access:
       - domain: "raw"
-        privileges: ["Select"]
+        privileges:
+        - name: "Select"
+          grant: false
       - domain: "staging"
-        privileges: ["Select"]
+        privileges:
+        - name: "Select"
+          grant: false
       - domain: "intermediate"
-        privileges: ["Select"]
+        privileges:
+        - name: "Select"
+          grant: false
       - domain: "marts"
-        privileges: ["Select"]
+        privileges:
+        - name: "Select"
+          grant: false
       - domain: "dimensional"
-        privileges: ["Select"]
+        privileges:
+        - name: "Select"
+          grant: false
 
     ol_instructor:
-      description: "Instructor role with limited read access to educational datasets\
-        \ and sample data"
-      clusters: ["ol-data-interactive", "ol-data-lake-production"]
+      description: "Instructor role with limited access"
+      clusters:
+      - name: "ol-data-interactive"
+        privileges:
+        - name: "UseCluster"
+          grant: false
       base_privileges:
       - entity_kind: "Schema"
-        privileges: ["CreateView"]
+        privileges:
+        - name: "CreateView"
+          grant: false
       data_access:
       - domain: "marts"
-        privileges: ["Select"]
+        privileges:
+        - name: "Select"
+          grant: false
       - domain: "dimensional"
-        privileges: ["Select"]
+        privileges:
+        - name: "Select"
+          grant: false
 
     ol_business_analyst:
-      description: "Business analyst role with read access to production marts and\
-        \ key business metrics"
-      clusters: ["ol-data-interactive", "ol-data-lake-production"]
+      description: "Business analyst role"
+      clusters:
+      - name: "ol-data-interactive"
+        privileges:
+        - name: "UseCluster"
+          grant: false
       base_privileges:
       - entity_kind: "Schema"
-        privileges: ["CreateView"]
+        privileges:
+        - name: "CreateView"
+          grant: false
       data_access:
       - domain: "marts"
-        privileges: ["Select"]
+        privileges:
+        - name: "Select"
+          grant: false
       - domain: "dimensional"
-        privileges: ["Select"]
+        privileges:
+        - name: "Select"
+          grant: false

@@ -318,6 +318,79 @@ class StarburstRole(dynamic.Resource):
         super().__init__(StarburstRoleProvider(), name, props, opts)
 
 
+def _build_base_privileges(
+    base_privilege_group: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Build base privilege definitions from configuration group."""
+    privileges = []
+    entity_kind = base_privilege_group["entity_kind"]
+    privilege_list = base_privilege_group.get("privileges", [])
+
+    # Handle additional properties like catalog_name
+    additional_props = {
+        k: v
+        for k, v in base_privilege_group.items()
+        if k not in ["entity_kind", "privileges"]
+    }
+
+    for privilege_config in privilege_list:
+        # Handle both old format (string) and new format (dict with grant)
+        if isinstance(privilege_config, str):
+            privilege_name = privilege_config
+            grant_option = False
+        else:
+            privilege_name = privilege_config["name"]
+            grant_option = privilege_config.get("grant", False)
+
+        privilege_def = {
+            "privilege": privilege_name,
+            "entity_kind": entity_kind,
+            "grant_option": grant_option,
+            **additional_props,
+        }
+        privileges.append(privilege_def)
+
+    return privileges
+
+
+def _build_cluster_privileges(
+    clusters_config: list[dict[str, Any]], cluster_ids: dict[str, str], role_name: str
+) -> list[dict[str, Any]]:
+    """Build cluster privilege definitions."""
+    privileges = []
+
+    for cluster_config in clusters_config:
+        cluster_name = cluster_config["name"]
+        cluster_privileges = cluster_config.get("privileges", [])
+
+        cluster_id = cluster_ids.get(cluster_name)
+        if not cluster_id:
+            pulumi.log.warn(
+                f"No cluster ID found - '{cluster_name}' in role '{role_name}'"
+            )
+            continue
+
+        for privilege_config in cluster_privileges:
+            # Handle both old format (string) and new format (dict with grant)
+            if isinstance(privilege_config, str):
+                privilege_name = privilege_config
+                grant_option = False
+            else:
+                privilege_name = privilege_config["name"]
+                grant_option = privilege_config.get("grant", False)
+
+            privileges.append(
+                {
+                    "privilege": privilege_name,
+                    "entity_kind": "Cluster",
+                    "entity_id": cluster_id,
+                    "grant_option": grant_option,
+                }
+            )
+
+    return privileges
+
+
 def generate_role_definitions(
     dbt_parser: DbtProjectParser,
     cluster_ids: dict[str, str],
@@ -334,17 +407,12 @@ def generate_role_definitions(
         for base_privilege_group in role_config.get("base_privileges", []):
             privileges.extend(_build_base_privileges(base_privilege_group))
 
-        # Add cluster access privileges
-        cluster_names = role_config.get("clusters", [])
-        if isinstance(cluster_names, str):
-            cluster_names = [cluster_names]
-
-        for cluster_name in cluster_names:
-            cluster_privilege = _build_cluster_privilege(
-                cluster_name, cluster_ids, role_name
-            )
-            if cluster_privilege:
-                privileges.append(cluster_privilege)
+        # Add cluster access privileges with support for multiple privilege types
+        clusters_config = role_config.get("clusters", [])
+        cluster_privileges = _build_cluster_privileges(
+            clusters_config, cluster_ids, role_name
+        )
+        privileges.extend(cluster_privileges)
 
         # Add data access privileges
         for data_access in role_config.get("data_access", []):
@@ -361,59 +429,15 @@ def generate_role_definitions(
     return roles
 
 
-def _build_base_privileges(
-    base_privilege_group: dict[str, Any],
-) -> list[dict[str, Any]]:
-    """Build base privilege definitions from configuration group."""
-    privileges = []
-    entity_kind = base_privilege_group["entity_kind"]
-    privilege_list = base_privilege_group.get("privileges", [])
-
-    # Handle additional properties like catalog_name
-    additional_props = {
-        k: v
-        for k, v in base_privilege_group.items()
-        if k not in ["entity_kind", "privileges"]
-    }
-
-    for privilege_name in privilege_list:
-        privilege_def = {
-            "privilege": privilege_name,
-            "entity_kind": entity_kind,
-            **additional_props,
-        }
-        privileges.append(privilege_def)
-
-    return privileges
-
-
-def _build_cluster_privilege(
-    cluster_name: str, cluster_ids: dict[str, str], role_name: str
-) -> dict[str, Any] | None:
-    """Build cluster privilege definition."""
-    cluster_id = cluster_ids.get(cluster_name)
-    if not cluster_id:
-        pulumi.log.warn(
-            f"No cluster ID found for cluster '{cluster_name}' in role '{role_name}'"
-        )
-        return None
-
-    return {
-        "privilege": "UseCluster",
-        "entity_kind": "Cluster",
-        "entity_id": cluster_id,
-    }
-
-
 def _build_data_privileges(
     data_access: dict[str, Any], data_domains: dict[str, list[str]], role_name: str
 ) -> list[dict[str, Any]]:
     """Build data access privilege definitions."""
     privileges: list[dict[str, Any]] = []
     domain = data_access["domain"]
-    privilege_types = data_access.get("privileges", [])
+    privilege_configs = data_access.get("privileges", [])
 
-    if not privilege_types:
+    if not privilege_configs:
         pulumi.log.warn(
             f"No privileges found for domain '{domain}' in role '{role_name}'"
         )
@@ -421,12 +445,21 @@ def _build_data_privileges(
 
     schemas = data_domains.get(domain, [])
     for schema in schemas:
-        for privilege_type in privilege_types:
+        for privilege_config in privilege_configs:
+            # Handle both old format (string) and new format (dict with grant)
+            if isinstance(privilege_config, str):
+                privilege_type = privilege_config
+                grant_option = False
+            else:
+                privilege_type = privilege_config["name"]
+                grant_option = privilege_config.get("grant", False)
+
             privilege_def = {
                 "privilege": privilege_type,
                 "entity_kind": "Column" if privilege_type == "Select" else "Table",
                 "schema_name": schema,
                 "table_name": "*",
+                "grant_option": grant_option,
             }
 
             if privilege_type == "Select":
@@ -449,9 +482,8 @@ def _get_cluster_ids(
     all_cluster_names = set()
     for role_config in roles_config.values():
         clusters = role_config.get("clusters", [])
-        if isinstance(clusters, str):
-            clusters = [clusters]
-        all_cluster_names.update(clusters)
+        for cluster in clusters:
+            all_cluster_names.add(cluster["name"])
 
     # Only fetch cluster IDs during actual deployment, not preview
     if pulumi.runtime.is_dry_run():
