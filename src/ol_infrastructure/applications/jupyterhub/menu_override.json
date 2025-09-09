@@ -2,11 +2,21 @@
   "@jupyterlab/mainmenu-extension:plugin": {
   "menus": [
     {
-      "id": "jp-mainmenu-tabs",
-      "disabled": true
+      "id": "jp-mainmenu-file",
+      "disabled": false,
+      "items": [
+        {
+          "command": "hub:logout",
+          "disabled": true
+        },
+        {
+          "command": "hub:control-panel",
+          "disabled": true
+        }
+      ]
     },
     {
-      "id": "jp-mainmenu-file",
+      "id": "jp-mainmenu-tabs",
       "disabled": true
     },
     {
@@ -19,7 +29,13 @@
     },
     {
       "id": "jp-mainmenu-run",
-      "disabled": true
+      "disabled": false,
+      "items": [
+        {
+          "command": "runmenu:restart-and-run-all",
+          "disabled": true
+        }
+      ]
     },
     {
       "id": "jp-mainmenu-kernel",
@@ -41,10 +57,6 @@
   },
   "@jupyterlab/notebook-extension:panel" : {
     "toolbar": [
-        {
-            "name": "save",
-            "disabled": true
-        },
         {
             "name": "insert",
             "disabled": true
