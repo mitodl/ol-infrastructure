@@ -77,7 +77,7 @@ config:
   edxapp:framework: "earthly"
   edxapp:web_node_capacity: "3"
   edxapp:worker_node_capacity: "5"
-  redis:instance_type: cache.r6g.large
+  redis:instance_type: cache.r7g.large
   mongodb:atlas_project_id: 61a8fd80284fd30a660f2699
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
