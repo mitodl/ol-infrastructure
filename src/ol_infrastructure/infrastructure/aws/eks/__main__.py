@@ -23,6 +23,7 @@ from bridge.lib.magic_numbers import (
 from bridge.lib.versions import (
     APISIX_CHART_VERSION,
     AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION,
+    AWS_NODE_TERMINATION_HANDLER_CHART_VERSION,
     CERT_MANAGER_CHART_VERSION,
     EBS_CSI_DRIVER_VERSION,
     EFS_CSI_DRIVER_VERSION,
@@ -33,6 +34,7 @@ from bridge.lib.versions import (
     VAULT_SECRETS_OPERATOR_CHART_VERSION,
 )
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
+from ol_infrastructure.infrastructure.aws.eks.aws_utils import setup_aws_integrations
 from ol_infrastructure.infrastructure.aws.eks.core_dns import create_core_dns_resources
 from ol_infrastructure.lib.aws.eks_helper import (
     ECR_DOCKERHUB_REGISTRY,
@@ -87,6 +89,9 @@ VERSIONS = {
     "APISIX_CHART": os.environ.get("APISIX_CHART", APISIX_CHART_VERSION),
     "AWS_LOAD_BALANCER_CONTROLLER_CHART": os.environ.get(
         "AWS_LOAD_BALANCER_CONTROLLER_CHART", AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION
+    ),
+    "AWS_NODE_TERMINATION_HANDLER_CHART": os.environ.get(
+        "AWS_NODE_TERMINATION_HANDLER_CHART", AWS_NODE_TERMINATION_HANDLER_CHART_VERSION
     ),
     "CERT_MANAGER_CHART": os.environ.get(
         "CERT_MANAGER_CHART", CERT_MANAGER_CHART_VERSION
@@ -1664,334 +1669,17 @@ cert_manager_release = kubernetes.helm.v3.Release(
     ),
 )
 
-############################################################
-# Install and configure AWS Load Balancer Controller
-############################################################
-# Ref: https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.13.4/deploy/
-# Ref: https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.13.4/docs/install/iam_policy.json
-
-aws_load_balancer_controller_policy_document = {
-    "Version": IAM_POLICY_VERSION,
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": ["iam:CreateServiceLinkedRole"],
-            "Resource": "*",
-            "Condition": {
-                "StringEquals": {
-                    "iam:AWSServiceName": "elasticloadbalancing.amazonaws.com"
-                }
-            },
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "ec2:DescribeAccountAttributes",
-                "ec2:DescribeAddresses",
-                "ec2:DescribeAvailabilityZones",
-                "ec2:DescribeInternetGateways",
-                "ec2:DescribeVpcs",
-                "ec2:DescribeVpcPeeringConnections",
-                "ec2:DescribeSubnets",
-                "ec2:DescribeSecurityGroups",
-                "ec2:DescribeInstances",
-                "ec2:DescribeNetworkInterfaces",
-                "ec2:DescribeTags",
-                "ec2:GetCoipPoolUsage",
-                "ec2:DescribeCoipPools",
-                "ec2:GetSecurityGroupsForVpc",
-                "ec2:DescribeIpamPools",
-                "ec2:DescribeRouteTables",
-                "elasticloadbalancing:DescribeLoadBalancers",
-                "elasticloadbalancing:DescribeLoadBalancerAttributes",
-                "elasticloadbalancing:DescribeListeners",
-                "elasticloadbalancing:DescribeListenerCertificates",
-                "elasticloadbalancing:DescribeSSLPolicies",
-                "elasticloadbalancing:DescribeRules",
-                "elasticloadbalancing:DescribeTargetGroups",
-                "elasticloadbalancing:DescribeTargetGroupAttributes",
-                "elasticloadbalancing:DescribeTargetHealth",
-                "elasticloadbalancing:DescribeTags",
-                "elasticloadbalancing:DescribeTrustStores",
-                "elasticloadbalancing:DescribeListenerAttributes",
-                "elasticloadbalancing:DescribeCapacityReservation",
-            ],
-            "Resource": "*",
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "cognito-idp:DescribeUserPoolClient",
-                "acm:ListCertificates",
-                "acm:DescribeCertificate",
-                "iam:ListServerCertificates",
-                "iam:GetServerCertificate",
-                "waf-regional:GetWebACL",
-                "waf-regional:GetWebACLForResource",
-                "waf-regional:AssociateWebACL",
-                "waf-regional:DisassociateWebACL",
-                "wafv2:GetWebACL",
-                "wafv2:GetWebACLForResource",
-                "wafv2:AssociateWebACL",
-                "wafv2:DisassociateWebACL",
-                "shield:GetSubscriptionState",
-                "shield:DescribeProtection",
-                "shield:CreateProtection",
-                "shield:DeleteProtection",
-            ],
-            "Resource": "*",
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "ec2:AuthorizeSecurityGroupIngress",
-                "ec2:RevokeSecurityGroupIngress",
-            ],
-            "Resource": "*",
-        },
-        {"Effect": "Allow", "Action": ["ec2:CreateSecurityGroup"], "Resource": "*"},
-        {
-            "Effect": "Allow",
-            "Action": ["ec2:CreateTags"],
-            "Resource": "arn:aws:ec2:*:*:security-group/*",
-            "Condition": {
-                "StringEquals": {"ec2:CreateAction": "CreateSecurityGroup"},
-                "Null": {"aws:RequestTag/elbv2.k8s.aws/cluster": "false"},
-            },
-        },
-        {
-            "Effect": "Allow",
-            "Action": ["ec2:CreateTags", "ec2:DeleteTags"],
-            "Resource": "arn:aws:ec2:*:*:security-group/*",
-            "Condition": {
-                "Null": {
-                    "aws:RequestTag/elbv2.k8s.aws/cluster": "true",
-                    "aws:ResourceTag/elbv2.k8s.aws/cluster": "false",
-                }
-            },
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "ec2:AuthorizeSecurityGroupIngress",
-                "ec2:RevokeSecurityGroupIngress",
-                "ec2:DeleteSecurityGroup",
-            ],
-            "Resource": "*",
-            "Condition": {"Null": {"aws:ResourceTag/elbv2.k8s.aws/cluster": "false"}},
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "elasticloadbalancing:CreateLoadBalancer",
-                "elasticloadbalancing:CreateTargetGroup",
-            ],
-            "Resource": "*",
-            "Condition": {"Null": {"aws:RequestTag/elbv2.k8s.aws/cluster": "false"}},
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "elasticloadbalancing:CreateListener",
-                "elasticloadbalancing:DeleteListener",
-                "elasticloadbalancing:CreateRule",
-                "elasticloadbalancing:DeleteRule",
-            ],
-            "Resource": "*",
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "elasticloadbalancing:AddTags",
-                "elasticloadbalancing:RemoveTags",
-            ],
-            "Resource": [
-                "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
-                "arn:aws:elasticloadbalancing:*:*:loadbalancer/net/*/*",
-                "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*",
-            ],
-            "Condition": {
-                "Null": {
-                    "aws:RequestTag/elbv2.k8s.aws/cluster": "true",
-                    "aws:ResourceTag/elbv2.k8s.aws/cluster": "false",
-                }
-            },
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "elasticloadbalancing:AddTags",
-                "elasticloadbalancing:RemoveTags",
-            ],
-            "Resource": [
-                "arn:aws:elasticloadbalancing:*:*:listener/net/*/*/*",
-                "arn:aws:elasticloadbalancing:*:*:listener/app/*/*/*",
-                "arn:aws:elasticloadbalancing:*:*:listener-rule/net/*/*/*",
-                "arn:aws:elasticloadbalancing:*:*:listener-rule/app/*/*/*",
-            ],
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "elasticloadbalancing:ModifyLoadBalancerAttributes",
-                "elasticloadbalancing:SetIpAddressType",
-                "elasticloadbalancing:SetSecurityGroups",
-                "elasticloadbalancing:SetSubnets",
-                "elasticloadbalancing:DeleteLoadBalancer",
-                "elasticloadbalancing:ModifyTargetGroup",
-                "elasticloadbalancing:ModifyTargetGroupAttributes",
-                "elasticloadbalancing:DeleteTargetGroup",
-                "elasticloadbalancing:ModifyListenerAttributes",
-                "elasticloadbalancing:ModifyCapacityReservation",
-                "elasticloadbalancing:ModifyIpPools",
-            ],
-            "Resource": "*",
-            "Condition": {"Null": {"aws:ResourceTag/elbv2.k8s.aws/cluster": "false"}},
-        },
-        {
-            "Effect": "Allow",
-            "Action": ["elasticloadbalancing:AddTags"],
-            "Resource": [
-                "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
-                "arn:aws:elasticloadbalancing:*:*:loadbalancer/net/*/*",
-                "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*",
-            ],
-            "Condition": {
-                "StringEquals": {
-                    "elasticloadbalancing:CreateAction": [
-                        "CreateTargetGroup",
-                        "CreateLoadBalancer",
-                    ]
-                },
-                "Null": {"aws:RequestTag/elbv2.k8s.aws/cluster": "false"},
-            },
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "elasticloadbalancing:RegisterTargets",
-                "elasticloadbalancing:DeregisterTargets",
-            ],
-            "Resource": "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "elasticloadbalancing:SetWebAcl",
-                "elasticloadbalancing:ModifyListener",
-                "elasticloadbalancing:AddListenerCertificates",
-                "elasticloadbalancing:RemoveListenerCertificates",
-                "elasticloadbalancing:ModifyRule",
-                "elasticloadbalancing:SetRulePriorities",
-            ],
-            "Resource": "*",
-        },
-    ],
-}
-
-aws_lb_controller_service_account_name = "aws-load-balancer-controller"
-
-aws_load_balancer_controller_role_config = OLEKSTrustRoleConfig(
-    account_id=aws_account.account_id,
+setup_aws_integrations(
+    aws_account=aws_account,
     cluster_name=cluster_name,
-    cluster_identities=cluster.eks_cluster.identities,
-    description="Trust role for allowing the AWS Load Balancer Controller to manage ALBs/NLBs.",
-    policy_operator="StringEquals",
-    role_name=aws_lb_controller_service_account_name,
-    service_account_identifier="system:serviceaccount:kube-system:aws-load-balancer-controller",
-    tags=aws_config.tags,
-)
-aws_load_balancer_controller_role = OLEKSTrustRole(
-    f"{cluster_name}-aws-load-balancer-controller-trust-role",
-    role_config=aws_load_balancer_controller_role_config,
-    opts=ResourceOptions(parent=cluster, depends_on=cluster),
-)
-
-aws_load_balancer_controller_service_account = kubernetes.core.v1.ServiceAccount(
-    "aws-lb-controller-service-account",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=aws_lb_controller_service_account_name,
-        namespace="kube-system",
-        labels=k8s_global_labels,
-        annotations={
-            "eks.amazonaws.com/role-arn": aws_load_balancer_controller_role.role.arn
-        },
-    ),
-    automount_service_account_token=True,
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        parent=cluster,
-        depends_on=[
-            cluster,
-        ],
-    ),
-)
-
-aws_load_balancer_controller_policy = aws.iam.Policy(
-    f"{cluster_name}-aws-load-balancer-controller-policy",
-    name=f"{cluster_name}-aws-load-balancer-controller-policy",
-    path=f"/ol-infrastructure/eks/{cluster_name}/",
-    policy=json.dumps(
-        aws_load_balancer_controller_policy_document,
-    ),
-    opts=ResourceOptions(parent=aws_load_balancer_controller_role, depends_on=cluster),
-)
-aws.iam.RolePolicyAttachment(
-    f"{cluster_name}-aws-load-balancer-controller-attachment",
-    policy_arn=aws_load_balancer_controller_policy.arn,
-    role=aws_load_balancer_controller_role.role.id,
-    opts=ResourceOptions(parent=aws_load_balancer_controller_role),
-)
-
-aws_load_balancer_controller_release = kubernetes.helm.v3.Release(
-    f"{cluster_name}-aws-load-balancer-controller-helm-release",
-    kubernetes.helm.v3.ReleaseArgs(
-        name="aws-load-balancer-controller",
-        chart="aws-load-balancer-controller",
-        version=VERSIONS["AWS_LOAD_BALANCER_CONTROLLER_CHART"],
-        namespace="kube-system",
-        cleanup_on_fail=True,
-        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-            repo="https://aws.github.io/eks-charts",
-        ),
-        values={
-            "clusterName": cluster_name,
-            "enableCertManager": True,
-            "serviceAccount": {
-                "create": False,
-                "name": aws_lb_controller_service_account_name,
-                "annotations": {
-                    "eks.amazonaws.com/role-arn": aws_load_balancer_controller_role.role.arn,
-                },
-            },
-            "vpcId": target_vpc["id"],
-            "region": aws.get_region().name,
-            "podLabels": k8s_global_labels,
-            "tolerations": operations_tolerations,
-            "resources": {
-                "requests": {
-                    "cpu": "100m",
-                    "memory": "128Mi",
-                },
-                "limits": {
-                    "cpu": "200m",
-                    "memory": "256Mi",
-                },
-            },
-        },
-        skip_await=False,
-    ),
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        parent=cluster,
-        depends_on=[
-            cluster,
-            node_groups[0],
-            aws_load_balancer_controller_role,
-            aws_load_balancer_controller_policy,
-        ],
-        delete_before_replace=True,
-    ),
+    cluster=cluster,
+    aws_config=aws_config,
+    k8s_global_labels=k8s_global_labels,
+    k8s_provider=k8s_provider,
+    operations_tolerations=operations_tolerations,
+    target_vpc=target_vpc,
+    node_groups=node_groups,
+    versions=VERSIONS,
 )
 
 ############################################################
