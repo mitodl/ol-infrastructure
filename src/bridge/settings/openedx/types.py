@@ -102,7 +102,6 @@ class OpenEdxSupportedRelease(str, Enum):
         return enum_element
 
     master = ("master", "master", "3.11", "20")
-    sumac = ("sumac", "open-release/sumac.master", "3.11", "20")
     teak = ("teak", "release/teak", "3.11", "20")
 
     def __str__(self):
