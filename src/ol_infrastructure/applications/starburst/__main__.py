@@ -324,69 +324,34 @@ def generate_role_definitions(
     roles_config: dict[str, Any],
 ) -> dict[str, dict[str, Any]]:
     """Generate Starburst role definitions based on configuration and dbt structure."""
-
     data_domains = dbt_parser.get_data_domains()
     roles = {}
 
     for role_name, role_config in roles_config.items():
-        # Start with base privileges from config
-        privileges = list(role_config.get("base_privileges", []))
+        privileges = []
 
-        # Add cluster access privileges for multiple clusters
+        # Process base privileges with new grouped format
+        for base_privilege_group in role_config.get("base_privileges", []):
+            privileges.extend(_build_base_privileges(base_privilege_group))
+
+        # Add cluster access privileges
         cluster_names = role_config.get("clusters", [])
-        if isinstance(cluster_names, str):  # Handle single cluster as string
+        if isinstance(cluster_names, str):
             cluster_names = [cluster_names]
 
         for cluster_name in cluster_names:
-            cluster_id = cluster_ids.get(cluster_name)
+            cluster_privilege = _build_cluster_privilege(
+                cluster_name, cluster_ids, role_name
+            )
+            if cluster_privilege:
+                privileges.append(cluster_privilege)
 
-            if cluster_id:
-                privileges.append(
-                    {
-                        "privilege": "UseCluster",
-                        "entity_kind": "Cluster",
-                        "entity_id": cluster_id,
-                    }
-                )
-            else:
-                pulumi.log.warn(
-                    f"No cluster ID found for cluster '{cluster_name}' "
-                    f"in role '{role_name}'"
-                )
-
-        # Add data access privileges based on domains
+        # Add data access privileges
         for data_access in role_config.get("data_access", []):
-            domain = data_access["domain"]
-            privilege_types = data_access.get("privileges", [])
-
-            if not privilege_types:
-                pulumi.log.warn(
-                    f"No privileges found for domain '{domain}' in role '{role_name}'"
-                )
-                continue
-
-            # Get schemas for this domain
-            schemas = data_domains.get(domain, [])
-
-            for schema in schemas:
-                for privilege_type in privilege_types:
-                    if privilege_type == "Select":
-                        privilege_def = {
-                            "privilege": privilege_type,
-                            "entity_kind": "Column",
-                            "schema_name": schema,
-                            "table_name": "*",
-                            "column_name": "*",
-                        }
-                    else:
-                        privilege_def = {
-                            "privilege": privilege_type,
-                            "entity_kind": "Table",
-                            "schema_name": schema,
-                            "table_name": "*",
-                        }
-
-                    privileges.append(privilege_def)
+            data_privileges = _build_data_privileges(
+                data_access, data_domains, role_name
+            )
+            privileges.extend(data_privileges)
 
         roles[role_name] = {
             "description": role_config.get("description", ""),
@@ -394,6 +359,82 @@ def generate_role_definitions(
         }
 
     return roles
+
+
+def _build_base_privileges(
+    base_privilege_group: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Build base privilege definitions from configuration group."""
+    privileges = []
+    entity_kind = base_privilege_group["entity_kind"]
+    privilege_list = base_privilege_group.get("privileges", [])
+
+    # Handle additional properties like catalog_name
+    additional_props = {
+        k: v
+        for k, v in base_privilege_group.items()
+        if k not in ["entity_kind", "privileges"]
+    }
+
+    for privilege_name in privilege_list:
+        privilege_def = {
+            "privilege": privilege_name,
+            "entity_kind": entity_kind,
+            **additional_props,
+        }
+        privileges.append(privilege_def)
+
+    return privileges
+
+
+def _build_cluster_privilege(
+    cluster_name: str, cluster_ids: dict[str, str], role_name: str
+) -> dict[str, Any] | None:
+    """Build cluster privilege definition."""
+    cluster_id = cluster_ids.get(cluster_name)
+    if not cluster_id:
+        pulumi.log.warn(
+            f"No cluster ID found for cluster '{cluster_name}' in role '{role_name}'"
+        )
+        return None
+
+    return {
+        "privilege": "UseCluster",
+        "entity_kind": "Cluster",
+        "entity_id": cluster_id,
+    }
+
+
+def _build_data_privileges(
+    data_access: dict[str, Any], data_domains: dict[str, list[str]], role_name: str
+) -> list[dict[str, Any]]:
+    """Build data access privilege definitions."""
+    privileges: list[dict[str, Any]] = []
+    domain = data_access["domain"]
+    privilege_types = data_access.get("privileges", [])
+
+    if not privilege_types:
+        pulumi.log.warn(
+            f"No privileges found for domain '{domain}' in role '{role_name}'"
+        )
+        return privileges
+
+    schemas = data_domains.get(domain, [])
+    for schema in schemas:
+        for privilege_type in privilege_types:
+            privilege_def = {
+                "privilege": privilege_type,
+                "entity_kind": "Column" if privilege_type == "Select" else "Table",
+                "schema_name": schema,
+                "table_name": "*",
+            }
+
+            if privilege_type == "Select":
+                privilege_def["column_name"] = "*"
+
+            privileges.append(privilege_def)
+
+    return privileges
 
 
 def _get_cluster_ids(

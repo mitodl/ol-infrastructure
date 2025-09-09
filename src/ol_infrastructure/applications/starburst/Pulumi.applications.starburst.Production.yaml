@@ -12,17 +12,15 @@ config:
       description: "Full administrative access to all data and platform resources"
       clusters: ["ol-data-interactive", "ol-data-lake-production"]
       base_privileges:
-      - privilege: "CreateSchema"
-        entity_kind: "Catalog"
+      - entity_kind: "Account"
+        privileges: ["CreateRole", "GrantRole", "CreateUser", "CreateCatalog", "CreateAiModel"]
+      - entity_kind: "Catalog"
         catalog_name: "ol_warehouse"
-      - privilege: "CreateRole"
-        entity_kind: "Account"
-      - privilege: "GrantRole"
-        entity_kind: "Account"
-      - privilege: "CreateUser"
-        entity_kind: "Account"
-      - privilege: "CreateCatalog"
-        entity_kind: "Account"
+        privileges: ["CreateSchema"]
+      - entity_kind: "Schema"
+        privileges: ["CreateTable", "CreateView"]
+      - entity_kind: "Function"
+        privileges: ["Execute"]
       data_access:
       - domain: "raw"
         privileges: ["Select", "Insert", "Update", "Delete"]
@@ -40,13 +38,11 @@ config:
         \ data and read access to production data"
       clusters: ["ol-data-interactive", "ol-data-lake-production"]
       base_privileges:
-      - privilege: "CreateSchema"
-        entity_kind: "Catalog"
+      - entity_kind: "Catalog"
         catalog_name: "ol_warehouse"
-      - privilege: "CreateTable"
-        entity_kind: "Schema"
-      - privilege: "CreateView"
-        entity_kind: "Schema"
+        privileges: ["CreateSchema"]
+      - entity_kind: "Schema"
+        privileges: ["CreateTable", "CreateView"]
       data_access:
       - domain: "raw"
         privileges: ["Select"]
@@ -64,8 +60,8 @@ config:
         \ production data"
       clusters: ["ol-data-interactive", "ol-data-lake-production"]
       base_privileges:
-      - privilege: "CreateView"
-        entity_kind: "Schema"
+      - entity_kind: "Schema"
+        privileges: ["CreateView"]
       data_access:
       - domain: "staging"
         privileges: ["Select"]
@@ -81,14 +77,12 @@ config:
         \ research"
       clusters: ["ol-data-interactive", "ol-data-lake-production"]
       base_privileges:
-      - privilege: "CreateAiModel"
-        entity_kind: "Account"
-      - privilege: "Execute"
-        entity_kind: "Function"
-      - privilege: "CreateView"
-        entity_kind: "Schema"
-      - privilege: "CreateTable"
-        entity_kind: "Schema"
+      - entity_kind: "Account"
+        privileges: ["CreateAiModel"]
+      - entity_kind: "Schema"
+        privileges: ["CreateView", "CreateTable"]
+      - entity_kind: "Function"
+        privileges: ["Execute"]
       data_access:
       - domain: "raw"
         privileges: ["Select"]
@@ -106,8 +100,8 @@ config:
         \ and sample data"
       clusters: ["ol-data-interactive", "ol-data-lake-production"]
       base_privileges:
-      - privilege: "CreateView"
-        entity_kind: "Schema"
+      - entity_kind: "Schema"
+        privileges: ["CreateView"]
       data_access:
       - domain: "marts"
         privileges: ["Select"]
@@ -119,8 +113,8 @@ config:
         \ key business metrics"
       clusters: ["ol-data-interactive", "ol-data-lake-production"]
       base_privileges:
-      - privilege: "CreateView"
-        entity_kind: "Schema"
+      - entity_kind: "Schema"
+        privileges: ["CreateView"]
       data_access:
       - domain: "marts"
         privileges: ["Select"]
