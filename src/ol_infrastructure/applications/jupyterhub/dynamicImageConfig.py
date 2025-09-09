@@ -26,7 +26,7 @@ class QueryStringKubeSpawner(KubeSpawner):
             "supervised_learning_fundamentals",
             "introduction_to_data_analytics_and_machine_learning",
         ]
-        GPU_ENABLED_COURSES = ["deep_learning_foundations_and_applications"]
+        GPU_ENABLED_COURSES = {"deep_learning_foundations_and_applications"}
         self.image = (
             "610119931565.dkr.ecr.us-east-1.amazonaws.com/"
             "ol-course-notebooks:clustering_and_descriptive_ai"
