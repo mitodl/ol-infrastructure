@@ -408,7 +408,7 @@ def setup_aws_integrations(
         ),
         opts=ResourceOptions(
             provider=k8s_provider,
-            parent=k8s_provider,
+            parent=cluster,
             delete_before_replace=True,
         ),
     )
