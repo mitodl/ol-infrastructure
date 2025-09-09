@@ -4,7 +4,10 @@ import argparse
 import logging
 import os
 import sys
+import urllib.parse
+import webbrowser
 from datetime import datetime, timedelta
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import hvac
 import requests
@@ -24,6 +27,83 @@ logger = logging.getLogger(__name__)
 HTTP_OK = 200
 HTTP_NOT_FOUND = 404
 REQUEST_TIMEOUT = 10
+
+
+# From hvac OIDC documentation
+OIDC_CALLBACK_PORT = 8250
+OIDC_REDIRECT_URI = f"http://localhost:{OIDC_CALLBACK_PORT}/oidc/callback"
+SELF_CLOSING_PAGE = """
+<!doctype html>
+<html>
+<head>
+<script>
+// Closes IE, Edge, Chrome, Brave
+window.onload = function load() {
+  window.open('', '_self', '');
+  window.close();
+};
+</script>
+</head>
+<body>
+  <p>Authentication successful, you can close the browser now.</p>
+  <script>
+    // Needed for Firefox security
+    setTimeout(function() {
+          window.close()
+    }, 5000);
+  </script>
+</body>
+</html>
+"""
+
+
+# handles the callback
+def login_oidc_get_token():
+    class HttpServ(HTTPServer):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.token = None
+
+    class AuthHandler(BaseHTTPRequestHandler):
+        token = ""
+
+        def do_GET(self):
+            params = urllib.parse.parse_qs(self.path.split("?")[1])
+            self.server.token = params["code"][0]  # type: ignore[attr-defined]
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(str.encode(SELF_CLOSING_PAGE))
+
+    server_address = ("", OIDC_CALLBACK_PORT)
+    httpd = HttpServ(server_address, AuthHandler)
+    httpd.handle_request()
+    return httpd.token
+
+
+def oidc_login(client: hvac.Client, role: str):
+    auth_url_response = client.auth.oidc.oidc_authorization_url_request(
+        role=role,
+        redirect_uri=OIDC_REDIRECT_URI,
+    )
+    auth_url = auth_url_response["data"]["auth_url"]
+    if auth_url == "":
+        msg = "Unable to retrieve auth URL from Vault"
+        raise RuntimeError(msg)
+
+    params = urllib.parse.parse_qs(auth_url.split("?")[1])
+    auth_url_nonce = params["nonce"][0]
+    auth_url_state = params["state"][0]
+
+    webbrowser.open(auth_url)
+    code = login_oidc_get_token()
+
+    auth_result = client.auth.oidc.oidc_callback(
+        code=code,
+        nonce=auth_url_nonce,
+        state=auth_url_state,
+    )
+    new_token = auth_result["auth"]["client_token"]
+    client.token = new_token
 
 
 def check_github_team_membership(token, org, team_slug, required_teams=None):
@@ -156,13 +236,26 @@ kubeconfig_parser.add_argument(
     required=False,
 )
 
+kubeconfig_parser.add_argument(
+    "-r",
+    "--role",
+    help="Set the OIDC role to use for authenticating to Vault (developer or admin)",
+    required=False,
+    default="developer",
+)
+
 args = vars(parser.parse_args())
 
-# Check GitHub team membership before proceeding
-logger.info("Verifying GitHub team membership")
-try:
-    github_token = os.environ["GITHUB_TOKEN"]
+github_token = os.environ.get("GITHUB_TOKEN")
 
+logger.info("Initializing Vault clients")
+ci_vault_client = hvac.Client(url="https://vault-ci.odl.mit.edu")
+qa_vault_client = hvac.Client(url="https://vault-qa.odl.mit.edu")
+production_vault_client = hvac.Client(url="https://vault-production.odl.mit.edu")
+
+if github_token:
+    # Check GitHub team membership before proceeding
+    logger.info("Verifying GitHub team membership")
     # Define required teams for access
     required_teams = ["vault-developer-access", "vault-devops-access"]
 
@@ -172,26 +265,30 @@ try:
         logger.error("Access denied: User is not a member of required GitHub teams")
         sys.exit(1)
 
-except KeyError:
-    logger.exception("GITHUB_TOKEN environment variable not found")
-    sys.exit(1)
-
-logger.info("Initializing Vault clients")
-ci_vault_client = hvac.Client(url="https://vault-ci.odl.mit.edu")
-qa_vault_client = hvac.Client(url="https://vault-qa.odl.mit.edu")
-production_vault_client = hvac.Client(url="https://vault-production.odl.mit.edu")
-
-logger.info("Authenticating with Vault using GitHub token")
-try:
-    logger.debug("Authenticating with CI Vault...")
-    ci_vault_client.auth.github.login(token=github_token)
-    logger.debug("Authenticating with QA Vault...")
-    qa_vault_client.auth.github.login(token=github_token)
-    logger.debug("Authenticating with Production Vault...")
-    production_vault_client.auth.github.login(token=github_token)
-except Exception:
-    logger.exception("Failed to authenticate with Vault")
-    sys.exit(1)
+    logger.info("Authenticating with Vault using GitHub token")
+    try:
+        logger.debug("Authenticating with CI Vault...")
+        ci_vault_client.auth.github.login(token=github_token)
+        logger.debug("Authenticating with QA Vault...")
+        qa_vault_client.auth.github.login(token=github_token)
+        logger.debug("Authenticating with Production Vault...")
+        production_vault_client.auth.github.login(token=github_token)
+    except Exception:
+        logger.exception("Failed to authenticate with Vault")
+        sys.exit(1)
+else:
+    logger.info("GITHUB_TOKEN not found, falling back to OIDC authentication.")
+    role = args.get("role", "developer")
+    try:
+        logger.info("Authenticating with CI Vault via OIDC (role: %s)...", role)
+        oidc_login(ci_vault_client, role)
+        logger.info("Authenticating with QA Vault via OIDC (role: %s)...", role)
+        oidc_login(qa_vault_client, role)
+        logger.info("Authenticating with Production Vault via OIDC (role: %s)...", role)
+        oidc_login(production_vault_client, role)
+    except Exception:
+        logger.exception("Failed to authenticate with Vault")
+        sys.exit(1)
 
 # Check authentication status for each client individually
 vault_clients = {
