@@ -11,6 +11,7 @@ config:
   - ["course_experience.relative_dates_disable_reset", "--create", "--everyone"]
   - ["course_home.course_home_mfe_progress_tab", "--create", "--everyone"]
   - ["courseware.courseware_mfe", "--create", "--superusers", "--everyone"]
+  - ["discussions.enable_forum_v2", "--deactivate"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
   - ["effort_estimation.disabled", "--create", "--superusers", "--everyone"]
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
@@ -20,8 +21,8 @@ config:
   - ["learner_recommendations.enable_dashboard_recommendations", "--create", "--superusers",
     "--everyone"]
   - ["new_core_editors.use_new_problem_editor", "--create", "--deactivate"]
-  - ["new_core_editors.use_new_text_editor", "--create", "--superusers", "--deactivate"]
-  - ["new_core_editors.use_new_video_editor", "--create", "--superusers", "--deactivate"]
+  - ["new_core_editors.use_new_text_editor", "--create", "--superusers"]
+  - ["new_core_editors.use_new_video_editor", "--create", "--superusers"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["studio.library_authoring_mfe", "--deactivate"]
