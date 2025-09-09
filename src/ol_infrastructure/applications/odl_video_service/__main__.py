@@ -9,7 +9,7 @@ from pathlib import Path
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi import Alias, Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, get_caller_identity, iam, route53
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
@@ -470,7 +470,16 @@ ovs_server_redis_config = OLAmazonRedisConfig(
     tags=aws_config.tags,
     **defaults(stack_info)["redis"],
 )
-ovs_server_redis_cluster = OLAmazonCache(ovs_server_redis_config)
+ovs_server_redis_cluster = OLAmazonCache(
+    ovs_server_redis_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"odl-video-service-redis-{stack_info.env_suffix}-redis-elasticache-cluster"
+            )
+        ]
+    ),
+)
 
 # Provision EC2 resources
 instance_type_name = (
