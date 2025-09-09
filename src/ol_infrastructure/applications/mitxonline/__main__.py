@@ -33,6 +33,10 @@ from ol_infrastructure.components.aws.cache import (
     OLAmazonRedisConfig,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.serverless_cache import (
+    OLAmazonServerlessCache,
+    OLAmazonServerlessCacheConfig,
+)
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
@@ -447,6 +451,23 @@ redis_cache = OLAmazonCache(
         aliases=[
             Alias(
                 name=f"mitxonline-app-redis-{stack_info.env_suffix}-redis-elasticache-cluster"
+            )
+        ]
+    ),
+)
+
+serverless_cache_config = OLAmazonServerlessCacheConfig(
+    description="Redis cluster for MITxonline",
+    cache_name=f"mitxonline-app-serverless-{stack_info.env_suffix}",
+    security_group_ids=[redis_cluster_security_group.id],
+    tags=aws_config.tags,
+)
+serverless_cache = OLAmazonServerlessCache(
+    serverless_cache_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"mitxonline-app-serverless-{stack_info.env_suffix}-serverless-elasticache-cluster"
             )
         ]
     ),
