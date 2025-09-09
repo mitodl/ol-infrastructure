@@ -85,60 +85,9 @@ config:
         privileges:
         - name: "Execute"
           grant: true
-      data_access:
-      - domain: "raw"
-        privileges:
-        - name: "Select"
-          grant: true
-        - name: "Insert"
-          grant: true
-        - name: "Update"
-          grant: true
-        - name: "Delete"
-          grant: true
-      - domain: "staging"
-        privileges:
-        - name: "Select"
-          grant: true
-        - name: "Insert"
-          grant: true
-        - name: "Update"
-          grant: true
-        - name: "Delete"
-          grant: true
-      - domain: "intermediate"
-        privileges:
-        - name: "Select"
-          grant: true
-        - name: "Insert"
-          grant: true
-        - name: "Update"
-          grant: true
-        - name: "Delete"
-          grant: true
-      - domain: "marts"
-        privileges:
-        - name: "Select"
-          grant: true
-        - name: "Insert"
-          grant: true
-        - name: "Update"
-          grant: true
-        - name: "Delete"
-          grant: true
-      - domain: "dimensional"
-        privileges:
-        - name: "Select"
-          grant: true
-        - name: "Insert"
-          grant: true
-        - name: "Update"
-          grant: true
-        - name: "Delete"
-          grant: true
 
     ol_data_engineer:
-      description: "Data engineering role"
+      description: "Data engineering role with limited production access"
       clusters:
       - name: "ol-data-interactive"
         privileges:
@@ -168,42 +117,9 @@ config:
           grant: true
         - name: "CreateView"
           grant: true
-      data_access:
-      - domain: "raw"
-        privileges:
-        - name: "Select"
-          grant: false
-      - domain: "staging"
-        privileges:
-        - name: "Select"
-          grant: true
-        - name: "Insert"
-          grant: true
-        - name: "Update"
-          grant: true
-        - name: "Delete"
-          grant: true
-      - domain: "intermediate"
-        privileges:
-        - name: "Select"
-          grant: true
-        - name: "Insert"
-          grant: true
-        - name: "Update"
-          grant: true
-        - name: "Delete"
-          grant: true
-      - domain: "marts"
-        privileges:
-        - name: "Select"
-          grant: false
-      - domain: "dimensional"
-        privileges:
-        - name: "Select"
-          grant: false
 
     ol_data_analyst:
-      description: "Data analyst role"
+      description: "Data analyst role with read-only access to production data"
       clusters:
       - name: "ol-data-interactive"
         privileges:
@@ -225,26 +141,9 @@ config:
         privileges:
         - name: "CreateView"
           grant: false
-      data_access:
-      - domain: "staging"
-        privileges:
-        - name: "Select"
-          grant: false
-      - domain: "intermediate"
-        privileges:
-        - name: "Select"
-          grant: false
-      - domain: "marts"
-        privileges:
-        - name: "Select"
-          grant: false
-      - domain: "dimensional"
-        privileges:
-        - name: "Select"
-          grant: false
 
     ol_researcher:
-      description: "Research role"
+      description: "Research role with ML capabilities and broad data access"
       clusters:
       - name: "ol-data-interactive"
         privileges:
@@ -278,30 +177,9 @@ config:
         privileges:
         - name: "Execute"
           grant: false
-      data_access:
-      - domain: "raw"
-        privileges:
-        - name: "Select"
-          grant: false
-      - domain: "staging"
-        privileges:
-        - name: "Select"
-          grant: false
-      - domain: "intermediate"
-        privileges:
-        - name: "Select"
-          grant: false
-      - domain: "marts"
-        privileges:
-        - name: "Select"
-          grant: false
-      - domain: "dimensional"
-        privileges:
-        - name: "Select"
-          grant: false
 
     ol_instructor:
-      description: "Instructor role"
+      description: "Instructor role with limited access to educational data"
       clusters:
       - name: "ol-data-interactive"
         privileges:
@@ -319,18 +197,10 @@ config:
         privileges:
         - name: "CreateView"
           grant: false
-      data_access:
-      - domain: "marts"
-        privileges:
-        - name: "Select"
-          grant: false
-      - domain: "dimensional"
-        privileges:
-        - name: "Select"
-          grant: false
 
     ol_business_analyst:
-      description: "Business analyst role"
+      description: "Business analyst role similar to existing business_intelligence\
+        \ and finance roles"
       clusters:
       - name: "ol-data-interactive"
         privileges:
@@ -351,13 +221,4 @@ config:
       - entity_kind: "Schema"
         privileges:
         - name: "CreateView"
-          grant: false
-      data_access:
-      - domain: "marts"
-        privileges:
-        - name: "Select"
-          grant: false
-      - domain: "dimensional"
-        privileges:
-        - name: "Select"
           grant: false

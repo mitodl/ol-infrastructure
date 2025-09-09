@@ -21,12 +21,11 @@ DBT_PROJECT_PATH = (
 
 
 class DbtProjectParser:
-    """Parse dbt project configuration to extract schema and model information."""
+    """Parse dbt project configuration to extract schema and grants information."""
 
     def __init__(self, project_path: str) -> None:
         self.project_path = project_path
         self.project_config = self._load_dbt_project()
-        self.models_config = self.project_config.get("models", {})
 
     def _load_dbt_project(self) -> dict[str, Any]:
         """Load dbt_project.yml configuration from local path or remote URL."""
@@ -54,80 +53,129 @@ class DbtProjectParser:
                 msg = f"Failed to read dbt_project.yml from {dbt_project_file}: {e}"
                 raise FileNotFoundError(msg) from e
 
-    def get_schema_mappings(self) -> dict[str, str]:
-        """Extract schema mappings from dbt project configuration."""
-        schema_mappings = {}
+    def get_grants_by_domain(self) -> dict[str, dict[str, list[str]]]:
+        """Extract grants by domain from dbt project configuration.
 
-        # Get the main project name
-        project_name = self.project_config.get("name", "ol_dbt")
+        Returns:
+            dict[domain, dict[privilege_type, list[role_names]]]
+            e.g., {"staging": {"Select": ["read_only_production", "reverse_etl"]}}
+        """
+        models_config = self.project_config.get("models", {})
+        project_name = self.project_config.get("name", "open_learning")
 
-        # Parse model configurations - try both direct project name and nested structure
-        if project_name in self.models_config:
-            models = self.models_config[project_name]
-            schema_mappings.update(self._parse_model_schemas(models))
+        if project_name not in models_config:
+            pulumi.log.warn(f"No models config found for project '{project_name}'")
+            return {}
 
-        # Also check for models at the root level
-        for key, value in self.models_config.items():
-            if isinstance(value, dict) and key != project_name:
-                schema_mappings.update(self._parse_model_schemas(value, key))
+        project_models = models_config[project_name]
+        return self._parse_grants_by_domain(project_models)
 
-        # If no schemas found, log a warning and return empty dict
-        if not schema_mappings:
-            pulumi.log.warn("No schema mappings found in dbt project configuration")
-            pulumi.log.warn("Roles will only have base privileges and cluster access")
+    def _parse_grants_by_domain(
+        self, models_config: dict[str, Any]
+    ) -> dict[str, dict[str, list[str]]]:
+        """Parse grants configuration and organize by domain."""
+        grants_by_domain = {}
 
-        return schema_mappings
-
-    def _parse_model_schemas(
-        self, models_config: dict[str, Any], prefix: str = ""
-    ) -> dict[str, str]:
-        """Recursively parse model schema configurations."""
-        schema_mappings = {}
-
-        for key, value in models_config.items():
-            current_path = f"{prefix}.{key}" if prefix else key
-
-            if isinstance(value, dict):
-                # Check if this level has a schema definition
-                if "schema" in value:
-                    schema_mappings[current_path] = value["schema"]
-                elif "+schema" in value:  # Alternative dbt syntax
-                    schema_mappings[current_path] = value["+schema"]
-
-                # Recursively parse nested configurations
-                nested_mappings = self._parse_model_schemas(value, current_path)
-                schema_mappings.update(nested_mappings)
-
-        return schema_mappings
-
-    def get_data_domains(self) -> dict[str, list[str]]:
-        """Group schemas by data domain based on dbt project structure."""
-        schema_mappings = self.get_schema_mappings()
-
-        data_domains: dict[str, list[str]] = {
-            "staging": [],
-            "intermediate": [],
-            "marts": [],
-            "dimensional": [],
-            "raw": [],
+        # Domain mapping: dbt model key -> (domain_name, actual_schema_name)
+        # Most are the same, but 'marts' -> 'mart' is different
+        domain_mappings = {
+            "staging": ("staging", "staging"),
+            "intermediate": ("intermediate", "intermediate"),
+            "marts": ("marts", "mart"),  # ← Key difference: plural -> singular
+            "dimensional": ("dimensional", "dimensional"),
+            "external": ("external", "external"),
+            "reporting": ("reporting", "reporting"),
+            "migration": ("migration", "migration"),
         }
 
-        for path, schema in schema_mappings.items():
-            if "staging" in path.lower() or "stg_" in schema.lower():
-                data_domains["staging"].append(schema)
-            elif "intermediate" in path.lower() or "int_" in schema.lower():
-                data_domains["intermediate"].append(schema)
-            elif "marts" in path.lower() or "mart_" in schema.lower():
-                data_domains["marts"].append(schema)
-            elif "dimensional" in path.lower() or "dimensional" in schema.lower():
-                data_domains["dimensional"].append(schema)
-            elif "raw" in path.lower() or "raw" in schema.lower():
-                data_domains["raw"].append(schema)
-            else:
-                # Default unknown schemas to staging
-                data_domains["staging"].append(schema)
+        # Process domain-specific grants
+        for dbt_key, (domain_name, _actual_schema) in domain_mappings.items():
+            if dbt_key in models_config:
+                domain_config = models_config[dbt_key]
+                if isinstance(domain_config, dict) and "+grants" in domain_config:
+                    grants = domain_config["+grants"]
+                    grants_by_domain[domain_name] = self._normalize_grants(grants)
 
-        return data_domains
+        # Apply global grants to all domains
+        if "+grants" in models_config:
+            global_grants = models_config["+grants"]
+            normalized_global = self._normalize_grants(global_grants)
+
+            for domain_name, _actual_schema in domain_mappings.values():
+                if domain_name not in grants_by_domain:
+                    grants_by_domain[domain_name] = {}
+
+                # Merge global grants with domain-specific grants
+                for privilege_type, roles in normalized_global.items():
+                    if privilege_type not in grants_by_domain[domain_name]:
+                        grants_by_domain[domain_name][privilege_type] = []
+                    grants_by_domain[domain_name][privilege_type].extend(roles)
+                    # Remove duplicates
+                    grants_by_domain[domain_name][privilege_type] = list(
+                        set(grants_by_domain[domain_name][privilege_type])
+                    )
+
+        return grants_by_domain
+
+    def _normalize_grants(self, grants: dict[str, Any]) -> dict[str, list[str]]:
+        """Normalize grants to standard privilege names."""
+        normalized = {}
+
+        # Map dbt grant names to Starburst privilege names
+        privilege_mapping = {
+            "select": "Select",
+            "insert": "Insert",
+            "update": "Update",
+            "delete": "Delete",
+            "all privileges": "All",
+        }
+
+        for dbt_privilege, roles in grants.items():
+            starburst_privilege = privilege_mapping.get(
+                dbt_privilege.lower(), dbt_privilege
+            )
+            if isinstance(roles, list):
+                normalized[starburst_privilege] = roles
+            elif isinstance(roles, str):
+                normalized[starburst_privilege] = [roles]
+
+        return normalized
+
+    def get_data_domains(self) -> dict[str, list[str]]:
+        """Get data domains with their corresponding schema names from dbt project."""
+        domain_to_schemas: dict[str, list[str]] = {}
+        models_config = self.project_config.get("models", {})
+        project_name = self.project_config.get("name", "open_learning")
+        project_models = models_config.get(project_name, {})
+
+        # Domain mapping: dbt model key -> domain_name
+        domain_mappings = {
+            "staging": "staging",
+            "intermediate": "intermediate",
+            "marts": "mart",  # ← Key difference: plural -> singular
+            "dimensional": "dimensional",
+            "external": "external",
+            "reporting": "reporting",
+            "migration": "migration",
+        }
+
+        for dbt_key, domain_name in domain_mappings.items():
+            model_config = project_models.get(dbt_key, {})
+            if isinstance(model_config, dict) and "+schema" in model_config:
+                base_schema = model_config["+schema"]
+                domain_to_schemas[domain_name] = [
+                    f"ol_warehouse_production_{base_schema}",
+                    f"ol_warehouse_qa_{base_schema}",
+                ]
+
+        # Add 'raw' domain which is not defined in dbt models section
+        if "raw" not in domain_to_schemas:
+            domain_to_schemas["raw"] = [
+                "ol_warehouse_production_raw",
+                "ol_warehouse_qa_raw",
+            ]
+
+        return domain_to_schemas
 
 
 class StarburstAPIClient:
@@ -191,9 +239,7 @@ class StarburstAPIClient:
         clusters_data = self.get_clusters()
         cluster_name_to_id = {}
 
-        # Extract clusters from API response
         clusters_list = clusters_data.get("result", [])
-
         for cluster in clusters_list:
             cluster_id = cluster.get("clusterId")
             cluster_name = cluster.get("name")
@@ -264,7 +310,6 @@ class StarburstRoleProvider(dynamic.ResourceProvider):
                     privilege_response = api_client.grant_privilege(role_id, privilege)
                     privilege_responses.append(privilege_response)
                 except requests.RequestException as e:
-                    # Log privilege failures but don't fail the entire resource
                     privilege_name = privilege.get("privilege")
                     role_name = props["role_name"]
                     pulumi.log.warn(
@@ -339,7 +384,7 @@ def _build_base_privileges(
     elif "catalog_name" in base_privilege_group:
         catalogs = [base_privilege_group["catalog_name"]]
     else:
-        catalogs = [None]  # No catalog specified
+        catalogs = [None]
 
     for catalog in catalogs:
         catalog_props = additional_props.copy()
@@ -383,7 +428,6 @@ def _build_cluster_privileges(
             continue
 
         for privilege_config in cluster_privileges:
-            # Handle both old format (string) and new format (dict with grant)
             if isinstance(privilege_config, str):
                 privilege_name = privilege_config
                 grant_option = False
@@ -403,6 +447,45 @@ def _build_cluster_privileges(
     return privileges
 
 
+def _build_data_privileges_from_dbt_grants(
+    role_name: str,
+    data_domains: dict[str, list[str]],
+    grants_by_domain: dict[str, dict[str, list[str]]],
+) -> list[dict[str, Any]]:
+    """Build data privileges based on dbt grants configuration."""
+    privileges: list[dict[str, Any]] = []
+
+    for domain, schemas in data_domains.items():
+        domain_grants = grants_by_domain.get(domain, {})
+
+        for privilege_type, granted_roles in domain_grants.items():
+            if role_name in granted_roles:
+                for schema in schemas:
+                    privilege_def = {
+                        "privilege": privilege_type,
+                        "entity_kind": "Column"
+                        if privilege_type == "Select"
+                        else "Table",
+                        "schema_name": schema,
+                        "table_name": "*",
+                        "grant_option": False,
+                    }
+
+                    if privilege_type == "Select":
+                        privilege_def["column_name"] = "*"
+
+                    privileges.append(privilege_def)
+
+    if not privileges:
+        pulumi.log.info(f"No dbt grants found for role '{role_name}'")
+    else:
+        pulumi.log.info(
+            f"Built {len(privileges)} privileges for role '{role_name}' from dbt grants"
+        )
+
+    return privileges
+
+
 def generate_role_definitions(
     dbt_parser: DbtProjectParser,
     cluster_ids: dict[str, str],
@@ -410,28 +493,28 @@ def generate_role_definitions(
 ) -> dict[str, dict[str, Any]]:
     """Generate Starburst role definitions based on configuration and dbt structure."""
     data_domains = dbt_parser.get_data_domains()
+    grants_by_domain = dbt_parser.get_grants_by_domain()
     roles = {}
 
     for role_name, role_config in roles_config.items():
         privileges = []
 
-        # Process base privileges with new grouped format
+        # Process base privileges
         for base_privilege_group in role_config.get("base_privileges", []):
             privileges.extend(_build_base_privileges(base_privilege_group))
 
-        # Add cluster access privileges with support for multiple privilege types
+        # Add cluster access privileges
         clusters_config = role_config.get("clusters", [])
         cluster_privileges = _build_cluster_privileges(
             clusters_config, cluster_ids, role_name
         )
         privileges.extend(cluster_privileges)
 
-        # Add data access privileges
-        for data_access in role_config.get("data_access", []):
-            data_privileges = _build_data_privileges(
-                data_access, data_domains, role_name
-            )
-            privileges.extend(data_privileges)
+        # Add data privileges from dbt grants
+        data_privileges = _build_data_privileges_from_dbt_grants(
+            role_name, data_domains, grants_by_domain
+        )
+        privileges.extend(data_privileges)
 
         roles[role_name] = {
             "description": role_config.get("description", ""),
@@ -439,47 +522,6 @@ def generate_role_definitions(
         }
 
     return roles
-
-
-def _build_data_privileges(
-    data_access: dict[str, Any], data_domains: dict[str, list[str]], role_name: str
-) -> list[dict[str, Any]]:
-    """Build data access privilege definitions."""
-    privileges: list[dict[str, Any]] = []
-    domain = data_access["domain"]
-    privilege_configs = data_access.get("privileges", [])
-
-    if not privilege_configs:
-        pulumi.log.warn(
-            f"No privileges found for domain '{domain}' in role '{role_name}'"
-        )
-        return privileges
-
-    schemas = data_domains.get(domain, [])
-    for schema in schemas:
-        for privilege_config in privilege_configs:
-            # Handle both old format (string) and new format (dict with grant)
-            if isinstance(privilege_config, str):
-                privilege_type = privilege_config
-                grant_option = False
-            else:
-                privilege_type = privilege_config["name"]
-                grant_option = privilege_config.get("grant", False)
-
-            privilege_def = {
-                "privilege": privilege_type,
-                "entity_kind": "Column" if privilege_type == "Select" else "Table",
-                "schema_name": schema,
-                "table_name": "*",
-                "grant_option": grant_option,
-            }
-
-            if privilege_type == "Select":
-                privilege_def["column_name"] = "*"
-
-            privileges.append(privilege_def)
-
-    return privileges
 
 
 def _get_cluster_ids(
@@ -497,12 +539,11 @@ def _get_cluster_ids(
         for cluster in clusters:
             all_cluster_names.add(cluster["name"])
 
-    # Only fetch cluster IDs during actual deployment, not preview
+    # Return dummy cluster IDs for preview
     if pulumi.runtime.is_dry_run():
         pulumi.log.info(
             f"Preview mode: using dummy cluster IDs for {list(all_cluster_names)}"
         )
-        # Return dummy cluster IDs for preview
         dummy_ids = {}
         for cluster_name in all_cluster_names:
             dummy_ids[cluster_name] = f"preview-{cluster_name.replace('-', '_')}-id"
@@ -517,38 +558,12 @@ def _get_cluster_ids(
 
         pulumi.log.info(f"Fetching cluster IDs for: {list(all_cluster_names)}")
         cluster_ids = api_client.get_cluster_ids_by_name(list(all_cluster_names))
-        pulumi.log.info(f"Found cluster IDs: {cluster_ids}")
     except requests.RequestException as e:
         pulumi.log.warn(f"Could not retrieve cluster data: {e}")
         return {}
     else:
+        pulumi.log.info(f"Found cluster IDs: {cluster_ids}")
         return cluster_ids
-
-
-def _prepare_role_definitions(
-    data: tuple[dict[str, str], str, str],
-    dbt_parser: DbtProjectParser,
-    roles_config: dict[str, Any],
-) -> dict[str, Any]:
-    """Prepare role definitions from cluster data."""
-    cluster_id_map, client_id_val, client_secret_val = data
-
-    roles_definitions = generate_role_definitions(
-        dbt_parser, cluster_id_map, roles_config
-    )
-
-    # Log what would be created during preview
-    for role_name, role_definition in roles_definitions.items():
-        privilege_count = len(role_definition.get("privileges", []))
-        pulumi.log.info(
-            f"Will create role '{role_name}' with {privilege_count} privileges"
-        )
-
-    return {
-        "roles_definitions": roles_definitions,
-        "client_id": client_id_val,
-        "client_secret": client_secret_val,
-    }
 
 
 def _create_roles(
@@ -593,24 +608,23 @@ def main() -> None:
     try:
         dbt_parser = DbtProjectParser(DBT_PROJECT_PATH)
         pulumi.log.info("Successfully parsed dbt project configuration")
-
-        schema_mappings = dbt_parser.get_schema_mappings()
-        pulumi.log.info(
-            f"Discovered {len(schema_mappings)} schema mappings from dbt project"
-        )
-
     except FileNotFoundError as e:
         pulumi.log.error(f"Failed to parse dbt project: {e}")
         return
 
-    # Get cluster IDs
+    # Get cluster IDs and prepare role definitions
     cluster_ids = pulumi.Output.all(client_id, client_secret).apply(
         lambda secrets: _get_cluster_ids(secrets, roles_config, starburst_domain)
     )
 
-    # Prepare role definitions
     prepared_data = pulumi.Output.all(cluster_ids, client_id, client_secret).apply(
-        lambda data: _prepare_role_definitions(data, dbt_parser, roles_config)
+        lambda data: {
+            "roles_definitions": generate_role_definitions(
+                dbt_parser, data[0], roles_config
+            ),
+            "client_id": data[1],
+            "client_secret": data[2],
+        }
     )
 
     # Create role resources
