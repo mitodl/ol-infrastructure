@@ -2,6 +2,18 @@ import os
 
 from kubespawner import KubeSpawner
 
+GPU_NODE_AFFINITY_LIST = [
+    {
+        "matchExpressions": [
+            {
+                "key": "ol.mit.edu/gpu_node",
+                "operator": "In",
+                "values": ["true"],
+            }
+        ]
+    }
+]
+
 
 class QueryStringKubeSpawner(KubeSpawner):
     def start(self):
@@ -14,6 +26,7 @@ class QueryStringKubeSpawner(KubeSpawner):
             "supervised_learning_fundamentals",
             "introduction_to_data_analytics_and_machine_learning",
         ]
+        GPU_ENABLED_COURSES = {"deep_learning_foundations_and_applications"}
         self.image = (
             "610119931565.dkr.ecr.us-east-1.amazonaws.com/"
             "ol-course-notebooks:clustering_and_descriptive_ai"
@@ -32,6 +45,12 @@ class QueryStringKubeSpawner(KubeSpawner):
                 self.image = (
                     image_base.format(tag) if tag else image_base.format(course)
                 )
+
+                if course in GPU_ENABLED_COURSES:
+                    # This course requires a GPU, so we are adding a node affinity
+                    # rule to schedule the pod on a node with a GPU.
+                    self.node_affinity_required = GPU_NODE_AFFINITY_LIST
+
                 # If we don't have a notebook, don't muck with default_url
                 # This falls back to the tree view in Jupyterhub if not specified
                 if notebook and notebook.endswith(".ipynb"):

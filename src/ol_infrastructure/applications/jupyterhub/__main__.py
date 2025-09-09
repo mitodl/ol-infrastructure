@@ -459,21 +459,9 @@ binderhub_application = kubernetes.helm.v3.Release(
                     },
                 },
                 "singleuser": {
-                    # This is where we would do our own notebook image
-                    # ref: https://z2jh.jupyter.org/en/stable/jupyterhub/customizing/user-environment.html#customize-an-existing-docker-image
-                    # "image": {
-                    #     "name": "mitodl/some-special-image"
-                    #     "tag": "some-tag",
-                    # },
-                    # Below is similar but not the same as k8s resource declarations.
-                    # These are on a PER-USER-BASIS, so they can quickly grow with lots of
-                    # users. Numbers are conservative to start with.
                     "image": {
                         "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
                         "tag": "clustering_and_descriptive_ai",
-                    },
-                    "nodeSelector": {
-                        "ol.mit.edu/gpu_node": "true",
                     },
                     "extraTolerations": [
                         {
