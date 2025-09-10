@@ -7,6 +7,8 @@ config:
   starburst:client_secret:
     secure: v1:1EDjfEvo53OOyg2O:exn1dPV+F5w34QEbpxRZmP/vnxQimmA8tAgwLTRIN1JeXLPd3kqjVZY+nJGmnAx1
   starburst:domain: mitol.galaxy.starburst.io
+  starburst:warehouse_prefix: "ol_warehouse"
+  starburst:environments: ["production", "qa"]
   starburst:roles:
     ol_platform_admin:
       description: "Full administrative access to all data and platform resources"

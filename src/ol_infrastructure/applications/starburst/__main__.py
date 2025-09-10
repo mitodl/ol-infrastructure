@@ -13,6 +13,10 @@ starburst_domain = config.get("starburst_domain")
 client_id = config.require_secret("client_id")
 client_secret = config.require_secret("client_secret")
 
+# Warehouse configuration
+warehouse_prefix = config.get("warehouse_prefix") or "ol_warehouse"
+environments = config.get_object("environments") or ["production", "qa"]
+
 # Path to dbt project
 DBT_PROJECT_PATH = (
     config.get("dbt_project_path")
@@ -164,15 +168,13 @@ class DbtProjectParser:
             if isinstance(model_config, dict) and "+schema" in model_config:
                 base_schema = model_config["+schema"]
                 domain_to_schemas[domain_name] = [
-                    f"ol_warehouse_production_{base_schema}",
-                    f"ol_warehouse_qa_{base_schema}",
+                    f"{warehouse_prefix}_{env}_{base_schema}" for env in environments
                 ]
 
         # Add 'raw' domain which is not defined in dbt models section
         if "raw" not in domain_to_schemas:
             domain_to_schemas["raw"] = [
-                "ol_warehouse_production_raw",
-                "ol_warehouse_qa_raw",
+                f"{warehouse_prefix}_{env}_raw" for env in environments
             ]
 
         return domain_to_schemas
