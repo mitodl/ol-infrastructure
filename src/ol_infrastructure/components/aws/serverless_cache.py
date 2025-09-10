@@ -76,14 +76,10 @@ class OLAmazonServerlessCache(pulumi.ComponentResource):
             opts=resource_options,
         )
 
-        # Extract connection endpoints
-        self.reader_endpoint = self.serverless_cache.reader_endpoint
-        self.endpoint = self.serverless_cache.endpoint
-
         self.register_outputs(
             {
                 "serverless_cache": self.serverless_cache.arn,
-                "endpoint": self.endpoint,
-                "reader_endpoint": self.reader_endpoint,
+                "endpoint": self.serverless_cache.endpoints[0],
+                "reader_endpoint": self.serverless_cache.reader_endpoints[0],
             }
         )

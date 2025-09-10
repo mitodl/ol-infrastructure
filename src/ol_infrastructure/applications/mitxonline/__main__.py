@@ -460,6 +460,7 @@ serverless_cache_config = OLAmazonServerlessCacheConfig(
     description="Redis cluster for MITxonline",
     cache_name=f"mitxonline-app-serverless-{stack_info.env_suffix}",
     security_group_ids=[redis_cluster_security_group.id],
+    subnet_ids=[redis_cache_config.subnet_group],
     tags=aws_config.tags,
 )
 serverless_cache = OLAmazonServerlessCache(
