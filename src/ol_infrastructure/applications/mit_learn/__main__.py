@@ -1389,8 +1389,8 @@ mitlearn_k8s_app = OLApplicationK8s(
                 redis_password=redis_config.require("password"),
             ),
         ],
-        resource_requests={"cpu": "500m", "memory": "1800Mi"},
-        resource_limits={"cpu": "1000m", "memory": "1800Mi"},
+        resource_requests={"cpu": "500m", "memory": "1600Mi"},
+        resource_limits={"cpu": "1000m", "memory": "2000Mi"},
         hpa_scaling_metrics=[
             kubernetes.autoscaling.v2.MetricSpecArgs(
                 type="Resource",
