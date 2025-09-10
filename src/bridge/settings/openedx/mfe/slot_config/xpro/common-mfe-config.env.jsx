@@ -208,21 +208,28 @@ if (learningApps.includes(edxMfeAppName)) {
 const CustomCertificateStatus = (widget) => {
   const { RenderWidget } = widget;
 
-  // Only modify widgets for "notAvailable_certificate_status"
-  if (RenderWidget.props.id.includes("notAvailable_")) {
-    const old_body = RenderWidget.props.children[1].props.children;
-    let endDate = old_body.split("available after")[1];
+  // Modify only "notAvailable_certificate_status" with exactly 3 children.
+  // If the structure changes (children count ≠ 3), fall back to the original widget for safety.
+  // Original code reference:
+  // https://github.com/openedx/frontend-app-learning/blob/release/teak/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx#L245
+  const renderProps = RenderWidget.props;
+  if (
+    renderProps.id.includes("notAvailable_") &&
+    renderProps.children.length == 3
+  ) {
+    const old_body = renderProps.children[1].props.children;
+    const endDate = old_body.split("available after")[1];
 
     const newSecondChild = React.cloneElement(
-      RenderWidget.props.children[1],
-      RenderWidget.props.children[1].props,
+      renderProps.children[1],
+      renderProps.children[1].props,
       `Final grades and any earned certificates are scheduled to be available 3 business days after ${endDate}`
     );
 
     const newChildren = [
-      RenderWidget.props.children[0],
+      renderProps.children[0],
       newSecondChild,
-      ...RenderWidget.props.children.slice(2),
+      ...renderProps.children.slice(2),
     ];
 
     widget.RenderWidget = React.cloneElement(
