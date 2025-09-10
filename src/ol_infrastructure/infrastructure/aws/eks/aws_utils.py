@@ -17,7 +17,6 @@ def setup_aws_integrations(
     cluster,
     aws_config,
     k8s_global_labels,
-    k8s_provider,
     operations_tolerations,
     target_vpc,
     node_groups,
@@ -289,7 +288,6 @@ def setup_aws_integrations(
         ),
         automount_service_account_token=True,
         opts=ResourceOptions(
-            provider=k8s_provider,
             parent=cluster,
             depends_on=[
                 cluster,
@@ -354,7 +352,6 @@ def setup_aws_integrations(
             skip_await=False,
         ),
         opts=ResourceOptions(
-            provider=k8s_provider,
             parent=cluster,
             depends_on=[
                 cluster,
@@ -407,7 +404,6 @@ def setup_aws_integrations(
             },
         ),
         opts=ResourceOptions(
-            provider=k8s_provider,
             parent=cluster,
             delete_before_replace=True,
         ),

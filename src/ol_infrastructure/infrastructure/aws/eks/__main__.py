@@ -36,9 +36,13 @@ from bridge.lib.versions import (
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.infrastructure.aws.eks.aws_utils import setup_aws_integrations
 from ol_infrastructure.infrastructure.aws.eks.core_dns import create_core_dns_resources
+from ol_infrastructure.infrastructure.aws.eks.nodegroups import (
+    create_and_update_nodegroup,
+)
 from ol_infrastructure.lib.aws.eks_helper import (
     ECR_DOCKERHUB_REGISTRY,
     get_cluster_version,
+    setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import (
     EKS_ADMIN_USERNAMES,
@@ -449,85 +453,34 @@ k8s_global_labels = {
     "pulumi_managed": "true",
     "pulumi_stack": stack_info.full_name,
 }
+
 k8s_provider = kubernetes.Provider(
     "k8s-provider",
     kubeconfig=cluster.kubeconfig,
     opts=ResourceOptions(parent=cluster, depends_on=[cluster, administrator_role]),
 )
+cluster.kubeconfig.apply(
+    lambda conf: setup_k8s_provider(
+        json.dumps(conf),
+        "k8s-provider",
+    )
+)
 
 # Loop through the node group definitions and add them to the cluster
 node_groups = []
 for ng_name, ng_config in eks_config.require_object("nodegroups").items():
-    taint_list = {}
-    for taint_name, taint_config in ng_config["taints"].items() or {}:
-        taint_list[taint_name] = eks.TaintArgs(
-            value=taint_config["value"],
-            effect=taint_config["effect"],
-        )
-    node_group_sec_group = eks.NodeGroupSecurityGroup(
-        f"{cluster_name}-eks-nodegroup-{ng_name}-secgroup",
-        cluster_security_group=cluster.cluster_security_group,
-        eks_cluster=cluster.eks_cluster,
-        vpc_id=target_vpc["id"],
-        tags=aws_config.tags,
+    # Build taints for the nodegroup
+    node_groups += create_and_update_nodegroup(
+        ng_name,
+        ng_config,
+        cluster,
+        cluster_role,
+        node_role,
+        node_instance_profile,
+        target_vpc,
+        aws_config,
+        k8s_provider,
     )
-    # Even though this is in the loop, it will only export the first one (the 'core nodes')
-    export("node_group_security_group_id", node_group_sec_group.security_group.id)
-
-    node_groups.append(
-        eks.NodeGroupV2(
-            f"{cluster_name}-eks-nodegroup-{ng_name}",
-            cluster=eks.CoreDataArgs(
-                cluster=cluster.eks_cluster,
-                cluster_iam_role=cluster_role,
-                endpoint=cluster.eks_cluster.endpoint,
-                instance_roles=[node_role],
-                node_group_options=eks.ClusterNodeGroupOptionsArgs(
-                    node_associate_public_ip_address=False,
-                ),
-                provider=k8s_provider,
-                subnet_ids=target_vpc["k8s_pod_subnet_ids"],
-                vpc_id=target_vpc["id"],
-            ),
-            launch_template_tag_specifications=[
-                aws.ec2.LaunchTemplateTagSpecificationArgs(
-                    resource_type="instance",
-                    tags=aws_config.tags,
-                ),
-                aws.ec2.LaunchTemplateTagSpecificationArgs(
-                    resource_type="volume",
-                    tags=aws_config.tags,
-                ),
-            ],
-            gpu=ng_config.get("gpu") or False,
-            min_refresh_percentage=eks_config.get_int("min_refresh_percentage") or 90,
-            instance_type=ng_config["instance_type"],
-            instance_profile=node_instance_profile,
-            labels=ng_config["labels"] or {},
-            node_security_group=node_group_sec_group.security_group,
-            node_root_volume_size=ng_config["disk_size_gb"] or 250,
-            node_root_volume_delete_on_termination=True,
-            node_root_volume_type="gp3",
-            cluster_ingress_rule=node_group_sec_group.security_group_rule,
-            desired_capacity=ng_config["scaling"]["desired"] or 3,
-            max_size=ng_config["scaling"]["max"] or 5,
-            min_size=ng_config["scaling"]["min"] or 2,
-            taints=taint_list,
-            opts=ResourceOptions(parent=cluster, depends_on=cluster),
-        )
-    )
-
-    allow_all_ingress_from_pod_cidrs = aws.ec2.SecurityGroupRule(
-        f"{cluster_name}-eks-nodegroup-{ng_name}-all-ingress-from-pod-cidrs",
-        type="ingress",
-        description="Allow all traffic from pod CIDRs",
-        security_group_id=node_group_sec_group.security_group.id,
-        protocol="-1",
-        from_port=0,
-        to_port=0,
-        cidr_blocks=pod_ip_blocks,
-    )
-
 
 # Every cluster gets an 'operations' namespace.
 # It acts as a parent resource to many other resources below.
@@ -538,7 +491,6 @@ operations_namespace = kubernetes.core.v1.Namespace(
         labels=k8s_global_labels,
     ),
     opts=ResourceOptions(
-        provider=k8s_provider,
         protect=False,
     ),
 )
@@ -553,7 +505,6 @@ for namespace in namespaces:
             labels=k8s_global_labels,
         ),
         opts=ResourceOptions(
-            provider=k8s_provider,
             protect=False,
         ),
     )
@@ -578,7 +529,6 @@ prometheus_operator_crds = kubernetes.yaml.v2.ConfigGroup(
         f"{PROMETHEUS_OPERATOR_CRD_BASE_URL}/monitoring.coreos.com_probes.yaml",
     ],
     opts=ResourceOptions(
-        provider=k8s_provider,
         delete_before_replace=True,
     ),
 )
@@ -687,7 +637,6 @@ if eks_config.get_bool("ebs_csi_provisioner"):
             "encrypted": "true",
         },
         opts=ResourceOptions(
-            provider=k8s_provider,
             depends_on=[ebs_csi_driver_role],
         ),
     )
@@ -786,7 +735,6 @@ if eks_config.get_bool("efs_csi_provisioner"):
             "directoryPerms": "700",
         },
         opts=ResourceOptions(
-            provider=k8s_provider,
             depends_on=[efs_csi_driver_role],
         ),
     )
@@ -913,7 +861,6 @@ vault_secrets_operator = kubernetes.helm.v3.Release(
         skip_await=False,
     ),
     opts=ResourceOptions(
-        provider=k8s_provider,
         parent=operations_namespace,
         depends_on=[cluster, node_groups[0], vault_secret_operator_transit_role],
         delete_before_replace=True,
@@ -937,7 +884,6 @@ gateway_api_crds = kubernetes.yaml.v2.ConfigGroup(
         f"https://github.com/kubernetes-sigs/gateway-api/releases/download/{VERSIONS['GATEWAY_API']}/experimental-install.yaml"
     ],
     opts=ResourceOptions(
-        provider=k8s_provider,
         parent=operations_namespace,
         delete_before_replace=True,
         depends_on=[cluster],
@@ -1100,7 +1046,6 @@ traefik_helm_release = kubernetes.helm.v3.Release(
         },
     ),
     opts=ResourceOptions(
-        provider=k8s_provider,
         parent=operations_namespace,
         delete_before_replace=True,
         depends_on=[
@@ -1374,7 +1319,6 @@ if eks_config.get_bool("apisix_ingress_enabled"):
             },
         ),
         opts=ResourceOptions(
-            provider=k8s_provider,
             parent=operations_namespace,
             delete_before_replace=True,
             depends_on=[
@@ -1519,7 +1463,6 @@ external_dns_release = (
             },
         ),
         opts=ResourceOptions(
-            provider=k8s_provider,
             parent=operations_namespace,
             delete_before_replace=True,
             depends_on=[cluster, node_groups[0], operations_namespace],
@@ -1662,7 +1605,6 @@ cert_manager_release = kubernetes.helm.v3.Release(
         },
     ),
     opts=ResourceOptions(
-        provider=k8s_provider,
         parent=operations_namespace,
         depends_on=[cluster, node_groups[0]],
         delete_before_replace=True,
@@ -1675,7 +1617,6 @@ setup_aws_integrations(
     cluster=cluster,
     aws_config=aws_config,
     k8s_global_labels=k8s_global_labels,
-    k8s_provider=k8s_provider,
     operations_tolerations=operations_tolerations,
     target_vpc=target_vpc,
     node_groups=node_groups,
@@ -1712,7 +1653,6 @@ metrics_server_release = kubernetes.helm.v3.Release(
         },
     ),
     opts=ResourceOptions(
-        provider=k8s_provider,
         parent=cluster,
         depends_on=[node_groups[0]],
         delete_before_replace=True,
@@ -1722,6 +1662,5 @@ metrics_server_release = kubernetes.helm.v3.Release(
 create_core_dns_resources(
     cluster_name=cluster_name,
     k8s_global_labels=k8s_global_labels,
-    k8s_provider=k8s_provider,
     cluster=cluster,
 )
