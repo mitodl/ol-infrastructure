@@ -134,6 +134,18 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
             raise ValueError(msg)
         return cluster_name
 
+    @field_validator("parameter_overrides")
+    @classmethod
+    def ensure_maxmemory_policy(
+        cls, parameter_overrides: dict[str, Any]
+    ) -> dict[str, Any]:
+        if parameter_overrides is None:
+            parameter_overrides = {}
+        parameter_overrides["maxmemory-policy"] = parameter_overrides.get(
+            "maxmemory-policy", "allkeys-lru"
+        )
+        return parameter_overrides
+
 
 class OLAmazonMemcachedConfig(OLAmazonCacheConfig):
     engine: str = "memcached"
