@@ -2,6 +2,7 @@
 
 import base64
 import logging
+import time
 from http import HTTPStatus
 from typing import Any
 
@@ -19,35 +20,64 @@ class StarburstAPIClient:
         self.client_secret = client_secret
         self.base_url = f"https://{domain}"
         self._access_token: str | None = None
+        self._token_expires_at: float | None = None
         self._session = requests.Session()
+
+    def _is_token_expired(self) -> bool:
+        """Check if the current token is expired or will expire soon."""
+        if self._token_expires_at is None:
+            return True
+        # Add 60 second buffer to avoid using token that expires during request
+        return time.time() >= (self._token_expires_at - 60)
 
     def _get_access_token(self) -> str:
         """Get OAuth access token for API calls."""
-        if self._access_token:
+        # Return cached token if it's still valid
+        if self._access_token and not self._is_token_expired():
             return self._access_token
+
+        logger.debug("Requesting new access token from Starburst")
 
         credentials = f"{self.client_id}:{self.client_secret}"
         encoded_credentials = base64.b64encode(credentials.encode()).decode()
 
-        response = self._session.post(
-            f"{self.base_url}/oauth/v2/token",
-            headers={
-                "Authorization": f"Basic {encoded_credentials}",
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-            data="grant_type=client_credentials",
-            timeout=30,
-        )
-        response.raise_for_status()
+        try:
+            response = self._session.post(
+                f"{self.base_url}/oauth/v2/token",
+                headers={
+                    "Authorization": f"Basic {encoded_credentials}",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                data="grant_type=client_credentials",
+                timeout=30,
+            )
+            response.raise_for_status()
 
-        token_data = response.json()
-        self._access_token = token_data["access_token"]
-        return self._access_token
+            token_data = response.json()
+            self._access_token = token_data["access_token"]
+
+            # Calculate expiration time
+            expires_in = token_data.get("expires_in", 3600)  # Default to 1 hour
+            self._token_expires_at = time.time() + expires_in
+
+            logger.debug(
+                "Successfully obtained access token, expires in %d seconds",
+                expires_in,
+            )
+
+        except requests.RequestException:
+            logger.exception("Failed to obtain access token")
+            self._access_token = None
+            self._token_expires_at = None
+            raise
+        else:
+            return self._access_token
 
     def _make_authenticated_request(
         self, method: str, endpoint: str, **kwargs: Any
     ) -> requests.Response:
         """Make an authenticated request to the Starburst API."""
+        # Get fresh token (will reuse if still valid)
         token = self._get_access_token()
         headers = kwargs.pop("headers", {})
         headers.update(
@@ -55,11 +85,37 @@ class StarburstAPIClient:
         )
 
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
-        response = self._session.request(
-            method, url, headers=headers, timeout=30, **kwargs
-        )
-        response.raise_for_status()
-        return response
+
+        try:
+            response = self._session.request(
+                method, url, headers=headers, timeout=30, **kwargs
+            )
+            response.raise_for_status()
+
+        except requests.HTTPError as e:
+            # If we get 401 Unauthorized, the token might be expired
+            # Clear it and retry once
+            if (
+                e.response is not None
+                and e.response.status_code == HTTPStatus.UNAUTHORIZED
+            ):
+                logger.warning("Received 401, clearing cached token and retrying")
+                self._access_token = None
+                self._token_expires_at = None
+
+                # Retry with fresh token
+                fresh_token = self._get_access_token()
+                headers["Authorization"] = f"Bearer {fresh_token}"
+
+                response = self._session.request(
+                    method, url, headers=headers, timeout=30, **kwargs
+                )
+                response.raise_for_status()
+                return response
+            else:
+                raise
+        else:
+            return response
 
     def get_clusters(self) -> dict[str, Any]:
         """Fetch clusters from Starburst API."""

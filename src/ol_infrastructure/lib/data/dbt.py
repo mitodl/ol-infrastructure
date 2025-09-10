@@ -27,7 +27,7 @@ class DbtProjectParser:
 
     def _load_dbt_project(self) -> dict[str, Any]:
         """Load dbt_project.yml configuration from local path or remote URL."""
-        if self.project_path.startswith(("http://", "https://")):
+        if self.project_path.startswith("https://"):
             # Remote URL
             dbt_project_url = f"{self.project_path}/dbt_project.yml"
             try:
