@@ -33,6 +33,7 @@ dependencies = [
     "pulumi-eks>=4,<5",
     "pulumi-aws-native>=1.25.0,<2",
     "packaging>=24.2",
+    "kubernetes>=29,<32",
 ]
 
 [project.urls]

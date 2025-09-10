@@ -10,7 +10,6 @@ from pulumi import ResourceOptions
 def create_core_dns_resources(
     cluster_name: str,
     k8s_global_labels: dict[str, str],
-    k8s_provider: kubernetes.Provider,
     cluster: eks.Cluster,
 ):
     """
@@ -38,7 +37,7 @@ def create_core_dns_resources(
                 }
             ),
         ),
-        opts=ResourceOptions(provider=k8s_provider, parent=cluster),
+        opts=ResourceOptions(parent=cluster),
     )
 
     # Modifying the coredns plugin is a huge pain, so we just patch the existing
@@ -61,5 +60,5 @@ def create_core_dns_resources(
                 },
             },
         },
-        opts=ResourceOptions(provider=k8s_provider, parent=cluster),
+        opts=ResourceOptions(parent=cluster),
     )
