@@ -1,9 +1,13 @@
 """Starburst Galaxy API client."""
 
 import base64
+import logging
+from http import HTTPStatus
 from typing import Any
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 class StarburstAPIClient:
@@ -95,10 +99,61 @@ class StarburstAPIClient:
         return response.json()
 
     def delete_role(self, role_id: str) -> bool:
-        """Delete a role."""
+        """Delete a role.
+
+        Args:
+            role_id: The ID of the role to delete
+
+        Returns:
+            True if deletion was successful, False otherwise
+
+        Raises:
+            requests.RequestException: If the deletion fails due to a client error (4xx)
+        """
         try:
             self._make_authenticated_request("DELETE", f"/public/api/v1/role/{role_id}")
-        except requests.RequestException:
+        except requests.RequestException as e:
+            # Log the specific error with context
+            logger.exception("Failed to delete role %s", role_id)
+
+            # Check if it's a 404 (role doesn't exist) - this is often acceptable
+            if hasattr(e, "response") and e.response is not None:
+                status_code = e.response.status_code
+
+                if status_code == HTTPStatus.NOT_FOUND:
+                    logger.warning(
+                        "Role %s not found during deletion "
+                        "(may have already been deleted)",
+                        role_id,
+                    )
+                    return False  # Not found is considered a non-critical failure
+
+                elif (
+                    HTTPStatus.BAD_REQUEST
+                    <= status_code
+                    < HTTPStatus.INTERNAL_SERVER_ERROR
+                ):
+                    # Client errors (4xx) - these are usually configuration issues
+                    logger.exception(
+                        "Client error deleting role %s: HTTP %d", role_id, status_code
+                    )
+                    # Re-raise client errors as they indicate a problem with our request
+                    raise
+
+                elif status_code >= HTTPStatus.INTERNAL_SERVER_ERROR:
+                    # Server errors (5xx) - these might be transient
+                    logger.exception(
+                        "Server error deleting role %s: HTTP %d", role_id, status_code
+                    )
+                    return False  # Don't raise server errors, just return False
+
+            # For other request exceptions (network issues, timeouts, etc.)
+            logger.exception(
+                "Network or request error deleting role %s: %s",
+                role_id,
+                type(e).__name__,
+            )
             return False
         else:
+            logger.info("Successfully deleted role %s", role_id)
             return True

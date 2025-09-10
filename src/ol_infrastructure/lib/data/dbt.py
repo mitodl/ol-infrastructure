@@ -1,7 +1,7 @@
 """dbt project parsing utilities."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import requests
 import yaml
@@ -9,6 +9,17 @@ import yaml
 
 class DbtProjectParser:
     """Parse dbt project configuration to extract schema and grants information."""
+
+    # Single source of truth for domain mappings
+    DOMAIN_MAPPINGS: ClassVar[dict[str, dict[str, str]]] = {
+        "staging": {"grants_key": "staging", "schema_name": "staging"},
+        "intermediate": {"grants_key": "intermediate", "schema_name": "intermediate"},
+        "marts": {"grants_key": "marts", "schema_name": "mart"},  # plural -> singular
+        "dimensional": {"grants_key": "dimensional", "schema_name": "dimensional"},
+        "external": {"grants_key": "external", "schema_name": "external"},
+        "reporting": {"grants_key": "reporting", "schema_name": "reporting"},
+        "migration": {"grants_key": "migration", "schema_name": "migration"},
+    }
 
     def __init__(self, project_path: str) -> None:
         self.project_path = project_path
@@ -95,35 +106,19 @@ class DbtProjectParser:
         environments: list[str] | None = None,
         project_name: str | None = None,
     ) -> dict[str, list[str]]:
-        """Get data domains with their corresponding schema names from dbt project.
-
-        Args:
-            warehouse_prefix: Prefix for warehouse schema names
-            environments: List of environments (e.g., ["production", "qa"])
-            project_name: dbt project name, defaults to project name from config
-        """
+        """Get data domains with their corresponding schema names from dbt project."""
         if environments is None:
             environments = ["production", "qa"]
 
         domain_to_schemas: dict[str, list[str]] = {}
         project_models = self.get_project_models_config(project_name)
 
-        # Domain mapping: dbt model key -> domain_name
-        domain_mappings = {
-            "staging": "staging",
-            "intermediate": "intermediate",
-            "marts": "mart",  # ← Key difference: plural -> singular
-            "dimensional": "dimensional",
-            "external": "external",
-            "reporting": "reporting",
-            "migration": "migration",
-        }
-
-        for dbt_key, domain_name in domain_mappings.items():
+        for dbt_key, mapping in self.DOMAIN_MAPPINGS.items():
             model_config = project_models.get(dbt_key, {})
             if isinstance(model_config, dict) and "+schema" in model_config:
                 base_schema = model_config["+schema"]
-                domain_to_schemas[domain_name] = [
+                schema_name = mapping["schema_name"]
+                domain_to_schemas[schema_name] = [
                     f"{warehouse_prefix}_{env}_{base_schema}" for env in environments
                 ]
 
@@ -141,43 +136,33 @@ class DbtProjectParser:
         """Parse grants configuration and organize by domain."""
         grants_by_domain = {}
 
-        # Domain mapping: dbt model key -> (domain_name, actual_schema_name)
-        # Most are the same, but 'marts' -> 'mart' is different
-        domain_mappings = {
-            "staging": ("staging", "staging"),
-            "intermediate": ("intermediate", "intermediate"),
-            "marts": ("marts", "mart"),  # ← Key difference: plural -> singular
-            "dimensional": ("dimensional", "dimensional"),
-            "external": ("external", "external"),
-            "reporting": ("reporting", "reporting"),
-            "migration": ("migration", "migration"),
-        }
-
-        # Process domain-specific grants
-        for dbt_key, (domain_name, _actual_schema) in domain_mappings.items():
+        # Process domain-specific grants using the centralized mapping
+        for dbt_key, mapping in self.DOMAIN_MAPPINGS.items():
             if dbt_key in models_config:
                 domain_config = models_config[dbt_key]
                 if isinstance(domain_config, dict) and "+grants" in domain_config:
                     grants = domain_config["+grants"]
-                    grants_by_domain[domain_name] = self._normalize_grants(grants)
+                    grants_key = mapping["grants_key"]
+                    grants_by_domain[grants_key] = self._normalize_grants(grants)
 
         # Apply global grants to all domains
         if "+grants" in models_config:
             global_grants = models_config["+grants"]
             normalized_global = self._normalize_grants(global_grants)
 
-            for domain_name, _actual_schema in domain_mappings.values():
-                if domain_name not in grants_by_domain:
-                    grants_by_domain[domain_name] = {}
+            for mapping in self.DOMAIN_MAPPINGS.values():
+                grants_key = mapping["grants_key"]
+                if grants_key not in grants_by_domain:
+                    grants_by_domain[grants_key] = {}
 
                 # Merge global grants with domain-specific grants
                 for privilege_type, roles in normalized_global.items():
-                    if privilege_type not in grants_by_domain[domain_name]:
-                        grants_by_domain[domain_name][privilege_type] = []
-                    grants_by_domain[domain_name][privilege_type].extend(roles)
+                    if privilege_type not in grants_by_domain[grants_key]:
+                        grants_by_domain[grants_key][privilege_type] = []
+                    grants_by_domain[grants_key][privilege_type].extend(roles)
                     # Remove duplicates
-                    grants_by_domain[domain_name][privilege_type] = list(
-                        set(grants_by_domain[domain_name][privilege_type])
+                    grants_by_domain[grants_key][privilege_type] = list(
+                        set(grants_by_domain[grants_key][privilege_type])
                     )
 
         return grants_by_domain
