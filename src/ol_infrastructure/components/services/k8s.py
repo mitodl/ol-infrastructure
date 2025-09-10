@@ -69,6 +69,7 @@ class OLApplicationK8sConfig(BaseModel):
     application_lb_service_port_name: str
     application_min_replicas: NonNegativeInt = 2
     application_max_replicas: NonNegativeInt = 10
+    application_deployment_use_anti_affinity: bool = True
     k8s_global_labels: dict[str, str]
     env_from_secret_names: list[str]
     application_security_group_id: Output[str]
@@ -150,12 +151,12 @@ class OLApplicationK8sConfig(BaseModel):
             ),
             initial_delay_seconds=10,  # Wait 10 seconds before first probe
             period_seconds=10,  # Probe every 10 seconds
-            failure_threshold=30,  # Allow up to 5 minutes (30 * 10s) for startup
+            failure_threshold=6,  # Allow up to 1 minutes (6 * 10s) for startup
             success_threshold=1,
             timeout_seconds=5,
         ),
     }
-    web_pdb_minimum: NonNegativeInt | str = 1
+    app_pdb_maximum_unavailable: NonNegativeInt | str = 1
 
     # See https://www.pulumi.com/docs/reference/pkg/python/pulumi/#pulumi.Output.from_input
     # for docs. This unwraps the value so Pydantic can store it in the config class.
@@ -390,6 +391,24 @@ class OLApplicationK8s(ComponentResource):
             ),
         }
 
+        pod_spec_args = {}
+        if ol_app_k8s_config.application_deployment_use_anti_affinity:
+            pod_spec_args["affinity"] = kubernetes.core.v1.AffinityArgs(
+                pod_anti_affinity=kubernetes.core.v1.PodAntiAffinityArgs(
+                    preferred_during_scheduling_ignored_during_execution=[
+                        kubernetes.core.v1.WeightedPodAffinityTermArgs(
+                            weight=100,
+                            pod_affinity_term=kubernetes.core.v1.PodAffinityTermArgs(
+                                label_selector=kubernetes.meta.v1.LabelSelectorArgs(
+                                    match_labels=application_labels,
+                                ),
+                                topology_key="kubernetes.io/hostname",
+                            ),
+                        ),
+                    ],
+                ),
+            )
+
         _application_deployment_name = truncate_k8s_metanames(
             f"{ol_app_k8s_config.application_name}-app"
         )
@@ -455,7 +474,7 @@ class OLApplicationK8s(ComponentResource):
                 strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
                     type="RollingUpdate",
                     rolling_update=kubernetes.apps.v1.RollingUpdateDeploymentArgs(
-                        max_surge="50%",
+                        max_surge="100%",
                         max_unavailable=1,
                     ),
                 ),
@@ -508,6 +527,7 @@ class OLApplicationK8s(ComponentResource):
                                 **ol_app_k8s_config.probe_configs,
                             ),
                         ],
+                        **pod_spec_args,
                     ),
                 ),
                 **extra_deployment_args,
@@ -524,7 +544,7 @@ class OLApplicationK8s(ComponentResource):
                 labels=application_labels,
             ),
             spec=kubernetes.policy.v1.PodDisruptionBudgetSpecArgs(
-                min_available=ol_app_k8s_config.web_pdb_minimum,
+                max_unavailable=ol_app_k8s_config.app_pdb_maximum_unavailable,
                 selector=kubernetes.meta.v1.LabelSelectorArgs(
                     match_labels=application_labels,
                 ),
