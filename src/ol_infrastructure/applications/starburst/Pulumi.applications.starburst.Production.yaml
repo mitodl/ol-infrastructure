@@ -9,6 +9,11 @@ config:
   starburst:domain: mitol.galaxy.starburst.io
   starburst:warehouse_prefix: "ol_warehouse"
   starburst:environments: ["production", "qa"]
+  # Data privilege management: Set to true only if you need Pulumi to manage data-level grants
+  # By default (false), dbt handles all table-level SELECT/INSERT/UPDATE/DELETE permissions
+  # through the +grants configuration in dbt_project.yml. This prevents privilege "flapping"
+  # when dbt recreates tables and ensures grants are automatically reapplied.
+  starburst:manage_data_privileges: false
   starburst:roles:
     ol_platform_admin:
       description: "Full administrative access to all data and platform resources"
