@@ -206,37 +206,34 @@ if (learningApps.includes(edxMfeAppName)) {
 }
 
 const CustomCertificateStatus = (widget) => {
-  const { RenderWidget } = widget;
-
   // Modify only "notAvailable_certificate_status" with exactly 3 children.
   // If the structure changes (children count ≠ 3), fall back to the original widget for safety.
   // Original code reference:
   // https://github.com/openedx/frontend-app-learning/blob/release/teak/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx#L245
-  const renderProps = RenderWidget.props;
-  if (
-    renderProps.id.includes("notAvailable_") &&
-    renderProps.children.length == 3
-  ) {
-    const old_body = renderProps.children[1].props.children;
-    const endDate = old_body.split("available after")[1];
 
-    const newSecondChild = React.cloneElement(
-      renderProps.children[1],
-      renderProps.children[1].props,
-      `Final grades and any earned certificates are scheduled to be available 3 business days after ${endDate}`
-    );
-
-    const newChildren = [
-      renderProps.children[0],
-      newSecondChild,
-      ...renderProps.children.slice(2),
-    ];
-
-    widget.RenderWidget = React.cloneElement(
-      RenderWidget,
-      RenderWidget.props,
-      ...newChildren
-    );
+  const { RenderWidget } = widget;
+  const { id, children } = RenderWidget.props;
+  const childArray = React.Children.toArray(children);
+  if (id?.includes("notAvailable_") && childArray.length === 3) {
+    const secondChild = childArray[1];
+    let oldBody = secondChild?.props?.children;
+    let endDate = null;
+    if (typeof oldBody === "string" && oldBody.includes("available after")) {
+      endDate = oldBody.split("available after")[1].trim();
+    }
+    if (endDate) {
+      const newSecondChild = React.cloneElement(
+        secondChild,
+        secondChild.props,
+        `Final grades and any earned certificates are scheduled to be available 3 busines s days after ${endDate}`
+      );
+      const newChildren = [childArray[0], newSecondChild, childArray[2]];
+      widget.RenderWidget = React.cloneElement(
+        RenderWidget,
+        RenderWidget.props,
+        newChildren
+      );
+    }
   }
   return widget;
 };
