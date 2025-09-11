@@ -134,6 +134,16 @@
       {
         "name": "scrollbar",
         "disabled": true
+      },
+      {
+        "name": "runAll",
+        "command": "runmenu:run-all",
+        "icon": "ui-components:fast-forward"
+      },
+      {
+        "name": "downloadNotebook",
+        "command": "docmanager:download",
+        "icon": "ui-components:download"
       }
     ]
   }
