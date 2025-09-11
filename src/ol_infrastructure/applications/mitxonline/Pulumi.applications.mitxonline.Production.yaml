@@ -12,6 +12,7 @@ config:
   mitxonline:domain: "api.mitxonline.mit.edu"
   mitxonline:k8s_deploy: "true"
   mitxonline:learn_backend_domain: "api.learn.mit.edu"
+  mitxonline:min_replicas: 4
   mitxonline:vars:
     AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-production"
     CORS_ALLOWED_ORIGINS: "https://mitxonline.mit.edu,https://learn.mit.edu"
