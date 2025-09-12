@@ -24,7 +24,7 @@ class OLAmazonServerlessCacheConfig(AWSBase):
     description: str | None = None
     kms_key_id: str | None = None
     security_group_ids: list[PulumiString] | None = None
-    subnet_ids: list[PulumiString] | None = None
+    subnet_ids: pulumi.Output | None = None
     user_group_id: str | None = None
     daily_snapshot_time: str | None = None
     snapshot_retention_limit: int | None = None
