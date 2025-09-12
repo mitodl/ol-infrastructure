@@ -7,6 +7,7 @@ GIT_EXPORT_DEFAULT_IDENT:
   email: odl-devops@mit.edu
 
 PARSE_KEYS: {}
+REDBEAT_KEY_PREFIX: redbeat_cms  # ADDED - RedBeat key prefix to separate LMS and CMS schedules
 SITE_NAME: {{ key "edxapp/studio-domain" }}  # MODIFIED
 {{ with secret "secret-xpro/edxapp" }}
 SOCIAL_AUTH_EDX_OAUTH2_KEY: {{ .Data.studio_oauth_client.id }}
