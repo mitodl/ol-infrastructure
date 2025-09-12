@@ -7,6 +7,7 @@ GIT_EXPORT_DEFAULT_IDENT:
   email: mitx-devops@mit.edu
 
 PARSE_KEYS: {}
+REDBEAT_KEY_PREFIX: cms:  # ADDED - RedBeat key prefix to separate LMS and CMS schedules
 SITE_NAME: {{ key "edxapp/studio-domain" }}  # MODIFIED
 # Configuration for logging into studio via OAuth with LMS
 {{ with secret "secret-mitx-staging/edxapp" }}
