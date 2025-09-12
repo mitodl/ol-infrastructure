@@ -12,6 +12,26 @@
           {
             "command": "hub:control-panel",
             "disabled": true
+          },
+          {
+            "command": "application:rename",
+            "disabled": true
+          },
+          {
+            "command": "application:duplicate",
+            "disabled": true
+          },
+          {
+            "command": "docmanager:save-as",
+            "disabled": true
+          },
+          {
+            "command": "docmanager:save-all",
+            "disabled": true
+          },
+          {
+            "command": "notebook:trust",
+            "disabled": true
           }
         ]
       },
@@ -29,39 +49,7 @@
       },
       {
         "id": "jp-mainmenu-run",
-        "disabled": false,
-        "items": [
-          {
-            "command": "runmenu:restart-and-run-all",
-            "disabled": true
-          },
-          {
-            "type": "submenu",
-            "rank": 1010,
-            "disabled": true,
-            "submenu": {
-              "id": "jp-runmenu-change-cell-type",
-              "label": "Cell Type",
-              "items": [
-                {
-                  "command": "notebook:change-cell-to-code",
-                  "rank": 0,
-                  "disabled": true
-                },
-                {
-                  "command": "notebook:change-cell-to-markdown",
-                  "rank": 0,
-                  "disabled": true
-                },
-                {
-                  "command": "notebook:change-cell-to-raw",
-                  "rank": 0,
-                  "disabled": true
-                }
-              ]
-            }
-          }
-        ]
+        "disabled": true
       },
       {
         "id": "jp-mainmenu-kernel",
