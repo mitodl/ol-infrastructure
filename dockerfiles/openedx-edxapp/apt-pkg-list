@@ -3,7 +3,6 @@ default-libmysqlclient-dev
 gettext
 gfortran
 git
-granian
 graphviz
 graphviz-dev
 libffi-dev
