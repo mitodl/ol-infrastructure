@@ -2,6 +2,7 @@
    "disabledExtensions": {
          "@jupyterlab/debugger-extension": true,
          "nbdime-jupyterlab": true,
-         "@jupyter-notebook/application-extension:logo": true
+         "@jupyter-notebook/application-extension:logo": true,
+         "@jupyter-notebook/notebook-extension:trusted": true
    }
 }
