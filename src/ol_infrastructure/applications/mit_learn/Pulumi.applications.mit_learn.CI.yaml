@@ -40,9 +40,6 @@ config:
   mitlearn:legacy_frontend_domain: "mitopen-ci.odl.mit.edu"
   mitlearn:nextjs_heroku_domain: "next.ci.learn.mit.edu"
   mitlearn:posthog_proxy: "ph.ol.mit.edu"
-  #  heroku:user: "odl-devops"
-  #heroku:app_id:
-  #  secure: v1:eSvnqne7KQRkHJlu:wTyl9W3aivfxlANqBML2wy4GEHe85VuKll60R5HmGUu1hJTcQBEfzK1cJOyvjlbLgBtXLw==
   mitlearn:vars:
     AI_MIT_SYLLABUS_URL: "https://api.ci.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.ci.learn.mit.edu/api/v0/vector_content_files_search/"
