@@ -1,0 +1,7 @@
+---
+name: ol-infrastructure-starburst-application
+runtime: python
+description: Pulumi project for managing Starburst roles and permissions based on
+  dbt project structure
+backend:
+  url: s3://mitol-pulumi-state/
