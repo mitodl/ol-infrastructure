@@ -60,23 +60,15 @@ default_instance_policy = iam.Policy(
     ),
 )
 
-# TODO MAD 20221208  # noqa: FIX002, TD002, TD004
-# Leave this to not break compatibility with other stacks importing this
-# Could probably be intergated with app_route_53 zone loop with a tweak
-# the output of the infrastructure.aws.dns stack
-odl_zone_route53_policy = iam.Policy(
-    "mitodl-zone-route53-records-policy",
-    name="route53-odl-zone-records-policy",
-    path="/ol-infrastructure/route53-odl-zone-records-policy/",
-    policy=mitodl_zone_id.apply(
-        lambda zone_id: lint_iam_policy(
-            route53_policy_template(zone_id), stringify=True
-        )
-    ),
-    description="Grant permissions to create Route53 records in the odl zone",
-)
-
-app_route53_zones = ["mitx", "mitxonline", "xpro", "ocw", "ol", "learn"]
+app_route53_zones = [
+    "learn",
+    "mitx",
+    "mitxonline",
+    "ocw",
+    "odl",
+    "ol",
+    "xpro",
+]
 app_route53_policies = {}
 for zone in app_route53_zones:
     zone_id = dns_stack.require_output(zone)["id"]
@@ -118,7 +110,6 @@ create_cloudwatch_logs_policy = iam.Policy(
 export_dict = {
     "describe_instances": default_instance_policy.arn,
     "cloudwatch_logging": create_cloudwatch_logs_policy.arn,
-    "route53_odl_zone_records": odl_zone_route53_policy.arn,
 } | app_route53_policies
 
 export("iam_policies", export_dict)
