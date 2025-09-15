@@ -17,7 +17,18 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
 )
-from ol_infrastructure.components.services.k8s import OLApisixRoute, OLApisixRouteConfig
+from ol_infrastructure.components.aws.eks import (
+    OLEKSGateway,
+    OLEKSGatewayConfig,
+    OLEKSGatewayListenerConfig,
+    OLEKSGatewayRouteConfig,
+)
+from ol_infrastructure.components.services.k8s import (
+    OLApisixRoute,
+    OLApisixRouteConfig,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
+)
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
@@ -426,6 +437,7 @@ def create_k8s_resources(
         spec=kubernetes.core.v1.ServiceSpecArgs(
             ports=[
                 kubernetes.core.v1.ServicePortArgs(
+                    name="http",
                     port=8000,
                     # 'http' is the name of the port in the deployment podspec
                     target_port="http",
@@ -585,7 +597,7 @@ def create_k8s_resources(
                                     value="lms.envs.production",
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
-                                    name="UWSGI_WORKERS", value="2"
+                                    name="USWSGI_WORKERS", value="2"
                                 ),
                             ],
                             ports=[
@@ -617,7 +629,7 @@ def create_k8s_resources(
                                 ),
                                 *staticfiles_volume_mounts,
                             ],
-                        )
+                        ),
                     ],
                 ),
             ),
@@ -638,6 +650,7 @@ def create_k8s_resources(
                 kubernetes.core.v1.ServicePortArgs(
                     name="http",
                     port=8000,
+                    # 'http' is the name of the port in the deployment podspec
                     target_port="http",
                     protocol="TCP",
                 )
@@ -647,6 +660,7 @@ def create_k8s_resources(
         ),
     )
 
+    # Convert this from using standalone certificate and apisix to using traefik. Tr
     tls_secret_name = "shared-backend-tls-pair"  # pragma: allowlist secret
     cert_manager_certificate = OLCertManagerCert(
         f"ol-{stack_info.env_prefix}-edxapp-tls-cert-{stack_info.env_suffix}",
@@ -664,411 +678,43 @@ def create_k8s_resources(
         ),
     )
 
-    lms_apisixroute = OLApisixRoute(
-        name=f"ol-{stack_info.env_prefix}-edxapp-lms-apisix-route-{stack_info.env_suffix}",
+    edxapp_shared_plugins = OLApisixSharedPlugins(
+        f"ol-{stack_info.env_prefix}-edxapp-shared-plugins-{stack_info.env_suffix}",
+        plugin_config=OLApisixSharedPluginsConfig(
+            application_name="edxapp",
+            resource_suffix="ol-shared-plugins",
+            k8s_namespace=namespace,
+            k8s_labels=k8s_global_labels,
+            enable_defaults=True,
+        ),
+    )
+
+    apisixroute = OLApisixRoute(
+        name=f"ol-{stack_info.env_prefix}-edxapp-apisix-route-{stack_info.env_suffix}",
         k8s_namespace=namespace,
         k8s_labels=k8s_global_labels,
         route_configs=[
             OLApisixRouteConfig(
-                route_name="default",
+                route_name="lms-default",
                 priority=0,
                 plugins=[],
+                shared_plugin_config_name=edxapp_shared_plugins.resource_name,
                 hosts=[edxapp_config.require("backend_lms_domain")],
                 paths=["/"],
                 backend_service_name=lms_deployment_name,
                 backend_service_port="http",
-            )
+            ),
+            #            OLApisixRouteConfig(
+            #                route_name="cms-default",
+            #                priority=0,
+            #                plugins=[],
+            #                shared_plugin_config_name=edxapp_shared_plugins.resource_name,
+            #                hosts=[edxapp_config.require("backend_studio_domain")],
+            #                paths=["/"],
+            #                backend_service_name=cms_deployment_name,
+            #                backend_service_port="http",
+            #            ),
         ],
-    )
-    ############################################
-    # Shared configuration for BOTH LMS and CMS
-    ############################################
-
-    secrets = create_k8s_secrets(
-        stack_info,
-        namespace,
-        k8s_global_labels,
-        vault_k8s_resources,
-        edxapp_db,
-        edxapp_cache,
-        edxapp_config,
-    )
-
-    configmaps = create_k8s_configmaps(
-        stack_info,
-        namespace,
-        k8s_global_labels,
-        edxapp_config,
-        edxapp_cache,
-        opensearch_hostname,
-    )
-
-    ############################################
-    # cms deployment resources
-    ############################################
-    # All of the secrets and configmaps that will be mounted into the edxapp cms containers
-    # The names are prefixed with numbers to control the order they are concatenated in.
-    cms_edxapp_config_sources = {
-        secrets.db_creds_secret_name: secrets.db_creds,
-        secrets.db_connections_secret_name: secrets.db_connections,
-        secrets.mongo_db_creds_secret_name: secrets.mongo_db_creds,
-        secrets.mongo_db_forum_secret_name: secrets.mongo_db_forum,
-        secrets.general_secrets_name: secrets.general,
-        secrets.xqueue_secret_name: secrets.xqueue,
-        secrets.forum_secret_name: secrets.forum,
-        configmaps.general_config_name: configmaps.general,
-        configmaps.interpolated_config_name: configmaps.interpolated,
-        # Just CMS specific resources below this line
-        secrets.cms_oauth_secret_name: secrets.cms_oauth,
-        configmaps.cms_general_config_name: configmaps.cms_general,
-        configmaps.cms_interpolated_config_name: configmaps.cms_interpolated,
-    }
-    cms_edxapp_secret_names = [
-        secrets.db_creds_secret_name,
-        secrets.db_connections_secret_name,
-        secrets.mongo_db_creds_secret_name,
-        secrets.mongo_db_forum_secret_name,
-        secrets.general_secrets_name,
-        secrets.xqueue_secret_name,
-        secrets.forum_secret_name,
-        # Just CMS specific resources below this line
-        secrets.cms_oauth_secret_name,
-    ]
-    cms_edxapp_configmap_names = [
-        configmaps.general_config_name,
-        configmaps.interpolated_config_name,
-        # Just CMS specific resources below this line
-        configmaps.cms_general_config_name,
-        configmaps.cms_interpolated_config_name,
-    ]
-
-    # Define the volumes that will be mounted into the edxapp containers
-    cms_edxapp_volumes = [
-        kubernetes.core.v1.VolumeArgs(
-            name=secret_name,
-            secret=kubernetes.core.v1.SecretVolumeSourceArgs(secret_name=secret_name),
-        )
-        for secret_name in cms_edxapp_secret_names
-    ]
-    cms_edxapp_volumes.extend(
-        [
-            kubernetes.core.v1.VolumeArgs(
-                name=configmap_name,
-                config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                    name=configmap_name
-                ),
-            )
-            for configmap_name in cms_edxapp_configmap_names
-        ]
-    )
-    cms_edxapp_volumes.append(
-        kubernetes.core.v1.VolumeArgs(
-            name="edxapp-config",
-            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
-        )
-    )
-    cms_edxapp_volumes.append(
-        kubernetes.core.v1.VolumeArgs(
-            name="openedx-data",
-            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
-        )
-    )
-    cms_edxapp_volumes.append(
-        kubernetes.core.v1.VolumeArgs(
-            name="openedx-logs",
-            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
-        )
-    )
-    cms_edxapp_volumes.append(
-        kubernetes.core.v1.VolumeArgs(
-            name="openedx-media",
-            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
-        )
-    )
-    cms_edxapp_volumes.append(
-        kubernetes.core.v1.VolumeArgs(
-            name=configmaps.uwsgi_ini_config_name,
-            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                name=configmaps.uwsgi_ini_config_name
-            ),
-        )
-    )
-
-    # Define the volume mounts for the init container that aggregates the config files
-    cms_edxapp_init_volume_mounts = [
-        kubernetes.core.v1.VolumeMountArgs(
-            name=source_name,
-            mount_path=f"/openedx/config-sources/{source_name}",
-            read_only=True,
-        )
-        for source_name in cms_edxapp_config_sources
-    ]
-    cms_edxapp_init_volume_mounts.append(
-        kubernetes.core.v1.VolumeMountArgs(
-            name="edxapp-config",
-            mount_path="/openedx/config",
-        )
-    )
-
-    cms_labels = k8s_global_labels | {
-        "ol.mit.edu/component": "edxapp-cms",
-        "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
-    }
-    cms_deployment = kubernetes.apps.v1.Deployment(
-        f"ol-{stack_info.env_prefix}-edxapp-cms-deployment-{stack_info.env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=cms_deployment_name,
-            namespace=namespace,
-            labels=cms_labels,
-        ),
-        spec=kubernetes.apps.v1.DeploymentSpecArgs(
-            replicas=1,
-            selector=kubernetes.meta.v1.LabelSelectorArgs(match_labels=cms_labels),
-            template=kubernetes.core.v1.PodTemplateSpecArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=cms_labels),
-                spec=kubernetes.core.v1.PodSpecArgs(
-                    service_account_name=vault_k8s_resources.service_account_name,
-                    volumes=cms_edxapp_volumes,
-                    init_containers=[
-                        kubernetes.core.v1.ContainerArgs(
-                            name="config-aggregator",
-                            image="busybox:1.35",
-                            command=["/bin/sh", "-c"],
-                            args=[
-                                "cat /openedx/config-sources/*/*.yaml > /openedx/config/cms.env.yml"
-                            ],
-                            volume_mounts=cms_edxapp_init_volume_mounts,
-                        )
-                    ],
-                    containers=[
-                        kubernetes.core.v1.ContainerArgs(
-                            name="cms-edxapp",
-                            image="610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/edxapp:master-mitxonline-36327ff",
-                            env=[
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="SERVICE_VARIANT", value="cms"
-                                ),
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="DJANGO_SETTINGS_MODULE",
-                                    value="cms.envs.production",
-                                ),
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="UWSGI_WORKERS", value="2"
-                                ),
-                            ],
-                            volume_mounts=[
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="edxapp-config",
-                                    mount_path="/openedx/config",
-                                ),
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="openedx-data",
-                                    mount_path="/openedx/data",
-                                ),
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="openedx-logs",
-                                    mount_path="/openedx/data/logs",
-                                ),
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="openedx-media",
-                                    mount_path="/openedx/media/",
-                                ),
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name=configmaps.uwsgi_ini_config_name,
-                                    mount_path="/openedx/edx-platform/uwsgi.ini",
-                                    sub_path="uwsgi.ini",
-                                ),
-                            ],
-                        )
-                    ],
-                ),
-            ),
-        ),
-        opts=pulumi.ResourceOptions(
-            depends_on=list(cms_edxapp_config_sources.values())
-        ),
-    )
-
-    ############################################
-    # lms deployment resources
-    ############################################
-    lms_edxapp_config_sources = {
-        secrets.db_creds_secret_name: secrets.db_creds,
-        secrets.db_connections_secret_name: secrets.db_connections,
-        secrets.mongo_db_creds_secret_name: secrets.mongo_db_creds,
-        secrets.mongo_db_forum_secret_name: secrets.mongo_db_forum,
-        secrets.general_secrets_name: secrets.general,
-        secrets.xqueue_secret_name: secrets.xqueue,
-        secrets.forum_secret_name: secrets.forum,
-        configmaps.general_config_name: configmaps.general,
-        configmaps.interpolated_config_name: configmaps.interpolated,
-        # Just LMS specific resources below this line
-        secrets.lms_oauth_secret_name: secrets.lms_oauth,
-        configmaps.lms_interpolated_config_name: configmaps.lms_interpolated,
-    }
-    lms_edxapp_secret_names = [
-        secrets.db_creds_secret_name,
-        secrets.db_connections_secret_name,
-        secrets.mongo_db_creds_secret_name,
-        secrets.mongo_db_forum_secret_name,
-        secrets.general_secrets_name,
-        secrets.xqueue_secret_name,
-        secrets.forum_secret_name,
-        # Just LMS specific resources below this line
-        secrets.lms_oauth_secret_name,
-    ]
-    lms_edxapp_configmap_names = [
-        configmaps.general_config_name,
-        configmaps.interpolated_config_name,
-        # Just LMS specific resources below this line
-        configmaps.lms_interpolated_config_name,
-    ]
-
-    # Define the volumes that will be mounted into the edxapp containers
-    lms_edxapp_volumes = [
-        kubernetes.core.v1.VolumeArgs(
-            name=secret_name,
-            secret=kubernetes.core.v1.SecretVolumeSourceArgs(secret_name=secret_name),
-        )
-        for secret_name in lms_edxapp_secret_names
-    ]
-    lms_edxapp_volumes.extend(
-        [
-            kubernetes.core.v1.VolumeArgs(
-                name=configmap_name,
-                config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                    name=configmap_name
-                ),
-            )
-            for configmap_name in lms_edxapp_configmap_names
-        ]
-    )
-    lms_edxapp_volumes.append(
-        kubernetes.core.v1.VolumeArgs(
-            name="edxapp-config",
-            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
-        )
-    )
-    lms_edxapp_volumes.append(
-        kubernetes.core.v1.VolumeArgs(
-            name="openedx-data",
-            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
-        )
-    )
-    lms_edxapp_volumes.append(
-        kubernetes.core.v1.VolumeArgs(
-            name="openedx-logs",
-            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
-        )
-    )
-    lms_edxapp_volumes.append(
-        kubernetes.core.v1.VolumeArgs(
-            name="openedx-media",
-            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
-        )
-    )
-    lms_edxapp_volumes.append(
-        kubernetes.core.v1.VolumeArgs(
-            name=configmaps.uwsgi_ini_config_name,
-            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                name=configmaps.uwsgi_ini_config_name
-            ),
-        )
-    )
-
-    # Define the volume mounts for the init container that aggregates the config files
-    lms_edxapp_init_volume_mounts = [
-        kubernetes.core.v1.VolumeMountArgs(
-            name=source_name,
-            mount_path=f"/openedx/config-sources/{source_name}",
-            read_only=True,
-        )
-        for source_name in lms_edxapp_config_sources
-    ]
-    lms_edxapp_init_volume_mounts.append(
-        kubernetes.core.v1.VolumeMountArgs(
-            name="edxapp-config",
-            mount_path="/openedx/config",
-        )
-    )
-
-    lms_labels = k8s_global_labels | {
-        "ol.mit.edu/component": "edxapp-lms",
-        "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
-    }
-    lms_deployment = kubernetes.apps.v1.Deployment(
-        f"ol-{stack_info.env_prefix}-edxapp-lms-deployment-{stack_info.env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=lms_deployment_name,
-            namespace=namespace,
-            labels=lms_labels,
-        ),
-        spec=kubernetes.apps.v1.DeploymentSpecArgs(
-            replicas=1,
-            selector=kubernetes.meta.v1.LabelSelectorArgs(match_labels=lms_labels),
-            template=kubernetes.core.v1.PodTemplateSpecArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=lms_labels),
-                spec=kubernetes.core.v1.PodSpecArgs(
-                    service_account_name=vault_k8s_resources.service_account_name,
-                    volumes=lms_edxapp_volumes,
-                    init_containers=[
-                        kubernetes.core.v1.ContainerArgs(
-                            name="config-aggregator",
-                            image="busybox:1.35",
-                            command=["/bin/sh", "-c"],
-                            args=[
-                                "cat /openedx/config-sources/*/*.yaml > /openedx/config/lms.env.yml"
-                            ],
-                            volume_mounts=lms_edxapp_init_volume_mounts,
-                        )
-                    ],
-                    containers=[
-                        kubernetes.core.v1.ContainerArgs(
-                            name="lms-edxapp",
-                            image="610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/edxapp:master-mitxonline-36327ff",
-                            env=[
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="SERVICE_VARIANT", value="lms"
-                                ),
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="DJANGO_SETTINGS_MODULE",
-                                    value="lms.envs.production",
-                                ),
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="UWSGI_WORKERS", value="2"
-                                ),
-                            ],
-                            volume_mounts=[
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="edxapp-config",
-                                    mount_path="/openedx/config",
-                                ),
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="openedx-data",
-                                    mount_path="/openedx/data",
-                                ),
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="openedx-logs",
-                                    mount_path="/openedx/data/logs",
-                                ),
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="openedx-media",
-                                    mount_path="/openedx/media/",
-                                ),
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name=configmaps.uwsgi_ini_config_name,
-                                    mount_path="/openedx/edx-platform/uwsgi.ini",
-                                    sub_path="uwsgi.ini",
-                                ),
-                            ],
-                        )
-                    ],
-                ),
-            ),
-        ),
-        opts=pulumi.ResourceOptions(
-            depends_on=list(lms_edxapp_config_sources.values())
-        ),
     )
 
     return {
