@@ -1,4 +1,5 @@
-from pulumi import StackReference, export
+from pulumi import ResourceOptions, StackReference, export
+from pulumi.resource import Alias
 from pulumi_aws import iam
 
 from ol_infrastructure.lib.aws.iam_helper import (
@@ -80,6 +81,9 @@ for zone in app_route53_zones:
             lambda z_id: lint_iam_policy(route53_policy_template(z_id), stringify=True)
         ),
         description=f"Grant permissions to create Route53 records in the {zone} zone",
+        opts=ResourceOptions(
+            aliases=[Alias(name="mitodl-zone-route53-records-policy")]
+        ),
     )
     app_route53_policies[f"route53_{zone}_zone_records"] = policy.arn
 
@@ -107,9 +111,33 @@ create_cloudwatch_logs_policy = iam.Policy(
 )
 
 
+data_landing_zone_write_access = iam.Policy(
+    "allow-writing-to-data-lake-landing-zone",
+    name="data-lake-landing-zone-write-only",
+    path="/ol-data/ingestion/write/",
+    policy=lint_iam_policy(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "s3:PutObject",
+                        "s3:AbortMultipartUpload",
+                        "s3:ListMultipartUploadParts",
+                    ],
+                    "Resource": "arn:aws:s3:::ol-data-lake-landing-zone-*/thirdparty/*",
+                }
+            ],
+        },
+        stringify=True,
+    ),
+)
+
 export_dict = {
     "describe_instances": default_instance_policy.arn,
     "cloudwatch_logging": create_cloudwatch_logs_policy.arn,
+    "data_landing_policy_arn": data_landing_zone_write_access.arn,
 } | app_route53_policies
 
 export("iam_policies", export_dict)
