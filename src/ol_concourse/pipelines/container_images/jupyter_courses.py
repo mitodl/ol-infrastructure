@@ -47,39 +47,39 @@ courses = [
         image_name="clustering_and_descriptive_ai",
     ),
     CourseImageInfo(
-        course_name="UAI_SOURCE-UAI.6-3T2025",
+        course_name="uai_source-uai.6",
         repo_uri="git@github.mit.edu:ol-notebooks-qa/UAI_SOURCE-UAI.6-3T2025.git",
-        image_name="UAI_SOURCE-UAI.6-3T2025",
+        image_name="uai_source-uai.6",
     ),
     CourseImageInfo(
-        course_name="UAI_SOURCE-UAI.7-3T2025",
+        course_name="uai_source-uai.7",
         repo_uri="git@github.mit.edu:ol-notebooks-qa/UAI_SOURCE-UAI.7-3T2025.git",
-        image_name="UAI_SOURCE-UAI.7-3T2025",
+        image_name="uai_source-uai.7",
     ),
     CourseImageInfo(
-        course_name="UAI_SOURCE-UAI.8-3T2025",
+        course_name="uai_source-uai.8",
         repo_uri="git@github.mit.edu:ol-notebooks-qa/UAI_SOURCE-UAI.8-3T2025.git",
-        image_name="UAI_SOURCE-UAI.8-3T2025",
+        image_name="uai_source-uai.8",
     ),
     CourseImageInfo(
-        course_name="UAI_SOURCE-UAI.9-3T2025",
+        course_name="uai_source-uai.9",
         repo_uri="git@github.mit.edu:ol-notebooks-qa/UAI_SOURCE-UAI.9-3T2025.git",
-        image_name="UAI_SOURCE-UAI.9-3T2025",
+        image_name="uai_source-uai.9",
     ),
     CourseImageInfo(
-        course_name="UAI_SOURCE-UAI.11-3T2025",
+        course_name="uai_source-uai.11",
         repo_uri="git@github.mit.edu:ol-notebooks-qa/UAI_SOURCE-UAI.11-3T2025.git",
-        image_name="UAI_SOURCE-UAI.11-3T2025",
+        image_name="uai_source-uai.11",
     ),
     CourseImageInfo(
-        course_name="UAI_SOURCE-UAI.12-3T2025",
+        course_name="uai_source-uai.12",
         repo_uri="git@github.mit.edu:ol-notebooks-qa/UAI_SOURCE-UAI.12-3T2025.git",
-        image_name="UAI_SOURCE-UAI.12-3T2025",
+        image_name="uai_source-uai.12",
     ),
     CourseImageInfo(
-        course_name="UAI_SOURCE-UAI.13-3T2025",
+        course_name="uai_source-uai.13",
         repo_uri="git@github.mit.edu:ol-notebooks-qa/UAI_SOURCE-UAI.13-3T2025.git",
-        image_name="UAI_SOURCE-UAI.13-3T2025",
+        image_name="uai_source-uai.13",
     ),
 ]
 
