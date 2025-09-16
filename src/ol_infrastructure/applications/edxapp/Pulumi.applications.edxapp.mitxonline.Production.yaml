@@ -51,7 +51,7 @@ config:
   edxapp:db_password:
     secure: v1:Za4LI6RKfAW7jLJh:hlthF86wmGH6VSiBHgehE8mY11hDfOUK/uYZADbodhCVuS8RSXoCoHtrRrBDNMXunQmHLABw4SM=
   edxapp:db_use_blue_green: true
-  edxapp:dns_zone: mitxonline
+  edxapp:dns_zone: learn
   edxapp:domains:
     lms: courses.learn.mit.edu
     preview: preview.courses.learn.mit.edu
