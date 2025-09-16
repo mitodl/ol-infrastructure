@@ -290,6 +290,21 @@ dockerhub_secret = vault.generic.get_secret_output(
     opts=InvokeOptions(parent=jupyterhub_vault_k8s_auth_backend_role),
 )
 
+COURSE_NAMES = [
+    "clustering_and_descriptive_ai",
+    "deep_learning_foundations_and_applications",
+    "supervised_learning_fundamentals",
+    "introduction_to_data_analytics_and_machine_learning",
+]
+COURSE_NAMES.extend([f"uai_source-uai.{i}" for i in [6, 7, 8, 9, 11, 12, 13]])
+EXTRA_IMAGES = {
+    course_name.replace(".", "-").replace("_", "-"): {
+        "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
+        "tag": course_name,
+    }
+    for course_name in COURSE_NAMES
+}
+
 # Binderhub and jupyterhub installation
 # Installing the binderhub will come with a subchart installation of jupyterhub
 #
@@ -427,26 +442,7 @@ binderhub_application = kubernetes.helm.v3.Release(
                     "continuous": {
                         "enabled": True,
                     },
-                    "extraImages": {
-                        # The object keys here are used for RFC 1123 names of init containers.
-                        # No underscores are allowed
-                        "clustering-and-descriptive-ai": {
-                            "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
-                            "tag": "clustering_and_descriptive_ai",
-                        },
-                        "deep-learning-foundations-and-applications": {
-                            "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
-                            "tag": "deep_learning_foundations_and_applications",
-                        },
-                        "introduction-to-data-analytics-and-machine-learning": {
-                            "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
-                            "tag": "introduction_to_data_analytics_and_machine_learning",
-                        },
-                        "supervised-learning-fundamentals": {
-                            "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
-                            "tag": "supervised_learning_fundamentals",
-                        },
-                    },
+                    "extraImages": EXTRA_IMAGES,
                     "resources": {
                         "requests": {
                             "cpu": "10m",
