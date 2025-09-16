@@ -1,7 +1,10 @@
-import React from "react";
+import React, { useContext, useEffect } from "react";
 import { Button, Dropdown, Collapsible, Hyperlink, Image } from "@openedx/paragon";
 import { ExpandLess, ExpandMore } from '@openedx/paragon/icons';
+import { getConfig } from '@edx/frontend-platform';
 import { PluginSlot } from '@openedx/frontend-plugin-framework';
+import { getLoginRedirectUrl } from '@edx/frontend-platform/auth';
+import { AppContext } from '@edx/frontend-platform/react';
 
 function RevealLinks({ label, children }) {
 
@@ -110,7 +113,26 @@ const config = {
     ],
   };
 
+const ForceLoginRedirect = () => {
+  const config = getConfig();
+  const { authenticatedUser } = useContext(AppContext);
+
+  useEffect(() => {
+    if (
+      config.APP_ID === "learning" &&
+      process.env.DEPLOYMENT_NAME?.includes("mitxonline") &&
+      authenticatedUser === null
+    ) {
+      const destination = getLoginRedirectUrl(window.location.href);
+      window.location.replace(destination);
+    }
+  }, [config, authenticatedUser]);
+
+  return null;
+};
+
 const Footer = () => {
+
   const {
     imageUrl,
     destinationUrl,
@@ -120,6 +142,7 @@ const Footer = () => {
 
   return (
     <footer className="d-flex flex-column align-items-stretch">
+      <ForceLoginRedirect />
         <PluginSlot id="frontend.shell.footer.desktop.top.ui">
             <RevealLinks label={"Reveal Button"} />
         </PluginSlot>
