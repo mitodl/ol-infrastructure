@@ -121,13 +121,18 @@ data_landing_zone_write_access = iam.Policy(
             "Statement": [
                 {
                     "Effect": "Allow",
+                    "Action": "s3:ListBucket",
+                    "Resource": "arn:aws:s3:::ol-data-lake-landing-zone-*",
+                },
+                {
+                    "Effect": "Allow",
                     "Action": [
                         "s3:PutObject",
                         "s3:AbortMultipartUpload",
                         "s3:ListMultipartUploadParts",
                     ],
                     "Resource": "arn:aws:s3:::ol-data-lake-landing-zone-*/thirdparty/*",
-                }
+                },
             ],
         },
         stringify=True,
