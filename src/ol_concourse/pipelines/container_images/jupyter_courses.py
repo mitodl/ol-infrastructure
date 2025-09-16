@@ -28,57 +28,57 @@ courses = [
     # TODO (dsubak) - Derive from course IDs # noqa: FIX002, TD004
     CourseImageInfo(
         course_name="course_deep_learning_foundations_and_applications",
-        repo_uri="git@github.mit.edu:ol-notebooks-qa/course_deep_learning_foundations_and_applications.git",
+        repo_uri="git@github.mit.edu:ol-notebooks/course_deep_learning_foundations_and_applications.git",
         image_name="deep_learning_foundations_and_applications",
     ),
     CourseImageInfo(
         course_name="supervised_learning_fundamentals",
-        repo_uri="git@github.mit.edu:ol-notebooks-qa/course_supervised_learning_fundamentals.git",
+        repo_uri="git@github.mit.edu:ol-notebooks/course_supervised_learning_fundamentals.git",
         image_name="supervised_learning_fundamentals",
     ),
     CourseImageInfo(
         course_name="introduction_to_data_analytics_and_machine_learning",
-        repo_uri="git@github.mit.edu:ol-notebooks-qa/course_introduction_to_data_analytics_and_machine_learning.git",
+        repo_uri="git@github.mit.edu:ol-notebooks/course_introduction_to_data_analytics_and_machine_learning.git",
         image_name="introduction_to_data_analytics_and_machine_learning",
     ),
     CourseImageInfo(
         course_name="clustering_and_descriptive_ai",
-        repo_uri="git@github.mit.edu:ol-notebooks-qa/course_clustering_and_descriptive_ai.git",
+        repo_uri="git@github.mit.edu:ol-notebooks/course_clustering_and_descriptive_ai.git",
         image_name="clustering_and_descriptive_ai",
     ),
     CourseImageInfo(
         course_name="uai_source-uai.6",
-        repo_uri="git@github.mit.edu:ol-notebooks-qa/UAI_SOURCE-UAI.6-3T2025.git",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.6-3T2025.git",
         image_name="uai_source-uai.6",
     ),
     CourseImageInfo(
         course_name="uai_source-uai.7",
-        repo_uri="git@github.mit.edu:ol-notebooks-qa/UAI_SOURCE-UAI.7-3T2025.git",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.7-3T2025.git",
         image_name="uai_source-uai.7",
     ),
     CourseImageInfo(
         course_name="uai_source-uai.8",
-        repo_uri="git@github.mit.edu:ol-notebooks-qa/UAI_SOURCE-UAI.8-3T2025.git",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.8-3T2025.git",
         image_name="uai_source-uai.8",
     ),
     CourseImageInfo(
         course_name="uai_source-uai.9",
-        repo_uri="git@github.mit.edu:ol-notebooks-qa/UAI_SOURCE-UAI.9-3T2025.git",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.9-3T2025.git",
         image_name="uai_source-uai.9",
     ),
     CourseImageInfo(
         course_name="uai_source-uai.11",
-        repo_uri="git@github.mit.edu:ol-notebooks-qa/UAI_SOURCE-UAI.11-3T2025.git",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.11-3T2025.git",
         image_name="uai_source-uai.11",
     ),
     CourseImageInfo(
         course_name="uai_source-uai.12",
-        repo_uri="git@github.mit.edu:ol-notebooks-qa/UAI_SOURCE-UAI.12-3T2025.git",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.12-3T2025.git",
         image_name="uai_source-uai.12",
     ),
     CourseImageInfo(
         course_name="uai_source-uai.13",
-        repo_uri="git@github.mit.edu:ol-notebooks-qa/UAI_SOURCE-UAI.13-3T2025.git",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.13-3T2025.git",
         image_name="uai_source-uai.13",
     ),
 ]
