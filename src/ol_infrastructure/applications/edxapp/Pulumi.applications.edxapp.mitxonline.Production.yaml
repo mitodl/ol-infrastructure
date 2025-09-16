@@ -53,9 +53,9 @@ config:
   edxapp:db_use_blue_green: true
   edxapp:dns_zone: mitxonline
   edxapp:domains:
-    lms: courses.mitxonline.mit.edu
-    preview: preview.mitxonline.mit.edu
-    studio: studio.mitxonline.mit.edu
+    lms: courses.learn.mit.edu
+    preview: preview.courses.learn.mit.edu
+    studio: studio.courses.learn.mit.edu
   edxapp:marketing_domain: mitxonline.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:qzfe99Jb8n0TnEQS:Y6fSOS8lksj7WvED+V7kCtV7arDtwx7184Fw330Mwh9JDHW72rVd8y7Nm0fF8ANCcFCwDV5EwSU2Fcc+X47NHDOLCOQv16lyB6jWOF2mTr/veRax6MbXY9NlLmsfp9EBQesDCitULbkz9hyHcHT3GPI=
