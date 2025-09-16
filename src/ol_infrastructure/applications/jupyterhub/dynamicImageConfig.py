@@ -14,19 +14,29 @@ GPU_NODE_AFFINITY_LIST = [
     }
 ]
 
+KNOWN_COURSES = [
+    "clustering_and_descriptive_ai",
+    "deep_learning_foundations_and_applications",
+    "supervised_learning_fundamentals",
+    "introduction_to_data_analytics_and_machine_learning",
+]
+# We have notebooks in UAI courses 6-13, excluding 10
+KNOWN_COURSES.extend([f"uai_source-uai.{i}" for i in [6, 7, 8, 9, 11, 12, 13]])
+# All courses which use the CUDA pytorch base image are below
+GPU_ENABLED_COURSES = {
+    "deep_learning_foundations_and_applications",
+    "uai_source-uai.8",
+    "uai_source-uai.9",
+    "uai_source-uai.12",
+    "uai_source-uai.13",
+}
+
 
 class QueryStringKubeSpawner(KubeSpawner):
     def start(self):
         image_base = (
             "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks:{}"
         )
-        KNOWN_COURSES = [
-            "clustering_and_descriptive_ai",
-            "deep_learning_foundations_and_applications",
-            "supervised_learning_fundamentals",
-            "introduction_to_data_analytics_and_machine_learning",
-        ]
-        GPU_ENABLED_COURSES = {"deep_learning_foundations_and_applications"}
         self.image = (
             "610119931565.dkr.ecr.us-east-1.amazonaws.com/"
             "ol-course-notebooks:clustering_and_descriptive_ai"
