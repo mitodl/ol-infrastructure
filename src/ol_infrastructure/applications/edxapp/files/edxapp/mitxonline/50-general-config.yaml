@@ -13,49 +13,37 @@ CONTENTSTORE:
     <<: *mongo_params
   ENGINE: xmodule.contentstore.mongo.MongoContentStore
   OPTIONS:
-     auth_source: ''
-     <<: *mongo_params
+    auth_source: ''
+    <<: *mongo_params
 
 ACCOUNT_MICROFRONTEND_URL: null
 ACTIVATION_EMAIL_SUPPORT_LINK: ''
 AFFILIATE_COOKIE_NAME: dev_affiliate_id
 # ANALYTICS_DASHBOARD_NAME: Your Platform Name Here Insights
 # ANALYTICS_DASHBOARD_URL: http://localhost:18110/courses
-AUTH_PASSWORD_VALIDATORS:
-- NAME: django.contrib.auth.password_validation.UserAttributeSimilarityValidator
-- NAME: common.djangoapps.util.password_policy_validators.MinimumLengthValidator
-  OPTIONS:
-    min_length: 2
-- NAME: common.djangoapps.util.password_policy_validators.MaximumLengthValidator
-  OPTIONS:
-    max_length: 75
-AUTH_PASSWORD_VALIDATORS:
-- NAME: django.contrib.auth.password_validation.UserAttributeSimilarityValidator
-- NAME: common.djangoapps.util.password_policy_validators.MinimumLengthValidator
-  OPTIONS:
-    min_length: 2
-- NAME: common.djangoapps.util.password_policy_validators.MaximumLengthValidator
-  OPTIONS:
-    max_length: 75
 
+AUTH_PASSWORD_VALIDATORS:
+- NAME: django.contrib.auth.password_validation.UserAttributeSimilarityValidator
+- NAME: common.djangoapps.util.password_policy_validators.MinimumLengthValidator
+  OPTIONS:
+    min_length: 2
+- NAME: common.djangoapps.util.password_policy_validators.MaximumLengthValidator
+  OPTIONS:
+    max_length: 75
 AWS_ACCESS_KEY_ID: "" # MODIFIED - not setting as we will use IAM Instance Profiles
 # AWS_QUERYSTRING_AUTH: false
-AWS_ACCESS_KEY_ID: "" # MODIFIED - not setting as we will use IAM Instance Profiles
 AWS_SECRET_ACCESS_KEY: ""  # MODIFIED - not setting as we will use IAM Instance Profiles
 AWS_SES_REGION_ENDPOINT: email.us-east-1.amazonaws.com
 AWS_SES_REGION_NAME: us-east-1
-
 BLOCKSTORE_USE_BLOCKSTORE_APP_API: true
 BUNDLE_ASSET_STORAGE_SETTINGS:
   STORAGE_CLASS: storages.backends.s3boto3.S3Boto3Storage
   STORAGE_KWARGS:
-    location: blockstore/
+  location: blockstore/
 BRANCH_IO_KEY: ''
 BUGS_EMAIL: odl-devops@mit.edu  # MODIFIED
-
 BULK_EMAIL_EMAILS_PER_TASK: 500
 BULK_EMAIL_LOG_SENT_EMAILS: false
-
 CACHES:  # MODIFIED
   celery:
     <<: *redis_cache_config
@@ -82,7 +70,6 @@ CACHES:  # MODIFIED
   staticfiles:
     <<: *redis_cache_config
     KEY_PREFIX: staticfiles
-
 CELERYBEAT_SCHEDULE:
   send-email-digest:
     task: openedx.core.djangoapps.notifications.email.tasks.send_digest_email_to_all_users
@@ -105,8 +92,8 @@ CELERY_TIMEZONE: UTC
 CELERY_TASK_TRACK_STARTED: true
 CELERY_TASK_SEND_SENT_EVENT: true
 CERTIFICATE_TEMPLATE_LANGUAGES:
-    en: English
-    es: Español
+  en: English
+  es: Español
 CERT_QUEUE: certificates
 CONTACT_MAILING_ADDRESS: SET-ME-PLEASE
 CONTACT_US_ENABLE: false
@@ -127,6 +114,7 @@ CREDENTIALS_INTERNAL_SERVICE_URL: http://localhost:8005
 CREDENTIALS_PUBLIC_SERVICE_URL: http://localhost:8005
 CREDIT_PROVIDER_SECRET_KEYS: {}
 CSRF_COOKIE_SECURE: true  # MODIFIED
+CSRF_COOKIE_SAMESITE: 'None'
 DASHBOARD_COURSE_LIMIT: null
 DATA_DIR: /openedx/data  # Filesystem path where edx puts files for course export/import
 DEFAULT_COURSE_VISIBILITY_IN_CATALOG: both
@@ -134,6 +122,9 @@ DEFAULT_FILE_STORAGE: storages.backends.s3boto3.S3Boto3Storage  # MODIFIED
 DEFAULT_MOBILE_AVAILABLE: false
 DEFAULT_SITE_THEME: mitxonline  # MODIFIED
 DEPRECATED_ADVANCED_COMPONENT_TYPES: []
+
+EDXNOTES_INTERNAL_API: http://localhost:18120/api/v1
+EDXNOTES_PUBLIC_API: http://localhost:18120/api/v1
 EDX_PLATFORM_REVISION: release
 EMAIL_BACKEND: django_ses.SESBackend  # MODIFIED
 # EMAIL_HOST: localhost
@@ -203,40 +194,48 @@ FINANCIAL_REPORTS:
   STORAGE_TYPE: localfs
 FOOTER_ORGANIZATION_IMAGE: /images/logo.png
 FORUM_SEARCH_BACKEND: "forum.search.es.ElasticsearchBackend"
+
+
+
+FORUM_MONGODB_DATABASE: "forum"
+GITHUB_REPO_ROOT: /openedx/data
 HELP_TOKENS_BOOKS:
-    course_author: http://edx.readthedocs.io/projects/open-edx-building-and-running-a-course
-    learner: http://edx.readthedocs.io/projects/open-edx-learner-guide
+  course_author: http://edx.readthedocs.io/projects/open-edx-building-and-running-a-course
+  learner: http://edx.readthedocs.io/projects/open-edx-learner-guide
 ICP_LICENSE: null
 ICP_LICENSE_INFO: {}
 ID_VERIFICATION_SUPPORT_LINK: ''
 INTEGRATED_CHANNELS_API_CHUNK_TRANSMISSION_LIMIT:
-    SAP: 1
+  SAP: 1
 JWT_EXPIRATION: 30
 LANGUAGE_CODE: en
 UAI_COURSE_KEY_FORMATS:
-  - course-v1:uai_
-  - course-v1:mit_et
+- course-v1:uai_
 LEARNER_PORTAL_URL_ROOT: https://learner-portal-localhost:18000
 LEARNER_HOME_MICROFRONTEND_URL: '/dashboard/'
 LOCAL_LOGLEVEL: INFO
 LOGGING_ENV: sandbox
-LOG_DIR: /openedx/data/var/log/edx/openedx/data/var/log/edx
+LOG_DIR: /openedx/data/var/log/ed/openedx/data/var/log/edx
 MAINTENANCE_BANNER_TEXT: Sample banner message
-MIT_BASE_URL: https://mit.edu # Keeping it hardcoded till we change MARKETING_SITE_BASE_URL
+MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within the bucket. No leading / allowed
+MEDIA_URL: /media/
+MICROSITE_CONFIGURATION: {}
+MIT_BASE_URL: https://web.mit.edu # Keeping it hardcoded till we change MARKETING_SITE_BASE_URL
 MITX_REDIRECT_ENABLED: True
-MITX_REDIRECT_ALLOW_RE_LIST: ["^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/)", "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler", "^/v1/accounts/bulk_retire_users"]  # ADDED VALUE
+MITX_REDIRECT_ALLOW_RE_LIST:  # ADDED VALUE
+- "^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/|lti_provider)"
+- "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"
+- "^/v1/accounts/bulk_retire_users"
+- "^/courses/course-v1:.*?/xqueue/.*$"  # TODO (TMM 2025-07-22): Remove this once the xqueue -> submissions migration is complete
 MKTG_URL_LINK_MAP:
   TOS: tos
-  HONOR: honor
   ABOUT: about
-  PRIVACY: privacy
   ACCESSIBILITY: accessibility
-  HELP_CENTER: help-center
 MOBILE_STORE_URLS: {}
 ########################################################################################
-# Previously assumed to be unnecessary config as it duplicates code from               #
+# Previously assumed to be unnecessary config as it duplicates code from         #
 # common.py. Unfortunately the `DOC_STORE_CONFIG` object does not propagate backwards, #
-# and so the entire structure has to be specified again                                #
+# and so the entire structure has to be specified again                #
 ########################################################################################
 MODULESTORE:
   default:
@@ -262,65 +261,97 @@ MODULESTORE:
           render_template: common.djangoapps.edxmako.shortcuts.render_to_string
 NOTIFICATION_TYPE_ICONS: {} # ADDED
 DEFAULT_NOTIFICATION_ICON_URL: '' # ADDED
+OAUTH2_PROVIDER:
+  OAUTH2_VALIDATOR_CLASS: "openedx.core.djangoapps.oauth_dispatch.dot_overrides.validators.EdxOAuth2Validator"
+  REFRESH_TOKEN_EXPIRE_SECONDS: 7776000
+  SCOPES_BACKEND_CLASS: "openedx.core.djangoapps.oauth_dispatch.scopes.ApplicationModelScopes"
+  SCOPES:
+    read: "Read access"
+    write: "Write access"
+    email: "Know your email address"
+    profile: "Know your name and username"
+    certificates:read: "Retrieve your course certificates"
+    grades:read: "Retrieve your grades for your enrolled courses"
+    tpa:read: "Retrieve your third-party authentication username mapping"
+    user_id: "Know your user identifier"
+  DEFAULT_SCOPES:
+    read: "Read access"
+    write: "Write access"
+    email: "Know your email address"
+    profile: "Know your name and username"
+  REQUEST_APPROVAL_PROMPT: "auto_even_if_expired"
+  ERROR_RESPONSE_WITH_SCOPES: true
+  ALLOWED_REDIRECT_URI_SCHEMES:
+    - "https"
+    - "edu.mit.learn.app"
 OL_OPENEDX_COURSE_SYNC_SERVICE_WORKER_USERNAME: studio_worker # ADDED for ol_openedx_course_sync
 ORA2_FILE_PREFIX: mitxonline/ora2  # MODIFIED
 PARTNER_SUPPORT_EMAIL: ''
 PASSWORD_POLICY_COMPLIANCE_ROLLOUT_CONFIG:
-    ENFORCE_COMPLIANCE_ON_LOGIN: false
+  ENFORCE_COMPLIANCE_ON_LOGIN: false
 PASSWORD_RESET_SUPPORT_LINK: ''
-PLATFORM_DESCRIPTION: MITx Online # MODIFIED
+PLATFORM_DESCRIPTION: MIT Learn # MODIFIED
 PLATFORM_FACEBOOK_ACCOUNT: http://www.facebook.com/YourPlatformFacebookAccount
-PLATFORM_NAME: MITx Online  # MODIFIED
+PLATFORM_NAME: MIT Learn  # MODIFIED
 PLATFORM_TWITTER_ACCOUNT: '@YourPlatformTwitterAccount'
 POLICY_CHANGE_GRADES_ROUTING_KEY: edx.lms.core.default
 PRESS_EMAIL: support@mitxonline.mit.edu # MODIFIED
 
 PROCTORING_SETTINGS: {}
 REGISTRATION_EXTRA_FIELDS:
-    city: hidden
-    confirm_email: hidden
-    country: hidden
-    gender: optional
-    goals: optional
-    honor_code: required
-    level_of_education: optional
-    mailing_address: hidden
-    terms_of_service: hidden
-    year_of_birth: optional
+  city: hidden
+  confirm_email: hidden
+  country: hidden
+  gender: optional
+  goals: optional
+  honor_code: required
+  level_of_education: optional
+  mailing_address: hidden
+  terms_of_service: hidden
+  year_of_birth: optional
 RETIRED_EMAIL_DOMAIN: retired.invalid
 RETIRED_EMAIL_PREFIX: retired__user__
 RETIRED_USERNAME_PREFIX: retired__user__
 RETIREMENT_SERVICE_WORKER_USERNAME: retirement_service_worker
 RETIREMENT_STATES:
-    - PENDING
-    - RETIRING_FORUMS
-    - FORUMS_COMPLETE
-    - RETIRING_ENROLLMENTS
-    - ENROLLMENTS_COMPLETE
-    - RETIRING_NOTES
-    - NOTES_COMPLETE
-    - RETIRING_PROCTORING
-    - PROCTORING_COMPLETE
-    - RETIRING_LMS_MISC
-    - LMS_MISC_COMPLETE
-    - RETIRING_LMS
-    - LMS_COMPLETE
-    - ERRORED
-    - ABORTED
-    - COMPLETE
+- PENDING
+- RETIRING_FORUMS
+- FORUMS_COMPLETE
+- RETIRING_ENROLLMENTS
+- ENROLLMENTS_COMPLETE
+- RETIRING_NOTES
+- NOTES_COMPLETE
+- RETIRING_PROCTORING
+- PROCTORING_COMPLETE
+- RETIRING_LMS_MISC
+- LMS_MISC_COMPLETE
+- RETIRING_LMS
+- LMS_COMPLETE
+- ERRORED
+- ABORTED
+- COMPLETE
 SEGMENT_KEY: null
 SERVER_EMAIL: odl-devops@mit.edu # MODIFIED
+# Removing the session cookie domain as it is no longer needed for sharing the cookie
+# between LMS and Studio (TMM 2021-10-22)
+# UPDATE: The session cookie domain appears to still be required for enabling the
+# preview subdomain to share authentication with LMS (TMM 2021-12-20)
+
+# Adding session cookie settings for LTI config
+# https://docs.openedx.org/en/latest/site_ops/install_configure_run_guide/configuration/lti/configure_lti.html#configure-the-tool-consumer
+SESSION_COOKIE_SAMESITE: 'None'
+SESSION_COOKIE_SAMESITE_FORCE_ALL: true
 SESSION_COOKIE_SECURE: true # MODIFIED
 SESSION_SAVE_EVERY_REQUEST: false
 SOCIAL_MEDIA_FOOTER_URLS: {}
 SOCIAL_MEDIA_FOOTER_ACE_URLS: {}
 SOCIAL_MEDIA_LOGO_URLS : {}
 SOCIAL_SHARING_SETTINGS:
-    CERTIFICATE_FACEBOOK: false
-    CERTIFICATE_TWITTER: false
-    CUSTOM_COURSE_URLS: false
-    DASHBOARD_FACEBOOK: false
-    DASHBOARD_TWITTER: false
+  CERTIFICATE_FACEBOOK: false
+  CERTIFICATE_TWITTER: false
+  CUSTOM_COURSE_URLS: false
+  DASHBOARD_FACEBOOK: false
+  DASHBOARD_TWITTER: false
 STATIC_URL_BASE: /static/
 STATIC_ROOT_BASE: /openedx/staticfiles/
 STUDIO_NAME: Studio
@@ -329,38 +360,40 @@ SUPPORT_SITE_LINK: https://mitxonline.zendesk.com/hc/
 SYSADMIN_DEFAULT_BRANCH: live
 SYSTEM_WIDE_ROLE_CLASSES: []
 TECH_SUPPORT_EMAIL: odl-devops@mit.edu  # MODIFIED
-TIME_ZONE: America/New_YorkA
+TIME_ZONE: America/New_York
 USERNAME_REPLACEMENT_WORKER: OVERRIDE THIS WITH A VALID USERNAME
 VIDEO_IMAGE_MAX_AGE: 31536000
 VIDEO_IMAGE_SETTINGS:
-    DIRECTORY_PREFIX: video-images/
-    STORAGE_KWARGS:
-        location: media/  # MODIFIED
-    VIDEO_IMAGE_MAX_BYTES: 2097152
-    VIDEO_IMAGE_MIN_BYTES: 2048
-    BASE_URL: /media/
+  DIRECTORY_PREFIX: video-images/
+  STORAGE_KWARGS:
+    location: media/  # MODIFIED
+  VIDEO_IMAGE_MAX_BYTES: 2097152
+  VIDEO_IMAGE_MIN_BYTES: 2048
+  BASE_URL: /media/
 VIDEO_TRANSCRIPTS_MAX_AGE: 31536000
 VIDEO_TRANSCRIPTS_SETTINGS:
-    DIRECTORY_PREFIX: video-transcripts/
-    STORAGE_KWARGS:
-        location: media/  # MODIFIED
-    VIDEO_TRANSCRIPTS_MAX_BYTES: 3145728
-    BASE_URL: /media/
+  DIRECTORY_PREFIX: video-transcripts/
+  STORAGE_KWARGS:
+    location: media/  # MODIFIED
+  VIDEO_TRANSCRIPTS_MAX_BYTES: 3145728
+  BASE_URL: /media/
 VIDEO_UPLOAD_PIPELINE:
-    BUCKET: ''
-    ROOT_PATH: ''
+  BUCKET: ''
+  ROOT_PATH: ''
 WIKI_ENABLED: true
 XBLOCK_FS_STORAGE_BUCKET: null
 XBLOCK_FS_STORAGE_PREFIX: null
 XBLOCK_SETTINGS: {}
-X_FRAME_OPTIONS: DENY
+# Needed for showing pages in Canvas via LTI
+X_FRAME_OPTIONS: "ALLOW-FROM canvas.mit.edu"
 YOUTUBE_API_KEY: null  # pragma: allowlist secret
-ZENDESK_API_KEY: ''  # pragma: allowlist secret
+ZENDESK_API_KEY: ''
 ZENDESK_CUSTOM_FIELDS: {}
 ZENDESK_GROUP_ID_MAPPING: {}
 ZENDESK_OAUTH_ACCESS_TOKEN: ''
 ZENDESK_URL: ''
 ZENDESK_USER: ''
+
 ##############################################
 # We will not be using the edX Ecommerce app #
 ##############################################

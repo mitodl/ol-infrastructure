@@ -16,6 +16,7 @@ class EdxappConfigMaps:
     interpolated: Output
     cms_general: kubernetes.core.v1.ConfigMap
     cms_interpolated: kubernetes.core.v1.ConfigMap
+    lms_general: kubernetes.core.v1.ConfigMap
     lms_interpolated: kubernetes.core.v1.ConfigMap
     uwsgi_ini: kubernetes.core.v1.ConfigMap
 
@@ -23,6 +24,7 @@ class EdxappConfigMaps:
     interpolated_config_name: str
     cms_general_config_name: str
     cms_interpolated_config_name: str
+    lms_general_config_name: str
     lms_interpolated_config_name: str
     uwsgi_ini_config_name: str
 
@@ -145,7 +147,10 @@ def create_k8s_configmaps(
                     # MIT_LEARN_AI_API_URL: https://{{ key "edxapp/learn-api-domain" }}/ai  # Added for ol_openedx_chat  # TODO
                     # MIT_LEARN_API_BASE_URL: https://{{ key "edxapp/learn-api-domain" }}/learn  # Added for ol_openedx_chat  # TODO
                     # MIT_LEARN_SUMMARY_FLASHCARD_URL: https://{{ key "edxapp/learn-api-domain" }}/learn/api/v1/contentfiles/  # Added for ol_openedx_chat  # TODO
-                    # MIT_LEARN_BASE_URL: https://{{ key "edxapp/learn-frontend-domain" }}  # TODO
+                    MIT_LEARN_BASE_URL: "https://{edxapp_config.require("mit_learn_domain")}"
+                    # MIT_LEARN_AI_XBLOCK_CHAT_API_URL: https://{{ key "edxapp/learn-api-domain" }}/ai/http/canvas_syllabus_agent/
+                    # MIT_LEARN_AI_XBLOCK_TUTOR_CHAT_API_URL:  https://{{ key "edxapp/learn-api-domain" }}/ai/http/canvas_tutor_agent/ # TODO
+                    # MIT_LEARN_AI_XBLOCK_PROBLEM_SET_LIST_URL: https://{{ key "edxapp/learn-api-domain" }}/ai/api/v0/problem_set_list  # Added for ol_openedx_chat_xblock # TODO
                     MIT_LEARN_LOGO: https://{edxapp_config.require_object("domains")["lms"]}/static/mitxonline/images/mit-learn-logo.svg
                     LEARNING_MICROFRONTEND_URL: https://{edxapp_config.require_object("domains")["lms"]}/learn
                     LMS_BASE: {edxapp_config.require_object("domains")["lms"]}
@@ -224,6 +229,21 @@ def create_k8s_configmaps(
         opts=ResourceOptions(delete_before_replace=True),
     )
 
+    lms_general_config_name = "81-lms-general-config-yaml"
+    lms_general_config_map = kubernetes.core.v1.ConfigMap(
+        f"ol-{stack_info.env_prefix}-edxapp-lms-general-config-{stack_info.env_suffix}",
+        metadata={
+            "name": lms_general_config_name,
+            "namespace": namespace,
+            "labels": k8s_global_labels,
+        },
+        data={
+            "81-cms-general-config.yaml": Path(
+                f"files/edxapp/{stack_info.env_prefix}/81-lms-general-config.yaml"
+            ).read_text()
+        },
+    )
+
     # Interpolated configuration items for the CMS application.
     lms_interpolated_config_name = "82-lms-interpolated-config-yaml"
     lms_interpolated_config = kubernetes.core.v1.ConfigMap(
@@ -258,12 +278,14 @@ def create_k8s_configmaps(
         interpolated=interpolated_config_map,
         cms_general=cms_general_config_map,
         cms_interpolated=cms_interpolated_config,
+        lms_general=lms_general_config_map,
         lms_interpolated=lms_interpolated_config,
         uwsgi_ini=uwsgi_ini_config_map,
         general_config_name=general_config_name,
         interpolated_config_name=interpolated_config_name,
         cms_general_config_name=cms_general_config_name,
         cms_interpolated_config_name=cms_interpolated_config_name,
+        lms_general_config_name=lms_general_config_name,
         lms_interpolated_config_name=lms_interpolated_config_name,
         uwsgi_ini_config_name=uwsgi_ini_config_name,
     )

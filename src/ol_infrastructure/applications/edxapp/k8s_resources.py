@@ -1,4 +1,4 @@
-# ruff: noqa: F841, E501, S105, PLR0913, FIX002, PLR0915
+# ruff: noqa: F841, E501, PLR0913, FIX002, PLR0915
 import os
 
 import pulumi
@@ -13,21 +13,11 @@ from ol_infrastructure.applications.edxapp.k8s_configmaps import create_k8s_conf
 from ol_infrastructure.applications.edxapp.k8s_secrets import create_k8s_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache
 from ol_infrastructure.components.aws.database import OLAmazonDB
-from ol_infrastructure.components.services.cert_manager import (
-    OLCertManagerCert,
-    OLCertManagerCertConfig,
-)
 from ol_infrastructure.components.aws.eks import (
     OLEKSGateway,
     OLEKSGatewayConfig,
     OLEKSGatewayListenerConfig,
     OLEKSGatewayRouteConfig,
-)
-from ol_infrastructure.components.services.k8s import (
-    OLApisixRoute,
-    OLApisixRouteConfig,
-    OLApisixSharedPlugins,
-    OLApisixSharedPluginsConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
@@ -464,6 +454,7 @@ def create_k8s_resources(
         configmaps.interpolated_config_name: configmaps.interpolated,
         # Just LMS specific resources below this line
         secrets.lms_oauth_secret_name: secrets.lms_oauth,
+        configmaps.lms_general_config_name: configmaps.lms_general,
         configmaps.lms_interpolated_config_name: configmaps.lms_interpolated,
     }
     lms_edxapp_secret_names = [
@@ -481,6 +472,7 @@ def create_k8s_resources(
         configmaps.general_config_name,
         configmaps.interpolated_config_name,
         # Just LMS specific resources below this line
+        configmaps.lms_general_config_name,
         configmaps.lms_interpolated_config_name,
     ]
 
@@ -597,7 +589,7 @@ def create_k8s_resources(
                                     value="lms.envs.production",
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
-                                    name="USWSGI_WORKERS", value="2"
+                                    name="UWSGI_WORKERS", value="2"
                                 ),
                             ],
                             ports=[
@@ -660,61 +652,144 @@ def create_k8s_resources(
         ),
     )
 
-    # Convert this from using standalone certificate and apisix to using traefik. Tr
-    tls_secret_name = "shared-backend-tls-pair"  # pragma: allowlist secret
-    cert_manager_certificate = OLCertManagerCert(
-        f"ol-{stack_info.env_prefix}-edxapp-tls-cert-{stack_info.env_suffix}",
-        cert_config=OLCertManagerCertConfig(
-            application_name="edxapp",
-            k8s_namespace=namespace,
-            k8s_labels=k8s_global_labels,
-            create_apisixtls_resource=True,
-            dest_secret_name=tls_secret_name,
-            dns_names=[
-                edxapp_config.require("backend_lms_domain"),
-                edxapp_config.require("backend_studio_domain"),
-                edxapp_config.require("backend_preview_domain"),
-            ],
-        ),
-    )
+    backend_lms_domain = edxapp_config.require("backend_lms_domain")
+    backend_studio_domain = edxapp_config.require("backend_studio_domain")
+    backend_preview_domain = edxapp_config.require("backend_preview_domain")
 
-    edxapp_shared_plugins = OLApisixSharedPlugins(
-        f"ol-{stack_info.env_prefix}-edxapp-shared-plugins-{stack_info.env_suffix}",
-        plugin_config=OLApisixSharedPluginsConfig(
-            application_name="edxapp",
-            resource_suffix="ol-shared-plugins",
-            k8s_namespace=namespace,
-            k8s_labels=k8s_global_labels,
-            enable_defaults=True,
-        ),
-    )
+    frontend_lms_domain = edxapp_config.require_object("domains")["lms"]
+    frontend_studio_domain = edxapp_config.require_object("domains")["studio"]
+    frontend_preview_domain = edxapp_config.require_object("domains")["preview"]
 
-    apisixroute = OLApisixRoute(
-        name=f"ol-{stack_info.env_prefix}-edxapp-apisix-route-{stack_info.env_suffix}",
-        k8s_namespace=namespace,
-        k8s_labels=k8s_global_labels,
-        route_configs=[
-            OLApisixRouteConfig(
-                route_name="lms-default",
-                priority=0,
-                plugins=[],
-                shared_plugin_config_name=edxapp_shared_plugins.resource_name,
-                hosts=[edxapp_config.require("backend_lms_domain")],
-                paths=["/"],
-                backend_service_name=lms_deployment_name,
-                backend_service_port="http",
+    gateway_config = OLEKSGatewayConfig(
+        gateway_name=f"{stack_info.env_prefix}-edxapp",
+        namespace=namespace,
+        labels=k8s_global_labels,
+        cert_issuer="letsencrypt-production",
+        cert_issuer_class="cluster-issuer",
+        listeners=[
+            OLEKSGatewayListenerConfig(
+                name="https-frontend-lms",
+                hostname=frontend_lms_domain,
+                port=8443,
+                protocol="HTTPS",
+                tls_mode="Terminate",
+                certificate_secret_name=f"{stack_info.env_prefix}-lms-tls",
+                certificate_secret_namespace=namespace,
             ),
-            #            OLApisixRouteConfig(
-            #                route_name="cms-default",
-            #                priority=0,
-            #                plugins=[],
-            #                shared_plugin_config_name=edxapp_shared_plugins.resource_name,
-            #                hosts=[edxapp_config.require("backend_studio_domain")],
-            #                paths=["/"],
-            #                backend_service_name=cms_deployment_name,
-            #                backend_service_port="http",
-            #            ),
+            OLEKSGatewayListenerConfig(
+                name="https-backend-lms",
+                hostname=backend_lms_domain,
+                port=8443,
+                protocol="HTTPS",
+                tls_mode="Terminate",
+                certificate_secret_name=f"{stack_info.env_prefix}-lms-tls",
+                certificate_secret_namespace=namespace,
+            ),
+            OLEKSGatewayListenerConfig(
+                name="https-frontend-studio",
+                hostname=frontend_studio_domain,
+                port=8443,
+                protocol="HTTPS",
+                tls_mode="Terminate",
+                certificate_secret_name=f"{stack_info.env_prefix}-studio-tls",
+                certificate_secret_namespace=namespace,
+            ),
+            OLEKSGatewayListenerConfig(
+                name="https-backend-studio",
+                hostname=backend_studio_domain,
+                port=8443,
+                protocol="HTTPS",
+                tls_mode="Terminate",
+                certificate_secret_name=f"{stack_info.env_prefix}-studio-tls",
+                certificate_secret_namespace=namespace,
+            ),
+            OLEKSGatewayListenerConfig(
+                name="https-frontend-preview",
+                hostname=frontend_preview_domain,
+                port=8443,
+                protocol="HTTPS",
+                tls_mode="Terminate",
+                certificate_secret_name=f"{stack_info.env_prefix}-preview-tls",
+                certificate_secret_namespace=namespace,
+            ),
+            OLEKSGatewayListenerConfig(
+                name="https-backend-preview",
+                hostname=backend_preview_domain,
+                port=8443,
+                protocol="HTTPS",
+                tls_mode="Terminate",
+                certificate_secret_name=f"{stack_info.env_prefix}-preview-tls",
+                certificate_secret_namespace=namespace,
+            ),
         ],
+        routes=[
+            OLEKSGatewayRouteConfig(
+                name="frontend-lms-route",
+                listener_name="https-frontend-lms",
+                hostnames=[frontend_lms_domain],
+                port=8443,
+                backend_service_name=lms_deployment_name,
+                backend_service_namespace=namespace,
+                backend_service_port=8000,
+                matches=[{"path": {"type": "PathPrefix", "value": "/"}}],
+            ),
+            OLEKSGatewayRouteConfig(
+                name="backend-lms-route",
+                listener_name="https-backend-lms",
+                hostnames=[backend_lms_domain],
+                port=8443,
+                backend_service_name=lms_deployment_name,
+                backend_service_namespace=namespace,
+                backend_service_port=8000,
+                matches=[{"path": {"type": "PathPrefix", "value": "/"}}],
+            ),
+            OLEKSGatewayRouteConfig(
+                name="frontend-studio-route",
+                listener_name="https-frontend-studio",
+                hostnames=[frontend_studio_domain],
+                port=8443,
+                backend_service_name=cms_deployment_name,
+                backend_service_namespace=namespace,
+                backend_service_port=8000,
+                matches=[{"path": {"type": "PathPrefix", "value": "/"}}],
+            ),
+            OLEKSGatewayRouteConfig(
+                name="backend-studio-route",
+                listener_name="https-backend-studio",
+                hostnames=[backend_studio_domain],
+                port=8443,
+                backend_service_name=cms_deployment_name,
+                backend_service_namespace=namespace,
+                backend_service_port=8000,
+                matches=[{"path": {"type": "PathPrefix", "value": "/"}}],
+            ),
+            OLEKSGatewayRouteConfig(
+                name="frontend-preview-route",
+                listener_name="https-frontend-preview",
+                hostnames=[frontend_preview_domain],
+                port=8443,
+                backend_service_name=lms_deployment_name,
+                backend_service_namespace=namespace,
+                backend_service_port=8000,
+                matches=[{"path": {"type": "PathPrefix", "value": "/"}}],
+            ),
+            OLEKSGatewayRouteConfig(
+                name="backend-preview-route",
+                listener_name="https-backend-preview",
+                hostnames=[backend_preview_domain],
+                port=8443,
+                backend_service_name=lms_deployment_name,
+                backend_service_namespace=namespace,
+                backend_service_port=8000,
+                matches=[{"path": {"type": "PathPrefix", "value": "/"}}],
+            ),
+        ],
+    )
+
+    OLEKSGateway(
+        f"ol-{stack_info.env_prefix}-edxapp-gateway-{stack_info.env_suffix}",
+        gateway_config=gateway_config,
+        opts=pulumi.ResourceOptions(depends_on=[lms_deployment, cms_deployment]),
     )
 
     return {

@@ -159,9 +159,9 @@ def create_k8s_secrets(
                       port: 27017
                       db: edxapp
                       replicaSet: {mongodb["replica_set"]}
-                      user: {{ get .Secrets "username" }}
-                      password: {{ get .Secrets "password" }}
-                      ssl: # TODO
+                      user: {{{{ get .Secrets "username" }}}}
+                      password: {{{{ get .Secrets "password" }}}}
+                      ssl: true
                 """),
                 },
                 vaultauth=vault_k8s_resources.auth_name,
@@ -173,33 +173,40 @@ def create_k8s_secrets(
     mongo_db_forum_secret_name = (
         "03-mongodb-forum-credentials-yaml"  # pragma: allowlist secret
     )
-    mongo_db_forum_secret = OLVaultK8SSecret(
-        f"ol-{stack_info.env_prefix}-edxapp-mongo-forum-creds-secret-{stack_info.env_suffix}",
-        OLVaultK8SStaticSecretConfig(
-            name=mongo_db_forum_secret_name,
-            namespace=namespace,
-            dest_secret_labels=k8s_global_labels,
-            dest_secret_name=mongo_db_forum_secret_name,
-            labels=k8s_global_labels,
-            mount=f"secret-{stack_info.env_prefix}",
-            mount_type="kv-v1",
-            path="mongodb-forum",
-            templates={
-                "03-mongo-db-forum-credentials.yaml": textwrap.dedent("""
-                    FORUM_MONGODB_CLIENT_PARAMETERS:
-                      authSource: admin
-                      host:  # TODO
-                      port: 27017
-                      # db is missing here, that is the difference from above
-                      replicaSet: # TODO
-                      user: {{ get .Secrets "username" }}
-                      password: {{ get .Secrets "password" }}
-                      ssl: # TODO
-                """),
-            },
-            vaultauth=vault_k8s_resources.auth_name,
-        ),
-        opts=ResourceOptions(delete_before_replace=True),
+    mongo_db_forum_secret = Output.all(
+        replica_set=mongodb_atlas_stack.require_output("atlas_cluster")["replica_set"],
+        host_string=mongodb_atlas_stack.require_output("atlas_cluster")[
+            "public_host_string"
+        ],
+    ).apply(
+        lambda mongodb: OLVaultK8SSecret(
+            f"ol-{stack_info.env_prefix}-edxapp-mongo-forum-creds-secret-{stack_info.env_suffix}",
+            OLVaultK8SStaticSecretConfig(
+                name=mongo_db_forum_secret_name,
+                namespace=namespace,
+                dest_secret_labels=k8s_global_labels,
+                dest_secret_name=mongo_db_forum_secret_name,
+                labels=k8s_global_labels,
+                mount=f"secret-{stack_info.env_prefix}",
+                mount_type="kv-v1",
+                path="mongodb-forum",
+                templates={
+                    "03-mongo-db-forum-credentials.yaml": textwrap.dedent(f"""
+                        FORUM_MONGODB_CLIENT_PARAMETERS:
+                          authsource: admin
+                          host: {mongodb["host_string"]}
+                          port: 27017
+                          db: edxapp
+                          replicaSet: {mongodb["replica_set"]}
+                          user: {{{{ get .Secrets "username" }}}}
+                          password: {{{{ get .Secrets "password" }}}}
+                          ssl: true
+                    """),
+                },
+                vaultauth=vault_k8s_resources.auth_name,
+            ),
+            opts=ResourceOptions(delete_before_replace=True),
+        )
     )
 
     general_secrets_name = "10-general-secrets-yaml"  # pragma: allowlist secret

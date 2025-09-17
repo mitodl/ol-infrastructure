@@ -1616,22 +1616,22 @@ edxapp_fastly_service = fastly.ServiceVcl(
             use_ssl=True,
         ),
         fastly.ServiceVclBackendArgs(
-            address=web_lb.dns_name,
+            address=edxapp_config.require("backend_lms_domain"),
             name="AWS ALB for edxapp",
             port=DEFAULT_HTTPS_PORT,
-            ssl_cert_hostname=edxapp_domains["lms"],
-            ssl_sni_hostname=edxapp_domains["lms"],
+            ssl_cert_hostname=edxapp_config.require("backend_lms_domain"),
+            ssl_sni_hostname=edxapp_config.require("backend_lms_domain"),
             use_ssl=True,
             # Increase the timeout to account for slow API responses
             first_byte_timeout=60000,
             between_bytes_timeout=15000,
         ),
         fastly.ServiceVclBackendArgs(
-            address=web_lb.dns_name,
+            address=edxapp_config.require("backend_studio_domain"),
             name="AWS ALB for edX Studio",
             port=DEFAULT_HTTPS_PORT,
-            ssl_cert_hostname=edxapp_domains["studio"],
-            ssl_sni_hostname=edxapp_domains["studio"],
+            ssl_cert_hostname=edxapp_config.require("backend_studio_domain"),
+            ssl_sni_hostname=edxapp_config.require("backend_studio_domain"),
             use_ssl=True,
             # Increase the timeout to account for slow API responses
             first_byte_timeout=60000,
