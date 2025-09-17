@@ -25,6 +25,10 @@ from ol_infrastructure.components.aws.cache import (
     OLAmazonRedisConfig,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.serverless_cache import (
+    OLAmazonServerlessCache,
+    OLAmazonServerlessCacheConfig,
+)
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
@@ -438,6 +442,28 @@ redis_cache = OLAmazonCache(
     ),
 )
 
+# Create Serverless Valkey cache as Redis replacement
+# This uses IAM authentication instead of auth tokens
+serverless_cache_config = OLAmazonServerlessCacheConfig(
+    description="Serverless Valkey cache for MITxonline",
+    cache_name=f"mitxonline-app-serverless-{stack_info.env_suffix}",
+    security_group_ids=[redis_cluster_security_group.id],
+    subnet_ids=apps_vpc["subnet_ids"][:3],  # ServerlessCache supports max 3 subnets
+    engine="valkey",
+    major_engine_version=8,
+    tags=aws_config.tags,
+)
+serverless_cache = OLAmazonServerlessCache(
+    serverless_cache_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"mitxonline-app-serverless-{stack_info.env_suffix}-serverless-cache"
+            )
+        ]
+    ),
+)
+
 # Create Kubernetes secrets using the dedicated function
 # The function returns the names of the secrets and the Pulumi resource objects
 secret_names, secret_resources = create_mitxonline_k8s_secrets(
@@ -734,5 +760,8 @@ export(
         "rds_host": mitxonline_db.db_instance.address,
         "redis": redis_cache.address,
         "redis_token": redis_cache.cache_cluster.auth_token,
+        "serverless_cache_endpoint": serverless_cache.endpoint,
+        "serverless_cache_reader_endpoint": serverless_cache.reader_endpoint,
+        "serverless_cache_arn": serverless_cache.serverless_cache.arn,
     },
 )
