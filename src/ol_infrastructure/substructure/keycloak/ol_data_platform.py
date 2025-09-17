@@ -179,10 +179,13 @@ def create_ol_data_platform_realm(  # noqa: PLR0913
 
     # Create realm roles for ol-data-platform
     keycloak.Role(
-        "ol-data-platform-eng-data-role",
+        "ol-platform-admin-role",
         realm_id=ol_data_platform_realm.id,
-        name="ol-eng-data",
-        description="OL Engineering Data role - maps to superset_admin",
+        name="ol-platform-admin",
+        description=(
+            "Full administrative access to all data and platform resources - "
+            "maps to superset_admin"
+        ),
         composite_roles=[
             ol_data_platform_superset_client_role_refs["superset_admin"].id
         ],
@@ -190,10 +193,13 @@ def create_ol_data_platform_realm(  # noqa: PLR0913
     )
 
     keycloak.Role(
-        "ol-data-platform-eng-researcher-role",
+        "ol-researcher-role",
         realm_id=ol_data_platform_realm.id,
-        name="ol-eng-researcher",
-        description="OL Engineering Researcher role - maps to superset_researcher",
+        name="ol-researcher",
+        description=(
+            "Research role with ML capabilities and broad data access - "
+            "maps to superset_researcher"
+        ),
         composite_roles=[
             ol_data_platform_superset_client_role_refs["superset_researcher"].id
         ],
@@ -201,10 +207,13 @@ def create_ol_data_platform_realm(  # noqa: PLR0913
     )
 
     keycloak.Role(
-        "ol-data-platform-eng-developer-role",
+        "ol-data-engineer-role",
         realm_id=ol_data_platform_realm.id,
-        name="ol-eng-developer",
-        description="OL Engineering Developer role - maps to superset_alpha",
+        name="ol-data-engineer",
+        description=(
+            "Data engineering role with limited production access - "
+            "maps to superset_alpha"
+        ),
         composite_roles=[
             ol_data_platform_superset_client_role_refs["superset_alpha"].id
         ],
@@ -212,13 +221,35 @@ def create_ol_data_platform_realm(  # noqa: PLR0913
     )
 
     keycloak.Role(
-        "ol-data-platform-eng-reporter-role",
+        "ol-data-analyst-role",
         realm_id=ol_data_platform_realm.id,
-        name="ol-eng-reporter",
-        description="OL Engineering Reporter role - maps to superset_gamma",
+        name="ol-data-analyst",
+        description=(
+            "Data analyst role with read-only access to production data - "
+            "maps to superset_gamma"
+        ),
         composite_roles=[
             ol_data_platform_superset_client_role_refs["superset_gamma"].id
         ],
+        opts=resource_options,
+    )
+
+    keycloak.Role(
+        "ol-instructor",
+        realm_id=ol_data_platform_realm.id,
+        name="ol-instructor",
+        description="Instructor role with limited access to educational data",
+        opts=resource_options,
+    )
+
+    keycloak.Role(
+        "ol-business-analyst",
+        realm_id=ol_data_platform_realm.id,
+        name="ol-business-analyst",
+        description=(
+            "Business analyst role similar to existing business_intelligence "
+            "and finance roles"
+        ),
         opts=resource_options,
     )
 
