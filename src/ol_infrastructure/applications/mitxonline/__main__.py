@@ -12,8 +12,9 @@ from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Alias, Config, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, iam, s3
+from pulumi import Alias, Config, ResourceOptions, StackReference, export, Output
+import pulumi
+from pulumi_aws import ec2, elasticache, iam, s3
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT, DEFAULT_REDIS_PORT
 from bridge.secrets.sops import read_yaml_secrets
@@ -165,38 +166,59 @@ mitxonline_iam_policy = iam.Policy(
     ),
     path=f"/ol-applications/mitxonline/{stack_info.env_suffix}/",
     name_prefix=f"mitxonline-{stack_info.env_suffix}-application-policy-",
-    policy=lint_iam_policy(
-        {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Action": "s3:ListAllMyBuckets",
-                    "Resource": "*",
-                },
-                {
-                    "Effect": "Allow",
-                    "Action": [
-                        "s3:ListBucket*",
-                        "s3:PutObject",
-                        "s3:PutObjectAcl",
-                        "s3:GetObject*",
-                        "s3:DeleteObject*",
-                    ],
-                    "Resource": [
-                        f"arn:aws:s3:::{mitxonline_bucket_name}",
-                        f"arn:aws:s3:::{mitxonline_bucket_name}/*",
-                    ],
-                },
-            ],
-        },
-        stringify=True,
-        parliament_config={
-            "PERMISSIONS_MANAGEMENT_ACTIONS": {
-                "ignore_locations": [{"actions": ["s3:putobjectacl"]}]
+    policy=pulumi.Output.all(
+        serverless_cache_arn=serverless_cache.serverless_cache.arn,
+        user_arn=elasticache_user.arn,
+        user_group_arn=elasticache_user_group.arn,
+    ).apply(
+        lambda args: lint_iam_policy(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "s3:ListAllMyBuckets",
+                        "Resource": "*",
+                    },
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "s3:ListBucket*",
+                            "s3:PutObject",
+                            "s3:PutObjectAcl",
+                            "s3:GetObject*",
+                            "s3:DeleteObject*",
+                        ],
+                        "Resource": [
+                            f"arn:aws:s3:::{mitxonline_bucket_name}",
+                            f"arn:aws:s3:::{mitxonline_bucket_name}/*",
+                        ],
+                    },
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "elasticache:Connect",
+                            "elasticache:DescribeServerlessCaches",
+                            "elasticache:DescribeUsers",
+                            "elasticache:DescribeUserGroups",
+                        ],
+                        "Resource": [
+                            args["serverless_cache_arn"],
+                            args["user_arn"],
+                            args["user_group_arn"],
+                        ],
+                    },
+                ],
             },
-            "RESOURCE_MISMATCH": {},
-        },
+            stringify=True,
+            parliament_config={
+                "PERMISSIONS_MANAGEMENT_ACTIONS": {
+                    "ignore_locations": [{"actions": ["s3:putobjectacl"]}]
+                },
+                "RESOURCE_MISMATCH": {},
+                "UNKNOWN_ACTION": {},  # Add this to ignore elasticache actions if needed
+            },
+        )
     ),
     opts=ResourceOptions(
         aliases=[
@@ -453,6 +475,30 @@ serverless_cache_config = OLAmazonServerlessCacheConfig(
     major_engine_version=8,
     tags=aws_config.tags,
 )
+
+# Create IAM user for serverless cache access
+# Serverless ElastiCache requires IAM authentication instead of auth tokens
+elasticache_user = elasticache.User(
+    f"mitxonline-serverless-user-{stack_info.env_suffix}",
+    user_id=f"mitxonline-app-{stack_info.env_suffix}",
+    user_name=f"mitxonline-app-{stack_info.env_suffix}",
+    access_string="on ~* &* +@all",  # Full access to all keys and commands
+    engine="valkey",
+    tags=aws_config.tags,
+)
+
+# Create user group for serverless cache access
+elasticache_user_group = elasticache.UserGroup(
+    f"mitxonline-serverless-usergroup-{stack_info.env_suffix}",
+    user_group_id=f"mitxonline-usergroup-{stack_info.env_suffix}",
+    engine="valkey",
+    user_ids=[elasticache_user.user_id],
+    tags=aws_config.tags,
+)
+
+# Update serverless cache config to use the user group
+serverless_cache_config.user_group_id = elasticache_user_group.user_group_id
+
 serverless_cache = OLAmazonServerlessCache(
     serverless_cache_config,
     opts=ResourceOptions(
@@ -763,5 +809,7 @@ export(
         "serverless_cache_endpoint": serverless_cache.endpoint,
         "serverless_cache_reader_endpoint": serverless_cache.reader_endpoint,
         "serverless_cache_arn": serverless_cache.serverless_cache.arn,
+        "serverless_cache_user_id": elasticache_user.user_id,
+        "serverless_cache_user_group_id": elasticache_user_group.user_group_id,
     },
 )
