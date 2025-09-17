@@ -27,6 +27,7 @@ GPU_ENABLED_COURSES = {
     "deep_learning_foundations_and_applications",
     "uai_source-uai.8",
     "uai_source-uai.9",
+    "uai_source-uai.11",
     "uai_source-uai.12",
     "uai_source-uai.13",
 }
