@@ -75,6 +75,8 @@ config:
     OPENSEARCH_URL: "https://search-opensearch-mitlearn-producti-qjtnw2dcoampmbtscs3wdfci6y.us-east-1.es.amazonaws.com"
     POSTHOG_API_HOST: "https://ph.ol.mit.edu"
     POSTHOG_ENABLED: "true"
+    POSTHOG_EVENT_S3_BUCKET: "ol-data-lake-landing-zone-production"
+    POSTHOG_EVENT_S3_PREFIX: "thirdparty/posthog/learn/events/"
     POSTHOG_PROJECT_ID: "63497"
     POSTHOG_TIMEOUT_MS: 1000
     QDRANT_HOST: "https://0567dbd5-d68d-4d9e-8c41-954ef5de90ae.us-east-1-0.aws.cloud.qdrant.io"
