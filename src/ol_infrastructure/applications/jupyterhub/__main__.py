@@ -296,7 +296,9 @@ COURSE_NAMES = [
     "supervised_learning_fundamentals",
     "introduction_to_data_analytics_and_machine_learning",
 ]
-COURSE_NAMES.extend([f"uai_source-uai.{i}" for i in [6, 7, 8, 9, 11, 12, 13]])
+COURSE_NAMES.extend(
+    [f"uai_source-uai.{i}" for i in [0, "0a", 1, 2, 3, 6, 7, 8, 9, 11, 12, 13]]
+)
 EXTRA_IMAGES = {
     course_name.replace(".", "-").replace("_", "-"): {
         "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
