@@ -187,7 +187,7 @@ def create_ol_data_platform_realm(  # noqa: PLR0913
             "maps to superset_admin"
         ),
         composite_roles=[
-            ol_data_platform_superset_client_role_refs["superset_admin"].id
+            ol_data_platform_superset_client_role_refs["ol_platform_admin"].id
         ],
         opts=resource_options,
     )
@@ -201,7 +201,7 @@ def create_ol_data_platform_realm(  # noqa: PLR0913
             "maps to superset_researcher"
         ),
         composite_roles=[
-            ol_data_platform_superset_client_role_refs["superset_researcher"].id
+            ol_data_platform_superset_client_role_refs["ol_researcher"].id
         ],
         opts=resource_options,
     )
@@ -215,7 +215,7 @@ def create_ol_data_platform_realm(  # noqa: PLR0913
             "maps to superset_alpha"
         ),
         composite_roles=[
-            ol_data_platform_superset_client_role_refs["superset_alpha"].id
+            ol_data_platform_superset_client_role_refs["ol_data_engineer"].id
         ],
         opts=resource_options,
     )
@@ -229,7 +229,7 @@ def create_ol_data_platform_realm(  # noqa: PLR0913
             "maps to superset_gamma"
         ),
         composite_roles=[
-            ol_data_platform_superset_client_role_refs["superset_gamma"].id
+            ol_data_platform_superset_client_role_refs["ol_data_analyst"].id
         ],
         opts=resource_options,
     )
