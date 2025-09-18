@@ -37,10 +37,10 @@ config:
     secure: v1:xDcFOGyX+zMEcLPi:bsgsId1OSzW4kJR8cdTMsltFM6WlrhwyJk8fwavo1rWpiS/yU8S4Z6A7Z5b+uj7I
   keycloak_realm:ol-data-platform-openmetadata-redirect-uris: ["https://open-metadata-ci.ol.mit.edu/*"]
   keycloak_realm:ol-data-platform-superset-client-roles:
-  - "superset_admin"
-  - "superset_alpha"
-  - "superset_gamma"
-  - "superset_researcher"
+  - "ol_platform_admin"
+  - "ol_data_engineer"
+  - "ol_data_analyst"
+  - "ol_researcher"
   keycloak_realm:ol-data-platform-superset-client-secret:
     secure: v1:Ow95HN9yKnXBg5jX:CUoA/qBSeUF2w0FNYlEnC5OyvP8sg7S3efyvrX8J10Q8T16oxlO3MF3ROByGk12G
   keycloak_realm:ol-data-platform-superset-redirect-uris: ["https://bi-ci.ol.mit.edu/*"]
