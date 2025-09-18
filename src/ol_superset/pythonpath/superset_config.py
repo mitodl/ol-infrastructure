@@ -18,9 +18,6 @@ if IS_K8S := os.environ.get("IS_K8S"):
     REDIS_TOKEN = os.environ.get("REDIS_PASSWORD") or os.environ.get("REDIS_TOKEN", "")
     REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
     REDIS_PORT = os.environ.get("REDIS_PORT", "6379")
-    SUPERSET_WEBSERVER_PROTOCOL = os.environ.get("SUPERSET_WEBSERVER_PROTOCOL", "https")
-    SUPERSET_WEBSERVER_ADDRESS = os.environ.get("SUPERSET_WEBSERVER_ADDRESS", "0.0.0.0")  # noqa: S104
-    SUPERSET_WEBSERVER_PORT = os.environ.get("SUPERSET_WEBSERVER_PORT", "8088")
 
     # Build DB URI from env (populated by Vault dynamic creds via K8s secret)
     DB_USER = os.environ.get("DB_USER")
@@ -28,12 +25,11 @@ if IS_K8S := os.environ.get("IS_K8S"):
     DB_HOST = os.environ.get("DB_HOST")
     DB_PORT = os.environ.get("DB_PORT", "5432")
     DB_NAME = os.environ.get("DB_NAME", "superset")
-    DB_SSLMODE = os.environ.get("DB_SSLMODE")  # optional, e.g., "require"
+    DB_SSLMODE = os.environ.get("DB_SSLMODE", "require")
     _db_uri = f"postgresql+psycopg2://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     SQLALCHEMY_DATABASE_URI = (
         f"{_db_uri}?sslmode={DB_SSLMODE}" if DB_SSLMODE else _db_uri
     )
-    ENABLE_PROXY_FIX = os.environ.get("ENABLE_PROXY_FIX", "True").lower() == "true"
     OIDC_URL = os.environ.get("OIDC_URL")
     OIDC_CLIENT_ID = os.environ.get("OIDC_CLIENT_ID")
     OIDC_CLIENT_SECRET = os.environ.get("OIDC_CLIENT_SECRET")
@@ -62,10 +58,18 @@ else:
     SLACK_API_TOKEN = vault_client.secrets.kv.v2.read_secret(
         path="app-config", mount_point="secret-superset"
     )["data"]["data"]["slack_token"]
+    pg_creds = vault_client.secrets.database.generate_credentials(
+        name="app", mount_point="postgres-superset"
+    )["data"]
+    SQLALCHEMY_DATABASE_URI = f"postgres://{pg_creds['username']}:{pg_creds['password']}@superset-db.service.consul:5432/superset?sslmode=require"
 
 
 SQLALCHEMY_ENCRYPTED_FIELD_TYPE_ADAPTER = SQLAlchemyUtilsAdapter
 
+SUPERSET_WEBSERVER_PROTOCOL = os.environ.get("SUPERSET_WEBSERVER_PROTOCOL", "https")
+SUPERSET_WEBSERVER_ADDRESS = os.environ.get("SUPERSET_WEBSERVER_ADDRESS", "0.0.0.0")  # noqa: S104
+SUPERSET_WEBSERVER_PORT = os.environ.get("SUPERSET_WEBSERVER_PORT", "8088")
+ENABLE_PROXY_FIX = os.environ.get("ENABLE_PROXY_FIX", "True").lower() == "true"
 # -------------------------------
 # White Labeling Configurations #
 # --------------------------------
