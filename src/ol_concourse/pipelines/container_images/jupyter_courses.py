@@ -47,6 +47,31 @@ courses = [
         image_name="clustering_and_descriptive_ai",
     ),
     CourseImageInfo(
+        course_name="uai_source-uai.0",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.0-3T2025.git",
+        image_name="uai_source-uai.0",
+    ),
+    CourseImageInfo(
+        course_name="uai_source-uai.0a",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.0A-3T2025.git",
+        image_name="uai_source-uai.0a",
+    ),
+    CourseImageInfo(
+        course_name="uai_source-uai.1",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.1-2T2025.git",
+        image_name="uai_source-uai.1",
+    ),
+    CourseImageInfo(
+        course_name="uai_source-uai.2",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.2-2T2025.git",
+        image_name="uai_source-uai.2",
+    ),
+    CourseImageInfo(
+        course_name="uai_source-uai.3",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.3-3T2025.git",
+        image_name="uai_source-uai.3",
+    ),
+    CourseImageInfo(
         course_name="uai_source-uai.6",
         repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.6-3T2025.git",
         image_name="uai_source-uai.6",
