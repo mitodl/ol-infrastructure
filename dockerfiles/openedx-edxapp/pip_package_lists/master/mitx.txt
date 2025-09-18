@@ -10,7 +10,7 @@ ol-openedx-canvas-integration==0.5.1
 ol-openedx-course-export==0.1.2
 ol-openedx-course-structure-api
 ol-openedx-logging==0.2.0
-ol-openedx-git-auto-export==0.4.1
+ol-openedx-git-auto-export==0.5.0
 ol-openedx-rapid-response-reports==0.3.0
 ol-openedx-sentry==0.2.1
 openedx-scorm-xblock>=19.0.1,<19.1.0
