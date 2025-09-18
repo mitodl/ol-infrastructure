@@ -22,7 +22,7 @@ KNOWN_COURSES = [
 ]
 # We have notebooks in UAI courses 6-13, excluding 10
 KNOWN_COURSES.extend(
-    [f"uai_source-uai.{i}" for i in [0, "0a", 2, 3, 6, 7, 8, 9, 11, 12, 13]]
+    [f"uai_source-uai.{i}" for i in [0, "0a", 1, 2, 3, 6, 7, 8, 9, 11, 12, 13]]
 )
 # All courses which use the CUDA pytorch base image are below
 GPU_ENABLED_COURSES = {
