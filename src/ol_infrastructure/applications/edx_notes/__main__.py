@@ -8,7 +8,7 @@ from pathlib import Path
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, ResourceOptions, StackReference
+from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, get_caller_identity, iam, route53
 
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
@@ -311,3 +311,6 @@ route53.Record(
     records=[as_setup.load_balancer.dns_name],
     zone_id=dns_zone_id,
 )
+
+export("security_group_id", notes_security_group.id)
+export("notes_domain", dns_name)
