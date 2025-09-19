@@ -1,14 +1,12 @@
-import base64
 import json
-import textwrap
-from functools import partial
 from pathlib import Path
+from typing import cast
 
 import pulumi_consul as consul
+import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-import yaml
-from pulumi import Alias, Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import acm, ec2, get_caller_identity, iam, route53, ses
+from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi_aws import ec2, get_caller_identity, iam, route53, ses
 
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
@@ -16,26 +14,38 @@ from bridge.lib.magic_numbers import (
     FIVE_MINUTES,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from ol_infrastructure.components.aws.auto_scale_group import (
-    BlockDeviceMapping,
-    OLAutoScaleGroupConfig,
-    OLAutoScaling,
-    OLLaunchTemplateConfig,
-    OLLoadBalancerConfig,
-    OLTargetGroupConfig,
-    TagSpecification,
-)
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.eks import (
+    OLEKSGateway,
+    OLEKSGatewayConfig,
+    OLEKSGatewayListenerConfig,
+    OLEKSGatewayRouteConfig,
+    OLEKSTrustRole,
+    OLEKSTrustRoleConfig,
+)
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
+    OLVaultK8SDynamicSecretConfig,
+    OLVaultK8SResources,
+    OLVaultK8SResourcesConfig,
+    OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
 )
-from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes
+from ol_infrastructure.lib.aws.eks_helper import (
+    cached_image_uri,
+    check_cluster_namespace,
+    setup_k8s_provider,
+)
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
-from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_records
 from ol_infrastructure.lib.consul import get_consul_provider
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.ol_types import (
+    AWSBase,
+    BusinessUnit,
+    K8sGlobalLabels,
+    Services,
+)
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -52,6 +62,8 @@ vault_mount_stack = StackReference(
     f"substructure.vault.static_mounts.operations.{stack_info.name}"
 )
 policy_stack = StackReference("infrastructure.aws.policies")
+cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
+
 mitol_zone_id = dns_stack.require_output("ol")["id"]
 operations_vpc = network_stack.require_output("operations_vpc")
 data_vpc = network_stack.require_output("data_vpc")
@@ -60,147 +72,109 @@ superset_vault_kv_path = vault_mount_stack.require_output("superset_kv")["path"]
 aws_config = AWSBase(tags={"OU": "data", "Environment": superset_env})
 consul_security_groups = consul_stack.require_output("security_groups")
 
-aws_account = get_caller_identity()
-superset_domain = superset_config.get("domain")
-superset_mail_domain = f"mail.{superset_domain}"
-# Create IAM role
+# Kubernetes provider setup
+# mypy/pylance: Output[str] is acceptable at runtime
+setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
+superset_namespace = "superset"
+# Validate namespace exists in the cluster (declared by EKS stack)
+cluster_stack.require_output("namespaces").apply(
+    lambda ns: check_cluster_namespace(superset_namespace, ns)
+)
+# Use a valid, existing service enum for labels
+k8s_global_labels = K8sGlobalLabels(
+    service=Services.superset,
+    ou=BusinessUnit.data,
+    stack=stack_info,
+).model_dump()
 
+aws_account = get_caller_identity()
+superset_domain = superset_config.require("domain")
+superset_mail_domain = f"mail.{superset_domain}"
+
+# S3 policy for Superset pods (IRSA)
 superset_bucket_name = f"ol-superset-{stack_info.env_suffix}"
-# Create instance profile for granting access to S3 buckets
+superset_policy_document = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": "s3:ListAllMyBuckets",
+            "Resource": "*",
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListBucket*",
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject*",
+            ],
+            "Resource": [
+                f"arn:aws:s3:::{superset_bucket_name}",
+                f"arn:aws:s3:::{superset_bucket_name}/*",
+            ],
+        },
+        {
+            "Effect": "Allow",
+            "Action": ["ses:SendEmail", "ses:SendRawEmail"],
+            "Resource": [
+                "arn:*:ses:*:*:identity/*mit.edu",
+                f"arn:aws:ses:*:*:configuration-set/superset-{superset_env}",
+            ],
+        },
+        {
+            "Effect": "Allow",
+            "Action": ["ses:GetSendQuota"],
+            "Resource": "*",
+        },
+    ],
+}
+
 superset_iam_policy = iam.Policy(
     f"superset-policy-{stack_info.env_suffix}",
     name=f"superset-policy-{stack_info.env_suffix}",
     path=f"/ol-data/superset-policy-{stack_info.env_suffix}/",
-    policy=lint_iam_policy(
-        policy_document=json.dumps(
-            {
-                "Version": IAM_POLICY_VERSION,
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Action": "s3:ListAllMyBuckets",
-                        "Resource": "*",
-                    },
-                    {
-                        "Effect": "Allow",
-                        "Action": [
-                            "s3:ListBucket*",
-                            "s3:GetObject",
-                            "s3:PutObject",
-                            "s3:DeleteObject*",
-                        ],
-                        "Resource": [
-                            f"arn:aws:s3:::{superset_bucket_name}",
-                            f"arn:aws:s3:::{superset_bucket_name}/*",
-                        ],
-                    },
-                    {
-                        "Effect": "Allow",
-                        "Action": ["ses:SendEmail", "ses:SendRawEmail"],
-                        "Resource": [
-                            "arn:*:ses:*:*:identity/*mit.edu",
-                            f"arn:aws:ses:*:*:configuration-set/superset-{superset_env}",
-                        ],
-                    },
-                    {
-                        "Effect": "Allow",
-                        "Action": ["ses:GetSendQuota"],
-                        "Resource": "*",
-                    },
-                ],
-            }
-        ),
-        stringify=True,
-    ),
+    policy=lint_iam_policy(superset_policy_document, stringify=True),
     description="Policy for granting acces for batch data workflows to AWS resources",
 )
 
-superset_instance_role = iam.Role(
-    "superset-instance-role",
-    assume_role_policy=json.dumps(
-        {
-            "Version": "2012-10-17",
-            "Statement": {
-                "Effect": "Allow",
-                "Action": "sts:AssumeRole",
-                "Principal": {"Service": "ec2.amazonaws.com"},
-            },
-        }
+# IRSA: Trust role for the Superset service account in EKS
+superset_trust_role = OLEKSTrustRole(
+    f"superset-irsa-trust-role-{stack_info.env_suffix}",
+    role_config=OLEKSTrustRoleConfig(
+        account_id=aws_account.account_id,
+        cluster_name=f"data-{stack_info.name}",
+        cluster_identities=cluster_stack.require_output("cluster_identities"),
+        description="Trust role for Superset k8s service account",
+        policy_operator="StringEquals",
+        role_name="superset",
+        service_account_name="superset",
+        service_account_namespace=superset_namespace,
+        tags=aws_config.tags,
     ),
-    name=f"superset-instance-role-{stack_info.env_suffix}",
-    path="/ol-data/superset-role/",
-    tags=aws_config.tags,
 )
 
 iam.RolePolicyAttachment(
-    f"superset-role-policy-{stack_info.env_suffix}",
+    f"superset-irsa-policy-attach-{stack_info.env_suffix}",
     policy_arn=superset_iam_policy.arn,
-    role=superset_instance_role.name,
+    role=superset_trust_role.role.name,
 )
 
-iam.RolePolicyAttachment(
-    f"superset-describe-instance-role-policy-{stack_info.env_suffix}",
-    policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
-    role=superset_instance_role.name,
-)
-
-iam.RolePolicyAttachment(
-    f"concourse-route53-role-policy-{stack_info.env_suffix}",
-    policy_arn=policy_stack.require_output("iam_policies")["route53_ol_zone_records"],
-    role=superset_instance_role.name,
-)
-
-superset_profile = iam.InstanceProfile(
-    f"superset-instance-profile-{stack_info.env_suffix}",
-    role=superset_instance_role.name,
-    name=f"superset-instance-profile-{stack_info.env_suffix}",
-    path="/ol-data/superset-profile/",
-)
-
-superset_security_group = ec2.SecurityGroup(
-    "superset-security-group",
-    name_prefix=f"superset-{superset_env}-",
-    description="Allow Superset to connect to RDS and Elasticache",
-    vpc_id=data_vpc["id"],
-    ingress=[],
-    egress=[],
-    tags=aws_config.merged_tags(
-        {"Name": f"superset-{superset_env}"},
-    ),
-)
-
-# Get the AMI ID for the superset/docker-compose image
-superset_ami = ec2.get_ami(
-    filters=[
-        ec2.GetAmiFilterArgs(name="name", values=["superset-server-*"]),
-        ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
-        ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
-    ],
-    most_recent=True,
-    owners=[aws_account.account_id],
-)
-
-# Create a vault policy to allow superset to get to the secrets it needs
+# Vault policy to allow Superset to access required secrets
 superset_server_vault_policy = vault.Policy(
     "superset-server-vault-policy",
     name="superset-server",
     policy=Path(__file__).parent.joinpath("superset_server_policy.hcl").read_text(),
 )
-# Register Superset AMI for Vault AWS auth
-vault.aws.AuthBackendRole(
-    "superset-server-ami-ec2-vault-auth",
-    backend="aws",
-    auth_type="ec2",
-    role="superset",
-    inferred_aws_region=aws_config.region,
-    bound_iam_instance_profile_arns=[superset_profile.arn],
-    bound_ami_ids=[
-        superset_ami.id
-    ],  # Reference the new way of doing stuff, not the old one
-    bound_account_ids=[aws_account.account_id],
-    bound_vpc_ids=[data_vpc["id"]],
+
+# Vault Kubernetes Auth role bound to Superset namespace/service account
+superset_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
+    f"superset-k8s-vault-auth-backend-role-{stack_info.env_suffix}",
+    role_name="superset",
+    backend=cluster_stack.require_output("vault_auth_endpoint"),
+    bound_service_account_names=["superset-vault"],
+    bound_service_account_namespaces=[superset_namespace],
     token_policies=[superset_server_vault_policy.name],
-    opts=ResourceOptions(delete_before_replace=True),
 )
 
 superset_secrets = read_yaml_secrets(
@@ -311,20 +285,30 @@ superset_ses_event_destintations = ses.EventDestination(
 )
 
 # Create RDS Postgres instance and connect with Vault
+k8s_pod_subnet_cidrs = data_vpc["k8s_pod_subnet_cidrs"]
+
 superset_db_security_group = ec2.SecurityGroup(
     "superset-rds-security-group",
     name_prefix=f"superset-rds-{superset_env}-",
     description="Grant access to RDS from Superset",
     ingress=[
+        # Allow from k8s pod subnets
+        ec2.SecurityGroupIngressArgs(
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
+            protocol="tcp",
+            cidr_blocks=k8s_pod_subnet_cidrs,
+            description="Grant access to RDS from EKS pods",
+        ),
+        # Allow Vault as well
         ec2.SecurityGroupIngressArgs(
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
             protocol="tcp",
             security_groups=[
-                superset_security_group.id,
-                vault_infra_stack.require_output("vault_server")["security_group"],
+                vault_infra_stack.require_output("vault_server")["security_group"]
             ],
-            description="Grant access to RDS from Superset",
+            description="Grant access to RDS from Vault",
         ),
     ],
     tags=aws_config.merged_tags({"Name": f"superset-rds-{superset_env}"}),
@@ -353,12 +337,14 @@ superset_vault_db_config = OLVaultPostgresDatabaseConfig(
 )
 superset_db_vault_backend = OLVaultDatabaseBackend(superset_vault_db_config)
 
+consul_opts = cast(ResourceOptions, consul_provider)
+
 superset_db_consul_node = consul.Node(
     "superset-instance-db-node",
     name="superset-postgres-db",
     address=superset_db.db_instance.address,
     datacenter=superset_env,
-    opts=consul_provider,
+    opts=consul_opts,
 )
 
 superset_db_consul_service = consul.Service(
@@ -367,8 +353,8 @@ superset_db_consul_service = consul.Service(
     name="superset-db",
     port=superset_db_config.port,
     meta={
-        "external-node": True,
-        "external-probe": True,
+        "external-node": "true",
+        "external-probe": "true",
     },
     checks=[
         consul.ServiceCheckArgs(
@@ -382,7 +368,7 @@ superset_db_consul_service = consul.Service(
             ),
         )
     ],
-    opts=consul_provider,
+    opts=consul_opts,
 )
 
 # Create an Elasticache cluster for Redis caching and Celery broker
@@ -392,17 +378,24 @@ redis_cluster_security_group = ec2.SecurityGroup(
     name_prefix=f"superset-redis-{superset_env}-",
     description="Grant access to Redis from Open edX",
     ingress=[
+        # Allow from EKS pods
         ec2.SecurityGroupIngressArgs(
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,
             protocol="tcp",
-            security_groups=[
-                superset_security_group.id,
-                operations_vpc["security_groups"]["celery_monitoring"],
-            ],
-            description="Allow access from edX & celery monitoring to Redis for"
-            "caching and queueing",
-        )
+            cidr_blocks=k8s_pod_subnet_cidrs,
+            description=(
+                "Allow access from EKS pods to Redis for caching and queueing"
+            ),
+        ),
+        # Allow from celery monitoring SG
+        ec2.SecurityGroupIngressArgs(
+            from_port=DEFAULT_REDIS_PORT,
+            to_port=DEFAULT_REDIS_PORT,
+            protocol="tcp",
+            security_groups=[operations_vpc["security_groups"]["celery_monitoring"]],
+            description="Allow access from celery monitoring",
+        ),
     ],
     tags=aws_config.merged_tags({"Name": f"superset-redis-{superset_env}"}),
     vpc_id=data_vpc["id"],
@@ -431,17 +424,12 @@ redis_cache_config = OLAmazonRedisConfig(
     ],  # the name of the subnet group created in the OLVPC component resource
     tags=aws_config.tags,
 )
-superset_redis_cache = OLAmazonCache(
-    redis_cache_config,
-    opts=ResourceOptions(
-        aliases=[Alias(name=f"superset-redis-{superset_env}-redis-elasticache-cluster")]
-    ),
-)
+superset_redis_cache = OLAmazonCache(redis_cache_config)
 superset_redis_consul_node = consul.Node(
     "superset-redis-cache-node",
     name="superset-redis",
     address=superset_redis_cache.address,
-    opts=consul_provider,
+    opts=consul_opts,
 )
 
 superset_redis_consul_service = consul.Service(
@@ -450,8 +438,8 @@ superset_redis_consul_service = consul.Service(
     name="superset-redis",
     port=redis_cache_config.port,
     meta={
-        "external-node": True,
-        "external-probe": True,
+        "external-node": "true",
+        "external-probe": "true",
     },
     checks=[
         consul.ServiceCheckArgs(
@@ -466,289 +454,264 @@ superset_redis_consul_service = consul.Service(
             ).apply(lambda cluster: "{address}:{port}".format(**cluster)),
         )
     ],
-    opts=consul_provider,
+    opts=consul_opts,
+)
+########################################
+# Vault Secrets synced into Kubernetes  #
+########################################
+
+# K8s/Vault resources (service account + VaultAuth/Connection)
+vault_k8s_resources_config = OLVaultK8SResourcesConfig(
+    application_name="superset",
+    namespace=superset_namespace,
+    labels=k8s_global_labels,
+    vault_address=Config("vault").require("address"),
+    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+    vault_auth_role_name=superset_k8s_auth_backend_role.role_name,
+)
+vault_k8s_resources = OLVaultK8SResources(
+    resource_config=vault_k8s_resources_config,
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[superset_k8s_auth_backend_role],
+    ),
 )
 
-# Create an auto-scale group for web application servers
-superset_web_acm_cert = acm.Certificate(
-    "superset-load-balancer-acm-certificate",
-    domain_name=superset_domain,
-    validation_method="DNS",
-    tags=aws_config.tags,
-)
-
-superset_acm_cert_validation_records = (
-    superset_web_acm_cert.domain_validation_options.apply(
-        partial(
-            acm_certificate_validation_records,
-            cert_name="superset",
-            zone_id=mitol_zone_id,
-            stack_info=stack_info,
-        )
+# DB dynamic creds secret for Superset
+db_creds_secret_name = "superset-db-creds"  # pragma: allowlist secret  # noqa: S105
+db_creds_secret = Output.all(
+    address=superset_db.db_instance.address,
+    port=superset_db.db_instance.port,
+    db_name=superset_db.db_instance.db_name,
+).apply(
+    lambda db: OLVaultK8SSecret(
+        f"superset-db-creds-{stack_info.env_suffix}",
+        OLVaultK8SDynamicSecretConfig(
+            name="superset-db-creds",
+            namespace=superset_namespace,
+            labels=k8s_global_labels,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=db_creds_secret_name,
+            mount=superset_db_vault_backend.db_mount.path,
+            path="creds/app",
+            exclude_raw=True,
+            templates={
+                "DB_USER": "{{ .Secrets.username }}",
+                "DB_PASS": "{{ .Secrets.password }}",
+                "DB_NAME": f"{db['db_name']}",
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=vault_k8s_resources,
+        ),
     )
 )
 
-superset_web_acm_validated_cert = acm.CertificateValidation(
-    "wait-for-superset-acm-cert-validation",
-    certificate_arn=superset_web_acm_cert.arn,
-    validation_record_fqdns=superset_acm_cert_validation_records.apply(
-        lambda validation_records: [
-            validation_record.fqdn for validation_record in validation_records
-        ]
+# Redis password from KV -> Kubernetes Secret
+redis_secret_name = "superset-redis-secret"  # pragma: allowlist secret  # noqa: S105
+redis_password_secret = OLVaultK8SSecret(
+    f"superset-redis-password-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name="superset-redis-token",
+        namespace=superset_namespace,
+        labels=k8s_global_labels,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name=redis_secret_name,
+        dest_secret_type="Opaque",  # pragma: allowlist secret  # noqa: S106
+        mount=superset_vault_kv_path,
+        mount_type="kv-v2",
+        path="redis",
+        templates={
+            "REDIS_PASSWORD": '{{ get .Secrets "token" }}',
+        },
+        refresh_after="1h",
+        vaultauth=vault_k8s_resources.auth_name,
     ),
-)
-superset_lb_config = OLLoadBalancerConfig(
-    subnets=data_vpc["subnet_ids"],
-    security_groups=[data_vpc["security_groups"]["web"]],
-    tags=aws_config.merged_tags({"Name": f"superset-lb-{stack_info.env_suffix}"}),
-    listener_cert_domain=superset_domain,
-    listener_cert_arn=superset_web_acm_cert.arn,
+    opts=ResourceOptions(delete_before_replace=True, depends_on=vault_k8s_resources),
 )
 
-superset_tg_config = OLTargetGroupConfig(
-    vpc_id=data_vpc["id"],
-    health_check_interval=60,
-    health_check_matcher="200-399",
-    health_check_path="/health",
-    health_check_unhealthy_threshold=3,  # give extra time for Superset to start up
-    tags=aws_config.merged_tags({"Name": f"superset-tg-{stack_info.env_suffix}"}),
-)
-
-consul_datacenter = consul_stack.require_output("datacenter")
-grafana_credentials = read_yaml_secrets(
-    Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
-)
-
-superset_web_block_device_mappings = [BlockDeviceMapping(volume_size=50)]
-superset_web_tag_specs = [
-    TagSpecification(
-        resource_type="instance",
-        tags=aws_config.merged_tags({"Name": f"superset-web-{stack_info.env_suffix}"}),
-    ),
-    TagSpecification(
-        resource_type="volume",
-        tags=aws_config.merged_tags({"Name": f"superset-web-{stack_info.env_suffix}"}),
-    ),
-]
-
-superset_web_lt_config = OLLaunchTemplateConfig(
-    block_device_mappings=superset_web_block_device_mappings,
-    image_id=superset_ami.id,
-    instance_type=superset_config.get("web_instance_type")
-    or InstanceTypes.burstable_medium,
-    instance_profile_arn=superset_profile.arn,
-    security_groups=[
-        superset_security_group.id,
-        consul_security_groups["consul_agent"],
-        data_vpc["security_groups"]["web"],
-    ],
-    tags=aws_config.merged_tags({"Name": f"superset-web-{stack_info.env_suffix}"}),
-    tag_specifications=superset_web_tag_specs,
-    user_data=consul_datacenter.apply(
-        lambda consul_dc: base64.b64encode(
-            "#cloud-config\n{}".format(
-                yaml.dump(
-                    {
-                        "write_files": [
-                            {
-                                "path": "/etc/consul.d/02-autojoin.json",
-                                "content": json.dumps(
-                                    {
-                                        "retry_join": [
-                                            "provider=aws tag_key=consul_env "
-                                            f"tag_value={consul_dc}"
-                                        ],
-                                        "datacenter": consul_dc,
-                                    }
-                                ),
-                                "owner": "consul:consul",
-                            },
-                            {
-                                "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
-                            ENVIRONMENT={consul_dc}
-                            APPLICATION=superset
-                            SERVICE=data-platform
-                            VECTOR_CONFIG_DIR=/etc/vector/
-                            VECTOR_STRICT_ENV_VARS=false
-                            AWS_REGION={aws_config.region}
-                            GRAFANA_CLOUD_API_KEY={grafana_credentials["api_key"]}
-                            GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials["prometheus_user_id"]}
-                            GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials["loki_user_id"]}
-                            """
-                                ),
-                                "owner": "root:root",
-                            },
-                            {
-                                "path": "/etc/docker/compose/.env",
-                                "content": f"DOMAIN={superset_domain}\nVAULT_ADDR=https://vault-{stack_info.env_suffix}.odl.mit.edu\n",
-                                "append": True,
-                            },
-                            {
-                                "path": "/etc/default/docker-compose",
-                                "content": "COMPOSE_PROFILES=web",
-                            },
-                            {
-                                "path": "/etc/profile",
-                                "content": "export COMPOSE_PROFILES=web",
-                                "append": True,
-                            },
-                        ]
-                    },
-                    sort_keys=True,
-                )
-            ).encode("utf8")
-        ).decode("utf8")
-    ),
-)
-
-superset_web_auto_scale_config = superset_config.get_object("web_auto_scale") or {
-    "desired": 1,
-    "min": 1,
-    "max": 2,
-}
-superset_web_asg_config = OLAutoScaleGroupConfig(
-    asg_name=f"superset-web-{superset_env}",
-    aws_config=aws_config,
-    health_check_grace_period=300,
-    instance_refresh_warmup=300,
-    desired_size=superset_web_auto_scale_config["desired"],
-    min_size=superset_web_auto_scale_config["min"],
-    max_size=superset_web_auto_scale_config["max"],
-    vpc_zone_identifiers=data_vpc["subnet_ids"],
-    tags=aws_config.merged_tags({"Name": f"superset-web-{superset_env}"}),
-)
-
-superset_web_asg = OLAutoScaling(
-    asg_config=superset_web_asg_config,
-    lt_config=superset_web_lt_config,
-    tg_config=superset_tg_config,
-    lb_config=superset_lb_config,
-)
-
-
-# Create an auto-scale group for Celery workers
-superset_worker_block_device_mappings = [BlockDeviceMapping(volume_size=50)]
-superset_worker_tag_specs = [
-    TagSpecification(
-        resource_type="instance",
-        tags=aws_config.merged_tags(
-            {"Name": f"superset-worker-{stack_info.env_suffix}"}
+# App configuration (SECRET_KEY, optional Slack token) from Vault KV
+app_config_secret_name = "superset-app-secret"  # pragma: allowlist secret # noqa: S105
+# The DB and Redis host/port combos need to be in this secret so that the init
+# containers running Dockerize have the values in their environment at startup.
+app_config_secret = Output.all(
+    db_host=superset_db.db_instance.address,
+    db_port=superset_db.db_instance.port,
+    redis_host=superset_redis_cache.address,
+).apply(
+    lambda kwargs: OLVaultK8SSecret(
+        f"superset-app-config-{stack_info.env_suffix}",
+        resource_config=OLVaultK8SStaticSecretConfig(
+            name="superset-app-config",
+            namespace=superset_namespace,
+            labels=k8s_global_labels,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=app_config_secret_name,
+            dest_secret_type="Opaque",  # pragma: allowlist secret  # noqa: S106
+            mount=superset_vault_kv_path,
+            mount_type="kv-v2",
+            path="app-config",
+            templates={
+                "SECRET_KEY": '{{ get .Secrets "secret_key" }}',
+                # Optional Slack token for Alerts & Reports
+                "SLACK_API_TOKEN": '{{ get .Secrets "slack_token" | default "" }}',
+                "DB_PORT": str(kwargs["db_port"]),
+                "DB_HOST": kwargs["db_host"],
+                "REDIS_HOST": kwargs["redis_host"],
+                "REDIS_PORT": str(DEFAULT_REDIS_PORT),
+            },
+            refresh_after="1h",
+            vaultauth=vault_k8s_resources.auth_name,
         ),
-    ),
-    TagSpecification(
-        resource_type="volume",
-        tags=aws_config.merged_tags(
-            {"Name": f"superset-worker-{stack_info.env_suffix}"}
+        opts=ResourceOptions(
+            delete_before_replace=True, depends_on=vault_k8s_resources
         ),
-    ),
-]
+    )
+)
 
-superset_worker_lt_config = OLLaunchTemplateConfig(
-    block_device_mappings=superset_worker_block_device_mappings,
-    image_id=superset_ami.id,
-    instance_type=superset_config.get("worker_instance_type")
-    or InstanceTypes.burstable_medium,
-    instance_profile_arn=superset_profile.arn,
-    security_groups=[
-        superset_security_group.id,
-        consul_security_groups["consul_agent"],
+# OIDC (Keycloak) config from operations KV -> Kubernetes Secret env
+oidc_secret_name = "superset-oidc-secret"  # pragma: allowlist secret  # noqa: S105
+oidc_secret = OLVaultK8SSecret(
+    f"superset-oidc-config-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name="superset-oidc-config",
+        namespace=superset_namespace,
+        labels=k8s_global_labels,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name=oidc_secret_name,
+        dest_secret_type="Opaque",  # pragma: allowlist secret  # noqa: S106
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/superset",
+        templates={
+            "OIDC_URL": '{{ get .Secrets "url" }}',
+            "OIDC_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+            "OIDC_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+            "OIDC_REALM_PUBLIC_KEY": '{{ get .Secrets "realm_public_key" }}',
+        },
+        refresh_after="1h",
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(delete_before_replace=True, depends_on=vault_k8s_resources),
+)
+
+########################################
+# Superset Helm chart on Kubernetes    #
+########################################
+
+superset_chart = kubernetes.helm.v3.Release(
+    "superset-helm-release",
+    kubernetes.helm.v3.ReleaseArgs(
+        name="superset",
+        chart="superset",
+        namespace=superset_namespace,
+        cleanup_on_fail=True,
+        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+            repo="https://apache.github.io/superset",
+        ),
+        values={
+            "fullnameOverride": "superset",
+            "image": {
+                # Use our custom image that bundles config and deps
+                "repository": cached_image_uri("mitodl/superset"),
+                "tag": "latest",
+            },
+            # Bring your own Postgres/Redis
+            "postgresql": {"enabled": False},
+            "redis": {"enabled": False},
+            # Do not let the chart create its own env secret; use Vault-synced ones
+            "secretEnv": {"create": False},
+            "extraEnv": {
+                "REDIS_PROTO": "rediss",
+            },
+            "configOverrides": {
+                "config": Path(__file__)
+                .parent.joinpath("superset_config.py")
+                .read_text()
+            },
+            "envFromSecret": app_config_secret_name,
+            "envFromSecrets": [
+                redis_secret_name,
+                db_creds_secret_name,
+                oidc_secret_name,
+            ],
+            # Connections (non-secret parts)
+            "supersetNode": {
+                "podLabels": k8s_global_labels,
+                "connections": {
+                    "redis_host": superset_redis_cache.address,
+                    "redis_port": str(DEFAULT_REDIS_PORT),
+                    "db_name": superset_db_config.db_name,
+                    "db_port": str(DEFAULT_POSTGRES_PORT),
+                    "db_host": superset_db.db_instance.address,
+                },
+                "replicas": {"enabled": False},
+                "autoscaling": {"enabled": True},
+            },
+            "supersetWorker": {
+                "podLabels": k8s_global_labels,
+                "replicas": {"enabled": True, "replicaCount": 1},
+            },
+            "supersetCeleryBeat": {
+                "enabled": True,
+                "podLabels": k8s_global_labels,
+            },
+            "serviceAccount": {
+                "create": True,
+                "name": "superset",
+                "annotations": {
+                    "eks.amazonaws.com/role-arn": superset_trust_role.role.arn.apply(
+                        lambda arn: f"{arn}"
+                    ),
+                },
+            },
+            # Disable chart's ingress; we'll attach Gateway API below
+            "ingress": {"enabled": False},
+        },
+    ),
+)
+
+########################################
+# Gateway API routing + TLS certificate #
+########################################
+
+gateway_config = OLEKSGatewayConfig(
+    cert_issuer="letsencrypt-production",
+    cert_issuer_class="cluster-issuer",
+    gateway_name="superset",
+    namespace=superset_namespace,
+    listeners=[
+        OLEKSGatewayListenerConfig(
+            name="https-web",
+            hostname=superset_domain,
+            port=8443,
+            tls_mode="Terminate",
+            certificate_secret_name="superset-tls",  # pragma: allowlist secret  # noqa: E501, S106
+            certificate_secret_namespace=superset_namespace,
+        ),
     ],
-    tags=aws_config.merged_tags({"Name": f"superset-worker-{stack_info.env_suffix}"}),
-    tag_specifications=superset_worker_tag_specs,
-    user_data=consul_datacenter.apply(
-        lambda consul_dc: base64.b64encode(
-            "#cloud-config\n{}".format(
-                yaml.dump(
-                    {
-                        "write_files": [
-                            {
-                                "path": "/etc/consul.d/02-autojoin.json",
-                                "content": json.dumps(
-                                    {
-                                        "retry_join": [
-                                            "provider=aws tag_key=consul_env "
-                                            f"tag_value={consul_dc}"
-                                        ],
-                                        "datacenter": consul_dc,
-                                    }
-                                ),
-                                "owner": "consul:consul",
-                            },
-                            {
-                                "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
-                            ENVIRONMENT={consul_dc}
-                            APPLICATION=superset
-                            SERVICE=data-platform
-                            VECTOR_CONFIG_DIR=/etc/vector/
-                            VECTOR_STRICT_ENV_VARS=false
-                            AWS_REGION={aws_config.region}
-                            GRAFANA_CLOUD_API_KEY={grafana_credentials["api_key"]}
-                            GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials["prometheus_user_id"]}
-                            GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials["loki_user_id"]}
-                            """
-                                ),
-                                "owner": "root:root",
-                            },
-                            {
-                                "path": "/etc/default/docker-compose",
-                                "content": "COMPOSE_PROFILES=worker",
-                            },
-                            {
-                                "path": "/etc/profile",
-                                "content": "export COMPOSE_PROFILES=worker",
-                                "append": True,
-                            },
-                            {
-                                "path": "/etc/docker/compose/.env",
-                                "content": f"DOMAIN={superset_domain}\nVAULT_ADDR=https://vault-{stack_info.env_suffix}.odl.mit.edu\n",
-                                "append": True,
-                            },
-                        ]
-                    },
-                    sort_keys=True,
-                )
-            ).encode("utf8")
-        ).decode("utf8")
-    ),
+    routes=[
+        OLEKSGatewayRouteConfig(
+            backend_service_name="superset",
+            backend_service_namespace=superset_namespace,
+            backend_service_port=8088,
+            name="superset-https-root",
+            listener_name="https-web",
+            hostnames=[superset_domain],
+            port=8443,
+            matches=[{"path": {"type": "PathPrefix", "value": "/"}}],
+        ),
+    ],
 )
 
-superset_worker_auto_scale_config = superset_config.get_object("worker_auto_scale") or {
-    "desired": 1,
-    "min": 1,
-    "max": 2,
-}
-superset_worker_asg_config = OLAutoScaleGroupConfig(
-    asg_name=f"superset-worker-{superset_env}",
-    aws_config=aws_config,
-    health_check_type="EC2",
-    desired_size=superset_worker_auto_scale_config["desired"],
-    min_size=superset_worker_auto_scale_config["min"],
-    max_size=superset_worker_auto_scale_config["max"],
-    vpc_zone_identifiers=data_vpc["subnet_ids"],
-    tags=aws_config.merged_tags({"Name": f"superset-worker-{superset_env}"}),
+_gateway = OLEKSGateway(
+    "superset-gateway",
+    gateway_config=gateway_config,
+    opts=ResourceOptions(parent=superset_chart, depends_on=[superset_chart]),
 )
-
-supserset_worker_asg = OLAutoScaling(
-    asg_config=superset_worker_asg_config,
-    lt_config=superset_worker_lt_config,
-)
-
-
-# Create Route53 DNS records for Superset
-five_minutes = 60 * 5
-route53.Record(
-    "superset-server-dns-record",
-    name=superset_config.require("domain"),
-    type="CNAME",
-    ttl=five_minutes,
-    records=[superset_web_asg.load_balancer.dns_name],
-    zone_id=mitol_zone_id,
-    opts=ResourceOptions(delete_before_replace=True),
-)
+# DNS is managed at the Gateway/ingress layer via cert-manager/external-dns
 
 export(
     "superset",
