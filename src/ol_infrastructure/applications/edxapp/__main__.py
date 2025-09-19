@@ -1,4 +1,5 @@
 # ruff: noqa: E501
+
 """Provision and deploy the resources needed for an edxapp installation.
 
 - Create S3 buckets required by edxapp
@@ -49,6 +50,7 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
+from ol_infrastructure.applications.edxapp.k8s_resources import create_k8s_resources
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
 from ol_infrastructure.components.services.vault import (
@@ -113,12 +115,16 @@ vector_log_proxy_stack = StackReference(
 mongodb_atlas_stack = StackReference(
     f"infrastructure.mongodb_atlas.{stack_info.env_prefix}.{stack_info.name}"
 )
+notes_stack = StackReference(
+    f"applications.edxnotes.{stack_info.env_prefix}.{stack_info.name}"
+)
 
 #############
 # Variables #
 #############
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 target_vpc = edxapp_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
+k8s_vpc = edxapp_config.get("k8s_vpc") or "applications_vpc"
 aws_account = get_caller_identity()
 aws_config = AWSBase(
     tags={
@@ -143,6 +149,9 @@ edxapp_mfe_paths = list(edxapp_mfes.values())
 edxapp_mail_domain = edxapp_config.require("mail_domain")
 edxapp_vpc = network_stack.require_output(target_vpc)
 edxapp_vpc_id = edxapp_vpc["id"]
+k8s_vpc = network_stack.require_output(k8s_vpc)
+k8s_pod_subnet_cidrs = k8s_vpc["k8s_pod_subnet_cidrs"]
+
 data_vpc = network_stack.require_output("data_vpc")
 data_integrator_secgroup = data_vpc["security_groups"]["integrator"]
 
@@ -467,6 +476,7 @@ edxapp_policy = iam.Policy(
     ),
     description="AWS access permissions for edX application instances",
 )
+
 edxapp_iam_role = iam.Role(
     "edxapp-instance-role",
     assume_role_policy=json.dumps(
@@ -537,8 +547,6 @@ edxapp_db_security_group = ec2.SecurityGroup(
                 data_vpc["security_groups"]["integrator"],
                 vault_stack.require_output("vault_server")["security_group"],
             ],
-            # TODO: Create Vault security group to act as source of allowed  # noqa: FIX002, TD002
-            # traffic. (TMM 2021-05-04)
             cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"].apply(
                 lambda pod_cidrs: [*pod_cidrs, edxapp_vpc["cidr"]]
             ),
@@ -546,6 +554,14 @@ edxapp_db_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_MYSQL_PORT,
             to_port=DEFAULT_MYSQL_PORT,
             description="Access to MariaDB from Edxapp web nodes",
+        ),
+        # This is needed because the security group pinning near the bottom does not work
+        ec2.SecurityGroupIngressArgs(
+            cidr_blocks=k8s_pod_subnet_cidrs.apply(lambda pod_cidrs: [*pod_cidrs]),
+            protocol="tcp",
+            from_port=DEFAULT_MYSQL_PORT,
+            to_port=DEFAULT_MYSQL_PORT,
+            description="Access to MariaDB from K8s application pods",
         ),
     ],
     tags=aws_config.tags,
@@ -878,6 +894,7 @@ redis_cluster_security_group = ec2.SecurityGroup(
                 edxapp_security_group.id,
                 operations_vpc["security_groups"]["celery_monitoring"],
             ],
+            cidr_blocks=k8s_pod_subnet_cidrs.apply(lambda pod_cidrs: pod_cidrs),
             description="Allow access from edX to Redis for caching and queueing",
         )
     ],
@@ -1582,6 +1599,17 @@ fastly_access_logging_iam_role = monitoring_stack.require_output(
     "fastly_access_logging_iam_role"
 )
 
+if edxapp_config.get("k8s_deployment"):
+    lms_backend_address = edxapp_config.require("backend_lms_domain")
+    lms_backend_ssl_hostname = edxapp_config.require("backend_lms_domain")
+    cms_backend_address = edxapp_config.require("backend_studio_domain")
+    cms_backend_ssl_hostname = edxapp_config.require("backend_studio_domain")
+else:
+    lms_backend_address = web_lb.dns_name
+    lms_backend_ssl_hostname = edxapp_domains["lms"]
+    cms_backend_address = web_lb.dns_name
+    cms_backend_ssl_hostname = edxapp_domains["studio"]
+
 mfe_regex = "^/({})/".format("|".join(edxapp_mfe_paths))
 edxapp_fastly_service = fastly.ServiceVcl(
     f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}",
@@ -1599,22 +1627,22 @@ edxapp_fastly_service = fastly.ServiceVcl(
             use_ssl=True,
         ),
         fastly.ServiceVclBackendArgs(
-            address=web_lb.dns_name,
+            address=lms_backend_address,
             name="AWS ALB for edxapp",
             port=DEFAULT_HTTPS_PORT,
-            ssl_cert_hostname=edxapp_domains["lms"],
-            ssl_sni_hostname=edxapp_domains["lms"],
+            ssl_cert_hostname=lms_backend_ssl_hostname,
+            ssl_sni_hostname=lms_backend_ssl_hostname,
             use_ssl=True,
             # Increase the timeout to account for slow API responses
             first_byte_timeout=60000,
             between_bytes_timeout=15000,
         ),
         fastly.ServiceVclBackendArgs(
-            address=web_lb.dns_name,
+            address=cms_backend_address,
             name="AWS ALB for edX Studio",
             port=DEFAULT_HTTPS_PORT,
-            ssl_cert_hostname=edxapp_domains["studio"],
-            ssl_sni_hostname=edxapp_domains["studio"],
+            ssl_cert_hostname=cms_backend_ssl_hostname,
+            ssl_sni_hostname=cms_backend_ssl_hostname,
             use_ssl=True,
             # Increase the timeout to account for slow API responses
             first_byte_timeout=60000,
@@ -1831,6 +1859,23 @@ for domain_key, domain_value in edxapp_domains.items():
             records=[dns_override or web_lb.dns_name],
             zone_id=edxapp_zone_id,
         )
+
+# Actions to take when the the stack is configured to deploy into k8s
+if edxapp_config.get("k8s_deployment"):
+    k8s_resources = create_k8s_resources(
+        aws_config=aws_config,
+        cluster_stack=cluster_stack,
+        edxapp_cache=edxapp_redis_cache,
+        edxapp_config=edxapp_config,
+        edxapp_db=edxapp_db,
+        edxapp_iam_policy=edxapp_policy,
+        mongodb_atlas_stack=mongodb_atlas_stack,
+        network_stack=network_stack,
+        notes_stack=notes_stack,
+        stack_info=stack_info,
+        vault_config=Config("vault"),
+        vault_policy=edxapp_vault_policy,
+    )
 
 
 export(

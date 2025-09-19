@@ -770,7 +770,7 @@ class OLVaultK8SSecret(ComponentResource):
 
 
 class OLVaultK8SResourcesConfig(BaseModel):
-    annotations: dict[str, str] | None = None
+    annotations: dict[str, str | Output[str]] | None = None
     application_name: str
     labels: dict[str, str] | None = None
     namespace: str
