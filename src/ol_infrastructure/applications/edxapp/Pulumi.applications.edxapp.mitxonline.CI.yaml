@@ -53,6 +53,7 @@ config:
     secure: v1:nTKkM6zA0wbJaq3T:LyxTy566zTW65zkQLLKsFGmCIPmPRB1rkXcsAg37hI+EUTX07XfX5TkpfdyBBRdntiLJ7odzNss=
   edxapp:dns_zone: learn
   edxapp:mit_learn_domain: ci.learn.mit.edu
+  edxapp:mit_learn_api_domain: api.ci.learn.mit.edu
   edxapp:domains:
     lms: courses.ci.learn.mit.edu
     preview: preview.courses.ci.learn.mit.edu

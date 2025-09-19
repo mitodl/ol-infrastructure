@@ -1,10 +1,10 @@
-# ruff: noqa: F841, E501, PLR0913, FBT003
+# ruff: noqa: E501, PLR0913, FBT003
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, Output, ResourceOptions
+from pulumi import Config, Output, ResourceOptions, StackReference
 
 from ol_infrastructure.components.aws.cache import OLAmazonCache
 from ol_infrastructure.lib.pulumi_helper import StackInfo
@@ -35,6 +35,7 @@ def create_k8s_configmaps(
     k8s_global_labels: dict[str, str],
     edxapp_config: Config,
     edxapp_cache: OLAmazonCache,
+    notes_stack: StackReference,
     opensearch_hostname: Output[str],
 ) -> EdxappConfigMaps:
     """Create all the k8s configmaps needed for edxapp."""
@@ -65,6 +66,7 @@ def create_k8s_configmaps(
     interpolated_config_map = Output.all(
         redis_hostname=edxapp_cache.address,
         opensearch_hostname=opensearch_hostname,
+        notes_domain=notes_stack.require_output("notes_domain"),
     ).apply(
         lambda runtime_config: kubernetes.core.v1.ConfigMap(
             f"ol-{stack_info.env_prefix}-edxapp-interpolated-config-{stack_info.env_suffix}",
@@ -103,19 +105,19 @@ def create_k8s_configmaps(
                     - https://{edxapp_config.require_object("domains")["studio"]}
                     - https://{edxapp_config.require_object("domains")["preview"]}
                     - https://{edxapp_config.require("marketing_domain")}
-                    # - https://{{{{ key "edx/notes-api-host" }}}} # TODO
-                    # - https://{{{{ key "edxapp/learn-ai-frontend-domain" }}}} # TODO
-                    COURSE_IMPORT_EXPORT_BUCKET: {storage_bucket_name}
+                    - https://{runtime_config["notes_domain"]}
+                    # - https://{{{{ key "edxapp/learn-ai-frontend-domain" }}}} # I don't think this is needed
+                    COURSE_IMPORT_EXPORT_BUCKET: {course_bucket_name}
                     CROSS_DOMAIN_CSRF_COOKIE_DOMAIN: {edxapp_config.require_object("domains")["lms"]}
                     CROSS_DOMAIN_CSRF_COOKIE_NAME: {env_name}-edxapp-csrftoken
                     CSRF_TRUSTED_ORIGINS:  # MODIFIED
                     - https://{edxapp_config.require_object("domains")["lms"]}
                     DEFAULT_FEEDBACK_EMAIL: {edxapp_config.require("sender_email_address")}
                     DEFAULT_FROM_EMAIL: {edxapp_config.require("sender_email_address")}
-                    DISCUSSIONS_MICROFRONTEND_URL: https://{{ key "edxapp/lms-domain" }}/discuss
+                    DISCUSSIONS_MICROFRONTEND_URL: https://{edxapp_config.require_object("domains")["lms"]}/discuss
                     EDXMKTG_USER_INFO_COOKIE_NAME: {env_name}-edx-user-info
-                    # EDXNOTES_INTERNAL_API: https://{{ key "edx/notes-api-host" }}/api/v1  # TODO
-                    # EDXNOTES_PUBLIC_API: https://{{ key "edx/notes-api-host" }}/api/v1  # TODO
+                    EDXNOTES_INTERNAL_API: https://{runtime_config["notes_domain"]}/api/v1
+                    EDXNOTES_PUBLIC_API: https://{runtime_config["notes_domain"]}/api/v1
                     ELASTIC_SEARCH_CONFIG:
                     - host: {runtime_config["opensearch_hostname"]}
                       port: 443
@@ -142,15 +144,15 @@ def create_k8s_configmaps(
                     IDA_LOGOUT_URI_LIST:
                     - https://{edxapp_config.require("marketing_domain")}/logout
                     - https://{edxapp_config.require_object("domains")["studio"]}/logout
-                    - https://{{ key "edxapp/learn-api-domain" }}/logout  # TODO
+                    - https://{edxapp_config.require("mit_learn_api_domain")}/logout
                     LANGUAGE_COOKIE: {env_name}-openedx-language-preference
-                    # MIT_LEARN_AI_API_URL: https://{{ key "edxapp/learn-api-domain" }}/ai  # Added for ol_openedx_chat  # TODO
-                    # MIT_LEARN_API_BASE_URL: https://{{ key "edxapp/learn-api-domain" }}/learn  # Added for ol_openedx_chat  # TODO
-                    # MIT_LEARN_SUMMARY_FLASHCARD_URL: https://{{ key "edxapp/learn-api-domain" }}/learn/api/v1/contentfiles/  # Added for ol_openedx_chat  # TODO
+                    # MIT_LEARN_AI_API_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai  # Added for ol_openedx_chat
+                    # MIT_LEARN_API_BASE_URL: https://{edxapp_config.require("mit_learn_api_domain")}/learn  # Added for ol_openedx_chat
+                    # MIT_LEARN_SUMMARY_FLASHCARD_URL: https://{edxapp_config.require("mit_learn_api_domain")}/learn/api/v1/contentfiles/  # Added for ol_openedx_chat
                     MIT_LEARN_BASE_URL: "https://{edxapp_config.require("mit_learn_domain")}"
-                    # MIT_LEARN_AI_XBLOCK_CHAT_API_URL: https://{{ key "edxapp/learn-api-domain" }}/ai/http/canvas_syllabus_agent/
-                    # MIT_LEARN_AI_XBLOCK_TUTOR_CHAT_API_URL:  https://{{ key "edxapp/learn-api-domain" }}/ai/http/canvas_tutor_agent/ # TODO
-                    # MIT_LEARN_AI_XBLOCK_PROBLEM_SET_LIST_URL: https://{{ key "edxapp/learn-api-domain" }}/ai/api/v0/problem_set_list  # Added for ol_openedx_chat_xblock # TODO
+                    # MIT_LEARN_AI_XBLOCK_CHAT_API_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai/http/canvas_syllabus_agent/
+                    # MIT_LEARN_AI_XBLOCK_TUTOR_CHAT_API_URL:  https://{edxapp_config.require("mit_learn_api_domain")}/ai/http/canvas_tutor_agent/
+                    # MIT_LEARN_AI_XBLOCK_PROBLEM_SET_LIST_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai/api/v0/problem_set_list  # Added for ol_openedx_chat_xblock
                     MIT_LEARN_LOGO: https://{edxapp_config.require_object("domains")["lms"]}/static/mitxonline/images/mit-learn-logo.svg
                     LEARNING_MICROFRONTEND_URL: https://{edxapp_config.require_object("domains")["lms"]}/learn
                     LMS_BASE: {edxapp_config.require_object("domains")["lms"]}

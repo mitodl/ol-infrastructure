@@ -292,7 +292,7 @@ def create_k8s_secrets(
                           django_auth:
                             password: {{ get .Secrets "edxapp_password" }}
                             username: edxapp
-                          url: http://xqueue.service.consul:8040 # TODO
+                          url: http://xqueue:8040 # Assumes Xqueue is running in K8S
                     """),
             },
             vaultauth=vault_k8s_resources.auth_name,

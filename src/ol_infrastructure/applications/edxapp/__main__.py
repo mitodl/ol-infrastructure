@@ -1,4 +1,4 @@
-# ruff: noqa: E501, FIX002
+# ruff: noqa: E501
 
 """Provision and deploy the resources needed for an edxapp installation.
 
@@ -115,6 +115,9 @@ vector_log_proxy_stack = StackReference(
 )
 mongodb_atlas_stack = StackReference(
     f"infrastructure.mongodb_atlas.{stack_info.env_prefix}.{stack_info.name}"
+)
+notes_stack = StackReference(
+    f"applications.edxnotes.{stack_info.env_prefix}.{stack_info.name}"
 )
 
 #############
@@ -474,6 +477,7 @@ edxapp_policy = iam.Policy(
     ),
     description="AWS access permissions for edX application instances",
 )
+
 edxapp_iam_role = iam.Role(
     "edxapp-instance-role",
     assume_role_policy=json.dumps(
@@ -536,8 +540,6 @@ edxapp_db_security_group = ec2.SecurityGroup(
     f"edxapp-db-access-{stack_info.env_suffix}",
     name_prefix=f"edxapp-db-access-{env_name}-",
     description="Access from Edxapp instances to the associated MariaDB database",
-    # TODO(Mike): Need to figure out how to get the application running in k8s in the apps vpc
-    # network access to this database running in the edxapp vpc.
     ingress=[
         ec2.SecurityGroupIngressArgs(
             security_groups=[
@@ -546,8 +548,6 @@ edxapp_db_security_group = ec2.SecurityGroup(
                 data_vpc["security_groups"]["integrator"],
                 vault_stack.require_output("vault_server")["security_group"],
             ],
-            # TODO: Create Vault security group to act as source of allowed  # noqa: TD002
-            # traffic. (TMM 2021-05-04)
             cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"].apply(
                 lambda pod_cidrs: [*pod_cidrs, edxapp_vpc["cidr"]]
             ),
@@ -1857,8 +1857,10 @@ if edxapp_config.get("k8s_deployment"):
         edxapp_cache=edxapp_redis_cache,
         edxapp_config=edxapp_config,
         edxapp_db=edxapp_db,
+        edxapp_iam_policy=edxapp_policy,
         mongodb_atlas_stack=mongodb_atlas_stack,
         network_stack=network_stack,
+        notes_stack=notes_stack,
         stack_info=stack_info,
         vault_config=Config("vault"),
         vault_policy=edxapp_vault_policy,

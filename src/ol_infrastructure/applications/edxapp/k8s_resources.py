@@ -6,6 +6,7 @@ import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi_aws import iam
 
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
@@ -18,6 +19,8 @@ from ol_infrastructure.components.aws.eks import (
     OLEKSGatewayConfig,
     OLEKSGatewayListenerConfig,
     OLEKSGatewayRouteConfig,
+    OLEKSTrustRole,
+    OLEKSTrustRoleConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
@@ -43,8 +46,10 @@ def create_k8s_resources(
     edxapp_cache: OLAmazonCache,
     edxapp_config: Config,
     edxapp_db: OLAmazonDB,
+    edxapp_iam_policy: aws.iam.Policy,
     mongodb_atlas_stack: StackReference,
     network_stack: StackReference,
+    notes_stack: StackReference,
     stack_info: StackInfo,
     vault_config: Config,
     vault_policy: vault.Policy,
@@ -52,6 +57,8 @@ def create_k8s_resources(
     env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
     lms_deployment_name = f"{env_name}-edxapp-lms"
     cms_deployment_name = f"{env_name}-edxapp-cms"
+
+    aws_account = aws.get_caller_identity()
 
     # Get various VPC / network configuration information
     apps_vpc = network_stack.require_output("applications_vpc")
@@ -89,6 +96,37 @@ def create_k8s_resources(
         stack=stack_info,
     ).model_dump()
 
+    # We need to "guess" service account name here because there is a loop with
+    # needing the service account name for the trust role, but needing the trustrole
+    # for the annotations on the service account created by OLVaultK8SResources.
+    edxapp_service_account_name = f"{stack_info.env_prefix}-edxapp-vault"
+
+    # The OLEKSTrustRole component appears to have an issue handling Pulumi Outputs as
+    # inputs. This can be worked around by resolving the outputs within an `apply` and
+    # then instantiating the component.
+    edxapp_trust_role = OLEKSTrustRole(
+        f"ol-{stack_info.env_prefix}-edxapp-trustrole-{stack_info.env_suffix}",
+        role_config=OLEKSTrustRoleConfig(
+            account_id=aws_account.account_id,
+            cluster_name=f"applications-{stack_info.name}",
+            cluster_identities=cluster_stack.require_output("cluster_identities"),
+            description=f"Trust role for allowing the {env_name} edxapp "
+            "application to access AWS resources",
+            policy_operator="StringEquals",
+            role_name=f"edxapp-trustrole-{env_name}",
+            service_account_identifier=(
+                f"system:serviceaccount:{namespace}:{edxapp_service_account_name}"
+            ),
+            tags=aws_config.tags,
+        ),
+    )
+
+    iam.RolePolicyAttachment(
+        f"ol-{stack_info.env_prefix}-edxapp-trustrole-policy-attachment-{stack_info.env_suffix}",
+        policy_arn=edxapp_iam_policy.arn,
+        role=edxapp_trust_role.role.name,
+    )
+
     # Create a kubernetes vault auth backend role
     edxapp_k8s_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
         f"ol-{stack_info.env_prefix}-vault-k8s-auth-backend-role-{stack_info.env_suffix}",
@@ -105,6 +143,7 @@ def create_k8s_resources(
             application_name=f"{stack_info.env_prefix}-edxapp",
             namespace=namespace,
             labels=k8s_global_labels,
+            annotations={"eks.amazonaws.com/role-arn": edxapp_trust_role.role.arn},
             vault_address=vault_config.require("address"),
             vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
             vault_auth_role_name=edxapp_k8s_vault_auth_backend_role.role_name,
@@ -160,12 +199,13 @@ def create_k8s_resources(
     )
 
     configmaps = create_k8s_configmaps(
-        stack_info,
-        namespace,
-        k8s_global_labels,
-        edxapp_config,
-        edxapp_cache,
-        opensearch_hostname,
+        stack_info=stack_info,
+        namespace=namespace,
+        k8s_global_labels=k8s_global_labels,
+        edxapp_config=edxapp_config,
+        edxapp_cache=edxapp_cache,
+        notes_stack=notes_stack,
+        opensearch_hostname=opensearch_hostname,
     )
 
     # Lookup environment vars needed for the deployment
