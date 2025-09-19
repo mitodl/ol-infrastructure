@@ -13,6 +13,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_REDIS_PORT,
     FIVE_MINUTES,
 )
+from bridge.lib.versions import SUPERSET_CHART_VERSION
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
@@ -606,6 +607,7 @@ superset_chart = kubernetes.helm.v3.Release(
     kubernetes.helm.v3.ReleaseArgs(
         name="superset",
         chart="superset",
+        version=SUPERSET_CHART_VERSION,
         namespace=superset_namespace,
         cleanup_on_fail=True,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(

@@ -21,6 +21,8 @@ VAULT_VERSION = "1.20.3"
 # EKS Specific Versions
 # renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/charts
 AIRBYTE_CHART_VERSION = "2.0.12"
+# renovate: datasource=helm depName=superset packageName=superset registryUrl=https://apache.github.io/superset
+SUPERSET_CHART_VERSION = "0.15.0"
 # renovate: datasource=docker depName=apisix packageName=registry-1.docker.io/bitnamicharts/apisix
 APISIX_CHART_VERSION = "5.1.6"
 # renovate: datasource=helm depName=aws-load-balancer-controller packageName=eks/aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts
