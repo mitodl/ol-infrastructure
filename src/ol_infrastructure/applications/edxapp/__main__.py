@@ -556,6 +556,7 @@ edxapp_db_security_group = ec2.SecurityGroup(
             to_port=DEFAULT_MYSQL_PORT,
             description="Access to MariaDB from Edxapp web nodes",
         ),
+        # This is needed because the security group pinning near the bottom does not work
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=k8s_pod_subnet_cidrs.apply(lambda pod_cidrs: [*pod_cidrs]),
             protocol="tcp",
@@ -1599,6 +1600,17 @@ fastly_access_logging_iam_role = monitoring_stack.require_output(
     "fastly_access_logging_iam_role"
 )
 
+if edxapp_config.get("k8s_deployment"):
+    lms_backend_address = edxapp_config.require("backend_lms_domain")
+    lms_backend_ssl_hostname = edxapp_config.require("backend_lms_domain")
+    cms_backend_address = edxapp_config.require("backend_studio_domain")
+    cms_backend_ssl_hostname = edxapp_config.require("backend_studio_domain")
+else:
+    lms_backend_address = web_lb.dns_name
+    lms_backend_ssl_hostname = edxapp_domains["lms"]
+    cms_backend_address = web_lb.dns_name
+    cms_backend_ssl_hostname = edxapp_domains["studio"]
+
 mfe_regex = "^/({})/".format("|".join(edxapp_mfe_paths))
 edxapp_fastly_service = fastly.ServiceVcl(
     f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}",
@@ -1616,22 +1628,22 @@ edxapp_fastly_service = fastly.ServiceVcl(
             use_ssl=True,
         ),
         fastly.ServiceVclBackendArgs(
-            address=edxapp_config.require("backend_lms_domain"),
+            address=lms_backend_address,
             name="AWS ALB for edxapp",
             port=DEFAULT_HTTPS_PORT,
-            ssl_cert_hostname=edxapp_config.require("backend_lms_domain"),
-            ssl_sni_hostname=edxapp_config.require("backend_lms_domain"),
+            ssl_cert_hostname=lms_backend_ssl_hostname,
+            ssl_sni_hostname=lms_backend_ssl_hostname,
             use_ssl=True,
             # Increase the timeout to account for slow API responses
             first_byte_timeout=60000,
             between_bytes_timeout=15000,
         ),
         fastly.ServiceVclBackendArgs(
-            address=edxapp_config.require("backend_studio_domain"),
+            address=cms_backend_address,
             name="AWS ALB for edX Studio",
             port=DEFAULT_HTTPS_PORT,
-            ssl_cert_hostname=edxapp_config.require("backend_studio_domain"),
-            ssl_sni_hostname=edxapp_config.require("backend_studio_domain"),
+            ssl_cert_hostname=cms_backend_ssl_hostname,
+            ssl_sni_hostname=cms_backend_ssl_hostname,
             use_ssl=True,
             # Increase the timeout to account for slow API responses
             first_byte_timeout=60000,
@@ -1867,6 +1879,7 @@ if edxapp_config.get("k8s_deployment"):
     )
 
     # Allows the application running in K8S to access the redis cluster.
+    # This doesn't work. Left here for posterity and maybe figure out why it doesn't work
     vpc.SecurityGroupIngressRule(
         "edxapp-k8s-redis-access",
         from_port=DEFAULT_REDIS_PORT,
@@ -1877,6 +1890,7 @@ if edxapp_config.get("k8s_deployment"):
         description="Allow access to Redis from the edxapp k8s deployment",
     )
     # Allow the application that is running k8s to access the database
+    # This doesn't work. Left here for posterity and maybe figure out why it doesn't work
     vpc.SecurityGroupIngressRule(
         "edxapp-k8s-database-access",
         from_port=DEFAULT_MYSQL_PORT,
