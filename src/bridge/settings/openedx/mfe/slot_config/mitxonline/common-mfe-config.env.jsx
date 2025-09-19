@@ -221,4 +221,26 @@ if (learningApps.includes(edxMfeAppName)) {
   };
 }
 
+// Hiding the course org and number from course header
+config.pluginSlots = {
+  ...config.pluginSlots,
+  "org.openedx.frontend.layout.header_learning_course_info.v1": {
+    plugins: [
+      { op: PLUGIN_OPERATIONS.Hide, widgetId: 'default_contents' },
+      {
+        op: PLUGIN_OPERATIONS.Insert,
+        widget: {
+          id: 'custom_footer',
+          type: DIRECT_PLUGIN,
+          RenderWidget: ({ courseTitle }) => (
+            <div style={{ minWidth: 0 }}>
+              <span className="d-block m-0 font-weight-bold course-title">{courseTitle}</span>
+            </div>
+          ),
+        },
+      },
+    ],
+  },
+};
+
 export default config;
