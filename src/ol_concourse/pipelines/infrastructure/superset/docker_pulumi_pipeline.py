@@ -90,8 +90,7 @@ def build_superset_docker_pipeline() -> Pipeline:
         project_source_path=PULUMI_CODE_PATH.joinpath("applications/superset/"),
         dependencies=[
             GetStep(
-                get=docker_build_job.name,
-                trigger=True,
+                get=superset_image.name, trigger=True, passed=[docker_build_job.name]
             )
         ],
     )
