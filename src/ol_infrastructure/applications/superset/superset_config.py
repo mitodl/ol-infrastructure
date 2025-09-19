@@ -65,7 +65,7 @@ OAUTH_PROVIDERS = [
             "client_id": OIDC_CLIENT_ID,
             "client_secret": OIDC_CLIENT_SECRET,
             "client_kwargs": {
-                "scope": "openid profile email roles",
+                "scope": "openid profile email ol_roles",
             },
             "server_metadata_url": f"{OIDC_URL}/.well-known/openid-configuration",
             "api_base_url": f"{OIDC_URL}/protocol/",
@@ -82,10 +82,10 @@ JWT_PUBLIC_KEY = OIDC_REALM_PUBLIC_KEY
 # Testing out Keycloak role mapping to Superset
 # https://superset.apache.org/docs/installation/configuring-superset#mapping-ldap-or-oauth-groups-to-superset-roles
 AUTH_ROLES_MAPPING = {
-    "superset_admin": ["Admin"],
-    "superset_researcher": ["Alpha", "sql_lab"],
-    "superset_alpha": ["Alpha"],
-    "superset_gamma": ["Gamma"],
+    "ol_platform_admin": ["Admin"],
+    "ol_researcher": ["Alpha", "sql_lab"],
+    "ol_data_engineer": ["Alpha"],
+    "ol_data_analyst": ["Gamma"],
 }
 
 # if we should replace ALL the user's roles each login, or only on registration

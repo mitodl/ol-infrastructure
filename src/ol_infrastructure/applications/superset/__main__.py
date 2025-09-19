@@ -353,8 +353,8 @@ superset_db_consul_service = consul.Service(
     name="superset-db",
     port=superset_db_config.port,
     meta={
-        "external-node": "true",
-        "external-probe": "true",
+        "external-node": True,
+        "external-probe": True,
     },
     checks=[
         consul.ServiceCheckArgs(
@@ -671,6 +671,48 @@ superset_chart = kubernetes.helm.v3.Release(
             "ingress": {"enabled": False},
         },
     ),
+)
+
+celery_keda_scaling = kubernetes.apiextensions.CustomResource(
+    "superset-celery-worker-scaledobject",
+    api_version="keda.sh/v1alpha1",
+    kind="ScaledObject",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="superset-celery",
+        namespace=superset_namespace,
+        labels=k8s_global_labels
+        | {"ol.mit.edu/process": "celery-worker", "ol.mit.edu/worker-name": "default"},
+    ),
+    spec=Output.all(
+        address=superset_redis_cache.cache_cluster.primary_endpoint_address,
+        token=superset_redis_cache.cache_cluster.auth_token,
+    ).apply(
+        lambda cache: {
+            "scaleTargetRef": {
+                "kind": "Deployment",
+                "name": "superset-worker",
+            },
+            "pollingInterval": 3,
+            "cooldownPeriod": 10,
+            "maxReplicaCount": 10,
+            "minReplicaCount": 1,
+            "triggers": [
+                {
+                    "type": "redis",
+                    "metadata": {
+                        "address": f"{cache['address']}:{DEFAULT_REDIS_PORT}",
+                        "username": "default",
+                        "databaseIndex": "0",
+                        "password": cache["token"],
+                        "listName": "celery",
+                        "listLength": "5",
+                        "enableTLS": "true",
+                    },
+                },
+            ],
+        }
+    ),
+    opts=ResourceOptions(delete_before_replace=True),
 )
 
 ########################################
