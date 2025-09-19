@@ -484,6 +484,7 @@ binderhub_application = kubernetes.helm.v3.Release(
                     "image": {
                         "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
                         "tag": "clustering_and_descriptive_ai",
+                        "pullPolicy": "Always",
                     },
                     "extraTolerations": [
                         {
