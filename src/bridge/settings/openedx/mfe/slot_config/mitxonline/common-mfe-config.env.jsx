@@ -221,7 +221,7 @@ if (learningApps.includes(edxMfeAppName)) {
   };
 }
 
-// Hiding the course org and number from course header
+// Hiding the course org and number from the learning header
 config.pluginSlots = {
   ...config.pluginSlots,
   "org.openedx.frontend.layout.header_learning_course_info.v1": {
