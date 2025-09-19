@@ -55,8 +55,11 @@ def create_k8s_resources(
     vault_policy: vault.Policy,
 ):
     env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
-    lms_deployment_name = f"{env_name}-edxapp-lms"
-    cms_deployment_name = f"{env_name}-edxapp-cms"
+    lms_webapp_deployment_name = f"{env_name}-edxapp-lms-webapp"
+    cms_webapp_deployment_name = f"{env_name}-edxapp-cms-webapp"
+
+    lms_celery_deployment_name = f"{env_name}-edxapp-lms-celery"
+    cms_celery_deployment_name = f"{env_name}-edxapp-cms-celery"
 
     aws_account = aws.get_caller_identity()
 
@@ -265,6 +268,35 @@ def create_k8s_resources(
         volume_mounts=staticfiles_volume_mounts,
     )
 
+    common_volume_mounts = [
+        kubernetes.core.v1.VolumeMountArgs(
+            name="edxapp-config",
+            mount_path="/openedx/config",
+        ),
+        kubernetes.core.v1.VolumeMountArgs(
+            name="openedx-data",
+            mount_path="/openedx/data",
+        ),
+        kubernetes.core.v1.VolumeMountArgs(
+            name="openedx-logs",
+            mount_path="/openedx/data/logs",
+        ),
+        kubernetes.core.v1.VolumeMountArgs(
+            name="openedx-media",
+            mount_path="/openedx/media/",
+        ),
+        *staticfiles_volume_mounts,
+    ]
+
+    webapp_volume_mounts = [
+        *common_volume_mounts,
+        kubernetes.core.v1.VolumeMountArgs(
+            name=configmaps.uwsgi_ini_config_name,
+            mount_path="/openedx/edx-platform/uwsgi.ini",
+            sub_path="uwsgi.ini",
+        ),
+    ]
+
     ############################################
     # cms deployment resources
     ############################################
@@ -372,22 +404,24 @@ def create_k8s_resources(
             mount_path="/openedx/config",
         )
     )
-    cms_labels = k8s_global_labels | {
-        "ol.mit.edu/component": "edxapp-cms",
+    cms_webapp_labels = k8s_global_labels | {
+        "ol.mit.edu/component": "edxapp-cms-webapp",
         "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
     }
-    cms_deployment = kubernetes.apps.v1.Deployment(
+    cms_webapp_deployment = kubernetes.apps.v1.Deployment(
         f"ol-{stack_info.env_prefix}-edxapp-cms-deployment-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=cms_deployment_name,
+            name=cms_webapp_deployment_name,
             namespace=namespace,
-            labels=cms_labels,
+            labels=cms_webapp_labels,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             replicas=1,
-            selector=kubernetes.meta.v1.LabelSelectorArgs(match_labels=cms_labels),
+            selector=kubernetes.meta.v1.LabelSelectorArgs(
+                match_labels=cms_webapp_labels
+            ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=cms_labels),
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=cms_webapp_labels),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     service_account_name=vault_k8s_resources.service_account_name,
                     volumes=cms_edxapp_volumes,
@@ -424,30 +458,7 @@ def create_k8s_resources(
                                     container_port=8000, name="http"
                                 )
                             ],
-                            volume_mounts=[
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="edxapp-config",
-                                    mount_path="/openedx/config",
-                                ),
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="openedx-data",
-                                    mount_path="/openedx/data",
-                                ),
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="openedx-logs",
-                                    mount_path="/openedx/data/logs",
-                                ),
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="openedx-media",
-                                    mount_path="/openedx/media/",
-                                ),
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name=configmaps.uwsgi_ini_config_name,
-                                    mount_path="/openedx/edx-platform/uwsgi.ini",
-                                    sub_path="uwsgi.ini",
-                                ),
-                                *staticfiles_volume_mounts,
-                            ],
+                            volume_mounts=webapp_volume_mounts,
                         )
                     ],
                 ),
@@ -457,12 +468,12 @@ def create_k8s_resources(
             depends_on=list(cms_edxapp_config_sources.values())
         ),
     )
-    cms_service = kubernetes.core.v1.Service(
+    cms_webapp_service = kubernetes.core.v1.Service(
         f"ol-{stack_info.env_prefix}-edxapp-cms-service-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=cms_deployment_name,
+            name=cms_webapp_deployment_name,
             namespace=namespace,
-            labels=cms_labels,
+            labels=cms_webapp_labels,
         ),
         spec=kubernetes.core.v1.ServiceSpecArgs(
             ports=[
@@ -474,8 +485,74 @@ def create_k8s_resources(
                     protocol="TCP",
                 )
             ],
-            selector=cms_labels,
+            selector=cms_webapp_labels,
             type="ClusterIP",
+        ),
+    )
+
+    cms_celery_labels = k8s_global_labels | {
+        "ol.mit.edu/component": "edxapp-cms-celery",
+        "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
+    }
+    cms_celery_deployment = kubernetes.apps.v1.Deployment(
+        f"ol-{stack_info.env_prefix}-edxapp-cms-celery-deployment-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{cms_celery_deployment_name}",
+            namespace=namespace,
+            labels=cms_celery_labels,
+        ),
+        spec=kubernetes.apps.v1.DeploymentSpecArgs(
+            replicas=1,
+            selector=kubernetes.meta.v1.LabelSelectorArgs(
+                match_labels=cms_celery_labels
+            ),
+            template=kubernetes.core.v1.PodTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=cms_celery_labels),
+                spec=kubernetes.core.v1.PodSpecArgs(
+                    service_account_name=vault_k8s_resources.service_account_name,
+                    volumes=cms_edxapp_volumes,
+                    init_containers=[
+                        staticfiles_init_container,  # strictly speaking, not required
+                        kubernetes.core.v1.ContainerArgs(
+                            name="config-aggregator",
+                            image="busybox:1.35",
+                            command=["/bin/sh", "-c"],
+                            args=[
+                                "cat /openedx/config-sources/*/*.yaml > /openedx/config/cms.env.yml"
+                            ],
+                            volume_mounts=cms_edxapp_init_volume_mounts,
+                        ),
+                    ],
+                    containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="cms-edxapp",
+                            image=edxapp_image,
+                            command=["celery"],
+                            args=[
+                                "--app=cms.celery",
+                                "worker",
+                                "-B",
+                                "-E",
+                                "--loglevel=info",
+                                "--hostname=edx.cms.core.default.%%h",
+                                "--max-tasks-per-child",
+                                "100",
+                                "--exclude-queues=edx.lms.core.default",
+                            ],
+                            env=[
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="SERVICE_VARIANT", value="cms"
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="DJANGO_SETTINGS_MODULE",
+                                    value="cms.envs.production",
+                                ),
+                            ],
+                            volume_mounts=common_volume_mounts,
+                        )
+                    ],
+                ),
+            ),
         ),
     )
 
@@ -585,22 +662,24 @@ def create_k8s_resources(
         )
     )
 
-    lms_labels = k8s_global_labels | {
-        "ol.mit.edu/component": "edxapp-lms",
+    lms_webapp_labels = k8s_global_labels | {
+        "ol.mit.edu/component": "edxapp-lms-webapp",
         "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
     }
-    lms_deployment = kubernetes.apps.v1.Deployment(
+    lms_webapp_deployment = kubernetes.apps.v1.Deployment(
         f"ol-{stack_info.env_prefix}-edxapp-lms-deployment-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=lms_deployment_name,
+            name=lms_webapp_deployment_name,
             namespace=namespace,
-            labels=lms_labels,
+            labels=lms_webapp_labels,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             replicas=1,
-            selector=kubernetes.meta.v1.LabelSelectorArgs(match_labels=lms_labels),
+            selector=kubernetes.meta.v1.LabelSelectorArgs(
+                match_labels=lms_webapp_labels
+            ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=lms_labels),
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=lms_webapp_labels),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     service_account_name=vault_k8s_resources.service_account_name,
                     volumes=lms_edxapp_volumes,
@@ -637,30 +716,7 @@ def create_k8s_resources(
                                     container_port=8000, name="http"
                                 )
                             ],
-                            volume_mounts=[
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="edxapp-config",
-                                    mount_path="/openedx/config",
-                                ),
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="openedx-data",
-                                    mount_path="/openedx/data",
-                                ),
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="openedx-logs",
-                                    mount_path="/openedx/data/logs",
-                                ),
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="openedx-media",
-                                    mount_path="/openedx/media/",
-                                ),
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name=configmaps.uwsgi_ini_config_name,
-                                    mount_path="/openedx/edx-platform/uwsgi.ini",
-                                    sub_path="uwsgi.ini",
-                                ),
-                                *staticfiles_volume_mounts,
-                            ],
+                            volume_mounts=webapp_volume_mounts,
                         ),
                     ],
                 ),
@@ -670,12 +726,12 @@ def create_k8s_resources(
             depends_on=list(lms_edxapp_config_sources.values())
         ),
     )
-    lms_service = kubernetes.core.v1.Service(
+    lms_webapp_service = kubernetes.core.v1.Service(
         f"ol-{stack_info.env_prefix}-edxapp-lms-service-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=lms_deployment_name,
+            name=lms_webapp_deployment_name,
             namespace=namespace,
-            labels=lms_labels,
+            labels=lms_webapp_labels,
         ),
         spec=kubernetes.core.v1.ServiceSpecArgs(
             ports=[
@@ -687,8 +743,73 @@ def create_k8s_resources(
                     protocol="TCP",
                 )
             ],
-            selector=lms_labels,
+            selector=lms_webapp_labels,
             type="ClusterIP",
+        ),
+    )
+    lms_celery_labels = k8s_global_labels | {
+        "ol.mit.edu/component": "edxapp-lms-celery",
+        "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
+    }
+    lms_celery_deployment = kubernetes.apps.v1.Deployment(
+        f"ol-{stack_info.env_prefix}-edxapp-lms-celery-deployment-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{lms_celery_deployment_name}",
+            namespace=namespace,
+            labels=lms_celery_labels,
+        ),
+        spec=kubernetes.apps.v1.DeploymentSpecArgs(
+            replicas=1,
+            selector=kubernetes.meta.v1.LabelSelectorArgs(
+                match_labels=lms_celery_labels
+            ),
+            template=kubernetes.core.v1.PodTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=lms_celery_labels),
+                spec=kubernetes.core.v1.PodSpecArgs(
+                    service_account_name=vault_k8s_resources.service_account_name,
+                    volumes=lms_edxapp_volumes,
+                    init_containers=[
+                        staticfiles_init_container,  # strictly speaking, not required
+                        kubernetes.core.v1.ContainerArgs(
+                            name="config-aggregator",
+                            image="busybox:1.35",
+                            command=["/bin/sh", "-c"],
+                            args=[
+                                "cat /openedx/config-sources/*/*.yaml > /openedx/config/lms.env.yml"
+                            ],
+                            volume_mounts=lms_edxapp_init_volume_mounts,
+                        ),
+                    ],
+                    containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="lms-edxapp",
+                            image=edxapp_image,
+                            command=["celery"],
+                            args=[
+                                "--app=lms.celery",
+                                "worker",
+                                "-B",
+                                "-E",
+                                "--loglevel=info",
+                                "--hostname=edx.lms.core.default.%%h",
+                                "--max-tasks-per-child",
+                                "100",
+                                "--exclude-queues=edx.lms.core.default",
+                            ],
+                            env=[
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="SERVICE_VARIANT", value="lms"
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="DJANGO_SETTINGS_MODULE",
+                                    value="lms.envs.production",
+                                ),
+                            ],
+                            volume_mounts=common_volume_mounts,
+                        )
+                    ],
+                ),
+            ),
         ),
     )
 
@@ -768,7 +889,7 @@ def create_k8s_resources(
                 listener_name="https-frontend-lms",
                 hostnames=[frontend_lms_domain],
                 port=8443,
-                backend_service_name=lms_deployment_name,
+                backend_service_name=lms_webapp_deployment_name,
                 backend_service_namespace=namespace,
                 backend_service_port=8000,
                 matches=[{"path": {"type": "PathPrefix", "value": "/"}}],
@@ -778,7 +899,7 @@ def create_k8s_resources(
                 listener_name="https-backend-lms",
                 hostnames=[backend_lms_domain],
                 port=8443,
-                backend_service_name=lms_deployment_name,
+                backend_service_name=lms_webapp_deployment_name,
                 backend_service_namespace=namespace,
                 backend_service_port=8000,
                 matches=[{"path": {"type": "PathPrefix", "value": "/"}}],
@@ -788,7 +909,7 @@ def create_k8s_resources(
                 listener_name="https-frontend-studio",
                 hostnames=[frontend_studio_domain],
                 port=8443,
-                backend_service_name=cms_deployment_name,
+                backend_service_name=cms_webapp_deployment_name,
                 backend_service_namespace=namespace,
                 backend_service_port=8000,
                 matches=[{"path": {"type": "PathPrefix", "value": "/"}}],
@@ -798,7 +919,7 @@ def create_k8s_resources(
                 listener_name="https-backend-studio",
                 hostnames=[backend_studio_domain],
                 port=8443,
-                backend_service_name=cms_deployment_name,
+                backend_service_name=cms_webapp_deployment_name,
                 backend_service_namespace=namespace,
                 backend_service_port=8000,
                 matches=[{"path": {"type": "PathPrefix", "value": "/"}}],
@@ -808,7 +929,7 @@ def create_k8s_resources(
                 listener_name="https-frontend-preview",
                 hostnames=[frontend_preview_domain],
                 port=8443,
-                backend_service_name=lms_deployment_name,
+                backend_service_name=lms_webapp_deployment_name,
                 backend_service_namespace=namespace,
                 backend_service_port=8000,
                 matches=[{"path": {"type": "PathPrefix", "value": "/"}}],
@@ -818,7 +939,7 @@ def create_k8s_resources(
                 listener_name="https-backend-preview",
                 hostnames=[backend_preview_domain],
                 port=8443,
-                backend_service_name=lms_deployment_name,
+                backend_service_name=lms_webapp_deployment_name,
                 backend_service_namespace=namespace,
                 backend_service_port=8000,
                 matches=[{"path": {"type": "PathPrefix", "value": "/"}}],
@@ -829,7 +950,9 @@ def create_k8s_resources(
     OLEKSGateway(
         f"ol-{stack_info.env_prefix}-edxapp-gateway-{stack_info.env_suffix}",
         gateway_config=gateway_config,
-        opts=pulumi.ResourceOptions(depends_on=[lms_deployment, cms_deployment]),
+        opts=pulumi.ResourceOptions(
+            depends_on=[lms_webapp_deployment, cms_webapp_deployment]
+        ),
     )
 
     return {

@@ -36,7 +36,6 @@ from pulumi_aws import (
     route53,
     s3,
     ses,
-    vpc,
 )
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
@@ -1876,29 +1875,6 @@ if edxapp_config.get("k8s_deployment"):
         stack_info=stack_info,
         vault_config=Config("vault"),
         vault_policy=edxapp_vault_policy,
-    )
-
-    # Allows the application running in K8S to access the redis cluster.
-    # This doesn't work. Left here for posterity and maybe figure out why it doesn't work
-    vpc.SecurityGroupIngressRule(
-        "edxapp-k8s-redis-access",
-        from_port=DEFAULT_REDIS_PORT,
-        to_port=DEFAULT_REDIS_PORT,
-        ip_protocol="tcp",
-        security_group_id=redis_cluster_security_group.id,
-        referenced_security_group_id=k8s_resources["edxapp_k8s_app_security_group_id"],
-        description="Allow access to Redis from the edxapp k8s deployment",
-    )
-    # Allow the application that is running k8s to access the database
-    # This doesn't work. Left here for posterity and maybe figure out why it doesn't work
-    vpc.SecurityGroupIngressRule(
-        "edxapp-k8s-database-access",
-        from_port=DEFAULT_MYSQL_PORT,
-        to_port=DEFAULT_MYSQL_PORT,
-        ip_protocol="tcp",
-        security_group_id=edxapp_db_security_group.id,
-        referenced_security_group_id=k8s_resources["edxapp_k8s_app_security_group_id"],
-        description="Allow access to Redis from the edxapp k8s deployment",
     )
 
 
