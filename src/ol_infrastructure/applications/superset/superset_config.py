@@ -9,33 +9,29 @@ from flask_appbuilder.security.manager import AUTH_OAUTH
 from flask_caching.backends.rediscache import RedisCache
 from superset.security import SupersetSecurityManager
 from superset.utils.encrypt import SQLAlchemyUtilsAdapter
-from vault.aws_auth import get_vault_client
 
-vault_addr = os.environ.get("VAULT_ADDR", "http://localhost:8200")
-vault_client = get_vault_client(vault_url=vault_addr, ec2_role="superset")
+# Kubernetes: secrets are provided via env by Vault Secrets Operator
+SECRET_KEY = os.environ.get("SECRET_KEY")
+# Backward compatibility: allow either REDIS_PASSWORD or REDIS_TOKEN
+REDIS_TOKEN = os.environ.get("REDIS_PASSWORD") or os.environ.get("REDIS_TOKEN", "")
+REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
+REDIS_PORT = os.environ.get("REDIS_PORT", "6379")
 
-SECRET_KEY = vault_client.secrets.kv.v2.read_secret(
-    path="app-config", mount_point="secret-superset"
-)["data"]["data"]["secret_key"]
-REDIS_TOKEN = vault_client.secrets.kv.v2.read_secret(
-    path="redis", mount_point="secret-superset"
-)["data"]["data"]["token"]
-REDIS_HOST = "superset-redis.service.consul"
-REDIS_PORT = "6379"
-oidc_creds = vault_client.secrets.kv.v1.read_secret(
-    path="sso/superset", mount_point="secret-operations"
-)["data"]
-OIDC_CLIENT_ID = oidc_creds["client_id"]
-OIDC_CLIENT_SECRET = oidc_creds["client_secret"]
-OIDC_URL = oidc_creds["url"]
-OIDC_REALM_PUBLIC_KEY = oidc_creds["realm_public_key"]
-SLACK_API_TOKEN = vault_client.secrets.kv.v2.read_secret(
-    path="app-config", mount_point="secret-superset"
-)["data"]["data"]["slack_token"]
-pg_creds = vault_client.secrets.database.generate_credentials(
-    name="app", mount_point="postgres-superset"
-)["data"]
-SQLALCHEMY_DATABASE_URI = f"postgres://{pg_creds['username']}:{pg_creds['password']}@superset-db.service.consul:5432/superset?sslmode=require"
+# Build DB URI from env (populated by Vault dynamic creds via K8s secret)
+DB_USER = os.environ.get("DB_USER")
+DB_PASS = os.environ.get("DB_PASS")
+DB_HOST = os.environ.get("DB_HOST")
+DB_PORT = os.environ.get("DB_PORT", "5432")
+DB_NAME = os.environ.get("DB_NAME", "superset")
+DB_SSLMODE = os.environ.get("DB_SSLMODE", "require")
+_db_uri = f"postgresql+psycopg2://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+SQLALCHEMY_DATABASE_URI = f"{_db_uri}?sslmode={DB_SSLMODE}" if DB_SSLMODE else _db_uri
+OIDC_URL = os.environ.get("OIDC_URL")
+OIDC_CLIENT_ID = os.environ.get("OIDC_CLIENT_ID")
+OIDC_CLIENT_SECRET = os.environ.get("OIDC_CLIENT_SECRET")
+OIDC_REALM_PUBLIC_KEY = os.environ.get("OIDC_REALM_PUBLIC_KEY")
+LOGOUT_REDIRECT_URL = f"{OIDC_URL}/protocol/openid-connect/logout"
+SLACK_API_TOKEN = os.environ.get("SLACK_API_TOKEN")
 
 SQLALCHEMY_ENCRYPTED_FIELD_TYPE_ADAPTER = SQLAlchemyUtilsAdapter
 
@@ -246,7 +242,7 @@ SUPERSET_WEBSERVER_TIMEOUT = 300  # 5 minutes timeout for HTTP requests
 cache_base = {
     "CACHE_TYPE": "RedisCache",
     "CACHE_DEFAULT_TIMEOUT": 86400,
-    "CACHE_REDIS_URL": f"rediss://default:{REDIS_TOKEN}@superset-redis.service.consul:6379/0",
+    "CACHE_REDIS_URL": f"rediss://default:{REDIS_TOKEN}@{REDIS_HOST}:6379/0",
 }
 FILTER_STATE_CACHE_CONFIG = {"CACHE_KEY_PREFIX": "superset_filter_cache", **cache_base}
 EXPLORE_FORM_DATA_CACHE_CONFIG = {
