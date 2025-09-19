@@ -65,7 +65,7 @@ OAUTH_PROVIDERS = [
             "client_id": OIDC_CLIENT_ID,
             "client_secret": OIDC_CLIENT_SECRET,
             "client_kwargs": {
-                "scope": "openid profile email ol_roles",
+                "scope": "openid profile email roles",
             },
             "server_metadata_url": f"{OIDC_URL}/.well-known/openid-configuration",
             "api_base_url": f"{OIDC_URL}/protocol/",

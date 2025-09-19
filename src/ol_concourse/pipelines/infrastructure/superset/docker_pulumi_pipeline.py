@@ -1,7 +1,7 @@
 import sys
 
 from ol_concourse.lib.containers import container_build_task
-from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
+from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     GetStep,
@@ -32,13 +32,6 @@ def build_superset_docker_pipeline() -> Pipeline:
         uri="https://github.com/mitodl/ol-infrastructure",
         branch=ol_inf_branch,
         paths=["src/ol_superset/"],
-    )
-
-    packer_code_repo = git_repo(
-        Identifier("ol-inf-superset-packer-code"),
-        uri="https://github.com/mitodl/ol-infrastructure",
-        branch=ol_inf_branch,
-        paths=["src/bilder/components/", "src/bilder/images/superset/"],
     )
 
     pulumi_code_repo = git_repo(
@@ -88,22 +81,6 @@ def build_superset_docker_pipeline() -> Pipeline:
         ],
     )
 
-    packer_fragment = packer_jobs(
-        dependencies=[
-            GetStep(
-                get=superset_image.name,
-                trigger=True,
-                passed=[docker_build_job.name],
-            ),
-        ],
-        image_code=packer_code_repo,
-        packer_template_path="src/bilder/images/superset/superset.pkr.hcl",
-        env_vars_from_files={"SUPERSET_IMAGE_SHA": f"{superset_image.name}/digest"},
-        extra_packer_params={
-            "only": ["amazon-ebs.superset"],
-        },
-    )
-
     pulumi_fragment = pulumi_jobs_chain(
         pulumi_code_repo,
         stack_names=[
@@ -113,25 +90,22 @@ def build_superset_docker_pipeline() -> Pipeline:
         project_source_path=PULUMI_CODE_PATH.joinpath("applications/superset/"),
         dependencies=[
             GetStep(
-                get=packer_fragment.resources[-1].name,
+                get=docker_build_job.name,
                 trigger=True,
-                passed=[packer_fragment.jobs[-1].name],
             )
         ],
     )
 
     combined_fragment = PipelineFragment(
-        resource_types=packer_fragment.resource_types + pulumi_fragment.resource_types,
+        resource_types=pulumi_fragment.resource_types,
         resources=[
             docker_code_repo,
-            packer_code_repo,
             pulumi_code_repo,
             superset_image,
             superset_release,
-            *packer_fragment.resources,
             *pulumi_fragment.resources,
         ],
-        jobs=[docker_build_job, *packer_fragment.jobs, *pulumi_fragment.jobs],
+        jobs=[docker_build_job, *pulumi_fragment.jobs],
     )
 
     return Pipeline(
