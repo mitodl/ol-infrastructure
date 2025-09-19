@@ -225,7 +225,7 @@ const CustomCertificateStatus = (widget) => {
       const newSecondChild = React.cloneElement(
         secondChild,
         secondChild.props,
-        `Final grades and any earned certificates are scheduled to be available 3 busines s days after ${endDate}`
+        `Final grades and any earned certificates are scheduled to be available 3 business days after ${endDate}`
       );
       const newChildren = [childArray[0], newSecondChild, childArray[2]];
       widget.RenderWidget = React.cloneElement(
