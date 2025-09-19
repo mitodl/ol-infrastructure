@@ -648,7 +648,15 @@ superset_chart = kubernetes.helm.v3.Release(
                     "db_host": superset_db.db_instance.address,
                 },
                 "replicas": {"enabled": False},
-                "autoscaling": {"enabled": True},
+                "autoscaling": {
+                    "enabled": True,
+                    "targetCPUUtilizationPercentage": "60",
+                    "targetMemoryUtilizationPercentage": "80",
+                },
+                "resources": {
+                    "limits": {"cpu": "8000m", "memory": "1Gi"},
+                    "requests": {"cpu": "100m", "memory": "256Mi"},
+                },
             },
             "supersetWorker": {
                 "podLabels": k8s_global_labels,
