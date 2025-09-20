@@ -1,7 +1,7 @@
 # renovate: datasource=github-releases depName=concourse packageName=concourse/concourse
 CONCOURSE_VERSION = "7.14.1"
 # renovate: datasource=github-releases depName=consul-template packageName=hashicorp/consul-template
-CONSUL_TEMPLATE_VERSION = "0.41.1"
+CONSUL_TEMPLATE_VERSION = "0.41.2"
 # renovate: datasource=github-releases depName=consul packageName=hashicorp/consul
 CONSUL_VERSION = "1.21.4"
 # renovate: datasource=pypi depName=jupyterhub packageName=jupyterhub
