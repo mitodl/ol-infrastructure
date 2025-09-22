@@ -240,7 +240,7 @@ def create_k8s_configmaps(
             "labels": k8s_global_labels,
         },
         data={
-            "81-cms-general-config.yaml": Path(
+            "81-lms-general-config.yaml": Path(
                 f"files/edxapp/{stack_info.env_prefix}/81-lms-general-config.yaml"
             ).read_text()
         },
