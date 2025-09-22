@@ -197,6 +197,84 @@ mongodb_cluster_uri = mongodb_atlas_stack.require_output("atlas_cluster")[
     "connection_strings"
 ][0]
 
+
+##############
+# Helper for creating user_data
+##############
+def cloud_init_user_data_func(
+    consul_env_name,
+):
+    grafana_credentials = read_yaml_secrets(
+        Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
+    )
+    # Used to switch which staticfiles collection to used
+    environment_tier = (
+        "production" if stack_info.env_suffix == "production" else "nonprod"
+    )
+    cloud_config_content = {
+        "write_files": [
+            {
+                "path": "/etc/consul.d/99-autojoin.json",
+                "content": json.dumps(
+                    {
+                        "retry_join": [
+                            "provider=aws tag_key=consul_env "
+                            f"tag_value={consul_env_name}"
+                        ],
+                        "datacenter": consul_env_name,
+                    }
+                ),
+                "owner": "consul:consul",
+            },
+            # There should be something that triggers this only if framework = docker
+            {
+                "path": "/etc/docker/compose/.env_caddy",
+                "content": textwrap.dedent(
+                    f"""\
+                    EDXAPP_LMS_URL={edxapp_domains["lms"]}
+                    EDXAPP_LMS_PREVIEW_URL={edxapp_domains["preview"]}
+                    EDXAPP_CMS_URL={edxapp_domains["studio"]}
+                    """
+                ),
+                "owner": "root:root",
+                "permissions": "0664",
+            },
+            {
+                "path": "/etc/default/vector",
+                "content": textwrap.dedent(
+                    f"""\
+                    ENVIRONMENT={consul_env_name}
+                    APPLICATION=edxapp
+                    SERVICE=openedx
+                    VECTOR_CONFIG_DIR=/etc/vector/
+                    VECTOR_STRICT_ENV_VARS=false
+                    GRAFANA_CLOUD_API_KEY={grafana_credentials["api_key"]}
+                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials["prometheus_user_id"]}
+                    GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials["loki_user_id"]}
+                    """
+                ),
+                "owner": "root:root",
+            },
+            {
+                "path": "/etc/default/consul-template",
+                "content": f"ENVIRONMENT={consul_env_name}",
+            },
+            {
+                "path": "/etc/default/environment-tier",
+                "content": f"{environment_tier}",
+            },
+        ]
+    }
+    return base64.b64encode(
+        "#cloud-config\n{}".format(
+            yaml.dump(
+                cloud_config_content,
+                sort_keys=True,
+            )
+        ).encode("utf8")
+    ).decode("utf8")
+
+
 ##############
 # S3 Buckets #
 ##############
@@ -1120,465 +1198,402 @@ consul.Keys(
 #     EC2 Deployment     #
 ##########################
 
-# Create load balancer for Edxapp web nodes
-edxapp_web_tag = f"edxapp-web-{env_name}"
-edxapp_worker_tag = f"edxapp-worker-{env_name}"
-web_lb = lb.LoadBalancer(
-    "edxapp-web-load-balancer",
-    name=edxapp_web_tag[:AWS_LOAD_BALANCER_NAME_MAX_LENGTH],
-    ip_address_type="dualstack",
-    load_balancer_type="application",
-    enable_http2=True,
-    subnets=edxapp_vpc["subnet_ids"],
-    security_groups=[
-        edxapp_vpc["security_groups"]["web"],
-    ],
-    tags=aws_config.merged_tags({"Name": edxapp_web_tag}),
-)
+if not edxapp_config.get_bool("disable_ec2_deployment"):
+    # Create load balancer for Edxapp web nodes
+    edxapp_web_tag = f"edxapp-web-{env_name}"
+    edxapp_worker_tag = f"edxapp-worker-{env_name}"
+    web_lb = lb.LoadBalancer(
+        "edxapp-web-load-balancer",
+        name=edxapp_web_tag[:AWS_LOAD_BALANCER_NAME_MAX_LENGTH],
+        ip_address_type="dualstack",
+        load_balancer_type="application",
+        enable_http2=True,
+        subnets=edxapp_vpc["subnet_ids"],
+        security_groups=[
+            edxapp_vpc["security_groups"]["web"],
+        ],
+        tags=aws_config.merged_tags({"Name": edxapp_web_tag}),
+    )
 
-TARGET_GROUP_NAME_MAX_LENGTH = 32
-lms_web_lb_target_group = lb.TargetGroup(
-    "edxapp-web-lms-alb-target-group",
-    vpc_id=edxapp_vpc_id,
-    target_type="instance",
-    port=DEFAULT_HTTPS_PORT,
-    protocol="HTTPS",
-    health_check=lb.TargetGroupHealthCheckArgs(
-        healthy_threshold=3,
-        timeout=10,
-        interval=edxapp_config.get_int("elb_healthcheck_interval") or 30,
-        path="/heartbeat",
-        port=str(DEFAULT_HTTPS_PORT),
+    TARGET_GROUP_NAME_MAX_LENGTH = 32
+    lms_web_lb_target_group = lb.TargetGroup(
+        "edxapp-web-lms-alb-target-group",
+        vpc_id=edxapp_vpc_id,
+        target_type="instance",
+        port=DEFAULT_HTTPS_PORT,
         protocol="HTTPS",
-    ),
-    name_prefix=f"lms-{stack_info.env_suffix}-"[:6],
-    tags=aws_config.tags,
-    preserve_client_ip=True,
-    load_balancing_algorithm_type="least_outstanding_requests",
-)
-# Studio has some workflows that are stateful, such as importing and exporting courses
-# which requires files to be written and read from the same EC2 instance. This adds
-# separate target groups and ALB listener rules to route requests for studio to a target
-# group with session stickiness enabled so that these stateful workflows don't fail.
-# TMM 2021-07-20
-studio_web_lb_target_group = lb.TargetGroup(
-    "edxapp-web-studio-alb-target-group",
-    vpc_id=edxapp_vpc_id,
-    target_type="instance",
-    port=DEFAULT_HTTPS_PORT,
-    protocol="HTTPS",
-    health_check=lb.TargetGroupHealthCheckArgs(
-        healthy_threshold=3,
-        timeout=10,
-        interval=30,
-        path="/heartbeat",
-        port=str(DEFAULT_HTTPS_PORT),
+        health_check=lb.TargetGroupHealthCheckArgs(
+            healthy_threshold=3,
+            timeout=10,
+            interval=edxapp_config.get_int("elb_healthcheck_interval") or 30,
+            path="/heartbeat",
+            port=str(DEFAULT_HTTPS_PORT),
+            protocol="HTTPS",
+        ),
+        name_prefix=f"lms-{stack_info.env_suffix}-"[:6],
+        tags=aws_config.tags,
+        preserve_client_ip=True,
+        load_balancing_algorithm_type="least_outstanding_requests",
+    )
+    # Studio has some workflows that are stateful, such as importing and exporting courses
+    # which requires files to be written and read from the same EC2 instance. This adds
+    # separate target groups and ALB listener rules to route requests for studio to a target
+    # group with session stickiness enabled so that these stateful workflows don't fail.
+    # TMM 2021-07-20
+    studio_web_lb_target_group = lb.TargetGroup(
+        "edxapp-web-studio-alb-target-group",
+        vpc_id=edxapp_vpc_id,
+        target_type="instance",
+        port=DEFAULT_HTTPS_PORT,
         protocol="HTTPS",
-    ),
-    stickiness=lb.TargetGroupStickinessArgs(
-        type="lb_cookie",
-        enabled=True,
-    ),
-    name_prefix=f"studio-{stack_info.env_suffix}-"[:6],
-    tags=aws_config.tags,
-)
-edxapp_web_acm_cert = acm.Certificate(
-    "edxapp-load-balancer-acm-certificate",
-    domain_name=edxapp_domains["lms"],
-    subject_alternative_names=[
-        domain for key, domain in edxapp_domains.items() if key != "lms"
-    ],
-    validation_method="DNS",
-    tags=aws_config.tags,
-)
-
-edxapp_acm_cert_validation_records = (
-    edxapp_web_acm_cert.domain_validation_options.apply(
-        partial(
-            acm_certificate_validation_records,
-            cert_name="edx-platform",
-            zone_id=edxapp_zone_id,
-            stack_info=stack_info,
-        )
+        health_check=lb.TargetGroupHealthCheckArgs(
+            healthy_threshold=3,
+            timeout=10,
+            interval=30,
+            path="/heartbeat",
+            port=str(DEFAULT_HTTPS_PORT),
+            protocol="HTTPS",
+        ),
+        stickiness=lb.TargetGroupStickinessArgs(
+            type="lb_cookie",
+            enabled=True,
+        ),
+        name_prefix=f"studio-{stack_info.env_suffix}-"[:6],
+        tags=aws_config.tags,
     )
-)
+    edxapp_web_acm_cert = acm.Certificate(
+        "edxapp-load-balancer-acm-certificate",
+        domain_name=edxapp_domains["lms"],
+        subject_alternative_names=[
+            domain for key, domain in edxapp_domains.items() if key != "lms"
+        ],
+        validation_method="DNS",
+        tags=aws_config.tags,
+    )
 
-edxapp_web_acm_validated_cert = acm.CertificateValidation(
-    "wait-for-edxapp-acm-cert-validation",
-    certificate_arn=edxapp_web_acm_cert.arn,
-    validation_record_fqdns=edxapp_acm_cert_validation_records.apply(
-        lambda validation_records: [
-            validation_record.fqdn for validation_record in validation_records
-        ]
-    ),
-)
-edxapp_web_alb_http_listener = lb.Listener(
-    "edxapp-web--alb-listener-http",
-    load_balancer_arn=web_lb.arn,
-    port=DEFAULT_HTTP_PORT,
-    protocol="HTTP",
-    default_actions=[
-        lb.ListenerDefaultActionArgs(
-            type="forward",
-            target_group_arn=lms_web_lb_target_group.arn,
-        )
-    ],
-    opts=ResourceOptions(delete_before_replace=True),
-)
-edxapp_web_alb_listener = lb.Listener(
-    "edxapp-web-alb-listener",
-    certificate_arn=edxapp_web_acm_validated_cert.certificate_arn,
-    load_balancer_arn=web_lb.arn,
-    port=DEFAULT_HTTPS_PORT,
-    protocol="HTTPS",
-    default_actions=[
-        lb.ListenerDefaultActionArgs(
-            type="forward",
-            target_group_arn=lms_web_lb_target_group.arn,
-        )
-    ],
-    opts=ResourceOptions(delete_before_replace=True),
-)
-edxapp_studio_web_alb_listener_rule = lb.ListenerRule(
-    "edxapp-web-studio-alb-listener-routing",
-    listener_arn=edxapp_web_alb_listener.arn,
-    actions=[
-        lb.ListenerRuleActionArgs(
-            type="forward",
-            target_group_arn=studio_web_lb_target_group.arn,
-        )
-    ],
-    conditions=[
-        lb.ListenerRuleConditionArgs(
-            host_header=lb.ListenerRuleConditionHostHeaderArgs(
-                values=[edxapp_domains["studio"]]
+    edxapp_acm_cert_validation_records = (
+        edxapp_web_acm_cert.domain_validation_options.apply(
+            partial(
+                acm_certificate_validation_records,
+                cert_name="edx-platform",
+                zone_id=edxapp_zone_id,
+                stack_info=stack_info,
             )
         )
-    ],
-    priority=1,
-    tags=aws_config.tags,
-)
-edxapp_lms_web_alb_listener_rule = lb.ListenerRule(
-    "edxapp-web-lms-alb-listener-routing",
-    listener_arn=edxapp_web_alb_listener.arn,
-    actions=[
-        lb.ListenerRuleActionArgs(
-            type="forward",
-            target_group_arn=lms_web_lb_target_group.arn,
-        )
-    ],
-    conditions=[
-        lb.ListenerRuleConditionArgs(
-            host_header=lb.ListenerRuleConditionHostHeaderArgs(
-                values=[edxapp_domains["lms"]]
-            )
-        )
-    ],
-    priority=2,
-    tags=aws_config.tags,
-)
-
-
-# Create auto scale group and launch configs for Edxapp web and worker
-def cloud_init_user_data_func(
-    consul_env_name,
-):
-    grafana_credentials = read_yaml_secrets(
-        Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
     )
-    # Used to switch which staticfiles collection to used
-    environment_tier = (
-        "production" if stack_info.env_suffix == "production" else "nonprod"
+
+    edxapp_web_acm_validated_cert = acm.CertificateValidation(
+        "wait-for-edxapp-acm-cert-validation",
+        certificate_arn=edxapp_web_acm_cert.arn,
+        validation_record_fqdns=edxapp_acm_cert_validation_records.apply(
+            lambda validation_records: [
+                validation_record.fqdn for validation_record in validation_records
+            ]
+        ),
     )
-    cloud_config_content = {
-        "write_files": [
-            {
-                "path": "/etc/consul.d/99-autojoin.json",
-                "content": json.dumps(
-                    {
-                        "retry_join": [
-                            "provider=aws tag_key=consul_env "
-                            f"tag_value={consul_env_name}"
-                        ],
-                        "datacenter": consul_env_name,
-                    }
-                ),
-                "owner": "consul:consul",
-            },
-            # There should be something that triggers this only if framework = docker
-            {
-                "path": "/etc/docker/compose/.env_caddy",
-                "content": textwrap.dedent(
-                    f"""\
-                    EDXAPP_LMS_URL={edxapp_domains["lms"]}
-                    EDXAPP_LMS_PREVIEW_URL={edxapp_domains["preview"]}
-                    EDXAPP_CMS_URL={edxapp_domains["studio"]}
-                    """
-                ),
-                "owner": "root:root",
-                "permissions": "0664",
-            },
-            {
-                "path": "/etc/default/vector",
-                "content": textwrap.dedent(
-                    f"""\
-                    ENVIRONMENT={consul_env_name}
-                    APPLICATION=edxapp
-                    SERVICE=openedx
-                    VECTOR_CONFIG_DIR=/etc/vector/
-                    VECTOR_STRICT_ENV_VARS=false
-                    GRAFANA_CLOUD_API_KEY={grafana_credentials["api_key"]}
-                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials["prometheus_user_id"]}
-                    GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials["loki_user_id"]}
-                    """
-                ),
-                "owner": "root:root",
-            },
-            {
-                "path": "/etc/default/consul-template",
-                "content": f"ENVIRONMENT={consul_env_name}",
-            },
-            {
-                "path": "/etc/default/environment-tier",
-                "content": f"{environment_tier}",
-            },
-        ]
-    }
-    return base64.b64encode(
-        "#cloud-config\n{}".format(
-            yaml.dump(
-                cloud_config_content,
-                sort_keys=True,
+    edxapp_web_alb_http_listener = lb.Listener(
+        "edxapp-web--alb-listener-http",
+        load_balancer_arn=web_lb.arn,
+        port=DEFAULT_HTTP_PORT,
+        protocol="HTTP",
+        default_actions=[
+            lb.ListenerDefaultActionArgs(
+                type="forward",
+                target_group_arn=lms_web_lb_target_group.arn,
             )
-        ).encode("utf8")
-    ).decode("utf8")
+        ],
+        opts=ResourceOptions(delete_before_replace=True),
+    )
+    edxapp_web_alb_listener = lb.Listener(
+        "edxapp-web-alb-listener",
+        certificate_arn=edxapp_web_acm_validated_cert.certificate_arn,
+        load_balancer_arn=web_lb.arn,
+        port=DEFAULT_HTTPS_PORT,
+        protocol="HTTPS",
+        default_actions=[
+            lb.ListenerDefaultActionArgs(
+                type="forward",
+                target_group_arn=lms_web_lb_target_group.arn,
+            )
+        ],
+        opts=ResourceOptions(delete_before_replace=True),
+    )
+    edxapp_studio_web_alb_listener_rule = lb.ListenerRule(
+        "edxapp-web-studio-alb-listener-routing",
+        listener_arn=edxapp_web_alb_listener.arn,
+        actions=[
+            lb.ListenerRuleActionArgs(
+                type="forward",
+                target_group_arn=studio_web_lb_target_group.arn,
+            )
+        ],
+        conditions=[
+            lb.ListenerRuleConditionArgs(
+                host_header=lb.ListenerRuleConditionHostHeaderArgs(
+                    values=[edxapp_domains["studio"]]
+                )
+            )
+        ],
+        priority=1,
+        tags=aws_config.tags,
+    )
+    edxapp_lms_web_alb_listener_rule = lb.ListenerRule(
+        "edxapp-web-lms-alb-listener-routing",
+        listener_arn=edxapp_web_alb_listener.arn,
+        actions=[
+            lb.ListenerRuleActionArgs(
+                type="forward",
+                target_group_arn=lms_web_lb_target_group.arn,
+            )
+        ],
+        conditions=[
+            lb.ListenerRuleConditionArgs(
+                host_header=lb.ListenerRuleConditionHostHeaderArgs(
+                    values=[edxapp_domains["lms"]]
+                )
+            )
+        ],
+        priority=2,
+        tags=aws_config.tags,
+    )
 
+    grafana_config = Config("grafana")
+    cloud_init_user_data = Output.secret(
+        consul_stack.require_output("datacenter").apply(cloud_init_user_data_func)
+    )
 
-grafana_config = Config("grafana")
-cloud_init_user_data = Output.secret(
-    consul_stack.require_output("datacenter").apply(cloud_init_user_data_func)
-)
-
-web_instance_type = (
-    edxapp_config.get("web_instance_type") or InstanceTypes.high_mem_regular.name
-)
-web_launch_config = ec2.LaunchTemplate(
-    "edxapp-web-launch-template",
-    name_prefix=f"edxapp-web-{env_name}-",
-    description=f"Launch template for deploying Edxapp web nodes in {env_name}",
-    iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
-        arn=edxapp_instance_profile.arn,
-    ),
-    image_id=edxapp_web_ami.id,
-    vpc_security_group_ids=[
-        edxapp_security_group.id,
-        edxapp_vpc["security_groups"]["web"],
-        consul_security_groups["consul_agent"],
-    ],
-    block_device_mappings=[
-        ec2.LaunchTemplateBlockDeviceMappingArgs(
-            device_name=edxapp_web_ami.root_device_name,
-            ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=25,
-                volume_type=DiskTypes.ssd,
-                delete_on_termination=True,
-                encrypted=True,
-                kms_key_id=kms_ebs["arn"],
+    web_instance_type = (
+        edxapp_config.get("web_instance_type") or InstanceTypes.high_mem_regular.name
+    )
+    web_launch_config = ec2.LaunchTemplate(
+        "edxapp-web-launch-template",
+        name_prefix=f"edxapp-web-{env_name}-",
+        description=f"Launch template for deploying Edxapp web nodes in {env_name}",
+        iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
+            arn=edxapp_instance_profile.arn,
+        ),
+        image_id=edxapp_web_ami.id,
+        vpc_security_group_ids=[
+            edxapp_security_group.id,
+            edxapp_vpc["security_groups"]["web"],
+            consul_security_groups["consul_agent"],
+        ],
+        block_device_mappings=[
+            ec2.LaunchTemplateBlockDeviceMappingArgs(
+                device_name=edxapp_web_ami.root_device_name,
+                ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
+                    volume_size=25,
+                    volume_type=DiskTypes.ssd,
+                    delete_on_termination=True,
+                    encrypted=True,
+                    kms_key_id=kms_ebs["arn"],
+                ),
             ),
-        ),
-    ],
-    instance_type=InstanceTypes.dereference(web_instance_type),
-    key_name=SSH_ACCESS_KEY_NAME,
-    tag_specifications=[
-        ec2.LaunchTemplateTagSpecificationArgs(
-            resource_type="instance",
-            tags=aws_config.merged_tags({"Name": edxapp_web_tag}),
-        ),
-        ec2.LaunchTemplateTagSpecificationArgs(
-            resource_type="volume",
-            tags=aws_config.merged_tags({"Name": edxapp_web_tag}),
-        ),
-    ],
-    tags=aws_config.tags,
-    user_data=cloud_init_user_data,
-)
-web_asg = autoscaling.Group(
-    "edxapp-web-autoscaling-group",
-    desired_capacity=edxapp_config.get_int("web_node_capacity")
-    or MIN_WEB_NODES_DEFAULT,
-    min_size=edxapp_config.get_int("min_web_nodes") or MIN_WEB_NODES_DEFAULT,
-    max_size=edxapp_config.get_int("max_web_nodes") or MAX_WEB_NODES_DEFAULT,
-    health_check_type="ELB",
-    vpc_zone_identifiers=edxapp_vpc["subnet_ids"],
-    launch_template=autoscaling.GroupLaunchTemplateArgs(
-        id=web_launch_config.id, version="$Latest"
-    ),
-    instance_refresh=autoscaling.GroupInstanceRefreshArgs(
-        strategy="Rolling",
-        preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=50
-        ),
-        triggers=["tag"],
-    ),
-    target_group_arns=[lms_web_lb_target_group.arn, studio_web_lb_target_group.arn],
-    tags=[
-        autoscaling.GroupTagArgs(
-            key=key_name,
-            value=key_value,
-            propagate_at_launch=True,
-        )
-        for key_name, key_value in aws_config.merged_tags(
-            {"ami_id": edxapp_web_ami.id, "edxapp_node_type": "web"},
-        ).items()
-    ],
-)
-
-web_asg_scale_up_policy = autoscaling.Policy(
-    "edxapp-web-scale-up-policy",
-    adjustment_type="PercentChangeInCapacity",
-    estimated_instance_warmup=300,
-    policy_type="StepScaling",
-    step_adjustments=[
-        autoscaling.PolicyStepAdjustmentArgs(
-            scaling_adjustment=0,
-            metric_interval_lower_bound=0,
-            metric_interval_upper_bound=10,
-        ),
-        autoscaling.PolicyStepAdjustmentArgs(
-            scaling_adjustment=10,
-            metric_interval_lower_bound=10,
-            metric_interval_upper_bound=20,
-        ),
-        autoscaling.PolicyStepAdjustmentArgs(
-            scaling_adjustment=30,
-            metric_interval_lower_bound=20,
-        ),
-    ],
-    autoscaling_group_name=web_asg.name,
-)
-
-web_asg_scale_down_policy = autoscaling.Policy(
-    "edxapp-web-scale-down-policy",
-    adjustment_type="PercentChangeInCapacity",
-    estimated_instance_warmup=300,
-    policy_type="StepScaling",
-    step_adjustments=[
-        autoscaling.PolicyStepAdjustmentArgs(
-            scaling_adjustment=0,
-            metric_interval_lower_bound=-10,
-            metric_interval_upper_bound=0,
-        ),
-        autoscaling.PolicyStepAdjustmentArgs(
-            scaling_adjustment=-10,
-            metric_interval_lower_bound=-20,
-            metric_interval_upper_bound=-10,
-        ),
-        autoscaling.PolicyStepAdjustmentArgs(
-            scaling_adjustment=-30,
-            metric_interval_upper_bound=-20,
-        ),
-    ],
-    autoscaling_group_name=web_asg.name,
-)
-
-web_alb_metric_alarm = cloudwatch.MetricAlarm(
-    "edxapp-web-alb-metric-alarm",
-    comparison_operator="GreaterThanOrEqualToThreshold",
-    evaluation_periods=5,
-    metric_name="TargetResponseTime",
-    namespace="AWS/ApplicationELB",
-    period=120,
-    statistic="Average",
-    threshold=1,
-    dimensions={
-        "LoadBalancer": Output.all(lb_arn=web_lb.arn_suffix).apply(
-            lambda lb_attrs: f"{lb_attrs['lb_arn']}"
-        ),
-    },
-    datapoints_to_alarm=5,
-    alarm_description=(
-        "Time elapsed after the request leaves the load balancer until a response from"
-        " the target is received"
-    ),
-    alarm_actions=[web_asg_scale_up_policy.arn],
-    ok_actions=[web_asg_scale_down_policy.arn],
-    tags=aws_config.tags,
-)
-
-worker_instance_type = (
-    edxapp_config.get("worker_instance_type") or InstanceTypes.burstable_medium.name
-)
-worker_launch_config = ec2.LaunchTemplate(
-    "edxapp-worker-launch-template",
-    name_prefix=f"{edxapp_worker_tag}-",
-    description="Launch template for deploying Edxapp worker nodes",
-    iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
-        arn=edxapp_instance_profile.arn,
-    ),
-    image_id=edxapp_worker_ami.id,
-    block_device_mappings=[
-        ec2.LaunchTemplateBlockDeviceMappingArgs(
-            device_name=edxapp_worker_ami.root_device_name,
-            ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=edxapp_config.get_int("worker_disk_size") or 50,
-                volume_type=DiskTypes.ssd,
-                delete_on_termination=True,
-                encrypted=True,
-                kms_key_id=kms_ebs["arn"],
+        ],
+        instance_type=InstanceTypes.dereference(web_instance_type),
+        key_name=SSH_ACCESS_KEY_NAME,
+        tag_specifications=[
+            ec2.LaunchTemplateTagSpecificationArgs(
+                resource_type="instance",
+                tags=aws_config.merged_tags({"Name": edxapp_web_tag}),
             ),
-        )
-    ],
-    vpc_security_group_ids=[
-        edxapp_security_group.id,
-        consul_security_groups["consul_agent"],
-    ],
-    instance_type=InstanceTypes.dereference(worker_instance_type),
-    key_name=SSH_ACCESS_KEY_NAME,
-    tag_specifications=[
-        ec2.LaunchTemplateTagSpecificationArgs(
-            resource_type="instance",
-            tags=aws_config.merged_tags({"Name": edxapp_worker_tag}),
+            ec2.LaunchTemplateTagSpecificationArgs(
+                resource_type="volume",
+                tags=aws_config.merged_tags({"Name": edxapp_web_tag}),
+            ),
+        ],
+        tags=aws_config.tags,
+        user_data=cloud_init_user_data,
+    )
+    web_asg = autoscaling.Group(
+        "edxapp-web-autoscaling-group",
+        desired_capacity=edxapp_config.get_int("web_node_capacity")
+        or MIN_WEB_NODES_DEFAULT,
+        min_size=edxapp_config.get_int("min_web_nodes") or MIN_WEB_NODES_DEFAULT,
+        max_size=edxapp_config.get_int("max_web_nodes") or MAX_WEB_NODES_DEFAULT,
+        health_check_type="ELB",
+        vpc_zone_identifiers=edxapp_vpc["subnet_ids"],
+        launch_template=autoscaling.GroupLaunchTemplateArgs(
+            id=web_launch_config.id, version="$Latest"
         ),
-        ec2.LaunchTemplateTagSpecificationArgs(
-            resource_type="volume",
-            tags=aws_config.merged_tags({"Name": edxapp_worker_tag}),
+        instance_refresh=autoscaling.GroupInstanceRefreshArgs(
+            strategy="Rolling",
+            preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
+                min_healthy_percentage=50
+            ),
+            triggers=["tag"],
         ),
-    ],
-    tags=aws_config.tags,
-    user_data=cloud_init_user_data,
-)
-worker_asg = autoscaling.Group(
-    "edxapp-worker-autoscaling-group",
-    desired_capacity=edxapp_config.get_int("worker_node_capacity") or 1,
-    min_size=1,
-    max_size=50,
-    health_check_type="EC2",
-    vpc_zone_identifiers=edxapp_vpc["subnet_ids"],
-    launch_template=autoscaling.GroupLaunchTemplateArgs(
-        id=worker_launch_config.id, version="$Latest"
-    ),
-    instance_refresh=autoscaling.GroupInstanceRefreshArgs(
-        strategy="Rolling",
-        preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=50
+        target_group_arns=[lms_web_lb_target_group.arn, studio_web_lb_target_group.arn],
+        tags=[
+            autoscaling.GroupTagArgs(
+                key=key_name,
+                value=key_value,
+                propagate_at_launch=True,
+            )
+            for key_name, key_value in aws_config.merged_tags(
+                {"ami_id": edxapp_web_ami.id, "edxapp_node_type": "web"},
+            ).items()
+        ],
+    )
+
+    web_asg_scale_up_policy = autoscaling.Policy(
+        "edxapp-web-scale-up-policy",
+        adjustment_type="PercentChangeInCapacity",
+        estimated_instance_warmup=300,
+        policy_type="StepScaling",
+        step_adjustments=[
+            autoscaling.PolicyStepAdjustmentArgs(
+                scaling_adjustment=0,
+                metric_interval_lower_bound=0,
+                metric_interval_upper_bound=10,
+            ),
+            autoscaling.PolicyStepAdjustmentArgs(
+                scaling_adjustment=10,
+                metric_interval_lower_bound=10,
+                metric_interval_upper_bound=20,
+            ),
+            autoscaling.PolicyStepAdjustmentArgs(
+                scaling_adjustment=30,
+                metric_interval_lower_bound=20,
+            ),
+        ],
+        autoscaling_group_name=web_asg.name,
+    )
+
+    web_asg_scale_down_policy = autoscaling.Policy(
+        "edxapp-web-scale-down-policy",
+        adjustment_type="PercentChangeInCapacity",
+        estimated_instance_warmup=300,
+        policy_type="StepScaling",
+        step_adjustments=[
+            autoscaling.PolicyStepAdjustmentArgs(
+                scaling_adjustment=0,
+                metric_interval_lower_bound=-10,
+                metric_interval_upper_bound=0,
+            ),
+            autoscaling.PolicyStepAdjustmentArgs(
+                scaling_adjustment=-10,
+                metric_interval_lower_bound=-20,
+                metric_interval_upper_bound=-10,
+            ),
+            autoscaling.PolicyStepAdjustmentArgs(
+                scaling_adjustment=-30,
+                metric_interval_upper_bound=-20,
+            ),
+        ],
+        autoscaling_group_name=web_asg.name,
+    )
+
+    web_alb_metric_alarm = cloudwatch.MetricAlarm(
+        "edxapp-web-alb-metric-alarm",
+        comparison_operator="GreaterThanOrEqualToThreshold",
+        evaluation_periods=5,
+        metric_name="TargetResponseTime",
+        namespace="AWS/ApplicationELB",
+        period=120,
+        statistic="Average",
+        threshold=1,
+        dimensions={
+            "LoadBalancer": Output.all(lb_arn=web_lb.arn_suffix).apply(
+                lambda lb_attrs: f"{lb_attrs['lb_arn']}"
+            ),
+        },
+        datapoints_to_alarm=5,
+        alarm_description=(
+            "Time elapsed after the request leaves the load balancer until a response from"
+            " the target is received"
         ),
-        triggers=["tag"],
-    ),
-    tags=[
-        autoscaling.GroupTagArgs(
-            key=key_name,
-            value=key_value,
-            propagate_at_launch=True,
-        )
-        for key_name, key_value in aws_config.merged_tags(
-            {"ami_id": edxapp_worker_ami.id, "edxapp_node_type": "worker"},
-        ).items()
-    ],
-)
+        alarm_actions=[web_asg_scale_up_policy.arn],
+        ok_actions=[web_asg_scale_down_policy.arn],
+        tags=aws_config.tags,
+    )
+
+    worker_instance_type = (
+        edxapp_config.get("worker_instance_type") or InstanceTypes.burstable_medium.name
+    )
+    worker_launch_config = ec2.LaunchTemplate(
+        "edxapp-worker-launch-template",
+        name_prefix=f"{edxapp_worker_tag}-",
+        description="Launch template for deploying Edxapp worker nodes",
+        iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
+            arn=edxapp_instance_profile.arn,
+        ),
+        image_id=edxapp_worker_ami.id,
+        block_device_mappings=[
+            ec2.LaunchTemplateBlockDeviceMappingArgs(
+                device_name=edxapp_worker_ami.root_device_name,
+                ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
+                    volume_size=edxapp_config.get_int("worker_disk_size") or 50,
+                    volume_type=DiskTypes.ssd,
+                    delete_on_termination=True,
+                    encrypted=True,
+                    kms_key_id=kms_ebs["arn"],
+                ),
+            )
+        ],
+        vpc_security_group_ids=[
+            edxapp_security_group.id,
+            consul_security_groups["consul_agent"],
+        ],
+        instance_type=InstanceTypes.dereference(worker_instance_type),
+        key_name=SSH_ACCESS_KEY_NAME,
+        tag_specifications=[
+            ec2.LaunchTemplateTagSpecificationArgs(
+                resource_type="instance",
+                tags=aws_config.merged_tags({"Name": edxapp_worker_tag}),
+            ),
+            ec2.LaunchTemplateTagSpecificationArgs(
+                resource_type="volume",
+                tags=aws_config.merged_tags({"Name": edxapp_worker_tag}),
+            ),
+        ],
+        tags=aws_config.tags,
+        user_data=cloud_init_user_data,
+    )
+    worker_asg = autoscaling.Group(
+        "edxapp-worker-autoscaling-group",
+        desired_capacity=edxapp_config.get_int("worker_node_capacity") or 1,
+        min_size=1,
+        max_size=50,
+        health_check_type="EC2",
+        vpc_zone_identifiers=edxapp_vpc["subnet_ids"],
+        launch_template=autoscaling.GroupLaunchTemplateArgs(
+            id=worker_launch_config.id, version="$Latest"
+        ),
+        instance_refresh=autoscaling.GroupInstanceRefreshArgs(
+            strategy="Rolling",
+            preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
+                min_healthy_percentage=50
+            ),
+            triggers=["tag"],
+        ),
+        tags=[
+            autoscaling.GroupTagArgs(
+                key=key_name,
+                value=key_value,
+                propagate_at_launch=True,
+            )
+            for key_name, key_value in aws_config.merged_tags(
+                {"ami_id": edxapp_worker_ami.id, "edxapp_node_type": "worker"},
+            ).items()
+        ],
+    )
 
 ########################
 # Fastly CDN Managment #
 ########################
+
+if edxapp_config.get("k8s_cutover"):
+    lms_backend_address = edxapp_config.require("backend_lms_domain")
+    lms_backend_ssl_hostname = edxapp_config.require("backend_lms_domain")
+    cms_backend_address = edxapp_config.require("backend_studio_domain")
+    cms_backend_ssl_hostname = edxapp_config.require("backend_studio_domain")
+else:
+    lms_backend_address = web_lb.dns_name
+    lms_backend_ssl_hostname = edxapp_domains["lms"]
+    cms_backend_address = web_lb.dns_name
+    cms_backend_ssl_hostname = edxapp_domains["studio"]
+
 
 vector_log_proxy_secrets = read_yaml_secrets(
     Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
@@ -1599,16 +1614,6 @@ fastly_access_logging_iam_role = monitoring_stack.require_output(
     "fastly_access_logging_iam_role"
 )
 
-if edxapp_config.get("k8s_deployment"):
-    lms_backend_address = edxapp_config.require("backend_lms_domain")
-    lms_backend_ssl_hostname = edxapp_config.require("backend_lms_domain")
-    cms_backend_address = edxapp_config.require("backend_studio_domain")
-    cms_backend_ssl_hostname = edxapp_config.require("backend_studio_domain")
-else:
-    lms_backend_address = web_lb.dns_name
-    lms_backend_ssl_hostname = edxapp_domains["lms"]
-    cms_backend_address = web_lb.dns_name
-    cms_backend_ssl_hostname = edxapp_domains["studio"]
 
 mfe_regex = "^/({})/".format("|".join(edxapp_mfe_paths))
 edxapp_fastly_service = fastly.ServiceVcl(
