@@ -1,3 +1,4 @@
+# ruff: noqa: FIX002
 from pathlib import Path
 from re import findall, sub
 from urllib.parse import parse_qs, urlparse
