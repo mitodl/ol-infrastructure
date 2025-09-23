@@ -16,24 +16,24 @@ This documentation captures:
 
 ---
 
-## Slot Overrides
+## Overrides
 
-| Slot Name                                   | Location (MFE)     | Purpose                                                            | Notes / Screenshots                 |
-| ------------------------------------------- | ------------------ | ------------------------------------------------------------------ | ----------------------------------- |
-| `footer_slot` / `studio_footer_slot`       | `All MFEs`         | Replaces default footer with our customized [footer](./Footer.jsx) | ![](./images/footer.png)  |
-| `learning_user_menu_slot`/`desktop_user_menu_slot`| `All MFEs`         | Updates the header menu links based on the application. The links are defined in the `userMenu` object within the config files.| ![](./images/header_links.png)|
-| `progress_certificate_status_slot` | `xPRO Learning MFE Progress Page` | Replaces the certificate status text in MITxPRO Learning MFE Progress Page | ![](./images/certificate_status.png) |
-| `org.openedx.frontend.learning.course_breadcrumbs.v1` | `MITxOnline / MIT Learn Learning MFE` | Shows the breadcrumps navigation which is hidden by default | ![](./images/breadcrump.png) |
-| `org.openedx.frontend.learning.sequence_navigation.v1`| `MITxOnline / MIT Learn Learning MFE` | Shows the sequence navigation bar which is hidden by default | ![](./images/sequence_navigation.png) |
-| `org.openedx.frontend.learning.course_outline_sidebar.v1` | `MITxOnline / MIT Learn Learning MFE` | Hides the default course outline sidebar in MITxOnline Learning MFE | ![](./images/course_outline_sidebar.png) |
-| `org.openedx.frontend.learning.course_outline_sidebar_trigger.v1` / `org.openedx.frontend.learning.course_outline_mobile_sidebar_trigger.v1` | `MITxOnline / MIT Learn Learning MFE` | Hide the default course outline sidebar trigger button in MITxOnline Learning MFE | ![](./images/course_outline_sidebar_trigger.png)
-| `org.openedx.frontend.learning.unit_title.v1` | `MITxOnline / MIT Learn Learning MFE` | Hides the navigation arrow buttons from the unit title slot with a custom implementation in MITxOnline Learning MFE | Before: ![](./images/unit_title_slot_before.png) After: ![](./images/unit_title_slot.png) |
-| `widget_sidebar_slot` | `MITx Learner Dashboard` | Hides the `Looking for a new challenge` banner in learner dashboard in MITx | ![](./images/looking_for_challenge.png) |
-| `org.openedx.frontend.layout.header_learning_course_info.v1` | `MIT Learn MFEs` | Hides the course organization and number from UAI courses in the MIT Learn MFEs using Learning Header | Before: ![](./images/course_num_org_hide_before.png) After: ![](./images/course_num_org_hide_after.png) |
+| Name / Slot ID                                                                 | Location (MFE)                         | Purpose                                                                                               | Notes / Screenshots / Code location                                                                 |
+| ------------------------------------------------------------------------------ | -------------------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `footer_slot` / `studio_footer_slot`                                           | All MFEs                               | Replaces default footer with our customized footer component.                                        | ![](./images/footer.png) — See [`Footer.jsx`](./Footer.jsx)                                                      |
+| `ForceLoginRedirect` (component)                                          | MITxOnline and xPRO Learning MFE  | Redirects unauthorized users from the learning MFE to the login page.                                 | Search `ForceLoginRedirect` in [`Footer.jsx`](./Footer.jsx)                    |
+| `learning_user_menu_slot` / `desktop_user_menu_slot`                           | All MFEs                               | Updates header menu links based on application (defined in `userMenu` object in config files).         | ![](./images/header_links.png) Links defined in `common-mfe-config.env.jsx` files     |
+| `progress_certificate_status_slot`                                             | xPRO Learning MFE Progress Page        | Replaces the certificate status text in MITxPRO Learning MFE Progress Page.                           | ![](./images/certificate_status.png)                                                                |
+| `org.openedx.frontend.learning.course_breadcrumbs.v1`                          | MITxOnline / MIT Learn Learning MFE    | Shows breadcrumbs navigation (hidden by default).                                                     | ![](./images/breadcrump.png)                                                                        |
+| `org.openedx.frontend.learning.sequence_navigation.v1`                         | MITxOnline / MIT Learn Learning MFE    | Shows sequence navigation bar (hidden by default).                                                    | ![](./images/sequence_navigation.png)                                                               |
+| `org.openedx.frontend.learning.course_outline_sidebar.v1`                      | MITxOnline / MIT Learn Learning MFE    | Hides the default course outline sidebar.                                                             | ![](./images/course_outline_sidebar.png)                                                            |
+| `org.openedx.frontend.learning.course_outline_sidebar_trigger.v1` <br> `org.openedx.frontend.learning.course_outline_mobile_sidebar_trigger.v1` | MITxOnline / MIT Learn Learning MFE    | Hides default course outline sidebar trigger button.                                                   | ![](./images/course_outline_sidebar_trigger.png)                                                    |
+| `org.openedx.frontend.learning.unit_title.v1`                                  | MITxOnline / MIT Learn Learning MFE    | Hides navigation arrow buttons from the unit title slot; replaced with custom implementation.          | Before: ![](./images/unit_title_slot_before.png) After: ![](./images/unit_title_slot.png)           |
+| `widget_sidebar_slot`                                                           | MITx Learner Dashboard                 | Hides the “Looking for a new challenge” banner in learner dashboard.                                   | ![](./images/looking_for_challenge.png)                                                             |
+| `org.openedx.frontend.layout.header_learning_course_info.v1`                   | MIT Learn MFEs                         | Hides course organization and number from UAI courses in the Learning Header.                         | Before: ![](./images/course_num_org_hide_before.png) After: ![](./images/course_num_org_hide_after.png) |
+| `externalLinkUrlOverrides`                                                      | MITxOnline Proctoring Info Panel       | Overrides “Review instructions and system requirements” link → MITxOnline Zendesk Helpdesk.            | Search `externalLinkUrlOverrides` in [`mitxonline/common-mfe-config.env.jsx`](./mitxonline/common-mfe-config.env.jsx)                         |
+| `mitx-styles.scss`                                                              | MITx Residential Learner Dashboard     | Hides information banner in dashboard cards via CSS overrides.                                        | Before: ![](./images/card_banner_before.png) After: ![](./images/card_banner_after.png) [`./mitx-styles.scss`](./mitx-styles.scss)                                                                                |
 
-## Other Overrides
-
-| Obverride Overview                          | Location
 
 
 ---
@@ -50,17 +50,3 @@ This documentation captures:
 
 ---
 
-## Maintenance Notes
-
-* Always document new overrides immediately.
-* Review existing overrides periodically to confirm they are still needed.
-* Remove outdated overrides and update this documentation accordingly.
-
----
-
-## 🔗 References
-
-* [Open edX MFE Plugin Slots documentation](https://github.com/openedx/frontend-plugin-framework)
-* [Discussion thread on overrides](https://github.com/mitodl/hq/issues/8298#issuecomment-3274936062)
-
----
