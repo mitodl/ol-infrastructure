@@ -377,6 +377,80 @@ def create_k8s_resources(
         ),
     ]
 
+    def _create_config_aggregator_init_container(
+        service: str, volume_mounts: list[kubernetes.core.v1.VolumeMountArgs]
+    ) -> kubernetes.core.v1.ContainerArgs:
+        return kubernetes.core.v1.ContainerArgs(
+            name="config-aggregator",
+            image="busybox:1.35",
+            command=["/bin/sh", "-c"],
+            args=[
+                f"cat /openedx/config-sources/*/*.yaml > /openedx/config/{service}.env.yml"
+            ],
+            volume_mounts=volume_mounts,
+        )
+
+    # This function reduces code duplication when creating the pre-deploy migrate jobs
+    def _create_pre_deploy_migrate_job(
+        service_type: str,
+        webapp_deployment_name: str,
+        edxapp_volumes: list[kubernetes.core.v1.VolumeArgs],
+        edxapp_init_volume_mounts: list[kubernetes.core.v1.VolumeMountArgs],
+    ) -> kubernetes.batch.v1.Job:
+        predeploy_labels = k8s_global_labels | {
+            "ol.mit.edu/component": f"edxapp-{service_type}-predeploy",
+            "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
+        }
+        return kubernetes.batch.v1.Job(
+            (
+                "ol-"
+                f"{stack_info.env_prefix}-edxapp-{service_type}-predeploy-migrate-job-"
+                f"{stack_info.env_suffix}"
+            ),
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name=f"{webapp_deployment_name}-predeploy-migrate",
+                namespace=namespace,
+                labels=predeploy_labels,
+            ),
+            spec=kubernetes.batch.v1.JobSpecArgs(
+                ttl_seconds_after_finished=60 * 30,  # 30 minutes
+                template=kubernetes.core.v1.PodTemplateSpecArgs(
+                    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                        labels=predeploy_labels,
+                    ),
+                    spec=kubernetes.core.v1.PodSpecArgs(
+                        service_account_name=vault_k8s_resources.service_account_name,
+                        restart_policy="OnFailure",
+                        volumes=edxapp_volumes,
+                        init_containers=[
+                            staticfiles_init_container,
+                            _create_config_aggregator_init_container(
+                                service_type, edxapp_init_volume_mounts
+                            ),
+                        ],
+                        containers=[
+                            kubernetes.core.v1.ContainerArgs(
+                                name=f"{service_type}-edxapp-migrate",
+                                image=edxapp_image,
+                                command=["python", "manage.py"],
+                                args=[service_type, "migrate", "--noinput"],
+                                env=[
+                                    kubernetes.core.v1.EnvVarArgs(
+                                        name="SERVICE_VARIANT", value=service_type
+                                    ),
+                                    kubernetes.core.v1.EnvVarArgs(
+                                        name="DJANGO_SETTINGS_MODULE",
+                                        value=f"{service_type}.envs.production",
+                                    ),
+                                ],
+                                volume_mounts=common_volume_mounts,
+                            )
+                        ],
+                    ),
+                ),
+            ),
+        )
+
     ############################################
     # cms deployment resources
     ############################################
@@ -498,7 +572,16 @@ def create_k8s_resources(
     )
 
     # Finally, actually define the CMS deployment
+    # Start with a pre-deployment job that runs the migrations
+    cms_pre_deploy_migrate_job = _create_pre_deploy_migrate_job(
+        service_type="cms",
+        webapp_deployment_name=cms_webapp_deployment_name,
+        edxapp_volumes=cms_edxapp_volumes,
+        edxapp_init_volume_mounts=cms_edxapp_init_volume_mounts,
+    )
     # It is important that the CMS and LMS deployment have distinct labels attached.
+    # These labels should be should be distict from those attached to the predeployment
+    # jobs as well.
     cms_webapp_labels = k8s_global_labels | {
         "ol.mit.edu/component": "edxapp-cms-webapp",
         "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
@@ -523,14 +606,8 @@ def create_k8s_resources(
                         staticfiles_init_container,
                         # This init container will concatenate all the config files that come from
                         # the umpteen secrets and configmaps into a single file that edxapp expects
-                        kubernetes.core.v1.ContainerArgs(
-                            name="config-aggregator",
-                            image="busybox:1.35",
-                            command=["/bin/sh", "-c"],
-                            args=[
-                                "cat /openedx/config-sources/*/*.yaml > /openedx/config/cms.env.yml"
-                            ],
-                            volume_mounts=cms_edxapp_init_volume_mounts,
+                        _create_config_aggregator_init_container(
+                            "cms", cms_edxapp_init_volume_mounts
                         ),
                     ],
                     containers=[
@@ -562,7 +639,10 @@ def create_k8s_resources(
             ),
         ),
         opts=pulumi.ResourceOptions(
-            depends_on=list(cms_edxapp_config_sources.values())
+            depends_on=[
+                *cms_edxapp_config_sources.values(),
+                cms_pre_deploy_migrate_job,
+            ]
         ),
     )
     cms_webapp_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
@@ -629,14 +709,8 @@ def create_k8s_resources(
                     volumes=cms_edxapp_volumes,
                     init_containers=[
                         staticfiles_init_container,  # strictly speaking, not required
-                        kubernetes.core.v1.ContainerArgs(
-                            name="config-aggregator",
-                            image="busybox:1.35",
-                            command=["/bin/sh", "-c"],
-                            args=[
-                                "cat /openedx/config-sources/*/*.yaml > /openedx/config/cms.env.yml"
-                            ],
-                            volume_mounts=cms_edxapp_init_volume_mounts,
+                        _create_config_aggregator_init_container(
+                            "cms", cms_edxapp_init_volume_mounts
                         ),
                     ],
                     containers=[
@@ -671,6 +745,42 @@ def create_k8s_resources(
                 ),
             ),
         ),
+    )
+    cms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
+        f"ol-{stack_info.env_prefix}-edxapp-cms-celery-scaledobject-{stack_info.env_suffix}",
+        api_version="keda.sh/v1alpha1",
+        kind="ScaledObject",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{cms_celery_deployment_name}-scaledobject",
+            namespace=namespace,
+            labels=cms_celery_labels,
+        ),
+        spec={
+            "scaleTargetRef": {
+                "kind": "Deployment",
+                "name": cms_celery_deployment_name,
+            },
+            "pollingInterval": 3,
+            "cooldownPeriod": 10,
+            "minReplicaCount": replicas_dict["celery"]["cms"]["min"],
+            "maxReplicaCount": replicas_dict["celery"]["cms"]["max"],
+            "triggers": [
+                {
+                    "type": "redis",
+                    "metadata": {
+                        "address": edxapp_cache.address.apply(
+                            lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
+                        ),
+                        "username": "default",
+                        "datbaseIndex": "0",
+                        "password": edxapp_cache.cache_cluster.auth_token,
+                        "listName": "celery",  # TODO(Mike): is this correct for both lms and cms?
+                        "listLength": "10",
+                        "enableTLS": "true",
+                    },
+                }
+            ],
+        },
     )
     # Celery deployment do not require service definitions
 
@@ -736,6 +846,7 @@ def create_k8s_resources(
             empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
         )
     )
+    # The data volume is special and is shared between all app instances. Use an EFS PVC
     lms_edxapp_volumes.append(
         kubernetes.core.v1.VolumeArgs(
             name="openedx-data",
@@ -783,6 +894,13 @@ def create_k8s_resources(
     )
 
     # Finally, actually define the LMS deployment
+    # Start with a pre-deployment job that runs the migrations
+    lms_pre_deploy_migrate_job = _create_pre_deploy_migrate_job(
+        service_type="lms",
+        webapp_deployment_name=lms_webapp_deployment_name,
+        edxapp_volumes=lms_edxapp_volumes,
+        edxapp_init_volume_mounts=lms_edxapp_init_volume_mounts,
+    )
     # It is important that the CMS and LMS deployment have distinct labels attached.
     lms_webapp_labels = k8s_global_labels | {
         "ol.mit.edu/component": "edxapp-lms-webapp",
@@ -808,14 +926,8 @@ def create_k8s_resources(
                         staticfiles_init_container,
                         # This init container will concatenate all the config files that come from
                         # the umpteen secrets and configmaps into a single file that edxapp expects
-                        kubernetes.core.v1.ContainerArgs(
-                            name="config-aggregator",
-                            image="busybox:1.35",
-                            command=["/bin/sh", "-c"],
-                            args=[
-                                "cat /openedx/config-sources/*/*.yaml > /openedx/config/lms.env.yml"
-                            ],
-                            volume_mounts=lms_edxapp_init_volume_mounts,
+                        _create_config_aggregator_init_container(
+                            "lms", lms_edxapp_init_volume_mounts
                         ),
                     ],
                     containers=[
@@ -847,7 +959,7 @@ def create_k8s_resources(
             ),
         ),
         opts=pulumi.ResourceOptions(
-            depends_on=list(lms_edxapp_config_sources.values())
+            depends_on=[*lms_edxapp_config_sources.values(), lms_pre_deploy_migrate_job]
         ),
     )
     lms_webapp_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
@@ -914,14 +1026,8 @@ def create_k8s_resources(
                     volumes=lms_edxapp_volumes,
                     init_containers=[
                         staticfiles_init_container,  # strictly speaking, not required
-                        kubernetes.core.v1.ContainerArgs(
-                            name="config-aggregator",
-                            image="busybox:1.35",
-                            command=["/bin/sh", "-c"],
-                            args=[
-                                "cat /openedx/config-sources/*/*.yaml > /openedx/config/lms.env.yml"
-                            ],
-                            volume_mounts=lms_edxapp_init_volume_mounts,
+                        _create_config_aggregator_init_container(
+                            "lms", lms_edxapp_init_volume_mounts
                         ),
                     ],
                     containers=[
@@ -957,6 +1063,7 @@ def create_k8s_resources(
             ),
         ),
     )
+
     lms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
         f"ol-{stack_info.env_prefix}-edxapp-lms-celery-scaledobject-{stack_info.env_suffix}",
         api_version="keda.sh/v1alpha1",
@@ -985,7 +1092,7 @@ def create_k8s_resources(
                         "username": "default",
                         "datbaseIndex": "0",
                         "password": edxapp_cache.cache_cluster.auth_token,
-                        "listName": "celery",
+                        "listName": "celery",  # TODO(Mike): is this correct for both lms and cms?
                         "listLength": "10",
                         "enableTLS": "true",
                     },
