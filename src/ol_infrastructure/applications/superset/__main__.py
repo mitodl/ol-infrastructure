@@ -1,10 +1,12 @@
+"""Deploy Superset to EKS."""
+
 import json
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, get_caller_identity, iam, route53, ses
+from pulumi_aws import ec2, get_caller_identity, route53, ses
 
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
@@ -13,6 +15,10 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.lib.versions import SUPERSET_CHART_VERSION
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.components.applications.eks import (
+    OLEKSApplication,
+    OLEKSApplicationConfig,
+)
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.eks import (
@@ -20,14 +26,10 @@ from ol_infrastructure.components.aws.eks import (
     OLEKSGatewayConfig,
     OLEKSGatewayListenerConfig,
     OLEKSGatewayRouteConfig,
-    OLEKSTrustRole,
-    OLEKSTrustRoleConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SDynamicSecretConfig,
-    OLVaultK8SResources,
-    OLVaultK8SResourcesConfig,
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
@@ -37,7 +39,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
 )
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
@@ -76,11 +78,12 @@ cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(superset_namespace, ns)
 )
 # Use a valid, existing service enum for labels
-k8s_global_labels = K8sGlobalLabels(
+k8s_labels = K8sGlobalLabels(
     service=Services.superset,
     ou=BusinessUnit.data,
     stack=stack_info,
-).model_dump()
+)
+k8s_global_labels = k8s_labels.model_dump()
 
 aws_account = get_caller_identity()
 superset_domain = superset_config.require("domain")
@@ -125,51 +128,20 @@ superset_policy_document = {
     ],
 }
 
-superset_iam_policy = iam.Policy(
-    f"superset-policy-{stack_info.env_suffix}",
-    name=f"superset-policy-{stack_info.env_suffix}",
-    path=f"/ol-data/superset-policy-{stack_info.env_suffix}/",
-    policy=lint_iam_policy(superset_policy_document, stringify=True),
-    description="Policy for granting acces for batch data workflows to AWS resources",
-)
-
-# IRSA: Trust role for the Superset service account in EKS
-superset_trust_role = OLEKSTrustRole(
-    f"superset-irsa-trust-role-{stack_info.env_suffix}",
-    role_config=OLEKSTrustRoleConfig(
-        account_id=aws_account.account_id,
-        cluster_name=f"data-{stack_info.name}",
+superset_app = OLEKSApplication(
+    OLEKSApplicationConfig(
+        application_name="superset",
+        namespace=superset_namespace,
+        stack_info=stack_info,
+        aws_config=aws_config,
+        iam_policy_document=superset_policy_document,
+        vault_policy_path=Path(__file__).parent.joinpath("superset_server_policy.hcl"),
         cluster_identities=cluster_stack.require_output("cluster_identities"),
-        description="Trust role for Superset k8s service account",
-        policy_operator="StringEquals",
-        role_name="superset",
-        service_account_name="superset",
-        service_account_namespace=superset_namespace,
-        tags=aws_config.tags,
-    ),
-)
-
-iam.RolePolicyAttachment(
-    f"superset-irsa-policy-attach-{stack_info.env_suffix}",
-    policy_arn=superset_iam_policy.arn,
-    role=superset_trust_role.role.name,
-)
-
-# Vault policy to allow Superset to access required secrets
-superset_server_vault_policy = vault.Policy(
-    "superset-server-vault-policy",
-    name="superset-server",
-    policy=Path(__file__).parent.joinpath("superset_server_policy.hcl").read_text(),
-)
-
-# Vault Kubernetes Auth role bound to Superset namespace/service account
-superset_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
-    f"superset-k8s-vault-auth-backend-role-{stack_info.env_suffix}",
-    role_name="superset",
-    backend=cluster_stack.require_output("vault_auth_endpoint"),
-    bound_service_account_names=["superset-vault"],
-    bound_service_account_namespaces=[superset_namespace],
-    token_policies=[superset_server_vault_policy.name],
+        vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+        irsa_service_account_name="superset",
+        vault_sync_service_account_name="superset-vault",
+        k8s_labels=k8s_labels,
+    )
 )
 
 superset_secrets = read_yaml_secrets(
@@ -393,21 +365,7 @@ superset_redis_cache = OLAmazonCache(redis_cache_config)
 ########################################
 
 # K8s/Vault resources (service account + VaultAuth/Connection)
-vault_k8s_resources_config = OLVaultK8SResourcesConfig(
-    application_name="superset",
-    namespace=superset_namespace,
-    labels=k8s_global_labels,
-    vault_address=Config("vault").require("address"),
-    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
-    vault_auth_role_name=superset_k8s_auth_backend_role.role_name,
-)
-vault_k8s_resources = OLVaultK8SResources(
-    resource_config=vault_k8s_resources_config,
-    opts=ResourceOptions(
-        delete_before_replace=True,
-        depends_on=[superset_k8s_auth_backend_role],
-    ),
-)
+vault_k8s_resources = superset_app.vault_k8s_resources
 
 # DB dynamic creds secret for Superset
 db_creds_secret_name = "superset-db-creds"  # pragma: allowlist secret  # noqa: S105
@@ -603,7 +561,7 @@ superset_chart = kubernetes.helm.v3.Release(
                 "create": True,
                 "name": "superset",
                 "annotations": {
-                    "eks.amazonaws.com/role-arn": superset_trust_role.role.arn.apply(
+                    "eks.amazonaws.com/role-arn": superset_app.irsa_role.arn.apply(
                         lambda arn: f"{arn}"
                     ),
                 },
