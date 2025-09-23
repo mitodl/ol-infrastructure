@@ -80,6 +80,7 @@ class OLApplicationK8sConfig(BaseModel):
     application_docker_tag: str
     application_cmd_array: list[str] | None = None
     application_arg_array: list[str] | None = None
+    deployment_notifications: bool = True
     vault_k8s_resource_auth_name: str
     use_pullthrough_cache: bool = True
     image_pull_policy: str = "IfNotPresent"
@@ -459,6 +460,11 @@ class OLApplicationK8s(ComponentResource):
             deployment_options = deployment_options.merge(
                 ResourceOptions(depends_on=[_pre_deploy_job])
             )
+
+        # TODO(<cpatti>):  actually fill in event creation fully.
+        _pre_deployment_event = kubernetes.events.v1.Event(f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-job",
+                event_time = "TODO figure out how to get current timestamp",
+        )
 
         _application_deployment = kubernetes.apps.v1.Deployment(
             f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-deployment",
