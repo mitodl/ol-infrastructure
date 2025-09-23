@@ -8,6 +8,7 @@ import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import iam
 
+from bridge.lib.magic_numbers import DEFAULT_REDIS_PORT
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.applications.edxapp.k8s_configmaps import create_k8s_configmaps
@@ -62,6 +63,23 @@ def create_k8s_resources(
 
     aws_account = aws.get_caller_identity()
 
+    replicas_dict = edxapp_config.require_object("k8s_replicas")
+    resources_dict = edxapp_config.require_object("k8s_resources")
+
+    def _get_resources_requests_limits(
+        class_name: str, component: str
+    ) -> kubernetes.core.v1.ResourceRequirementsArgs:
+        return kubernetes.core.v1.ResourceRequirementsArgs(
+            requests={
+                "cpu": resources_dict[class_name][component]["cpu_request"],
+                "memory": resources_dict[class_name][component]["memory_request"],
+            },
+            limits={
+                "cpu": resources_dict[class_name][component]["cpu_limit"],
+                "memory": resources_dict[class_name][component]["memory_limit"],
+            },
+        )
+
     # Get various VPC / network configuration information
     apps_vpc = network_stack.require_output("applications_vpc")
     k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
@@ -103,9 +121,6 @@ def create_k8s_resources(
     # for the annotations on the service account created by OLVaultK8SResources.
     edxapp_service_account_name = f"{stack_info.env_prefix}-edxapp-vault"
 
-    # The OLEKSTrustRole component appears to have an issue handling Pulumi Outputs as
-    # inputs. This can be worked around by resolving the outputs within an `apply` and
-    # then instantiating the component.
     edxapp_trust_role = OLEKSTrustRole(
         f"ol-{stack_info.env_prefix}-edxapp-trustrole-{stack_info.env_suffix}",
         role_config=OLEKSTrustRoleConfig(
@@ -189,6 +204,54 @@ def create_k8s_resources(
         opts=pulumi.ResourceOptions(depends_on=[edxapp_k8s_app_security_group]),
     )
 
+    webapp_hpa_scaling_metrics = [
+        kubernetes.autoscaling.v2.MetricSpecArgs(
+            type="Resource",
+            resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                name="cpu",
+                target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                    type="Utilization",
+                    average_utilization=60,
+                ),
+            ),
+        ),
+        kubernetes.autoscaling.v2.MetricSpecArgs(
+            type="Resource",
+            resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                name="memory",
+                target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                    type="Utilization",
+                    average_utilization=60,
+                ),
+            ),
+        ),
+    ]
+    webapp_hpa_behavior = kubernetes.autoscaling.v2.HorizontalPodAutoscalerBehaviorArgs(
+        scale_up=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
+            stabilization_window_seconds=60,  # wait 1 minute before scaling uzp again
+            select_policy="Max",  # Choose the max value when multiple metrics
+            policies=[
+                kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
+                    type="Percent",
+                    value=100,  # at most, double the pods
+                    period_seconds=60,  # within a minute
+                )
+            ],
+        ),
+        scale_down=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
+            stabilization_window_seconds=300,  # wait 5 minutes before scaling down again
+            select_policy="Min",  # Choose the max value when multiple metrics
+            policies=[
+                kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
+                    type="Percent",
+                    value=25,  # at most, remove 1/4 of the pods at once
+                    period_seconds=60,  # within 1 minute
+                )
+            ],
+        ),
+    )
+
+    # Call out to other modules to create the k8s secrets and configmaps
     secrets = create_k8s_secrets(
         edxapp_cache=edxapp_cache,
         edxapp_config=edxapp_config,
@@ -199,7 +262,6 @@ def create_k8s_resources(
         stack_info=stack_info,
         vault_k8s_resources=vault_k8s_resources,
     )
-
     configmaps = create_k8s_configmaps(
         stack_info=stack_info,
         namespace=namespace,
@@ -208,6 +270,22 @@ def create_k8s_resources(
         edxapp_cache=edxapp_cache,
         notes_stack=notes_stack,
         opensearch_hostname=opensearch_hostname,
+    )
+
+    openedx_data_pvc = kubernetes.core.v1.PersistentVolumeClaim(
+        f"ol-{stack_info.env_prefix}-openedx-data-pvc-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{env_name}-openedx-data-pvc",
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        spec=kubernetes.core.v1.PersistentVolumeClaimSpecArgs(
+            access_modes=["ReadWriteMany"],
+            storage_class_name="efs-sc",
+            resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                requests={"storage": "5Gi"}
+            ),
+        ),
     )
 
     # Lookup environment vars needed for the deployment
@@ -240,6 +318,7 @@ def create_k8s_resources(
         dl_command = prod_dl_command
     else:
         dl_command = nonprod_dl_command
+
     staticfiles_init_container_command = [
         "/bin/sh",
         "-c",
@@ -267,6 +346,7 @@ def create_k8s_resources(
         volume_mounts=staticfiles_volume_mounts,
     )
 
+    # Setup the volume mount lists for the webapp and celery containers
     common_volume_mounts = [
         kubernetes.core.v1.VolumeMountArgs(
             name="edxapp-config",
@@ -287,6 +367,7 @@ def create_k8s_resources(
         *staticfiles_volume_mounts,
     ]
 
+    # The webapp deployment requires an addition mount of the uwsgi.ini configmap
     webapp_volume_mounts = [
         *common_volume_mounts,
         kubernetes.core.v1.VolumeMountArgs(
@@ -335,6 +416,16 @@ def create_k8s_resources(
         configmaps.cms_interpolated_config_name,
     ]
 
+    # This can be confusing. We are working with two different 'volume' concepts here.
+    # 1. The 'volumes' that are defined in the pod spec.
+    # 2. The 'volumeMounts' that are defined in each container.
+    # Not every container must have every (or any) volumeMounts, but the volumeMounts
+    # it does have must be defined as volumes in the pod spec.
+    #
+    # volumeMounts reference volumes.
+    #
+    # See: https://kubernetes.io/docs/concepts/storage/volumes/
+
     # Define the volumes that will be mounted into the edxapp containers
     cms_edxapp_volumes = [
         kubernetes.core.v1.VolumeArgs(
@@ -363,7 +454,9 @@ def create_k8s_resources(
     cms_edxapp_volumes.append(
         kubernetes.core.v1.VolumeArgs(
             name="openedx-data",
-            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+            persistent_volume_claim=kubernetes.core.v1.PersistentVolumeClaimVolumeSourceArgs(
+                claim_name=openedx_data_pvc.metadata.name
+            ),
         )
     )
     cms_edxapp_volumes.append(
@@ -403,6 +496,9 @@ def create_k8s_resources(
             mount_path="/openedx/config",
         )
     )
+
+    # Finally, actually define the CMS deployment
+    # It is important that the CMS and LMS deployment have distinct labels attached.
     cms_webapp_labels = k8s_global_labels | {
         "ol.mit.edu/component": "edxapp-cms-webapp",
         "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
@@ -415,7 +511,6 @@ def create_k8s_resources(
             labels=cms_webapp_labels,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
-            replicas=1,
             selector=kubernetes.meta.v1.LabelSelectorArgs(
                 match_labels=cms_webapp_labels
             ),
@@ -426,6 +521,8 @@ def create_k8s_resources(
                     volumes=cms_edxapp_volumes,
                     init_containers=[
                         staticfiles_init_container,
+                        # This init container will concatenate all the config files that come from
+                        # the umpteen secrets and configmaps into a single file that edxapp expects
                         kubernetes.core.v1.ContainerArgs(
                             name="config-aggregator",
                             image="busybox:1.35",
@@ -452,6 +549,7 @@ def create_k8s_resources(
                                     name="UWSGI_WORKERS", value="2"
                                 ),
                             ],
+                            resources=_get_resources_requests_limits("webapp", "cms"),
                             ports=[
                                 kubernetes.core.v1.ContainerPortArgs(
                                     container_port=8000, name="http"
@@ -465,6 +563,25 @@ def create_k8s_resources(
         ),
         opts=pulumi.ResourceOptions(
             depends_on=list(cms_edxapp_config_sources.values())
+        ),
+    )
+    cms_webapp_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
+        f"ol-{stack_info.env_prefix}-edxapp-cms-hpa-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{cms_webapp_deployment_name}-hpa",
+            namespace=namespace,
+            labels=cms_webapp_labels,
+        ),
+        spec=kubernetes.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
+            scale_target_ref=kubernetes.autoscaling.v2.CrossVersionObjectReferenceArgs(
+                api_version="apps/v1",
+                kind="Deployment",
+                name=cms_webapp_deployment_name,
+            ),
+            min_replicas=replicas_dict["webapp"]["cms"]["min"],
+            max_replicas=replicas_dict["webapp"]["cms"]["max"],
+            metrics=webapp_hpa_scaling_metrics,
+            behavior=webapp_hpa_behavior,
         ),
     )
     cms_webapp_service = kubernetes.core.v1.Service(
@@ -489,6 +606,7 @@ def create_k8s_resources(
         ),
     )
 
+    # It is important that the celery workers have distinct labels from the webapps
     cms_celery_labels = k8s_global_labels | {
         "ol.mit.edu/component": "edxapp-cms-celery",
         "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
@@ -501,7 +619,6 @@ def create_k8s_resources(
             labels=cms_celery_labels,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
-            replicas=1,
             selector=kubernetes.meta.v1.LabelSelectorArgs(
                 match_labels=cms_celery_labels
             ),
@@ -547,6 +664,7 @@ def create_k8s_resources(
                                     value="cms.envs.production",
                                 ),
                             ],
+                            resources=_get_resources_requests_limits("celery", "cms"),
                             volume_mounts=common_volume_mounts,
                         )
                     ],
@@ -554,6 +672,7 @@ def create_k8s_resources(
             ),
         ),
     )
+    # Celery deployment do not require service definitions
 
     ############################################
     # lms deployment resources
@@ -620,7 +739,9 @@ def create_k8s_resources(
     lms_edxapp_volumes.append(
         kubernetes.core.v1.VolumeArgs(
             name="openedx-data",
-            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+            persistent_volume_claim=kubernetes.core.v1.PersistentVolumeClaimVolumeSourceArgs(
+                claim_name=openedx_data_pvc.metadata.name
+            ),
         )
     )
     lms_edxapp_volumes.append(
@@ -645,7 +766,7 @@ def create_k8s_resources(
     )
     lms_edxapp_volumes.extend(staticfiles_volumes)
 
-    # Define the volume mounts for the init container that aggregates the config files
+    # Define the volumemounts for the init container that aggregates the config files
     lms_edxapp_init_volume_mounts = [
         kubernetes.core.v1.VolumeMountArgs(
             name=source_name,
@@ -661,6 +782,8 @@ def create_k8s_resources(
         )
     )
 
+    # Finally, actually define the LMS deployment
+    # It is important that the CMS and LMS deployment have distinct labels attached.
     lms_webapp_labels = k8s_global_labels | {
         "ol.mit.edu/component": "edxapp-lms-webapp",
         "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
@@ -673,7 +796,6 @@ def create_k8s_resources(
             labels=lms_webapp_labels,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
-            replicas=1,
             selector=kubernetes.meta.v1.LabelSelectorArgs(
                 match_labels=lms_webapp_labels
             ),
@@ -684,6 +806,8 @@ def create_k8s_resources(
                     volumes=lms_edxapp_volumes,
                     init_containers=[
                         staticfiles_init_container,
+                        # This init container will concatenate all the config files that come from
+                        # the umpteen secrets and configmaps into a single file that edxapp expects
                         kubernetes.core.v1.ContainerArgs(
                             name="config-aggregator",
                             image="busybox:1.35",
@@ -710,6 +834,7 @@ def create_k8s_resources(
                                     name="UWSGI_WORKERS", value="2"
                                 ),
                             ],
+                            resources=_get_resources_requests_limits("webapp", "lms"),
                             ports=[
                                 kubernetes.core.v1.ContainerPortArgs(
                                     container_port=8000, name="http"
@@ -723,6 +848,25 @@ def create_k8s_resources(
         ),
         opts=pulumi.ResourceOptions(
             depends_on=list(lms_edxapp_config_sources.values())
+        ),
+    )
+    lms_webapp_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
+        f"ol-{stack_info.env_prefix}-edxapp-lms-hpa-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{lms_webapp_deployment_name}-hpa",
+            namespace=namespace,
+            labels=lms_webapp_labels,
+        ),
+        spec=kubernetes.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
+            scale_target_ref=kubernetes.autoscaling.v2.CrossVersionObjectReferenceArgs(
+                api_version="apps/v1",
+                kind="Deployment",
+                name=lms_webapp_deployment_name,
+            ),
+            min_replicas=replicas_dict["webapp"]["lms"]["min"],
+            max_replicas=replicas_dict["webapp"]["lms"]["max"],
+            metrics=webapp_hpa_scaling_metrics,
+            behavior=webapp_hpa_behavior,
         ),
     )
     lms_webapp_service = kubernetes.core.v1.Service(
@@ -746,6 +890,8 @@ def create_k8s_resources(
             type="ClusterIP",
         ),
     )
+
+    # It is important that the celery workers have distinct labels from the webapps
     lms_celery_labels = k8s_global_labels | {
         "ol.mit.edu/component": "edxapp-lms-celery",
         "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
@@ -758,7 +904,6 @@ def create_k8s_resources(
             labels=lms_celery_labels,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
-            replicas=1,
             selector=kubernetes.meta.v1.LabelSelectorArgs(
                 match_labels=lms_celery_labels
             ),
@@ -804,6 +949,7 @@ def create_k8s_resources(
                                     value="lms.envs.production",
                                 ),
                             ],
+                            resources=_get_resources_requests_limits("celery", "lms"),
                             volume_mounts=common_volume_mounts,
                         )
                     ],
@@ -811,6 +957,43 @@ def create_k8s_resources(
             ),
         ),
     )
+    lms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
+        f"ol-{stack_info.env_prefix}-edxapp-lms-celery-scaledobject-{stack_info.env_suffix}",
+        api_version="keda.sh/v1alpha1",
+        kind="ScaledObject",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{lms_celery_deployment_name}-scaledobject",
+            namespace=namespace,
+            labels=lms_celery_labels,
+        ),
+        spec={
+            "scaleTargetRef": {
+                "kind": "Deployment",
+                "name": lms_celery_deployment_name,
+            },
+            "pollingInterval": 3,
+            "cooldownPeriod": 10,
+            "minReplicaCount": replicas_dict["celery"]["lms"]["min"],
+            "maxReplicaCount": replicas_dict["celery"]["lms"]["max"],
+            "triggers": [
+                {
+                    "type": "redis",
+                    "metadata": {
+                        "address": edxapp_cache.address.apply(
+                            lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
+                        ),
+                        "username": "default",
+                        "datbaseIndex": "0",
+                        "password": edxapp_cache.cache_cluster.auth_token,
+                        "listName": "celery",
+                        "listLength": "10",
+                        "enableTLS": "true",
+                    },
+                }
+            ],
+        },
+    )
+    # Celery deployment do not require service definitions
 
     create_k8s_ingress_resources(
         edxapp_config=edxapp_config,
