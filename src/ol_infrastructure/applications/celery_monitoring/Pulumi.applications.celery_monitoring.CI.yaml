@@ -20,5 +20,3 @@ config:
   celery_monitoring:heroku_map:
     mitx-devops:
     - ocw-studio-ci
-    odl-devops:
-    - odl-open-discussions-ci
