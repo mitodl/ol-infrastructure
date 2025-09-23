@@ -10,6 +10,7 @@ from pulumi import Output, ResourceOptions, StackReference
 from bridge.lib.magic_numbers import AWS_EVENT_TARGET_GROUP_NAME_MAX_LENGTH
 from bridge.lib.versions import KARPENTER_CHART_VERSION
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
+from ol_infrastructure.lib.aws.ec2_helper import InstanceClasses, InstanceTypes
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.substructure.aws.eks.karpenter_iam import (
@@ -184,6 +185,49 @@ def setup_karpenter(  # noqa: PLR0913
         policy_arn=karpenter_controller_policy.arn,
     )
 
+    crd_info = {
+        "ec2nodeclasses.karpenter.k8s.aws": "EC2NodeClass",
+        "nodeclaims.karpenter.sh": "NodeClaim",
+        "nodepools.karpenter.sh": "NodePool",
+    }
+    crd_patches = []
+    for crd_name, kind in crd_info.items():
+        group = crd_name.split(".", 1)[1]
+        patch = kubernetes.apiextensions.v1.CustomResourceDefinitionPatch(
+            f"patch-crd-{crd_name.replace('.', '-')}",
+            metadata=kubernetes.meta.v1.ObjectMetaPatchArgs(
+                name=crd_name,
+                labels={"app.kubernetes.io/managed-by": "Helm"},
+                annotations={
+                    "meta.helm.sh/release-name": "karpeter-crds",
+                    "meta.helm.sh/release-namespace": "operations",
+                },
+            ),
+            spec=kubernetes.apiextensions.v1.CustomResourceDefinitionSpecPatchArgs(
+                group=group,
+                names=kubernetes.apiextensions.v1.CustomResourceDefinitionNamesPatchArgs(
+                    kind=kind
+                ),
+            ),
+            opts=ResourceOptions(provider=k8s_provider),
+        )
+        crd_patches.append(patch)
+
+    # Install Karpeter CRD Helm Chart
+    karpenter_crd_release = kubernetes.helm.v3.Release(
+        f"{cluster_name}-karpeter-crd-helm-release",
+        kubernetes.helm.v3.ReleaseArgs(
+            name="karpeter-crds",
+            chart="oci://public.ecr.aws/karpenter/karpenter-crd",
+            version=KARPENTER_CHART_VERSION,
+            disable_crd_hooks=True,
+            namespace="operations",
+            cleanup_on_fail=True,
+            skip_await=False,
+            values={},
+        ),
+        opts=ResourceOptions(provider=k8s_provider, depends_on=crd_patches),
+    )
     # Install Karpenter Helm Chart
     karpenter_release = kubernetes.helm.v3.Release(
         f"{cluster_name}-karpenter-helm-release",
@@ -194,6 +238,7 @@ def setup_karpenter(  # noqa: PLR0913
             namespace="operations",  # Deploy into the operations namespace
             cleanup_on_fail=True,
             skip_await=False,  # Wait for resources to be ready
+            skip_crds=True,  # CRDs are managed by the separate CRD cha
             values={
                 # Configure IRSA
                 "serviceAccount": {
@@ -233,6 +278,7 @@ def setup_karpenter(  # noqa: PLR0913
         opts=ResourceOptions(
             provider=k8s_provider,
             depends_on=[
+                karpenter_crd_release,  # Ensure CRDs are installed first
                 karpenter_trust_role,
                 karpenter_controller_policy,  # Ensure policy exists before Helm install
                 karpenter_interruption_queue,  # Ensure queue exists
@@ -358,7 +404,14 @@ def setup_karpenter(  # noqa: PLR0913
                         {
                             "key": "karpenter.k8s.aws/instance-family",
                             "operator": "In",
-                            "values": ["m7a", "m7i", "r7a", "r7i", "c7a", "c7i"],
+                            "values": [
+                                InstanceClasses.general_purpose_amd,
+                                InstanceClasses.general_purpose_intel,
+                                InstanceClasses.memory_optimized_amd,
+                                InstanceClasses.memory_optimized_intel,
+                                InstanceClasses.compute_optimized_amd,
+                                InstanceClasses.compute_optimized_intel,
+                            ],
                         },
                         {
                             "key": "kubernetes.io/arch",
@@ -385,6 +438,85 @@ def setup_karpenter(  # noqa: PLR0913
             "limits": {
                 "cpu": "64",
                 "memory": "256Gi",
+            },
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            depends_on=[karpenter_release],
+        ),
+    )
+
+    gpu_node_labels = {**k8s_global_labels, "ol.mit.edu/gpu_node": "true"}
+
+    # Karpenter will select this NodePool for pods with a node selector matching
+    # "ol.mit.edu/gpu_node": "true". When a pod is unschedulable, Karpenter evaluates
+    # all NodePools to find one that can satisfy the pod's scheduling constraints
+    # (like node selectors, taints, and resource requests). Because this NodePool's
+    # template adds the required label to new nodes, Karpenter will choose it over
+    # the default NodePool for matching pods.
+    kubernetes.apiextensions.CustomResource(
+        f"{cluster_name}-karpenter-gpu-node-pool",
+        api_version="karpenter.sh/v1",
+        kind="NodePool",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="gpu",
+            namespace="operations",
+            labels=k8s_global_labels,
+        ),
+        spec={
+            "template": {
+                "metadata": {
+                    "labels": gpu_node_labels,
+                },
+                "spec": {
+                    "nodeClassRef": {
+                        "group": "karpenter.k8s.aws",
+                        "kind": "EC2NodeClass",
+                        "name": "default",
+                    },
+                    "taints": [
+                        {
+                            "key": "ol.mit.edu/gpu_node",
+                            "value": "true",
+                            "effect": "NoSchedule",
+                        }
+                    ],
+                    "expireAfter": "24h",
+                    "terminationGracePeriod": "30m",
+                    "requirements": [
+                        {
+                            "key": "node.kubernetes.io/instance-type",
+                            "operator": "In",
+                            "values": [
+                                InstanceTypes.gpu_xlarge,
+                                InstanceTypes.gpu_2xlarge,
+                            ],
+                        },
+                        {
+                            "key": "kubernetes.io/arch",
+                            "operator": "In",
+                            "values": ["amd64"],
+                        },
+                        {
+                            "key": "kubernetes.io/os",
+                            "operator": "In",
+                            "values": ["linux"],
+                        },
+                        {
+                            "key": "karpenter.sh/capacity-type",
+                            "operator": "In",
+                            "values": ["spot"],
+                        },
+                    ],
+                },
+            },
+            "disruption": {
+                "consolidationPolicy": "WhenEmptyOrUnderutilized",
+                "consolidateAfter": "2m",
+            },
+            "limits": {
+                "cpu": "32",
+                "memory": "128Gi",
             },
         },
         opts=ResourceOptions(

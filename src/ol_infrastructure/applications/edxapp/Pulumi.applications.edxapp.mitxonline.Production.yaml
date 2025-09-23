@@ -50,7 +50,7 @@ config:
   edxapp:business_unit: mitxonline
   edxapp:db_password:
     secure: v1:Za4LI6RKfAW7jLJh:hlthF86wmGH6VSiBHgehE8mY11hDfOUK/uYZADbodhCVuS8RSXoCoHtrRrBDNMXunQmHLABw4SM=
-  edxapp:db_version: "10.11"
+  edxapp:db_use_blue_green: true
   edxapp:dns_zone: mitxonline
   edxapp:domains:
     lms: courses.mitxonline.mit.edu

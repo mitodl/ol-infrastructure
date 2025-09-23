@@ -150,6 +150,18 @@ botkube_application = kubernetes.helm.v3.Release(
             "settings": {
                 "clusterName": "applications-ci",
             },
+            "executors": {
+                "k8s-default-tools": {
+                    "botkube/kubectl": {"enabled": True},
+                },
+            },
+            "plugins": {
+                "repositories": {
+                    "botkube": {
+                        "url": "https://github.com/kubeshop/botkube/releases/download/v1.14.0/plugins-index.yaml"
+                    },
+                },
+            },
             "communications": {
                 "default-group": {
                     "socketSlack": {
@@ -158,7 +170,9 @@ botkube_application = kubernetes.helm.v3.Release(
                             "default": {
                                 "name": f"#{slack_channel}",
                                 "bindings": {
-                                    "executors": ["k8s-default-tools"],
+                                    "executors": [
+                                        "k8s-default-tools",
+                                    ],
                                     "sources": [
                                         "k8s-recommendation-events",
                                     ],
@@ -167,13 +181,6 @@ botkube_application = kubernetes.helm.v3.Release(
                         },
                     },
                 },
-            },
-            "plugins": {
-                "repositories": {
-                    "botkube": {
-                        "url": f"https://github.com/kubeshop/botkube/releases/download/{BOTKUBE_CHART_VERSION}/plugins-index.yaml"
-                    }
-                }
             },
             "extraEnv": [
                 {"name": "LOG_LEVEL_SOURCE_BOTKUBE_KUBERNETES", "value": "debug"},

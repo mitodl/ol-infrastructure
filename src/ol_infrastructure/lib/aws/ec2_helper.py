@@ -33,6 +33,16 @@ def is_valid_instance_type(instance_type):
 
 
 @unique
+class InstanceClasses(str, Enum):
+    general_purpose_amd = "m7a"
+    general_purpose_intel = "m7i"
+    memory_optimized_amd = "r7a"
+    memory_optimized_intel = "r7i"
+    compute_optimized_amd = "c7a"
+    compute_optimized_intel = "c7i"
+
+
+@unique
 class InstanceTypes(str, Enum):
     burstable_nano = "t3a.nano"
     burstable_micro = "t3a.micro"
@@ -51,6 +61,8 @@ class InstanceTypes(str, Enum):
     high_mem_2xlarge = "r7a.2xlarge"
     high_mem_4xlarge = "r7a.4xlarge"
     high_mem_8xlarge = "r7a.8xlarge"
+    gpu_xlarge = "g4dn.xlarge"
+    gpu_2xlarge = "g4dn.2xlarge"
 
     @classmethod
     def dereference(cls, instance_specifier) -> str:

@@ -33,6 +33,7 @@ from bridge.lib.versions import (
     VAULT_SECRETS_OPERATOR_CHART_VERSION,
 )
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
+from ol_infrastructure.infrastructure.aws.eks.core_dns import create_core_dns_resources
 from ol_infrastructure.lib.aws.eks_helper import (
     ECR_DOCKERHUB_REGISTRY,
     get_cluster_version,
@@ -494,7 +495,7 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
                 ),
             ],
             gpu=ng_config.get("gpu") or False,
-            min_refresh_percentage=eks_config.get_int("min_refresh_interval") or 75,
+            min_refresh_percentage=eks_config.get_int("min_refresh_percentage") or 90,
             instance_type=ng_config["instance_type"],
             instance_profile=node_instance_profile,
             labels=ng_config["labels"] or {},
@@ -2028,4 +2029,11 @@ metrics_server_release = kubernetes.helm.v3.Release(
         depends_on=[node_groups[0]],
         delete_before_replace=True,
     ),
+)
+
+create_core_dns_resources(
+    cluster_name=cluster_name,
+    k8s_global_labels=k8s_global_labels,
+    k8s_provider=k8s_provider,
+    cluster=cluster,
 )

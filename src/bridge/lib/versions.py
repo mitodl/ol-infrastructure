@@ -9,7 +9,7 @@ JUPYTERHUB_VERSION = "5.3.0"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
 KEYCLOAK_VERSION = "26.3.3"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
-OPEN_METADATA_VERSION = "1.9.4"
+OPEN_METADATA_VERSION = "1.9.7"
 OVS_VERSION = "v0.65.1-3-g2630021"
 REDASH_VERSION = "9d273e4"
 # renovate: datasource=github-releases depName=traefik packageName=traefik/traefik
@@ -19,8 +19,8 @@ TUTOR_PERMISSIONS_VERSION = "15.3.4"
 VAULT_VERSION = "1.20.3"
 
 # EKS Specific Versions
-# renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/helm-charts
-AIRBYTE_CHART_VERSION = "1.8.1"
+# renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/charts
+AIRBYTE_CHART_VERSION = "2.0.12"
 # renovate: datasource=docker depName=apisix packageName=registry-1.docker.io/bitnamicharts/apisix
 APISIX_CHART_VERSION = "5.1.6"
 # renovate: datasource=helm depName=aws-load-balancer-controller packageName=eks/aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts
@@ -44,7 +44,7 @@ KEDA_CHART_VERSION = "2.17.1"
 # renovate: datasource=docker depName=kube-state-metrics packageName=registry-1.docker.io/bitnamicharts/kube-state-metrics
 KUBE_STATE_METRICS_CHART_VERSION = "5.1.0"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
-TRAEFIK_CHART_VERSION = "37.0.0"
+TRAEFIK_CHART_VERSION = "37.1.0"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
 VANTAGE_K8S_AGENT_CHART_VERSION = "1.2.1"
 # renovate: datasource=helm depName=vault-secrets-operator packageName=vault-secrets-operator registryUrl=https://helm.releases.hashicorp.com

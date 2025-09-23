@@ -617,7 +617,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
     route_configs=[
         OLApisixRouteConfig(
             route_name="passauth",
-            priority=10,
+            priority=0,
             hosts=[api_domain],
             paths=["/*"],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
@@ -673,7 +673,7 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
     route_configs=[
         OLApisixRouteConfig(
             route_name="passauth",
-            priority=10,
+            priority=0,
             hosts=[learn_api_domain],
             paths=[f"/{api_path_prefix}/*"],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
