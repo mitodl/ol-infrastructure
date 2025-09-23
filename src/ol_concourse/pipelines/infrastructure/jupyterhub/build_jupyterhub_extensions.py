@@ -61,7 +61,8 @@ for plugin in plugins:
                         args=[
                             "-exc",
                             f"""
-                            cd {plugin_git_repo.name};
+                            apt update && apt install -y nodejs npm;
+                            cd {plugin_git_repo.name}/{plugin};
                             uv build --package {plugin};
                             uvx twine check dist/*
                             uvx twine upload --skip-existing --non-interactive dist/*
