@@ -118,9 +118,10 @@ const ForceLoginRedirect = () => {
   const { authenticatedUser } = useContext(AppContext);
 
   useEffect(() => {
+    const allowedRedirects = ["mitxonline", "xpro"];
     if (
       config.APP_ID === "learning" &&
-      process.env.DEPLOYMENT_NAME?.includes("mitxonline") &&
+      allowedRedirects.some((name) => process.env.DEPLOYMENT_NAME?.includes(name)) &&
       authenticatedUser === null
     ) {
       const destination = getLoginRedirectUrl(window.location.href);
