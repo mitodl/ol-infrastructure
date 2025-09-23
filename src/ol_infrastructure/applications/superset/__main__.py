@@ -1,8 +1,6 @@
 import json
 from pathlib import Path
-from typing import cast
 
-import pulumi_consul as consul
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, StackReference, export
@@ -40,7 +38,6 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
-from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
@@ -54,10 +51,8 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 setup_vault_provider()
 superset_config = Config("superset")
 stack_info = parse_stack()
-consul_provider = get_consul_provider(stack_info)
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 dns_stack = StackReference("infrastructure.aws.dns")
-consul_stack = StackReference(f"infrastructure.consul.data.{stack_info.name}")
 vault_infra_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 vault_mount_stack = StackReference(
     f"substructure.vault.static_mounts.operations.{stack_info.name}"
@@ -71,7 +66,6 @@ data_vpc = network_stack.require_output("data_vpc")
 superset_env = f"data-{stack_info.env_suffix}"
 superset_vault_kv_path = vault_mount_stack.require_output("superset_kv")["path"]
 aws_config = AWSBase(tags={"OU": "data", "Environment": superset_env})
-consul_security_groups = consul_stack.require_output("security_groups")
 
 # Kubernetes provider setup
 # mypy/pylance: Output[str] is acceptable at runtime
@@ -338,39 +332,6 @@ superset_vault_db_config = OLVaultPostgresDatabaseConfig(
 )
 superset_db_vault_backend = OLVaultDatabaseBackend(superset_vault_db_config)
 
-consul_opts = cast(ResourceOptions, consul_provider)
-
-superset_db_consul_node = consul.Node(
-    "superset-instance-db-node",
-    name="superset-postgres-db",
-    address=superset_db.db_instance.address,
-    datacenter=superset_env,
-    opts=consul_opts,
-)
-
-superset_db_consul_service = consul.Service(
-    "superset-instance-db-service",
-    node=superset_db_consul_node.name,
-    name="superset-db",
-    port=superset_db_config.port,
-    meta={
-        "external-node": True,
-        "external-probe": True,
-    },
-    checks=[
-        consul.ServiceCheckArgs(
-            check_id="superset-instance-db",
-            interval="10s",
-            name="superset-instance-id",
-            timeout="60s",
-            status="passing",
-            tcp=superset_db.db_instance.address.apply(
-                lambda address: f"{address}:{superset_db_config.port}"
-            ),
-        )
-    ],
-    opts=consul_opts,
-)
 
 # Create an Elasticache cluster for Redis caching and Celery broker
 redis_config = Config("redis")
@@ -426,37 +387,7 @@ redis_cache_config = OLAmazonRedisConfig(
     tags=aws_config.tags,
 )
 superset_redis_cache = OLAmazonCache(redis_cache_config)
-superset_redis_consul_node = consul.Node(
-    "superset-redis-cache-node",
-    name="superset-redis",
-    address=superset_redis_cache.address,
-    opts=consul_opts,
-)
 
-superset_redis_consul_service = consul.Service(
-    "superset-redis-consul-service",
-    node=superset_redis_consul_node.name,
-    name="superset-redis",
-    port=redis_cache_config.port,
-    meta={
-        "external-node": "true",
-        "external-probe": "true",
-    },
-    checks=[
-        consul.ServiceCheckArgs(
-            check_id="superset-redis",
-            interval="10s",
-            name="superset-redis",
-            timeout="1m0s",
-            status="passing",
-            tcp=Output.all(
-                address=superset_redis_cache.address,
-                port=superset_redis_cache.cache_cluster.port,
-            ).apply(lambda cluster: "{address}:{port}".format(**cluster)),
-        )
-    ],
-    opts=consul_opts,
-)
 ########################################
 # Vault Secrets synced into Kubernetes  #
 ########################################
