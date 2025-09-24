@@ -71,8 +71,12 @@ class QueryStringKubeSpawner(KubeSpawner):
 
                 # If we don't have a notebook, don't muck with default_url
                 # This falls back to the tree view in Jupyterhub if not specified
-                if notebook and notebook.endswith(".ipynb"):
-                    self.default_url = f"/notebooks/{notebook}"
+                if notebook:
+                    if notebook.endswith(".ipynb"):
+                        self.default_url = f"/notebooks/{notebook}"
+                    elif notebook.endswith(".py"):
+                        self.default_url = f"/tree/{notebook}"
+
         return super().start()
 
 
