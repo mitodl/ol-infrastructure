@@ -5,6 +5,7 @@ import { getConfig } from '@edx/frontend-platform';
 import { PluginSlot } from '@openedx/frontend-plugin-framework';
 import { getLoginRedirectUrl } from '@edx/frontend-platform/auth';
 import { AppContext } from '@edx/frontend-platform/react';
+import { useLocation } from 'react-router-dom';
 
 function RevealLinks({ label, children }) {
 
@@ -116,7 +117,7 @@ const config = {
 const ForceLoginRedirect = () => {
   const config = getConfig();
   const { authenticatedUser } = useContext(AppContext);
-
+  const location = useLocation(); // React Router's current page URL
   useEffect(() => {
     const allowedRedirects = ["mitxonline", "xpro"];
     if (
@@ -124,10 +125,12 @@ const ForceLoginRedirect = () => {
       allowedRedirects.some((name) => process.env.DEPLOYMENT_NAME?.includes(name)) &&
       authenticatedUser === null
     ) {
-      const destination = getLoginRedirectUrl(global.location.href);
-      global.location.replace(destination);
+      const destination = getLoginRedirectUrl(
+        `${process.env.LEARNING_BASE_URL}${location.pathname}${location.search}`
+      );
+      window.location.replace(destination);
     }
-  }, [config, authenticatedUser]);
+  }, [config, authenticatedUser, location]);
 
   return null;
 };
