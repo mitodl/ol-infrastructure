@@ -46,6 +46,9 @@ config:
     learning: learn
     ora_grading: ora-grading
   edxapp:google_analytics_id: UA-5145472-38
+  edxapp:k8s_deployment: false
+  edxapp:k8s_cutover: false
+  edxapp:disable_ec2_deployment: false
   edxapp:framework: "earthly"
   edxapp:mail_domain: edxapp-mail-production.xpro.mit.edu
   edxapp:min_web_nodes: "3"

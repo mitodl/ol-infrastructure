@@ -69,6 +69,9 @@ config:
     learning: learn
     ora_grading: ora-grading
   edxapp:google_analytics_id: UA-5145472-46
+  edxapp:k8s_deployment: false
+  edxapp:k8s_cutover: false
+  edxapp:disable_ec2_deployment: false
   edxapp:mail_domain: edxapp-mail.rc.learn.mit.edu
   edxapp:proctortrack_url: https://preproduction.verificient.com
   edxapp:sender_email_address: mitlearn-support+rc@mit.edu
