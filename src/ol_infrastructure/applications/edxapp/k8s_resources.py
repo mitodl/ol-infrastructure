@@ -1168,8 +1168,74 @@ def create_k8s_resources(
             ],
         },
     )
+
     # Celery deployment do not require service definitions
 
+    # Special one-off deployment that invokes the process_scheduled_emails.py script rather than launching the
+    # application-proper.
+    # It is important that this have distinct labels from the webapp or celery
+    lms_process_scheduled_emails_labels = k8s_global_labels | {
+        "ol.mit.edu/component": "edxapp-lms-process-scheduled-emails",
+        "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
+    }
+    lms_process_scheduled_emails_deployment = kubernetes.apps.v1.Deployment(
+        f"ol-{stack_info.env_prefix}-edxapp-lms-process-scheduled-emails-deployment-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=lms_webapp_deployment_name,
+            namespace=namespace,
+            labels=lms_process_scheduled_emails_labels,
+        ),
+        spec=kubernetes.apps.v1.DeploymentSpecArgs(
+            replicas=1,
+            selector=kubernetes.meta.v1.LabelSelectorArgs(
+                match_labels=lms_process_scheduled_emails_labels
+            ),
+            template=kubernetes.core.v1.PodTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    labels=lms_process_scheduled_emails_labels
+                ),
+                spec=kubernetes.core.v1.PodSpecArgs(
+                    service_account_name=vault_k8s_resources.service_account_name,
+                    volumes=lms_edxapp_volumes,
+                    init_containers=[
+                        staticfiles_init_container,
+                        # This init container will concatenate all the config files that come from
+                        # the umpteen secrets and configmaps into a single file that edxapp expects
+                        _create_config_aggregator_init_container(
+                            "lms", lms_edxapp_init_volume_mounts
+                        ),
+                    ],
+                    containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="lms-edxapp",
+                            image=edxapp_image,
+                            command=["python"],
+                            args=[
+                                "process_scheduled_emails.py",
+                            ],
+                            env=[
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="SERVICE_VARIANT", value="lms"
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="DJANGO_SETTINGS_MODULE",
+                                    value="lms.envs.production",
+                                ),
+                            ],
+                            volume_mounts=common_volume_mounts,
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        opts=pulumi.ResourceOptions(
+            depends_on=[
+                *lms_edxapp_config_sources.values(),
+                lms_pre_deploy_migrate_job,
+                lms_pre_deploy_waffleflag_job,
+            ]
+        ),
+    )
     create_k8s_ingress_resources(
         edxapp_config=edxapp_config,
         stack_info=stack_info,
