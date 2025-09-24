@@ -124,8 +124,8 @@ const ForceLoginRedirect = () => {
       allowedRedirects.some((name) => process.env.DEPLOYMENT_NAME?.includes(name)) &&
       authenticatedUser === null
     ) {
-      const destination = getLoginRedirectUrl(window.location.href);
-      window.location.replace(destination);
+      const destination = getLoginRedirectUrl(global.location.href);
+      global.location.replace(destination);
     }
   }, [config, authenticatedUser]);
 
