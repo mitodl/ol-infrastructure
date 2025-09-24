@@ -211,7 +211,7 @@ def create_k8s_resources(
                 name="cpu",
                 target=kubernetes.autoscaling.v2.MetricTargetArgs(
                     type="Utilization",
-                    average_utilization=60,
+                    average_utilization=80,
                 ),
             ),
         ),
@@ -221,7 +221,7 @@ def create_k8s_resources(
                 name="memory",
                 target=kubernetes.autoscaling.v2.MetricTargetArgs(
                     type="Utilization",
-                    average_utilization=60,
+                    average_utilization=80,
                 ),
             ),
         ),
@@ -364,6 +364,11 @@ def create_k8s_resources(
             name="openedx-media",
             mount_path="/openedx/media/",
         ),
+        kubernetes.core.v1.VolumeMountArgs(
+            name=configmaps.waffle_flags_yaml_config_name,
+            mount_path="/openedx/config/waffle-flags.yaml",
+            sub_path="waffle-flags.yaml",
+        ),
         *staticfiles_volume_mounts,
     ]
 
@@ -377,6 +382,8 @@ def create_k8s_resources(
         ),
     ]
 
+    # Helper function to create the init container that aggregates the config files
+    # helps reduce code duplication
     def _create_config_aggregator_init_container(
         service: str, volume_mounts: list[kubernetes.core.v1.VolumeMountArgs]
     ) -> kubernetes.core.v1.ContainerArgs:
@@ -390,12 +397,36 @@ def create_k8s_resources(
             volume_mounts=volume_mounts,
         )
 
+    # Helper function to create the affinity block for the deployments.
+    # helps reduce code duplication
+    def _create_affinity_args(
+        match_labels: dict[str, str],
+    ) -> kubernetes.core.v1.AffinityArgs:
+        return kubernetes.core.v1.AffinityArgs(
+            pod_anti_affinity=kubernetes.core.v1.PodAntiAffinityArgs(
+                preferred_during_scheduling_ignored_during_execution=[
+                    kubernetes.core.v1.WeightedPodAffinityTermArgs(
+                        weight=100,
+                        pod_affinity_term=kubernetes.core.v1.PodAffinityTermArgs(
+                            label_selector=kubernetes.meta.v1.LabelSelectorArgs(
+                                match_labels=match_labels,
+                            ),
+                            topology_key="kubernetes.io/hostname",
+                        ),
+                    ),
+                ]
+            )
+        )
+
     # This function reduces code duplication when creating the pre-deploy migrate jobs
-    def _create_pre_deploy_migrate_job(
+    def _create_pre_deploy_job(
         service_type: str,
         webapp_deployment_name: str,
         edxapp_volumes: list[kubernetes.core.v1.VolumeArgs],
         edxapp_init_volume_mounts: list[kubernetes.core.v1.VolumeMountArgs],
+        command: list[str],
+        args: list[str],
+        purpose: str = "migrate",
     ) -> kubernetes.batch.v1.Job:
         predeploy_labels = k8s_global_labels | {
             "ol.mit.edu/component": f"edxapp-{service_type}-predeploy",
@@ -403,12 +434,10 @@ def create_k8s_resources(
         }
         return kubernetes.batch.v1.Job(
             (
-                "ol-"
-                f"{stack_info.env_prefix}-edxapp-{service_type}-predeploy-migrate-job-"
-                f"{stack_info.env_suffix}"
+                f"ol-{stack_info.env_prefix}-edxapp-{service_type}-predeploy-{purpose}-job-{stack_info.env_suffix}"
             ),
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                name=f"{webapp_deployment_name}-predeploy-migrate",
+                name=f"{webapp_deployment_name}-predeploy-{purpose}",
                 namespace=namespace,
                 labels=predeploy_labels,
             ),
@@ -430,10 +459,10 @@ def create_k8s_resources(
                         ],
                         containers=[
                             kubernetes.core.v1.ContainerArgs(
-                                name=f"{service_type}-edxapp-migrate",
+                                name=f"{service_type}-edxapp-{purpose}",
                                 image=edxapp_image,
-                                command=["python", "manage.py"],
-                                args=[service_type, "migrate", "--noinput"],
+                                command=command,
+                                args=args,
                                 env=[
                                     kubernetes.core.v1.EnvVarArgs(
                                         name="SERVICE_VARIANT", value=service_type
@@ -553,6 +582,14 @@ def create_k8s_resources(
             ),
         )
     )
+    cms_edxapp_volumes.append(
+        kubernetes.core.v1.VolumeArgs(
+            name=configmaps.waffle_flags_yaml_config_name,
+            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                name=configmaps.waffle_flags_yaml_config_name,
+            ),
+        )
+    )
     cms_edxapp_volumes.extend(staticfiles_volumes)
 
     # Define the volume mounts for the init container that aggregates the config files
@@ -573,11 +610,14 @@ def create_k8s_resources(
 
     # Finally, actually define the CMS deployment
     # Start with a pre-deployment job that runs the migrations
-    cms_pre_deploy_migrate_job = _create_pre_deploy_migrate_job(
+    cms_pre_deploy_migrate_job = _create_pre_deploy_job(
         service_type="cms",
         webapp_deployment_name=cms_webapp_deployment_name,
         edxapp_volumes=cms_edxapp_volumes,
         edxapp_init_volume_mounts=cms_edxapp_init_volume_mounts,
+        command=["python", "manage.py"],
+        args=["cms", "migrate", "--noinput"],
+        purpose="migrate",
     )
     # It is important that the CMS and LMS deployment have distinct labels attached.
     # These labels should be should be distict from those attached to the predeployment
@@ -600,6 +640,7 @@ def create_k8s_resources(
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=cms_webapp_labels),
                 spec=kubernetes.core.v1.PodSpecArgs(
+                    affinity=_create_affinity_args(cms_webapp_labels),
                     service_account_name=vault_k8s_resources.service_account_name,
                     volumes=cms_edxapp_volumes,
                     init_containers=[
@@ -705,6 +746,7 @@ def create_k8s_resources(
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=cms_celery_labels),
                 spec=kubernetes.core.v1.PodSpecArgs(
+                    affinity=_create_affinity_args(cms_celery_labels),
                     service_account_name=vault_k8s_resources.service_account_name,
                     volumes=cms_edxapp_volumes,
                     init_containers=[
@@ -875,6 +917,14 @@ def create_k8s_resources(
             ),
         )
     )
+    lms_edxapp_volumes.append(
+        kubernetes.core.v1.VolumeArgs(
+            name=configmaps.waffle_flags_yaml_config_name,
+            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                name=configmaps.waffle_flags_yaml_config_name,
+            ),
+        )
+    )
     lms_edxapp_volumes.extend(staticfiles_volumes)
 
     # Define the volumemounts for the init container that aggregates the config files
@@ -895,11 +945,23 @@ def create_k8s_resources(
 
     # Finally, actually define the LMS deployment
     # Start with a pre-deployment job that runs the migrations
-    lms_pre_deploy_migrate_job = _create_pre_deploy_migrate_job(
+    lms_pre_deploy_migrate_job = _create_pre_deploy_job(
         service_type="lms",
         webapp_deployment_name=lms_webapp_deployment_name,
         edxapp_volumes=lms_edxapp_volumes,
         edxapp_init_volume_mounts=lms_edxapp_init_volume_mounts,
+        command=["python", "manage.py"],
+        args=["lms", "migrate", "--noinput"],
+        purpose="migrate",
+    )
+    lms_pre_deploy_waffleflag_job = _create_pre_deploy_job(
+        service_type="lms",
+        webapp_deployment_name=lms_webapp_deployment_name,
+        edxapp_volumes=lms_edxapp_volumes,
+        edxapp_init_volume_mounts=lms_edxapp_init_volume_mounts,
+        command=["python", "set_waffle_flags.py"],
+        args=["/openedx/config/waffle-flags.yaml"],
+        purpose="waffleflags",
     )
     # It is important that the CMS and LMS deployment have distinct labels attached.
     lms_webapp_labels = k8s_global_labels | {
@@ -920,6 +982,7 @@ def create_k8s_resources(
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=lms_webapp_labels),
                 spec=kubernetes.core.v1.PodSpecArgs(
+                    affinity=_create_affinity_args(lms_webapp_labels),
                     service_account_name=vault_k8s_resources.service_account_name,
                     volumes=lms_edxapp_volumes,
                     init_containers=[
@@ -959,7 +1022,11 @@ def create_k8s_resources(
             ),
         ),
         opts=pulumi.ResourceOptions(
-            depends_on=[*lms_edxapp_config_sources.values(), lms_pre_deploy_migrate_job]
+            depends_on=[
+                *lms_edxapp_config_sources.values(),
+                lms_pre_deploy_migrate_job,
+                lms_pre_deploy_waffleflag_job,
+            ]
         ),
     )
     lms_webapp_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
@@ -1022,6 +1089,7 @@ def create_k8s_resources(
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=lms_celery_labels),
                 spec=kubernetes.core.v1.PodSpecArgs(
+                    affinity=_create_affinity_args(lms_celery_labels),
                     service_account_name=vault_k8s_resources.service_account_name,
                     volumes=lms_edxapp_volumes,
                     init_containers=[

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
+import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference
 
 from ol_infrastructure.components.aws.cache import OLAmazonCache
@@ -19,6 +20,7 @@ class EdxappConfigMaps:
     lms_general: kubernetes.core.v1.ConfigMap
     lms_interpolated: kubernetes.core.v1.ConfigMap
     uwsgi_ini: kubernetes.core.v1.ConfigMap
+    waffle_flags_yaml: kubernetes.core.v1.ConfigMap
 
     general_config_name: str
     interpolated_config_name: str
@@ -27,6 +29,7 @@ class EdxappConfigMaps:
     lms_general_config_name: str
     lms_interpolated_config_name: str
     uwsgi_ini_config_name: str
+    waffle_flags_yaml_config_name: str
 
 
 def create_k8s_configmaps(
@@ -213,7 +216,7 @@ def create_k8s_configmaps(
 
     # Interpolated configuration items for the CMS application.
     cms_interpolated_config_name = "72-cms-interpolated-config-yaml"
-    cms_interpolated_config = kubernetes.core.v1.ConfigMap(
+    cms_interpolated_config_map = kubernetes.core.v1.ConfigMap(
         f"ol-{stack_info.env_prefix}-edxapp-cms-interpolated-config-{stack_info.env_suffix}",
         metadata={
             "name": cms_interpolated_config_name,
@@ -248,7 +251,7 @@ def create_k8s_configmaps(
 
     # Interpolated configuration items for the CMS application.
     lms_interpolated_config_name = "82-lms-interpolated-config-yaml"
-    lms_interpolated_config = kubernetes.core.v1.ConfigMap(
+    lms_interpolated_config_map = kubernetes.core.v1.ConfigMap(
         f"ol-{stack_info.env_prefix}-edxapp-lms-interpolated-config-{stack_info.env_suffix}",
         metadata={
             "name": lms_interpolated_config_name,
@@ -275,14 +278,31 @@ def create_k8s_configmaps(
         data={"uwsgi.ini": Path("files/edxapp/uwsgi.ini").read_text()},
     )
 
+    waffle_flags_yaml_config_name = "waffle-flags-yaml"
+    waffle_list = edxapp_config.get_object("waffle_flags", default=[])
+    waffle_flags_yaml_content = yaml.safe_dump({"waffles": waffle_list})
+
+    waffle_flags_yaml_config_map = kubernetes.core.v1.ConfigMap(
+        f"ol-{stack_info.env_prefix}-edxapp-waffle-flags-{stack_info.env_suffix}",
+        metadata={
+            "name": waffle_flags_yaml_config_name,
+            "namespace": namespace,
+            "labels": k8s_global_labels,
+        },
+        data={
+            "waffle-flags.yaml": waffle_flags_yaml_content,
+        },
+    )
+
     return EdxappConfigMaps(
         general=general_config_map,
         interpolated=interpolated_config_map,
         cms_general=cms_general_config_map,
-        cms_interpolated=cms_interpolated_config,
+        cms_interpolated=cms_interpolated_config_map,
         lms_general=lms_general_config_map,
-        lms_interpolated=lms_interpolated_config,
+        lms_interpolated=lms_interpolated_config_map,
         uwsgi_ini=uwsgi_ini_config_map,
+        waffle_flags_yaml=waffle_flags_yaml_config_map,
         general_config_name=general_config_name,
         interpolated_config_name=interpolated_config_name,
         cms_general_config_name=cms_general_config_name,
@@ -290,4 +310,5 @@ def create_k8s_configmaps(
         lms_general_config_name=lms_general_config_name,
         lms_interpolated_config_name=lms_interpolated_config_name,
         uwsgi_ini_config_name=uwsgi_ini_config_name,
+        waffle_flags_yaml_config_name=waffle_flags_yaml_config_name,
     )
