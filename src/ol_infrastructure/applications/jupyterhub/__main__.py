@@ -393,6 +393,14 @@ binderhub_application = kubernetes.helm.v3.Release(
                 # extraConfig is executed as python at the end of the JH config. For more details see
                 # https://z2jh.jupyter.org/en/latest/administrator/advanced.html#hub-extraconfig
                 "hub": {
+                    "extraFiles": {
+                        "mit_learn_svg": {
+                            "mountPath": "/opt/mit_learn.svg",
+                            "stringData": Path(__file__)
+                            .parent.joinpath("mit_learn.svg")
+                            .read_text(),
+                        }
+                    },
                     "extraEnv": [
                         {
                             "name": "DATABASE_URL",
