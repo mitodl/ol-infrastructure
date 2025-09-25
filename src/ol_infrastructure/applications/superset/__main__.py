@@ -16,8 +16,8 @@ from bridge.lib.magic_numbers import (
 from bridge.lib.versions import SUPERSET_CHART_VERSION
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.applications.eks import (
-    OLEKSApplication,
-    OLEKSApplicationConfig,
+    OLEKSAuthBinding,
+    OLEKSAuthBindingConfig,
 )
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
@@ -128,8 +128,8 @@ superset_policy_document = {
     ],
 }
 
-superset_app = OLEKSApplication(
-    OLEKSApplicationConfig(
+superset_app = OLEKSAuthBinding(
+    OLEKSAuthBindingConfig(
         application_name="superset",
         namespace=superset_namespace,
         stack_info=stack_info,

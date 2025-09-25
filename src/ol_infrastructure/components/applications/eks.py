@@ -19,7 +19,7 @@ from ol_infrastructure.lib.ol_types import AWSBase, K8sGlobalLabels
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
-class OLEKSApplicationConfig(BaseModel):
+class OLEKSAuthBindingConfig(BaseModel):
     """Configuration for EKS application services.
 
     This component is intended to simplify the deployment of applications on EKS that
@@ -50,12 +50,15 @@ class OLEKSApplicationConfig(BaseModel):
         arbitrary_types_allowed = True
 
 
-class OLEKSApplication(ComponentResource):
+class OLEKSAuthBinding(ComponentResource):
     """A component for deploying applications to EKS."""
+
+    irsa_role: iam.Role
+    vault_k8s_resources: OLVaultK8SResources
 
     def __init__(
         self,
-        config: OLEKSApplicationConfig,
+        config: OLEKSAuthBindingConfig,
         opts: ResourceOptions | None = None,
     ):
         """Initialize the EKS application component.
