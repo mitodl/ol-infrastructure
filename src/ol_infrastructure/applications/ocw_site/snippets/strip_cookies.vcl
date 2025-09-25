@@ -1,1 +1,0 @@
-unset req.http.Cookie;

@@ -40,9 +40,6 @@ config:
   mitlearn:legacy_frontend_domain: "mitopen-ci.odl.mit.edu"
   mitlearn:nextjs_heroku_domain: "next.ci.learn.mit.edu"
   mitlearn:posthog_proxy: "ph.ol.mit.edu"
-  #  heroku:user: "odl-devops"
-  #heroku:app_id:
-  #  secure: v1:eSvnqne7KQRkHJlu:wTyl9W3aivfxlANqBML2wy4GEHe85VuKll60R5HmGUu1hJTcQBEfzK1cJOyvjlbLgBtXLw==
   mitlearn:vars:
     AI_MIT_SYLLABUS_URL: "https://api.ci.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.ci.learn.mit.edu/api/v0/vector_content_files_search/"
@@ -77,6 +74,8 @@ config:
     OPENSEARCH_URL: "https://search-opensearch-mitlearn-ci-q7fuxrc2j26me44ymcftz3ahba.us-east-1.es.amazonaws.com"
     POSTHOG_API_HOST: "https://ph.ol.mit.edu"
     POSTHOG_ENABLED: "true"
+    POSTHOG_EVENT_S3_BUCKET: "ol-data-lake-landing-zone-qa"
+    POSTHOG_EVENT_S3_PREFIX: "thirdparty/posthog/learn/events/"
     POSTHOG_PROJECT_ID: "86325"
     POSTHOG_TIMEOUT_MS: 1000
     SEE_API_ENABLED: "true"

@@ -70,10 +70,10 @@ config:
   - "https://binder.ol.mit.edu/*"
   keycloak_realm:ol-data-platform-superset-redirect-uris: ["https://bi.ol.mit.edu/*"]
   keycloak_realm:ol-data-platform-superset-client-roles:
-  - "superset_admin"
-  - "superset_alpha"
-  - "superset_gamma"
-  - "superset_researcher"
+  - "ol_platform_admin"
+  - "ol_data_engineer"
+  - "ol_data_analyst"
+  - "ol_researcher"
   keycloak_realm:ol-data-platform-openmetadata-redirect-uris: ["https://data.ol.mit.edu/*"]
   keycloak_realm:ol-data-platform-openmetadata-client-roles:
   - "open_metadata_admin"

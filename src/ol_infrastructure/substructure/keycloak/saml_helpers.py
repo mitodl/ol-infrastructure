@@ -27,7 +27,7 @@ SAML_FRIENDLY_NAMES = {
         "emailaddress",
         "Email Address",
         "user.email",  # {Link: According to Lucid Community
-        # https://community.lucid.co/admin-questions-2/azure-saml-sso-and-first-last-names-in-attributes-claims-not-working-7600}
+        # https://community.lucid.co/admin-questions-2/azure-saml-sso-and-first-last-names-in_attributes-claims-not-working-7600}
     ],
     "fullName": [
         "Name",  # Often used in ADFS for the display name or full name
@@ -100,7 +100,19 @@ def extract_saml_metadata(metadata_url: str) -> dict[str, str | None]:
     entity_id = root.get("entityID")
 
     # Extract Single Sign-On Service URL
-    sso_service = root.find(".//md:SingleSignOnService", namespaces)
+    # Look for SAML2.0 POST binding endpoints first.
+    sso_service = root.find(
+        ".//md:SingleSignOnService[@Binding='urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST']",
+        namespaces,
+    )
+    # If no POST binding, look for any SAML2.0 binding
+    if sso_service is None:
+        for service in root.findall(".//md:SingleSignOnService", namespaces):
+            binding = service.get("Binding")
+            if binding and binding.startswith("urn:oasis:names:tc:SAML:2.0:bindings:"):
+                sso_service = service
+                break
+
     sso_url = sso_service.get("Location") if sso_service is not None else None
 
     # Extract Single Logout Service URL (optional)

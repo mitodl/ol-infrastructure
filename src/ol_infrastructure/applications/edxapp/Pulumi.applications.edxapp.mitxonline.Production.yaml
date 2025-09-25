@@ -13,6 +13,7 @@ config:
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone",
     "--staff", "--authenticated"]
   - ["course_experience.relative_dates_disable_reset", "--create", "--everyone"]
+  - ["discussions.enable_forum_v2", "--create", "--everyone"]
   - ["discussions.pages_and_resources_mfe", "--create", "--everyone"]
   - ["grades.bulk_management", "--create", "--superusers", "--everyone", "--staff",
     "--authenticated"]
@@ -50,12 +51,12 @@ config:
   edxapp:business_unit: mitxonline
   edxapp:db_password:
     secure: v1:Za4LI6RKfAW7jLJh:hlthF86wmGH6VSiBHgehE8mY11hDfOUK/uYZADbodhCVuS8RSXoCoHtrRrBDNMXunQmHLABw4SM=
-  edxapp:db_version: "10.11"
-  edxapp:dns_zone: mitxonline
+  edxapp:db_use_blue_green: true
+  edxapp:dns_zone: learn
   edxapp:domains:
-    lms: courses.mitxonline.mit.edu
-    preview: preview.mitxonline.mit.edu
-    studio: studio.mitxonline.mit.edu
+    lms: courses.learn.mit.edu
+    preview: preview.courses.learn.mit.edu
+    studio: studio.courses.learn.mit.edu
   edxapp:k8s_deployment: false
   edxapp:k8s_cutover: false
   edxapp:disable_ec2_deployment: false
@@ -71,17 +72,17 @@ config:
     learning: learn
     ora_grading: ora-grading
   edxapp:google_analytics_id: UA-5145472-48
-  edxapp:mail_domain: edxapp-mail.mitxonline.mit.edu
+  edxapp:mail_domain: edxapp-mail.learn.mit.edu
   edxapp:proctortrack_url: https://testing.verificient.com
-  edxapp:sender_email_address: mitxonline-support@mit.edu
+  edxapp:sender_email_address: mitlearn-support@mit.edu
   edxapp:email_use_course_id_from_for_bulk: "True"
-  edxapp:bulk_email_default_from_email: no-reply@edxapp-mail.mitxonline.mit.edu
+  edxapp:bulk_email_default_from_email: no-reply@edxapp-mail.learn.mit.edu
   edxapp:framework: "earthly"
   edxapp:web_node_capacity: "9"
   edxapp:worker_node_capacity: "5"
   edxapp:worker_instance_type: "r7a.large"
   mongodb:atlas_project_id: 61f0a63f8bc1f86a073a7148
-  redis:instance_type: cache.r6g.2xlarge
+  redis:instance_type: cache.r7g.2xlarge
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   edxapp:edx_xqueue_secrets:

@@ -45,8 +45,7 @@ config:
   edxapp:db_max_storage_gb: "1000"
   edxapp:db_password:
     secure: v1:vkG4n/X+C+SBaMf7:W/zi1Bxqkab0Hx1HAAiVhZuj/8WOJ7v94lxfERa5YIF5dD037uuULgPxIt+3zzHVur26pBcVIk4=
-  edxapp:db_storage_gb: "500"
-  edxapp:db_version: 10.11
+  edxapp:db_use_blue_green: true
   edxapp:dns_zone: mitx
   edxapp:domains:
     lms: lms.mitx.mit.edu
@@ -80,6 +79,6 @@ config:
   edxapp:worker_instance_type: "m7a.xlarge"
   edxapp:framework: "earthly"
   mongodb:atlas_project_id: 61b728704656cb4747e589a0
-  redis:instance_type: cache.r6g.2xlarge
+  redis:instance_type: cache.r7g.2xlarge
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

@@ -2,18 +2,49 @@ import os
 
 from kubespawner import KubeSpawner
 
+GPU_NODE_AFFINITY_LIST = [
+    {
+        "matchExpressions": [
+            {
+                "key": "ol.mit.edu/gpu_node",
+                "operator": "In",
+                "values": ["true"],
+            }
+        ]
+    }
+]
+
+KNOWN_COURSES = [
+    "clustering_and_descriptive_ai",
+    "deep_learning_foundations_and_applications",
+    "supervised_learning_fundamentals",
+    "introduction_to_data_analytics_and_machine_learning",
+]
+# We have notebooks in UAI courses 6-13, excluding 10
+KNOWN_COURSES.extend(
+    [f"uai_source-uai.{i}" for i in [0, "0a", 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13]]
+)
+# All courses which use the CUDA pytorch base image are below
+GPU_ENABLED_COURSES = {
+    "deep_learning_foundations_and_applications",
+    "uai_source-uai.1",
+    "uai_source-uai.2",
+    "uai_source-uai.3",
+    "uai_source-uai.4",
+    "uai_source-uai.5",
+    "uai_source-uai.8",
+    "uai_source-uai.9",
+    "uai_source-uai.11",
+    "uai_source-uai.12",
+    "uai_source-uai.13",
+}
+
 
 class QueryStringKubeSpawner(KubeSpawner):
     def start(self):
         image_base = (
             "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks:{}"
         )
-        KNOWN_COURSES = [
-            "clustering_and_descriptive_ai",
-            "deep_learning_foundations_and_applications",
-            "supervised_learning_fundamentals",
-            "introduction_to_data_analytics_and_machine_learning",
-        ]
         self.image = (
             "610119931565.dkr.ecr.us-east-1.amazonaws.com/"
             "ol-course-notebooks:clustering_and_descriptive_ai"
@@ -32,6 +63,12 @@ class QueryStringKubeSpawner(KubeSpawner):
                 self.image = (
                     image_base.format(tag) if tag else image_base.format(course)
                 )
+
+                if course in GPU_ENABLED_COURSES:
+                    # This course requires a GPU, so we are adding a node affinity
+                    # rule to schedule the pod on a node with a GPU.
+                    self.node_affinity_required = GPU_NODE_AFFINITY_LIST
+
                 # If we don't have a notebook, don't muck with default_url
                 # This falls back to the tree view in Jupyterhub if not specified
                 if notebook and notebook.endswith(".ipynb"):
@@ -42,3 +79,4 @@ class QueryStringKubeSpawner(KubeSpawner):
 c.JupyterHub.spawner_class = QueryStringKubeSpawner  # type: ignore[name-defined] # noqa: F821
 c.Authenticator.allow_all = True  # type: ignore[name-defined] # noqa: F821
 c.JupyterHub.db_url = os.environ["DATABASE_URL"]  # type: ignore[name-defined] # noqa: F821
+c.JupyterHub.tornado_settings["cookie_options"] = {"expires_days": 1}  # type: ignore[name-defined] # noqa: F821

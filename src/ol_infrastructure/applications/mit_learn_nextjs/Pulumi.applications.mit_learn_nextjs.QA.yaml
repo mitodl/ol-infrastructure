@@ -12,6 +12,7 @@ config:
   nextjs:mitol_noindex: "true"
   nextjs:mitxonline_base_url: "https://api.rc.learn.mit.edu/mitxonline"
   nextjs:origin: "https://rc.learn.mit.edu"
+  nextjs:pod_count: 4
   nextjs:posthog_api_host: "https://ph.ol.mit.edu"
   nextjs:posthog_api_key:
     secure: v1:D6BU/g0NUZDvxXD9:DkvCwOFtQ3uuThjx/Nrtz/LSAz706abquAc0FQxz5Jhe8qmatDHOgS1PvMbgFojqhbyfODCn3nQhUD8zfEUJ

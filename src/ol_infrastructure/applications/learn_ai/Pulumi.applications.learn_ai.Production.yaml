@@ -7,6 +7,7 @@ config:
   learn_ai:db_password:
     secure: v1:DIaoiP0dVXpI2w72:zcSTWgD6DInTMOdD1oH1FTdlUJCney7MLeAfL5Q5hcL9lDfW7AjVGynLDeDtpL3DQIZvFBUvcbjIHVaBYQf8Ikf8tdjWamNBv+4Ymwe2
   learn_ai:env_vars:
+    AI_CHATBOTS_SESSION_EXPIRY_DAYS: 36500
     AI_CITED_PROMPTS: '["syllabus_canvas"]'
     AI_DEFAULT_RECOMMENDATION_MODEL: "openai/gpt-4o-mini"
     AI_DEFAULT_SYLLABUS_MODEL: "openai/gpt-4o-mini"
@@ -49,8 +50,8 @@ config:
     MIT_LEARN_APP_BASE_URL: https://learn.mit.edu/
     MIT_SEARCH_ELASTIC_URL: https://api.learn.mit.edu/api/v1/learning_resources_search/
     MIT_SEARCH_VECTOR_URL: https://api.learn.mit.edu/api/v0/vector_learning_resources_search/
-    OPENEDX_API_BASE_URL: https://courses.mitxonline.mit.edu/
-    OPENEDX_LOGIN_URL: https://courses.mitxonline.mit.edu/auth/login/ol-oauth2/?auth_entry=login
+    OPENEDX_API_BASE_URL: https://courses.learn.mit.edu/
+    OPENEDX_LOGIN_URL: https://courses.learn.mit.edu/auth/login/ol-oauth2/?auth_entry=login
   learn_ai:learn_backend_domain: "api.learn.mit.edu"
   learn_ai:min_replicas: 4
   redis:password:
