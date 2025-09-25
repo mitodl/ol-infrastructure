@@ -1842,28 +1842,29 @@ validated_tls_subscription = fastly.TlsSubscriptionValidation(
 
 
 # Create Route53 DNS records for Edxapp web nodes
-for domain_key, domain_value in edxapp_domains.items():
-    dns_override = edxapp_config.get("maintenance_page_dns")
-    if domain_key in {"studio", "lms"}:
-        route53.Record(
-            f"edxapp-web-{domain_key}-dns-record",
-            name=domain_value,
-            type="CNAME",
-            ttl=FIVE_MINUTES,
-            allow_overwrite=True,
-            records=[dns_override or "j.sni.global.fastly.net"],
-            zone_id=edxapp_zone_id,
-        )
-    else:
-        route53.Record(
-            f"edxapp-web-{domain_key}-dns-record",
-            name=domain_value,
-            type="CNAME",
-            ttl=FIVE_MINUTES,
-            allow_overwrite=True,
-            records=[dns_override or web_lb.dns_name],
-            zone_id=edxapp_zone_id,
-        )
+if not edxapp_config.get_bool("disable_ec2_deployment"):
+    for domain_key, domain_value in edxapp_domains.items():
+        dns_override = edxapp_config.get("maintenance_page_dns")
+        if domain_key in {"studio", "lms"}:
+            route53.Record(
+                f"edxapp-web-{domain_key}-dns-record",
+                name=domain_value,
+                type="CNAME",
+                ttl=FIVE_MINUTES,
+                allow_overwrite=True,
+                records=[dns_override or "j.sni.global.fastly.net"],
+                zone_id=edxapp_zone_id,
+            )
+        else:
+            route53.Record(
+                f"edxapp-web-{domain_key}-dns-record",
+                name=domain_value,
+                type="CNAME",
+                ttl=FIVE_MINUTES,
+                allow_overwrite=True,
+                records=[dns_override or web_lb.dns_name],
+                zone_id=edxapp_zone_id,
+            )
 
 # Actions to take when the the stack is configured to deploy into k8s
 if edxapp_config.get("k8s_deployment"):
@@ -1882,20 +1883,19 @@ if edxapp_config.get("k8s_deployment"):
         vault_policy=edxapp_vault_policy,
     )
 
+export_dict = {
+    "mariadb": edxapp_db.db_instance.address,
+    "redis": edxapp_redis_cache.address,
+    "redis_token": edxapp_redis_cache.cache_cluster.auth_token,
+    "mfe_bucket": edxapp_mfe_bucket_name,
+    "ses_configuration_set": edxapp_ses_configuration_set.name,
+    "edx_notes_iam_role": edxapp_notes_iam_role.arn,
+    "deployment": stack_info.env_prefix,
+}
+if not edxapp_config.get_bool("disable_ec2_deployment"):
+    export_dict["load_balancer"] = {"dns_name": web_lb.dns_name, "arn": web_lb.arn}
 
-export(
-    "edxapp",
-    {
-        "mariadb": edxapp_db.db_instance.address,
-        "redis": edxapp_redis_cache.address,
-        "redis_token": edxapp_redis_cache.cache_cluster.auth_token,
-        "mfe_bucket": edxapp_mfe_bucket_name,
-        "load_balancer": {"dns_name": web_lb.dns_name, "arn": web_lb.arn},
-        "ses_configuration_set": edxapp_ses_configuration_set.name,
-        "edx_notes_iam_role": edxapp_notes_iam_role.arn,
-        "deployment": stack_info.env_prefix,
-    },
-)
+export("edxapp", export_dict)
 
 export("edxapp_security_group", edxapp_security_group.id)
 

@@ -1181,7 +1181,7 @@ def create_k8s_resources(
     lms_process_scheduled_emails_deployment = kubernetes.apps.v1.Deployment(
         f"ol-{stack_info.env_prefix}-edxapp-lms-process-scheduled-emails-deployment-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=lms_webapp_deployment_name,
+            name=f"{env_name}-edxapp-lms-process-scheduled-emails",
             namespace=namespace,
             labels=lms_process_scheduled_emails_labels,
         ),
