@@ -427,6 +427,7 @@ def create_k8s_resources(
         command: list[str],
         args: list[str],
         purpose: str = "migrate",
+        opts: ResourceOptions = None,
     ) -> kubernetes.batch.v1.Job:
         predeploy_labels = k8s_global_labels | {
             "ol.mit.edu/component": f"edxapp-{service_type}-predeploy",
@@ -478,357 +479,14 @@ def create_k8s_resources(
                     ),
                 ),
             ),
+            opts=opts,
         )
-
-    ############################################
-    # cms deployment resources
-    ############################################
-    # All of the secrets and configmaps that will be mounted into the edxapp cms containers
-    # The names are prefixed with numbers to control the order they are concatenated in.
-    cms_edxapp_config_sources = {
-        secrets.db_creds_secret_name: secrets.db_creds,
-        secrets.db_connections_secret_name: secrets.db_connections,
-        secrets.mongo_db_creds_secret_name: secrets.mongo_db_creds,
-        secrets.mongo_db_forum_secret_name: secrets.mongo_db_forum,
-        secrets.general_secrets_name: secrets.general,
-        secrets.xqueue_secret_name: secrets.xqueue,
-        secrets.forum_secret_name: secrets.forum,
-        configmaps.general_config_name: configmaps.general,
-        configmaps.interpolated_config_name: configmaps.interpolated,
-        # Just CMS specific resources below this line
-        secrets.cms_oauth_secret_name: secrets.cms_oauth,
-        configmaps.cms_general_config_name: configmaps.cms_general,
-        configmaps.cms_interpolated_config_name: configmaps.cms_interpolated,
-    }
-    cms_edxapp_secret_names = [
-        secrets.db_creds_secret_name,
-        secrets.db_connections_secret_name,
-        secrets.mongo_db_creds_secret_name,
-        secrets.mongo_db_forum_secret_name,
-        secrets.general_secrets_name,
-        secrets.xqueue_secret_name,
-        secrets.forum_secret_name,
-        # Just CMS specific resources below this line
-        secrets.cms_oauth_secret_name,
-    ]
-    cms_edxapp_configmap_names = [
-        configmaps.general_config_name,
-        configmaps.interpolated_config_name,
-        # Just CMS specific resources below this line
-        configmaps.cms_general_config_name,
-        configmaps.cms_interpolated_config_name,
-    ]
-
-    # This can be confusing. We are working with two different 'volume' concepts here.
-    # 1. The 'volumes' that are defined in the pod spec.
-    # 2. The 'volumeMounts' that are defined in each container.
-    # Not every container must have every (or any) volumeMounts, but the volumeMounts
-    # it does have must be defined as volumes in the pod spec.
-    #
-    # volumeMounts reference volumes.
-    #
-    # See: https://kubernetes.io/docs/concepts/storage/volumes/
-
-    # Define the volumes that will be mounted into the edxapp containers
-    cms_edxapp_volumes = [
-        kubernetes.core.v1.VolumeArgs(
-            name=secret_name,
-            secret=kubernetes.core.v1.SecretVolumeSourceArgs(secret_name=secret_name),
-        )
-        for secret_name in cms_edxapp_secret_names
-    ]
-    cms_edxapp_volumes.extend(
-        [
-            kubernetes.core.v1.VolumeArgs(
-                name=configmap_name,
-                config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                    name=configmap_name
-                ),
-            )
-            for configmap_name in cms_edxapp_configmap_names
-        ]
-    )
-    cms_edxapp_volumes.append(
-        kubernetes.core.v1.VolumeArgs(
-            name="edxapp-config",
-            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
-        )
-    )
-    cms_edxapp_volumes.append(
-        kubernetes.core.v1.VolumeArgs(
-            name="openedx-data",
-            persistent_volume_claim=kubernetes.core.v1.PersistentVolumeClaimVolumeSourceArgs(
-                claim_name=openedx_data_pvc.metadata.name
-            ),
-        )
-    )
-    cms_edxapp_volumes.append(
-        kubernetes.core.v1.VolumeArgs(
-            name="openedx-logs",
-            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
-        )
-    )
-    cms_edxapp_volumes.append(
-        kubernetes.core.v1.VolumeArgs(
-            name="openedx-media",
-            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
-        )
-    )
-    cms_edxapp_volumes.append(
-        kubernetes.core.v1.VolumeArgs(
-            name=configmaps.uwsgi_ini_config_name,
-            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                name=configmaps.uwsgi_ini_config_name
-            ),
-        )
-    )
-    cms_edxapp_volumes.append(
-        kubernetes.core.v1.VolumeArgs(
-            name=configmaps.waffle_flags_yaml_config_name,
-            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                name=configmaps.waffle_flags_yaml_config_name,
-            ),
-        )
-    )
-    cms_edxapp_volumes.extend(staticfiles_volumes)
-
-    # Define the volume mounts for the init container that aggregates the config files
-    cms_edxapp_init_volume_mounts = [
-        kubernetes.core.v1.VolumeMountArgs(
-            name=source_name,
-            mount_path=f"/openedx/config-sources/{source_name}",
-            read_only=True,
-        )
-        for source_name in cms_edxapp_config_sources
-    ]
-    cms_edxapp_init_volume_mounts.append(
-        kubernetes.core.v1.VolumeMountArgs(
-            name="edxapp-config",
-            mount_path="/openedx/config",
-        )
-    )
-
-    # Finally, actually define the CMS deployment
-    # Start with a pre-deployment job that runs the migrations
-    cms_pre_deploy_migrate_job = _create_pre_deploy_job(
-        service_type="cms",
-        webapp_deployment_name=cms_webapp_deployment_name,
-        edxapp_volumes=cms_edxapp_volumes,
-        edxapp_init_volume_mounts=cms_edxapp_init_volume_mounts,
-        command=["python", "manage.py"],
-        args=["cms", "migrate", "--noinput"],
-        purpose="migrate",
-    )
-    # It is important that the CMS and LMS deployment have distinct labels attached.
-    # These labels should be should be distict from those attached to the predeployment
-    # jobs as well.
-    cms_webapp_labels = k8s_global_labels | {
-        "ol.mit.edu/component": "edxapp-cms-webapp",
-        "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
-    }
-    cms_webapp_deployment = kubernetes.apps.v1.Deployment(
-        f"ol-{stack_info.env_prefix}-edxapp-cms-deployment-{stack_info.env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=cms_webapp_deployment_name,
-            namespace=namespace,
-            labels=cms_webapp_labels,
-        ),
-        spec=kubernetes.apps.v1.DeploymentSpecArgs(
-            selector=kubernetes.meta.v1.LabelSelectorArgs(
-                match_labels=cms_webapp_labels
-            ),
-            template=kubernetes.core.v1.PodTemplateSpecArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=cms_webapp_labels),
-                spec=kubernetes.core.v1.PodSpecArgs(
-                    affinity=_create_affinity_args(cms_webapp_labels),
-                    service_account_name=vault_k8s_resources.service_account_name,
-                    volumes=cms_edxapp_volumes,
-                    init_containers=[
-                        staticfiles_init_container,
-                        # This init container will concatenate all the config files that come from
-                        # the umpteen secrets and configmaps into a single file that edxapp expects
-                        _create_config_aggregator_init_container(
-                            "cms", cms_edxapp_init_volume_mounts
-                        ),
-                    ],
-                    containers=[
-                        kubernetes.core.v1.ContainerArgs(
-                            name="cms-edxapp",
-                            image=edxapp_image,
-                            env=[
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="SERVICE_VARIANT", value="cms"
-                                ),
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="DJANGO_SETTINGS_MODULE",
-                                    value="cms.envs.production",
-                                ),
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="UWSGI_WORKERS", value="2"
-                                ),
-                            ],
-                            resources=_get_resources_requests_limits("webapp", "cms"),
-                            ports=[
-                                kubernetes.core.v1.ContainerPortArgs(
-                                    container_port=8000, name="http"
-                                )
-                            ],
-                            volume_mounts=webapp_volume_mounts,
-                        )
-                    ],
-                ),
-            ),
-        ),
-        opts=pulumi.ResourceOptions(
-            depends_on=[
-                *cms_edxapp_config_sources.values(),
-                cms_pre_deploy_migrate_job,
-            ]
-        ),
-    )
-    cms_webapp_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
-        f"ol-{stack_info.env_prefix}-edxapp-cms-hpa-{stack_info.env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=f"{cms_webapp_deployment_name}-hpa",
-            namespace=namespace,
-            labels=cms_webapp_labels,
-        ),
-        spec=kubernetes.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
-            scale_target_ref=kubernetes.autoscaling.v2.CrossVersionObjectReferenceArgs(
-                api_version="apps/v1",
-                kind="Deployment",
-                name=cms_webapp_deployment_name,
-            ),
-            min_replicas=replicas_dict["webapp"]["cms"]["min"],
-            max_replicas=replicas_dict["webapp"]["cms"]["max"],
-            metrics=webapp_hpa_scaling_metrics,
-            behavior=webapp_hpa_behavior,
-        ),
-    )
-    cms_webapp_service = kubernetes.core.v1.Service(
-        f"ol-{stack_info.env_prefix}-edxapp-cms-service-{stack_info.env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=cms_webapp_deployment_name,
-            namespace=namespace,
-            labels=cms_webapp_labels,
-        ),
-        spec=kubernetes.core.v1.ServiceSpecArgs(
-            ports=[
-                kubernetes.core.v1.ServicePortArgs(
-                    name="http",
-                    port=8000,
-                    # 'http' is the name of the port in the deployment podspec
-                    target_port="http",
-                    protocol="TCP",
-                )
-            ],
-            selector=cms_webapp_labels,
-            type="ClusterIP",
-        ),
-    )
-
-    # It is important that the celery workers have distinct labels from the webapps
-    cms_celery_labels = k8s_global_labels | {
-        "ol.mit.edu/component": "edxapp-cms-celery",
-        "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
-    }
-    cms_celery_deployment = kubernetes.apps.v1.Deployment(
-        f"ol-{stack_info.env_prefix}-edxapp-cms-celery-deployment-{stack_info.env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=f"{cms_celery_deployment_name}",
-            namespace=namespace,
-            labels=cms_celery_labels,
-        ),
-        spec=kubernetes.apps.v1.DeploymentSpecArgs(
-            selector=kubernetes.meta.v1.LabelSelectorArgs(
-                match_labels=cms_celery_labels
-            ),
-            template=kubernetes.core.v1.PodTemplateSpecArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=cms_celery_labels),
-                spec=kubernetes.core.v1.PodSpecArgs(
-                    affinity=_create_affinity_args(cms_celery_labels),
-                    service_account_name=vault_k8s_resources.service_account_name,
-                    volumes=cms_edxapp_volumes,
-                    init_containers=[
-                        staticfiles_init_container,  # strictly speaking, not required
-                        _create_config_aggregator_init_container(
-                            "cms", cms_edxapp_init_volume_mounts
-                        ),
-                    ],
-                    containers=[
-                        kubernetes.core.v1.ContainerArgs(
-                            name="cms-edxapp",
-                            image=edxapp_image,
-                            command=["celery"],
-                            args=[
-                                "--app=cms.celery",
-                                "worker",
-                                "-B",
-                                "-E",
-                                "--loglevel=info",
-                                "--hostname=edx.cms.core.default.%%h",
-                                "--max-tasks-per-child",
-                                "100",
-                                "--exclude-queues=edx.lms.core.default",
-                            ],
-                            env=[
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="SERVICE_VARIANT", value="cms"
-                                ),
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="DJANGO_SETTINGS_MODULE",
-                                    value="cms.envs.production",
-                                ),
-                            ],
-                            resources=_get_resources_requests_limits("celery", "cms"),
-                            volume_mounts=common_volume_mounts,
-                        )
-                    ],
-                ),
-            ),
-        ),
-    )
-    cms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
-        f"ol-{stack_info.env_prefix}-edxapp-cms-celery-scaledobject-{stack_info.env_suffix}",
-        api_version="keda.sh/v1alpha1",
-        kind="ScaledObject",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=f"{cms_celery_deployment_name}-scaledobject",
-            namespace=namespace,
-            labels=cms_celery_labels,
-        ),
-        spec={
-            "scaleTargetRef": {
-                "kind": "Deployment",
-                "name": cms_celery_deployment_name,
-            },
-            "pollingInterval": 3,
-            "cooldownPeriod": 10,
-            "minReplicaCount": replicas_dict["celery"]["cms"]["min"],
-            "maxReplicaCount": replicas_dict["celery"]["cms"]["max"],
-            "triggers": [
-                {
-                    "type": "redis",
-                    "metadata": {
-                        "address": edxapp_cache.address.apply(
-                            lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
-                        ),
-                        "username": "default",
-                        "datbaseIndex": "0",
-                        "password": edxapp_cache.cache_cluster.auth_token,
-                        "listName": "celery",  # TODO(Mike): is this correct for both lms and cms?
-                        "listLength": "10",
-                        "enableTLS": "true",
-                    },
-                }
-            ],
-        },
-    )
-    # Celery deployment do not require service definitions
 
     ############################################
     # lms deployment resources
     ############################################
+    # All of the secrets and configmaps that will be mounted into the edxapp lms containers
+    # The names are prefixed with numbers to control the order they are concatenated in.
     lms_edxapp_config_sources = {
         secrets.db_creds_secret_name: secrets.db_creds,
         secrets.db_connections_secret_name: secrets.db_connections,
@@ -1236,6 +894,353 @@ def create_k8s_resources(
             ]
         ),
     )
+
+    ############################################
+    # cms deployment resources
+    ############################################
+    # All of the secrets and configmaps that will be mounted into the edxapp cms containers
+    # The names are prefixed with numbers to control the order they are concatenated in.
+    cms_edxapp_config_sources = {
+        secrets.db_creds_secret_name: secrets.db_creds,
+        secrets.db_connections_secret_name: secrets.db_connections,
+        secrets.mongo_db_creds_secret_name: secrets.mongo_db_creds,
+        secrets.mongo_db_forum_secret_name: secrets.mongo_db_forum,
+        secrets.general_secrets_name: secrets.general,
+        secrets.xqueue_secret_name: secrets.xqueue,
+        secrets.forum_secret_name: secrets.forum,
+        configmaps.general_config_name: configmaps.general,
+        configmaps.interpolated_config_name: configmaps.interpolated,
+        # Just CMS specific resources below this line
+        secrets.cms_oauth_secret_name: secrets.cms_oauth,
+        configmaps.cms_general_config_name: configmaps.cms_general,
+        configmaps.cms_interpolated_config_name: configmaps.cms_interpolated,
+    }
+    cms_edxapp_secret_names = [
+        secrets.db_creds_secret_name,
+        secrets.db_connections_secret_name,
+        secrets.mongo_db_creds_secret_name,
+        secrets.mongo_db_forum_secret_name,
+        secrets.general_secrets_name,
+        secrets.xqueue_secret_name,
+        secrets.forum_secret_name,
+        # Just CMS specific resources below this line
+        secrets.cms_oauth_secret_name,
+    ]
+    cms_edxapp_configmap_names = [
+        configmaps.general_config_name,
+        configmaps.interpolated_config_name,
+        # Just CMS specific resources below this line
+        configmaps.cms_general_config_name,
+        configmaps.cms_interpolated_config_name,
+    ]
+
+    # This can be confusing. We are working with two different 'volume' concepts here.
+    # 1. The 'volumes' that are defined in the pod spec.
+    # 2. The 'volumeMounts' that are defined in each container.
+    # Not every container must have every (or any) volumeMounts, but the volumeMounts
+    # it does have must be defined as volumes in the pod spec.
+    #
+    # volumeMounts reference volumes.
+    #
+    # See: https://kubernetes.io/docs/concepts/storage/volumes/
+
+    # Define the volumes that will be mounted into the edxapp containers
+    cms_edxapp_volumes = [
+        kubernetes.core.v1.VolumeArgs(
+            name=secret_name,
+            secret=kubernetes.core.v1.SecretVolumeSourceArgs(secret_name=secret_name),
+        )
+        for secret_name in cms_edxapp_secret_names
+    ]
+    cms_edxapp_volumes.extend(
+        [
+            kubernetes.core.v1.VolumeArgs(
+                name=configmap_name,
+                config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                    name=configmap_name
+                ),
+            )
+            for configmap_name in cms_edxapp_configmap_names
+        ]
+    )
+    cms_edxapp_volumes.append(
+        kubernetes.core.v1.VolumeArgs(
+            name="edxapp-config",
+            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+        )
+    )
+    cms_edxapp_volumes.append(
+        kubernetes.core.v1.VolumeArgs(
+            name="openedx-data",
+            persistent_volume_claim=kubernetes.core.v1.PersistentVolumeClaimVolumeSourceArgs(
+                claim_name=openedx_data_pvc.metadata.name
+            ),
+        )
+    )
+    cms_edxapp_volumes.append(
+        kubernetes.core.v1.VolumeArgs(
+            name="openedx-logs",
+            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+        )
+    )
+    cms_edxapp_volumes.append(
+        kubernetes.core.v1.VolumeArgs(
+            name="openedx-media",
+            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+        )
+    )
+    cms_edxapp_volumes.append(
+        kubernetes.core.v1.VolumeArgs(
+            name=configmaps.uwsgi_ini_config_name,
+            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                name=configmaps.uwsgi_ini_config_name
+            ),
+        )
+    )
+    cms_edxapp_volumes.append(
+        kubernetes.core.v1.VolumeArgs(
+            name=configmaps.waffle_flags_yaml_config_name,
+            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                name=configmaps.waffle_flags_yaml_config_name,
+            ),
+        )
+    )
+    cms_edxapp_volumes.extend(staticfiles_volumes)
+
+    # Define the volume mounts for the init container that aggregates the config files
+    cms_edxapp_init_volume_mounts = [
+        kubernetes.core.v1.VolumeMountArgs(
+            name=source_name,
+            mount_path=f"/openedx/config-sources/{source_name}",
+            read_only=True,
+        )
+        for source_name in cms_edxapp_config_sources
+    ]
+    cms_edxapp_init_volume_mounts.append(
+        kubernetes.core.v1.VolumeMountArgs(
+            name="edxapp-config",
+            mount_path="/openedx/config",
+        )
+    )
+
+    # Finally, actually define the CMS deployment
+    # Start with a pre-deployment job that runs the migrations
+    cms_pre_deploy_migrate_job = _create_pre_deploy_job(
+        service_type="cms",
+        webapp_deployment_name=cms_webapp_deployment_name,
+        edxapp_volumes=cms_edxapp_volumes,
+        edxapp_init_volume_mounts=cms_edxapp_init_volume_mounts,
+        command=["python", "manage.py"],
+        args=["cms", "migrate", "--noinput"],
+        purpose="migrate",
+        opts=ResourceOptions(depends_on=[lms_pre_deploy_migrate_job]),
+    )
+    # It is important that the CMS and LMS deployment have distinct labels attached.
+    # These labels should be should be distict from those attached to the predeployment
+    # jobs as well.
+    cms_webapp_labels = k8s_global_labels | {
+        "ol.mit.edu/component": "edxapp-cms-webapp",
+        "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
+    }
+    cms_webapp_deployment = kubernetes.apps.v1.Deployment(
+        f"ol-{stack_info.env_prefix}-edxapp-cms-deployment-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=cms_webapp_deployment_name,
+            namespace=namespace,
+            labels=cms_webapp_labels,
+        ),
+        spec=kubernetes.apps.v1.DeploymentSpecArgs(
+            selector=kubernetes.meta.v1.LabelSelectorArgs(
+                match_labels=cms_webapp_labels
+            ),
+            template=kubernetes.core.v1.PodTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=cms_webapp_labels),
+                spec=kubernetes.core.v1.PodSpecArgs(
+                    affinity=_create_affinity_args(cms_webapp_labels),
+                    service_account_name=vault_k8s_resources.service_account_name,
+                    volumes=cms_edxapp_volumes,
+                    init_containers=[
+                        staticfiles_init_container,
+                        # This init container will concatenate all the config files that come from
+                        # the umpteen secrets and configmaps into a single file that edxapp expects
+                        _create_config_aggregator_init_container(
+                            "cms", cms_edxapp_init_volume_mounts
+                        ),
+                    ],
+                    containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="cms-edxapp",
+                            image=edxapp_image,
+                            env=[
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="SERVICE_VARIANT", value="cms"
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="DJANGO_SETTINGS_MODULE",
+                                    value="cms.envs.production",
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="UWSGI_WORKERS", value="2"
+                                ),
+                            ],
+                            resources=_get_resources_requests_limits("webapp", "cms"),
+                            ports=[
+                                kubernetes.core.v1.ContainerPortArgs(
+                                    container_port=8000, name="http"
+                                )
+                            ],
+                            volume_mounts=webapp_volume_mounts,
+                        )
+                    ],
+                ),
+            ),
+        ),
+        opts=pulumi.ResourceOptions(
+            depends_on=[
+                *cms_edxapp_config_sources.values(),
+                cms_pre_deploy_migrate_job,
+            ]
+        ),
+    )
+    cms_webapp_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
+        f"ol-{stack_info.env_prefix}-edxapp-cms-hpa-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{cms_webapp_deployment_name}-hpa",
+            namespace=namespace,
+            labels=cms_webapp_labels,
+        ),
+        spec=kubernetes.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
+            scale_target_ref=kubernetes.autoscaling.v2.CrossVersionObjectReferenceArgs(
+                api_version="apps/v1",
+                kind="Deployment",
+                name=cms_webapp_deployment_name,
+            ),
+            min_replicas=replicas_dict["webapp"]["cms"]["min"],
+            max_replicas=replicas_dict["webapp"]["cms"]["max"],
+            metrics=webapp_hpa_scaling_metrics,
+            behavior=webapp_hpa_behavior,
+        ),
+    )
+    cms_webapp_service = kubernetes.core.v1.Service(
+        f"ol-{stack_info.env_prefix}-edxapp-cms-service-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=cms_webapp_deployment_name,
+            namespace=namespace,
+            labels=cms_webapp_labels,
+        ),
+        spec=kubernetes.core.v1.ServiceSpecArgs(
+            ports=[
+                kubernetes.core.v1.ServicePortArgs(
+                    name="http",
+                    port=8000,
+                    # 'http' is the name of the port in the deployment podspec
+                    target_port="http",
+                    protocol="TCP",
+                )
+            ],
+            selector=cms_webapp_labels,
+            type="ClusterIP",
+        ),
+    )
+
+    # It is important that the celery workers have distinct labels from the webapps
+    cms_celery_labels = k8s_global_labels | {
+        "ol.mit.edu/component": "edxapp-cms-celery",
+        "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
+    }
+    cms_celery_deployment = kubernetes.apps.v1.Deployment(
+        f"ol-{stack_info.env_prefix}-edxapp-cms-celery-deployment-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{cms_celery_deployment_name}",
+            namespace=namespace,
+            labels=cms_celery_labels,
+        ),
+        spec=kubernetes.apps.v1.DeploymentSpecArgs(
+            selector=kubernetes.meta.v1.LabelSelectorArgs(
+                match_labels=cms_celery_labels
+            ),
+            template=kubernetes.core.v1.PodTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=cms_celery_labels),
+                spec=kubernetes.core.v1.PodSpecArgs(
+                    affinity=_create_affinity_args(cms_celery_labels),
+                    service_account_name=vault_k8s_resources.service_account_name,
+                    volumes=cms_edxapp_volumes,
+                    init_containers=[
+                        staticfiles_init_container,  # strictly speaking, not required
+                        _create_config_aggregator_init_container(
+                            "cms", cms_edxapp_init_volume_mounts
+                        ),
+                    ],
+                    containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="cms-edxapp",
+                            image=edxapp_image,
+                            command=["celery"],
+                            args=[
+                                "--app=cms.celery",
+                                "worker",
+                                "-B",
+                                "-E",
+                                "--loglevel=info",
+                                "--hostname=edx.cms.core.default.%%h",
+                                "--max-tasks-per-child",
+                                "100",
+                                "--exclude-queues=edx.lms.core.default",
+                            ],
+                            env=[
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="SERVICE_VARIANT", value="cms"
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="DJANGO_SETTINGS_MODULE",
+                                    value="cms.envs.production",
+                                ),
+                            ],
+                            resources=_get_resources_requests_limits("celery", "cms"),
+                            volume_mounts=common_volume_mounts,
+                        )
+                    ],
+                ),
+            ),
+        ),
+    )
+    cms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
+        f"ol-{stack_info.env_prefix}-edxapp-cms-celery-scaledobject-{stack_info.env_suffix}",
+        api_version="keda.sh/v1alpha1",
+        kind="ScaledObject",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{cms_celery_deployment_name}-scaledobject",
+            namespace=namespace,
+            labels=cms_celery_labels,
+        ),
+        spec={
+            "scaleTargetRef": {
+                "kind": "Deployment",
+                "name": cms_celery_deployment_name,
+            },
+            "pollingInterval": 3,
+            "cooldownPeriod": 10,
+            "minReplicaCount": replicas_dict["celery"]["cms"]["min"],
+            "maxReplicaCount": replicas_dict["celery"]["cms"]["max"],
+            "triggers": [
+                {
+                    "type": "redis",
+                    "metadata": {
+                        "address": edxapp_cache.address.apply(
+                            lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
+                        ),
+                        "username": "default",
+                        "datbaseIndex": "0",
+                        "password": edxapp_cache.cache_cluster.auth_token,
+                        "listName": "celery",  # TODO(Mike): is this correct for both lms and cms?
+                        "listLength": "10",
+                        "enableTLS": "true",
+                    },
+                }
+            ],
+        },
+    )
+    # Celery deployment do not require service definitions
     create_k8s_ingress_resources(
         edxapp_config=edxapp_config,
         stack_info=stack_info,
