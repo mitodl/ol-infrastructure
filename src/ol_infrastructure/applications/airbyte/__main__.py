@@ -681,8 +681,10 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                     "registry": "610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub",  # noqa: E501
                 },
                 "airbyteUrl": f"https://{airbyte_config.require('web_host_domain')}",
-                "api": {"host": airbyte_config.require("api_host_domain")},
-                "server": {"host": airbyte_config.require("web_host_domain")},
+                "api": {"host": f"https://{airbyte_config.require('api_host_domain')}"},
+                "server": {
+                    "host": f"https://{airbyte_config.require('web_host_domain')}"
+                },
                 "serviceAccountName": airbyte_service_account_name,
                 "deploymentMode": "oss",
                 "edition": "community",
