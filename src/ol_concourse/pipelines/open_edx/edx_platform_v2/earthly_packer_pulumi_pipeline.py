@@ -326,6 +326,12 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                     ),
                     dependencies=[
                         GetStep(
+                            get=edx_registry_image_resource.name,
+                            trigger=False,
+                            passed=[earthly_build_job.name],
+                            params={"skip_download": True},
+                        ),
+                        GetStep(
                             get=packer_fragments[-1].resources[-1].name,
                             trigger=True,
                             passed=[packer_fragments[-1].jobs[-1].name],
