@@ -52,10 +52,15 @@ config:
   edxapp:db_password:
     secure: v1:nTKkM6zA0wbJaq3T:LyxTy566zTW65zkQLLKsFGmCIPmPRB1rkXcsAg37hI+EUTX07XfX5TkpfdyBBRdntiLJ7odzNss=
   edxapp:dns_zone: learn
+  edxapp:mit_learn_domain: ci.learn.mit.edu
+  edxapp:mit_learn_api_domain: api.ci.learn.mit.edu
   edxapp:domains:
     lms: courses.ci.learn.mit.edu
     preview: preview.courses.ci.learn.mit.edu
     studio: studio.courses.ci.learn.mit.edu
+  edxapp:backend_lms_domain: courses-backend.ci.learn.mit.edu
+  edxapp:backend_studio_domain: studio-backend.ci.learn.mit.edu
+  edxapp:backend_preview_domain: preview-backend.ci.learn.mit.edu
   edxapp:marketing_domain: ci.mitxonline.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:+8kgTH+x98kC+Lxc:bW03E5mk8wRB+FxZYtj06FPx/MEJuEiKO5ekaDTZKmqmfklisVhidp0fhX+So2Eygf/Aiyqp5L03RCzA8k7I4ZmlNss19//pdGgBDwa3HAbw
@@ -82,6 +87,47 @@ config:
   edxapp:min_worker_nodes: "1"
   edxapp:web_node_capacity: "2"
   edxapp:worker_node_capacity: "1"
+  edxapp:k8s_replicas:
+    webapp:
+      lms:
+        max: 2
+        min: 1
+      cms:
+        max: 2
+        min: 1
+    celery:
+      lms:
+        max: 1
+        min: 1
+      cms:
+        max: 1
+        min: 1
+  edxapp:k8s_resources:
+    webapp:
+      lms:
+        cpu_request: "250m"
+        cpu_limit: "500m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+      cms:
+        cpu_request: "250m"
+        cpu_limit: "500m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+    celery:
+      lms:
+        cpu_request: "250m"
+        cpu_limit: "500m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+      cms:
+        cpu_request: "250m"
+        cpu_limit: "500m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+  edxapp:k8s_deployment: true
+  edxapp:k8s_cutover: true
+  edxapp:disable_ec2_deployment: true
   mongodb:atlas_project_id: 6196c37185012b5319a42e16
   edxapp:edx_xqueue_secrets:
     secure: v1:dh6OMi07yWRUJk/B:uoUEEYflcgbAADKASHNMkuuyocGFon9KU/bwQj7hcfKXlv3iXYqyTcwD5D2rCRxKnWPvckSAvA4JR9sqhJ0DbIIH/4BkFApJ5XrBKjhUD6S7iACp/pLwjymlaXF5/OhAKdyNcByi2VdrB800oHww3BfhvltrD+2CW5pgGnYv/7+HEMtC7HvzWO2Npe/rZQQebBKK0yGvtg==

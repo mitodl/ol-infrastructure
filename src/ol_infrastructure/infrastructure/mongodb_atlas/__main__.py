@@ -1,3 +1,4 @@
+# ruff: noqa: FIX002
 from pathlib import Path
 from re import findall, sub
 from urllib.parse import parse_qs, urlparse
@@ -283,6 +284,7 @@ privatized_mongo_uri_with_options = atlas_cluster.mongo_uri_with_options.apply(
 )
 
 if atlas_config.get_bool("ready_for_traffic"):
+    # TODO(Mike): Export these keys below into as stack outputs
     consul.Keys(
         "set-mongo-connection-info-in-consul",
         keys=[
