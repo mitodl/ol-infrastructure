@@ -154,6 +154,7 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901, PLR0912
     github_issue_labels: list[str] | None = None,
     github_issue_repository: str | None = None,
     additional_env_vars: dict[str, str] | None = None,
+    env_vars_from_files: dict[str, str] | None = None,
 ) -> PipelineFragment:
     """Create a chained sequence of jobs for running Pulumi tasks.
 
@@ -170,6 +171,9 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901, PLR0912
         used as inputs or triggers for the jobs in the chain.
     :param github_issue_assignees: A list of GitHub usernames that should be assigned
     :param github_issue_labels: A list of GitHub labels that should be applied
+    :param env_vars_from_files: The list of environment variables that should be set
+        during the build and the files to load for populating the values (e.g. the
+        `version` file from a GitHub resource)
     :type custom_dependencies: Dict[int, list[GetStep]]
 
     :returns: A `PipelineFragment` object that can be composed with other fragments to
@@ -252,6 +256,7 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901, PLR0912
             (additional_post_steps or {}).get(index, []),
             previous_job,
             additional_env_vars=additional_env_vars,
+            env_vars_from_files=env_vars_from_files,
         )
 
         default_github_issue_labels = [
@@ -298,6 +303,7 @@ def pulumi_job(  # noqa: PLR0913
     additional_post_steps: list[GetStep | PutStep | TaskStep] | None = None,
     previous_job: Job | None = None,
     additional_env_vars: dict[str, str] | None = None,
+    env_vars_from_files: dict[str, str] | None = None,
 ) -> PipelineFragment:
     """Create a job definition for running a Pulumi task.
 
@@ -365,6 +371,7 @@ def pulumi_job(  # noqa: PLR0913
                         **(additional_env_vars or {}),
                     },
                     "stack_name": stack_name,
+                    "env_vars_from_files": env_vars_from_files or {},
                 },
             ),
         ]

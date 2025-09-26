@@ -337,6 +337,12 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                             passed=[packer_fragments[-1].jobs[-1].name],
                         ),
                     ],
+                    additional_env_vars={"OPENEDX_RELEASE": release_name},
+                    env_vars_from_files={
+                        "DOCKER_IMAGE_DIGEST": (
+                            f"{edx_registry_image_resource.name}/digest"
+                        ),
+                    },
                 )
             )
             job_names.extend([job.name for job in pulumi_fragments[-1].jobs])
