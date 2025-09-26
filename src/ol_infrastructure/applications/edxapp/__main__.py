@@ -1583,7 +1583,7 @@ if not edxapp_config.get_bool("disable_ec2_deployment"):
 # Fastly CDN Managment #
 ########################
 
-if edxapp_config.get("k8s_cutover"):
+if edxapp_config.get_bool("k8s_cutover"):
     lms_backend_address = edxapp_config.require("backend_lms_domain")
     lms_backend_ssl_hostname = edxapp_config.require("backend_lms_domain")
     cms_backend_address = edxapp_config.require("backend_studio_domain")
@@ -1867,7 +1867,7 @@ if not edxapp_config.get_bool("disable_ec2_deployment"):
             )
 
 # Actions to take when the the stack is configured to deploy into k8s
-if edxapp_config.get("k8s_deployment"):
+if edxapp_config.get_bool("k8s_deployment"):
     k8s_resources = create_k8s_resources(
         aws_config=aws_config,
         cluster_stack=cluster_stack,
