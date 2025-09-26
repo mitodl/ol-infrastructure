@@ -32,7 +32,7 @@ config:
     MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
     MITXONLINE_NEW_USER_LOGIN_URL: https://ci.mitxonline.mit.edu/create-profile
     MITX_ONLINE_BASE_URL: "https://ci.mitxonline.mit.edu"
-    MITX_ONLINE_ENVIRONMENT: "rc"
+    MITX_ONLINE_ENVIRONMENT: "ci"
     MITX_ONLINE_LOG_LEVEL: "INFO"
     MITX_ONLINE_SECURE_SSL_HOST: "ci.mitxonline.mit.edu"
     OPENEDX_API_BASE_URL: "https://courses.ci.learn.mit.edu"
