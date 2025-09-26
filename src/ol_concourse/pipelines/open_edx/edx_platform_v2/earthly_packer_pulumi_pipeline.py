@@ -339,7 +339,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                     ],
                     additional_env_vars={"OPENEDX_RELEASE": release_name},
                     env_vars_from_files={
-                        "DOCKER_IMAGE_DIGEST": (
+                        "EDXAPP_DOCKER_IMAGE_DIGEST": (
                             f"{edx_registry_image_resource.name}/digest"
                         ),
                     },
