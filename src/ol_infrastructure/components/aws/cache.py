@@ -17,6 +17,7 @@ from pydantic import (
     conint,
     field_validator,
 )
+from pydantic.functional_validators import model_validator
 
 from bridge.lib.magic_numbers import DEFAULT_MEMCACHED_PORT, DEFAULT_REDIS_PORT
 from ol_infrastructure.components.aws.cloudwatch import (
@@ -133,6 +134,15 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
             msg = "The cluster name does not comply with the Elasticache naming constraints for Redis"  # noqa: E501
             raise ValueError(msg)
         return cluster_name
+
+    @model_validator(mode="after")
+    def ensure_maxmemory_policy(self):
+        if self.parameter_overrides is None:
+            self.parameter_overrides = {}
+        self.parameter_overrides["maxmemory-policy"] = self.parameter_overrides.get(
+            "maxmemory-policy", "allkeys-lru"
+        )
+        return self
 
 
 class OLAmazonMemcachedConfig(OLAmazonCacheConfig):

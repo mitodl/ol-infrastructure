@@ -52,6 +52,7 @@ class Services(str, Enum):
     """Canonical source of truth for defining apps."""
 
     airbyte = "airbyte"
+    superset = "superset"
     bootcamps = "bootcamps"
     botkube = "botkube"
     dagster = "dagster"

@@ -1,13 +1,10 @@
-# ruff: noqa: ERA001, TD002, TD004, FIX002, E501
+# ruff: noqa: ERA001, E501
 """Pulumi program for deploying an EKS cluster."""
 
 # Misc Ref: https://docs.aws.amazon.com/eks/latest/userguide/associate-service-account-role.html
 
-import base64
 import json
 import os
-import textwrap
-from pathlib import Path
 
 import pulumi_aws as aws
 import pulumi_eks as eks
@@ -16,13 +13,13 @@ import pulumi_vault as vault
 from pulumi import Alias, Config, Output, ResourceOptions, StackReference, export
 
 from bridge.lib.magic_numbers import (
-    AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
     DEFAULT_EFS_PORT,
     IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
 )
 from bridge.lib.versions import (
     APISIX_CHART_VERSION,
     AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION,
+    AWS_NODE_TERMINATION_HANDLER_CHART_VERSION,
     CERT_MANAGER_CHART_VERSION,
     EBS_CSI_DRIVER_VERSION,
     EFS_CSI_DRIVER_VERSION,
@@ -33,11 +30,16 @@ from bridge.lib.versions import (
     VAULT_SECRETS_OPERATOR_CHART_VERSION,
 )
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
+from ol_infrastructure.infrastructure.aws.eks.apisix import setup_apisix
+from ol_infrastructure.infrastructure.aws.eks.aws_utils import setup_aws_integrations
+from ol_infrastructure.infrastructure.aws.eks.cert_manager import setup_cert_manager
 from ol_infrastructure.infrastructure.aws.eks.core_dns import create_core_dns_resources
-from ol_infrastructure.lib.aws.eks_helper import (
-    ECR_DOCKERHUB_REGISTRY,
-    get_cluster_version,
+from ol_infrastructure.infrastructure.aws.eks.external_dns import setup_external_dns
+from ol_infrastructure.infrastructure.aws.eks.traefik import setup_traefik
+from ol_infrastructure.infrastructure.aws.eks.vault_secrets_operator import (
+    setup_vault_secrets_operator,
 )
+from ol_infrastructure.lib.aws.eks_helper import get_cluster_version
 from ol_infrastructure.lib.aws.iam_helper import (
     EKS_ADMIN_USERNAMES,
     IAM_POLICY_VERSION,
@@ -87,6 +89,9 @@ VERSIONS = {
     "APISIX_CHART": os.environ.get("APISIX_CHART", APISIX_CHART_VERSION),
     "AWS_LOAD_BALANCER_CONTROLLER_CHART": os.environ.get(
         "AWS_LOAD_BALANCER_CONTROLLER_CHART", AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION
+    ),
+    "AWS_NODE_TERMINATION_HANDLER_CHART": os.environ.get(
+        "AWS_NODE_TERMINATION_HANDLER_CHART", AWS_NODE_TERMINATION_HANDLER_CHART_VERSION
     ),
     "CERT_MANAGER_CHART": os.environ.get(
         "CERT_MANAGER_CHART", CERT_MANAGER_CHART_VERSION
@@ -799,1199 +804,99 @@ if eks_config.get_bool("efs_csi_provisioner"):
     )
     export("efs_storageclass", "efs-sc")
 
-############################################################
-# Configure vault-secrets-operator
-############################################################
-# Setup vault auth endpoint for the cluster.  Apps will need
-# their own auth backend roles added to auth backend which
-# we will export the name of below.
-vault_auth_endpoint_name = f"k8s-{stack_info.env_prefix}"
-vault_k8s_auth = vault.AuthBackend(
-    f"{cluster_name}-eks-vault-k8s-auth-backend",
-    type="kubernetes",
-    path=vault_auth_endpoint_name,
-    opts=ResourceOptions(
-        parent=cluster, depends_on=cluster, delete_before_replace=True
-    ),
-)
-vault_k8s_auth_backend_config = vault.kubernetes.AuthBackendConfig(
-    f"{cluster_name}-eks-vault-authentication-configuration-operations",
-    kubernetes_ca_cert=cluster.eks_cluster.certificate_authority.data.apply(
-        lambda b64_cert: "{}".format(base64.b64decode(b64_cert).decode("utf-8"))
-    ),  # Important
-    kubernetes_host=cluster.eks_cluster.endpoint,
-    backend=vault_auth_endpoint_name,
-    disable_iss_validation=True,  # Important
-    disable_local_ca_jwt=False,  # Important
-    opts=ResourceOptions(parent=vault_k8s_auth),
-)
-export("vault_auth_endpoint", vault_auth_endpoint_name)
 
-# This role allows the vault secrets operator to use a transit mount for
-# maintaining a cache of open leases. Makes operator restarts less painful
-# on applications
-# Ref: https://developer.hashicorp.com/vault/tutorials/kubernetes/vault-secrets-operator#transit-encryption
-transit_policy_name = f"{stack_info.env_prefix}-eks-vso-transit"
-transit_policy = vault.Policy(
-    f"{cluster_name}-eks-vault-secrets-operator-transit-policy",
-    name=transit_policy_name,
-    policy=Path(__file__).parent.joinpath("vso_transit_policy.hcl").read_text(),
-    opts=ResourceOptions(parent=vault_k8s_auth),
-)
-transit_role_name = "vso-transit"
-vault_secrets_operator_service_account_name = (
-    "vault-secrets-operator-controller-manager"
-)
-vault_secret_operator_transit_role = vault.kubernetes.AuthBackendRole(
-    f"{cluster_name}-eks-vault-secrets-operator-transit-role",
-    role_name=transit_role_name,
-    backend=vault_auth_endpoint_name,
-    bound_service_account_names=[vault_secrets_operator_service_account_name],
-    bound_service_account_namespaces=["operations"],
-    token_policies=[transit_policy_name],
-    opts=ResourceOptions(parent=vault_k8s_auth),
-)
-
-# Install the vault-secrets-operator directly from the public chart
-vault_secrets_operator = kubernetes.helm.v3.Release(
-    f"{cluster_name}-vault-secrets-operator-helm-release",
-    kubernetes.helm.v3.ReleaseArgs(
-        name="vault-secrets-operator",
-        chart="vault-secrets-operator",
-        version=VERSIONS["VAULT_SECRETS_OPERATOR_CHART"],
-        namespace="operations",
-        cleanup_on_fail=True,
-        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-            repo="https://helm.releases.hashicorp.com",
-        ),
-        values={
-            "image": {
-                "pullPolicy": "Always",
-            },
-            "extraLabels": k8s_global_labels,
-            "defaultVaultConnection": {
-                "enabled": True,
-                "address": f"https://vault-{stack_info.env_suffix}.odl.mit.edu",
-                "skipTLSVerify": False,
-            },
-            "controller": {
-                "replicas": 1,
-                "tolerations": operations_tolerations,
-                "manager": {
-                    "resources": {
-                        "requests": {
-                            "memory": "64Mi",
-                            "cpu": "10m",
-                        },
-                        "limits": {
-                            "memory": "128Mi",
-                            "cpu": "50m",
-                        },
-                    },
-                    "clientCache": {
-                        "persistenceModel": "direct-encrypted",
-                        "storageEncryption": {
-                            "enabled": True,
-                            "mount": vault_auth_endpoint_name,
-                            "keyName": "vault-secrets-operator",
-                            "transitMount": "infrastructure",
-                            "kubernetes": {
-                                "role": transit_role_name,
-                                "serviceAccount": "vault-secrets-operator-controller-manager",
-                                "tokenAudiences": [],
-                            },
-                        },
-                    },
-                },
-            },
-        },
-        skip_await=False,
-    ),
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        parent=operations_namespace,
-        depends_on=[cluster, node_groups[0], vault_secret_operator_transit_role],
-        delete_before_replace=True,
-    ),
-)
-
-############################################################
-# Install and configure the traefik gateway api controller
-############################################################
-
-# The custom resource definitions that come with the traefik helm chart
-# don't install the experimental CRDs even if you say you want to use
-# the experimental features. So we need to install them by hand
-# and explicitly tell the traefik helm release below NOT
-# to install any CRDS or we will get errors.
-#
-# TODO @Ardiea it would be nice if we could add the k8s_global_labels to these
-gateway_api_crds = kubernetes.yaml.v2.ConfigGroup(
-    f"{cluster_name}-gateway-api-experimental-crds",
-    files=[
-        f"https://github.com/kubernetes-sigs/gateway-api/releases/download/{VERSIONS['GATEWAY_API']}/experimental-install.yaml"
-    ],
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        parent=operations_namespace,
-        delete_before_replace=True,
-        depends_on=[cluster],
-    ),
-)
-
-# This helm release installs the traefik k8s gateway api controller
-# which will server as the ingress point for ALL connections going into
-# the applications installed on the cluster. No other publically listening
-# services or load balancers should be configured on the cluster.
-#
-# This does NOT configure a default gateway or any httproutes within
-# the cluster.
-#
-# Ref: https://gateway-api.sigs.k8s.io/reference/spec/
-# Ref: https://doc.traefik.io/traefik/routing/providers/kubernetes-gateway/
-# Ref: https://doc.traefik.io/traefik/providers/kubernetes-gateway/
-#
-# TODO: @Ardiea add the ability to define more ports in config.
-traefik_helm_release = kubernetes.helm.v3.Release(
-    f"{cluster_name}-traefik-gateway-controller-helm-release",
-    kubernetes.helm.v3.ReleaseArgs(
-        name="traefik-gateway-controller",
-        chart="traefik",
-        version=VERSIONS["TRAEFIK_CHART"],
-        namespace="operations",
-        skip_crds=False,
-        cleanup_on_fail=True,
-        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-            repo="https://helm.traefik.io/traefik",
-        ),
-        values={
-            "image": {
-                "pullPolicy": "Always",
-                "registry": f"{ECR_DOCKERHUB_REGISTRY}/library",
-            },
-            "commonLabels": k8s_global_labels,
-            "tolerations": operations_tolerations,
-            "deployment": {
-                "kind": "Deployment",
-                "podLabels": {
-                    # "traffic-gateway-controller-security-group": "True",
-                },
-                "additionalVolumes": [
-                    {"name": "plugins"},
-                ],
-            },
-            "autoscaling": {
-                "enabled": True,
-                "minReplicas": eks_config.get_int("traefik_min_replicas") or 2,
-                "maxReplicas": eks_config.get_int("traefik_max_replicas") or 5,
-                "metrics": [
-                    {
-                        "resource": {
-                            "name": "cpu",
-                            "target": {
-                                "type": "Utilization",
-                                "averageUtilization": 50,
-                            },
-                        },
-                        "type": "Resource",
-                    }
-                ],
-            },
-            "additionalVolumeMounts": [
-                {"name": "plugins", "mountPath": "/plugins-storage"},
-            ],
-            # Not supporting legacy ingress resources
-            "kubernetesIngress": {
-                "enabled": False,
-            },
-            # Do not create a default gateway
-            "gateway": {
-                "enabled": False,
-            },
-            "gatewayClass": {
-                "enabled": True,
-            },
-            "providers": {
-                "kubernetesGateway": {
-                    "enabled": True,
-                },
-            },
-            # These are important for external-dns to actually work
-            "additionalArguments": [
-                "--providers.kubernetesgateway.statusAddress.service.namespace=operations",
-                "--providers.kubernetesgateway.statusAddress.service.name=traefik-gateway-controller",
-                "--serverstransport.insecureskipverify",
-            ],
-            # Redirect all :80 to :443
-            "ports": {
-                "web": {
-                    "port": 8000,
-                    "expose": {
-                        "default": True,
-                    },
-                    "exposedPort": 80,
-                    "redirections": {
-                        "entryPoint": {
-                            "to": "websecure",
-                            "scheme": "https",
-                            "permanent": True,
-                        }
-                    },
-                },
-                "websecure": {
-                    "port": 8443,
-                    "expose": {
-                        "default": True,
-                    },
-                    "exposedPort": 443,
-                },
-            },
-            "logs": {
-                "general": {
-                    "level": "INFO",
-                },
-                "access": {
-                    "enabled": True,
-                    "format": "json",
-                },
-            },
-            "resources": {
-                "requests": {
-                    "cpu": "100m",
-                    "memory": "50Mi",
-                },
-                "limits": {
-                    "cpu": "300m",
-                    "memory": "150Mi",
-                },
-            },
-            "metrics": {
-                "prometheus": {
-                    "serviceMonitor": {
-                        "enabled": True,
-                    },
-                },
-            },
-            "service": {
-                # These control the configuration of the network load balancer that EKS will create
-                # automatically and point at every traefik pod.
-                # Ref: https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.4/guide/service/annotations/#subnets
-                "annotations": {
-                    "service.beta.kubernetes.io/aws-load-balancer-name": f"{cluster_name}-traefik"[
-                        :AWS_LOAD_BALANCER_NAME_MAX_LENGTH
-                    ],
-                    "service.beta.kubernetes.io/aws-load-balancer-type": "external",
-                    "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
-                    "service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
-                    "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled": "true",
-                    "service.beta.kubernetes.io/aws-load-balancer-subnets": target_vpc.apply(
-                        lambda tvpc: ",".join(tvpc["k8s_public_subnet_ids"])
-                    ),
-                    "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags": ",".join(
-                        [f"{k}={v}" for k, v in aws_config.tags.items()]
-                    ),
-                },
-            },
-        },
-    ),
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        parent=operations_namespace,
-        delete_before_replace=True,
-        depends_on=[
-            cluster,
-            node_groups[0],
-            operations_namespace,
-            gateway_api_crds,
-            prometheus_operator_crds,
-        ],
-    ),
-)
-
-# At this time 20241218, apisix does not provide first class support for the
-# kubernetes gateway api. So, we are going to use their custom resources and
-# not enable the experimental gateway-api features.
-#
-# We load apisix into the operations namespace for the cluster with a
-# feature flag but we will create the customresources in the application
-# namespaces that need them. See unified-ecommerce as an example.
-#
-# A consequence of this is that apisix will need its own NLB but if
-# we wanted to invest the time we could probably create OLGateway
-# resources that point traefik to the apisix. Seems like one more
-# layer of complexity that we probably don't need just to save a few
-# dollars.
-
-# Ref: https://apisix.apache.org/docs/ingress-controller/next/tutorials/configure-ingress-with-gateway-api/
-# Ref: https://apisix.apache.org/docs/ingress-controller/getting-started/
-# Ref: https://artifacthub.io/packages/helm/bitnami/apisix
-if eks_config.get_bool("apisix_ingress_enabled"):
-    apisix_domains = eks_config.require_object("apisix_domains")
-    session_cookie_name = f"{stack_info.env_suffix}_gateway_session".removeprefix(
-        "production"
-    ).strip("_")
-    apisix_helm_release = kubernetes.helm.v3.Release(
-        f"{cluster_name}-apisix-gateway-controller-helm-release",
-        kubernetes.helm.v3.ReleaseArgs(
-            name="apisix",
-            version=VERSIONS[
-                "APISIX_CHART"
-            ],  # Ensure this version exists in Bitnami repo
-            namespace="operations",
-            # skip_crds=False, # Bitnami charts install CRDs by default
-            cleanup_on_fail=True,
-            chart="oci://registry-1.docker.io/bitnamicharts/apisix",  # Use Bitnami repo
-            values={
-                # --- Global/Common ---
-                # deploymentMode is configured under controlPlane.extraConfig for traditional mode
-                "commonLabels": k8s_global_labels,
-                "image": {
-                    "pullPolicy": "Always",
-                    # Assuming default Bitnami registry/repository is okay
-                    "registry": ECR_DOCKERHUB_REGISTRY,
-                },
-                "global": {
-                    "security": {"allowInsecureImages": True},
-                    "imageRegistry": ECR_DOCKERHUB_REGISTRY,
-                },
-                "volumePermissions": {
-                    "image": {
-                        "registry": ECR_DOCKERHUB_REGISTRY,
-                    },
-                },
-                # --- Data Plane (Gateway) ---
-                # Disabled for traditional mode
-                "dataPlane": {
-                    "enabled": False,
-                    "metrics": {
-                        "enabled": True,
-                        "serviceMonitor": {
-                            "enabled": True,
-                        },
-                    },
-                },
-                # --- Control Plane (Admin API) ---
-                # In traditional mode, this also handles gateway traffic
-                "controlPlane": {
-                    "enabled": True,
-                    "metrics": {
-                        "enabled": True,
-                        "serviceMonitor": {
-                            "enabled": True,
-                        },
-                    },
-                    "useDaemonSet": False,
-                    "autoscaling": {
-                        "hpa": {
-                            "enabled": True,
-                            "minReplicas": eks_config.get("apisix_min_replicas") or "3",
-                            "maxReplicas": eks_config.get("apisix_max_replicas") or "5",
-                            "targetCPU": "50",
-                        },
-                    },
-                    "pdb": {
-                        "create": False
-                    },  # No need for pod disruption budget with daemonset
-                    "tolerations": operations_tolerations,
-                    # Set admin/viewer tokens directly
-                    "apiTokenAdmin": eks_config.require("apisix_admin_key"),
-                    "apiTokenViewer": eks_config.require("apisix_viewer_key"),
-                    # Configure traditional mode
-                    "extraConfig": {
-                        "deployment": {
-                            "role": "traditional",
-                            "role_traditional": {
-                                "config_provider": "etcd",  # Default, but explicit
-                            },
-                        },
-                        "nginx_config": {
-                            "http": {
-                                "access_log_format": 'time_local="$time_local" '
-                                "body_bytes_sent=$body_bytes_sent "
-                                "bytes_sent=$bytes_sent "
-                                "client=$remote_addr "
-                                "host=$host "
-                                "remote_addr=$remote_addr "
-                                "request_id=$request_id "
-                                "request_length=$request_length "
-                                "request_method=$request_method "
-                                "request_time=$request_time "
-                                "request_uri=$request_uri "
-                                "status=$status "
-                                "upstream_addr=$upstream_addr "
-                                "upstream_connect_time=$upstream_connect_time "
-                                "upstream_header_time=$upstream_header_time "
-                                "upstream_response_time=$upstream_response_time "
-                                "upstream_status=$upstream_status "
-                                'http_referer="$http_referer" '
-                                'http_user_agent="$http_user_agent" '
-                                "method=$request_method "
-                                'request="$request"',
-                            },
-                            "http_configuration_snippet": textwrap.dedent(
-                                """\
-                                client_header_buffer_size 8k;
-                                large_client_header_buffers 4 32k;
-                                """
-                            ),
-                            "http_server_configuration_snippet": textwrap.dedent(
-                                f"""\
-                                set $session_compressor zlib;
-                                set $session_name {session_cookie_name};
-                                """
-                            ),
-                        },
-                    },
-                    # Note: allow.ipList from original config doesn't map directly.
-                    # Access control might need NetworkPolicy or similar.
-                    "resources": {  # Default resources seem okay, but let's define explicitly if needed
-                        "requests": {
-                            "cpu": "100m",
-                            "memory": "200Mi",
-                        },
-                        # "requests": {"cpu": "10m", "memory": "50Mi"}, # Duplicate key removed
-                        "limits": {"cpu": "500m", "memory": "400Mi"},
-                    },
-                    "service": {
-                        # Use LoadBalancer for traditional mode as control plane handles traffic
-                        "type": "LoadBalancer",
-                        "annotations": {
-                            "external-dns.alpha.kubernetes.io/hostname": ",".join(
-                                apisix_domains
-                            ),
-                            "service.beta.kubernetes.io/aws-load-balancer-name": f"{cluster_name}-apisix"[
-                                :AWS_LOAD_BALANCER_NAME_MAX_LENGTH
-                            ],
-                            "service.beta.kubernetes.io/aws-load-balancer-type": "external",
-                            "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
-                            "service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
-                            "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled": "true",
-                            "service.beta.kubernetes.io/aws-load-balancer-subnets": target_vpc.apply(
-                                lambda tvpc: ",".join(tvpc["k8s_public_subnet_ids"])
-                            ),
-                            "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags": ",".join(
-                                [f"{k}={v}" for k, v in aws_config.tags.items()]
-                            ),
-                        },
-                        # Expose HTTP/HTTPS ports for gateway traffic as per traditional mode docs
-                        "extraPorts": [
-                            {
-                                "name": "http",
-                                "port": 80,
-                                "targetPort": 9080,  # Default dataPlane HTTP port
-                                "protocol": "TCP",
-                            },
-                            {
-                                "name": "https",
-                                "port": 443,
-                                "targetPort": 9443,  # Default dataPlane HTTPS port
-                                "protocol": "TCP",
-                            },
-                        ],
-                        # Keep admin API internal (default port 9180 is exposed by chart)
-                        # Default metrics port 9099 is also exposed by chart
-                    },
-                },
-                # --- Ingress Controller ---
-                # In traditional mode, this still watches K8s resources and configures APISIX via Admin API
-                "ingressController": {
-                    "enabled": True,
-                    "replicaCount": 2,
-                    "tolerations": operations_tolerations,
-                    "resources": {  # Apply original gateway resources here
-                        "requests": {
-                            "cpu": "50m",
-                            "memory": "50Mi",
-                        },
-                        "limits": {
-                            "cpu": "50m",
-                            "memory": "256Mi",
-                        },
-                    },
-                    # Map controller config under extraConfig
-                    "extraConfig": {
-                        "apisix": {
-                            "service_namespace": "operations",
-                            # Use interpolated name for the control plane service
-                            "service_name": Output.concat("apisix", "-control-plane"),
-                            "admin_key": eks_config.require("apisix_admin_key"),
-                            "admin_api_version": "v3",
-                        },
-                        "kubernetes": {
-                            "enable_gateway_api": False,  # As per original config
-                            "resync_interval": "1m",
-                        },
-                    },
-                },
-                # --- Etcd ---
-                "etcd": {
-                    "enabled": True,
-                    "tolerations": operations_tolerations,
-                    "image": {
-                        "registry": ECR_DOCKERHUB_REGISTRY,
-                    },
-                    "persistence": {
-                        "enabled": True,
-                        "storageClass": "efs-sc",
-                    },
-                    "livenessProbe": {
-                        "enabled": True,
-                        "initialDelaySeconds": 120,
-                        "timeoutSeconds": 5,
-                        "periodSeconds": 10,
-                        "successThreshold": 1,
-                        "failureThreshold": 3,
-                    },
-                    "readinessProbe": {
-                        "enabled": True,
-                        "initialDelaySeconds": 120,
-                        "timeoutSeconds": 5,
-                        "periodSeconds": 10,
-                        "successThreshold": 1,
-                        "failureThreshold": 3,
-                    },
-                    "resources": {
-                        "requests": {
-                            "cpu": "50m",
-                            "memory": "100Mi",
-                        },
-                        "limits": {
-                            "cpu": "100m",
-                            "memory": "300Mi",
-                        },
-                    },
-                    # Add auth config if needed based on etcd subchart values
-                },
-                # --- Dashboard (Disable if not needed, seems disabled in original via config structure) ---
-                "dashboard": {
-                    "enabled": False,
-                },
-            },
-        ),
-        opts=ResourceOptions(
-            provider=k8s_provider,
-            parent=operations_namespace,
-            delete_before_replace=True,
-            depends_on=[
-                cluster,
-                node_groups[0],
-                operations_namespace,
-                gateway_api_crds,  # Keep dependency on Gateway CRDs if still relevant elsewhere
-            ],
-        ),
-    )
-
-############################################################
-# Configure external-dns operator to setup domain names automatically
-############################################################
-# Ref: https://github.com/kubernetes-sigs/external-dns
-# Ref: https://github.com/kubernetes-sigs/external-dns/blob/master/docs/tutorials/aws.md
-# Ref: https://github.com/kubernetes-sigs/external-dns/blob/master/docs/sources/traefik-proxy.md
-external_dns_parliament_config = {
-    "UNKNOWN_FEDERATION_SOURCE": {"ignore_locations": [{"principal": "federated"}]},
-    "PERMISSIONS_MANAGEMENT_ACTIONS": {"ignore_locations": []},
-    "MALFORMED": {"ignore_lcoations": []},
-    "RESOURCE_STAR": {"ignore_locations": []},
-}
-external_dns_role_config = OLEKSTrustRoleConfig(
-    account_id=aws_account.account_id,
+setup_vault_secrets_operator(
     cluster_name=cluster_name,
-    cluster_identities=cluster.eks_cluster.identities,
-    description="Trust role for allowing external-dns to modify route53 "
-    "resources from within the cluster.",
-    policy_operator="StringEquals",
-    role_name="external-dns",
-    service_account_identifier="system:serviceaccount:operations:external-dns",
-    tags=aws_config.tags,
-)
-external_dns_role = OLEKSTrustRole(
-    f"{cluster_name}-external-dns-trust-role",
-    role_config=external_dns_role_config,
-    opts=ResourceOptions(parent=cluster, depends_on=cluster),
-)
-external_dns_policy_document = {
-    "Version": IAM_POLICY_VERSION,
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": ["route53:ChangeResourceRecordSets"],
-            "Resource": [
-                # TODO @Ardiea interpolate with explicit zone IDs
-                # More difficult than it sounds
-                "arn:aws:route53:::hostedzone/*"
-            ],
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "route53:ListHostedZones",
-                "route53:ListResourceRecordSets",
-                "route53:ListTagsForResource",
-            ],
-            "Resource": ["*"],
-        },
-    ],
-}
-export("allowed_dns_zones", eks_config.require_object("allowed_dns_zones"))
-
-external_dns_policy = aws.iam.Policy(
-    f"{cluster_name}-external-dns-policy",
-    name=f"{cluster_name}-external-dns-policy",
-    path=f"/ol-infrastructure/eks/{cluster_name}/",
-    policy=lint_iam_policy(
-        external_dns_policy_document,
-        parliament_config=external_dns_parliament_config,
-        stringify=True,
-    ),
-    opts=ResourceOptions(parent=external_dns_role, depends_on=cluster),
-)
-aws.iam.RolePolicyAttachment(
-    f"{cluster_name}-external-dns-attachment",
-    policy_arn=external_dns_policy.arn,
-    role=external_dns_role.role.id,
-    opts=ResourceOptions(parent=external_dns_role),
-)
-external_dns_release = (
-    kubernetes.helm.v3.Release(
-        f"{cluster_name}-external-dns-helm-release",
-        kubernetes.helm.v3.ReleaseArgs(
-            name="external-dns",
-            chart="external-dns",
-            version=VERSIONS["EXTERNAL_DNS_CHART"],
-            namespace="operations",
-            cleanup_on_fail=True,
-            repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-                repo="https://kubernetes-sigs.github.io/external-dns/",
-            ),
-            values={
-                "image": {
-                    "pullPolicy": "Always",
-                },
-                "commonLabels": k8s_global_labels,
-                "podLabels": k8s_global_labels,
-                "tolerations": operations_tolerations,
-                "serviceAccount": {
-                    "create": True,
-                    "name": "external-dns",
-                    "annotations": {
-                        # Allows external-dns to make aws API calls to route53
-                        "eks.amazonaws.com/role-arn": external_dns_role.role.arn.apply(
-                            lambda arn: f"{arn}"
-                        ),
-                    },
-                },
-                "logLevel": "info",
-                "policy": "sync",
-                # Configure external-dns to only look at gateway resources
-                # disables support for monitoring services or legacy ingress resources
-                "sources": [
-                    "service",
-                    "gateway-udproute",
-                    "gateway-tcproute",
-                    "gateway-grpcroute",
-                    "gateway-httproute",
-                    "gateway-tlsroute",
-                ],
-                # Create a txt record to indicate provenance of the record(s)
-                "txtOwnerId": cluster_name,
-                # Need to explicitly turn off support for legacy traefik ingress services
-                # to avoid an annoying bug
-                "extraArgs": [
-                    "--traefik-disable-legacy",
-                ],
-                # Limit the dns zones that external dns knows about
-                "domainFilters": eks_config.require_object("allowed_dns_zones"),
-                "resources": {
-                    "requests": {
-                        "memory": "64Mi",
-                        "cpu": "10m",
-                    },
-                    "limits": {
-                        "memory": "128Mi",
-                        "cpu": "50m",
-                    },
-                },
-            },
-        ),
-        opts=ResourceOptions(
-            provider=k8s_provider,
-            parent=operations_namespace,
-            delete_before_replace=True,
-            depends_on=[cluster, node_groups[0], operations_namespace],
-        ),
-    ),
+    cluster=cluster,
+    k8s_provider=k8s_provider,
+    operations_namespace=operations_namespace,
+    node_groups=node_groups,
+    stack_info=stack_info,
+    k8s_global_labels=k8s_global_labels,
+    operations_tolerations=operations_tolerations,
+    versions=VERSIONS,
 )
 
-############################################################
-# Install and configure cert-manager
-############################################################
-cert_manager_parliament_config = {
-    "UNKNOWN_FEDERATION_SOURCE": {"ignore_locations": [{"principal": "federated"}]},
-    "PERMISSIONS_MANAGEMENT_ACTIONS": {"ignore_locations": []},
-    "MALFORMED": {"ignore_lcoations": []},
-    "RESOURCE_STAR": {"ignore_lcoations": []},
-}
-# Cert manager uses DNS txt records to confirm that we control the
-# domains that we are requesting certificates for.
-# Ref: https://cert-manager.io/docs/configuration/acme/dns01/route53/#set-up-an-iam-role
-cert_manager_role_config = OLEKSTrustRoleConfig(
-    account_id=aws_account.account_id,
+gateway_api_crds = setup_traefik(
     cluster_name=cluster_name,
-    cluster_identities=cluster.eks_cluster.identities,
-    description="Trust role for allowing cert-manager to modify route53 "
-    "resources from within the cluster.",
-    policy_operator="StringEquals",
-    role_name="cert-manager",
-    service_account_identifier="system:serviceaccount:operations:cert-manager",
-    tags=aws_config.tags,
-)
-cert_manager_role = OLEKSTrustRole(
-    f"{cluster_name}-cert-manager-trust-role",
-    role_config=cert_manager_role_config,
-    opts=ResourceOptions(parent=cluster, depends_on=cluster),
-)
-export("cert_manager_arn", cert_manager_role.role.arn)
-
-cert_manager_policy_document = {
-    "Version": IAM_POLICY_VERSION,
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": "route53:GetChange",
-            "Resource": "arn:aws:route53:::change/*",
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "route53:ChangeResourceRecordSets",
-                "route53:ListResourceRecordSets",
-            ],
-            # TODO @Ardiea interpolate with explicit zone IDs
-            # More difficult than it sounds
-            "Resource": "arn:aws:route53:::hostedzone/*",
-        },
-        {"Effect": "Allow", "Action": "route53:ListHostedZonesByName", "Resource": "*"},
-    ],
-}
-
-cert_manager_policy = aws.iam.Policy(
-    f"{cluster_name}-cert-manager-policy",
-    name=f"{cluster_name}-cert-manager-policy",
-    path=f"/ol-infrastructure/eks/{cluster_name}/",
-    policy=lint_iam_policy(
-        cert_manager_policy_document,
-        parliament_config=cert_manager_parliament_config,
-        stringify=True,
-    ),
-    opts=ResourceOptions(parent=cert_manager_role, depends_on=cluster),
-)
-aws.iam.RolePolicyAttachment(
-    f"{cluster_name}-cert-manager-attachment",
-    policy_arn=cert_manager_policy.arn,
-    role=cert_manager_role.role.id,
-    opts=ResourceOptions(parent=cert_manager_role),
+    k8s_provider=k8s_provider,
+    operations_namespace=operations_namespace,
+    node_groups=node_groups,
+    prometheus_operator_crds=prometheus_operator_crds,
+    k8s_global_labels=k8s_global_labels,
+    operations_tolerations=operations_tolerations,
+    versions=VERSIONS,
+    eks_config=eks_config,
+    target_vpc=target_vpc,
+    aws_config=aws_config,
+    cluster=cluster,
 )
 
-default_cert_manager_resources = {
-    "requests": {
-        "memory": "64Mi",
-        "cpu": "10m",
-    },
-    "limits": {
-        "memory": "128Mi",
-        "cpu": "50m",
-    },
-}
-
-# Ref: https://cert-manager.io/docs/installation/
-cert_manager_release = kubernetes.helm.v3.Release(
-    f"{cluster_name}-cert-manager-helm-release",
-    kubernetes.helm.v3.ReleaseArgs(
-        name="cert-manager",
-        chart="cert-manager",
-        version=VERSIONS["CERT_MANAGER_CHART"],
-        namespace="operations",
-        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-            repo="https://charts.jetstack.io",
-        ),
-        cleanup_on_fail=True,
-        skip_await=False,
-        values={
-            "crds": {
-                "enabled": True,
-                "keep": True,
-            },
-            "global": {
-                "commonLabels": k8s_global_labels,
-            },
-            "resources": default_cert_manager_resources,
-            "tolerations": operations_tolerations,
-            "replicaCount": 1,
-            "enableCertificateOwnerRef": True,
-            "prometheus": {
-                "enabled": False,
-            },
-            "config": {
-                "apiVersion": "controller.config.cert-manager.io/v1alpha1",
-                "kind": "ControllerConfiguration",
-                "enableGatewayAPI": True,
-            },
-            "webhook": {
-                "resources": default_cert_manager_resources,
-                "tolerations": operations_tolerations,
-            },
-            "cainjector": {
-                "resources": default_cert_manager_resources,
-                "tolerations": operations_tolerations,
-            },
-            "serviceAccount": {
-                "create": True,
-                "name": "cert-manager",
-                "annotations": {
-                    # Allows cert-manager to make aws API calls to route53
-                    "eks.amazonaws.com/role-arn": cert_manager_role.role.arn.apply(
-                        lambda arn: f"{arn}"
-                    ),
-                },
-            },
-        },
-    ),
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        parent=operations_namespace,
-        depends_on=[cluster, node_groups[0]],
-        delete_before_replace=True,
-    ),
-)
-
-############################################################
-# Install and configure AWS Load Balancer Controller
-############################################################
-# Ref: https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.13.4/deploy/
-# Ref: https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.13.4/docs/install/iam_policy.json
-
-aws_load_balancer_controller_policy_document = {
-    "Version": IAM_POLICY_VERSION,
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": ["iam:CreateServiceLinkedRole"],
-            "Resource": "*",
-            "Condition": {
-                "StringEquals": {
-                    "iam:AWSServiceName": "elasticloadbalancing.amazonaws.com"
-                }
-            },
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "ec2:DescribeAccountAttributes",
-                "ec2:DescribeAddresses",
-                "ec2:DescribeAvailabilityZones",
-                "ec2:DescribeInternetGateways",
-                "ec2:DescribeVpcs",
-                "ec2:DescribeVpcPeeringConnections",
-                "ec2:DescribeSubnets",
-                "ec2:DescribeSecurityGroups",
-                "ec2:DescribeInstances",
-                "ec2:DescribeNetworkInterfaces",
-                "ec2:DescribeTags",
-                "ec2:GetCoipPoolUsage",
-                "ec2:DescribeCoipPools",
-                "ec2:GetSecurityGroupsForVpc",
-                "ec2:DescribeIpamPools",
-                "ec2:DescribeRouteTables",
-                "elasticloadbalancing:DescribeLoadBalancers",
-                "elasticloadbalancing:DescribeLoadBalancerAttributes",
-                "elasticloadbalancing:DescribeListeners",
-                "elasticloadbalancing:DescribeListenerCertificates",
-                "elasticloadbalancing:DescribeSSLPolicies",
-                "elasticloadbalancing:DescribeRules",
-                "elasticloadbalancing:DescribeTargetGroups",
-                "elasticloadbalancing:DescribeTargetGroupAttributes",
-                "elasticloadbalancing:DescribeTargetHealth",
-                "elasticloadbalancing:DescribeTags",
-                "elasticloadbalancing:DescribeTrustStores",
-                "elasticloadbalancing:DescribeListenerAttributes",
-                "elasticloadbalancing:DescribeCapacityReservation",
-            ],
-            "Resource": "*",
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "cognito-idp:DescribeUserPoolClient",
-                "acm:ListCertificates",
-                "acm:DescribeCertificate",
-                "iam:ListServerCertificates",
-                "iam:GetServerCertificate",
-                "waf-regional:GetWebACL",
-                "waf-regional:GetWebACLForResource",
-                "waf-regional:AssociateWebACL",
-                "waf-regional:DisassociateWebACL",
-                "wafv2:GetWebACL",
-                "wafv2:GetWebACLForResource",
-                "wafv2:AssociateWebACL",
-                "wafv2:DisassociateWebACL",
-                "shield:GetSubscriptionState",
-                "shield:DescribeProtection",
-                "shield:CreateProtection",
-                "shield:DeleteProtection",
-            ],
-            "Resource": "*",
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "ec2:AuthorizeSecurityGroupIngress",
-                "ec2:RevokeSecurityGroupIngress",
-            ],
-            "Resource": "*",
-        },
-        {"Effect": "Allow", "Action": ["ec2:CreateSecurityGroup"], "Resource": "*"},
-        {
-            "Effect": "Allow",
-            "Action": ["ec2:CreateTags"],
-            "Resource": "arn:aws:ec2:*:*:security-group/*",
-            "Condition": {
-                "StringEquals": {"ec2:CreateAction": "CreateSecurityGroup"},
-                "Null": {"aws:RequestTag/elbv2.k8s.aws/cluster": "false"},
-            },
-        },
-        {
-            "Effect": "Allow",
-            "Action": ["ec2:CreateTags", "ec2:DeleteTags"],
-            "Resource": "arn:aws:ec2:*:*:security-group/*",
-            "Condition": {
-                "Null": {
-                    "aws:RequestTag/elbv2.k8s.aws/cluster": "true",
-                    "aws:ResourceTag/elbv2.k8s.aws/cluster": "false",
-                }
-            },
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "ec2:AuthorizeSecurityGroupIngress",
-                "ec2:RevokeSecurityGroupIngress",
-                "ec2:DeleteSecurityGroup",
-            ],
-            "Resource": "*",
-            "Condition": {"Null": {"aws:ResourceTag/elbv2.k8s.aws/cluster": "false"}},
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "elasticloadbalancing:CreateLoadBalancer",
-                "elasticloadbalancing:CreateTargetGroup",
-            ],
-            "Resource": "*",
-            "Condition": {"Null": {"aws:RequestTag/elbv2.k8s.aws/cluster": "false"}},
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "elasticloadbalancing:CreateListener",
-                "elasticloadbalancing:DeleteListener",
-                "elasticloadbalancing:CreateRule",
-                "elasticloadbalancing:DeleteRule",
-            ],
-            "Resource": "*",
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "elasticloadbalancing:AddTags",
-                "elasticloadbalancing:RemoveTags",
-            ],
-            "Resource": [
-                "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
-                "arn:aws:elasticloadbalancing:*:*:loadbalancer/net/*/*",
-                "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*",
-            ],
-            "Condition": {
-                "Null": {
-                    "aws:RequestTag/elbv2.k8s.aws/cluster": "true",
-                    "aws:ResourceTag/elbv2.k8s.aws/cluster": "false",
-                }
-            },
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "elasticloadbalancing:AddTags",
-                "elasticloadbalancing:RemoveTags",
-            ],
-            "Resource": [
-                "arn:aws:elasticloadbalancing:*:*:listener/net/*/*/*",
-                "arn:aws:elasticloadbalancing:*:*:listener/app/*/*/*",
-                "arn:aws:elasticloadbalancing:*:*:listener-rule/net/*/*/*",
-                "arn:aws:elasticloadbalancing:*:*:listener-rule/app/*/*/*",
-            ],
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "elasticloadbalancing:ModifyLoadBalancerAttributes",
-                "elasticloadbalancing:SetIpAddressType",
-                "elasticloadbalancing:SetSecurityGroups",
-                "elasticloadbalancing:SetSubnets",
-                "elasticloadbalancing:DeleteLoadBalancer",
-                "elasticloadbalancing:ModifyTargetGroup",
-                "elasticloadbalancing:ModifyTargetGroupAttributes",
-                "elasticloadbalancing:DeleteTargetGroup",
-                "elasticloadbalancing:ModifyListenerAttributes",
-                "elasticloadbalancing:ModifyCapacityReservation",
-                "elasticloadbalancing:ModifyIpPools",
-            ],
-            "Resource": "*",
-            "Condition": {"Null": {"aws:ResourceTag/elbv2.k8s.aws/cluster": "false"}},
-        },
-        {
-            "Effect": "Allow",
-            "Action": ["elasticloadbalancing:AddTags"],
-            "Resource": [
-                "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
-                "arn:aws:elasticloadbalancing:*:*:loadbalancer/net/*/*",
-                "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*",
-            ],
-            "Condition": {
-                "StringEquals": {
-                    "elasticloadbalancing:CreateAction": [
-                        "CreateTargetGroup",
-                        "CreateLoadBalancer",
-                    ]
-                },
-                "Null": {"aws:RequestTag/elbv2.k8s.aws/cluster": "false"},
-            },
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "elasticloadbalancing:RegisterTargets",
-                "elasticloadbalancing:DeregisterTargets",
-            ],
-            "Resource": "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "elasticloadbalancing:SetWebAcl",
-                "elasticloadbalancing:ModifyListener",
-                "elasticloadbalancing:AddListenerCertificates",
-                "elasticloadbalancing:RemoveListenerCertificates",
-                "elasticloadbalancing:ModifyRule",
-                "elasticloadbalancing:SetRulePriorities",
-            ],
-            "Resource": "*",
-        },
-    ],
-}
-
-aws_lb_controller_service_account_name = "aws-load-balancer-controller"
-
-aws_load_balancer_controller_role_config = OLEKSTrustRoleConfig(
-    account_id=aws_account.account_id,
+setup_apisix(
     cluster_name=cluster_name,
-    cluster_identities=cluster.eks_cluster.identities,
-    description="Trust role for allowing the AWS Load Balancer Controller to manage ALBs/NLBs.",
-    policy_operator="StringEquals",
-    role_name=aws_lb_controller_service_account_name,
-    service_account_identifier="system:serviceaccount:kube-system:aws-load-balancer-controller",
-    tags=aws_config.tags,
-)
-aws_load_balancer_controller_role = OLEKSTrustRole(
-    f"{cluster_name}-aws-load-balancer-controller-trust-role",
-    role_config=aws_load_balancer_controller_role_config,
-    opts=ResourceOptions(parent=cluster, depends_on=cluster),
-)
-
-aws_load_balancer_controller_service_account = kubernetes.core.v1.ServiceAccount(
-    "aws-lb-controller-service-account",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=aws_lb_controller_service_account_name,
-        namespace="kube-system",
-        labels=k8s_global_labels,
-        annotations={
-            "eks.amazonaws.com/role-arn": aws_load_balancer_controller_role.role.arn
-        },
-    ),
-    automount_service_account_token=True,
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        parent=cluster,
-        depends_on=[
-            cluster,
-        ],
-    ),
+    k8s_provider=k8s_provider,
+    operations_namespace=operations_namespace,
+    node_groups=node_groups,
+    gateway_api_crds=gateway_api_crds,
+    stack_info=stack_info,
+    k8s_global_labels=k8s_global_labels,
+    operations_tolerations=operations_tolerations,
+    versions=VERSIONS,
+    eks_config=eks_config,
+    target_vpc=target_vpc,
+    aws_config=aws_config,
+    cluster=cluster,
 )
 
-aws_load_balancer_controller_policy = aws.iam.Policy(
-    f"{cluster_name}-aws-load-balancer-controller-policy",
-    name=f"{cluster_name}-aws-load-balancer-controller-policy",
-    path=f"/ol-infrastructure/eks/{cluster_name}/",
-    policy=json.dumps(
-        aws_load_balancer_controller_policy_document,
-    ),
-    opts=ResourceOptions(parent=aws_load_balancer_controller_role, depends_on=cluster),
-)
-aws.iam.RolePolicyAttachment(
-    f"{cluster_name}-aws-load-balancer-controller-attachment",
-    policy_arn=aws_load_balancer_controller_policy.arn,
-    role=aws_load_balancer_controller_role.role.id,
-    opts=ResourceOptions(parent=aws_load_balancer_controller_role),
+setup_external_dns(
+    cluster_name=cluster_name,
+    cluster=cluster,
+    aws_account=aws_account,
+    aws_config=aws_config,
+    k8s_provider=k8s_provider,
+    operations_namespace=operations_namespace,
+    node_groups=node_groups,
+    k8s_global_labels=k8s_global_labels,
+    operations_tolerations=operations_tolerations,
+    versions=VERSIONS,
+    eks_config=eks_config,
 )
 
-aws_load_balancer_controller_release = kubernetes.helm.v3.Release(
-    f"{cluster_name}-aws-load-balancer-controller-helm-release",
-    kubernetes.helm.v3.ReleaseArgs(
-        name="aws-load-balancer-controller",
-        chart="aws-load-balancer-controller",
-        version=VERSIONS["AWS_LOAD_BALANCER_CONTROLLER_CHART"],
-        namespace="kube-system",
-        cleanup_on_fail=True,
-        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-            repo="https://aws.github.io/eks-charts",
-        ),
-        values={
-            "clusterName": cluster_name,
-            "enableCertManager": True,
-            "serviceAccount": {
-                "create": False,
-                "name": aws_lb_controller_service_account_name,
-                "annotations": {
-                    "eks.amazonaws.com/role-arn": aws_load_balancer_controller_role.role.arn,
-                },
-            },
-            "vpcId": target_vpc["id"],
-            "region": aws.get_region().name,
-            "podLabels": k8s_global_labels,
-            "tolerations": operations_tolerations,
-            "resources": {
-                "requests": {
-                    "cpu": "100m",
-                    "memory": "128Mi",
-                },
-                "limits": {
-                    "cpu": "200m",
-                    "memory": "256Mi",
-                },
-            },
-        },
-        skip_await=False,
-    ),
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        parent=cluster,
-        depends_on=[
-            cluster,
-            node_groups[0],
-            aws_load_balancer_controller_role,
-            aws_load_balancer_controller_policy,
-        ],
-        delete_before_replace=True,
-    ),
+setup_cert_manager(
+    cluster_name=cluster_name,
+    cluster=cluster,
+    aws_account=aws_account,
+    aws_config=aws_config,
+    k8s_provider=k8s_provider,
+    operations_namespace=operations_namespace,
+    node_groups=node_groups,
+    k8s_global_labels=k8s_global_labels,
+    operations_tolerations=operations_tolerations,
+    versions=VERSIONS,
+)
+
+create_core_dns_resources(
+    cluster_name=cluster_name,
+    k8s_global_labels=k8s_global_labels,
+    k8s_provider=k8s_provider,
+    cluster=cluster,
+)
+
+############################################################
+# Setup AWS integrations
+# AWS Load Balancer Controller, AWS Node Termination Handler
+############################################################
+setup_aws_integrations(
+    aws_account=aws_account,
+    cluster_name=cluster_name,
+    cluster=cluster,
+    aws_config=aws_config,
+    k8s_global_labels=k8s_global_labels,
+    k8s_provider=k8s_provider,
+    operations_tolerations=operations_tolerations,
+    target_vpc=target_vpc,
+    node_groups=node_groups,
+    versions=VERSIONS,
 )
 
 ############################################################
@@ -2029,11 +934,4 @@ metrics_server_release = kubernetes.helm.v3.Release(
         depends_on=[node_groups[0]],
         delete_before_replace=True,
     ),
-)
-
-create_core_dns_resources(
-    cluster_name=cluster_name,
-    k8s_global_labels=k8s_global_labels,
-    k8s_provider=k8s_provider,
-    cluster=cluster,
 )

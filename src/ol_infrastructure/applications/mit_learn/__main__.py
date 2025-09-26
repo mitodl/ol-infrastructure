@@ -481,6 +481,13 @@ mitlearn_db_security_group = ec2.SecurityGroup(
                     "18.213.226.96/32",
                     "3.224.126.197/32",
                     "3.217.26.199/32",
+                    # This is in order to allow Vault to resolve the connection over the
+                    # public internet due to being located in a separate VPC. The public
+                    # access is toggled to ON because of Hightouch, so the default
+                    # resolution outside of the VPC that the DB lives in is to go over
+                    # the public net. Because Vault couldn't reach the DB it couldn't
+                    # create credentials. (TMM 2025-09-08)
+                    "0.0.0.0/0",
                     *pod_cidrs,
                 ]
             ),
@@ -1382,8 +1389,8 @@ mitlearn_k8s_app = OLApplicationK8s(
                 redis_password=redis_config.require("password"),
             ),
         ],
-        resource_requests={"cpu": "500m", "memory": "1800Mi"},
-        resource_limits={"cpu": "1000m", "memory": "1800Mi"},
+        resource_requests={"cpu": "500m", "memory": "1600Mi"},
+        resource_limits={"cpu": "1000m", "memory": "2000Mi"},
         hpa_scaling_metrics=[
             kubernetes.autoscaling.v2.MetricSpecArgs(
                 type="Resource",

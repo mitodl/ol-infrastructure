@@ -36,6 +36,7 @@ config:
   mitlearn:learn_ai_syllabus_endpoint: "https://api.rc.learn.mit.edu/ai/http/syllabus_agent/"
   mitlearn:legacy_api_domain: "api.mitopen-rc.mit.edu"
   mitlearn:legacy_frontend_domain: "mitopen-rc.odl.mit.edu"
+  mit_learn:min_replicas: 4
   mitlearn:nextjs_heroku_domain: "next.rc.learn.mit.edu"
   mitlearn:posthog_proxy: "ph.ol.mit.edu"
   mitlearn:vars:
@@ -73,6 +74,8 @@ config:
     OPENSEARCH_URL: "https://search-opensearch-mitlearn-qa-254ozvoip3e2ywfx5lsch5w2uu.us-east-1.es.amazonaws.com"
     POSTHOG_API_HOST: "https://ph.ol.mit.edu"
     POSTHOG_ENABLED: "true"
+    POSTHOG_EVENT_S3_BUCKET: "ol-data-lake-landing-zone-qa"
+    POSTHOG_EVENT_S3_PREFIX: "thirdparty/posthog/learn/events/"
     POSTHOG_PROJECT_ID: "86325"
     POSTHOG_TIMEOUT_MS: 1000
     SEE_API_ENABLED: "true"

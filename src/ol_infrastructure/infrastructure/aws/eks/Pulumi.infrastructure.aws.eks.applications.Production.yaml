@@ -55,7 +55,8 @@ config:
         desired: 4
         max: 8
         min: 4
-      tags: {}
+      tags:
+        cluster: applications-production
       taints: {}
       version:
     gpu-worker-xlarge:
@@ -72,7 +73,9 @@ config:
         desired: 1
         max: 2
         min: 1
-      tags: {}
+      tags:
+        cluster: applications-production
+        gpu: "true"
       taints: {"ol.mit.edu/gpu_node": {value: "true", effect: "NoSchedule"}}
       version:
   eks:traefik_min_replicas: 5

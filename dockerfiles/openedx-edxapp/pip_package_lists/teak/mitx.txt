@@ -1,12 +1,13 @@
 celery-redbeat==2.3.3  # Support for using Redis as the lock for Celery schedules
+granian==2.5.4
 django-redis==6.0.0
-ol-openedx-git-auto-export==0.4.1
+ol-openedx-git-auto-export==0.5.0
 edx-sga
 edx-sysadmin==0.3.2
 git+https://github.com/raccoongang/xblock-pdf.git@d8948bf3c7127e23be202d1f8600f1ba293ba978#egg=xblock-pdf
 invideoquiz-xblock
 nodeenv>=1.7.0
-ol-openedx-canvas-integration==0.5.1
+ol-openedx-canvas-integration==0.5.2
 ol-openedx-course-export==0.1.2
 ol-openedx-course-structure-api
 ol-openedx-logging==0.2.0
@@ -15,7 +16,7 @@ ol-openedx-sentry==0.2.1
 openedx-scorm-xblock>=19.0.1,<19.1.0
 pip==25.2
 pydantic-settings==2.10.1
-rapid-response-xblock==0.10.0
+rapid-response-xblock==0.10.1
 uwsgi==2.0.30
 wheel==0.45.1
 

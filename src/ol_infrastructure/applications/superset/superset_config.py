@@ -9,29 +9,36 @@ from flask_appbuilder.security.manager import AUTH_OAUTH
 from flask_caching.backends.rediscache import RedisCache
 from superset.security import SupersetSecurityManager
 from superset.utils.encrypt import SQLAlchemyUtilsAdapter
-from vault.aws_auth import get_vault_client
 
-vault_addr = os.environ.get("VAULT_ADDR", "http://localhost:8200")
-vault_client = get_vault_client(vault_url=vault_addr, ec2_role="superset")
+# Kubernetes: secrets are provided via env by Vault Secrets Operator
+SECRET_KEY = os.environ.get("SECRET_KEY")
+# Backward compatibility: allow either REDIS_PASSWORD or REDIS_TOKEN
+REDIS_TOKEN = os.environ.get("REDIS_PASSWORD") or os.environ.get("REDIS_TOKEN", "")
+REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
+REDIS_PORT = os.environ.get("REDIS_PORT", "6379")
 
-SECRET_KEY = vault_client.secrets.kv.v2.read_secret(
-    path="app-config", mount_point="secret-superset"
-)["data"]["data"]["secret_key"]
-REDIS_TOKEN = vault_client.secrets.kv.v2.read_secret(
-    path="redis", mount_point="secret-superset"
-)["data"]["data"]["token"]
+# Build DB URI from env (populated by Vault dynamic creds via K8s secret)
+DB_USER = os.environ.get("DB_USER")
+DB_PASS = os.environ.get("DB_PASS")
+DB_HOST = os.environ.get("DB_HOST")
+DB_PORT = os.environ.get("DB_PORT", "5432")
+DB_NAME = os.environ.get("DB_NAME", "superset")
+DB_SSLMODE = os.environ.get("DB_SSLMODE", "require")
+_db_uri = f"postgresql+psycopg2://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+SQLALCHEMY_DATABASE_URI = f"{_db_uri}?sslmode={DB_SSLMODE}" if DB_SSLMODE else _db_uri
+OIDC_URL = os.environ.get("OIDC_URL")
+OIDC_CLIENT_ID = os.environ.get("OIDC_CLIENT_ID")
+OIDC_CLIENT_SECRET = os.environ.get("OIDC_CLIENT_SECRET")
+OIDC_REALM_PUBLIC_KEY = os.environ.get("OIDC_REALM_PUBLIC_KEY")
+LOGOUT_REDIRECT_URL = f"{OIDC_URL}/protocol/openid-connect/logout"
+SLACK_API_TOKEN = os.environ.get("SLACK_API_TOKEN")
+
+SQLALCHEMY_ENCRYPTED_FIELD_TYPE_ADAPTER = SQLAlchemyUtilsAdapter
 
 SUPERSET_WEBSERVER_PROTOCOL = os.environ.get("SUPERSET_WEBSERVER_PROTOCOL", "https")
 SUPERSET_WEBSERVER_ADDRESS = os.environ.get("SUPERSET_WEBSERVER_ADDRESS", "0.0.0.0")  # noqa: S104
 SUPERSET_WEBSERVER_PORT = os.environ.get("SUPERSET_WEBSERVER_PORT", "8088")
-pg_creds = vault_client.secrets.database.generate_credentials(
-    name="app", mount_point="postgres-superset"
-)["data"]
-SQLALCHEMY_DATABASE_URI = f"postgres://{pg_creds['username']}:{pg_creds['password']}@superset-db.service.consul:5432/superset?sslmode=require"
-SQLALCHEMY_ENCRYPTED_FIELD_TYPE_ADAPTER = SQLAlchemyUtilsAdapter
-
 ENABLE_PROXY_FIX = os.environ.get("ENABLE_PROXY_FIX", "True").lower() == "true"
-
 # -------------------------------
 # White Labeling Configurations #
 # --------------------------------
@@ -48,24 +55,20 @@ APP_ICON = "/static/assets/images/ol-data-platform-logo.svg"
 # AUTH_LDAP : Is for LDAP
 # AUTH_REMOTE_USER : Is for using REMOTE_USER from web server
 # AUTH_TYPE = AUTH_OID
-oidc_creds = vault_client.secrets.kv.v1.read_secret(
-    path="sso/superset", mount_point="secret-operations"
-)["data"]
 AUTH_TYPE = AUTH_OAUTH
-LOGOUT_REDIRECT_URL = f"{oidc_creds['url']}/protocol/openid-connect/logout"
 OAUTH_PROVIDERS = [
     {
         "name": "keycloak",
         "icon": "fa-key",
         "token_key": "access_token",
         "remote_app": {
-            "client_id": oidc_creds["client_id"],
-            "client_secret": oidc_creds["client_secret"],
+            "client_id": OIDC_CLIENT_ID,
+            "client_secret": OIDC_CLIENT_SECRET,
             "client_kwargs": {
                 "scope": "openid profile email roles",
             },
-            "server_metadata_url": f"{oidc_creds['url']}/.well-known/openid-configuration",  # noqa: E501
-            "api_base_url": f"{oidc_creds['url']}/protocol/",
+            "server_metadata_url": f"{OIDC_URL}/.well-known/openid-configuration",
+            "api_base_url": f"{OIDC_URL}/protocol/",
         },
     }
 ]
@@ -74,15 +77,15 @@ OAUTH_PROVIDERS = [
 # Required config to get Keycloak token for Superset API use
 # ----------------------------------------------------------
 JWT_ALGORITHM = "RS256"
-JWT_PUBLIC_KEY = oidc_creds["realm_public_key"]
+JWT_PUBLIC_KEY = OIDC_REALM_PUBLIC_KEY
 
 # Testing out Keycloak role mapping to Superset
 # https://superset.apache.org/docs/installation/configuring-superset#mapping-ldap-or-oauth-groups-to-superset-roles
 AUTH_ROLES_MAPPING = {
-    "superset_admin": ["Admin"],
-    "superset_researcher": ["Alpha", "sql_lab"],
-    "superset_alpha": ["Alpha"],
-    "superset_gamma": ["Gamma"],
+    "ol_platform_admin": ["Admin"],
+    "ol_researcher": ["Alpha", "sql_lab"],
+    "ol_data_engineer": ["Alpha"],
+    "ol_data_analyst": ["Gamma"],
 }
 
 # if we should replace ALL the user's roles each login, or only on registration
@@ -239,7 +242,7 @@ SUPERSET_WEBSERVER_TIMEOUT = 300  # 5 minutes timeout for HTTP requests
 cache_base = {
     "CACHE_TYPE": "RedisCache",
     "CACHE_DEFAULT_TIMEOUT": 86400,
-    "CACHE_REDIS_URL": f"rediss://default:{REDIS_TOKEN}@superset-redis.service.consul:6379/0",
+    "CACHE_REDIS_URL": f"rediss://default:{REDIS_TOKEN}@{REDIS_HOST}:6379/0",
 }
 FILTER_STATE_CACHE_CONFIG = {"CACHE_KEY_PREFIX": "superset_filter_cache", **cache_base}
 EXPLORE_FORM_DATA_CACHE_CONFIG = {
@@ -258,9 +261,11 @@ HTTP_HEADERS = {"X-Frame-Options": "ALLOWALL"}
 
 
 class CeleryConfig:  # pylint: disable=too-few-public-methods
-    broker_url = f"rediss://default:{REDIS_TOKEN}@superset-redis.service.consul:6379/1?ssl_cert_reqs=optional"
+    # Build redis URLs from env (REDIS_HOST/PORT provided by chart, REDIS_TOKEN from
+    # env)
+    broker_url = f"rediss://default:{REDIS_TOKEN}@{REDIS_HOST}:{REDIS_PORT}/1?ssl_cert_reqs=optional"
     imports = ("superset.sql_lab", "superset.tasks.scheduler")
-    result_backend = f"rediss://default:{REDIS_TOKEN}@superset-redis.service.consul:6379/2?ssl_cert_reqs=optional"
+    result_backend = f"rediss://default:{REDIS_TOKEN}@{REDIS_HOST}:{REDIS_PORT}/2?ssl_cert_reqs=optional"
     worker_prefetch_multiplier = 1
     task_acks_late = True
     task_track_started = True
@@ -287,10 +292,10 @@ class CeleryConfig:  # pylint: disable=too-few-public-methods
 CELERY_CONFIG = CeleryConfig  # pylint: disable=invalid-name
 RESULTS_BACKEND = RedisCache(
     db=2,
-    host="superset-redis.service.consul",
+    host=REDIS_HOST,
     key_prefix="superset_results",
     password=REDIS_TOKEN,
-    port=6379,
+    port=int(REDIS_PORT),
     ssl=True,
     ssl_cert_reqs=CERT_OPTIONAL,
     username="default",
@@ -310,10 +315,6 @@ SMTP_MAIL_FROM = "ol-data@mit.edu"
 # default system root CA certificates.
 SMTP_SSL_SERVER_AUTH = False
 ENABLE_CHUNK_ENCODING = False
-
-SLACK_API_TOKEN = vault_client.secrets.kv.v2.read_secret(
-    path="app-config", mount_point="secret-superset"
-)["data"]["data"]["slack_token"]
 
 
 #######################

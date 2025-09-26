@@ -221,4 +221,28 @@ if (learningApps.includes(edxMfeAppName)) {
   };
 }
 
+if (isLearnCourse) {
+  // Hiding the course org and number from the learning header in the UAI courses
+  config.pluginSlots = {
+    ...config.pluginSlots,
+    "org.openedx.frontend.layout.header_learning_course_info.v1": {
+      plugins: [
+        { op: PLUGIN_OPERATIONS.Hide, widgetId: 'default_contents' },
+        {
+          op: PLUGIN_OPERATIONS.Insert,
+          widget: {
+            id: 'custom_header_learning_course_info',
+            type: DIRECT_PLUGIN,
+            RenderWidget: ({ courseTitle }) => (
+              <div style={{ paddingTop: '14px', minWidth: 0 }}>
+                <span className="d-block m-0 font-weight-bold course-title">{courseTitle}</span>
+              </div>
+            ),
+          },
+        },
+      ],
+    },
+  };
+}
+
 export default config;

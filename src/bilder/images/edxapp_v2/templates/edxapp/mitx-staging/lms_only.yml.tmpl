@@ -30,7 +30,6 @@ HTTPS: 'on'
 LEARNER_HOME_MFE_REDIRECT_PERCENTAGE: 100  # ADDED
 LEARNER_HOME_MICROFRONTEND_URL: /dashboard/  # ADDED
 LEARNING_MICROFRONTEND_URL: https://{{ key "edxapp/lms-domain" }}/learn
-LTI_AGGREGATE_SCORE_PASSBACK_DELAY: 900
 LTI_USER_EMAIL_DOMAIN: lti.example.com
 MAILCHIMP_NEW_USER_LIST_ID: null
 OAUTH_DELETE_EXPIRED: true
@@ -94,6 +93,7 @@ THIRD_PARTY_AUTH_BACKENDS:
 - common.djangoapps.third_party_auth.saml.SAMLAuthBackend
 - common.djangoapps.third_party_auth.lti.LTIAuthBackend
 THIRD_PARTY_AUTH_SAML_FETCH_PERIOD_HOURS: 24 # ADDED - Sets the frequency for Celery Beat to refresh the SAML metadata
+REDBEAT_KEY_PREFIX: redbeat_lms  # ADDED - RedBeat key prefix to separate LMS and CMS schedules
 TRACKING_SEGMENTIO_WEBHOOK_SECRET: ''
 VERIFY_STUDENT:
     DAYS_GOOD_FOR: 365

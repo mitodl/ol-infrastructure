@@ -13,6 +13,7 @@ from ol_infrastructure.substructure.keycloak.org_flows import (
     create_organization_scope,
 )
 from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
+    NameIdFormat,
     OrgConfig,
     SamlIdpConfig,
     create_org_for_learn,
@@ -733,10 +734,13 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         )
         onboard_saml_org(
             SamlIdpConfig(
-                org_domains=["ntua.gr", "mail.ntua.gr"],
+                org_domains=["ntua.gr", "mail.ntua.gr", "chemeng.ntua.gr"],
                 org_name="National Technical University of Athens",
                 org_alias="NTUA",
                 org_saml_metadata_url="https://login.ntua.gr/metadata-signed.xml",
+                principal_type="FRIENDLY_ATTRIBUTE",
+                principal_attribute="mail",
+                name_id_format=NameIdFormat.unspecified,
                 keycloak_url=keycloak_url,
                 learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,

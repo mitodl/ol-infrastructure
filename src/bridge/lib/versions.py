@@ -1,19 +1,19 @@
 # renovate: datasource=github-releases depName=concourse packageName=concourse/concourse
 CONCOURSE_VERSION = "7.14.1"
 # renovate: datasource=github-releases depName=consul-template packageName=hashicorp/consul-template
-CONSUL_TEMPLATE_VERSION = "0.41.1"
+CONSUL_TEMPLATE_VERSION = "0.41.2"
 # renovate: datasource=github-releases depName=consul packageName=hashicorp/consul
 CONSUL_VERSION = "1.21.4"
 # renovate: datasource=pypi depName=jupyterhub packageName=jupyterhub
 JUPYTERHUB_VERSION = "5.3.0"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
-KEYCLOAK_VERSION = "26.3.3"
+KEYCLOAK_VERSION = "26.3.4"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
-OPEN_METADATA_VERSION = "1.9.7"
+OPEN_METADATA_VERSION = "1.9.9"
 OVS_VERSION = "v0.65.1-3-g2630021"
 REDASH_VERSION = "9d273e4"
 # renovate: datasource=github-releases depName=traefik packageName=traefik/traefik
-TRAEFIK_VERSION = "3.5.1"
+TRAEFIK_VERSION = "3.5.2"
 TUTOR_PERMISSIONS_VERSION = "15.3.4"
 # renovate: datasource=github-releases depName=vault packageName=hashicorp/vault
 VAULT_VERSION = "1.20.3"
@@ -21,10 +21,14 @@ VAULT_VERSION = "1.20.3"
 # EKS Specific Versions
 # renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/charts
 AIRBYTE_CHART_VERSION = "2.0.12"
+# renovate: datasource=helm depName=superset packageName=superset registryUrl=https://apache.github.io/superset
+SUPERSET_CHART_VERSION = "0.15.0"
 # renovate: datasource=docker depName=apisix packageName=registry-1.docker.io/bitnamicharts/apisix
 APISIX_CHART_VERSION = "5.1.6"
-# renovate: datasource=helm depName=aws-load-balancer-controller packageName=eks/aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts
+# renovate: datasource=helm depName=aws-load-balancer-controller packageName=aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts
 AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION = "1.13.4"
+# renovate: datasource=helm depName=aws-node-termination-handler packageName=aws-node-termination-handler registryUrl=https://aws.github.io/eks-charts
+AWS_NODE_TERMINATION_HANDLER_CHART_VERSION = "0.27.2"
 # renovate: datasource=helm depName=botkube packageName=botkube
 BOTKUBE_CHART_VERSION = "v1.14.0"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager
@@ -38,13 +42,13 @@ EXTERNAL_DNS_CHART_VERSION = "1.15.0"
 # renovate: datasource=github-releases depName=gateway-api packageName=kubernetes-sigs/gateway-api
 GATEWAY_API_VERSION = "v1.3.0"
 # renovate: datasource=docker depName=karpenter packageName=public.ecr.aws/karpenter/karpenter
-KARPENTER_CHART_VERSION = "1.6.3"
+KARPENTER_CHART_VERSION = "1.7.1"
 # renoavate: datasource=helm depName=keda registryUrl=https://kedacore.github.io/charts packageName=keda
 KEDA_CHART_VERSION = "2.17.1"
 # renovate: datasource=docker depName=kube-state-metrics packageName=registry-1.docker.io/bitnamicharts/kube-state-metrics
 KUBE_STATE_METRICS_CHART_VERSION = "5.1.0"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
-TRAEFIK_CHART_VERSION = "37.1.0"
+TRAEFIK_CHART_VERSION = "37.1.1"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
 VANTAGE_K8S_AGENT_CHART_VERSION = "1.2.1"
 # renovate: datasource=helm depName=vault-secrets-operator packageName=vault-secrets-operator registryUrl=https://helm.releases.hashicorp.com

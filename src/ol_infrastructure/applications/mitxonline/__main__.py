@@ -465,6 +465,7 @@ mitxonline_k8s_app = OLApplicationK8s(
         application_namespace=mitxonline_namespace,
         application_lb_service_name="mitxonline-webapp",
         application_lb_service_port_name="http",
+        application_min_replicas=mitxonline_config.get_int("min_replicas") or 2,
         k8s_global_labels=k8s_global_labels,
         # Use the secret names returned by create_mitxonline_k8s_secrets
         env_from_secret_names=secret_names,

@@ -163,6 +163,14 @@ query_engine_permissions: list[dict[str, str | list[str]]] = [
     },
     {
         "Effect": "Allow",
+        "Action": ["bedrock:InvokeModel"],
+        "Resource": [
+            "arn:*:bedrock:*:*:foundation-model/*",
+            "arn:*:bedrock:*:*:provisioned-model/*",
+        ],
+    },
+    {
+        "Effect": "Allow",
         "Action": [
             "glue:BatchCreatePartition",
             "glue:BatchDeletePartition",
