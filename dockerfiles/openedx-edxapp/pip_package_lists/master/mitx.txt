@@ -15,7 +15,7 @@ ol-openedx-rapid-response-reports==0.3.0
 ol-openedx-sentry==0.2.1
 openedx-scorm-xblock>=19.0.1,<19.1.0
 pip==25.2
-pydantic-settings==2.10.1
+pydantic-settings==2.11.0
 rapid-response-xblock==0.10.1
 uwsgi==2.0.30
 wheel==0.45.1
