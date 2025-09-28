@@ -13,7 +13,7 @@ ol-openedx-logging
 ol-openedx-sentry
 openedx-scorm-xblock
 ol-social-auth==0.1.1
-pydantic-settings==2.10.1
+pydantic-settings==2.11.0
 uwsgi==2.0.30
 wheel==0.45.1
 
