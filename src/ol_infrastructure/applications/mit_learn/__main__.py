@@ -22,6 +22,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
+    DEFAULT_WSGI_PORT,
     ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
@@ -951,6 +952,7 @@ env_vars = {
     "MITOL_AXIOS_BASE_PATH": f"https://{mitlearn_config.get('frontend_domain')}",
     "MITOL_DB_CONN_MAX_AGE": 0,
     "MITOL_DB_DISABLE_SSL": "True",
+    "MITOL_SECURE_SSL_REDIRECT": "False",
     "QDRANT_ENABLE_INDEXING_PLUGIN_HOOKS": True,
     "MITOL_DEFAULT_SITE_KEY": "micromasters",
     "MITOL_EMAIL_PORT": 587,
@@ -1368,12 +1370,26 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_image_repository="mitodl/mit-learn-app",
         application_docker_tag=MIT_LEARN_DOCKER_TAG,
         application_cmd_array=[
-            "uwsgi",
-            "/tmp/uwsgi.ini",  # noqa: S108
+            "granian",
+        ],
+        application_arg_array=[
+            "--interface",
+            "wsgi",
+            "--host",
+            "0.0.0.0",  # noqa: S104
+            "--port",
+            f"{DEFAULT_WSGI_PORT}",
+            "--workers",
+            "1",
+            "--runtime-threads",
+            "2",
+            "--log-level",
+            "warning",
+            "main.wsgi:application",
         ],
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,  # Assuming Django app needs nginx
-        import_uwsgi_config=True,  # Assuming Django app needs uwsgi
+        import_uwsgi_config=False,
         init_migrations=False,
         init_collectstatic=True,  # Assuming Django app needs collectstatic
         pre_deploy_commands=[("migrate", ["scripts/heroku-release-phase.sh"])],
