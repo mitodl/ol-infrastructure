@@ -215,7 +215,7 @@ class OLVPC(ComponentResource):
             tags=vpc_config.tags,
         )
 
-        route_table_resource_opts, imported_route_table_id = route_table_opts(
+        route_table_resource_opts, _imported_route_table_id = route_table_opts(
             imported_gateway_id
         )
         self.route_table = ec2.RouteTable(
@@ -533,7 +533,7 @@ class OLVPCPeeringConnection(ComponentResource):
             ResourceOptions(parent=self),
             opts,
         )
-        vpc_peer_resource_opts, imported_vpc_peer_id = vpc_peer_opts(
+        vpc_peer_resource_opts, _imported_vpc_peer_id = vpc_peer_opts(
             str(source_vpc.vpc_config.cidr_block),
             str(destination_vpc.vpc_config.cidr_block),
         )
