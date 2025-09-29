@@ -5,14 +5,12 @@ import os
 from itertools import chain
 from pathlib import Path
 
-import pulumi_consul as consul
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 import requests
 import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, get_caller_identity, iam
-from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
@@ -44,7 +42,6 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
-from ol_infrastructure.lib.consul import consul_key_helper, get_consul_provider
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
@@ -67,7 +64,6 @@ cluster_stack = StackReference(f"infrastructure.aws.eks.operations.{stack_info.n
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
-consul_stack = StackReference(f"infrastructure.consul.operations.{stack_info.name}")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 vault_pki_stack = StackReference(f"substructure.vault.pki.operations.{stack_info.name}")
 
@@ -102,7 +98,6 @@ if secrets is None:
 aws_config = AWSBase(
     tags={"OU": "operations", "Environment": f"operations-{stack_info.env_suffix}"}
 )
-consul_provider = get_consul_provider(stack_info)
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
@@ -242,7 +237,6 @@ keycloak_database_security_group = ec2.SecurityGroup(
         ec2.SecurityGroupIngressArgs(
             security_groups=[
                 keycloak_server_security_group.id,
-                consul_stack.require_output("security_groups")["consul_server"],
                 vault_stack.require_output("vault_server")["security_group"],
                 data_vpc["security_groups"]["integrator"],
             ],
@@ -294,38 +288,6 @@ keycloak_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_host=db_address,
 )
 keycloak_db_vault_backend = OLVaultDatabaseBackend(keycloak_db_vault_backend_config)
-
-keycloak_db_consul_node = Node(
-    f"keycloak-{stack_info.env_suffix}-db-node",
-    name="keycloak-postgres-db",
-    address=db_address,
-    opts=consul_provider,
-)
-
-keycloak_db_consul_service = Service(
-    f"keycloak-{stack_info.env_suffix}-db-service",
-    node=keycloak_db_consul_node.name,
-    name="keycloak-postgres",
-    port=db_port,
-    meta={
-        "external-node": True,
-        "external-probe": True,
-    },
-    checks=[
-        ServiceCheckArgs(
-            check_id="keycloak-db",
-            interval="10s",
-            name="keycloak-db",
-            timeout="60s",
-            status="passing",
-            tcp=Output.all(
-                address=db_address,
-                port=db_port,
-            ).apply(lambda db: "{address}:{port}".format(**db)),
-        )
-    ],
-    opts=consul_provider,
-)
 
 subnets = target_vpc["subnet_ids"]
 subnet_id = subnets.apply(chain)
@@ -619,21 +581,10 @@ keycloak_server_vault_mount = vault.Mount(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
-
 keycloak_server_secrets = vault.generic.Secret(
     "keycloak-server-configuration-secrets",
     path=keycloak_server_vault_mount.path.apply("{}/keycloak-secrets".format),
     data_json=json.dumps(secrets),
-)
-
-consul_keys = {
-    "keycloak/keycloak_host": keycloak_domain,
-    "keycloak/rds_host": db_address,
-}
-consul.Keys(
-    "keycloak-server-configuration-data",
-    keys=consul_key_helper(consul_keys),
-    opts=consul_provider,
 )
 
 export(
