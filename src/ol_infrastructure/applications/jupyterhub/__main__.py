@@ -297,7 +297,10 @@ COURSE_NAMES = [
     "introduction_to_data_analytics_and_machine_learning",
 ]
 COURSE_NAMES.extend(
-    [f"uai_source-uai.{i}" for i in [0, "0a", 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13]]
+    [
+        f"uai_source-uai.{i}"
+        for i in ["intro", 0, "0a", 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13]
+    ]
 )
 EXTRA_IMAGES = {
     course_name.replace(".", "-").replace("_", "-"): {
