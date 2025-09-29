@@ -24,8 +24,6 @@ class CourseImageInfo:
 # Used to make a parameterized pipeline which builds
 # and publishes the image from GH to ECR
 courses = [
-    # TODO (dsubak) - Remove the first 4 once the rest are tested # noqa: FIX002, TD004
-    # TODO (dsubak) - Derive from course IDs # noqa: FIX002, TD004
     CourseImageInfo(
         course_name="course_deep_learning_foundations_and_applications",
         repo_uri="git@github.mit.edu:ol-notebooks/course_deep_learning_foundations_and_applications.git",
@@ -45,6 +43,11 @@ courses = [
         course_name="clustering_and_descriptive_ai",
         repo_uri="git@github.mit.edu:ol-notebooks/course_clustering_and_descriptive_ai.git",
         image_name="clustering_and_descriptive_ai",
+    ),
+    CourseImageInfo(
+        course_name="uai_source-uai.intro",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.INTRO-2025_C604.git",
+        image_name="uai_source-uai.intro",
     ),
     CourseImageInfo(
         course_name="uai_source-uai.0",
