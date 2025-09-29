@@ -681,10 +681,13 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                     "registry": "610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub",  # noqa: E501
                 },
                 "airbyteUrl": f"https://{airbyte_config.require('web_host_domain')}",
-                "api": {"host": f"https://{airbyte_config.require('api_host_domain')}"},
-                "server": {
-                    "host": f"https://{airbyte_config.require('web_host_domain')}"
-                },
+                # Disabling this for now, but leaving it for documentation about how to
+                # customize the host reported in `next` parameters for API
+                # requests. (TMM 2025-09-29)
+                # "api": {"host": f"https://{airbyte_config.require('api_host_domain')}"},  # noqa: E501, ERA001
+                # "server": {  # noqa: ERA001
+                #     "host": f"https://{airbyte_config.require('web_host_domain')}"
+                # },
                 "serviceAccountName": airbyte_service_account_name,
                 "deploymentMode": "oss",
                 "edition": "community",
