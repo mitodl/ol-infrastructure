@@ -15,7 +15,11 @@ import pulumi_vault as vault
 from pulumi import Alias, Config, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, iam, s3
 
-from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT, DEFAULT_REDIS_PORT
+from bridge.lib.magic_numbers import (
+    DEFAULT_POSTGRES_PORT,
+    DEFAULT_REDIS_PORT,
+    DEFAULT_WSGI_PORT,
+)
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.mitxonline.k8s_secrets import (
     create_mitxonline_k8s_secrets,
@@ -474,8 +478,22 @@ mitxonline_k8s_app = OLApplicationK8s(
         application_image_repository="mitodl/mitxonline-app",
         application_docker_tag=MITXONLINE_DOCKER_TAG,
         application_cmd_array=[
-            "uwsgi",
-            "/tmp/uwsgi.ini",  # noqa: S108
+            "granian",
+        ],
+        application_arg_array=[
+            "--interface",
+            "wsgi",
+            "--host",
+            "0.0.0.0",  # noqa: S104
+            "--port",
+            f"{DEFAULT_WSGI_PORT}",
+            "--workers",
+            "1",
+            "--runtime-threads",
+            "2",
+            "--log-level",
+            "warning",
+            "main.wsgi:application",
         ],
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,
