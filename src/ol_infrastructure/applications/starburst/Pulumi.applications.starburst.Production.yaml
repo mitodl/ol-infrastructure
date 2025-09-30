@@ -9,7 +9,6 @@ config:
   starburst:domain: mitol.galaxy.starburst.io
   starburst:warehouse_prefix: "ol_warehouse"
   starburst:environments: ["production", "qa"]
-  starburst:manage_data_privileges: false
   starburst:roles:
     ol_platform_admin:
       description: "Full administrative access to all data and platform resources"

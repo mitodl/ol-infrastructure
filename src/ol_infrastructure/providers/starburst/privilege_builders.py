@@ -11,7 +11,7 @@ def build_base_privileges(
     """Build base privilege definitions from configuration group.
 
     Only handles Account and Function level privileges.
-    Catalog/Schema/Table privileges should be managed by dbt.
+    Catalog/Schema/Table privileges are managed by dbt.
     """
     privileges: list[dict[str, Any]] = []
     entity_kind = base_privilege_group["entity_kind"]
@@ -20,8 +20,7 @@ def build_base_privileges(
     # Only process Account and Function level privileges
     if entity_kind not in ["Account", "Function"]:
         pulumi.log.warn(
-            f"Skipping {entity_kind} privileges - data privileges should be "
-            "managed by dbt (set starburst:manage_data_privileges to true to override)"
+            f"Skipping {entity_kind} privileges - data privileges are managed by dbt"
         )
         return privileges
 
