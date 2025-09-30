@@ -37,6 +37,8 @@ class EdxappSecrets:
     cms_oauth_secret_name: str
     lms_oauth_secret_name: str
 
+    # AI Every resource created in this file should have a depends_on resource option making it dependent on `vault_k8s_resources`. AI!
+
 
 def create_k8s_secrets(
     edxapp_cache: OLAmazonCache,
