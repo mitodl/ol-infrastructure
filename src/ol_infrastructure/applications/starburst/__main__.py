@@ -16,7 +16,7 @@ from ol_infrastructure.providers.starburst import (
 
 # Configuration
 config = pulumi.Config("starburst")
-starburst_domain = config.get("starburst_domain")
+starburst_domain = config.require("domain")
 client_id = config.require_secret("client_id")
 client_secret = config.require_secret("client_secret")
 
@@ -105,16 +105,8 @@ def _get_cluster_ids(
         for cluster in clusters:
             all_cluster_names.add(cluster["name"])
 
-    # Return dummy cluster IDs for preview
-    if pulumi.runtime.is_dry_run():
-        pulumi.log.info(
-            f"Preview mode: using dummy cluster IDs for {list(all_cluster_names)}"
-        )
-        dummy_ids = {}
-        for cluster_name in all_cluster_names:
-            dummy_ids[cluster_name] = f"preview-{cluster_name.replace('-', '_')}-id"
-        return dummy_ids
-
+    # Only use dummy IDs during preview if we can't connect to the API
+    # Don't check is_dry_run() - let the API call happen during pulumi up
     try:
         api_client = StarburstAPIClient(
             domain=starburst_domain,
@@ -124,11 +116,18 @@ def _get_cluster_ids(
 
         pulumi.log.info(f"Fetching cluster IDs for: {list(all_cluster_names)}")
         cluster_ids = api_client.get_cluster_ids_by_name(list(all_cluster_names))
-    except requests.RequestException as e:
-        pulumi.log.warn(f"Could not retrieve cluster data: {e}")
-        return {}
-    else:
         pulumi.log.info(f"Found cluster IDs: {cluster_ids}")
+    except requests.RequestException as e:
+        # Only fall back to dummy IDs if API call fails
+        pulumi.log.warn(f"Could not retrieve cluster data: {e}")
+
+        # Return dummy IDs as fallback
+        pulumi.log.info(f"Using dummy cluster IDs for {list(all_cluster_names)}")
+        dummy_ids = {}
+        for cluster_name in all_cluster_names:
+            dummy_ids[cluster_name] = f"preview-{cluster_name.replace('-', '_')}-id"
+        return dummy_ids
+    else:
         return cluster_ids
 
 
