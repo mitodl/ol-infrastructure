@@ -5,12 +5,10 @@ import os
 from pathlib import Path
 from string import Template
 
-import pulumi_consul as consul
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, get_caller_identity, iam, s3
-from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
@@ -43,7 +41,6 @@ from ol_infrastructure.lib.aws.iam_helper import (
     IAM_POLICY_VERSION,
     lint_iam_policy,
 )
-from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
@@ -66,7 +63,6 @@ vault_config = Config("vault")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
-consul_stack = StackReference(f"infrastructure.consul.data.{stack_info.name}")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
 
@@ -78,7 +74,6 @@ target_vpc_name = airbyte_config.get("target_vpc") or f"{stack_info.env_prefix}_
 target_vpc = network_stack.require_output(target_vpc_name)
 k8s_pod_subnet_cidrs = target_vpc["k8s_pod_subnet_cidrs"]
 
-consul_security_groups = consul_stack.require_output("security_groups")
 aws_config = AWSBase(
     tags={
         "OU": airbyte_config.get("business_unit") or "operations",
@@ -97,7 +92,6 @@ airbyte_namespace = "airbyte"
 aws_account = get_caller_identity()
 vpc_id = target_vpc["id"]
 
-consul_provider = get_consul_provider(stack_info)
 
 VERSIONS = {
     "AIRBYTE_CHART": os.environ.get("AIRBYTE_CHART_VERSION", AIRBYTE_CHART_VERSION),
@@ -442,7 +436,6 @@ airbyte_db_security_group = ec2.SecurityGroup(
         ec2.SecurityGroupIngressArgs(
             security_groups=[
                 airbyte_server_security_group.id,
-                consul_security_groups["consul_server"],
                 vault_stack.require_output("vault_server")["security_group"],
             ],
             cidr_blocks=[target_vpc["cidr"]],
@@ -509,40 +502,6 @@ airbyte_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
 )
 airbyte_db_vault_backend = OLVaultDatabaseBackend(airbyte_db_vault_backend_config)
 
-##################################
-#     Consul Configs             #
-##################################
-airbyte_db_consul_node = Node(
-    "airbyte-instance-db-node",
-    name="airbyte-postgres-db",
-    address=db_address,
-    opts=consul_provider,
-)
-
-airbyte_db_consul_service = Service(
-    "airbyte-instance-db-service",
-    node=airbyte_db_consul_node.name,
-    name="airbyte-postgres",
-    port=db_port,
-    meta={
-        "external-node": True,
-        "external-probe": True,
-    },
-    checks=[
-        ServiceCheckArgs(
-            check_id="airbyte-instance-db",
-            interval="10s",
-            name="airbyte-instance-db",
-            timeout="60s",
-            status="passing",
-            tcp=Output.all(
-                address=db_address,
-                port=db_port,
-            ).apply(lambda db: "{address}:{port}".format(**db)),
-        )
-    ],
-    opts=consul_provider,
-)
 
 connection_string = Output.all(address=db_address, port=db_port, name=db_name).apply(
     lambda db: (
@@ -552,36 +511,6 @@ connection_string = Output.all(address=db_address, port=db_port, name=db_name).a
     )
 )
 
-consul.Keys(
-    "airbyte-consul-template-data",
-    keys=[
-        consul.KeysKeyArgs(path="airbyte/database-host", value=db_address),
-        consul.KeysKeyArgs(path="airbyte/database-port", value=db_port),
-        consul.KeysKeyArgs(path="airbyte/database-name", value=db_name),
-        consul.KeysKeyArgs(
-            path="airbyte/database-connection-string",
-            value=connection_string,
-        ),
-        consul.KeysKeyArgs(
-            path="airbyte/vault-address",
-            value=f"{Config('vault').get('address')}/",
-        ),
-        consul.KeysKeyArgs(
-            path="airbyte/airbyte-hostname",
-            value=airbyte_config.require("web_host_domain"),
-        ),
-        consul.KeysKeyArgs(
-            path="airbyte/traefik-certificate-resolver",
-            value=(
-                "letsencrypt_staging_resolver"
-                if stack_info.env_suffix != "production"
-                else "letsencrypt_resolver"
-            ),
-        ),
-        consul.KeysKeyArgs(path="airbyte/env-stage", value=stack_info.env_suffix),
-    ],
-    opts=consul_provider,
-)
 
 ##################################
 #     General K8S + IAM Config   #
