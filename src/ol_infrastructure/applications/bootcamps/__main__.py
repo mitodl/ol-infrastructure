@@ -243,7 +243,6 @@ heroku_vars = {
     "BOOTCAMP_REPLY_TO_ADDRESS": "MIT Bootcamps <bootcamps-support@mit.edu>",
     "BOOTCAMP_SECURE_SSL_REDIRECT": "True",
     "BOOTCAMP_USE_S3": "True",
-    "CYBERSOURCE_MERCHANT_ID": "mit_clb_bootcamp",
     "ENABLE_STUNNEL_AMAZON_RDS_FIX": "True",
     "FEATURE_ENABLE_CERTIFICATE_USER_VIEW": "True",
     "FEATURE_SOCIAL_AUTH_API": "True",
@@ -259,14 +258,8 @@ heroku_vars = {
 
 sensitive_heroku_vars = {
     "CYBERSOURCE_ACCESS_KEY": "",
-    "CYBERSOURCE_INQUIRY_LOG_NACL_ENCRYPTION_KEY": bootcamps_vault_secrets[
-        "cybersource"
-    ]["inquiry_public_encryption_key"],
     "CYBERSOURCE_PROFILE_ID": bootcamps_vault_secrets["cybersource"]["profile_id"],
     "CYBERSOURCE_SECURITY_KEY": bootcamps_vault_secrets["cybersource"]["security_key"],
-    "CYBERSOURCE_TRANSACTION_KEY": bootcamps_vault_secrets["cybersource"][
-        "transaction_key"
-    ],
     "EDXORG_CLIENT_ID": bootcamps_vault_secrets["edx"]["client_id"],
     "EDXORG_CLIENT_SECRET": bootcamps_vault_secrets["edx"]["client_secret"],
     "JOBMA_ACCESS_TOKEN": bootcamps_vault_secrets["jobma"]["access_token"],
