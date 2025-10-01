@@ -36,3 +36,8 @@ The steps for updating a new course is a subset of the steps for adding a new co
 1. Author your changes in the course repo. If it is an update to an existing course, it should already have a Concourse build pipeline which will automatically attempt to build an updated image.
 1. Once the image is built, you should be able to start a notebook server with the updated image automatically. If you adjusted the notebook directory structure, you may need to construct a new URL, but you will not need to make any additional infrastructure changes.
 1. Test the updated image by running through the notebook as you would for a new one.
+
+### Troubleshooting
+If you run into issues, here are some common things to check:
+- If you get the wrong image when you log in, verify that you've specified the right course parameter and that the value is in `KNOWN_IMAGES` in `jupyterhub_config.py`.
+- If the image starts but you get a 404, verify that the notebook path is correct and URL encoded.
