@@ -461,10 +461,21 @@ class OLApplicationK8s(ComponentResource):
                 ResourceOptions(depends_on=[_pre_deploy_job])
             )
 
-        # TODO(<cpatti>):  actually fill in event creation fully.
-        _pre_deployment_event = kubernetes.events.v1.Event(f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-job",
+            _application_pre_deployment_event_name = truncate_k8s_metanames(
+                f"{ol_app_k8s_config.application_name}-predeploy"
+            )
+
+            _pre_deployment_event = kubernetes.events.v1.Event(f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-job",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=_application_pre_deployment_event_name,
+                    namespace=ol_app_k8s_config.application_namespace,
+                    labels=application_labels,
+                ),
                 event_time = "TODO figure out how to get current timestamp",
-        )
+                regarding = _pre_deploy_job,
+
+                reason = f"Deployment {_application_deployment_name} pre-deploy job started",
+            )
 
         _application_deployment = kubernetes.apps.v1.Deployment(
             f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-deployment",
