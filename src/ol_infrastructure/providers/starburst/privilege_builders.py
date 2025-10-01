@@ -8,46 +8,41 @@ import pulumi
 def build_base_privileges(
     base_privilege_group: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """Build base privilege definitions from configuration group."""
-    privileges = []
+    """Build base privilege definitions from configuration group.
+
+    Only handles Account and Function level privileges.
+    Catalog/Schema/Table privileges are managed by dbt.
+    """
+    privileges: list[dict[str, Any]] = []
     entity_kind = base_privilege_group["entity_kind"]
     privilege_list = base_privilege_group.get("privileges", [])
 
-    # Handle additional properties
-    additional_props = {
-        k: v
-        for k, v in base_privilege_group.items()
-        if k not in ["entity_kind", "privileges", "catalogs"]
-    }
+    # Only process Account and Function level privileges
+    if entity_kind not in ["Account", "Function"]:
+        pulumi.log.warn(
+            f"Skipping {entity_kind} privileges - data privileges are managed by dbt"
+        )
+        return privileges
 
-    # Handle multiple catalogs
-    if "catalogs" in base_privilege_group:
-        catalogs = base_privilege_group["catalogs"]
-    elif "catalog_name" in base_privilege_group:
-        catalogs = [base_privilege_group["catalog_name"]]
-    else:
-        catalogs = [None]
+    for privilege_config in privilege_list:
+        if isinstance(privilege_config, str):
+            privilege_name = privilege_config
+            grant_option = False
+        else:
+            privilege_name = privilege_config["name"]
+            grant_option = privilege_config.get("with_grant_option", False)
 
-    for catalog in catalogs:
-        catalog_props = additional_props.copy()
-        if catalog:
-            catalog_props["catalog_name"] = catalog
+        privilege_def = {
+            "privilege": privilege_name,
+            "entity_kind": entity_kind,
+            "grant_option": grant_option,
+        }
 
-        for privilege_config in privilege_list:
-            if isinstance(privilege_config, str):
-                privilege_name = privilege_config
-                grant_option = False
-            else:
-                privilege_name = privilege_config["name"]
-                grant_option = privilege_config.get("grant", False)
+        # For Function privileges, default to wildcard
+        if entity_kind == "Function":
+            privilege_def["function_name"] = "*"
 
-            privilege_def = {
-                "privilege": privilege_name,
-                "entity_kind": entity_kind,
-                "grant_option": grant_option,
-                **catalog_props,
-            }
-            privileges.append(privilege_def)
+        privileges.append(privilege_def)
 
     return privileges
 
@@ -65,7 +60,7 @@ def build_cluster_privileges(
         cluster_id = cluster_ids.get(cluster_name)
         if not cluster_id:
             pulumi.log.warn(
-                f"No cluster ID found - '{cluster_name}' in role '{role_name}'"
+                f"No cluster ID found for '{cluster_name}' in role '{role_name}'"
             )
             continue
 
@@ -75,7 +70,7 @@ def build_cluster_privileges(
                 grant_option = False
             else:
                 privilege_name = privilege_config["name"]
-                grant_option = privilege_config.get("grant", False)
+                grant_option = privilege_config.get("with_grant_option", False)
 
             privileges.append(
                 {
@@ -91,38 +86,57 @@ def build_cluster_privileges(
 
 def build_data_privileges_from_dbt_grants(
     role_name: str,
-    data_domains: dict[str, list[str]],
+    data_domains: dict[str, dict[str, Any]],
     grants_by_domain: dict[str, dict[str, list[str]]],
 ) -> list[dict[str, Any]]:
-    """Build data privileges based on dbt grants configuration."""
-    privileges: list[dict[str, Any]] = []
+    """Build data privileges based on dbt grants configuration.
 
-    for domain, schemas in data_domains.items():
-        domain_grants = grants_by_domain.get(domain, {})
+    This function is only called when manage_data_privileges is True.
+    Otherwise, dbt manages these privileges automatically through its own
+    grant mechanism.
+    """
+    privileges = []
 
-        for privilege_type, granted_roles in domain_grants.items():
-            if role_name in granted_roles:
-                for schema in schemas:
-                    privilege_def = {
-                        "privilege": privilege_type,
-                        "entity_kind": "Column"
-                        if privilege_type == "Select"
-                        else "Table",
-                        "schema_name": schema,
-                        "table_name": "*",
-                        "grant_option": False,
-                    }
+    # Minimum parts needed for a valid object path
+    MIN_OBJECT_PATH_PARTS = 2
 
-                    if privilege_type == "Select":
-                        privilege_def["column_name"] = "*"
+    # For each data domain, check if the role has grants
+    for domain_key, domain_config in data_domains.items():
+        if role_name not in grants_by_domain.get(domain_key, {}):
+            continue
 
-                    privileges.append(privilege_def)
+        # Get privileges granted to this role for this domain
+        privilege_list = grants_by_domain[domain_key][role_name]
+        object_path = domain_config["object_path"]
 
-    if not privileges:
-        pulumi.log.info(f"No dbt grants found for role '{role_name}'")
-    else:
-        pulumi.log.info(
-            f"Built {len(privileges)} privileges for role '{role_name}' from dbt grants"
+        # Parse the object path (catalog.schema.table)
+        parts = object_path.split(".")
+        if len(parts) < MIN_OBJECT_PATH_PARTS:
+            pulumi.log.warn(f"Invalid object path in dbt grants: {object_path}")
+            continue
+
+        catalog_name = parts[0]
+        schema_name = parts[1]
+        table_name = (
+            parts[MIN_OBJECT_PATH_PARTS] if len(parts) > MIN_OBJECT_PATH_PARTS else None
         )
+
+        for privilege_name in privilege_list:
+            # Determine the entity type based on whether we have a table
+            if table_name:
+                entity_kind = "Table"
+                entity_id = f"{catalog_name}.{schema_name}.{table_name}"
+            else:
+                entity_kind = "Schema"
+                entity_id = f"{catalog_name}.{schema_name}"
+
+            privileges.append(
+                {
+                    "entity_kind": entity_kind,
+                    "entity_id": entity_id,
+                    "privilege": privilege_name,
+                    "grant_option": False,
+                }
+            )
 
     return privileges

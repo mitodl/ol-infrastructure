@@ -5,18 +5,16 @@ from typing import Any
 import pulumi
 import requests
 
-from ol_infrastructure.lib.data.dbt import DbtProjectParser
 from ol_infrastructure.providers.starburst import (
     StarburstAPIClient,
     StarburstRole,
     build_base_privileges,
     build_cluster_privileges,
-    build_data_privileges_from_dbt_grants,
 )
 
 # Configuration
 config = pulumi.Config("starburst")
-starburst_domain = config.get("starburst_domain")
+starburst_domain = config.require("domain")
 client_id = config.require_secret("client_id")
 client_secret = config.require_secret("client_secret")
 
@@ -24,37 +22,17 @@ client_secret = config.require_secret("client_secret")
 warehouse_prefix = config.get("warehouse_prefix") or "ol_warehouse"
 environments = config.get_object("environments") or ["production", "qa"]
 
-# Data privilege management configuration
-manage_data_privileges = config.get_bool("manage_data_privileges") or False
-
-# Path to dbt project
-DBT_PROJECT_PATH = (
-    config.get("dbt_project_path")
-    or "https://raw.githubusercontent.com/mitodl/ol-data-platform/main/src/ol_dbt"
-)
-
 
 def generate_role_definitions(
-    dbt_parser: DbtProjectParser,
     cluster_ids: dict[str, str],
     roles_config: dict[str, Any],
 ) -> dict[str, dict[str, Any]]:
-    """Generate Starburst role definitions based on configuration and dbt structure."""
+    """Generate Starburst role definitions based on configuration."""
     roles = {}
 
-    # Only parse dbt grants if data privilege management is enabled
-    if manage_data_privileges:
-        data_domains = dbt_parser.get_data_domains(warehouse_prefix, environments)
-        grants_by_domain = dbt_parser.get_grants_by_domain()
-        pulumi.log.info(
-            "Data privilege management enabled - will sync privileges from dbt grants"
-        )
-    else:
-        data_domains = {}
-        grants_by_domain = {}
-        pulumi.log.info(
-            "Data privilege management disabled - dbt handles data grants automatically"
-        )
+    pulumi.log.info(
+        "Data privilege management disabled - dbt handles data grants automatically"
+    )
 
     for role_name, role_config in roles_config.items():
         privileges = []
@@ -69,18 +47,6 @@ def generate_role_definitions(
             clusters_config, cluster_ids, role_name
         )
         privileges.extend(cluster_privileges)
-
-        # Add data privileges from dbt grants (only if enabled)
-        if manage_data_privileges:
-            data_privileges = build_data_privileges_from_dbt_grants(
-                role_name, data_domains, grants_by_domain
-            )
-            privileges.extend(data_privileges)
-            if data_privileges:
-                pulumi.log.info(
-                    f"Added {len(data_privileges)} data privileges for role "
-                    f"'{role_name}'"
-                )
 
         roles[role_name] = {
             "description": role_config.get("description", ""),
@@ -105,16 +71,8 @@ def _get_cluster_ids(
         for cluster in clusters:
             all_cluster_names.add(cluster["name"])
 
-    # Return dummy cluster IDs for preview
-    if pulumi.runtime.is_dry_run():
-        pulumi.log.info(
-            f"Preview mode: using dummy cluster IDs for {list(all_cluster_names)}"
-        )
-        dummy_ids = {}
-        for cluster_name in all_cluster_names:
-            dummy_ids[cluster_name] = f"preview-{cluster_name.replace('-', '_')}-id"
-        return dummy_ids
-
+    # Only use dummy IDs during preview if we can't connect to the API
+    # Don't check is_dry_run() - let the API call happen during pulumi up
     try:
         api_client = StarburstAPIClient(
             domain=starburst_domain,
@@ -124,11 +82,18 @@ def _get_cluster_ids(
 
         pulumi.log.info(f"Fetching cluster IDs for: {list(all_cluster_names)}")
         cluster_ids = api_client.get_cluster_ids_by_name(list(all_cluster_names))
-    except requests.RequestException as e:
-        pulumi.log.warn(f"Could not retrieve cluster data: {e}")
-        return {}
-    else:
         pulumi.log.info(f"Found cluster IDs: {cluster_ids}")
+    except requests.RequestException as e:
+        # Only fall back to dummy IDs if API call fails
+        pulumi.log.warn(f"Could not retrieve cluster data: {e}")
+
+        # Return dummy IDs as fallback
+        pulumi.log.info(f"Using dummy cluster IDs for {list(all_cluster_names)}")
+        dummy_ids = {}
+        for cluster_name in all_cluster_names:
+            dummy_ids[cluster_name] = f"preview-{cluster_name.replace('-', '_')}-id"
+        return dummy_ids
+    else:
         return cluster_ids
 
 
@@ -160,7 +125,7 @@ def _create_roles(
 
 
 def main() -> None:
-    """Create Starburst roles based on dbt project configuration."""
+    """Create Starburst roles based on configuration."""
 
     # Load role definitions from configuration
     roles_config = config.get_object("roles") or {}
@@ -170,14 +135,6 @@ def main() -> None:
 
     pulumi.log.info(f"Found {len(roles_config)} role definitions in configuration")
 
-    # Parse dbt project
-    try:
-        dbt_parser = DbtProjectParser(DBT_PROJECT_PATH)
-        pulumi.log.info("Successfully parsed dbt project configuration")
-    except FileNotFoundError as e:
-        pulumi.log.error(f"Failed to parse dbt project: {e}")
-        return
-
     # Get cluster IDs and prepare role definitions
     cluster_ids = pulumi.Output.all(client_id, client_secret).apply(
         lambda secrets: _get_cluster_ids(secrets, roles_config, starburst_domain)
@@ -185,9 +142,7 @@ def main() -> None:
 
     prepared_data = pulumi.Output.all(cluster_ids, client_id, client_secret).apply(
         lambda data: {
-            "roles_definitions": generate_role_definitions(
-                dbt_parser, data[0], roles_config
-            ),
+            "roles_definitions": generate_role_definitions(data[0], roles_config),
             "client_id": data[1],
             "client_secret": data[2],
         }
