@@ -441,6 +441,7 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
               // Drop metrics that start with go_
               // These are usually metrics about the exporter itself rather than
               // the application / service we are interested in.
+
               rule {{
                 source_labels = ["__name__"]
                 regex         = "go_.*"
@@ -451,6 +452,63 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
                 target_label = "cluster"
                 replacement  = "{cluster_name}"
                 action       = "replace"
+              }}
+
+              // KSM emits a ton of metrics. We only want to opt in jupyter at the moment
+              rule {{
+                source_labels = ["source", "namespace"]
+                regex = "kube-state-monitor;(?!(jupyter))"
+                action = "drop"
+              }}
+              // We only want the two metrics allowlisted below from kube-state-metrics
+              rule {{
+                source_labels = ["source", "__name__"]
+                regex         = "kube-state-monitor;(?!kube_pod_container_info$|kube_pod_container_status_restarts_total$)"
+                action        = "drop"
+              }}
+              // Drop anything that isn't notebook related
+              rule {{
+                source_labels = ["source", "container"]
+                regex = "kube-state-monitor;(?!(notebook))"
+                action = "drop"
+              }}
+              // At this point, we should have dropped all metrics we don't care about from ksm
+              // Now we must flatten some of the UUID fields to keep cardinality from exploding
+              // Would we be better off doing keeps instead of drops since we previously only dropped go_*?
+              rule {{
+                source_labels = ["source"]
+                regex         = "kube-state-monitor"
+                action        = "replace"
+                target_label  = "pod"
+                replacement   = "DROP_ME"
+              }}
+              rule {{
+                source_labels = ["source"]
+                regex         = "kube-state-monitor"
+                action        = "replace"
+                target_label  = "uid"
+                replacement   = "DROP_ME"
+              }}
+              rule {{
+                source_labels = ["source"]
+                regex         = "kube-state-monitor"
+                action        = "replace"
+                target_label  = "image_spec"
+                replacement   = "DROP_ME"
+              }}
+              rule {{
+                source_labels = ["source"]
+                regex         = "kube-state-monitor"
+                action        = "replace"
+                target_label  = "image_id"
+                replacement   = "DROP_ME"
+              }}
+              rule {{
+                source_labels = ["source"]
+                regex         = "kube-state-monitor"
+                action        = "replace"
+                target_label  = "container_id"
+                replacement   = "DROP_ME"
               }}
             }}
 
@@ -743,8 +801,9 @@ ksm_release = kubernetes.helm.v3.Release(
         skip_await=True,
         values={
             "serviceMonitor": {
-                "enabled": False,
+                "enabled": True,
             },
+            "customLabels": {"source": "kube-state-monitor"},
         },
     ),
     opts=ResourceOptions(
