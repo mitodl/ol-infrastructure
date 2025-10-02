@@ -16,7 +16,6 @@ config:
     BOOTCAMP_SUPPORT_EMAIL: "bootcamp-support@mit.edu"
     CYBERSOURCE_REFERENCE_PREFIX: "rc"
     CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
-    CYBERSOURCE_WSDL_URL: "https://ics2wstest.ic3.com/commerce/1.x/transactionProcessor/CyberSourceTransaction_1.154.wsdl"
     EDXORG_BASE_URL: "https://courses.stage.edx.org"
     FEATURE_NOVOED_INTEGRATION: "True"
     GA_TRACKING_ID: "UA-5145472-19"
