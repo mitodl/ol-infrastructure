@@ -422,6 +422,9 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
               level = "info"
               format = "logfmt"
             }}
+            livedebugging {{
+              enabled = true
+            }}
 
             // ----------------------------------------------------------
             // Discover servicemonitor and podmonitor resources in the
@@ -453,37 +456,37 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
                 action       = "replace"
               }}
               rule {{
-                source_labels = ["job"]
-                regex         = "kube-state-metrics"
+                source_labels = ["__name__"]
+                regex         = "kube_pod_container_info"
                 action        = "replace"
                 target_label  = "pod"
                 replacement   = "DROP_ME"
               }}
               // Collapse some labels that include UUIDs and are not useful
               rule {{
-                source_labels = ["job"]
-                regex         = "kube-state-metrics"
+                source_labels = ["__name__"]
+                regex         = "kube_pod_container_info"
                 action        = "replace"
                 target_label  = "uid"
                 replacement   = "DROP_ME"
               }}
               rule {{
-                source_labels = ["job"]
-                regex         = "kube-state-metrics"
+                source_labels = ["__name__"]
+                regex         = "kube_pod_container_info"
                 action        = "replace"
                 target_label  = "image_spec"
                 replacement   = "DROP_ME"
               }}
               rule {{
-                source_labels = ["job"]
-                regex         = "kube-state-metrics"
+                source_labels = ["__name__"]
+                regex         = "kube_pod_container_info"
                 action        = "replace"
                 target_label  = "image_id"
                 replacement   = "DROP_ME"
               }}
               rule {{
-                source_labels = ["job"]
-                regex         = "kube-state-metrics"
+                source_labels = ["__name__"]
+                regex         = "kube_pod_container_info"
                 action        = "replace"
                 target_label  = "container_id"
                 replacement   = "DROP_ME"
