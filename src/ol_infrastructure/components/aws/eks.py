@@ -93,20 +93,6 @@ class OLEKSGatewayConfig(BaseModel):
                 raise ValueError(msg)
         return self
 
-    @model_validator(mode="after")
-    def check_hostnames(self):
-        listener_hostnames = {
-            listener_config.hostname for listener_config in self.listeners
-        }  # a set comprehension!
-        route_hostnames = set()
-        for route_config in self.routes:
-            for hostname in route_config.hostnames:
-                route_hostnames.add(hostname)
-        if not listener_hostnames & route_hostnames:
-            msg = "The set of listener hostnames must match the set of route hostnames."
-            raise ValueError(msg)
-        return self
-
     @field_validator("gateway_class_name")
     @classmethod
     def check_gateway_class(cls, gateway_class_name: str) -> str:
