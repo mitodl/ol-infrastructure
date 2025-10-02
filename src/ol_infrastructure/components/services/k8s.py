@@ -22,7 +22,7 @@ from pydantic import (
 from bridge.lib.magic_numbers import (
     DEFAULT_NGINX_PORT,
     DEFAULT_REDIS_PORT,
-    DEFAULT_UWSGI_PORT,
+    DEFAULT_WSGI_PORT,
     MAXIMUM_K8S_NAME_LENGTH,
 )
 from bridge.lib.versions import NGINX_VERSION
@@ -79,6 +79,7 @@ class OLApplicationK8sConfig(BaseModel):
     application_image_repository_suffix: str | None = None
     application_docker_tag: str
     application_cmd_array: list[str] | None = None
+    application_arg_array: list[str] | None = None
     vault_k8s_resource_auth_name: str
     use_pullthrough_cache: bool = True
     image_pull_policy: str = "IfNotPresent"
@@ -333,7 +334,7 @@ class OLApplicationK8s(ComponentResource):
                 )
             )
         application_deployment_env_vars.append(
-            kubernetes.core.v1.EnvVarArgs(name="PORT", value=str(DEFAULT_UWSGI_PORT))
+            kubernetes.core.v1.EnvVarArgs(name="PORT", value=str(DEFAULT_WSGI_PORT))
         )
         # Build a list of sensitive env vars for the deployment config via envFrom
         application_deployment_envfrom = []
@@ -512,7 +513,7 @@ class OLApplicationK8s(ComponentResource):
                                 image=app_image,
                                 ports=[
                                     kubernetes.core.v1.ContainerPortArgs(
-                                        container_port=DEFAULT_UWSGI_PORT
+                                        container_port=DEFAULT_WSGI_PORT
                                     )
                                 ],
                                 image_pull_policy=image_pull_policy,
@@ -521,6 +522,7 @@ class OLApplicationK8s(ComponentResource):
                                     limits=ol_app_k8s_config.resource_limits,
                                 ),
                                 command=ol_app_k8s_config.application_cmd_array,
+                                args=ol_app_k8s_config.application_arg_array,
                                 env=application_deployment_env_vars,
                                 env_from=application_deployment_envfrom,
                                 volume_mounts=webapp_volume_mounts,
