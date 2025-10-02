@@ -422,6 +422,9 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
               level = "info"
               format = "logfmt"
             }}
+            livedebugging {{
+              enabled = true
+            }}
 
             // ----------------------------------------------------------
             // Discover servicemonitor and podmonitor resources in the
@@ -451,6 +454,42 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
                 target_label = "cluster"
                 replacement  = "{cluster_name}"
                 action       = "replace"
+              }}
+              rule {{
+                source_labels = ["__name__"]
+                regex         = "kube_pod_container_info"
+                action        = "replace"
+                target_label  = "pod"
+                replacement   = "DROP_ME"
+              }}
+              // Collapse some labels that include UUIDs and are not useful
+              rule {{
+                source_labels = ["__name__"]
+                regex         = "kube_pod_container_info"
+                action        = "replace"
+                target_label  = "uid"
+                replacement   = "DROP_ME"
+              }}
+              rule {{
+                source_labels = ["__name__"]
+                regex         = "kube_pod_container_info"
+                action        = "replace"
+                target_label  = "image_spec"
+                replacement   = "DROP_ME"
+              }}
+              rule {{
+                source_labels = ["__name__"]
+                regex         = "kube_pod_container_info"
+                action        = "replace"
+                target_label  = "image_id"
+                replacement   = "DROP_ME"
+              }}
+              rule {{
+                source_labels = ["__name__"]
+                regex         = "kube_pod_container_info"
+                action        = "replace"
+                target_label  = "container_id"
+                replacement   = "DROP_ME"
               }}
             }}
 
@@ -743,7 +782,15 @@ ksm_release = kubernetes.helm.v3.Release(
         skip_await=True,
         values={
             "serviceMonitor": {
-                "enabled": False,
+                "enabled": True,
+            },
+            "namespaces": "jupyter",
+            "extraArgs": {
+                "metric-allowlist": "kube_pod_container_info,kube_pod_container_status_restarts_total",
+            },
+            "image": {
+                "repository": "bitnamilegacy/kube-state-metrics",
+                "tag": "2.16.0-debian-12-r5",
             },
             "image": {
                 "repository": "bitnamilegacy/kube-state-metrics",
