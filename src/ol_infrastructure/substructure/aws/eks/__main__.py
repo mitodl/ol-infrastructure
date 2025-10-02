@@ -453,37 +453,37 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
                 action       = "replace"
               }}
               rule {{
-                source_labels = ["source"]
-                regex         = "kube-state-monitor"
+                source_labels = ["job"]
+                regex         = "kube-state-metrics"
                 action        = "replace"
                 target_label  = "pod"
                 replacement   = "DROP_ME"
               }}
               // Collapse some labels that include UUIDs and are not useful
               rule {{
-                source_labels = ["source"]
-                regex         = "kube-state-monitor"
+                source_labels = ["job"]
+                regex         = "kube-state-metrics"
                 action        = "replace"
                 target_label  = "uid"
                 replacement   = "DROP_ME"
               }}
               rule {{
-                source_labels = ["source"]
-                regex         = "kube-state-monitor"
+                source_labels = ["job"]
+                regex         = "kube-state-metrics"
                 action        = "replace"
                 target_label  = "image_spec"
                 replacement   = "DROP_ME"
               }}
               rule {{
-                source_labels = ["source"]
-                regex         = "kube-state-monitor"
+                source_labels = ["job"]
+                regex         = "kube-state-metrics"
                 action        = "replace"
                 target_label  = "image_id"
                 replacement   = "DROP_ME"
               }}
               rule {{
-                source_labels = ["source"]
-                regex         = "kube-state-monitor"
+                source_labels = ["job"]
+                regex         = "kube-state-metrics"
                 action        = "replace"
                 target_label  = "container_id"
                 replacement   = "DROP_ME"
