@@ -611,6 +611,7 @@ def create_k8s_resources(
         command=["python", "manage.py"],
         args=["lms", "migrate", "--noinput"],
         purpose="migrate",
+        opts=ResourceOptions(depends_on=[*lms_edxapp_config_sources.values()]),
     )
     lms_pre_deploy_waffleflag_job = _create_pre_deploy_job(
         service_type="lms",
@@ -620,6 +621,7 @@ def create_k8s_resources(
         command=["python", "set_waffle_flags.py"],
         args=["/openedx/config/waffle-flags.yaml"],
         purpose="waffleflags",
+        opts=ResourceOptions(depends_on=[*lms_edxapp_config_sources.values()]),
     )
     # It is important that the CMS and LMS deployment have distinct labels attached.
     lms_webapp_labels = k8s_global_labels | {
@@ -788,6 +790,7 @@ def create_k8s_resources(
                 ),
             ),
         ),
+        opts=pulumi.ResourceOptions(depends_on=[*lms_edxapp_config_sources.values()]),
     )
 
     lms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
@@ -1033,7 +1036,9 @@ def create_k8s_resources(
         command=["python", "manage.py"],
         args=["cms", "migrate", "--noinput"],
         purpose="migrate",
-        opts=ResourceOptions(depends_on=[lms_pre_deploy_migrate_job]),
+        opts=ResourceOptions(
+            depends_on=[*cms_edxapp_config_sources.values(), lms_pre_deploy_migrate_job]
+        ),
     )
     # It is important that the CMS and LMS deployment have distinct labels attached.
     # These labels should be should be distict from those attached to the predeployment
@@ -1203,6 +1208,7 @@ def create_k8s_resources(
                 ),
             ),
         ),
+        opts=pulumi.ResourceOptions(depends_on=[*cms_edxapp_config_sources.values()]),
     )
     cms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
         f"ol-{stack_info.env_prefix}-edxapp-cms-celery-scaledobject-{stack_info.env_suffix}",

@@ -52,10 +52,15 @@ config:
   edxapp:db_password:
     secure: v1:xHUw5WC3aN02zuAj:0BozwDxrtF0OA7wkYuv4R4CCnSHYdgXt+vi6/3eP9zwJgHgQO20+8sQfg7rXPC9SIUobEA==
   edxapp:dns_zone: learn
+  edxapp:mit_learn_domain: rc.learn.mit.edu
+  edxapp:mit_learn_api_domain: api.rc.learn.mit.edu
   edxapp:domains:
     lms: courses.rc.learn.mit.edu
     preview: preview.courses.rc.learn.mit.edu
     studio: studio.courses.rc.learn.mit.edu
+  edxapp:backend_lms_domain: courses-backend.rc.learn.mit.edu
+  edxapp:backend_studio_domain: studio-backend.rc.learn.mit.edu
+  edxapp:backend_preview_domain: preview-backend.rc.learn.mit.edu
   edxapp:marketing_domain: rc.mitxonline.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:IqXRArQveCV+9lkE:cRaraFuN2dDmI29PD4QifOU7MrRFdszOoaUb7o3pDJordt4TSjw8fIxldWfMzNhZRLC+NS291DorO1IuN6ASdCbt5d53aMvHVt+3hA6wyuI11OFjk7U=
@@ -69,9 +74,6 @@ config:
     learning: learn
     ora_grading: ora-grading
   edxapp:google_analytics_id: UA-5145472-46
-  edxapp:k8s_deployment: false
-  edxapp:k8s_cutover: false
-  edxapp:disable_ec2_deployment: false
   edxapp:mail_domain: edxapp-mail.rc.learn.mit.edu
   edxapp:proctortrack_url: https://preproduction.verificient.com
   edxapp:sender_email_address: mitlearn-support+rc@mit.edu
@@ -80,6 +82,47 @@ config:
   edxapp:framework: "earthly"
   edxapp:web_node_capacity: "3"
   edxapp:worker_node_capacity: "5"
+  edxapp:k8s_replicas:
+    webapp:
+      lms:
+        max: 2
+        min: 1
+      cms:
+        max: 2
+        min: 1
+    celery:
+      lms:
+        max: 1
+        min: 1
+      cms:
+        max: 1
+        min: 1
+  edxapp:k8s_resources:
+    webapp:
+      lms:
+        cpu_request: "250m"
+        cpu_limit: "500m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+      cms:
+        cpu_request: "250m"
+        cpu_limit: "500m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+    celery:
+      lms:
+        cpu_request: "250m"
+        cpu_limit: "500m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+      cms:
+        cpu_request: "250m"
+        cpu_limit: "500m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+  edxapp:k8s_deployment: true
+  edxapp:k8s_cutover: true
+  edxapp:disable_ec2_deployment: false
   redis:instance_type: cache.r7g.large
   mongodb:atlas_project_id: 61a8fd80284fd30a660f2699
   vault:address: https://vault-qa.odl.mit.edu
