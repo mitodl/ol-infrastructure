@@ -745,6 +745,10 @@ ksm_release = kubernetes.helm.v3.Release(
             "serviceMonitor": {
                 "enabled": False,
             },
+            "image": {
+                "repository": "bitnamilegacy/kube-state-metrics",
+                "tag": "2.16.0-debian-12-r5",
+            },
         },
     ),
     opts=ResourceOptions(
