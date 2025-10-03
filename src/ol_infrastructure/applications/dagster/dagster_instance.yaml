@@ -23,7 +23,7 @@ run_launcher:
   class: K8sRunLauncher
   config:
     load_incluster_config: true
-    job_namespace: {dagster_namespace: dagster}
+    job_namespace: dagster
     image_pull_policy: Always
     service_account_name: dagster
     dagster_home: "/opt/dagster/dagster_home"
