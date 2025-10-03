@@ -753,6 +753,10 @@ edxapp_notes_vault_auth_role = vault.aws.AuthBackendRole(
 ##########################
 #     Database Setup     #
 ##########################
+rds_defaults = defaults(stack_info)["rds"]
+rds_defaults["instance_size"] = (
+    edxapp_config.get("db_instance_type") or rds_defaults["instance_size"]
+)
 edxapp_db_config = OLMariaDBConfig(
     instance_name=f"edxapp-db-{env_name}",
     password=edxapp_config.require("db_password"),
@@ -763,7 +767,7 @@ edxapp_db_config = OLMariaDBConfig(
     db_name="edxapp",
     storage=edxapp_config.get_int("db_storage_gb") or 50,
     use_blue_green=edxapp_config.get_bool("db_use_blue_green") or False,
-    **defaults(stack_info)["rds"],
+    **rds_defaults,
 )
 edxapp_db = OLAmazonDB(edxapp_db_config)
 

@@ -43,6 +43,8 @@ class OLEKSAuthBindingConfig(BaseModel):
     vault_sync_service_account_name: str = "vault-secrets"
     # Labels to apply to k8s resources created by the component
     k8s_labels: K8sGlobalLabels
+    # Optional parliament config for IAM policy linting
+    parliament_config: dict[str, Any] | None = None
 
     class Config:
         """Pydantic model configuration."""
@@ -77,7 +79,11 @@ class OLEKSAuthBinding(ComponentResource):
             f"{config.application_name}-policy-{config.stack_info.env_suffix}",
             name=f"{config.application_name}-policy-{config.stack_info.env_suffix}",
             path=f"/ol-data/{config.application_name}-policy-{config.stack_info.env_suffix}/",
-            policy=lint_iam_policy(config.iam_policy_document, stringify=True),
+            policy=lint_iam_policy(
+                config.iam_policy_document,
+                stringify=True,
+                parliament_config=config.parliament_config,
+            ),
             description=(
                 f"Policy for granting access for {config.application_name} to AWS"
                 " resources"

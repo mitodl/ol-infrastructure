@@ -7,6 +7,8 @@ config:
   dagster:db_password:
     secure: v1:XI74KBKUpbjHPTtE:3ZRZk+kvQ9w92TJPRRC4qw6kdK3etaumBDAgnySVagHjzYgRPfr8MhSeag==
   dagster:domain: pipelines-qa.odl.mit.edu
+  dagster:docker_repo_name: mitodl/mono-dagster
+  dagster:docker_image_tag: latest
   dagster:edx_pipeline_gcs_courses_bucket_name: edxorg-qa-edxapp-courses
   dagster:edx_pipeline_micromasters_bucket_name: ol-data-lake-mit-open-qa
   dagster:edx_pipeline_micromasters_postgres_db_hostname: micromasters-db-read-replica.cbnm7ajau6mi.us-east-1.rds.amazonaws.com
