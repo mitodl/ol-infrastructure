@@ -4,10 +4,10 @@ This is a service components that replaces a number of "boilerplate" kubernetes
 calls we currently make into one convenient callable package.
 """
 
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-import pulumi
 import pulumi_kubernetes as kubernetes
 from pulumi import ComponentResource, Output, ResourceOptions
 from pydantic import (
@@ -416,6 +416,7 @@ class OLApplicationK8s(ComponentResource):
             f"{ol_app_k8s_config.application_name}-app"
         )
 
+        # Put into Pydantic validator. Always want event. If no commands, create hello world command.
         if pre_deploy_commands := ol_app_k8s_config.pre_deploy_commands:
             _pre_deploy_job = kubernetes.batch.v1.Job(
                 f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-job",
@@ -465,16 +466,17 @@ class OLApplicationK8s(ComponentResource):
                 f"{ol_app_k8s_config.application_name}-predeploy"
             )
 
-            _pre_deployment_event = kubernetes.events.v1.Event(f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-job",
+            _pre_deployment_event = kubernetes.events.v1.Event(
+                f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-job",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
                     name=_application_pre_deployment_event_name,
                     namespace=ol_app_k8s_config.application_namespace,
                     labels=application_labels,
                 ),
-                event_time = "TODO figure out how to get current timestamp",
-                regarding = _pre_deploy_job,
-
-                reason = f"Deployment {_application_deployment_name} pre-deploy job started",
+                kind="Job",
+                event_time=datetime.now(tz=UTC).isoformat(),
+                regarding=_pre_deploy_job,
+                reason=f"Deployment {_application_deployment_name} pre-deploy job started",
             )
 
         _application_deployment = kubernetes.apps.v1.Deployment(
@@ -855,7 +857,7 @@ class OLApisixRouteConfig(BaseModel):
         return self
 
 
-class OLApisixRoute(pulumi.ComponentResource):
+class OLApisixRoute(ComponentResource):
     """
     Route configuration for apisix
     Defines and creates an "ApisixRoute" resource in the k8s cluster
@@ -867,14 +869,14 @@ class OLApisixRoute(pulumi.ComponentResource):
         route_configs: list[OLApisixRouteConfig],
         k8s_namespace: str,
         k8s_labels: dict[str, str],
-        opts: pulumi.ResourceOptions | None = None,
+        opts: ResourceOptions | None = None,
     ):
         """Initialize the OLApisixRoute component resource."""
         super().__init__(
             "ol:infrastructure:services:k8s:OLApisixRoute", name, None, opts
         )
 
-        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)
+        resource_options = ResourceOptions(parent=self).merge(opts)
 
         self.apisix_route_resource = kubernetes.apiextensions.CustomResource(
             f"OLApisixRoute-{name}",
@@ -888,9 +890,7 @@ class OLApisixRoute(pulumi.ComponentResource):
             spec={
                 "http": self.__build_route_list(route_configs),
             },
-            opts=resource_options.merge(
-                pulumi.ResourceOptions(delete_before_replace=True)
-            ),
+            opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
         )
 
     @classmethod
@@ -951,7 +951,7 @@ class OLApisixOIDCConfig(BaseModel):
     oidc_use_session_secret: bool = True
 
 
-class OLApisixOIDCResources(pulumi.ComponentResource):
+class OLApisixOIDCResources(ComponentResource):
     """
     OIDC configuration for apisix
     Defines and creates an "OLVaultK8SSecret" resource in the k8s cluster
@@ -962,14 +962,14 @@ class OLApisixOIDCResources(pulumi.ComponentResource):
         self,
         name: str,
         oidc_config: OLApisixOIDCConfig,
-        opts: pulumi.ResourceOptions | None = None,
+        opts: ResourceOptions | None = None,
     ):
         """Initialize the OLApisixOIDCResources component resource."""
         super().__init__(
             "ol:infrastructure:services:k8s:OLApisixOIDCResources", name, None, opts
         )
 
-        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)
+        resource_options = ResourceOptions(parent=self).merge(opts)
 
         self.secret_name = f"ol-apisix-{oidc_config.application_name}-oidc-secrets"
 
@@ -1000,9 +1000,7 @@ class OLApisixOIDCResources(pulumi.ComponentResource):
                 templates=__templates,
                 vaultauth=oidc_config.vaultauth,
             ),
-            opts=resource_options.merge(
-                pulumi.ResourceOptions(delete_before_replace=True)
-            ),
+            opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
         )
 
         cookie_config = {}
@@ -1063,7 +1061,7 @@ class OLApisixSharedPluginsConfig(BaseModel):
     plugins: list[dict[str, Any]] = []
 
 
-class OLApisixSharedPlugins(pulumi.ComponentResource):
+class OLApisixSharedPlugins(ComponentResource):
     """
     Shared plugin configuration for apisix
     Defines and creates an "ApisixPluginConfig" resource in the k8s cluster
@@ -1073,7 +1071,7 @@ class OLApisixSharedPlugins(pulumi.ComponentResource):
         self,
         name: str,
         plugin_config: OLApisixSharedPluginsConfig,
-        opts: pulumi.ResourceOptions | None = None,
+        opts: ResourceOptions | None = None,
     ):
         """Initialize the OLApisixSharedPlugins component resource."""
         super().__init__(
@@ -1111,7 +1109,7 @@ class OLApisixSharedPlugins(pulumi.ComponentResource):
             },
         ]
 
-        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)
+        resource_options = ResourceOptions(parent=self).merge(opts)
 
         if plugin_config.enable_defaults:
             plugin_config.plugins.extend(__default_plugins)
@@ -1146,7 +1144,7 @@ class OLApisixExternalUpstreamConfig(BaseModel):
     scheme: str = "https"
 
 
-class OLApisixExternalUpstream(pulumi.ComponentResource):
+class OLApisixExternalUpstream(ComponentResource):
     """
     External upstream configuration for apisix
     Defines and creates an "ApisixUpstream" resource in the k8s cluster
@@ -1158,13 +1156,13 @@ class OLApisixExternalUpstream(pulumi.ComponentResource):
         self,
         name: str,
         external_upstream_config: OLApisixExternalUpstreamConfig,
-        opts: pulumi.ResourceOptions | None = None,
+        opts: ResourceOptions | None = None,
     ):
         """Initialize the OLApisixExternalUpstream component resource."""
         super().__init__(
             "ol:infrastructure:services:k8s:OLApisixExternalUpstream", name, None, opts
         )
-        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)
+        resource_options = ResourceOptions(parent=self).merge(opts)
 
         self.resource_name = f"{external_upstream_config.application_name}-{external_upstream_config.resource_suffix}"
         self.shared_plugin_apisix_pluginconfig_resource = (
@@ -1191,7 +1189,7 @@ class OLApisixExternalUpstream(pulumi.ComponentResource):
         )
 
 
-class OLTraefikMiddleware(pulumi.ComponentResource):
+class OLTraefikMiddleware(ComponentResource):
     """
     Generic component for creating Traefik Middleware custom resources.
     """
@@ -1202,13 +1200,13 @@ class OLTraefikMiddleware(pulumi.ComponentResource):
         middleware_name: str,
         namespace: str,
         spec: dict[str, Any],
-        opts: pulumi.ResourceOptions | None = None,
+        opts: ResourceOptions | None = None,
     ):
         """Initialize the OLTraefikMiddleware component resource."""
         super().__init__(
             "ol:infrastructure:services:k8s:OLTraefikMiddleware", name, None, opts
         )
-        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)
+        resource_options = ResourceOptions(parent=self).merge(opts)
 
         self.traefik_middleware = kubernetes.apiextensions.CustomResource(
             f"OLTraefikMiddleware-{name}",
