@@ -467,16 +467,25 @@ class OLApplicationK8s(ComponentResource):
             )
 
             _pre_deployment_event = kubernetes.events.v1.Event(
-                f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-job",
+                f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-event",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
                     name=_application_pre_deployment_event_name,
                     namespace=ol_app_k8s_config.application_namespace,
                     labels=application_labels,
                 ),
-                kind="Job",
                 event_time=datetime.now(tz=UTC).isoformat(),
-                regarding=_pre_deploy_job,
-                reason=f"Deployment {_application_deployment_name} pre-deploy job started",
+                regarding=kubernetes.core.v1.ObjectReferenceArgs(
+                    api_version="batch/v1",
+                    kind="Job",
+                    name=f"{_application_deployment_name}-pre-deploy",
+                    namespace=ol_app_k8s_config.application_namespace,
+                ),
+                reason="PreDeployJobStarted",
+                note=f"Pre-deployment job started for {_application_deployment_name}",
+                type="Normal",
+                reporting_controller="ol-infrastructure",
+                reporting_instance=f"{ol_app_k8s_config.application_name}-controller",
+                opts=resource_options,
             )
 
         _application_deployment = kubernetes.apps.v1.Deployment(
@@ -555,6 +564,79 @@ class OLApplicationK8s(ComponentResource):
                 **extra_deployment_args,
             ),
             opts=deployment_options,
+        )
+
+        # Create post-deployment job
+        _post_deploy_job = kubernetes.batch.v1.Job(
+            f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-post-deploy-job",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name=f"{_application_deployment_name}-post-deploy",
+                namespace=ol_app_k8s_config.application_namespace,
+                labels=ol_app_k8s_config.k8s_global_labels
+                | {
+                    "ol.mit.edu/job": "post-deploy",
+                    "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
+                    "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
+                        truncate_k8s_metanames
+                    ),
+                },
+            ),
+            spec=kubernetes.batch.v1.JobSpecArgs(
+                # Remove job 30 minutes after completion
+                ttl_seconds_after_finished=60 * 30,
+                template=kubernetes.core.v1.PodTemplateSpecArgs(
+                    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                        labels=application_labels,
+                    ),
+                    spec=kubernetes.core.v1.PodSpecArgs(
+                        service_account_name=ol_app_k8s_config.application_service_account_name,
+                        containers=[
+                            kubernetes.core.v1.ContainerArgs(
+                                name="post-deploy-notification",
+                                image=app_image,
+                                command=[
+                                    "echo",
+                                    f"Post-deployment tasks completed for {_application_deployment_name}",
+                                ],
+                                image_pull_policy=image_pull_policy,
+                                env=application_deployment_env_vars,
+                                env_from=application_deployment_envfrom,
+                            )
+                        ],
+                        restart_policy="Never",
+                    ),
+                ),
+            ),
+            opts=resource_options.merge(
+                ResourceOptions(depends_on=[_application_deployment])
+            ),
+        )
+
+        # Create post-deployment event
+        _application_post_deployment_event_name = truncate_k8s_metanames(
+            f"{ol_app_k8s_config.application_name}-postdeploy"
+        )
+
+        _post_deployment_event = kubernetes.events.v1.Event(
+            f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-post-deploy-event",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name=_application_post_deployment_event_name,
+                namespace=ol_app_k8s_config.application_namespace,
+                labels=application_labels,
+            ),
+            event_time=datetime.now(tz=UTC).isoformat(),
+            regarding=kubernetes.core.v1.ObjectReferenceArgs(
+                api_version="batch/v1",
+                kind="Job",
+                name=f"{_application_deployment_name}-post-deploy",
+                namespace=ol_app_k8s_config.application_namespace,
+            ),
+            reason="PostDeployJobStarted",
+            note=f"Post-deployment job started for {_application_deployment_name}",
+            type="Normal",
+            reporting_controller="ol-infrastructure",
+            reporting_instance=f"{ol_app_k8s_config.application_name}-controller",
+            opts=resource_options.merge(ResourceOptions(depends_on=[_post_deploy_job])),
         )
 
         # Pod Disruption Budget to ensure at least one web application pod is available.
