@@ -12,12 +12,10 @@ This deployment uses:
 
 from pathlib import Path
 
-import pulumi_consul as consul
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi.config import get_config
 from pulumi_aws import ec2, get_caller_identity, s3
-from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.lib.versions import DAGSTER_CHART_VERSION
@@ -45,7 +43,6 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
-from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
@@ -68,7 +65,6 @@ dns_stack = StackReference("infrastructure.aws.dns")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
-consul_stack = StackReference(f"infrastructure.consul.data.{stack_info.name}")
 cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
 
 # VPC and network configuration
@@ -94,8 +90,6 @@ k8s_global_labels = K8sGlobalLabels(
 )
 
 aws_account = get_caller_identity()
-consul_provider = get_consul_provider(stack_info)
-consul_security_groups = consul_stack.require_output("security_groups")
 dagster_namespace = "dagster"
 
 # Verify namespace exists in the cluster
@@ -352,145 +346,6 @@ dagster_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
 )
 dagster_db_vault_backend = OLVaultDatabaseBackend(dagster_db_vault_backend_config)
 
-# Keep Consul service registration for database
-dagster_db_consul_node = Node(
-    "dagster-instance-db-node",
-    name="dagster-postgres-db",
-    address=dagster_db.db_instance.address,
-    datacenter=dagster_environment,
-    opts=consul_provider,
-)
-
-dagster_db_consul_service = Service(
-    "dagster-instance-db-service",
-    node=dagster_db_consul_node.name,
-    name="dagster-db",
-    port=dagster_db_config.port,
-    meta={
-        "external-node": True,
-        "external-probe": True,
-    },
-    checks=[
-        ServiceCheckArgs(
-            check_id="dagster-instance-db",
-            interval="10s",
-            name="dagster-instance-id",
-            timeout="60s",
-            status="passing",
-            tcp=dagster_db.db_instance.address.apply(
-                lambda address: f"{address}:{dagster_db_config.port}"
-            ),
-        )
-    ],
-    opts=consul_provider,
-)
-
-
-# Keep Consul keys for pipeline configurations (may still be referenced)
-consul.Keys(
-    "dagster-consul-template-data",
-    keys=[
-        consul.KeysKeyArgs(
-            path="dagster/postgresql-host",
-            value=dagster_db.db_instance.address,
-        ),
-        consul.KeysKeyArgs(
-            path="dagster/dagster-bucket-name",
-            value=f"dagster-data-{stack_info.env_suffix}",
-        ),
-        consul.KeysKeyArgs(
-            path="dagster/server-address",
-            value=get_config("dagster:domain"),
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline/shared/env-suffix",
-            value=stack_info.env_suffix,
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline/mit-open/bucket-name",
-            value=get_config("dagster:edx_pipeline_mit_open_bucket_name"),
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline/mit-open/postgres-db/hostname",
-            value=get_config("dagster:edx_pipeline_mit_open_postgres_db_hostname"),
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline/xpro-edx/bucket-name",
-            value=get_config("dagster:edx_pipeline_xpro_edx_bucket_name"),
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline/xpro-edx/mysql-db/hostname",
-            value=xpro_stack.require_output("edxapp")["mariadb"],
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline/xpro-edx/mongodb-forum/uri",
-            value=xpro_mongodb_stack.require_output("atlas_cluster")[
-                "mongo_uri_with_options"
-            ],
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline/xpro-edx/xpro-purpose",
-            value=get_config("dagster:edx_pipeline_xpro_edx_xpro_purpose"),
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline/xpro-edx/xpro-course-bucket-name",
-            value=get_config("dagster:edx_pipeline_xpro_edx_course_bucket_name"),
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline/micromasters/postgres-db/name",
-            value=get_config("dagster:edx_pipeline_micromasters_postgres_db_name"),
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline/micromasters/postgres-db/hostname",
-            value=get_config("dagster:edx_pipeline_micromasters_postgres_db_hostname"),
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline/micromasters/bucket-name",
-            value=get_config("dagster:edx_pipeline_micromasters_bucket_name"),
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline-mitx-online/edx-course-bucket",
-            value=get_config("dagster:edx_pipeline_mitx_online_edx_course_bucket"),
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline/mitx-online/purpose",
-            value=get_config("dagster:edx_pipeline_mitx_online_purpose"),
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline/residential/mongodb/uri",
-            value=residential_mongodb_stack.require_output("atlas_cluster")[
-                "mongo_uri_with_options"
-            ],
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline/residential/mysql-db/hostname",
-            value=get_config("dagster:edx_pipeline_residential_mysql_db_hostname"),
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline/mitxonline/mysql-db/hostname",
-            value=mitxonline_stack.require_output("edxapp")["mariadb"],
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline/mitxonline/mongodb/uri",
-            value=mitxonline_mongodb_stack.require_output("atlas_cluster")[
-                "mongo_uri_with_options"
-            ],
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline/mitxonline/purpose",
-            value=get_config("dagster:edx_pipeline_xpro_edx_xpro_purpose"),
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline/mitxonline/edx-course-bucket-name",
-            value=get_config("dagster:edx_pipeline_mitxonline_edx_course_bucket_name"),
-        ),
-        consul.KeysKeyArgs(
-            path="edx-pipeline/mitx-enrollments/bucket-name",
-            value=get_config("dagster:edx_pipeline_mitx_enrollments_bucket_name"),
-        ),
-    ],
-    opts=consul_provider,
-)
 
 # ============================================================================
 # Kubernetes Deployment using Helm
@@ -527,10 +382,10 @@ dagster_static_secrets = OLVaultK8SSecret(
         mount_type="kv-v1",
         name="dagster-static-secrets",
         namespace=dagster_namespace,
-        path="dagster",
+        path="dagster-http-auth-password",
         refresh_after="1m",
         templates={
-            "DAGSTER_AIRBYTE_AUTH": '{{ printf "dagster:%s" (get .Secrets "dagster_unhashed_password") }}',  # noqa: E501
+            "DAGSTER_AIRBYTE_AUTH": '{{ printf "dagster:%s" (get .Secrets "dagster_unhashed_password") }}',  # pragma: allowlist secret  # noqa: E501
         },
         vaultauth=dagster_auth_binding.vault_k8s_resources.auth_name,
     ),
@@ -575,6 +430,12 @@ dagster_db_secret = OLVaultK8SSecret(
         revoke_on_delete=True,
         role_name="app",
         vaultauth=dagster_auth_binding.vault_k8s_resources.auth_name,
+        # Map Vault's fields to both Dagster Helm chart format and environment variables
+        templates={
+            "postgresql-password": "{{ .Secrets.password }}",
+            "DAGSTER_PG_PASSWORD": "{{ .Secrets.password }}",
+            "DAGSTER_PG_USER": "{{ .Secrets.username }}",
+        },
     ),
     opts=ResourceOptions(depends_on=[dagster_auth_binding]),
 )
@@ -598,30 +459,18 @@ dagster_oidc_resources = OLApisixOIDCResources(
     opts=ResourceOptions(depends_on=[dagster_auth_binding]),
 )
 
-# ConfigMap for pipeline environment variables
-dagster_pipeline_env_configmap = kubernetes.core.v1.ConfigMap(
-    f"dagster-pipeline-env-configmap-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="dagster-pipeline-env",
-        namespace=dagster_namespace,
-        labels=k8s_global_labels.model_dump(),
-    ),
-    data={
-        "DAGSTER_PG_HOST": dagster_db.db_instance.address,
-        "DAGSTER_PG_DB_NAME": "dagster",
-        "DAGSTER_BUCKET_NAME": dagster_bucket_name,
-        "DAGSTER_ENVIRONMENT": stack_info.env_suffix,
-        "DAGSTER_HOSTNAME": dagster_config.require("domain"),
-        "DAGSTER_AIRBYTE_PORT": "443",
-        "AWS_DEFAULT_REGION": "us-east-1",
-    },
+
+# Custom Dagster instance ConfigMap with dynamic credentials support
+# Note: We create this before the Helm release so it gets proper ownership
+dagster_instance_yaml = (
+    Path(__file__).parent.joinpath("dagster_instance.yaml").read_text()
 )
 
 # Dagster Helm chart values
 dagster_helm_values = {
     "global": {
         "serviceAccountName": "dagster",
-        "postgresqlSecretName": "dagster-postgresql-secret",  # pragma: allowlist secret
+        "postgresqlSecretName": "dagster-postgresql-secret",  # pragma: allowlist secret  # noqa: E501
     },
     "serviceAccount": {
         "create": True,
@@ -632,7 +481,7 @@ dagster_helm_values = {
     },
     # Dagster webserver (UI)
     "dagsterWebserver": {
-        "replicas": 2,
+        "replicaCount": 2,
         "service": {
             "type": "ClusterIP",
             "port": 3000,
@@ -648,7 +497,6 @@ dagster_helm_values = {
             },
         },
         "livenessProbe": {
-            "enabled": True,
             "httpGet": {
                 "path": "/server_info",
                 "port": 3000,
@@ -659,7 +507,6 @@ dagster_helm_values = {
             "failureThreshold": 3,
         },
         "readinessProbe": {
-            "enabled": True,
             "httpGet": {
                 "path": "/server_info",
                 "port": 3000,
@@ -669,28 +516,37 @@ dagster_helm_values = {
             "timeoutSeconds": 10,
             "failureThreshold": 3,
         },
-        "env": {
-            "DAGSTER_K8S_PIPELINE_RUN_NAMESPACE": dagster_namespace,
-            "DAGSTER_K8S_PIPELINE_RUN_ENV_CONFIGMAP": "dagster-pipeline-env",
-        },
-        "envConfigMaps": [
-            {"name": "dagster-pipeline-env"},
+        "env": [
+            {"name": "DAGSTER_PG_HOST", "value": dagster_db.db_instance.address},
+            {"name": "DAGSTER_PG_DB", "value": "dagster"},
+            {"name": "DAGSTER_BUCKET_NAME", "value": dagster_bucket_name},
+            {"name": "DAGSTER_ENVIRONMENT", "value": stack_info.env_suffix},
+            {"name": "DAGSTER_HOSTNAME", "value": dagster_config.require("domain")},
+            {"name": "DAGSTER_AIRBYTE_PORT", "value": "443"},
+            {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
         ],
         "envSecrets": [
             {"name": "dagster-static-secrets"},
             {"name": "dagster-dbt-secrets"},
+            {"name": "dagster-postgresql-secret"},
         ],
     },
     # Dagster daemon (background job scheduler)
     "dagsterDaemon": {
-        "replicas": 1,
-        "serviceAccount": {
-            "name": "dagster-daemon",
-            "create": True,
-            "annotations": {
-                "eks.amazonaws.com/role-arn": dagster_auth_binding.irsa_role.arn,
-            },
-        },
+        "env": [
+            {"name": "DAGSTER_PG_HOST", "value": dagster_db.db_instance.address},
+            {"name": "DAGSTER_PG_DB", "value": "dagster"},
+            {"name": "DAGSTER_BUCKET_NAME", "value": dagster_bucket_name},
+            {"name": "DAGSTER_ENVIRONMENT", "value": stack_info.env_suffix},
+            {"name": "DAGSTER_HOSTNAME", "value": dagster_config.require("domain")},
+            {"name": "DAGSTER_AIRBYTE_PORT", "value": "443"},
+            {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
+        ],
+        "envSecrets": [
+            {"name": "dagster-static-secrets"},
+            {"name": "dagster-dbt-secrets"},
+            {"name": "dagster-postgresql-secret"},
+        ],
         "resources": {
             "requests": {
                 "cpu": "500m",
@@ -701,90 +557,49 @@ dagster_helm_values = {
                 "memory": "4Gi",
             },
         },
-        "env": {
-            "DAGSTER_K8S_PIPELINE_RUN_NAMESPACE": dagster_namespace,
-            "DAGSTER_K8S_PIPELINE_RUN_ENV_CONFIGMAP": "dagster-pipeline-env",
-        },
-        "envConfigMaps": [
-            {"name": "dagster-pipeline-env"},
-        ],
-        "envSecrets": [
-            {"name": "dagster-static-secrets"},
-            {"name": "dagster-dbt-secrets"},
-        ],
     },
     # PostgreSQL configuration (using external RDS)
     "postgresql": {
         "enabled": False,  # We're using external RDS
+        "postgresqlHost": dagster_db.db_instance.address,
+        "postgresqlDatabase": "dagster",
     },
+    # Tell Dagster to use our externally-managed secret
+    "generatePostgresqlPasswordSecret": False,
+    # Add custom instance ConfigMap with dynamic credential support
+    "extraManifests": [
+        {
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": {
+                "name": "dagster-instance",
+            },
+            "data": {
+                "dagster.yaml": dagster_instance_yaml,
+            },
+        }
+    ],
     "runLauncher": {
         "type": "K8sRunLauncher",
         "config": {
             "k8sRunLauncher": {
-                "envConfigMaps": [{"name": "dagster-pipeline-env"}],
+                "envVars": dagster_db.db_instance.address.apply(
+                    lambda db_host: [
+                        f"DAGSTER_PG_HOST={db_host}",
+                        "DAGSTER_PG_DB=dagster",
+                        f"DAGSTER_BUCKET_NAME={dagster_bucket_name}",
+                        f"DAGSTER_ENVIRONMENT={stack_info.env_suffix}",
+                        "AWS_DEFAULT_REGION=us-east-1",
+                    ]
+                ),
                 "envSecrets": [
                     {"name": "dagster-static-secrets"},
                     {"name": "dagster-dbt-secrets"},
                     {"name": "dagster-postgresql-secret"},
                 ],
                 "jobNamespace": dagster_namespace,
-                "serviceAccountName": "dagster-user-deployments",
             },
         },
-    },
-    # User code deployments (mitodl/mono-dagster image)
-    "dagsterUserDeployments": {
-        "enabled": True,
-        "enableSubchart": True,
-        "deployments": [
-            {
-                "name": "dagster-user-code",
-                "image": {
-                    "repository": dagster_config.get("docker_repo_name")
-                    or "mitodl/mono-dagster",
-                    "tag": dagster_config.get("docker_image_tag") or "latest",
-                    "pullPolicy": "Always",
-                },
-                "dagsterApiGrpcArgs": [
-                    "-m",
-                    "dagster_user_code",
-                ],
-                "port": 3030,
-                "replicas": 2,
-                "serviceAccount": {
-                    "name": "dagster-user-deployments",
-                    "create": True,
-                    "annotations": {
-                        "eks.amazonaws.com/role-arn": dagster_auth_binding.irsa_role.arn,  # noqa: E501
-                    },
-                },
-                "resources": {
-                    "requests": {
-                        "cpu": "1000m",
-                        "memory": "2Gi",
-                    },
-                    "limits": {
-                        "cpu": "4000m",
-                        "memory": "8Gi",
-                    },
-                },
-                "env": {
-                    "DAGSTER_CURRENT_IMAGE": Output.concat(
-                        dagster_config.get("docker_repo_name") or "mitodl/mono-dagster",
-                        ":",
-                        dagster_config.get("docker_image_tag") or "latest",
-                    ),
-                    "DAGSTER_SENSOR_GRPC_TIMEOUT_SECONDS": "300",
-                },
-                "envConfigMaps": [
-                    {"name": "dagster-pipeline-env"},
-                ],
-                "envSecrets": [
-                    {"name": "dagster-static-secrets"},
-                    {"name": "dagster-dbt-secrets"},
-                ],
-            }
-        ],
     },
 }
 
@@ -804,11 +619,105 @@ dagster_helm_release = kubernetes.helm.v3.Release(
     ),
     opts=ResourceOptions(
         depends_on=[
-            dagster_pipeline_env_configmap,
             dagster_db_secret,
             dagster_static_secrets,
             dagster_dbt_secrets,
             dagster_auth_binding,
+        ]
+    ),
+)
+
+# Deploy Dagster user code separately
+dagster_user_code_service_account = kubernetes.core.v1.ServiceAccount(
+    f"dagster-user-code-service-account-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-user-code",
+        namespace=dagster_namespace,
+        annotations={
+            "eks.amazonaws.com/role-arn": dagster_auth_binding.irsa_role.arn,
+        },
+        labels=k8s_global_labels.model_dump(),
+    ),
+)
+
+dagster_user_code_values = {
+    "deployments": [
+        {
+            "name": "user-code",
+            "image": {
+                "repository": dagster_config.get("docker_repo_name")
+                or "mitodl/mono-dagster",
+                "tag": dagster_config.get("docker_image_tag") or "latest",
+                "pullPolicy": "Always",
+            },
+            "dagsterApiGrpcArgs": [
+                "-m",
+                "dagster_user_code",
+            ],
+            "port": 3030,
+            "annotations": dagster_auth_binding.irsa_role.arn.apply(
+                lambda arn: {
+                    "eks.amazonaws.com/role-arn": arn,
+                }
+            ),
+            "resources": {
+                "requests": {
+                    "cpu": "1000m",
+                    "memory": "2Gi",
+                },
+                "limits": {
+                    "cpu": "4000m",
+                    "memory": "8Gi",
+                },
+            },
+            "env": [
+                {
+                    "name": "DAGSTER_CURRENT_IMAGE",
+                    "value": Output.concat(
+                        dagster_config.get("docker_repo_name") or "mitodl/mono-dagster",
+                        ":",
+                        dagster_config.get("docker_image_tag") or "latest",
+                    ),
+                },
+                {
+                    "name": "DAGSTER_SENSOR_GRPC_TIMEOUT_SECONDS",
+                    "value": "300",
+                },
+                {"name": "DAGSTER_PG_HOST", "value": dagster_db.db_instance.address},
+                {"name": "DAGSTER_PG_DB", "value": "dagster"},
+                {"name": "DAGSTER_BUCKET_NAME", "value": dagster_bucket_name},
+                {"name": "DAGSTER_ENVIRONMENT", "value": stack_info.env_suffix},
+                {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
+            ],
+            "envSecrets": [
+                {"name": "dagster-static-secrets"},
+                {"name": "dagster-dbt-secrets"},
+                {"name": "dagster-postgresql-secret"},
+            ],
+        }
+    ],
+}
+
+dagster_user_code_release = kubernetes.helm.v3.Release(
+    f"dagster-user-code-release-{stack_info.env_suffix}",
+    kubernetes.helm.v3.ReleaseArgs(
+        name="dagster-user-code",
+        version=DAGSTER_CHART_VERSION,
+        namespace=dagster_namespace,
+        chart="dagster-user-deployments",
+        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+            repo="https://dagster-io.github.io/helm",
+        ),
+        cleanup_on_fail=True,
+        values=dagster_user_code_values,
+    ),
+    opts=ResourceOptions(
+        depends_on=[
+            dagster_static_secrets,
+            dagster_dbt_secrets,
+            dagster_db_secret,
+            dagster_user_code_service_account,
+            dagster_helm_release,
         ]
     ),
 )
@@ -835,7 +744,13 @@ dagster_apisix_route = OLApisixRoute(
     ],
     k8s_namespace=dagster_namespace,
     k8s_labels=k8s_global_labels.model_dump(),
-    opts=ResourceOptions(depends_on=[dagster_helm_release, dagster_oidc_resources]),
+    opts=ResourceOptions(
+        depends_on=[
+            dagster_helm_release,
+            dagster_user_code_release,
+            dagster_oidc_resources,
+        ]
+    ),
 )
 
 # Exports
@@ -845,6 +760,7 @@ export(
         "rds_host": dagster_db.db_instance.address,
         "namespace": dagster_namespace,
         "helm_release": dagster_helm_release.name,
+        "user_code_release": dagster_user_code_release.name,
         "service_name": "dagster-dagster-webserver",
         "irsa_role_arn": dagster_auth_binding.irsa_role.arn,
         "domain": dagster_config.require("domain"),
