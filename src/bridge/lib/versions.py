@@ -7,7 +7,7 @@ CONSUL_VERSION = "1.21.5"
 # renovate: datasource=pypi depName=jupyterhub packageName=jupyterhub
 JUPYTERHUB_VERSION = "5.3.0"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
-KEYCLOAK_VERSION = "26.3.5"
+KEYCLOAK_VERSION = "26.4.0"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
 OPEN_METADATA_VERSION = "1.9.11"
 OVS_VERSION = "v0.65.1-3-g2630021"
