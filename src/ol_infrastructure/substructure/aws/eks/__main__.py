@@ -792,10 +792,6 @@ ksm_release = kubernetes.helm.v3.Release(
                 "repository": "bitnamilegacy/kube-state-metrics",
                 "tag": "2.16.0-debian-12-r5",
             },
-            "metricAllowlist": [
-                "kube_pod_container_info",
-                "kube_pod_container_status_restarts_total",
-            ],
             "namespaces": "jupyter",
             "extraArgs": {
                 "metric-allowlist": "kube_pod_container_info,kube_pod_container_status_restarts_total",
