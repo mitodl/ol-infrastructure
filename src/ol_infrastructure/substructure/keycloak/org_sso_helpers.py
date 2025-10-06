@@ -5,6 +5,9 @@ import pulumi
 import pulumi_keycloak as keycloak
 from pydantic import BaseModel, ConfigDict, model_validator
 
+from ol_infrastructure.substructure.keycloak.oidc_helpers import (
+    oidc_identity_provider_args_from_discovery_url,
+)
 from ol_infrastructure.substructure.keycloak.saml_helpers import (
     SAML_FRIENDLY_NAMES,
     extract_saml_metadata,
@@ -136,3 +139,37 @@ def onboard_saml_org(
                     },
                     opts=saml_config.resource_options,
                 )
+
+
+class OIDCIdpConfig(OrgConfig):
+    org_oidc_metadata_url: str
+    keycloak_url: str
+    first_login_flow: keycloak.authentication.Flow
+    client_id: str
+
+
+def onboard_oidc_org(
+    oidc_config: OIDCIdpConfig,
+) -> None:
+    org = create_org_for_learn(oidc_config)
+
+    oidc_idp_arg_map = oidc_identity_provider_args_from_discovery_url(
+        oidc_config.org_oidc_metadata_url
+    )
+    keycloak.oidc.IdentityProvider(
+        f"ol-apps-{oidc_config.org_alias}-oidc-idp",
+        alias=oidc_config.org_alias.lower(),
+        client_id=oidc_config.client_id,
+        first_broker_login_flow_alias=oidc_config.first_login_flow.alias,
+        realm=oidc_config.realm_id,
+        display_name=oidc_config.org_name,
+        enabled=True,
+        sync_mode="IMPORT",
+        hide_on_login_page=True,
+        org_domain="ANY",
+        org_redirect_mode_email_matches=True,
+        organization_id=org.id,
+        validate_signature=True,
+        trust_email=True,
+        **oidc_idp_arg_map,
+    )
