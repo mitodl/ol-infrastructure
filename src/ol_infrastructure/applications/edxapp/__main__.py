@@ -1592,11 +1592,15 @@ if edxapp_config.get_bool("k8s_cutover"):
     lms_backend_ssl_hostname = edxapp_config.require("backend_lms_domain")
     cms_backend_address = edxapp_config.require("backend_studio_domain")
     cms_backend_ssl_hostname = edxapp_config.require("backend_studio_domain")
+    preview_backend_address = edxapp_config.require("backend_preview_domain")
+    preview_backend_ssl_hostname = edxapp_config.require("backend_preview_domain")
 else:
     lms_backend_address = web_lb.dns_name
     lms_backend_ssl_hostname = edxapp_domains["lms"]
     cms_backend_address = web_lb.dns_name
     cms_backend_ssl_hostname = edxapp_domains["studio"]
+    preview_backend_address = web_lb.dns_name
+    preview_backend_ssl_hostname = edxapp_domains["preview"]
 
 
 vector_log_proxy_secrets = read_yaml_secrets(
@@ -1639,6 +1643,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
             address=lms_backend_address,
             name="AWS ALB for edxapp",
             port=DEFAULT_HTTPS_PORT,
+            override_host=edxapp_domains["lms"],
             ssl_cert_hostname=lms_backend_ssl_hostname,
             ssl_sni_hostname=lms_backend_ssl_hostname,
             use_ssl=True,
@@ -1650,9 +1655,11 @@ edxapp_fastly_service = fastly.ServiceVcl(
             address=cms_backend_address,
             name="AWS ALB for edX Studio",
             port=DEFAULT_HTTPS_PORT,
+            override_host=edxapp_domains["studio"],
             ssl_cert_hostname=cms_backend_ssl_hostname,
             ssl_sni_hostname=cms_backend_ssl_hostname,
             use_ssl=True,
+            request_condition="studio host",
             # Increase the timeout to account for slow API responses
             first_byte_timeout=60000,
             between_bytes_timeout=15000,
@@ -1666,6 +1673,11 @@ edxapp_fastly_service = fastly.ServiceVcl(
         )
     ],
     conditions=[
+        fastly.ServiceVclConditionArgs(
+            name="studio host",
+            statement=f'req.http.host == "{edxapp_domains["studio"]}"',
+            type="REQUEST",
+        ),
         fastly.ServiceVclConditionArgs(
             name="Django Admin Route",
             statement='req.url ~ "^/admin"',
@@ -1846,29 +1858,28 @@ validated_tls_subscription = fastly.TlsSubscriptionValidation(
 
 
 # Create Route53 DNS records for Edxapp web nodes
-if not edxapp_config.get_bool("disable_ec2_deployment"):
-    for domain_key, domain_value in edxapp_domains.items():
-        dns_override = edxapp_config.get("maintenance_page_dns")
-        if domain_key in {"studio", "lms"}:
-            route53.Record(
-                f"edxapp-web-{domain_key}-dns-record",
-                name=domain_value,
-                type="CNAME",
-                ttl=FIVE_MINUTES,
-                allow_overwrite=True,
-                records=[dns_override or "j.sni.global.fastly.net"],
-                zone_id=edxapp_zone_id,
-            )
-        else:
-            route53.Record(
-                f"edxapp-web-{domain_key}-dns-record",
-                name=domain_value,
-                type="CNAME",
-                ttl=FIVE_MINUTES,
-                allow_overwrite=True,
-                records=[dns_override or web_lb.dns_name],
-                zone_id=edxapp_zone_id,
-            )
+for domain_key, domain_value in edxapp_domains.items():
+    dns_override = edxapp_config.get("maintenance_page_dns")
+    if domain_key in {"studio", "lms"}:
+        route53.Record(
+            f"edxapp-web-{domain_key}-dns-record",
+            name=domain_value,
+            type="CNAME",
+            ttl=FIVE_MINUTES,
+            allow_overwrite=True,
+            records=[dns_override or "j.sni.global.fastly.net"],
+            zone_id=edxapp_zone_id,
+        )
+    else:
+        route53.Record(
+            f"edxapp-web-{domain_key}-dns-record",
+            name=domain_value,
+            type="CNAME",
+            ttl=FIVE_MINUTES,
+            allow_overwrite=True,
+            records=[dns_override or preview_backend_address],
+            zone_id=edxapp_zone_id,
+        )
 
 # Actions to take when the the stack is configured to deploy into k8s
 if edxapp_config.get_bool("k8s_deployment"):

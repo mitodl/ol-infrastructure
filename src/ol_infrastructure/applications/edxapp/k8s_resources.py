@@ -12,15 +12,22 @@ from bridge.lib.magic_numbers import DEFAULT_REDIS_PORT
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.applications.edxapp.k8s_configmaps import create_k8s_configmaps
-from ol_infrastructure.applications.edxapp.k8s_ingress_resources import (
-    create_k8s_ingress_resources,
-)
 from ol_infrastructure.applications.edxapp.k8s_secrets import create_k8s_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache
 from ol_infrastructure.components.aws.database import OLAmazonDB
 from ol_infrastructure.components.aws.eks import (
     OLEKSTrustRole,
     OLEKSTrustRoleConfig,
+)
+from ol_infrastructure.components.services.cert_manager import (
+    OLCertManagerCert,
+    OLCertManagerCertConfig,
+)
+from ol_infrastructure.components.services.k8s import (
+    OLApisixRoute,
+    OLApisixRouteConfig,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
@@ -611,6 +618,7 @@ def create_k8s_resources(
         command=["python", "manage.py"],
         args=["lms", "migrate", "--noinput"],
         purpose="migrate",
+        opts=ResourceOptions(depends_on=[*lms_edxapp_config_sources.values()]),
     )
     lms_pre_deploy_waffleflag_job = _create_pre_deploy_job(
         service_type="lms",
@@ -620,6 +628,7 @@ def create_k8s_resources(
         command=["python", "set_waffle_flags.py"],
         args=["/openedx/config/waffle-flags.yaml"],
         purpose="waffleflags",
+        opts=ResourceOptions(depends_on=[*lms_edxapp_config_sources.values()]),
     )
     # It is important that the CMS and LMS deployment have distinct labels attached.
     lms_webapp_labels = k8s_global_labels | {
@@ -788,6 +797,7 @@ def create_k8s_resources(
                 ),
             ),
         ),
+        opts=pulumi.ResourceOptions(depends_on=[*lms_edxapp_config_sources.values()]),
     )
 
     lms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
@@ -1033,7 +1043,9 @@ def create_k8s_resources(
         command=["python", "manage.py"],
         args=["cms", "migrate", "--noinput"],
         purpose="migrate",
-        opts=ResourceOptions(depends_on=[lms_pre_deploy_migrate_job]),
+        opts=ResourceOptions(
+            depends_on=[*cms_edxapp_config_sources.values(), lms_pre_deploy_migrate_job]
+        ),
     )
     # It is important that the CMS and LMS deployment have distinct labels attached.
     # These labels should be should be distict from those attached to the predeployment
@@ -1203,6 +1215,7 @@ def create_k8s_resources(
                 ),
             ),
         ),
+        opts=pulumi.ResourceOptions(depends_on=[*cms_edxapp_config_sources.values()]),
     )
     cms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
         f"ol-{stack_info.env_prefix}-edxapp-cms-celery-scaledobject-{stack_info.env_suffix}",
@@ -1240,16 +1253,70 @@ def create_k8s_resources(
             ],
         },
     )
-    # Celery deployment do not require service definitions
-    create_k8s_ingress_resources(
-        edxapp_config=edxapp_config,
-        stack_info=stack_info,
-        namespace=namespace,
-        k8s_global_labels=k8s_global_labels,
-        lms_webapp_deployment_name=lms_webapp_deployment_name,
-        cms_webapp_deployment_name=cms_webapp_deployment_name,
-        lms_webapp_deployment=lms_webapp_deployment,
-        cms_webapp_deployment=cms_webapp_deployment,
+
+    # APISIX ingress configuration and s4etup
+    tls_secret_name = (
+        "shared-backend-tls-pair"  # pragma: allowlist secret  # noqa: S105
+    )
+    cert_manager_certificate = OLCertManagerCert(
+        f"ol-{stack_info.env_prefix}-edxapp-tls-cert-{stack_info.env_suffix}",
+        cert_config=OLCertManagerCertConfig(
+            application_name="edxapp",
+            k8s_namespace=namespace,
+            k8s_labels=k8s_global_labels,
+            create_apisixtls_resource=True,
+            dest_secret_name=tls_secret_name,
+            dns_names=[
+                edxapp_config.require("backend_lms_domain"),
+                edxapp_config.require("backend_studio_domain"),
+                edxapp_config.require("backend_preview_domain"),
+            ],
+        ),
+    )
+
+    edxapp_shared_plugins = OLApisixSharedPlugins(
+        f"ol-{stack_info.env_prefix}-edxapp-shared-plugins-{stack_info.env_suffix}",
+        plugin_config=OLApisixSharedPluginsConfig(
+            application_name="edxapp",
+            resource_suffix="ol-shared-plugins",
+            k8s_namespace=namespace,
+            k8s_labels=k8s_global_labels,
+            enable_defaults=True,
+        ),
+    )
+
+    lms_apisixroute = OLApisixRoute(
+        name=f"ol-{stack_info.env_prefix}-edxapp-lms-apisix-route-{stack_info.env_suffix}",
+        k8s_namespace=namespace,
+        k8s_labels=k8s_global_labels,
+        route_configs=[
+            OLApisixRouteConfig(
+                route_name="lms-default",
+                priority=0,
+                plugins=[],
+                shared_plugins=edxapp_shared_plugins.resource_name,
+                hosts=[
+                    edxapp_config.require("backend_lms_domain"),
+                    edxapp_config.require_object("domains")["lms"],
+                ],
+                paths=["/*"],
+                backend_service_name=lms_webapp_deployment_name,
+                backend_service_port="http",
+            ),
+            OLApisixRouteConfig(
+                route_name="cms-default",
+                priority=0,
+                plugins=[],
+                shared_plugins=edxapp_shared_plugins.resource_name,
+                hosts=[
+                    edxapp_config.require("backend_studio_domain"),
+                    edxapp_config.require_object("domains")["studio"],
+                ],
+                paths=["/*"],
+                backend_service_name=cms_webapp_deployment_name,
+                backend_service_port="http",
+            ),
+        ],
     )
 
     return {
