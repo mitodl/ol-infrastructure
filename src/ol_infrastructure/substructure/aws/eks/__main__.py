@@ -453,35 +453,35 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
                     regex         = "(kube_pod_container_info|kube_pod_container_status_restarts_total)"
                     action        = "replace"
                     target_label  = "uid"
-                    replacement   = "DROP_ME"
+                    replacement   = ""
                 }}
                 write_relabel_config {{
                     source_labels = ["__name__"]
                     regex         = "kube_pod_container_info"
                     action        = "replace"
                     target_label  = "image_spec"
-                    replacement   = "DROP_ME"
+                    replacement   = ""
                 }}
                 write_relabel_config {{
                     source_labels = ["__name__"]
                     regex         = "(kube_pod_container_info|kube_pod_container_status_restarts_total)"
                     action        = "replace"
                     target_label  = "exported_pod"
-                    replacement   = "DROP_ME"
+                    replacement   = ""
                 }}
                 write_relabel_config {{
                     source_labels = ["__name__"]
                     regex         = "kube_pod_container_info"
                     action        = "replace"
                     target_label  = "image_id"
-                    replacement   = "DROP_ME"
+                    replacement   = ""
                 }}
                 write_relabel_config {{
                     source_labels = ["__name__"]
                     regex         = "kube_pod_container_info"
                     action        = "replace"
                     target_label  = "container_id"
-                    replacement   = "DROP_ME"
+                    replacement   = ""
                 }}
               }}
             }}
