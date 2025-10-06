@@ -416,7 +416,6 @@ class OLApplicationK8s(ComponentResource):
             f"{ol_app_k8s_config.application_name}-app"
         )
 
-        # Put into Pydantic validator. Always want event. If no commands, create hello world command.
         if pre_deploy_commands := ol_app_k8s_config.pre_deploy_commands:
             _pre_deploy_job = kubernetes.batch.v1.Job(
                 f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-job",
