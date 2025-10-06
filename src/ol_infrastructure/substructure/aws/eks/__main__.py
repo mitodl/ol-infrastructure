@@ -436,6 +436,53 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
                   username = env("GRAFANA_CLOUD_PROMETHEUS_USERNAME")
                   password = env("GRAFANA_CLOUD_PROMETHEUS_PASSWORD")
                 }}
+                write_relabel_config {{
+                  source_labels = ["__name__"]
+                  regex         = "go_.*"
+                  action        = "drop"
+                }}
+                write_relabel_config {{
+                    source_labels = ["exported_namespace", "exported_container"]
+                    regex         = "jupyter;(binder|chp|dind|image-cleaner-dind|pause|kube-scheduler)"
+                    action        = "drop"
+                }}
+
+                // Collapse some labels that include UUIDs and are not useful
+                write_relabel_config {{
+                    source_labels = ["__name__"]
+                    regex         = "(kube_pod_container_info|kube_pod_container_status_restarts_total)"
+                    action        = "replace"
+                    target_label  = "uid"
+                    replacement   = "DROP_ME"
+                }}
+                write_relabel_config {{
+                    source_labels = ["__name__"]
+                    regex         = "kube_pod_container_info"
+                    action        = "replace"
+                    target_label  = "image_spec"
+                    replacement   = "DROP_ME"
+                }}
+                write_relabel_config {{
+                    source_labels = ["__name__"]
+                    regex         = "(kube_pod_container_info|kube_pod_container_status_restarts_total)"
+                    action        = "replace"
+                    target_label  = "exported_pod"
+                    replacement   = "DROP_ME"
+                }}
+                write_relabel_config {{
+                    source_labels = ["__name__"]
+                    regex         = "kube_pod_container_info"
+                    action        = "replace"
+                    target_label  = "image_id"
+                    replacement   = "DROP_ME"
+                }}
+                write_relabel_config {{
+                    source_labels = ["__name__"]
+                    regex         = "kube_pod_container_info"
+                    action        = "replace"
+                    target_label  = "container_id"
+                    replacement   = "DROP_ME"
+                }}
               }}
             }}
 
@@ -444,52 +491,12 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
               // Drop metrics that start with go_
               // These are usually metrics about the exporter itself rather than
               // the application / service we are interested in.
-              rule {{
-                source_labels = ["__name__"]
-                regex         = "go_.*"
-                action        = "drop"
-              }}
+
               // Add cluster label
               rule {{
                 target_label = "cluster"
                 replacement  = "{cluster_name}"
                 action       = "replace"
-              }}
-              rule {{
-                source_labels = ["__name__"]
-                regex         = "kube_pod_container_info"
-                action        = "replace"
-                target_label  = "pod"
-                replacement   = "DROP_ME"
-              }}
-              // Collapse some labels that include UUIDs and are not useful
-              rule {{
-                source_labels = ["__name__"]
-                regex         = "kube_pod_container_info"
-                action        = "replace"
-                target_label  = "uid"
-                replacement   = "DROP_ME"
-              }}
-              rule {{
-                source_labels = ["__name__"]
-                regex         = "kube_pod_container_info"
-                action        = "replace"
-                target_label  = "image_spec"
-                replacement   = "DROP_ME"
-              }}
-              rule {{
-                source_labels = ["__name__"]
-                regex         = "kube_pod_container_info"
-                action        = "replace"
-                target_label  = "image_id"
-                replacement   = "DROP_ME"
-              }}
-              rule {{
-                source_labels = ["__name__"]
-                regex         = "kube_pod_container_info"
-                action        = "replace"
-                target_label  = "container_id"
-                replacement   = "DROP_ME"
               }}
             }}
 
