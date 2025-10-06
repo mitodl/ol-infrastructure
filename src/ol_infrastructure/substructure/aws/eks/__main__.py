@@ -786,7 +786,7 @@ ksm_release = kubernetes.helm.v3.Release(
         skip_await=True,
         values={
             "serviceMonitor": {
-                "enabled": True,
+                "enabled": False,
             },
             "image": {
                 "repository": "bitnamilegacy/kube-state-metrics",
