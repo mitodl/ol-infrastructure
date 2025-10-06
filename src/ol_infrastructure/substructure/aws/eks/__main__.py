@@ -422,9 +422,6 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
               level = "info"
               format = "logfmt"
             }}
-            livedebugging {{
-              enabled = true
-            }}
 
             // ----------------------------------------------------------
             // Discover servicemonitor and podmonitor resources in the
