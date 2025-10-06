@@ -433,6 +433,53 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
                   username = env("GRAFANA_CLOUD_PROMETHEUS_USERNAME")
                   password = env("GRAFANA_CLOUD_PROMETHEUS_PASSWORD")
                 }}
+                write_relabel_config {{
+                  source_labels = ["__name__"]
+                  regex         = "go_.*"
+                  action        = "drop"
+                }}
+                write_relabel_config {{
+                    source_labels = ["exported_namespace", "exported_container"]
+                    regex         = "jupyter;(binder|chp|dind|image-cleaner-dind|pause|kube-scheduler)"
+                    action        = "drop"
+                }}
+
+                // Collapse some labels that include UUIDs and are not useful
+                write_relabel_config {{
+                    source_labels = ["__name__"]
+                    regex         = "(kube_pod_container_info|kube_pod_container_status_restarts_total)"
+                    action        = "replace"
+                    target_label  = "uid"
+                    replacement   = ""
+                }}
+                write_relabel_config {{
+                    source_labels = ["__name__"]
+                    regex         = "kube_pod_container_info"
+                    action        = "replace"
+                    target_label  = "image_spec"
+                    replacement   = ""
+                }}
+                write_relabel_config {{
+                    source_labels = ["__name__"]
+                    regex         = "(kube_pod_container_info|kube_pod_container_status_restarts_total)"
+                    action        = "replace"
+                    target_label  = "exported_pod"
+                    replacement   = ""
+                }}
+                write_relabel_config {{
+                    source_labels = ["__name__"]
+                    regex         = "kube_pod_container_info"
+                    action        = "replace"
+                    target_label  = "image_id"
+                    replacement   = ""
+                }}
+                write_relabel_config {{
+                    source_labels = ["__name__"]
+                    regex         = "kube_pod_container_info"
+                    action        = "replace"
+                    target_label  = "container_id"
+                    replacement   = ""
+                }}
               }}
             }}
 
@@ -441,11 +488,7 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
               // Drop metrics that start with go_
               // These are usually metrics about the exporter itself rather than
               // the application / service we are interested in.
-              rule {{
-                source_labels = ["__name__"]
-                regex         = "go_.*"
-                action        = "drop"
-              }}
+
               // Add cluster label
               rule {{
                 target_label = "cluster"
@@ -743,11 +786,15 @@ ksm_release = kubernetes.helm.v3.Release(
         skip_await=True,
         values={
             "serviceMonitor": {
-                "enabled": False,
+                "enabled": True,
             },
             "image": {
                 "repository": "bitnamilegacy/kube-state-metrics",
                 "tag": "2.16.0-debian-12-r5",
+            },
+            "namespaces": "jupyter",
+            "extraArgs": {
+                "metric-allowlist": "kube_pod_container_info,kube_pod_container_status_restarts_total",
             },
         },
     ),
