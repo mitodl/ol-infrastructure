@@ -79,6 +79,7 @@ config:
   edxapp:email_use_course_id_from_for_bulk: "True"
   edxapp:bulk_email_default_from_email: no-reply@edxapp-mail.learn.mit.edu
   edxapp:framework: "earthly"
+  edxapp:web_instance_type: m7a.2xlarge
   edxapp:web_node_capacity: "9"
   edxapp:worker_node_capacity: "5"
   edxapp:worker_instance_type: "r7a.large"
