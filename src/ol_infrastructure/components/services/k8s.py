@@ -123,6 +123,10 @@ class OLApplicationK8sConfig(BaseModel):
         default=None,
         description="A tuple of <job_name>, <job_command_array> for executing prior to the deployment updating",
     )
+    post_deploy_commands: list[tuple[str, list[str]]] | None = Field(
+        default=None,
+        description="A tuple of <job_name>, <job_command_array> for executing prior to the deployment updating",
+    )
     probe_configs: dict[str, kubernetes.core.v1.ProbeArgs] = {
         # Liveness probe to check if the application is still running
         "liveness_probe": kubernetes.core.v1.ProbeArgs(
@@ -566,133 +570,139 @@ class OLApplicationK8s(ComponentResource):
             opts=deployment_options,
         )
 
-        # Create post-deployment job
-        _post_deploy_job = kubernetes.batch.v1.Job(
-            f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-post-deploy-job",
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                name=f"{_application_deployment_name}-post-deploy",
-                namespace=ol_app_k8s_config.application_namespace,
-                labels=ol_app_k8s_config.k8s_global_labels
-                | {
-                    "ol.mit.edu/job": "post-deploy",
-                    "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
-                    "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
-                        truncate_k8s_metanames
-                    ),
-                },
-            ),
-            spec=kubernetes.batch.v1.JobSpecArgs(
-                # Remove job 30 minutes after completion
-                ttl_seconds_after_finished=60 * 30,
-                template=kubernetes.core.v1.PodTemplateSpecArgs(
-                    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                        labels=application_labels,
-                    ),
-                    spec=kubernetes.core.v1.PodSpecArgs(
-                        service_account_name=ol_app_k8s_config.application_service_account_name,
-                        containers=[
-                            kubernetes.core.v1.ContainerArgs(
-                                name="post-deploy-notification",
-                                image=app_image,
-                                command=[
-                                    "echo",
-                                    f"Post-deployment tasks completed for {_application_deployment_name}",
-                                ],
-                                image_pull_policy=image_pull_policy,
-                                env=application_deployment_env_vars,
-                                env_from=application_deployment_envfrom,
-                            )
-                        ],
-                        restart_policy="Never",
+        if post_deploy_commands := ol_app_k8s_config.post_deploy_commands:
+            # Create post-deployment job
+            _post_deploy_job = kubernetes.batch.v1.Job(
+                f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-post-deploy-job",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=f"{_application_deployment_name}-post-deploy",
+                    namespace=ol_app_k8s_config.application_namespace,
+                    labels=ol_app_k8s_config.k8s_global_labels
+                    | {
+                        "ol.mit.edu/job": "post-deploy",
+                        "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
+                        "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
+                            truncate_k8s_metanames
+                        ),
+                    },
+                ),
+                spec=kubernetes.batch.v1.JobSpecArgs(
+                    # Remove job 30 minutes after completion
+                    ttl_seconds_after_finished=60 * 30,
+                    template=kubernetes.core.v1.PodTemplateSpecArgs(
+                        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                            labels=application_labels,
+                        ),
+                        spec=kubernetes.core.v1.PodSpecArgs(
+                            service_account_name=ol_app_k8s_config.application_service_account_name,
+                            containers=[
+                                kubernetes.core.v1.ContainerArgs(
+                                    name=command_name,
+                                    image=app_image,
+                                    command=command_array,
+                                    image_pull_policy=image_pull_policy,
+                                    env=application_deployment_env_vars,
+                                    env_from=application_deployment_envfrom,
+                                )
+                                for (
+                                    command_name,
+                                    command_array,
+                                ) in post_deploy_commands
+                            ],
+                            restart_policy="Never",
+                        ),
                     ),
                 ),
-            ),
-            opts=resource_options.merge(
-                ResourceOptions(depends_on=[_application_deployment])
-            ),
-        )
+                opts=resource_options.merge(
+                    ResourceOptions(depends_on=[_application_deployment])
+                ),
+            )
 
-        # Create post-deployment event
-        _application_post_deployment_event_name = truncate_k8s_metanames(
-            f"{ol_app_k8s_config.application_name}-postdeploy"
-        )
+            # Create post-deployment event
+            _application_post_deployment_event_name = truncate_k8s_metanames(
+                f"{ol_app_k8s_config.application_name}-postdeploy"
+            )
 
-        # Use the job's status to determine success/failure for the event
-        def create_post_deploy_event_note(job_status):
-            """Create event note based on job completion status."""
-            if job_status is None:
-                return f"Post-deployment job started for {_application_deployment_name}"
+            # Use the job's status to determine success/failure for the event
+            def create_post_deploy_event_note(job_status):
+                """Create event note based on job completion status."""
+                if job_status is None:
+                    return f"Post-deployment job started for {_application_deployment_name}"
 
-            succeeded = job_status.get("succeeded", 0)
-            failed = job_status.get("failed", 0)
+                succeeded = job_status.get("succeeded", 0)
+                failed = job_status.get("failed", 0)
 
-            if succeeded > 0:
-                return f"Post-deployment job completed successfully for {_application_deployment_name}"
-            elif failed > 0:
-                return f"Post-deployment job failed for {_application_deployment_name}"
-            else:
-                return f"Post-deployment job in progress for {_application_deployment_name}"
+                if succeeded > 0:
+                    return f"Post-deployment job completed successfully for {_application_deployment_name}"
+                elif failed > 0:
+                    return (
+                        f"Post-deployment job failed for {_application_deployment_name}"
+                    )
+                else:
+                    return f"Post-deployment job in progress for {_application_deployment_name}"
 
-        def create_post_deploy_event_type(job_status):
-            """Determine event type based on job completion status."""
-            if job_status is None:
-                return "Normal"
+            def create_post_deploy_event_type(job_status):
+                """Determine event type based on job completion status."""
+                if job_status is None:
+                    return "Normal"
 
-            failed = job_status.get("failed", 0)
-            return "Warning" if failed > 0 else "Normal"
+                failed = job_status.get("failed", 0)
+                return "Warning" if failed > 0 else "Normal"
 
-        def create_post_deploy_event_action(job_status):
-            """Determine event action based on job completion status."""
-            if job_status is None:
-                return "PostDeployJobStarted"
+            def create_post_deploy_event_action(job_status):
+                """Determine event action based on job completion status."""
+                if job_status is None:
+                    return "PostDeployJobStarted"
 
-            succeeded = job_status.get("succeeded", 0)
-            failed = job_status.get("failed", 0)
+                succeeded = job_status.get("succeeded", 0)
+                failed = job_status.get("failed", 0)
 
-            if succeeded > 0:
-                return "PostDeployJobCompleted"
-            elif failed > 0:
-                return "PostDeployJobFailed"
-            else:
-                return "PostDeployJobInProgress"
+                if succeeded > 0:
+                    return "PostDeployJobCompleted"
+                elif failed > 0:
+                    return "PostDeployJobFailed"
+                else:
+                    return "PostDeployJobInProgress"
 
-        def create_post_deploy_event_reason(job_status):
-            """Determine event reason based on job completion status."""
-            if job_status is None:
-                return "PostDeployJobStarted"
+            def create_post_deploy_event_reason(job_status):
+                """Determine event reason based on job completion status."""
+                if job_status is None:
+                    return "PostDeployJobStarted"
 
-            succeeded = job_status.get("succeeded", 0)
-            failed = job_status.get("failed", 0)
+                succeeded = job_status.get("succeeded", 0)
+                failed = job_status.get("failed", 0)
 
-            if succeeded > 0:
-                return "PostDeployJobSucceeded"
-            elif failed > 0:
-                return "PostDeployJobFailed"
-            else:
-                return "PostDeployJobRunning"
+                if succeeded > 0:
+                    return "PostDeployJobSucceeded"
+                elif failed > 0:
+                    return "PostDeployJobFailed"
+                else:
+                    return "PostDeployJobRunning"
 
-        _post_deployment_event = kubernetes.events.v1.Event(
-            f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-post-deploy-event",
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                name=_application_post_deployment_event_name,
-                namespace=ol_app_k8s_config.application_namespace,
-                labels=application_labels,
-            ),
-            event_time=datetime.now(tz=UTC).isoformat(),
-            regarding=kubernetes.core.v1.ObjectReferenceArgs(
-                api_version="batch/v1",
-                kind="Job",
-                name=f"{_application_deployment_name}-post-deploy",
-                namespace=ol_app_k8s_config.application_namespace,
-            ),
-            action=_post_deploy_job.status.apply(create_post_deploy_event_action),
-            reason=_post_deploy_job.status.apply(create_post_deploy_event_reason),
-            note=_post_deploy_job.status.apply(create_post_deploy_event_note),
-            type=_post_deploy_job.status.apply(create_post_deploy_event_type),
-            reporting_controller="ol-infrastructure",
-            reporting_instance=f"{ol_app_k8s_config.application_name}-controller",
-            opts=resource_options.merge(ResourceOptions(depends_on=[_post_deploy_job])),
-        )
+            _post_deployment_event = kubernetes.events.v1.Event(
+                f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-post-deploy-event",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=_application_post_deployment_event_name,
+                    namespace=ol_app_k8s_config.application_namespace,
+                    labels=application_labels,
+                ),
+                event_time=datetime.now(tz=UTC).isoformat(),
+                regarding=kubernetes.core.v1.ObjectReferenceArgs(
+                    api_version="batch/v1",
+                    kind="Job",
+                    name=f"{_application_deployment_name}-post-deploy",
+                    namespace=ol_app_k8s_config.application_namespace,
+                ),
+                action=_post_deploy_job.status.apply(create_post_deploy_event_action),
+                reason=_post_deploy_job.status.apply(create_post_deploy_event_reason),
+                note=_post_deploy_job.status.apply(create_post_deploy_event_note),
+                type=_post_deploy_job.status.apply(create_post_deploy_event_type),
+                reporting_controller="ol-infrastructure",
+                reporting_instance=f"{ol_app_k8s_config.application_name}-controller",
+                opts=resource_options.merge(
+                    ResourceOptions(depends_on=[_post_deploy_job])
+                ),
+            )
 
         # Pod Disruption Budget to ensure at least one web application pod is available.
         _application_pdb = kubernetes.policy.v1.PodDisruptionBudget(
