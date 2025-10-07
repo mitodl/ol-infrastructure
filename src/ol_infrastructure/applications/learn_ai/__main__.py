@@ -27,7 +27,7 @@ from bridge.lib.constants import FASTLY_A_TLS_1_3
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_REDIS_PORT,
-    DEFAULT_UWSGI_PORT,
+    DEFAULT_WSGI_PORT,
     ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
@@ -755,7 +755,7 @@ learn_ai_app_k8s = OLApplicationK8s(
             "--host",
             "0.0.0.0",  # noqa: S104
             "--port",
-            f"{DEFAULT_UWSGI_PORT}",
+            f"{DEFAULT_WSGI_PORT}",
         ],
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,
