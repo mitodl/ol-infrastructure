@@ -1352,6 +1352,28 @@ if "MIT_LEARN_DOCKER_TAG" not in os.environ:
 MIT_LEARN_DOCKER_TAG = os.environ["MIT_LEARN_DOCKER_TAG"]
 
 # Configure and deploy the mitlearn application using OLApplicationK8s
+if mitlearn_config.get_bool("use_granian"):
+    cmd_array = [
+        "granian",
+    ]
+    arg_array = [
+        "--interface",
+        "wsgi",
+        "--host",
+        "0.0.0.0",  # noqa: S104
+        "--port",
+        f"{DEFAULT_WSGI_PORT}",
+        "--workers",
+        "1",
+        "--runtime-threads",
+        "2",
+        "--log-level",
+        "warning",
+        "main.wsgi:application",
+    ]
+else:
+    cmd_array = ["uwsgi"]
+    arg_array = ["/tmp/uwsgi.ini"]  # noqa: S108
 
 mitlearn_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
@@ -1369,24 +1391,8 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_security_group_name=mitlearn_app_security_group.name,
         application_image_repository="mitodl/mit-learn-app",
         application_docker_tag=MIT_LEARN_DOCKER_TAG,
-        application_cmd_array=[
-            "granian",
-        ],
-        application_arg_array=[
-            "--interface",
-            "wsgi",
-            "--host",
-            "0.0.0.0",  # noqa: S104
-            "--port",
-            f"{DEFAULT_WSGI_PORT}",
-            "--workers",
-            "1",
-            "--runtime-threads",
-            "2",
-            "--log-level",
-            "warning",
-            "main.wsgi:application",
-        ],
+        application_cmd_array=cmd_array,
+        application_arg_array=arg_array,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,  # Assuming Django app needs nginx
         import_uwsgi_config=False,
