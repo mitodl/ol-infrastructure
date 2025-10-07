@@ -778,6 +778,7 @@ learn_ai_app_k8s = OLApplicationK8s(
         application_min_replicas=learn_ai_config.get("min_replicas") or 2,
         application_cmd_array=cmd_array,
         application_arg_array=arg_array,
+
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,
         # Nginx resources (defaults from component are fine)

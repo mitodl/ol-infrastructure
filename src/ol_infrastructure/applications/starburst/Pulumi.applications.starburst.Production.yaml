@@ -9,11 +9,6 @@ config:
   starburst:domain: mitol.galaxy.starburst.io
   starburst:warehouse_prefix: "ol_warehouse"
   starburst:environments: ["production", "qa"]
-  # Data privilege management: Set to true only if you need Pulumi to manage data-level grants
-  # By default (false), dbt handles all table-level SELECT/INSERT/UPDATE/DELETE permissions
-  # through the +grants configuration in dbt_project.yml. This prevents privilege "flapping"
-  # when dbt recreates tables and ensures grants are automatically reapplied.
-  starburst:manage_data_privileges: false
   starburst:roles:
     ol_platform_admin:
       description: "Full administrative access to all data and platform resources"
@@ -21,77 +16,39 @@ config:
       - name: "ol-data-interactive"
         privileges:
         - name: "UseCluster"
-          grant: true
         - name: "MonitorCluster"
-          grant: true
         - name: "EnableDisableCluster"
-          grant: true
       - name: "ol-data-lake-production"
         privileges:
         - name: "UseCluster"
-          grant: true
         - name: "MonitorCluster"
-          grant: true
         - name: "EnableDisableCluster"
-          grant: true
       base_privileges:
       - entity_kind: "Account"
         privileges:
         - name: "ApplyTag"
-          grant: true
         - name: "CreateAiModel"
-          grant: true
         - name: "CreateCatalog"
-          grant: true
         - name: "CreateCluster"
-          grant: true
         - name: "CreateRole"
-          grant: true
         - name: "CreateTag"
-          grant: true
         - name: "CreateUser"
-          grant: true
         - name: "ManageBilling"
-          grant: true
         - name: "ManageIngestStreams"
-          grant: true
         - name: "ManageNotifications"
-          grant: true
         - name: "ManageOauthClient"
-          grant: true
         - name: "ManageQueryRoutingRules"
-          grant: true
         - name: "ManageSecurity"
-          grant: true
         - name: "ManageServiceAccount"
-          grant: true
         - name: "ManageSso"
-          grant: true
         - name: "SsoUserPasswordLogin"
-          grant: true
         - name: "ViewAllDataLineage"
-          grant: true
         - name: "ViewAllQueryHistory"
-          grant: true
         - name: "ViewAuditLog"
-          grant: true
         - name: "ViewPublicOauthClient"
-          grant: true
-      - entity_kind: "Catalog"
-        catalogs: ["ol_data_lake_production", "ol_data_lake_qa"]
-        privileges:
-        - name: "CreateSchema"
-          grant: true
-      - entity_kind: "Schema"
-        privileges:
-        - name: "CreateTable"
-          grant: true
-        - name: "CreateView"
-          grant: true
       - entity_kind: "Function"
         privileges:
         - name: "Execute"
-          grant: true
 
     ol_data_engineer:
       description: "Data engineering role with limited production access"
@@ -99,31 +56,11 @@ config:
       - name: "ol-data-interactive"
         privileges:
         - name: "UseCluster"
-          grant: true
         - name: "MonitorCluster"
-          grant: false
       - name: "ol-data-lake-production"
         privileges:
         - name: "UseCluster"
-          grant: false
         - name: "MonitorCluster"
-          grant: false
-      base_privileges:
-      - entity_kind: "Catalog"
-        catalogs: ["ol_data_lake_qa"]
-        privileges:
-        - name: "CreateSchema"
-          grant: false
-        - name: "ShowSchemas"
-          grant: false
-        - name: "ShowTables"
-          grant: false
-      - entity_kind: "Schema"
-        privileges:
-        - name: "CreateTable"
-          grant: true
-        - name: "CreateView"
-          grant: true
 
     ol_data_analyst:
       description: "Data analyst role with read-only access to production data"
@@ -131,23 +68,9 @@ config:
       - name: "ol-data-interactive"
         privileges:
         - name: "UseCluster"
-          grant: false
       - name: "ol-data-lake-production"
         privileges:
         - name: "UseCluster"
-          grant: false
-      base_privileges:
-      - entity_kind: "Catalog"
-        catalogs: ["ol_data_lake_production"]
-        privileges:
-        - name: "ShowSchemas"
-          grant: false
-        - name: "ShowTables"
-          grant: false
-      - entity_kind: "Schema"
-        privileges:
-        - name: "CreateView"
-          grant: false
 
     ol_researcher:
       description: "Research role with ML capabilities and broad data access"
@@ -155,35 +78,17 @@ config:
       - name: "ol-data-interactive"
         privileges:
         - name: "UseCluster"
-          grant: false
         - name: "MonitorCluster"
-          grant: false
       - name: "ol-data-lake-production"
         privileges:
         - name: "UseCluster"
-          grant: false
       base_privileges:
       - entity_kind: "Account"
         privileges:
         - name: "CreateAiModel"
-          grant: false
-      - entity_kind: "Catalog"
-        catalogs: ["ol_data_lake_production"]
-        privileges:
-        - name: "ShowSchemas"
-          grant: false
-        - name: "ShowTables"
-          grant: false
-      - entity_kind: "Schema"
-        privileges:
-        - name: "CreateView"
-          grant: false
-        - name: "CreateTable"
-          grant: false
       - entity_kind: "Function"
         privileges:
         - name: "Execute"
-          grant: false
 
     ol_instructor:
       description: "Instructor role with limited access to educational data"
@@ -191,19 +96,6 @@ config:
       - name: "ol-data-interactive"
         privileges:
         - name: "UseCluster"
-          grant: false
-      base_privileges:
-      - entity_kind: "Catalog"
-        catalogs: ["ol_data_lake_production"]
-        privileges:
-        - name: "ShowSchemas"
-          grant: false
-        - name: "ShowTables"
-          grant: false
-      - entity_kind: "Schema"
-        privileges:
-        - name: "CreateView"
-          grant: false
 
     ol_business_analyst:
       description: "Business analyst role similar to existing business_intelligence\
@@ -212,20 +104,6 @@ config:
       - name: "ol-data-interactive"
         privileges:
         - name: "UseCluster"
-          grant: false
       - name: "ol-data-lake-production"
         privileges:
         - name: "UseCluster"
-          grant: false
-      base_privileges:
-      - entity_kind: "Catalog"
-        catalogs: ["ol_data_lake_production"]
-        privileges:
-        - name: "ShowSchemas"
-          grant: false
-        - name: "ShowTables"
-          grant: false
-      - entity_kind: "Schema"
-        privileges:
-        - name: "CreateView"
-          grant: false

@@ -76,7 +76,9 @@ def create_k8s_secrets(
                 },
                 vaultauth=vault_k8s_resources.auth_name,
             ),
-            opts=ResourceOptions(delete_before_replace=True),
+            opts=ResourceOptions(
+                delete_before_replace=True, depends_on=[vault_k8s_resources]
+            ),
         ),
     )
 
@@ -127,7 +129,9 @@ def create_k8s_secrets(
                 },
                 vaultauth=vault_k8s_resources.auth_name,
             ),
-            opts=ResourceOptions(delete_before_replace=True),
+            opts=ResourceOptions(
+                delete_before_replace=True, depends_on=[vault_k8s_resources]
+            ),
         ),
     )
 
@@ -166,7 +170,9 @@ def create_k8s_secrets(
                 },
                 vaultauth=vault_k8s_resources.auth_name,
             ),
-            opts=ResourceOptions(delete_before_replace=True),
+            opts=ResourceOptions(
+                delete_before_replace=True, depends_on=[vault_k8s_resources]
+            ),
         )
     )
 
@@ -205,7 +211,9 @@ def create_k8s_secrets(
                 },
                 vaultauth=vault_k8s_resources.auth_name,
             ),
-            opts=ResourceOptions(delete_before_replace=True),
+            opts=ResourceOptions(
+                delete_before_replace=True, depends_on=[vault_k8s_resources]
+            ),
         )
     )
 
@@ -270,7 +278,9 @@ def create_k8s_secrets(
                 },
                 vaultauth=vault_k8s_resources.auth_name,
             ),
-            opts=ResourceOptions(delete_before_replace=True),
+            opts=ResourceOptions(
+                delete_before_replace=True, depends_on=[vault_k8s_resources]
+            ),
         ),
     )
 
@@ -297,7 +307,9 @@ def create_k8s_secrets(
             },
             vaultauth=vault_k8s_resources.auth_name,
         ),
-        opts=ResourceOptions(delete_before_replace=True),
+        opts=ResourceOptions(
+            delete_before_replace=True, depends_on=[vault_k8s_resources]
+        ),
     )
 
     forum_secret_name = "12-forum-secrets-yaml"  # pragma: allowlist secret
@@ -319,7 +331,9 @@ def create_k8s_secrets(
             },
             vaultauth=vault_k8s_resources.auth_name,
         ),
-        opts=ResourceOptions(delete_before_replace=True),
+        opts=ResourceOptions(
+            delete_before_replace=True, depends_on=[vault_k8s_resources]
+        ),
     )
 
     cms_oauth_secret_name = "70-cms-oauth-credentials-yaml"  # pragma: allowlist secret
@@ -342,7 +356,9 @@ def create_k8s_secrets(
             },
             vaultauth=vault_k8s_resources.auth_name,
         ),
-        opts=ResourceOptions(delete_before_replace=True),
+        opts=ResourceOptions(
+            delete_before_replace=True, depends_on=[vault_k8s_resources]
+        ),
     )
 
     lms_oauth_secret_name = "80-lms-oauth-credentials-yaml"  # pragma: allowlist secret
@@ -365,7 +381,9 @@ def create_k8s_secrets(
             },
             vaultauth=vault_k8s_resources.auth_name,
         ),
-        opts=ResourceOptions(delete_before_replace=True),
+        opts=ResourceOptions(
+            delete_before_replace=True, depends_on=[vault_k8s_resources]
+        ),
     )
 
     return EdxappSecrets(

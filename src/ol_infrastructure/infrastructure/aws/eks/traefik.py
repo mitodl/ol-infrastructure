@@ -1,10 +1,12 @@
 # ruff: noqa: E501, PLR0913, TD002 FIX002
 import pulumi_eks as eks
+import pulumi_fastly as fastly
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, ResourceOptions
+from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from bridge.lib.magic_numbers import AWS_LOAD_BALANCER_NAME_MAX_LENGTH
 from ol_infrastructure.lib.aws.eks_helper import ECR_DOCKERHUB_REGISTRY
+from ol_infrastructure.lib.fastly import get_fastly_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 
 
@@ -59,6 +61,8 @@ def setup_traefik(
             depends_on=[cluster],
         ),
     )
+
+    fastly_provider = get_fastly_provider(wrap_in_pulumi_options=False)
 
     # This helm release installs the traefik k8s gateway api controller
     # which will server as the ingress point for ALL connections going into
@@ -160,6 +164,17 @@ def setup_traefik(
                         },
                     },
                     "websecure": {
+                        "forwardedHeaders": {
+                            "trustedIPs": Output.all(
+                                fastly.get_fastly_ip_ranges(
+                                    opts=InvokeOptions(provider=fastly_provider)
+                                ).cidr_blocks,
+                                fastly.get_fastly_ip_ranges(
+                                    opts=InvokeOptions(provider=fastly_provider)
+                                ).ipv6_cidr_blocks,
+                            ).apply(lambda blocks: [*blocks[0], *blocks[1]]),
+                            "insecure": False,
+                        },
                         "port": 8443,
                         "expose": {
                             "default": True,
