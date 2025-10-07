@@ -460,6 +460,28 @@ if "MITXONLINE_DOCKER_TAG" not in os.environ:
     msg = "MITXONLINE_DOCKER_TAG must be set."
     raise OSError(msg)
 MITXONLINE_DOCKER_TAG = os.environ["MITXONLINE_DOCKER_TAG"]
+if mitxonline_config.get_bool("use_granian"):
+    cmd_array = [
+        "granian",
+    ]
+    arg_array = [
+        "--interface",
+        "wsgi",
+        "--host",
+        "0.0.0.0",  # noqa: S104
+        "--port",
+        f"{DEFAULT_WSGI_PORT}",
+        "--workers",
+        "1",
+        "--runtime-threads",
+        "2",
+        "--log-level",
+        "warning",
+        "main.wsgi:application",
+    ]
+else:
+    cmd_array = ["uwsgi"]
+    arg_array = ["/tmp/uswgi.ini"]  # noqa: S108
 
 mitxonline_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
@@ -477,24 +499,8 @@ mitxonline_k8s_app = OLApplicationK8s(
         application_security_group_name=mitxonline_app_security_group.name,
         application_image_repository="mitodl/mitxonline-app",
         application_docker_tag=MITXONLINE_DOCKER_TAG,
-        application_cmd_array=[
-            "granian",
-        ],
-        application_arg_array=[
-            "--interface",
-            "wsgi",
-            "--host",
-            "0.0.0.0",  # noqa: S104
-            "--port",
-            f"{DEFAULT_WSGI_PORT}",
-            "--workers",
-            "1",
-            "--runtime-threads",
-            "2",
-            "--log-level",
-            "warning",
-            "main.wsgi:application",
-        ],
+        application_cmd_array=cmd_array,
+        application_arg_array=arg_array,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,
         import_uwsgi_config=True,
