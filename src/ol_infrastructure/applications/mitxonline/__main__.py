@@ -480,7 +480,7 @@ if mitxonline_config.get_bool("use_granian"):
     nginx_config_path = "files/web.conf_granian"
 else:
     cmd_array = ["uwsgi"]
-    arg_array = ["/tmp/uswgi.ini"]  # noqa: S108
+    arg_array = ["/tmp/uwsgi.ini"]  # noqa: S108
     nginx_config_path = "files/web.conf_uwsgi"
 
 mitxonline_k8s_app = OLApplicationK8s(
