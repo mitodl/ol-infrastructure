@@ -479,9 +479,11 @@ if mitxonline_config.get_bool("use_granian"):
         "warning",
         "main.wsgi:application",
     ]
+    nginx_config_path = "files/web.conf_granian"
 else:
     cmd_array = ["uwsgi"]
     arg_array = ["/tmp/uswgi.ini"]  # noqa: S108
+    nginx_config_path = "files/web.conf_uwsgi"
 
 mitxonline_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
@@ -503,6 +505,7 @@ mitxonline_k8s_app = OLApplicationK8s(
         application_arg_array=arg_array,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,
+        import_nginx_config_path=nginx_config_path,
         import_uwsgi_config=True,
         init_migrations=False,
         init_collectstatic=True,
