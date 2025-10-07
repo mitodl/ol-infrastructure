@@ -57,6 +57,7 @@ config:
     OPENEDX_API_BASE_URL: https://courses.rc.learn.mit.edu/
     OPENEDX_LOGIN_URL: https://courses.rc.learn.mit.edu/auth/login/ol-oauth2/?auth_entry=login
   learn_ai:learn_backend_domain: "api.rc.learn.mit.edu"
+  learn_ai:use_granian: true
   redis:password:
     secure: v1:j1q4KgePVUsaaySb:EhUqxWBezBKe6Ck1o/gqlX68GBnrZZQdmUCscl5aPok1j6jJWKSRO89XfV+6dWJaCMhqHA==
   vault:address: "https://vault-qa.odl.mit.edu"

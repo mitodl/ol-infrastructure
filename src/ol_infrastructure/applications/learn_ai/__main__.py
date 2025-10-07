@@ -726,6 +726,34 @@ learn_ai_nginx_configmap = kubernetes.core.v1.ConfigMap(
     },
 )
 
+if learn_ai_config.get_bool("use_granian"):
+    cmd_array = ["granian"]
+    arg_array = [
+        "--interface",
+        "asgi",
+        "--host",
+        "0.0.0.0",  # noqa: S104
+        "--port",
+        f"{DEFAULT_WSGI_PORT}",
+        "--workers",
+        "1",
+        "--runtime-threads",
+        "2",
+        "--log-level",
+        "debug",
+        "main.asgi:application",
+    ]
+else:
+    cmd_array = ["uvicorn"]
+    arg_array = [
+        "main.asgi:application",
+        "--reload",
+        "--host",
+        "0.0.0.0",  # noqa: S104
+        "--port",
+        f"{DEFAULT_WSGI_PORT}",
+    ]
+
 # Instantiate the OLApplicationK8s component
 learn_ai_app_k8s = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
@@ -748,22 +776,8 @@ learn_ai_app_k8s = OLApplicationK8s(
         application_image_repository="mitodl/learn-ai-app",
         application_docker_tag=LEARN_AI_DOCKER_TAG,
         application_min_replicas=learn_ai_config.get("min_replicas") or 2,
-        application_cmd_array=["granian"],
-        application_arg_array=[
-            "--interface",
-            "asgi",
-            "--host",
-            "0.0.0.0",  # noqa: S104
-            "--port",
-            f"{DEFAULT_WSGI_PORT}",
-            "--workers",
-            "1",
-            "--runtime-threads",
-            "2",
-            "--log-level",
-            "debug",
-            "main.asgi:application",
-        ],
+        application_cmd_array=cmd_array,
+        application_arg_array=arg_array,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,
         # Nginx resources (defaults from component are fine)
