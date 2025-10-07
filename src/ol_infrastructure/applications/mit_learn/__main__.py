@@ -1365,15 +1365,15 @@ if mitlearn_config.get_bool("use_granian"):
         f"{DEFAULT_WSGI_PORT}",
         "--workers",
         "1",
-        "--runtime-threads",
-        "2",
         "--log-level",
         "warning",
         "main.wsgi:application",
     ]
+    nginx_config_path = "files/web.conf_granian"
 else:
     cmd_array = ["uwsgi"]
     arg_array = ["/tmp/uwsgi.ini"]  # noqa: S108
+    nginx_config_path = "files/web.conf_uwsgi"
 
 mitlearn_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
@@ -1395,7 +1395,8 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_arg_array=arg_array,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,  # Assuming Django app needs nginx
-        import_uwsgi_config=False,
+        import_nginx_config_path=nginx_config_path,
+        import_uwsgi_config=True,
         init_migrations=False,
         init_collectstatic=True,  # Assuming Django app needs collectstatic
         pre_deploy_commands=[("migrate", ["scripts/heroku-release-phase.sh"])],

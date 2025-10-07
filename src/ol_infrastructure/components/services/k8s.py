@@ -107,6 +107,7 @@ class OLApplicationK8sConfig(BaseModel):
         ),
     ]
     import_nginx_config: bool = Field(default=True)
+    import_nginx_config_path: str = "files/web.conf"
     import_uwsgi_config: bool = Field(default=False)
     resource_requests: dict[str, str] = Field(
         default={"cpu": "250m", "memory": "300Mi"}
@@ -257,7 +258,7 @@ class OLApplicationK8s(ComponentResource):
                 ),
                 data={
                     "web.conf": ol_app_k8s_config.project_root.joinpath(
-                        "files/web.conf"
+                        ol_app_k8s_config.import_nginx_config_path
                     ).read_text(),
                 },
                 opts=resource_options,
