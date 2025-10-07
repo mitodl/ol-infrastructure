@@ -461,13 +461,6 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
                 }}
                 write_relabel_config {{
                     source_labels = ["__name__"]
-                    regex         = "(kube_pod_container_info|kube_pod_container_status_restarts_total)"
-                    action        = "replace"
-                    target_label  = "exported_pod"
-                    replacement   = ""
-                }}
-                write_relabel_config {{
-                    source_labels = ["__name__"]
                     regex         = "kube_pod_container_info"
                     action        = "replace"
                     target_label  = "image_id"
