@@ -148,7 +148,7 @@ botkube_application = kubernetes.helm.v3.Release(
             "commonLabels": k8s_global_labels,
             "sources": {},
             "settings": {
-                "clusterName": Config("kubernetes").require("cluster_name"),
+                "clusterName": cluster_stack.require_output("cluster_name"),
             },
             "executors": {
                 "k8s-default-tools": {
