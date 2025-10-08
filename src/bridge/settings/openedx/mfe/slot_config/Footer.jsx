@@ -129,6 +129,8 @@ const ForceLoginRedirect = () => {
       const destination = getLoginRedirectUrl(
         `${process.env.LEARNING_BASE_URL}${location.pathname}${location.search}`
       );
+      console.log(`Login Redirect URL: ${process.env.LEARNING_BASE_URL}${location.pathname}${location.search}`)
+      console.log(`Redirecting to: ${destination}`);
       window.location.replace(destination);
     }
   }, [config, authenticatedUser, location]);
