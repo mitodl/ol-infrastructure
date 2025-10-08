@@ -824,7 +824,9 @@ mitlearn_fastly_service = fastly.ServiceVcl(
     ),
     cache_settings=[],
     conditions=[],
-    dictionaries=[],
+    dictionaries=[
+        fastly.ServiceVclDictionaryArgs(name="path_redirects"),  # path level redirects
+    ],
     domains=[
         fastly.ServiceVclDomainArgs(
             comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application",
@@ -883,6 +885,21 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             ),
             type="error",
         ),
+        fastly.ServiceVclSnippetArgs(
+            name="handle route dictionary redirect",
+            content=Path(__file__)
+            .parent.joinpath("snippets/redirect_recv.vcl")
+            .read_text(),
+            type="recv",
+            priority=10,
+        ),
+        fastly.ServiceVclSnippetArgs(
+            name="deliver route dictionary redirect",
+            content=Path(__file__)
+            .parent.joinpath("snippets/redirect_deliver.vcl")
+            .read_text(),
+            type="error",
+        ),
     ],
     logging_https=[
         fastly.ServiceVclLoggingHttpArgs(
@@ -910,6 +927,21 @@ mitlearn_fastly_service = fastly.ServiceVcl(
         ),
     ),
 )
+
+path_redirects_dict_id = mitlearn_fastly_service.dictionaries.apply(
+    lambda dicts: str(
+        next(d.dictionary_id for d in (dicts or []) if d.name == "path_redirects")
+    )
+)
+mitlearn_redirects_dictionary = fastly.ServiceDictionaryItems(
+    "mitlearn-redirects-dictionary",
+    dictionary_id=path_redirects_dict_id,
+    items={"/dashboard/organization/mit": "/dashboard/organization/mit-universal-ai"},
+    service_id=mitlearn_fastly_service.id,
+    manage_items=True,
+    opts=fastly_provider,
+)
+
 
 five_minutes = 60 * 5
 route53.Record(
