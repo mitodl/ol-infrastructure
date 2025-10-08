@@ -14,9 +14,11 @@ from ol_infrastructure.substructure.keycloak.org_flows import (
 )
 from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
     NameIdFormat,
+    OIDCIdpConfig,
     OrgConfig,
     SamlIdpConfig,
     create_org_for_learn,
+    onboard_oidc_org,
     onboard_saml_org,
 )
 
@@ -762,6 +764,61 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,
                 resource_options=resource_options,
+            )
+        )
+        onboard_oidc_org(
+            OIDCIdpConfig(
+                org_domains=[
+                    "duth.gr",
+                    "admin.duth.gr",
+                    "af.duth.gr",
+                    "affil.duth.gr",
+                    "agro.duth.gr",
+                    "arch.duth.gr",
+                    "bscc.duth.gr",
+                    "chem.duth.gr",
+                    "civil.duth.gr",
+                    "cs.duth.gr",
+                    "econ.duth.gr",
+                    "edu.duth.gr",
+                    "ee.duth.gr",
+                    "eled.duth.gr",
+                    "eng.duth.gr",
+                    "env.duth.gr",
+                    "fmenr.duth.gr",
+                    "he.duth.gr",
+                    "helit.duth.gr",
+                    "hs.duth.gr",
+                    "law.duth.gr",
+                    "mbg.duth.gr",
+                    "med.duth.gr",
+                    "mst.duth.gr",
+                    "neclir.duth.gr",
+                    "nurs.duth.gr",
+                    "ores.duth.gr",
+                    "ot.duth.gr",
+                    "phyed.duth.gr",
+                    "physics.duth.gr",
+                    "pme.duth.gr",
+                    "polsci.duth.gr",
+                    "psed.duth.gr",
+                    "psy.duth.gr",
+                    "sci.duth.gr",
+                    "socadm.duth.gr",
+                    "sp.duth.gr",
+                    "sw.duth.gr",
+                    "vo.duth.gr",
+                    "xan.duth.gr",
+                ],
+                org_name="Democritus University of Thrace",
+                org_alias="DUTH",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                keycloak_url=keycloak_url,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                org_oidc_metadata_url="https://sso.duth.gr/realms/main/.well-known/openid-configuration",
+                client_id="mit-learn",
             )
         )
 
