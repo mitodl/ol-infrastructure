@@ -887,13 +887,17 @@ mitlearn_fastly_service = fastly.ServiceVcl(
         ),
         fastly.ServiceVclSnippetArgs(
             name="handle route dictionary redirect",
-            content=Path(__file__).parent.joinpath("snippets/redirect_recv.vcl"),
+            content=Path(__file__)
+            .parent.joinpath("snippets/redirect_recv.vcl")
+            .read_text(),
             type="recv",
             priority=10,
         ),
         fastly.ServiceVclSnippetArgs(
             name="deliver route dictionary redirect",
-            content=Path(__file__).parent.joinpath("snippets/redirect_deliver.vcl"),
+            content=Path(__file__)
+            .parent.joinpath("snippets/redirect_deliver.vcl")
+            .read_text(),
             type="error",
         ),
     ],
@@ -930,7 +934,7 @@ path_redirects_dict_id = mitlearn_fastly_service.dictionaries.apply(
     )
 )
 mitlearn_redirects_dictionary = fastly.ServiceDictionaryItems(
-    "ol-redirect-service-redirects-dictionary",
+    "mitlearn-redirects-dictionary",
     dictionary_id=path_redirects_dict_id,
     items={"/dashboard/organization/mit": "/dashboard/organization/mit-universal-ai"},
     service_id=mitlearn_fastly_service.id,

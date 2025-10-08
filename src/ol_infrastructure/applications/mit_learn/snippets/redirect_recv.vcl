@@ -5,7 +5,7 @@
 declare local var.redirect STRING;
 declare local var.location STRING;
 
-set var.redirect = table.lookup(redirects, req.url.path);
+set var.redirect = table.lookup(path_redirects, req.url.path);
 
 if (var.redirect) {
 
@@ -14,7 +14,14 @@ if (var.redirect) {
   } else {
     set var.location = var.redirect;
   }
-  set req.http.redirect_dict = var.location;
+  set req.http.redirect_dest = var.location;
 
-  error 601 req.http.redirect_dict;
+  error 601 req.http.redirect_dest;
+}
+
+if (req.url.path ~ "^/attach/(.*$)") {
+  set var.location = regsub(req.url, "/attach/", "/enrollmentcode/");
+  set req.http.redirect_dest = var.location;
+
+  error 601 req.http.redirect_dest;
 }
