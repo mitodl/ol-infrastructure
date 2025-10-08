@@ -9,7 +9,7 @@ const authoringAppID = "authoring";
 const href = window.location.href.toLowerCase();
 const isLearnCourse = ["course-v1:uai_"].some(key => href.includes(key));
 const accessibilityURL = process.env.ACCESSIBILITY_URL || 'https://accessibility.mit.edu/';
-const contactUsURL = process.env.CONTACT_URL || "mailto:learn-support@mit.edu";
+const contactUsURL = process.env.CONTACT_URL || "mailto:mitlearn-support@mit.edu";
 const linkTitles = {
   dashboard: "Dashboard",
   profile: "Profile",
