@@ -125,6 +125,7 @@ const ForceLoginRedirect = () => {
       allowedRedirects.some((name) => process.env.DEPLOYMENT_NAME?.includes(name)) &&
       authenticatedUser === null
     ) {
+      console.log(`User not authenticated, Redirecting to: ${process.env.LEARNING_BASE_URL}${location.pathname}${location.search}`)
       const destination = getLoginRedirectUrl(
         `${process.env.LEARNING_BASE_URL}${location.pathname}${location.search}`
       );
