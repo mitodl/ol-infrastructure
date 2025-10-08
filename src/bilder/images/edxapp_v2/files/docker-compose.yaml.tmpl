@@ -47,6 +47,9 @@ services:
     - ./settings/Caddyfile:/etc/caddy/Caddyfile:ro
     - ./tls/certificate:/etc/caddy/certificate:ro
     - ./tls/key:/etc/caddy/key:ro
+    - /opt/data/media:/openedx/media
+    - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
+    - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
   lms:
     image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/${DOCKER_REPO_AND_DIGEST}
     profiles:
