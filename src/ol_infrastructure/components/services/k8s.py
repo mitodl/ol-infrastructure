@@ -386,7 +386,7 @@ class OLApplicationK8s(ComponentResource):
 
         # Create a deployment resource to manage the application pods
         application_labels = ol_app_k8s_config.k8s_global_labels | {
-            "ol.mit.edu/service": "webapp",
+            "ol.mit.edu/process": "webapp",
             "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
             "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
                 truncate_k8s_metanames
@@ -627,7 +627,7 @@ class OLApplicationK8s(ComponentResource):
 
         for celery_worker_config in ol_app_k8s_config.celery_worker_configs:
             celery_labels = ol_app_k8s_config.k8s_global_labels | {
-                "ol.mit.edu/service": "celery",
+                "ol.mit.edu/process": "celery",
                 "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
                 "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
                     truncate_k8s_metanames
