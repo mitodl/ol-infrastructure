@@ -16,9 +16,9 @@ if (table.lookup(path_redirects, req.url)) {
   error 601 "## path redirect";
 }
 
-if (req.url.path ~ "^/attach/(.*$)") {
-  set var.location = regsub(req.url, "/attach/", "/enrollmentcode/");
-  set req.http.redirect_dest = var.location;
+# if (req.url.path ~ "^/attach/(.*$)") {
+#   set var.location = regsub(req.url, "/attach/", "/enrollmentcode/");
+#   set req.http.redirect_dest = var.location;
 
-  error 601 "## path redirect";
-}
+#   error 601 "## path redirect";
+# }
