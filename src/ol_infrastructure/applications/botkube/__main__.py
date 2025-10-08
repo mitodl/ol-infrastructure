@@ -147,6 +147,9 @@ botkube_application = kubernetes.helm.v3.Release(
         values={
             "commonLabels": k8s_global_labels,
             "sources": {},
+            "settings": {
+                "clusterName": cluster_stack.require_output("cluster_name"),
+            },
             "executors": {
                 "k8s-default-tools": {
                     "botkube/kubectl": {"enabled": True},
@@ -171,7 +174,6 @@ botkube_application = kubernetes.helm.v3.Release(
                                         "k8s-default-tools",
                                     ],
                                     "sources": [
-                                        "k8s-err-events",
                                         "k8s-recommendation-events",
                                     ],
                                 },
