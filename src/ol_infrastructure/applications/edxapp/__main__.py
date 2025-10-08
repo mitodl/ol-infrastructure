@@ -1675,7 +1675,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
     conditions=[
         fastly.ServiceVclConditionArgs(
             name="studio host",
-            statement=f'req.http.host == "{edxapp_domains["studio"]}"',
+            statement=f'req.http.host == "{edxapp_domains["studio"]}" && req.url.path !~ "{mfe_regex}"',
             type="REQUEST",
         ),
         fastly.ServiceVclConditionArgs(
