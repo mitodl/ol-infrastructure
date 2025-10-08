@@ -125,7 +125,7 @@ class OLApplicationK8sConfig(BaseModel):
     )
     post_deploy_commands: list[tuple[str, list[str]]] | None = Field(
         default=None,
-        description="A tuple of <job_name>, <job_command_array> for executing prior to the deployment updating",
+        description="A tuple of <job_name>, <job_command_array> for executing upon completion of the deployment updating",
     )
     probe_configs: dict[str, kubernetes.core.v1.ProbeArgs] = {
         # Liveness probe to check if the application is still running
