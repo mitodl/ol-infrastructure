@@ -36,6 +36,18 @@
     }
     rewrite @favicon_matcher /theming/asset/images/favicon.ico
 
+    handle_path /static/* {
+        file_server {
+            root /openedx/staticfiles
+        }
+    }
+
+    handle_path /media/* {
+        file_server {
+            root /openedx/media
+        }
+    }
+
     # Limit profile image upload size
     handle_path /api/profile_images/*/*/upload {
         request_body {
@@ -57,6 +69,18 @@
         path_regexp ^/favicon.ico$
     }
     rewrite @favicon_matcher /theming/asset/images/favicon.ico
+
+    handle_path /static/* {
+        file_server {
+            root /openedx/staticfiles
+        }
+    }
+
+    handle_path /media/* {
+        file_server {
+            root /openedx/media
+        }
+    }
 
     import proxy "cms:8000"
 
