@@ -480,7 +480,7 @@ class OLApplicationK8s(ComponentResource):
                 regarding=kubernetes.core.v1.ObjectReferenceArgs(
                     api_version="batch/v1",
                     kind="Job",
-                    name=f"{_application_deployment_name}-pre-deploy",
+                    name=_application_pre_deployment_event_name,
                     namespace=ol_app_k8s_config.application_namespace,
                 ),
                 action="PreDeployJobStarted",
