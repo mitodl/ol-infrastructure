@@ -4,11 +4,12 @@ This is a service components that replaces a number of "boilerplate" kubernetes
 calls we currently make into one convenient callable package.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
 import pulumi_kubernetes as kubernetes
+import pulumiverse_time as pulumi_time
 from pulumi import ComponentResource, Output, ResourceOptions
 from pydantic import (
     BaseModel,
@@ -469,14 +470,19 @@ class OLApplicationK8s(ComponentResource):
                 f"{ol_app_k8s_config.application_name}-predeploy"
             )
 
+            _now = datetime.now(tz=UTC)
             _pre_deployment_event = kubernetes.events.v1.Event(
                 f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-event",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
                     name=_application_pre_deployment_event_name,
                     namespace=ol_app_k8s_config.application_namespace,
                     labels=application_labels,
+                    deletion_timestamp=(_now + timedelta(seconds=30)).isoformat(),
                 ),
-                event_time=datetime.now(tz=UTC).isoformat(),
+                event_time=pulumi_time.Static(
+                    f"{_application_pre_deployment_event_name}-time",
+                    triggers={"pre_deploy_job_id": _pre_deploy_job.id},
+                ),
                 regarding=kubernetes.core.v1.ObjectReferenceArgs(
                     api_version="batch/v1",
                     kind="Job",
@@ -489,7 +495,9 @@ class OLApplicationK8s(ComponentResource):
                 type="Normal",
                 reporting_controller="ol-infrastructure",
                 reporting_instance=f"{ol_app_k8s_config.application_name}-controller",
-                opts=resource_options,
+                opts=ResourceOptions(delete_before_replace=True).merge(
+                    resource_options
+                ),
             )
 
         _application_deployment = kubernetes.apps.v1.Deployment(
@@ -679,14 +687,19 @@ class OLApplicationK8s(ComponentResource):
                 else:
                     return "PostDeployJobRunning"
 
+            _now = datetime.now(tz=UTC)
             _post_deployment_event = kubernetes.events.v1.Event(
                 f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-post-deploy-event",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
                     name=_application_post_deployment_event_name,
                     namespace=ol_app_k8s_config.application_namespace,
                     labels=application_labels,
+                    deletion_timestamp=(_now + timedelta(seconds=30)).isoformat(),
                 ),
-                event_time=datetime.now(tz=UTC).isoformat(),
+                event_time=pulumi_time.Static(
+                    f"{_application_post_deployment_event_name}-time",
+                    triggers={"post_deploy_job_id": _post_deploy_job.id},
+                ),
                 regarding=kubernetes.core.v1.ObjectReferenceArgs(
                     api_version="batch/v1",
                     kind="Job",

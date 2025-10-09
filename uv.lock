@@ -190,7 +190,7 @@ name = "cffi"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pycparser", marker = "implementation_name != 'PyPy'" },
+    { name = "pycparser", marker = "implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/eb/56/b1ba7935a17738ae8453301356628e8147c79dbb825bcbc73dc7401f9846/cffi-2.0.0.tar.gz", hash = "sha256:44d1b5909021139fe36001ae048dbdde8214afa20200eda0f64c068cac5d5529", size = 523588, upload-time = "2025-09-08T23:24:04.541Z" }
 wheels = [
@@ -940,6 +940,7 @@ dependencies = [
     { name = "pulumi-tls" },
     { name = "pulumi-vault" },
     { name = "pulumiverse-heroku" },
+    { name = "pulumiverse-time" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pyinfra" },
@@ -978,6 +979,7 @@ requires-dist = [
     { name = "pulumi-tls", specifier = ">=5.0.0,<6" },
     { name = "pulumi-vault", specifier = ">=7,<8" },
     { name = "pulumiverse-heroku", specifier = ">=1.0.3,<2" },
+    { name = "pulumiverse-time", specifier = ">=0.1.1" },
     { name = "pydantic", specifier = ">=2,<3" },
     { name = "pydantic-settings", specifier = ">=2.0.1,<3" },
     { name = "pyinfra", specifier = "~=3.0" },
@@ -1334,6 +1336,17 @@ dependencies = [
     { name = "semver" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f6/eb/1ab9951beee42cb1af9b7164b5d9c60c9348d838c6f229dc49eb62656f86/pulumiverse_heroku-1.0.4.tar.gz", hash = "sha256:6ecc7ea57238e4ec9f9373401a8464a6d712a4f1cebb963c5e65c9ce6c89c501", size = 55873, upload-time = "2025-04-08T10:55:58.355Z" }
+
+[[package]]
+name = "pulumiverse-time"
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "parver" },
+    { name = "pulumi" },
+    { name = "semver" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8a/6b/89e78d25f6a8ec58fdb02a2daef019bb7a277bc0c1af6ee504c4d4ca2dc8/pulumiverse_time-0.1.1.tar.gz", hash = "sha256:4567837b6f2c1112871ff8a2cf4433308af8ab7a2814ca3aabd424825b2ad6ec", size = 15567, upload-time = "2024-12-29T17:07:24.188Z" }
 
 [[package]]
 name = "pycparser"
