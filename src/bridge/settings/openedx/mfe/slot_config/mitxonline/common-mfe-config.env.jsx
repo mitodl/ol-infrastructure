@@ -6,8 +6,11 @@ const configData = getConfig();
 const currentYear = new Date().getFullYear();
 const edxMfeAppName = configData.APP_ID;
 const authoringAppID = "authoring";
-const href = window.location.href.toLowerCase();
-const isLearnCourse = ["course-v1:uai_"].some(key => href.includes(key));
+const href = (window.location?.href || document.URL || '').toLowerCase();
+const isLearnCourse = ["course-v1:uai_"].some(key => {
+  const encodedKey = encodeURIComponent(key).toLowerCase()
+  return href.includes(key) ||  href.includes(encodedKey)
+});
 const accessibilityURL = process.env.ACCESSIBILITY_URL || 'https://accessibility.mit.edu/';
 const contactUsURL = process.env.CONTACT_URL || "mailto:mitlearn-support@mit.edu";
 const linkTitles = {
@@ -22,7 +25,6 @@ const linkTitles = {
 };
 
 const copyRightText = "Massachusetts Institute of Technology";
-
 const logo = <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={process.env.MIT_BASE_URL} />;
 
 let userMenu = [
