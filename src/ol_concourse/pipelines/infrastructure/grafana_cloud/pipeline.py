@@ -72,7 +72,8 @@ cortextool_registry_image = AnonymousResource(
 )
 
 git_registry_image = AnonymousResource(
-    type=REGISTRY_IMAGE, source=RegistryImage(repository="bitnami/git", tag="2.35.1")
+    type=REGISTRY_IMAGE,
+    source=RegistryImage(repository="bitnamilegacy/git", tag="2.35.1"),
 )
 
 commit_managed_dashboards_job = Job(
@@ -354,8 +355,6 @@ for tool in ["loki", "cortex", "alertmanager"]:
             "CORTEX_API_KEY": f"((cortextool.cortex-api-key-{stage}))",
             "CORTEX_API_USER": f"((cortextool.{tool}-rules-api-user-{stage}))",
             "CORTEX_TENANT_ID": f"((cortextool.{tool}-rules-api-user-{stage}))",
-            "OPS_TEAM_OPS_GENIE_API_KEY": "((cortextool.ops-team-ops-genie-api-key))",
-            "TESTING_OPS_GENIE_API_KEY": "((cortextool.testing-ops-genie-api-key))",
             "SLACK_NOTIFICATIONS_OCW_MISC_API_URL": (
                 "((cortextool.slack-notifications-ocw-misc-api-url))"
             ),
