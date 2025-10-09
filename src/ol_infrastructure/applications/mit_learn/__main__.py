@@ -1418,7 +1418,8 @@ mitlearn_k8s_app = OLApplicationK8s(
         k8s_global_labels=k8s_global_labels,
         # Reference all Kubernetes secrets containing environment variables
         env_from_secret_names=secret_names,
-        application_min_replicas=mitlearn_config.get("min_replicas") or 2,
+        application_min_replicas=mitlearn_config.get_int("min_replicas") or 2,
+        application_max_replicas=mitlearn_config.get_int("max_replicas") or 10,
         application_security_group_id=mitlearn_app_security_group.id,
         application_security_group_name=mitlearn_app_security_group.name,
         application_image_repository="mitodl/mit-learn-app",
@@ -1435,6 +1436,7 @@ mitlearn_k8s_app = OLApplicationK8s(
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="default",
+                max_replicas=20,
                 redis_host=redis_cache.address,
                 redis_password=redis_config.require("password"),
             ),
@@ -1445,6 +1447,7 @@ mitlearn_k8s_app = OLApplicationK8s(
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="embeddings",
+                max_replicas=30,
                 redis_host=redis_cache.address,
                 redis_password=redis_config.require("password"),
             ),
