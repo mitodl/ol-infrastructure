@@ -121,6 +121,7 @@ const ForceLoginRedirect = () => {
   useEffect(() => {
     const allowedRedirects = ["mitxonline", "xpro"];
     if (
+      process.env.ENVIRONMENT_STAGE.toLowerCase() !== "production" &&
       config.APP_ID === "learning" &&
       allowedRedirects.some((name) => process.env.DEPLOYMENT_NAME?.includes(name)) &&
       authenticatedUser === null

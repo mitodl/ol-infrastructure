@@ -101,6 +101,7 @@ def mfe_params(
         "CSRF_TOKEN_API_PATH": "/csrf/api/v1/token",
         "DISPLAY_FEEDBACK_WIDGET": open_edx.display_feedback_widget,
         "ENABLE_CERTIFICATE_PAGE": open_edx.enable_certificate_page,
+        "ENVIRONMENT_STAGE": open_edx.environment_stage,
         "DEPLOYMENT_NAME": open_edx.deployment_name,
         "DISCUSSIONS_MFE_BASE_URL": (
             f"https://{open_edx.lms_domain}/{discussion_mfe_path}"
