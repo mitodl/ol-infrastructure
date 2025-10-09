@@ -65,6 +65,8 @@ config:
     MITOL_LOG_LEVEL: "INFO"
     MITOL_NEW_USER_LOGIN_URL: "https://rc.learn.mit.edu/onboarding"
     MITOL_SUPPORT_EMAIL: "odl-learn-rc-support@mit.edu" # Need to verify
+    MITX_ONLINE_BASE_URL: "https://rc.mitxonline.mit.edu/"
+    MITX_ONLINE_LEARNING_COURSE_BUCKET_NAME: "mitx-etl-mitxonline-rc"
     MITX_ONLINE_COURSES_API_URL: "https://rc.mitxonline.mit.edu/api/v2/courses/"
     MITX_ONLINE_PROGRAMS_API_URL: "https://rc.mitxonline.mit.edu/api/v2/programs/"
     MITPE_API_ENABLED: "true"
