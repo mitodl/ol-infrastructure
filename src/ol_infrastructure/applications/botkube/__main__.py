@@ -173,9 +173,7 @@ botkube_application = kubernetes.helm.v3.Release(
                                     "executors": [
                                         "k8s-default-tools",
                                     ],
-                                    "sources": [
-                                        "k8s-deployment-events",
-                                    ],
+                                    "sources": [],
                                 },
                             }
                         },
