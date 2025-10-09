@@ -3,84 +3,196 @@ import { getConfig } from '@edx/frontend-platform';
 import Footer, { Logo, MenuLinks, CopyrightNotice } from './Footer.jsx';
 
 const configData = getConfig();
-const currentYear = new Date().getFullYear();
-const edxMfeAppName = configData.APP_ID;
-const authoringAppID = "authoring";
-const href = (window.location?.href || document.URL || '').toLowerCase();
-const isLearnCourse = ["course-v1:uai_"].some(key => {
-  const encodedKey = encodeURIComponent(key).toLowerCase()
-  return href.includes(key) ||  href.includes(encodedKey)
-});
-const accessibilityURL = process.env.ACCESSIBILITY_URL || 'https://accessibility.mit.edu/';
-const contactUsURL = process.env.CONTACT_URL || "mailto:mitlearn-support@mit.edu";
-const linkTitles = {
-  dashboard: "Dashboard",
-  profile: "Profile",
-  account: "Settings",
-  logout: "Sign Out",
-  aboutUs: "About Us",
-  termsOfService: "Terms of Service",
-  accessibility: "Accessibility",
-  contactUs: "Contact Us",
-};
-
-const copyRightText = "Massachusetts Institute of Technology";
-const logo = <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={process.env.MIT_BASE_URL} />;
-
-let userMenu = [
-  {
-    url: `${process.env.MIT_LEARN_BASE_URL}/dashboard`,
-    title: linkTitles.dashboard,
+const UAI_COURSE_KEYS = ['course-v1:uai_'];
+const AUTHORING_APP_ID = 'authoring';
+const CURRENT_MFE_APP_ID = configData.APP_ID;
+const SLOT_IDS = {
+  header: {
+    learning_user_menu: 'org.openedx.frontend.layout.header_learning_user_menu.v1',
+    desktop_user_menu: 'org.openedx.frontend.layout.header_desktop_user_menu.v1',
+    learning_course_info: 'org.openedx.frontend.layout.header_learning_course_info.v1',
   },
-  {
-    url: `${configData.LMS_BASE_URL}/logout`,
-    title: linkTitles.logout,
+  footer: {
+    slot: 'footer_slot',
+    studio_slot: 'studio_footer_slot',
+    desktop_left_links: 'frontend.shell.footer.desktop.leftLinks.ui',
+    desktop_center_links: 'frontend.shell.footer.desktop.centerLinks.ui',
+    desktop_legal_notices: 'frontend.shell.footer.desktop.legalNotices.ui',
+    desktop_top: 'frontend.shell.footer.desktop.top.ui',
+    desktop_right_links: 'frontend.shell.footer.desktop.rightLinks.ui',
   },
-];
-
-if (!isLearnCourse) {
-
-  userMenu = [
-    {
-      url: `${configData.MARKETING_SITE_BASE_URL}/dashboard`,
-      title: linkTitles.dashboard,
-    },
-    {
-      url: `${configData.MARKETING_SITE_BASE_URL}/profile/`,
-      title: linkTitles.profile,
-    },
-    {
-      url: `${configData.MARKETING_SITE_BASE_URL}/account-settings/`,
-      title: linkTitles.account,
-    },
-    {
-      url: `${configData.LMS_BASE_URL}/logout`,
-      title: linkTitles.logout,
-    },
-  ];
-
 }
 
-const footerLegalLinks = [
+const addFooterSubSlotsOverride = (config) => {
+  const currentYear = new Date().getFullYear();
+  const accessibilityURL = process.env.ACCESSIBILITY_URL || 'https://accessibility.mit.edu/';
+  const contactUsURL = process.env.CONTACT_URL || 'mailto:mitlearn-support@mit.edu';
+  const copyRightText = 'Massachusetts Institute of Technology';
+  const footerLogo = <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={process.env.MIT_BASE_URL} />;
+
+  const footerLegalLinks = [
     {
       url: `${process.env.MIT_LEARN_BASE_URL}/about`,
-      title: linkTitles.aboutUs,
+      title: 'About Us',
     },
     {
       url: `${process.env.MIT_LEARN_BASE_URL}/terms`,
-      title: linkTitles.termsOfService,
+      title: 'Terms of Service',
     },
     {
       url: accessibilityURL,
-      title: linkTitles.accessibility,
+      title: 'Accessibility',
     },
     {
       url: contactUsURL,
-      title: linkTitles.contactUs,
+      title: 'Contact Us',
     },
   ];
 
+  const footerSubSlotsConfig = {
+    [SLOT_IDS.footer.desktop_left_links]: {
+      plugins: [
+        { op: PLUGIN_OPERATIONS.Hide, widgetId: 'default_contents' },
+        {
+          op: PLUGIN_OPERATIONS.Insert,
+          widget: {
+            id: 'custom_logo',
+            type: DIRECT_PLUGIN,
+            RenderWidget: () => footerLogo,
+          },
+        },
+      ],
+    },
+    [SLOT_IDS.footer.desktop_center_links]: {
+      plugins: [
+        { op: PLUGIN_OPERATIONS.Hide, widgetId: 'default_contents' },
+        {
+          op: PLUGIN_OPERATIONS.Insert,
+          widget: {
+            id: 'custom_menu_links',
+            type: DIRECT_PLUGIN,
+            RenderWidget: () => (
+              <MenuLinks menuItems={footerLegalLinks} />
+            ),
+          },
+        },
+      ],
+    },
+    [SLOT_IDS.footer.desktop_legal_notices]: {
+      plugins: [
+        { op: PLUGIN_OPERATIONS.Hide, widgetId: 'default_contents' },
+        {
+          op: PLUGIN_OPERATIONS.Insert,
+          widget: {
+            id: 'custom_legal_notice',
+            type: DIRECT_PLUGIN,
+            RenderWidget: () => (
+              <CopyrightNotice copyrightText={`© ${currentYear} ${copyRightText}`} />
+            ),
+          },
+        },
+      ],
+    },
+    [SLOT_IDS.footer.desktop_top]: {
+      plugins: [{ op: PLUGIN_OPERATIONS.Hide, widgetId: 'default_contents' }],
+    },
+    [SLOT_IDS.footer.desktop_right_links]: {
+      plugins: [{ op: PLUGIN_OPERATIONS.Hide, widgetId: 'default_contents' }],
+    },
+  };
+  return {
+    ...config,
+    pluginSlots: {
+      ...config.pluginSlots,
+      ...footerSubSlotsConfig,
+    },
+  }
+}
+
+const addFooterSlotOverride = (config) => {
+  const footerSlotConfig = {
+    plugins: [
+      { op: PLUGIN_OPERATIONS.Hide, widgetId: 'default_contents' },
+      {
+        op: PLUGIN_OPERATIONS.Insert,
+        widget: {
+          id: 'custom_footer',
+          type: DIRECT_PLUGIN,
+          RenderWidget: () => <Footer />,
+        },
+      },
+    ],
+  };
+
+  if (CURRENT_MFE_APP_ID === AUTHORING_APP_ID) {
+    return {
+      ...config,
+      pluginSlots: {
+        ...config.pluginSlots,
+        [SLOT_IDS.footer.studio_slot]: footerSlotConfig,
+      },
+    };
+  } else {
+    return {
+      ...config,
+      pluginSlots: {
+        ...config.pluginSlots,
+        [SLOT_IDS.footer.slot]: footerSlotConfig,
+      },
+    };
+  }
+}
+
+const isLearnCourse = () => {
+  const href = (window.location?.href || document.URL || '').toLowerCase();
+  return UAI_COURSE_KEYS.some(key => {
+    const encodedKey = encodeURIComponent(key).toLowerCase();
+    return href.includes(key) || href.includes(encodedKey)
+  });
+}
+
+const getUserMenu = () => {
+  const userMenuLinkTitles = {
+    dashboard: 'Dashboard',
+    profile: 'Profile',
+    account: 'Settings',
+    logout: 'Sign Out',
+  };
+
+  if (isLearnCourse()) {
+    return [
+      {
+        url: `${process.env.MIT_LEARN_BASE_URL}/dashboard`,
+        title: userMenuLinkTitles.dashboard,
+      },
+      {
+        url: `${configData.LMS_BASE_URL}/logout`,
+        title: userMenuLinkTitles.logout,
+      },
+    ];
+  }
+  return [
+    {
+      url: `${configData.MARKETING_SITE_BASE_URL}/dashboard`,
+      title: userMenuLinkTitles.dashboard,
+    },
+    {
+      url: `${configData.MARKETING_SITE_BASE_URL}/profile/`,
+      title: userMenuLinkTitles.profile,
+    },
+    {
+      url: `${configData.MARKETING_SITE_BASE_URL}/account-settings/`,
+      title: userMenuLinkTitles.account,
+    },
+    {
+      url: `${configData.LMS_BASE_URL}/logout`,
+      title: userMenuLinkTitles.logout,
+    },
+  ];
+}
+
 const DesktopHeaderUserMenu = (widget) => {
+  const userMenu = getUserMenu();
   widget.content.menu = [
     {
       items: userMenu.map((item) => ({
@@ -94,6 +206,7 @@ const DesktopHeaderUserMenu = (widget) => {
 };
 
 const LearningHeaderUserMenu = (widget) => {
+  const userMenu = getUserMenu();
   widget.content.items = userMenu.map((item) => ({
     href: item.url,
     message: item.title,
@@ -101,150 +214,89 @@ const LearningHeaderUserMenu = (widget) => {
   return widget;
 };
 
-const footerSubSlotsConfig = {
-  "frontend.shell.footer.desktop.leftLinks.ui": {
-    plugins: [
-      { op: PLUGIN_OPERATIONS.Hide, widgetId: 'default_contents' },
-      {
-        op: PLUGIN_OPERATIONS.Insert,
-        widget: {
-          id: 'custom_logo',
-          type: DIRECT_PLUGIN,
-          RenderWidget: () => logo,
-        },
-      },
-    ],
-  },
-  "frontend.shell.footer.desktop.centerLinks.ui": {
-    plugins: [
-      { op: PLUGIN_OPERATIONS.Hide, widgetId: 'default_contents' },
-      {
-        op: PLUGIN_OPERATIONS.Insert,
-        widget: {
-          id: 'custom_menu_links',
-          type: DIRECT_PLUGIN,
-          RenderWidget: () => (
-            <MenuLinks menuItems={footerLegalLinks} />
-          ),
-        },
-      },
-    ],
-  },
-  "frontend.shell.footer.desktop.legalNotices.ui": {
-    plugins: [
-      { op: PLUGIN_OPERATIONS.Hide, widgetId: 'default_contents' },
-      {
-        op: PLUGIN_OPERATIONS.Insert,
-        widget: {
-          id: 'custom_legal_notice',
-          type: DIRECT_PLUGIN,
-          RenderWidget: () => (
-            <CopyrightNotice copyrightText={`© ${currentYear} ${copyRightText}`} />
-          ),
-        },
-      },
-    ],
-  },
-  "frontend.shell.footer.desktop.top.ui": {
-    plugins: [{ op: PLUGIN_OPERATIONS.Hide, widgetId: 'default_contents' }],
-  },
-  "frontend.shell.footer.desktop.rightLinks.ui": {
-    plugins: [{ op: PLUGIN_OPERATIONS.Hide, widgetId: 'default_contents' }],
-  },
-};
+const addUserMenuSlotOverride = (config) => {
+  const learningApps = ['learning', 'discussions', 'ora-grading', 'communications'];
+  const dashboardApps = ['gradebook', 'learner-dashboard'];
 
-const footerSlotConfig = {
-  plugins: [
-    { op: PLUGIN_OPERATIONS.Hide, widgetId: 'default_contents' },
-    {
-      op: PLUGIN_OPERATIONS.Insert,
-      widget: {
-        id: 'custom_footer',
-        type: DIRECT_PLUGIN,
-        RenderWidget: () => <Footer />,
+  if (learningApps.includes(CURRENT_MFE_APP_ID)) {
+
+    return {
+      ...config,
+      pluginSlots: {
+        ...config.pluginSlots,
+        [SLOT_IDS.header.learning_user_menu]: {
+          keepDefault: true,
+          plugins: [
+            {
+              op: PLUGIN_OPERATIONS.Modify,
+              widgetId: 'default_contents',
+              fn: LearningHeaderUserMenu,
+            },
+          ],
+        },
       },
-    },
-  ],
-};
+    }
+  }
+  else if (dashboardApps.includes(CURRENT_MFE_APP_ID)) {
+
+    return {
+      ...config,
+      pluginSlots: {
+        ...config.pluginSlots,
+        [SLOT_IDS.header.desktop_user_menu]: {
+          keepDefault: true,
+          plugins: [
+            {
+              op: PLUGIN_OPERATIONS.Modify,
+              widgetId: 'default_contents',
+              fn: DesktopHeaderUserMenu,
+            },
+          ],
+        },
+      },
+    }
+  }
+  return config;
+}
+
+const addLearningCourseInfoSlotOverride = (config) => {
+  if (isLearnCourse()) {
+  // Hiding the course org and number from the learning header in the UAI courses
+    config.pluginSlots = {
+      ...config.pluginSlots,
+      [SLOT_IDS.header.learning_course_info]: {
+        plugins: [
+          { op: PLUGIN_OPERATIONS.Hide, widgetId: 'default_contents' },
+          {
+            op: PLUGIN_OPERATIONS.Insert,
+            widget: {
+              id: 'custom_header_learning_course_info',
+              type: DIRECT_PLUGIN,
+              RenderWidget: ({ courseTitle }) => (
+                <div style={{ paddingTop: '14px', minWidth: 0 }}>
+                  <span className='d-block m-0 font-weight-bold course-title'>{courseTitle}</span>
+                </div>
+              ),
+            },
+          },
+        ],
+      },
+    };
+  }
+  return config;
+}
 
 let config = {
   ...process.env,
-  pluginSlots: footerSubSlotsConfig,
   // Override the proctoring info panel 'Review instructions and system requirements' link
   externalLinkUrlOverrides : {
-    "https://support.edx.org/hc/en-us/sections/115004169247-Taking-Timed-and-Proctored-Exams": "https://mitxonline.zendesk.com/hc/en-us/articles/4418223178651-What-is-the-Proctortrack-Onboarding-Exam",
+    'https://support.edx.org/hc/en-us/sections/115004169247-Taking-Timed-and-Proctored-Exams': 'https://mitxonline.zendesk.com/hc/en-us/articles/4418223178651-What-is-the-Proctortrack-Onboarding-Exam',
   },
 };
 
-// Additional plugin config based on MFE
-if (edxMfeAppName === authoringAppID) {
-  config = {
-    ...config,
-    pluginSlots: {
-      studio_footer_slot: footerSlotConfig,
-      ...config.pluginSlots,
-    },
-  };
-} else {
-  config = {
-    ...config,
-    pluginSlots: {
-      footer_slot: footerSlotConfig,
-      ...config.pluginSlots,
-    },
-  };
-}
-
-// Dynamic header menu slot overrides
-const learningApps = ["learning", "discussions", "ora-grading", "communications"];
-const dashboardApps = ["gradebook", "learner-dashboard"];
-
-if (learningApps.includes(edxMfeAppName)) {
-  config.pluginSlots.learning_user_menu_slot = {
-    keepDefault: true,
-    plugins: [
-      {
-        op: PLUGIN_OPERATIONS.Modify,
-        widgetId: 'default_contents',
-        fn: LearningHeaderUserMenu,
-      },
-    ],
-  };
-} else if (dashboardApps.includes(edxMfeAppName)) {
-  config.pluginSlots.desktop_user_menu_slot = {
-    keepDefault: true,
-    plugins: [
-      {
-        op: PLUGIN_OPERATIONS.Modify,
-        widgetId: 'default_contents',
-        fn: DesktopHeaderUserMenu,
-      },
-    ],
-  };
-}
-
-if (isLearnCourse) {
-  // Hiding the course org and number from the learning header in the UAI courses
-  config.pluginSlots = {
-    ...config.pluginSlots,
-    "org.openedx.frontend.layout.header_learning_course_info.v1": {
-      plugins: [
-        { op: PLUGIN_OPERATIONS.Hide, widgetId: 'default_contents' },
-        {
-          op: PLUGIN_OPERATIONS.Insert,
-          widget: {
-            id: 'custom_header_learning_course_info',
-            type: DIRECT_PLUGIN,
-            RenderWidget: ({ courseTitle }) => (
-              <div style={{ paddingTop: '14px', minWidth: 0 }}>
-                <span className="d-block m-0 font-weight-bold course-title">{courseTitle}</span>
-              </div>
-            ),
-          },
-        },
-      ],
-    },
-  };
-}
+config = addFooterSubSlotsOverride(config);
+config = addFooterSlotOverride(config);
+config = addLearningCourseInfoSlotOverride(config);
+config = addUserMenuSlotOverride(config);
 
 export default config;
