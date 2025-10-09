@@ -123,6 +123,7 @@ const ForceLoginRedirect = () => {
     if (
       config.APP_ID === "learning" &&
       allowedRedirects.some((name) => process.env.DEPLOYMENT_NAME?.includes(name)) &&
+      process.env.ENVIRONMENT_STAGE !== "Production" &&
       authenticatedUser === null
     ) {
       const destination = getLoginRedirectUrl(
