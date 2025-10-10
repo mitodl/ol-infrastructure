@@ -400,7 +400,11 @@ MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within
 MEDIA_URL: /media/
 MICROSITE_CONFIGURATION: {}
 MITX_REDIRECT_ENABLED: True
-MITX_REDIRECT_ALLOW_RE_LIST: ["^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/)", "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"]  # ADDED VALUE
+MITX_REDIRECT_ALLOW_RE_LIST: # ADDED VALUE
+  - "^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/)"
+  - "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"
+  - "^/courses/.*/courseware-navigation-sidebar/toggles$"
+  - "^/courses/.*/courseware-search/enabled$"
 MITXPRO_CORE_REDIRECT_ALLOW_RE_LIST: ["^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/)", "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"]  # ADDED VALUE
 MKTG_URLS:
     ROOT: https://{{ key "edxapp/marketing-domain" }}/
