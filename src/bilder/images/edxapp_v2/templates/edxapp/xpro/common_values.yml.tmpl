@@ -403,8 +403,8 @@ MITX_REDIRECT_ENABLED: True
 MITX_REDIRECT_ALLOW_RE_LIST: # ADDED VALUE
   - "^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/)"
   - "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"
-  - "^/courses/.*/courseware-navigation-sidebar/toggles$"
-  - "^/courses/.*/courseware-search/enabled$"
+  - "^/courses/.*/courseware-navigation-sidebar/toggles/?$"
+  - "^/courses/.*/courseware-search/enabled/?$"
 MITXPRO_CORE_REDIRECT_ALLOW_RE_LIST: ["^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/)", "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"]  # ADDED VALUE
 MKTG_URLS:
     ROOT: https://{{ key "edxapp/marketing-domain" }}/
