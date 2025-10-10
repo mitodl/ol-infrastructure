@@ -1,9 +1,5 @@
 packer {
   required_plugins {
-    ansible = {
-      source  = "github.com/hashicorp/ansible"
-      version = "~> 1"
-    }
     amazon = {
       source  = "github.com/hashicorp/amazon"
       version = "~> 1"
@@ -38,11 +34,6 @@ variable "business_unit" {
 variable "node_type" {
   type    = string
   default = "server"
-}
-
-variable "ol_ansible_branch" {
-  type    = string
-  default = "md/issue_2326"
 }
 
 source "amazon-ebs" "xqwatcher" {
@@ -115,7 +106,7 @@ build {
     ]
   }
 
-  # Run the pre-ansible configuration / setup via py-infra
+  # Run setup via py-infra
   provisioner "shell-local" {
     environment_vars = [
       "DEPLOYMENT=${var.deployment}"
