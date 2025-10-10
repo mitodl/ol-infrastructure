@@ -681,7 +681,7 @@ for location in code_locations:
         "name": name.replace("_", "-"),
         "image": {
             "repository": f"mitodl/dagster-{name}",
-            "tag": image_tag_or_digest,
+            "tag": "latest",  # image_tag_or_digest,
             "pullPolicy": "Always",
         },
         "dagsterApiGrpcArgs": [
