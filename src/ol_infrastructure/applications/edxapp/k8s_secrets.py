@@ -24,6 +24,7 @@ class EdxappSecrets:
     general: Output
     xqueue: OLVaultK8SSecret
     forum: OLVaultK8SSecret
+    learn_ai_canvas_syllabus_token: OLVaultK8SSecret
     cms_oauth: OLVaultK8SSecret
     lms_oauth: OLVaultK8SSecret
 
@@ -34,6 +35,7 @@ class EdxappSecrets:
     general_secrets_name: str
     xqueue_secret_name: str
     forum_secret_name: str
+    learn_ai_canvas_syllabus_token_secret_name: str
     cms_oauth_secret_name: str
     lms_oauth_secret_name: str
 
@@ -250,7 +252,7 @@ def create_k8s_secrets(
                           JWT_AUTH_COOKIE: {stack_info.env_prefix}-{stack_info.env_suffix}-edx-jwt-cookie
                           JWT_AUTH_COOKIE_HEADER_PAYLOAD: {stack_info.env_prefix}-{stack_info.env_suffix}-edx-jwt-cookie-header-payload
                           JWT_AUTH_COOKIE_SIGNATURE: {stack_info.env_prefix}-{stack_info.env_suffix}-edx-jwt-cookie-signature
-                          JWT_ISSUER: 'https://{edxapp_config.require_object("domains")["lms"]}/oauth2'
+                          JWT_ISSUER: 'https://{edxapp_config.require_object("domains")["lms"]}/oauth3'
                           JWT_LOGIN_CLIENT_ID: login-service-client-id
                           JWT_LOGIN_SERVICE_USERNAME: login_service_user
                           JWT_PRIVATE_SIGNING_JWK: '{{{{ get .Secrets "private_signing_jwk" }}}}'
@@ -336,6 +338,32 @@ def create_k8s_secrets(
         ),
     )
 
+    learn_ai_canvas_syllabus_token_secret_name = (
+        "13-canvas-syllabus-token-yaml"  # pragma: allowlist secret
+    )
+    learn_ai_canvas_syllabus_token_secret_secret = OLVaultK8SSecret(
+        f"ol-{stack_info.env_prefix}-edxapp-learn-ai-canvas-syllabus-token-secret-{stack_info.env_suffix}",
+        OLVaultK8SStaticSecretConfig(
+            name=forum_secret_name,
+            namespace=namespace,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=forum_secret_name,
+            labels=k8s_global_labels,
+            mount="secret-global",
+            mount_type="kv-v2",
+            path="learn_ai",
+            templates={
+                "13-canvas-syllabus-token-secrets.yaml": textwrap.dedent("""
+                        COMMENTS_SERVICE_KEY: {{ get .Secrets "canvas_syllabus_token" }}
+                    """),
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True, depends_on=[vault_k8s_resources]
+        ),
+    )
+
     cms_oauth_secret_name = "70-cms-oauth-credentials-yaml"  # pragma: allowlist secret
     cms_oauth_secret = OLVaultK8SSecret(
         f"ol-{stack_info.env_prefix}-edxapp-cms-oauth-secret-{stack_info.env_suffix}",
@@ -394,6 +422,7 @@ def create_k8s_secrets(
         general=general_secrets_secret,
         xqueue=xqueue_secret_secret,
         forum=forum_secret_secret,
+        learn_ai_canvas_syllabus_token=learn_ai_canvas_syllabus_token_secret_secret,
         cms_oauth=cms_oauth_secret,
         lms_oauth=lms_oauth_secret,
         db_creds_secret_name=db_creds_secret_name,
@@ -403,6 +432,7 @@ def create_k8s_secrets(
         general_secrets_name=general_secrets_name,
         xqueue_secret_name=xqueue_secret_name,
         forum_secret_name=forum_secret_name,
+        learn_ai_canvas_syllabus_token_secret_name=learn_ai_canvas_syllabus_token_secret_name,
         cms_oauth_secret_name=cms_oauth_secret_name,
         lms_oauth_secret_name=lms_oauth_secret_name,
     )

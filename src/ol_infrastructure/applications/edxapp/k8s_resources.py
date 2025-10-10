@@ -503,6 +503,7 @@ def create_k8s_resources(
         secrets.general_secrets_name: secrets.general,
         secrets.xqueue_secret_name: secrets.xqueue,
         secrets.forum_secret_name: secrets.forum,
+        secrets.learn_ai_canvas_syllabus_token_secret_name: secrets.learn_ai_canvas_syllabus_token,
         configmaps.general_config_name: configmaps.general,
         configmaps.interpolated_config_name: configmaps.interpolated,
         # Just LMS specific resources below this line
