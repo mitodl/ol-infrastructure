@@ -2,7 +2,7 @@
 
 This deployment uses:
 - The official Dagster Helm chart for the control plane (webserver, daemon)
-- The mitodl/mono-dagster image for user code deployments
+- Individual Dagster code location images for user code deployments
 - The data EKS cluster
 - Existing RDS PostgreSQL instance for Dagster's metadata storage
 - S3 for compute logs and I/O manager storage
@@ -10,10 +10,11 @@ This deployment uses:
 - APISix ingress with OpenID Connect for authentication
 """
 
+import os
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi.config import get_config
 from pulumi_aws import ec2, get_caller_identity, s3
 
@@ -627,7 +628,7 @@ dagster_helm_release = kubernetes.helm.v3.Release(
     ),
 )
 
-# Deploy Dagster user code separately
+# Deploy Dagster user code separately - one deployment per code location
 dagster_user_code_service_account = kubernetes.core.v1.ServiceAccount(
     f"dagster-user-code-service-account-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -640,62 +641,108 @@ dagster_user_code_service_account = kubernetes.core.v1.ServiceAccount(
     ),
 )
 
-dagster_user_code_values = {
-    "deployments": [
-        {
-            "name": "user-code",
-            "image": {
-                "repository": dagster_config.get("docker_repo_name")
-                or "mitodl/mono-dagster",
-                "tag": dagster_config.get("docker_image_tag") or "latest",
-                "pullPolicy": "Always",
+# Define all code locations based on ol-data-platform structure
+code_locations: list[dict[str, str | int]] = [
+    {"name": "canvas", "module": "canvas.definitions", "port": 4000},
+    {"name": "data_platform", "module": "data_platform.definitions", "port": 4001},
+    {"name": "edxorg", "module": "edxorg.definitions", "port": 4002},
+    {"name": "lakehouse", "module": "lakehouse.definitions", "port": 4003},
+    {
+        "name": "learning_resources",
+        "module": "learning_resources.definitions",
+        "port": 4004,
+    },
+    {"name": "legacy_openedx", "module": "legacy_openedx.definitions", "port": 4005},
+    {"name": "openedx", "module": "openedx.definitions", "port": 4006},
+]
+
+# Build deployments list for user code
+deployments = []
+for location in code_locations:
+    name: str = location["name"]  # type: ignore[assignment]
+    module: str = location["module"]  # type: ignore[assignment]
+    port: int = location["port"]  # type: ignore[assignment]
+
+    # Get image digest from environment variable set by Concourse pipeline
+    env_var_name = f"DAGSTER_{name.upper()}_IMAGE_DIGEST"
+    image_digest = os.environ.get(env_var_name)
+
+    # Construct image reference - use digest if available, otherwise use tag
+    if image_digest:
+        # When using digest, the full image reference is repository@digest
+        image_tag_or_digest = f"@{image_digest}"
+        current_image_ref = f"mitodl/dagster-{name}@{image_digest}"
+    else:
+        # Fallback to tag-based reference
+        image_tag_or_digest = dagster_config.get("docker_image_tag") or "latest"
+        current_image_ref = f"mitodl/dagster-{name}:{image_tag_or_digest}"
+
+    deployment = {
+        "name": name,
+        "image": {
+            "repository": f"mitodl/dagster-{name}",
+            "tag": image_tag_or_digest,
+            "pullPolicy": "Always",
+        },
+        "dagsterApiGrpcArgs": [
+            "-m",
+            module,
+        ],
+        "port": port,
+        "annotations": dagster_auth_binding.irsa_role.arn.apply(
+            lambda arn: {
+                "eks.amazonaws.com/role-arn": arn,
+            }
+        ),
+        "resources": {
+            "requests": {
+                "cpu": "500m",
+                "memory": "1Gi",
             },
-            "dagsterApiGrpcArgs": [
-                "-m",
-                "dagster_user_code",
-            ],
-            "port": 3030,
-            "annotations": dagster_auth_binding.irsa_role.arn.apply(
-                lambda arn: {
-                    "eks.amazonaws.com/role-arn": arn,
-                }
-            ),
-            "resources": {
-                "requests": {
-                    "cpu": "1000m",
-                    "memory": "2Gi",
-                },
-                "limits": {
-                    "cpu": "4000m",
-                    "memory": "8Gi",
-                },
+            "limits": {
+                "cpu": "2000m",
+                "memory": "4Gi",
             },
-            "env": [
-                {
-                    "name": "DAGSTER_CURRENT_IMAGE",
-                    "value": Output.concat(
-                        dagster_config.get("docker_repo_name") or "mitodl/mono-dagster",
-                        ":",
-                        dagster_config.get("docker_image_tag") or "latest",
-                    ),
-                },
-                {
-                    "name": "DAGSTER_SENSOR_GRPC_TIMEOUT_SECONDS",
-                    "value": "300",
-                },
-                {"name": "DAGSTER_PG_HOST", "value": dagster_db.db_instance.address},
-                {"name": "DAGSTER_PG_DB", "value": "dagster"},
-                {"name": "DAGSTER_BUCKET_NAME", "value": dagster_bucket_name},
-                {"name": "DAGSTER_ENVIRONMENT", "value": stack_info.env_suffix},
-                {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
-            ],
-            "envSecrets": [
-                {"name": "dagster-static-secrets"},
-                {"name": "dagster-dbt-secrets"},
-                {"name": "dagster-postgresql-secret"},
-            ],
+        },
+        "env": [
+            {
+                "name": "DAGSTER_CURRENT_IMAGE",
+                "value": current_image_ref,
+            },
+            {
+                "name": "DAGSTER_SENSOR_GRPC_TIMEOUT_SECONDS",
+                "value": "300",
+            },
+            {"name": "DAGSTER_PG_HOST", "value": dagster_db.db_instance.address},
+            {"name": "DAGSTER_PG_DB", "value": "dagster"},
+            {"name": "DAGSTER_BUCKET_NAME", "value": dagster_bucket_name},
+            {"name": "DAGSTER_ENVIRONMENT", "value": stack_info.env_suffix},
+            {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
+        ],
+        "envSecrets": [
+            {"name": "dagster-static-secrets"},
+            {"name": "dagster-dbt-secrets"},
+            {"name": "dagster-postgresql-secret"},
+        ],
+    }
+
+    # Add higher resources for lakehouse deployment (runs dbt)
+    if name == "lakehouse":
+        deployment["resources"] = {
+            "requests": {
+                "cpu": "1000m",
+                "memory": "2Gi",
+            },
+            "limits": {
+                "cpu": "4000m",
+                "memory": "8Gi",
+            },
         }
-    ],
+
+    deployments.append(deployment)
+
+dagster_user_code_values = {
+    "deployments": deployments,
 }
 
 dagster_user_code_release = kubernetes.helm.v3.Release(

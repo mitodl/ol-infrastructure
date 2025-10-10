@@ -1,7 +1,7 @@
 import sys
 
 from ol_concourse.lib.containers import container_build_task
-from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
+from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
@@ -19,39 +19,56 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resources import git_repo, registry_image
 from ol_concourse.pipelines.constants import (
-    PACKER_WATCHED_PATHS,
     PULUMI_CODE_PATH,
     PULUMI_WATCHED_PATHS,
 )
 
 
 def build_dagster_docker_pipeline() -> Pipeline:
-    data_platform_branch = "main"
-    data_platform_repo = git_repo(
-        Identifier("ol-data-platform"),
-        uri="https://github.com/mitodl/ol-data-platform",
-        branch=data_platform_branch,
-    )
+    data_platform_branch = "dagster_dg_restructuring"
 
-    mono_dagster_image = registry_image(
-        name=Identifier("mono-dagster-image"),
-        image_repository="mitodl/mono-dagster",
-        username="((dockerhub.username))",
-        password="((dockerhub.password))",  # noqa: S106
-    )
-    packer_code_branch = "main"
-    packer_code = git_repo(
-        name=Identifier("ol-infrastructure-packer"),
-        uri="https://github.com/mitodl/ol-infrastructure",
-        paths=[
-            *PACKER_WATCHED_PATHS,
-            "src/bilder/components/",
-            "src/bilder/images/dagster/",
-        ],
-        branch=packer_code_branch,
-    )
+    # Define all code location images based on docker-compose.yaml
+    code_locations = [
+        {"name": "canvas", "module": "canvas.definitions"},
+        {"name": "data_platform", "module": "data_platform.definitions"},
+        {"name": "edxorg", "module": "edxorg.definitions"},
+        {"name": "lakehouse", "module": "lakehouse.definitions"},
+        {"name": "learning_resources", "module": "learning_resources.definitions"},
+        {"name": "legacy_openedx", "module": "legacy_openedx.definitions"},
+        {"name": "openedx", "module": "openedx.definitions"},
+    ]
 
-    pulumi_code_branch = "main"
+    # Create git resources for each code location with specific path filters
+    code_location_repos = {}
+    for location in code_locations:
+        name = location["name"]
+        paths = [
+            f"dg_projects/{name}/",
+            "packages/ol-orchestrate-lib/",
+        ]
+        # Lakehouse also needs the dbt project
+        if name == "lakehouse":
+            paths.append("src/ol_dbt/")
+
+        code_location_repos[name] = git_repo(
+            name=Identifier(f"ol-data-platform-{name}"),
+            uri="https://github.com/mitodl/ol-data-platform",
+            branch=data_platform_branch,
+            paths=paths,
+        )
+
+    # Create registry image resources for each code location
+    code_location_images = {}
+    for location in code_locations:
+        name = location["name"]
+        code_location_images[name] = registry_image(
+            name=Identifier(f"dagster-{name}-image"),
+            image_repository=f"mitodl/dagster-{name}",
+            username="((dockerhub.username))",
+            password="((dockerhub.password))",  # noqa: S106
+        )
+
+    pulumi_code_branch = "dagster_helm"
     pulumi_code = git_repo(
         name=Identifier("ol-infrastructure-pulumi"),
         uri="https://github.com/mitodl/ol-infrastructure",
@@ -59,106 +76,117 @@ def build_dagster_docker_pipeline() -> Pipeline:
         branch=pulumi_code_branch,
     )
 
-    docker_build_job = Job(
-        name="build-mono-dagster-image",
-        plan=[
-            GetStep(
-                get=data_platform_repo.name,
-                trigger=True,
-                params={"skip_download": True},
-            ),
-            container_build_task(
-                inputs=[Input(name=data_platform_repo.name)],
-                build_parameters={
-                    "CONTEXT": data_platform_repo.name,
-                    "DOCKERFILE": f"{data_platform_repo.name}/dockerfiles/orchestrate/Dockerfile.global",  # noqa: E501
+    # Create build jobs for each code location
+    docker_build_jobs = []
+    for location in code_locations:
+        name = location["name"]
+        repo = code_location_repos[name]
+        image = code_location_images[name]
+
+        # Determine if this location needs DBT secrets (lakehouse requires it)
+        needs_dbt_secrets = name == "lakehouse"
+
+        build_params = {
+            "CONTEXT": repo.name,
+            "DOCKERFILE": f"{repo.name}/dg_projects/{name}/Dockerfile",
+        }
+
+        if needs_dbt_secrets:
+            build_params.update(
+                {
                     "BUILDKIT_SECRETTEXT_dbt_trino_username": "((dbt.trino_username))",
                     "BUILDKIT_SECRETTEXT_dbt_trino_password": "((dbt.trino_password))",
-                },
-                build_args=[],
-            ),
-            TaskStep(
-                task=Identifier("collect-tags"),
-                config=TaskConfig(
-                    platform=Platform.linux,
-                    inputs=[Input(name=data_platform_repo.name)],
-                    outputs=[Output(name="tags")],
-                    image_resource=AnonymousResource(
-                        type="registry-image",
-                        source={
-                            "repository": "mitodl/ol-infrastructure",
-                            "tag": "latest",
-                        },
-                    ),
-                    run=Command(
-                        path="sh",
-                        user="root",
-                        args=[
-                            "-exc",
-                            f"""ls -ltrha;
-                            ls -lthra ../;
-                            egrep -A1 "^name = \\"dagster\\"$" {data_platform_repo.name}/poetry.lock | tail -n 1 | cut -d'"' -f2 >> tags/collected_tags;
-                            echo " " >> tags/collected_tags;
-                            cat ./{data_platform_repo.name}/.git/describe_ref >> tags/collected_tags;""",  # noqa: E501
-                        ],
+                }
+            )
+
+        docker_build_job = Job(
+            name=f"build-dagster-{name}-image",
+            plan=[
+                GetStep(
+                    get=repo.name,
+                    trigger=True,
+                    params={"skip_download": True},
+                ),
+                container_build_task(
+                    inputs=[Input(name=repo.name)],
+                    build_parameters=build_params,
+                    build_args=[],
+                ),
+                TaskStep(
+                    task=Identifier("collect-tags"),
+                    config=TaskConfig(
+                        platform=Platform.linux,
+                        inputs=[Input(name=repo.name)],
+                        outputs=[Output(name="tags")],
+                        image_resource=AnonymousResource(
+                            type="registry-image",
+                            source={
+                                "repository": "mitodl/ol-infrastructure",
+                                "tag": "latest",
+                            },
+                        ),
+                        run=Command(
+                            path="sh",
+                            user="root",
+                            args=[
+                                "-exc",
+                                rf"""ls -ltrha;
+                                ls -lthra ../;
+                                grep -oP '^version = "\K(\d+\.\d+\.\d+)' {repo.name}/dg_projects/{name}/pyproject.toml >> tags/collected_tags;
+                                echo " " >> tags/collected_tags;
+                                cat ./{repo.name}/.git/describe_ref >> tags/collected_tags;""",  # noqa: E501
+                            ],
+                        ),
                     ),
                 ),
-            ),
-            PutStep(
-                put=mono_dagster_image.name,
-                inputs="all",
-                params={
-                    "image": "image/image.tar",
-                    "additional_tags": "tags/collected_tags",
-                },
-            ),
-        ],
-    )
+                PutStep(
+                    put=image.name,
+                    inputs="all",
+                    params={
+                        "image": "image/image.tar",
+                        "additional_tags": "tags/collected_tags",
+                    },
+                ),
+            ],
+        )
+        docker_build_jobs.append(docker_build_job)
 
-    packer_fragment = packer_jobs(
-        dependencies=[
-            GetStep(
-                get=mono_dagster_image.name,
-                trigger=True,
-                passed=[docker_build_job.name],
-            )
-        ],
-        image_code=packer_code,
-        packer_template_path="src/bilder/images/dagster/dagster.pkr.hcl",
-        env_vars_from_files={
-            "DOCKER_REPO_NAME": f"{mono_dagster_image.name}/repository",
-            "DOCKER_IMAGE_DIGEST": f"{mono_dagster_image.name}/digest",
-        },
-        extra_packer_params={
-            "only": ["amazon-ebs.dagster"],
-        },
-    )
+    # Collect env vars from all code location images for Pulumi
+    pulumi_env_vars = {}
+    for location in code_locations:
+        name = location["name"]
+        image = code_location_images[name]
+        env_var_name = f"DAGSTER_{name.upper()}_IMAGE_DIGEST"
+        pulumi_env_vars[env_var_name] = f"{image.name}/digest"
+
+    # Get dependencies - trigger Pulumi when all images are built
+    pulumi_dependencies = [
+        GetStep(
+            get=image.name,
+            trigger=True,
+            passed=[f"build-dagster-{name}-image"],
+        )
+        for name, image in code_location_images.items()
+    ]
 
     pulumi_fragment = pulumi_jobs_chain(
         pulumi_code,
         stack_names=[f"applications.dagster.{stage}" for stage in ("QA", "Production")],
         project_name="ol-infrastructure-dagster-server",
         project_source_path=PULUMI_CODE_PATH.joinpath("applications/dagster/"),
-        dependencies=[
-            GetStep(
-                get=packer_fragment.resources[-1].name,
-                trigger=True,
-                passed=[packer_fragment.jobs[-1].name],
-            ),
-        ],
+        dependencies=pulumi_dependencies,
+        env_vars_from_files=pulumi_env_vars,
     )
 
     combined_fragment = PipelineFragment(
-        resource_types=packer_fragment.resource_types + pulumi_fragment.resource_types,
+        resource_types=pulumi_fragment.resource_types,
         resources=[
-            data_platform_repo,
-            mono_dagster_image,
-            packer_code,
+            *code_location_repos.values(),
+            *code_location_images.values(),
             pulumi_code,
-            *packer_fragment.resources,
             *pulumi_fragment.resources,
         ],
-        jobs=[docker_build_job, *packer_fragment.jobs, *pulumi_fragment.jobs],
+        jobs=[*docker_build_jobs, *pulumi_fragment.jobs],
     )
 
     return Pipeline(
