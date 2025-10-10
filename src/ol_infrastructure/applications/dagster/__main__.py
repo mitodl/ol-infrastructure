@@ -678,7 +678,7 @@ for location in code_locations:
         current_image_ref = f"mitodl/dagster-{name}:{image_tag_or_digest}"
 
     deployment = {
-        "name": name,
+        "name": name.replace("_", "-"),
         "image": {
             "repository": f"mitodl/dagster-{name}",
             "tag": image_tag_or_digest,
