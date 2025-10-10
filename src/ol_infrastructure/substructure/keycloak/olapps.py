@@ -72,12 +72,12 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         security_defenses=keycloak.RealmSecurityDefensesArgs(
             brute_force_detection=keycloak.RealmSecurityDefensesBruteForceDetectionArgs(
                 failure_reset_time_seconds=43200,
-                max_failure_wait_seconds=900,
+                max_failure_wait_seconds=3600,
                 max_login_failures=10,
                 minimum_quick_login_wait_seconds=60,
                 permanent_lockout=True,
-                quick_login_check_milli_seconds=1000,
-                wait_increment_seconds=60,
+                quick_login_check_milli_seconds=700,
+                wait_increment_seconds=300,
             ),
             headers=keycloak.RealmSecurityDefensesHeadersArgs(
                 content_security_policy=(
