@@ -34,6 +34,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResourcesConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
+    cached_image_uri,
     check_cluster_namespace,
     default_psg_egress_args,
     get_default_psg_ingress_args,
@@ -308,7 +309,7 @@ def create_k8s_resources(
     ############################################
     # Setup an init container that downloads and extracts the staticfiles
     ############################################
-    edxapp_image = f"610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/edxapp@{EDXAPP_DOCKER_IMAGE_DIGEST}"
+    edxapp_image = cached_image_uri(f"mitodl/edxapp@{EDXAPP_DOCKER_IMAGE_DIGEST}")
     production_staticfiles_archive_name = (
         f"staticfiles-production-{EDXAPP_DOCKER_IMAGE_DIGEST}.tar.gz"
     )
@@ -348,7 +349,7 @@ def create_k8s_resources(
 
     staticfiles_init_container = kubernetes.core.v1.ContainerArgs(
         name="staticfiles-downloader",
-        image="busybox:1.35",
+        image=cached_image_uri("busybox:1.35"),
         command=staticfiles_init_container_command,
         volume_mounts=staticfiles_volume_mounts,
     )
@@ -396,7 +397,7 @@ def create_k8s_resources(
     ) -> kubernetes.core.v1.ContainerArgs:
         return kubernetes.core.v1.ContainerArgs(
             name="config-aggregator",
-            image="busybox:1.35",
+            image=cached_image_uri("busybox:1.35"),
             command=["/bin/sh", "-c"],
             args=[
                 f"cat /openedx/config-sources/*/*.yaml > /openedx/config/{service}.env.yml"
