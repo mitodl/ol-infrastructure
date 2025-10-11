@@ -40,7 +40,7 @@ EFS_CSI_DRIVER_VERSION = "v2.1.6-eksbuild.1"
 # renovate: datasource=helm depName=external-dns packageName=external-dns
 EXTERNAL_DNS_CHART_VERSION = "1.15.0"
 # renovate: datasource=github-releases depName=gateway-api packageName=kubernetes-sigs/gateway-api
-GATEWAY_API_VERSION = "v1.3.0"
+GATEWAY_API_VERSION = "v1.4.0"
 # renovate: datasource=docker depName=karpenter packageName=public.ecr.aws/karpenter/karpenter
 KARPENTER_CHART_VERSION = "1.7.1"
 # renoavate: datasource=helm depName=keda registryUrl=https://kedacore.github.io/charts packageName=keda
