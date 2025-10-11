@@ -15,6 +15,6 @@ ol-openedx-sentry
 ol-social-auth
 openedx-scorm-xblock
 pydantic-settings==2.11.0
-uwsgi==2.0.30
+uwsgi==2.0.31
 wheel==0.45.1
 ol-openedx-chat
