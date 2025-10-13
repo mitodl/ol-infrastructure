@@ -751,6 +751,46 @@ dagster_user_code_service_account = kubernetes.core.v1.ServiceAccount(
     ),
 )
 
+dagster_user_code_cluster_role_binding = kubernetes.rbac.v1.ClusterRoleBinding(
+    f"dagster-user-code-cluster-role-binding-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-user-code:cluster-auth",
+        labels=k8s_global_labels.model_dump(),
+    ),
+    role_ref=kubernetes.rbac.v1.RoleRefArgs(
+        api_group="rbac.authorization.k8s.io",
+        kind="ClusterRole",
+        name="system:auth-delegator",
+    ),
+    subjects=[
+        kubernetes.rbac.v1.SubjectArgs(
+            kind="ServiceAccount",
+            name="dagster-user-code",
+            namespace=dagster_namespace,
+        ),
+    ],
+)
+
+dagster_user_code_cluster_role_binding = kubernetes.rbac.v1.ClusterRoleBinding(
+    f"dagster-user-code-helm-cluster-role-binding-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-user-code-helm-sa:cluster-auth",
+        labels=k8s_global_labels.model_dump(),
+    ),
+    role_ref=kubernetes.rbac.v1.RoleRefArgs(
+        api_group="rbac.authorization.k8s.io",
+        kind="ClusterRole",
+        name="system:auth-delegator",
+    ),
+    subjects=[
+        kubernetes.rbac.v1.SubjectArgs(
+            kind="ServiceAccount",
+            name="dagster-user-code-dagster-user-deployments-user-deployments",
+            namespace=dagster_namespace,
+        ),
+    ],
+)
+
 dagster_user_code_values = {
     "deployments": deployments,
 }
@@ -774,6 +814,7 @@ dagster_user_code_release = kubernetes.helm.v3.Release(
             dagster_dbt_secrets,
             dagster_db_secret,
             dagster_user_code_service_account,
+            dagster_user_code_cluster_role_binding,
             dagster_helm_release,
         ]
     ),

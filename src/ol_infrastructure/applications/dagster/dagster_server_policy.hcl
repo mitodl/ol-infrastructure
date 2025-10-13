@@ -94,7 +94,6 @@ path "secret-xpro/mongodb-forum/*" {
 path "secret-xpro/mongodb-forum" {
   capabilities = ["read"]
 }
-
 path "secret-operations/data/institutional-research-bigquery-service-account" {
   capabilities = ["read"]
 }
