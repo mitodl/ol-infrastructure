@@ -139,7 +139,7 @@ superset_app = OLEKSAuthBinding(
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
         irsa_service_account_name="superset",
-        vault_sync_service_account_name="superset-vault",
+        vault_sync_service_account_names="superset-vault",
         k8s_labels=k8s_labels,
     )
 )

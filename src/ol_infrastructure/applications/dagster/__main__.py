@@ -364,7 +364,12 @@ dagster_auth_binding = OLEKSAuthBinding(
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
         irsa_service_account_name="dagster",
-        vault_sync_service_account_name="dagster-vault",
+        vault_sync_service_account_names=[
+            "dagster",
+            "dagster-vault",
+            "dagster-user-code",
+            "dagster-user-code-dagster-user-deployments-user-deployments",
+        ],
         k8s_labels=k8s_global_labels,
         parliament_config=parliament_config,
     )
@@ -526,10 +531,6 @@ for location in code_locations:
         },
         "env": [
             {
-                "name": "DAGSTER_CURRENT_IMAGE",
-                "value": current_image_ref,
-            },
-            {
                 "name": "DAGSTER_SENSOR_GRPC_TIMEOUT_SECONDS",
                 "value": "300",
             },
@@ -538,6 +539,7 @@ for location in code_locations:
             {"name": "DAGSTER_BUCKET_NAME", "value": dagster_bucket_name},
             {"name": "DAGSTER_ENVIRONMENT", "value": stack_info.env_suffix},
             {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
+            {"name": "DAGSTER_VAULT_ROLE", "value": "dagster"},
         ],
         "envSecrets": [
             {"name": "dagster-static-secrets"},

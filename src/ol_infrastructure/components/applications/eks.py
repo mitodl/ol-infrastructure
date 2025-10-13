@@ -39,8 +39,9 @@ class OLEKSAuthBindingConfig(BaseModel):
     vault_auth_endpoint: Output[str]
     # Name of the k8s service account that will be used for IRSA
     irsa_service_account_name: str
-    # Name of the k8s service account used for vault secret sync
-    vault_sync_service_account_name: str = "vault-secrets"
+    # Name(s) of the k8s service account(s) used for vault secret sync
+    # Can be a single string or a list of strings
+    vault_sync_service_account_names: str | list[str] = "vault-secrets"
     # Labels to apply to k8s resources created by the component
     k8s_labels: K8sGlobalLabels
     # Optional parliament config for IAM policy linting
@@ -124,11 +125,18 @@ class OLEKSAuthBinding(ComponentResource):
             opts=ResourceOptions(parent=self),
         )
 
+        # Convert service account names to list if it's a single string
+        service_account_names = (
+            [config.vault_sync_service_account_names]
+            if isinstance(config.vault_sync_service_account_names, str)
+            else config.vault_sync_service_account_names
+        )
+
         k8s_auth_backend_role = vault_kubernetes.AuthBackendRole(
             f"{config.application_name}-k8s-vault-auth-backend-role-{config.stack_info.env_suffix}",
             role_name=config.application_name,
             backend=config.vault_auth_endpoint,
-            bound_service_account_names=[config.vault_sync_service_account_name],
+            bound_service_account_names=service_account_names,
             bound_service_account_namespaces=[config.namespace],
             token_policies=[vault_policy.name],
             opts=ResourceOptions(parent=self),
@@ -141,7 +149,7 @@ class OLEKSAuthBinding(ComponentResource):
             vault_address=Config("vault").require("address"),
             vault_auth_endpoint=config.vault_auth_endpoint,
             vault_auth_role_name=k8s_auth_backend_role.role_name,
-            service_account_name=config.vault_sync_service_account_name,
+            service_account_name=service_account_names[0],
         )
         self.vault_k8s_resources = OLVaultK8SResources(
             resource_config=vault_k8s_resources_config,
