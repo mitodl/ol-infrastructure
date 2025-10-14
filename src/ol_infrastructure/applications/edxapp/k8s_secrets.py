@@ -252,7 +252,7 @@ def create_k8s_secrets(
                           JWT_AUTH_COOKIE: {stack_info.env_prefix}-{stack_info.env_suffix}-edx-jwt-cookie
                           JWT_AUTH_COOKIE_HEADER_PAYLOAD: {stack_info.env_prefix}-{stack_info.env_suffix}-edx-jwt-cookie-header-payload
                           JWT_AUTH_COOKIE_SIGNATURE: {stack_info.env_prefix}-{stack_info.env_suffix}-edx-jwt-cookie-signature
-                          JWT_ISSUER: 'https://{edxapp_config.require_object("domains")["lms"]}/oauth3'
+                          JWT_ISSUER: 'https://{edxapp_config.require_object("domains")["lms"]}/oauth2'
                           JWT_LOGIN_CLIENT_ID: login-service-client-id
                           JWT_LOGIN_SERVICE_USERNAME: login_service_user
                           JWT_PRIVATE_SIGNING_JWK: '{{{{ get .Secrets "private_signing_jwk" }}}}'
