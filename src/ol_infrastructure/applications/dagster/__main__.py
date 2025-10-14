@@ -638,25 +638,6 @@ for location in code_locations:
         deployment["env"].append(
             {"name": "AWS_CONFIG_FILE", "value": "/etc/aws/config"}
         )
-
-    # Add pipeline configuration files for legacy_openedx deployment
-    if name == "legacy_openedx":
-        deployment["volumes"] = [
-            {
-                "name": "pipeline-configs",
-                "secret": {
-                    "secretName": "dagster-edxorg-gcp-secrets"  # pragma: allowlist secret  # noqa: E501
-                },
-            }
-        ]
-        deployment["volumeMounts"] = [
-            {
-                "name": "pipeline-configs",
-                "mountPath": "/etc/dagster",
-                "readOnly": True,
-            }
-        ]
-
     deployments.append(deployment)
 
 # Custom Dagster instance ConfigMap with dynamic credentials support
