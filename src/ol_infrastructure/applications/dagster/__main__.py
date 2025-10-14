@@ -470,16 +470,23 @@ dagster_oidc_resources = OLApisixOIDCResources(
     opts=ResourceOptions(depends_on=[dagster_auth_binding]),
 )
 
+
 # Create ConfigMap for AWS profile configuration to handle cross-account access This
-# allows the edxorg code location to assume a role in the edX.org AWS account
-# For EKS with IRSA, we use Environment as the credential_source, which will pick up the
-# IRSA credentials from environment variables (AWS_WEB_IDENTITY_TOKEN_FILE,
-# AWS_ROLE_ARN)
-aws_config_content = """[profile edxorg]
+# allows the edxorg code location to assume a role in the edX.org AWS account For EKS
+# with IRSA, the default profile specifies the IRSA role ARN and web identity token
+# file. The edxorg profile then uses those credentials to assume the cross-account role.
+def create_aws_config(irsa_role_arn: str) -> str:
+    return f"""[default]
+region = us-east-1
+web_identity_token_file = /var/run/secrets/eks.amazonaws.com/serviceaccount/token
+role_arn = {irsa_role_arn}
+
+[profile edxorg]
 role_arn = arn:aws:iam::708756755355:role/mit-s3-edx-program-reports-access
 role_session_name = replicate-program-credentials-reports
-credential_source = Environment
+source_profile = default
 """
+
 
 aws_profile_configmap = kubernetes.core.v1.ConfigMap(
     f"dagster-aws-profile-config-{stack_info.env_suffix}",
@@ -489,7 +496,7 @@ aws_profile_configmap = kubernetes.core.v1.ConfigMap(
         labels=k8s_global_labels.model_dump(),
     ),
     data={
-        "config": aws_config_content,
+        "config": dagster_auth_binding.irsa_role.arn.apply(create_aws_config),
     },
 )
 
