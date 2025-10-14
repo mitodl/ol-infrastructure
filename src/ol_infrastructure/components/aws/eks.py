@@ -339,7 +339,7 @@ class OLEKSTrustRole(pulumi.ComponentResource):
 
         self.__service_account_identifier = (
             role_config.service_account_identifier
-            or f"system.serviceaccount:{role_config.service_account_namespace}:{role_config.service_account_name}"  # noqa: E501
+            or f"system:serviceaccount:{role_config.service_account_namespace}:{role_config.service_account_name}"  # noqa: E501
         )
         self.role = aws.iam.Role(
             f"{role_config.cluster_name}-{role_config.role_name}-trust-role",
