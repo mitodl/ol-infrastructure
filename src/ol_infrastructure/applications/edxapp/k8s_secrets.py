@@ -273,7 +273,7 @@ def create_k8s_secrets(
                           'proctortrack':
                             'client_id': '{{{{ get .Secrets "proctortrack_client_id" }}}}'
                             'client_secret': '{{{{ get .Secrets "proctortrack_client_secret" }}}}'
-                            'base_url': '{{{{ get .Secrets "edxapp/proctortrack-base-url" }}}}'
+                            'base_url': '{edxapp_config.require_object("proctortrack_url")}'
                           'null': {{}}
                         PROCTORING_USER_OBFUSCATION_KEY: {{{{ get .Secrets "proctortrack_user_obfuscation_key" }}}}
                     """),
