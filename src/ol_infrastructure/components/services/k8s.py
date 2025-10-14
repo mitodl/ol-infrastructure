@@ -466,10 +466,10 @@ class OLApplicationK8s(ComponentResource):
                 ResourceOptions(depends_on=[_pre_deploy_job])
             )
 
-            _application_pre_deployment_event_name = truncate_k8s_metanames(
-                f"{ol_app_k8s_config.application_name}-predeploy"
-            )
             if ol_app_k8s_config.deployment_notifications:
+                _application_pre_deployment_event_name = truncate_k8s_metanames(
+                    f"{ol_app_k8s_config.application_name}-predeploy"
+                )
                 # Create pre-deployment event
                 _now = datetime.now(tz=UTC)
                 _pre_deployment_event = kubernetes.events.v1.Event(
@@ -627,68 +627,66 @@ class OLApplicationK8s(ComponentResource):
                 ),
             )
 
-            # Create post-deployment event
-            _application_post_deployment_event_name = truncate_k8s_metanames(
-                f"{ol_app_k8s_config.application_name}-postdeploy"
-            )
-
-            # Use the job's status to determine success/failure for the event
-            def create_post_deploy_event_note(job_status):
-                """Create event note based on job completion status."""
-                if job_status is None:
-                    return f"Post-deployment job started for {_application_deployment_name}"
-
-                succeeded = job_status.get("succeeded", 0)
-                failed = job_status.get("failed", 0)
-
-                if succeeded > 0:
-                    return f"Post-deployment job completed successfully for {_application_deployment_name}"
-                elif failed > 0:
-                    return (
-                        f"Post-deployment job failed for {_application_deployment_name}"
-                    )
-                else:
-                    return f"Post-deployment job in progress for {_application_deployment_name}"
-
-            def create_post_deploy_event_type(job_status):
-                """Determine event type based on job completion status."""
-                if job_status is None:
-                    return "Normal"
-
-                failed = job_status.get("failed", 0)
-                return "Warning" if failed > 0 else "Normal"
-
-            def create_post_deploy_event_action(job_status):
-                """Determine event action based on job completion status."""
-                if job_status is None:
-                    return "PostDeployJobStarted"
-
-                succeeded = job_status.get("succeeded", 0)
-                failed = job_status.get("failed", 0)
-
-                if succeeded > 0:
-                    return "PostDeployJobCompleted"
-                elif failed > 0:
-                    return "PostDeployJobFailed"
-                else:
-                    return "PostDeployJobInProgress"
-
-            def create_post_deploy_event_reason(job_status):
-                """Determine event reason based on job completion status."""
-                if job_status is None:
-                    return "PostDeployJobStarted"
-
-                succeeded = job_status.get("succeeded", 0)
-                failed = job_status.get("failed", 0)
-
-                if succeeded > 0:
-                    return "PostDeployJobSucceeded"
-                elif failed > 0:
-                    return "PostDeployJobFailed"
-                else:
-                    return "PostDeployJobRunning"
-
             if ol_app_k8s_config.deployment_notifications:
+                # Create post-deployment event
+                _application_post_deployment_event_name = truncate_k8s_metanames(
+                    f"{ol_app_k8s_config.application_name}-postdeploy"
+                )
+
+                # Use the job's status to determine success/failure for the event
+                def create_post_deploy_event_note(job_status):
+                    """Create event note based on job completion status."""
+                    if job_status is None:
+                        return f"Post-deployment job started for {_application_deployment_name}"
+
+                    succeeded = job_status.get("succeeded", 0)
+                    failed = job_status.get("failed", 0)
+
+                    if succeeded > 0:
+                        return f"Post-deployment job completed successfully for {_application_deployment_name}"
+                    elif failed > 0:
+                        return f"Post-deployment job failed for {_application_deployment_name}"
+                    else:
+                        return f"Post-deployment job in progress for {_application_deployment_name}"
+
+                def create_post_deploy_event_type(job_status):
+                    """Determine event type based on job completion status."""
+                    if job_status is None:
+                        return "Normal"
+
+                    failed = job_status.get("failed", 0)
+                    return "Warning" if failed > 0 else "Normal"
+
+                def create_post_deploy_event_action(job_status):
+                    """Determine event action based on job completion status."""
+                    if job_status is None:
+                        return "PostDeployJobStarted"
+
+                    succeeded = job_status.get("succeeded", 0)
+                    failed = job_status.get("failed", 0)
+
+                    if succeeded > 0:
+                        return "PostDeployJobCompleted"
+                    elif failed > 0:
+                        return "PostDeployJobFailed"
+                    else:
+                        return "PostDeployJobInProgress"
+
+                def create_post_deploy_event_reason(job_status):
+                    """Determine event reason based on job completion status."""
+                    if job_status is None:
+                        return "PostDeployJobStarted"
+
+                    succeeded = job_status.get("succeeded", 0)
+                    failed = job_status.get("failed", 0)
+
+                    if succeeded > 0:
+                        return "PostDeployJobSucceeded"
+                    elif failed > 0:
+                        return "PostDeployJobFailed"
+                    else:
+                        return "PostDeployJobRunning"
+
                 _now = datetime.now(tz=UTC)
                 _post_deployment_event = kubernetes.events.v1.Event(
                     f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-post-deploy-event",
