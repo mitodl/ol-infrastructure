@@ -136,8 +136,6 @@ def build_dagster_docker_pipeline() -> Pipeline:
                                 "-exc",
                                 rf"""ls -ltrha;
                                 ls -lthra ../;
-                                grep -oP '^version = "\K(\d+\.\d+\.\d+)' {repo.name}/dg_projects/{name}/pyproject.toml >> tags/collected_tags;
-                                echo " " >> tags/collected_tags;
                                 cat ./{repo.name}/.git/describe_ref >> tags/collected_tags;""",  # noqa: E501
                             ],
                         ),
