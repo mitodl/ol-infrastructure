@@ -81,7 +81,7 @@ class OLApplicationK8sConfig(BaseModel):
     application_docker_tag: str
     application_cmd_array: list[str] | None = None
     application_arg_array: list[str] | None = None
-    deployment_notifications: bool = True
+    deployment_notifications: bool = False
     vault_k8s_resource_auth_name: str
     use_pullthrough_cache: bool = True
     image_pull_policy: str = "IfNotPresent"
@@ -469,36 +469,37 @@ class OLApplicationK8s(ComponentResource):
             _application_pre_deployment_event_name = truncate_k8s_metanames(
                 f"{ol_app_k8s_config.application_name}-predeploy"
             )
-
-            _now = datetime.now(tz=UTC)
-            _pre_deployment_event = kubernetes.events.v1.Event(
-                f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-event",
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    name=_application_pre_deployment_event_name,
-                    namespace=ol_app_k8s_config.application_namespace,
-                    labels=application_labels,
-                    deletion_timestamp=(_now + timedelta(seconds=30)).isoformat(),
-                ),
-                event_time=pulumi_time.Static(
-                    f"{_application_pre_deployment_event_name}-time",
-                    triggers={"pre_deploy_job_id": _pre_deploy_job.id},
-                ),
-                regarding=kubernetes.core.v1.ObjectReferenceArgs(
-                    api_version="batch/v1",
-                    kind="Job",
-                    name=_application_pre_deployment_event_name,
-                    namespace=ol_app_k8s_config.application_namespace,
-                ),
-                action="PreDeployJobStarted",
-                reason="PreDeployJobStarted",
-                note=f"Pre-deployment job started for {_application_deployment_name}",
-                type="Normal",
-                reporting_controller="ol-infrastructure",
-                reporting_instance=f"{ol_app_k8s_config.application_name}-controller",
-                opts=ResourceOptions(delete_before_replace=True).merge(
-                    resource_options
-                ),
-            )
+            if ol_app_k8s_config.deployment_notifications:
+                # Create pre-deployment event
+                _now = datetime.now(tz=UTC)
+                _pre_deployment_event = kubernetes.events.v1.Event(
+                    f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-event",
+                    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                        name=_application_pre_deployment_event_name,
+                        namespace=ol_app_k8s_config.application_namespace,
+                        labels=application_labels,
+                        deletion_timestamp=(_now + timedelta(seconds=30)).isoformat(),
+                    ),
+                    event_time=pulumi_time.Static(
+                        f"{_application_pre_deployment_event_name}-time",
+                        triggers={"pre_deploy_job_id": _pre_deploy_job.id},
+                    ),
+                    regarding=kubernetes.core.v1.ObjectReferenceArgs(
+                        api_version="batch/v1",
+                        kind="Job",
+                        name=_application_pre_deployment_event_name,
+                        namespace=ol_app_k8s_config.application_namespace,
+                    ),
+                    action="PreDeployJobStarted",
+                    reason="PreDeployJobStarted",
+                    note=f"Pre-deployment job started for {_application_deployment_name}",
+                    type="Normal",
+                    reporting_controller="ol-infrastructure",
+                    reporting_instance=f"{ol_app_k8s_config.application_name}-controller",
+                    opts=ResourceOptions(delete_before_replace=True).merge(
+                        resource_options
+                    ),
+                )
 
         _application_deployment = kubernetes.apps.v1.Deployment(
             f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-deployment",
@@ -687,35 +688,40 @@ class OLApplicationK8s(ComponentResource):
                 else:
                     return "PostDeployJobRunning"
 
-            _now = datetime.now(tz=UTC)
-            _post_deployment_event = kubernetes.events.v1.Event(
-                f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-post-deploy-event",
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    name=_application_post_deployment_event_name,
-                    namespace=ol_app_k8s_config.application_namespace,
-                    labels=application_labels,
-                    deletion_timestamp=(_now + timedelta(seconds=30)).isoformat(),
-                ),
-                event_time=pulumi_time.Static(
-                    f"{_application_post_deployment_event_name}-time",
-                    triggers={"post_deploy_job_id": _post_deploy_job.id},
-                ),
-                regarding=kubernetes.core.v1.ObjectReferenceArgs(
-                    api_version="batch/v1",
-                    kind="Job",
-                    name=f"{_application_deployment_name}-post-deploy",
-                    namespace=ol_app_k8s_config.application_namespace,
-                ),
-                action=_post_deploy_job.status.apply(create_post_deploy_event_action),
-                reason=_post_deploy_job.status.apply(create_post_deploy_event_reason),
-                note=_post_deploy_job.status.apply(create_post_deploy_event_note),
-                type=_post_deploy_job.status.apply(create_post_deploy_event_type),
-                reporting_controller="ol-infrastructure",
-                reporting_instance=f"{ol_app_k8s_config.application_name}-controller",
-                opts=resource_options.merge(
-                    ResourceOptions(depends_on=[_post_deploy_job])
-                ),
-            )
+            if ol_app_k8s_config.deployment_notifications:
+                _now = datetime.now(tz=UTC)
+                _post_deployment_event = kubernetes.events.v1.Event(
+                    f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-post-deploy-event",
+                    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                        name=_application_post_deployment_event_name,
+                        namespace=ol_app_k8s_config.application_namespace,
+                        labels=application_labels,
+                        deletion_timestamp=(_now + timedelta(seconds=30)).isoformat(),
+                    ),
+                    event_time=pulumi_time.Static(
+                        f"{_application_post_deployment_event_name}-time",
+                        triggers={"post_deploy_job_id": _post_deploy_job.id},
+                    ),
+                    regarding=kubernetes.core.v1.ObjectReferenceArgs(
+                        api_version="batch/v1",
+                        kind="Job",
+                        name=f"{_application_deployment_name}-post-deploy",
+                        namespace=ol_app_k8s_config.application_namespace,
+                    ),
+                    action=_post_deploy_job.status.apply(
+                        create_post_deploy_event_action
+                    ),
+                    reason=_post_deploy_job.status.apply(
+                        create_post_deploy_event_reason
+                    ),
+                    note=_post_deploy_job.status.apply(create_post_deploy_event_note),
+                    type=_post_deploy_job.status.apply(create_post_deploy_event_type),
+                    reporting_controller="ol-infrastructure",
+                    reporting_instance=f"{ol_app_k8s_config.application_name}-controller",
+                    opts=resource_options.merge(
+                        ResourceOptions(depends_on=[_post_deploy_job])
+                    ),
+                )
 
         # Pod Disruption Budget to ensure at least one web application pod is available.
         _application_pdb = kubernetes.policy.v1.PodDisruptionBudget(
