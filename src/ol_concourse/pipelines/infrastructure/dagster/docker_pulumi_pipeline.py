@@ -66,6 +66,11 @@ def build_dagster_docker_pipeline() -> Pipeline:
             image_repository=f"mitodl/dagster-{name}",
             username="((dockerhub.username))",
             password="((dockerhub.password))",  # noqa: S106
+            image_tag=None,
+            # While check_every=never, defining tag_regex helps Concourse UI understand
+            # resource versions
+            tag_regex=r"^[0-9a-f]{4,40}$",  # Git short ref
+            sort_by_creation=True,
         )
 
     pulumi_code_branch = "dagster_helm"
@@ -156,8 +161,8 @@ def build_dagster_docker_pipeline() -> Pipeline:
     for location in code_locations:
         name = location["name"]
         image = code_location_images[name]
-        env_var_name = f"DAGSTER_{name.upper()}_IMAGE_DIGEST"
-        pulumi_env_vars[env_var_name] = f"{image.name}/digest"
+        env_var_name = f"DAGSTER_{name.upper()}_IMAGE_TAG"
+        pulumi_env_vars[env_var_name] = f"{image.name}/tag"
 
     # Get dependencies - trigger Pulumi when all images are built
     pulumi_dependencies = [
@@ -201,5 +206,5 @@ if __name__ == "__main__":
         definition.write(build_dagster_docker_pipeline().json(indent=2))
     sys.stdout.write(build_dagster_docker_pipeline().json(indent=2))
     sys.stdout.writelines(
-        ("\n", "fly -t pr-inf sp -p docker-packer-pulumi-dagster -c definition.json")
+        ("\n", "fly -t pr-inf sp -p docker-pulumi-dagster -c definition.json")
     )

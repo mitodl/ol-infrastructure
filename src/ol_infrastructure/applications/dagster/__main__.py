@@ -44,6 +44,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
+    cached_image_uri,
     check_cluster_namespace,
     setup_k8s_provider,
 )
@@ -493,26 +494,25 @@ for location in code_locations:
     module: str = location["module"]  # type: ignore[assignment]
     port: int = location["port"]  # type: ignore[assignment]
 
-    # Get image digest from environment variable set by Concourse pipeline
-    env_var_name = f"DAGSTER_{name.upper()}_IMAGE_DIGEST"
-    image_digest = os.environ.get(env_var_name)
+    # Get image tag from environment variable set by Concourse pipeline
+    # The pipeline tags each image with the git short-ref of the commit
+    env_var_name = f"DAGSTER_{name.upper()}_IMAGE_TAG"
+    image_tag = os.environ.get(env_var_name)
 
-    # Construct image reference - use digest if available, otherwise use tag
-    if image_digest:
-        # When using digest, the full image reference is repository@digest
-        image_tag_or_digest = f"@{image_digest}"
-        current_image_ref = f"mitodl/dagster-{name}@{image_digest}"
+    # Use the tag from the environment variable if available, otherwise fallback to
+    # config or latest
+    if image_tag:
+        image_tag_or_digest = image_tag
     else:
         # Fallback to tag-based reference
         image_tag_or_digest = dagster_config.get("docker_image_tag") or "latest"
-        current_image_ref = f"mitodl/dagster-{name}:{image_tag_or_digest}"
 
     deployment = {
         "name": name.replace("_", "-"),
         "image": {
-            "repository": f"mitodl/dagster-{name}",
-            "tag": "latest",  # image_tag_or_digest,
-            "pullPolicy": "Always",
+            "repository": cached_image_uri(f"mitodl/dagster-{name}"),
+            "tag": image_tag_or_digest,
+            "pullPolicy": "IfNotPresent",
         },
         "dagsterApiGrpcArgs": [
             "-m",
@@ -639,6 +639,10 @@ dagster_helm_values = {
             {"name": "DAGSTER_ENVIRONMENT", "value": stack_info.env_suffix},
             {"name": "DAGSTER_HOSTNAME", "value": dagster_config.require("domain")},
             {"name": "DAGSTER_AIRBYTE_PORT", "value": "443"},
+            {
+                "name": "DAGSTER_SENSOR_GRPC_TIMEOUT_SECONDS",
+                "value": "300",
+            },
             {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
         ],
         "envSecrets": [
@@ -656,6 +660,10 @@ dagster_helm_values = {
             {"name": "DAGSTER_ENVIRONMENT", "value": stack_info.env_suffix},
             {"name": "DAGSTER_HOSTNAME", "value": dagster_config.require("domain")},
             {"name": "DAGSTER_AIRBYTE_PORT", "value": "443"},
+            {
+                "name": "DAGSTER_SENSOR_GRPC_TIMEOUT_SECONDS",
+                "value": "300",
+            },
             {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
         ],
         "envSecrets": [

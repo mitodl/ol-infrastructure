@@ -34,8 +34,8 @@ run_launcher:
   class: K8sRunLauncher
   config:
     load_incluster_config: true
-    job_namespace: {dagster_namespace: dagster}
-    image_pull_policy: Always
+    job_namespace: dagster
+    image_pull_policy: IfNotPresent
     service_account_name: dagster
     dagster_home: "/opt/dagster/dagster_home"
     instance_config_map: "dagster-instance"
