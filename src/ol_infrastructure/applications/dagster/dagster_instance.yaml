@@ -1,7 +1,18 @@
 ---
+telemetry:
+  enabled: true
+
 scheduler:
   module: dagster.core.scheduler
   class: DagsterDaemonScheduler
+
+compute_logs:
+  module: dagster_aws.s3.compute_log_manager
+  class: S3ComputeLogManager
+  config:
+    bucket:
+      env: DAGSTER_BUCKET_NAME
+    prefix: compute-logs/
 
 schedule_storage:
   module: dagster_postgres.schedule_storage
@@ -67,6 +78,3 @@ event_log_storage:
 run_coordinator:
   module: dagster.core.run_coordinator
   class: QueuedRunCoordinator
-
-telemetry:
-  enabled: false
