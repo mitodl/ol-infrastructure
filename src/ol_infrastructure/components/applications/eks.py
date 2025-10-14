@@ -37,8 +37,9 @@ class OLEKSAuthBindingConfig(BaseModel):
     # From cluster stack reference
     cluster_identities: Output[Any]
     vault_auth_endpoint: Output[str]
-    # Name of the k8s service account that will be used for IRSA
-    irsa_service_account_name: str
+    # Name(s) of the k8s service account(s) that will be used for IRSA
+    # Can be a single string or a list of strings
+    irsa_service_account_name: str | list[str]
     # Name(s) of the k8s service account(s) used for vault secret sync
     # Can be a single string or a list of strings
     vault_sync_service_account_names: str | list[str] = "vault-secrets"

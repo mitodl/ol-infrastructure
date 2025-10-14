@@ -141,7 +141,7 @@ def route53_policy_template(zone_id: str) -> dict[str, Any]:
 def oidc_trust_policy_template(
     oidc_identifier: str,
     account_id: str,
-    k8s_service_account_identifier: str,
+    k8s_service_account_identifier: str | list[str],
     operator: Literal["StringLike", "StringEquals"],
 ) -> dict[str, Any]:
     """Policy definition to allow EBS CSI driver installed into a EKS cluster
@@ -152,9 +152,9 @@ def oidc_trust_policy_template(
     :type oidc_identifier: str
     :param account_id: The numerical account identifier
     :type account_id: str
-    :param k8s_service_account_identifier: The service account identifier to apply
-     to the :sub condition.
-    :type k8s_service_account_identifier: str
+    :param k8s_service_account_identifier: The service account identifier(s) to apply
+     to the :sub condition. Can be a single string or a list of strings.
+    :type k8s_service_account_identifier: str | list[str]
     :param operator: Which string operator to use inside the conditional expression.
      vaild choices are "StringLike" and "StringEquals"
     :type operator: str
@@ -163,21 +163,33 @@ def oidc_trust_policy_template(
      CSI driver installed into an EKS cluster to provision storage.
     """
     stripped_oidc_identifier = oidc_identifier.replace("https://", "")
+
+    # Convert single identifier to list for uniform handling
+    identifiers = (
+        [k8s_service_account_identifier]
+        if isinstance(k8s_service_account_identifier, str)
+        else k8s_service_account_identifier
+    )
+
+    # For multiple identifiers, create separate statements
+    statements = [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Federated": f"arn:aws:iam::{account_id}:oidc-provider/{stripped_oidc_identifier}"  # noqa: E501
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+                f"{operator}": {
+                    f"{stripped_oidc_identifier}:aud": "sts.amazonaws.com",
+                    f"{stripped_oidc_identifier}:sub": f"{identifier}",
+                }
+            },
+        }
+        for identifier in identifiers
+    ]
+
     return {
         "Version": IAM_POLICY_VERSION,
-        "Statement": [
-            {
-                "Effect": "Allow",
-                "Principal": {
-                    "Federated": f"arn:aws:iam::{account_id}:oidc-provider/{stripped_oidc_identifier}"  # noqa: E501
-                },
-                "Action": "sts:AssumeRoleWithWebIdentity",
-                "Condition": {
-                    f"{operator}": {
-                        f"{stripped_oidc_identifier}:aud": "sts.amazonaws.com",
-                        f"{stripped_oidc_identifier}:sub": f"{k8s_service_account_identifier}",  # noqa: E501
-                    }
-                },
-            }
-        ],
+        "Statement": statements,
     }

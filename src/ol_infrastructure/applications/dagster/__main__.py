@@ -368,12 +368,11 @@ dagster_auth_binding = OLEKSAuthBinding(
         vault_policy_path=Path(__file__).parent.joinpath("dagster_server_policy.hcl"),
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
-        irsa_service_account_name="dagster",
+        irsa_service_account_name=["dagster", "dagster-user-code"],
         vault_sync_service_account_names=[
             "dagster",
             "dagster-vault",
             "dagster-user-code",
-            "dagster-user-code-dagster-user-deployments-user-deployments",
         ],
         k8s_labels=k8s_global_labels,
         parliament_config=parliament_config,
