@@ -447,7 +447,7 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
                 // Collapse some labels that include UUIDs and are not useful
                 write_relabel_config {{
                     source_labels = ["__name__"]
-                    regex         = "(kube_pod_container_info|kube_pod_container_status_restarts_total)"
+                    regex         = "(kube_pod_container_info|kube_pod_container_status_restarts_total|kube_pod_status_reason)"
                     action        = "replace"
                     target_label  = "uid"
                     replacement   = ""
@@ -787,7 +787,7 @@ ksm_release = kubernetes.helm.v3.Release(
             },
             "namespaces": "jupyter",
             "extraArgs": {
-                "metric-allowlist": "kube_pod_container_info,kube_pod_container_status_restarts_total",
+                "metric-allowlist": "kube_pod_container_info,kube_pod_container_status_restarts_total,kube_pod_status_reason",
             },
         },
     ),
