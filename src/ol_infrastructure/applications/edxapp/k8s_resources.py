@@ -519,6 +519,7 @@ def create_k8s_resources(
         secrets.general_secrets_name,
         secrets.xqueue_secret_name,
         secrets.forum_secret_name,
+        secrets.learn_ai_canvas_syllabus_token_secret_name,
         # Just LMS specific resources below this line
         secrets.lms_oauth_secret_name,
     ]
@@ -935,6 +936,7 @@ def create_k8s_resources(
         secrets.general_secrets_name,
         secrets.xqueue_secret_name,
         secrets.forum_secret_name,
+        secrets.learn_ai_canvas_syllabus_token_secret_name,
         # Just CMS specific resources below this line
         secrets.cms_oauth_secret_name,
     ]

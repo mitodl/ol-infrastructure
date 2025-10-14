@@ -273,7 +273,7 @@ def create_k8s_secrets(
                           'proctortrack':
                             'client_id': '{{{{ get .Secrets "proctortrack_client_id" }}}}'
                             'client_secret': '{{{{ get .Secrets "proctortrack_client_secret" }}}}'
-                            'base_url': '{edxapp_config.require_object("proctortrack_url")}'
+                            'base_url': '{edxapp_config.require("proctortrack_url")}'
                           'null': {{}}
                         PROCTORING_USER_OBFUSCATION_KEY: {{{{ get .Secrets "proctortrack_user_obfuscation_key" }}}}
                     """),
@@ -344,10 +344,10 @@ def create_k8s_secrets(
     learn_ai_canvas_syllabus_token_secret_secret = OLVaultK8SSecret(
         f"ol-{stack_info.env_prefix}-edxapp-learn-ai-canvas-syllabus-token-secret-{stack_info.env_suffix}",
         OLVaultK8SStaticSecretConfig(
-            name=forum_secret_name,
+            name=learn_ai_canvas_syllabus_token_secret_name,
             namespace=namespace,
             dest_secret_labels=k8s_global_labels,
-            dest_secret_name=forum_secret_name,
+            dest_secret_name=learn_ai_canvas_syllabus_token_secret_name,
             labels=k8s_global_labels,
             mount="secret-global",
             mount_type="kv-v2",
