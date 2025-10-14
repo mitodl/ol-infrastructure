@@ -470,6 +470,60 @@ dagster_oidc_resources = OLApisixOIDCResources(
     opts=ResourceOptions(depends_on=[dagster_auth_binding]),
 )
 
+# Create ConfigMap for AWS profile configuration to handle cross-account access
+# This allows the edxorg code location to assume a role in the edX.org AWS account
+aws_config_content = """[profile edxorg]
+role_arn = arn:aws:iam::708756755355:role/mit-s3-edx-program-reports-access
+role_session_name = replicate-program-credentials-reports
+credential_source = EcsContainer
+"""
+
+aws_profile_configmap = kubernetes.core.v1.ConfigMap(
+    f"dagster-aws-profile-config-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-aws-profile-config",
+        namespace=dagster_namespace,
+        labels=k8s_global_labels.model_dump(),
+    ),
+    data={
+        "config": aws_config_content,
+    },
+)
+
+# Create Vault secret for edxorg GCP credentials used by legacy_openedx pipelines
+edxorg_gcp_secret = OLVaultK8SSecret(
+    f"dagster-k8s-edxorg-gcp-secrets-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        dest_secret_labels=k8s_global_labels.model_dump(),
+        dest_secret_name="dagster-edxorg-gcp-secrets",  # pragma: allowlist secret  # noqa: E501, S106
+        exclude_raw=True,
+        excludes=[".*"],
+        labels=k8s_global_labels.model_dump(),
+        mount="secret-data",
+        mount_type="kv-v1",
+        name="dagster-edxorg-gcp-secrets",
+        namespace=dagster_namespace,
+        path="pipelines/edx/org/gcp-oauth-client",
+        refresh_after="24h",
+        templates={
+            "edxorg_gcp.yaml": """resources:
+  gcp_gcs:
+    config:
+      auth_uri: {{ get .Secrets "url" }}
+      client_email: {{ get .Secrets "client_email" }}
+      client_id: "{{ get .Secrets "client_id" }}"
+      client_x509_cert_url: {{ get .Secrets "cert_url" }}
+      private_key: |
+{{ get .Secrets "private_key" | indent 8 }}
+      private_key_id: {{ get .Secrets "private_key_id" }}
+      project_id: {{ get .Secrets "project_id" }}
+      token_uri: {{ get .Secrets "token_uri" }}""",
+        },
+        vaultauth=dagster_auth_binding.vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(depends_on=[dagster_auth_binding]),
+)
+
 # Define the user code deployments before the main helm chart so they can be referenced
 # Define all code locations based on ol-data-platform structure
 code_locations: list[dict[str, str | int]] = [
@@ -564,6 +618,44 @@ for location in code_locations:
                 "memory": "8Gi",
             },
         }
+
+    # Add AWS profile configuration for edxorg deployment to handle cross-account access
+    if name == "edxorg":
+        deployment["volumes"] = [
+            {
+                "name": "aws-config",
+                "configMap": {"name": "dagster-aws-profile-config"},
+            }
+        ]
+        deployment["volumeMounts"] = [
+            {
+                "name": "aws-config",
+                "mountPath": "/etc/aws",
+                "readOnly": True,
+            }
+        ]
+        # Set AWS_CONFIG_FILE to use the mounted configuration
+        deployment["env"].append(
+            {"name": "AWS_CONFIG_FILE", "value": "/etc/aws/config"}
+        )
+
+    # Add pipeline configuration files for legacy_openedx deployment
+    if name == "legacy_openedx":
+        deployment["volumes"] = [
+            {
+                "name": "pipeline-configs",
+                "secret": {
+                    "secretName": "dagster-edxorg-gcp-secrets"  # pragma: allowlist secret  # noqa: E501
+                },
+            }
+        ]
+        deployment["volumeMounts"] = [
+            {
+                "name": "pipeline-configs",
+                "mountPath": "/etc/dagster",
+                "readOnly": True,
+            }
+        ]
 
     deployments.append(deployment)
 
@@ -813,6 +905,8 @@ dagster_user_code_release = kubernetes.helm.v3.Release(
             dagster_user_code_service_account,
             dagster_user_code_cluster_role_binding,
             dagster_helm_release,
+            aws_profile_configmap,
+            edxorg_gcp_secret,
         ]
     ),
 )
