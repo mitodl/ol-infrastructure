@@ -461,6 +461,7 @@ dagster_oidc_resources = OLApisixOIDCResources(
         oidc_post_logout_redirect_uri=f"https://{dagster_config.require('domain')}/",
         oidc_session_cookie_lifetime=60 * 20160,  # 14 days
         oidc_use_session_secret=True,
+        oidc_scope="openid profile email",
         vault_mount="secret-operations",
         vault_mount_type="kv-v1",
         vault_path="sso/dagster",
