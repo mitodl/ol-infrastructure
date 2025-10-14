@@ -1427,6 +1427,7 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_docker_tag=MIT_LEARN_DOCKER_TAG,
         application_cmd_array=cmd_array,
         application_arg_array=arg_array,
+        deployment_notifications=True,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,  # Assuming Django app needs nginx
         import_nginx_config_path=nginx_config_path,
