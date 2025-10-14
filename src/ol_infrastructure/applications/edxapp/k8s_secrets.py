@@ -201,12 +201,12 @@ def create_k8s_secrets(
                 templates={
                     "03-mongo-db-forum-credentials.yaml": textwrap.dedent(f"""
                         FORUM_MONGODB_CLIENT_PARAMETERS:
-                          authsource: admin
+                          authSource: admin
                           host: {mongodb["host_string"]}
                           port: 27017
                           db: edxapp
                           replicaSet: {mongodb["replica_set"]}
-                          user: {{{{ get .Secrets "username" }}}}
+                          username: {{{{ get .Secrets "username" }}}}
                           password: {{{{ get .Secrets "password" }}}}
                           ssl: true
                     """),
