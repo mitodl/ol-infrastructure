@@ -25,6 +25,10 @@ from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBindingConfig,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.services.cert_manager import (
+    OLCertManagerCert,
+    OLCertManagerCertConfig,
+)
 from ol_infrastructure.components.services.k8s import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
@@ -821,6 +825,19 @@ dagster_user_code_release = kubernetes.helm.v3.Release(
 )
 
 # APISix route configuration
+dagster_tls_secret_name = "dagster-tls-pair"  # pragma: allowlist secret # noqa: S105
+cert_manager_certificate = OLCertManagerCert(
+    f"dagster-cert-manager-certificate-{stack_info.env_suffix}",
+    cert_config=OLCertManagerCertConfig(
+        application_name="dagster",
+        k8s_namespace=dagster_namespace,
+        k8s_labels=k8s_global_labels.model_dump(),
+        create_apisixtls_resource=True,
+        dest_secret_name=dagster_tls_secret_name,
+        dns_names=[dagster_config.require("domain")],
+    ),
+)
+
 dagster_apisix_route = OLApisixRoute(
     f"dagster-apisix-route-{stack_info.env_suffix}",
     route_configs=[
