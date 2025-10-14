@@ -1020,6 +1020,7 @@ env_vars = {
     "QDRANT_ENCODER": "vector_search.encoders.litellm.LiteLLMEncoder",
     "CONTENT_FILE_EMBEDDING_CHUNK_OVERLAP": 51,
     "CONTENT_FILE_EMBEDDING_CHUNK_SIZE": 512,
+    "EMBEDDING_SCHEDULE_MINUTES": 120,
     "PROLEARN_CATALOG_API_URL": "https://prolearn.mit.edu/graphql",
     "SEE_API_URL": "https://mit-unified-portal-prod-78eeds.43d8q2.usa-e2.cloudhub.io/api/",
     "SEE_API_ACCESS_TOKEN_URL": "https://mit-unified-portal-prod-78eeds.43d8q2.usa-e2.cloudhub.io/oauth/token",
