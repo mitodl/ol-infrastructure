@@ -44,8 +44,8 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
-    cached_image_uri,
     check_cluster_namespace,
+    ecr_image_uri,
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
@@ -510,7 +510,7 @@ for location in code_locations:
     deployment = {
         "name": name.replace("_", "-"),
         "image": {
-            "repository": cached_image_uri(f"mitodl/dagster-{name}"),
+            "repository": ecr_image_uri(f"mitodl/dagster-{name}"),
             "tag": image_tag_or_digest,
             "pullPolicy": "IfNotPresent",
         },

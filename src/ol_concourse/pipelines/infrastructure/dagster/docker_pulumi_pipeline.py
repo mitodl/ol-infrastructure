@@ -64,13 +64,12 @@ def build_dagster_docker_pipeline() -> Pipeline:
         code_location_images[name] = registry_image(
             name=Identifier(f"dagster-{name}-image"),
             image_repository=f"mitodl/dagster-{name}",
-            username="((dockerhub.username))",
-            password="((dockerhub.password))",  # noqa: S106
             image_tag=None,
             # While check_every=never, defining tag_regex helps Concourse UI understand
             # resource versions
             tag_regex=r"^[0-9a-f]{4,40}$",  # Git short ref
             sort_by_creation=True,
+            ecr_region="us-east-1",
         )
 
     pulumi_code_branch = "dagster_helm"
@@ -140,6 +139,27 @@ def build_dagster_docker_pipeline() -> Pipeline:
                                 grep -oP '^version = "\K(\d+\.\d+\.\d+)' {repo.name}/dg_projects/{name}/pyproject.toml >> tags/collected_tags;
                                 echo " " >> tags/collected_tags;
                                 cat ./{repo.name}/.git/describe_ref >> tags/collected_tags;""",  # noqa: E501
+                            ],
+                        ),
+                    ),
+                ),
+                TaskStep(
+                    task=Identifier("ensure-ecr-repository"),
+                    config=TaskConfig(
+                        platform=Platform.linux,
+                        image_resource=AnonymousResource(
+                            type="registry-image",
+                            source={"repository": "amazon/aws-cli", "tag": "latest"},
+                        ),
+                        params={
+                            "REPO_NAME": image.source["repository"],
+                            "AWS_PAGER": "cat",
+                        },
+                        run=Command(
+                            path="sh",
+                            args=[
+                                "-exc",
+                                "aws ecr describe-repositories --repository-names ${REPO_NAME} || aws ecr create-repository --repository-name ${REPO_NAME}",  # noqa: E501
                             ],
                         ),
                     ),
