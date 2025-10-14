@@ -1018,6 +1018,7 @@ env_vars = {
     "QDRANT_COLLECTION_NAME": f"mitlearn-{stack_info.env_suffix}",
     "QDRANT_DENSE_MODEL": "text-embedding-3-large",
     "QDRANT_ENCODER": "vector_search.encoders.litellm.LiteLLMEncoder",
+    "QDRANT_CHUNK_SIZE": 20,
     "CONTENT_FILE_EMBEDDING_CHUNK_OVERLAP": 51,
     "CONTENT_FILE_EMBEDDING_CHUNK_SIZE": 512,
     "EMBEDDING_SCHEDULE_MINUTES": 120,
