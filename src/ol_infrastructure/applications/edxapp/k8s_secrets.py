@@ -204,7 +204,6 @@ def create_k8s_secrets(
                           authSource: admin
                           host: {mongodb["host_string"]}
                           port: 27017
-                          db: edxapp
                           replicaSet: {mongodb["replica_set"]}
                           username: {{{{ get .Secrets "username" }}}}
                           password: {{{{ get .Secrets "password" }}}}
