@@ -8,7 +8,7 @@ git+https://github.com/raccoongang/xblock-pdf.git@d8948bf3c7127e23be202d1f8600f1
 invideoquiz-xblock
 nodeenv>=1.7.0
 ol-openedx-canvas-integration==0.6.0
-ol-openedx-course-export==0.1.2
+ol-openedx-course-export==0.2.0
 ol-openedx-course-structure-api
 ol-openedx-logging==0.2.0
 ol-openedx-rapid-response-reports==0.3.0
