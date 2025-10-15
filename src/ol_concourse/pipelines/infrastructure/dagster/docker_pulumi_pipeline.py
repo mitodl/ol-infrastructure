@@ -25,7 +25,7 @@ from ol_concourse.pipelines.constants import (
 
 
 def build_dagster_docker_pipeline() -> Pipeline:
-    data_platform_branch = "dagster_dg_restructuring"
+    data_platform_branch = "main"
 
     # Define all code location images based on docker-compose.yaml
     code_locations = [
@@ -72,7 +72,7 @@ def build_dagster_docker_pipeline() -> Pipeline:
             ecr_region="us-east-1",
         )
 
-    pulumi_code_branch = "dagster_helm"
+    pulumi_code_branch = "main"
     pulumi_code = git_repo(
         name=Identifier("ol-infrastructure-pulumi"),
         uri="https://github.com/mitodl/ol-infrastructure",
