@@ -39,7 +39,7 @@ BLOCKSTORE_USE_BLOCKSTORE_APP_API: true
 BUNDLE_ASSET_STORAGE_SETTINGS:
   STORAGE_CLASS: storages.backends.s3boto3.S3Boto3Storage
   STORAGE_KWARGS:
-  location: blockstore/
+    location: blockstore/
 BRANCH_IO_KEY: ''
 BUGS_EMAIL: odl-devops@mit.edu  # MODIFIED
 BULK_EMAIL_EMAILS_PER_TASK: 500
@@ -168,7 +168,7 @@ FEATURES:
   ENABLE_GIT_AUTO_EXPORT: true  # ADDED KEY
   ENABLE_GRADE_DOWNLOADS: true
   ENABLE_INSTRUCTOR_ANALYTICS: false
-  ENABLE_LTI_PROVIDER: false
+  ENABLE_LTI_PROVIDER: true
   ENABLE_MKTG_SITE: true
   ENABLE_MOBILE_REST_API: true
   ENABLE_NEW_BULK_EMAIL_EXPERIENCE: true  # ADDED KEY
@@ -182,7 +182,7 @@ FEATURES:
   ENABLE_V2_CERT_DISPLAY_SETTINGS: true # ADDED KEY
   ENABLE_VIDEO_UPLOAD_PIPELINE: true # MODIFIED
   MILESTONES_APP: true # ADDED KEY FOR PROCTORTRACK
-  PREVIEW_LMS_BASE: "preview.ci.mitxonline.mit.edu"  # MODIFIED, HARD CODED Preview domain
+  PREVIEW_LMS_BASE: "preview.courses.rc.learn.mit.edu"
   SHOW_FOOTER_LANGUAGE_SELECTOR: false
   SHOW_HEADER_LANGUAGE_SELECTOR: false
   SKIP_EMAIL_VALIDATION: true # ADDED KEY
@@ -227,6 +227,8 @@ MITX_REDIRECT_ALLOW_RE_LIST:  # ADDED VALUE
 - "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"
 - "^/v1/accounts/bulk_retire_users"
 - "^/courses/course-v1:.*?/xqueue/.*$"  # TODO (TMM 2025-07-22): Remove this once the xqueue -> submissions migration is complete
+-  "^/courses/.*/courseware-navigation-sidebar/toggles/?$"
+-  "^/courses/.*/courseware-search/enabled/?$"
 MKTG_URL_LINK_MAP:
   TOS: tos
   ABOUT: about
@@ -298,6 +300,7 @@ POLICY_CHANGE_GRADES_ROUTING_KEY: edx.lms.core.default
 PRESS_EMAIL: support@mitxonline.mit.edu # MODIFIED
 
 PROCTORING_SETTINGS: {}
+REDBEAT_KEY_PREFIX: redbeat_lms
 REGISTRATION_EXTRA_FIELDS:
   city: hidden
   confirm_email: hidden
@@ -362,7 +365,7 @@ SYSTEM_WIDE_ROLE_CLASSES: []
 TECH_SUPPORT_EMAIL: odl-devops@mit.edu  # MODIFIED
 TIME_ZONE: America/New_York
 USERNAME_REPLACEMENT_WORKER: OVERRIDE THIS WITH A VALID USERNAME
-USE_X_FORWARDED_HOST: true  # MODIFIED
+USE_X_FORWARDED_HOST: false  # MODIFIED
 VIDEO_IMAGE_MAX_AGE: 31536000
 VIDEO_IMAGE_SETTINGS:
   DIRECTORY_PREFIX: video-images/

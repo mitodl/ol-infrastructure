@@ -24,6 +24,7 @@ class EdxappSecrets:
     general: Output
     xqueue: OLVaultK8SSecret
     forum: OLVaultK8SSecret
+    learn_ai_canvas_syllabus_token: OLVaultK8SSecret
     cms_oauth: OLVaultK8SSecret
     lms_oauth: OLVaultK8SSecret
 
@@ -34,6 +35,7 @@ class EdxappSecrets:
     general_secrets_name: str
     xqueue_secret_name: str
     forum_secret_name: str
+    learn_ai_canvas_syllabus_token_secret_name: str
     cms_oauth_secret_name: str
     lms_oauth_secret_name: str
 
@@ -199,12 +201,12 @@ def create_k8s_secrets(
                 templates={
                     "03-mongo-db-forum-credentials.yaml": textwrap.dedent(f"""
                         FORUM_MONGODB_CLIENT_PARAMETERS:
-                          authsource: admin
+                          authSource: admin
                           host: {mongodb["host_string"]}
                           port: 27017
                           db: edxapp
                           replicaSet: {mongodb["replica_set"]}
-                          user: {{{{ get .Secrets "username" }}}}
+                          username: {{{{ get .Secrets "username" }}}}
                           password: {{{{ get .Secrets "password" }}}}
                           ssl: true
                     """),
@@ -271,7 +273,7 @@ def create_k8s_secrets(
                           'proctortrack':
                             'client_id': '{{{{ get .Secrets "proctortrack_client_id" }}}}'
                             'client_secret': '{{{{ get .Secrets "proctortrack_client_secret" }}}}'
-                            'base_url': '{{{{ get .Secrets "edxapp/proctortrack-base-url" }}}}'
+                            'base_url': '{edxapp_config.require("proctortrack_url")}'
                           'null': {{}}
                         PROCTORING_USER_OBFUSCATION_KEY: {{{{ get .Secrets "proctortrack_user_obfuscation_key" }}}}
                     """),
@@ -327,6 +329,32 @@ def create_k8s_secrets(
             templates={
                 "12-forum-secrets.yaml": textwrap.dedent("""
                         COMMENTS_SERVICE_KEY: {{ get .Secrets "forum_api_key" }}
+                    """),
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True, depends_on=[vault_k8s_resources]
+        ),
+    )
+
+    learn_ai_canvas_syllabus_token_secret_name = (
+        "13-canvas-syllabus-token-yaml"  # pragma: allowlist secret
+    )
+    learn_ai_canvas_syllabus_token_secret_secret = OLVaultK8SSecret(
+        f"ol-{stack_info.env_prefix}-edxapp-learn-ai-canvas-syllabus-token-secret-{stack_info.env_suffix}",
+        OLVaultK8SStaticSecretConfig(
+            name=learn_ai_canvas_syllabus_token_secret_name,
+            namespace=namespace,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=learn_ai_canvas_syllabus_token_secret_name,
+            labels=k8s_global_labels,
+            mount="secret-global",
+            mount_type="kv-v2",
+            path="learn_ai",
+            templates={
+                "13-canvas-syllabus-token-secrets.yaml": textwrap.dedent("""
+                       MIT_LEARN_AI_XBLOCK_CHAT_API_TOKEN: {{ get .Secrets "canvas_syllabus_token" }}
                     """),
             },
             vaultauth=vault_k8s_resources.auth_name,
@@ -394,6 +422,7 @@ def create_k8s_secrets(
         general=general_secrets_secret,
         xqueue=xqueue_secret_secret,
         forum=forum_secret_secret,
+        learn_ai_canvas_syllabus_token=learn_ai_canvas_syllabus_token_secret_secret,
         cms_oauth=cms_oauth_secret,
         lms_oauth=lms_oauth_secret,
         db_creds_secret_name=db_creds_secret_name,
@@ -403,6 +432,7 @@ def create_k8s_secrets(
         general_secrets_name=general_secrets_name,
         xqueue_secret_name=xqueue_secret_name,
         forum_secret_name=forum_secret_name,
+        learn_ai_canvas_syllabus_token_secret_name=learn_ai_canvas_syllabus_token_secret_name,
         cms_oauth_secret_name=cms_oauth_secret_name,
         lms_oauth_secret_name=lms_oauth_secret_name,
     )

@@ -149,13 +149,13 @@ def create_k8s_configmaps(
                     - https://{edxapp_config.require_object("domains")["studio"]}/logout
                     - https://{edxapp_config.require("mit_learn_api_domain")}/logout
                     LANGUAGE_COOKIE: {env_name}-openedx-language-preference
-                    # MIT_LEARN_AI_API_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai  # Added for ol_openedx_chat
-                    # MIT_LEARN_API_BASE_URL: https://{edxapp_config.require("mit_learn_api_domain")}/learn  # Added for ol_openedx_chat
-                    # MIT_LEARN_SUMMARY_FLASHCARD_URL: https://{edxapp_config.require("mit_learn_api_domain")}/learn/api/v1/contentfiles/  # Added for ol_openedx_chat
+                    MIT_LEARN_AI_API_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai  # Added for ol_openedx_chat
+                    MIT_LEARN_API_BASE_URL: https://{edxapp_config.require("mit_learn_api_domain")}/learn  # Added for ol_openedx_chat
+                    MIT_LEARN_SUMMARY_FLASHCARD_URL: https://{edxapp_config.require("mit_learn_api_domain")}/learn/api/v1/contentfiles/  # Added for ol_openedx_chat
                     MIT_LEARN_BASE_URL: "https://{edxapp_config.require("mit_learn_domain")}"
-                    # MIT_LEARN_AI_XBLOCK_CHAT_API_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai/http/canvas_syllabus_agent/
-                    # MIT_LEARN_AI_XBLOCK_TUTOR_CHAT_API_URL:  https://{edxapp_config.require("mit_learn_api_domain")}/ai/http/canvas_tutor_agent/
-                    # MIT_LEARN_AI_XBLOCK_PROBLEM_SET_LIST_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai/api/v0/problem_set_list  # Added for ol_openedx_chat_xblock
+                    MIT_LEARN_AI_XBLOCK_CHAT_API_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai/http/canvas_syllabus_agent/
+                    MIT_LEARN_AI_XBLOCK_TUTOR_CHAT_API_URL:  https://{edxapp_config.require("mit_learn_api_domain")}/ai/http/canvas_tutor_agent/
+                    MIT_LEARN_AI_XBLOCK_PROBLEM_SET_LIST_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai/api/v0/problem_set_list  # Added for ol_openedx_chat_xblock
                     MIT_LEARN_LOGO: https://{edxapp_config.require_object("domains")["lms"]}/static/mitxonline/images/mit-learn-logo.svg
                     LEARNING_MICROFRONTEND_URL: https://{edxapp_config.require_object("domains")["lms"]}/learn
                     LMS_BASE: {edxapp_config.require_object("domains")["lms"]}
@@ -175,10 +175,10 @@ def create_k8s_configmaps(
                       ROOT: https://{edxapp_config.require("marketing_domain")}/
                     MKTG_URL_OVERRIDES:
                       COURSES: https://{edxapp_config.require("marketing_domain")}/
-                      PRIVACY: https://{edxapp_config.require("marketing_domain")}/privacy-policy/
-                      TOS: https://{edxapp_config.require("marketing_domain")}/terms-of-service/
-                      ABOUT: https://{edxapp_config.require("marketing_domain")}/about-us/
-                      HONOR: https://{edxapp_config.require("marketing_domain")}/honor-code/
+                      PRIVACY: https://{edxapp_config.require("marketing_domain")}/privacy
+                      TOS: https://{edxapp_config.require("marketing_domain")}/terms
+                      ABOUT: https://{edxapp_config.require("marketing_domain")}/about
+                      HONOR: https://{edxapp_config.require("marketing_domain")}/honor-code
                       ACCESSIBILITY: https://accessibility.mit.edu/
                       CONTACT: https://mitxonline.zendesk.com/hc/en-us/requests/new/
                       TOS_AND_HONOR: ''
@@ -191,7 +191,7 @@ def create_k8s_configmaps(
                     # preview subdomain to share authentication with LMS (TMM 2021-12-20)
                     SESSION_COOKIE_DOMAIN: {".{}".format(edxapp_config.require_object("domains")["lms"].split(".", 1)[-1])}
                     UNIVERSITY_EMAIL: {edxapp_config.require("sender_email_address")}
-                    ECOMMERCE_PUBLIC_URL_ROOT: https://{edxapp_config.require_object("domains")["lms"]}
+                    ECOMMERCE_PUBLIC_URL_ROOT: {edxapp_config.require_object("domains")["lms"]}
             """),
             },
             opts=ResourceOptions(delete_before_replace=True),
