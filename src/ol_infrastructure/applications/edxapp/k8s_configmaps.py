@@ -175,10 +175,10 @@ def create_k8s_configmaps(
                       ROOT: https://{edxapp_config.require("marketing_domain")}/
                     MKTG_URL_OVERRIDES:
                       COURSES: https://{edxapp_config.require("marketing_domain")}/
-                      PRIVACY: https://{edxapp_config.require("marketing_domain")}/privacy-policy/
-                      TOS: https://{edxapp_config.require("marketing_domain")}/terms-of-service/
-                      ABOUT: https://{edxapp_config.require("marketing_domain")}/about-us/
-                      HONOR: https://{edxapp_config.require("marketing_domain")}/honor-code/
+                      PRIVACY: https://{edxapp_config.require("marketing_domain")}/privacy
+                      TOS: https://{edxapp_config.require("marketing_domain")}/terms
+                      ABOUT: https://{edxapp_config.require("marketing_domain")}/about
+                      HONOR: https://{edxapp_config.require("marketing_domain")}/honor-code
                       ACCESSIBILITY: https://accessibility.mit.edu/
                       CONTACT: https://mitxonline.zendesk.com/hc/en-us/requests/new/
                       TOS_AND_HONOR: ''

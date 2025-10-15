@@ -182,7 +182,7 @@ FEATURES:
   ENABLE_V2_CERT_DISPLAY_SETTINGS: true # ADDED KEY
   ENABLE_VIDEO_UPLOAD_PIPELINE: true # MODIFIED
   MILESTONES_APP: true # ADDED KEY FOR PROCTORTRACK
-  PREVIEW_LMS_BASE: "preview.ci.mitxonline.mit.edu"  # MODIFIED, HARD CODED Preview domain
+  PREVIEW_LMS_BASE: "preview.courses.rc.learn.mit.edu"
   SHOW_FOOTER_LANGUAGE_SELECTOR: false
   SHOW_HEADER_LANGUAGE_SELECTOR: false
   SKIP_EMAIL_VALIDATION: true # ADDED KEY
@@ -227,6 +227,8 @@ MITX_REDIRECT_ALLOW_RE_LIST:  # ADDED VALUE
 - "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"
 - "^/v1/accounts/bulk_retire_users"
 - "^/courses/course-v1:.*?/xqueue/.*$"  # TODO (TMM 2025-07-22): Remove this once the xqueue -> submissions migration is complete
+-  "^/courses/.*/courseware-navigation-sidebar/toggles/?$"
+-  "^/courses/.*/courseware-search/enabled/?$"
 MKTG_URL_LINK_MAP:
   TOS: tos
   ABOUT: about

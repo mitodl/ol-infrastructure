@@ -354,7 +354,7 @@ def create_k8s_secrets(
             path="learn_ai",
             templates={
                 "13-canvas-syllabus-token-secrets.yaml": textwrap.dedent("""
-                        COMMENTS_SERVICE_KEY: {{ get .Secrets "canvas_syllabus_token" }}
+                       MIT_LEARN_AI_XBLOCK_CHAT_API_TOKEN: {{ get .Secrets "canvas_syllabus_token" }}
                     """),
             },
             vaultauth=vault_k8s_resources.auth_name,
