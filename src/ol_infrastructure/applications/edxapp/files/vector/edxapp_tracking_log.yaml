@@ -1,0 +1,109 @@
+---
+sources:
+  collect_edx_tracking_logs:
+    file_key: log_file
+    type: file
+    include:
+    - /opt/data/cms/logs/tracking_logs.log*
+    - /opt/data/lms/logs/tracking_logs.log*
+
+transforms:
+  # Maintaining a copy of the logs with nested objects for MIT IRx (TMM 2023-07-05)
+  parse_edx_tracking_logs_legacy:
+    inputs:
+    - 'collect_edx_tracking_logs'
+    type: remap
+    source: |
+      # Only parse top level JSON and render nested objects as strings
+      parsed, err = parse_json(.message)
+      if parsed != null {
+        del(.message)
+        . = merge!(., parsed)
+        .labels = ["edx_tracking"]
+        .environment = "${ENVIRONMENT}"
+      } else {
+        log(err, level: "error")
+        .malformed = true
+      }
+
+  filter_out_malformed_message_edx_tracking_logs_legacy:
+    inputs:
+    - 'parse_edx_tracking_logs_legacy'
+    type: filter
+    condition: .malformed != true
+
+  parse_edx_tracking_logs:
+    inputs:
+    - 'collect_edx_tracking_logs'
+    type: remap
+    source: |
+      # Only parse top level JSON and render nested objects as strings
+      parsed, err = parse_json(.message, max_depth: 1)
+      if parsed != null {
+        del(.message)
+        . = merge!(., parsed)
+        .labels = ["edx_tracking"]
+        .environment = "${ENVIRONMENT}"
+      } else {
+        log(err, level: "error")
+        .malformed = true
+      }
+
+  filter_out_malformed_message_edx_tracking_logs:
+    inputs:
+    - 'parse_edx_tracking_logs'
+    type: filter
+    condition: .malformed != true
+
+  filter_out_well_formed_message_edx_tracking_logs:
+    inputs:
+    - 'parse_edx_tracking_logs'
+    type: filter
+    condition: .malformed == true
+
+sinks:
+  ship_edx_tracking_logs_to_s3_legacy:
+    inputs:
+    - 'filter_out_malformed_message_edx_tracking_logs_legacy'
+    type: aws_s3
+    bucket: ${ENVIRONMENT}-${TIER}-edxapp-tracking
+    region: us-east-1
+    key_prefix: logs/%F/%H_
+    encoding:
+      codec: json
+    framing:
+      method: "newline_delimited"
+    batch:
+      timeout_secs: 3600
+      max_bytes: 2147483648
+    healthcheck: false
+  ship_edx_tracking_logs_to_s3:
+    inputs:
+    - 'filter_out_malformed_message_edx_tracking_logs'
+    type: aws_s3
+    bucket: ${ENVIRONMENT}-${TIER}-edxapp-tracking
+    region: us-east-1
+    key_prefix: valid/%F/%H_
+    encoding:
+      codec: json
+    framing:
+      method: "newline_delimited"
+    batch:
+      timeout_secs: 3600
+      max_bytes: 2147483648
+    healthcheck: false
+  ship_malformed_edx_tracking_logs_to_s3:
+    inputs:
+    - 'filter_out_well_formed_message_edx_tracking_logs'
+    type: aws_s3
+    bucket: ${ENVIRONMENT}-${TIER}-edxapp-tracking
+    region: us-east-1
+    key_prefix: malformed/%F/%H_
+    encoding:
+      codec: json
+    framing:
+      method: "newline_delimited"
+    batch:
+      timeout_secs: 3600
+      max_bytes: 2147483648
+    healthcheck: false
