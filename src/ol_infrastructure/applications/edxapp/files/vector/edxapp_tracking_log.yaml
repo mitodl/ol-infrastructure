@@ -75,7 +75,7 @@ sinks:
       method: "newline_delimited"
     batch:
       timeout_secs: 3600
-      max_bytes: 2147483648
+      max_bytes: 67108864
     healthcheck: false
   ship_edx_tracking_logs_to_s3:
     inputs:
@@ -90,7 +90,7 @@ sinks:
       method: "newline_delimited"
     batch:
       timeout_secs: 3600
-      max_bytes: 2147483648
+      max_bytes: 67108864
     healthcheck: false
   ship_malformed_edx_tracking_logs_to_s3:
     inputs:
@@ -105,5 +105,5 @@ sinks:
       method: "newline_delimited"
     batch:
       timeout_secs: 3600
-      max_bytes: 2147483648
+      max_bytes: 67108864
     healthcheck: false
