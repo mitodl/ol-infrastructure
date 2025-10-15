@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-kubewatch-application
+runtime: python
+description: A project to forward select k8s events to Slack
+backend:
+  url: s3://mitol-pulumi-state/
