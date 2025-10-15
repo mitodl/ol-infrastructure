@@ -1,6 +1,7 @@
 """Keycloak realm definition for OL applications."""
 
 import json
+from pathlib import Path
 
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
@@ -756,6 +757,30 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 },
             )
         )
+        onboard_saml_org(
+            SamlIdpConfig(
+                org_domains=["ceide.unam.mx"],
+                org_name="Coordinación de Evaluación, Innovación y Desarrollo Educativos, UNAM",  # noqa: E501
+                org_alias="CEIDE",
+                org_saml_metadata_xml=Path(__file__)
+                .parent.joinpath("files/olapps/ceide_metadata.xml")
+                .read_text(),
+                principal_type="FRIENDLY_ATTRIBUTE",
+                principal_attribute="Email",
+                name_id_format=NameIdFormat.unspecified,
+                keycloak_url=keycloak_url,
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                attribute_map={
+                    "email": "Email",
+                    "firstName": "Given Name",
+                    "lastName": "Surname",
+                    "fullName": "Display Name",
+                },
+            )
+        )
         create_org_for_learn(
             OrgConfig(
                 org_domains=["ttt-mit.edu"],
@@ -819,6 +844,34 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 resource_options=resource_options,
                 org_oidc_metadata_url="https://sso.duth.gr/realms/main/.well-known/openid-configuration",
                 client_id="mit-learn",
+            )
+        )
+        onboard_oidc_org(
+            OIDCIdpConfig(
+                org_domains=["athenscollege.edu.gr"],
+                org_name="Hellenic American Educational Foundation",
+                org_alias="HAEF",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                keycloak_url=keycloak_url,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                org_oidc_metadata_url="https://login.microsoftonline.com/35a07f23-c5cb-4b42-81ad-10d269586c9a/v2.0/.well-known/openid-configuration",
+                client_id="1b380514-33ff-4dca-a26f-ddd0600b2f02",
+            )
+        )
+        onboard_oidc_org(
+            OIDCIdpConfig(
+                org_domains=["nust.na"],
+                org_name="Namibia University of Science and Technology",
+                org_alias="NUST",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                keycloak_url=keycloak_url,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                org_oidc_metadata_url="https://login.microsoftonline.com/d5cf20c2-4a84-4902-a3e6-c4a3190ea239/v2.0/.well-known/openid-configuration",
+                client_id="a5c7a2f3-47ce-4e3c-b4ce-fe79b86660b7",
             )
         )
 

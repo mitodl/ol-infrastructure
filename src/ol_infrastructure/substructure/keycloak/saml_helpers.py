@@ -75,18 +75,41 @@ def _fetch_and_parse_saml_metadata(metadata_url: str) -> ET.Element | None:
         return None
 
 
-def extract_saml_metadata(metadata_url: str) -> dict[str, str | None]:
-    """
-    Extract relevant information from a SAML IdP metadata XML file.
+def _parse_saml_metadata_string(metadata_xml: str) -> ET.Element | None:
+    """Parse SAML metadata from an XML string.
 
     Args:
-        metadata_url (str): The URL of the SAML IdP metadata XML file.
+        metadata_xml: The SAML IdP metadata as an XML string.
+
+    Returns:
+        The root ElementTree element of the parsed XML, or None if parsing fails.
+    """
+    try:
+        return ET.fromstring(metadata_xml)  # noqa: S314
+    except ET.ParseError:
+        return None
+
+
+def extract_saml_metadata(metadata_source: str) -> dict[str, str | None]:
+    """
+    Extract relevant information from a SAML IdP metadata XML file or string.
+
+    Args:
+        metadata_source (str): Either the URL of the SAML IdP metadata XML file,
+                               or the XML string itself.
 
     Returns:
         dict: A dictionary containing the extracted metadata attributes,
               or an empty dictionary if parsing fails.
     """
-    root = _fetch_and_parse_saml_metadata(metadata_url)
+    # Determine if this is a URL or XML string
+    if metadata_source.strip().startswith(
+        "<?xml"
+    ) or metadata_source.strip().startswith("<"):
+        root = _parse_saml_metadata_string(metadata_source)
+    else:
+        root = _fetch_and_parse_saml_metadata(metadata_source)
+
     if root is None:
         return {}
 
@@ -160,7 +183,7 @@ def generate_pulumi_args_dict(metadata: dict[str, str]) -> dict[str, str]:
 
 
 def get_saml_attribute_mappers(
-    metadata_url: str, idp_alias: str, attribute_map: dict[str, str] | None = None
+    metadata_source: str, idp_alias: str, attribute_map: dict[str, str] | None = None
 ) -> dict[str, dict[str, Collection[str]]]:
     """Parse SAML metadata to find attributes that can be used for attribute mappers.
 
@@ -168,14 +191,23 @@ def get_saml_attribute_mappers(
     list of candidate attribute names.
 
     Args:
-        metadata_url: The URL to the SAML IdP metadata XML.
+        metadata_source: Either the URL to the SAML IdP metadata XML or the
+            XML string itself.
         idp_alias: The alias for the Keycloak identity provider.
+        attribute_map: Optional mapping of attributes to friendly names.
 
     Returns:
         A dictionary of attribute mapper configurations suitable for Pulumi.
 
     """
-    root = _fetch_and_parse_saml_metadata(metadata_url)
+    # Determine if this is a URL or XML string
+    if metadata_source.strip().startswith(
+        "<?xml"
+    ) or metadata_source.strip().startswith("<"):
+        root = _parse_saml_metadata_string(metadata_source)
+    else:
+        root = _fetch_and_parse_saml_metadata(metadata_source)
+
     if root is None:
         return {}
 
