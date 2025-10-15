@@ -54,6 +54,7 @@ config:
   edxapp:dns_zone: learn
   edxapp:mit_learn_domain: rc.learn.mit.edu
   edxapp:mit_learn_api_domain: api.rc.learn.mit.edu
+  edxapp:learn_ai_frontend_domain: "learn-ai-qa.ol.mit.edu"
   edxapp:domains:
     lms: courses.rc.learn.mit.edu
     preview: preview.courses.rc.learn.mit.edu

@@ -109,7 +109,7 @@ def create_k8s_configmaps(
                     - https://{edxapp_config.require_object("domains")["preview"]}
                     - https://{edxapp_config.require("marketing_domain")}
                     - https://{runtime_config["notes_domain"]}
-                    # - https://{{{{ key "edxapp/learn-ai-frontend-domain" }}}} # I don't think this is needed
+                    - https://{edxapp_config.require("learn_ai_frontend_domain")}
                     COURSE_IMPORT_EXPORT_BUCKET: {course_bucket_name}
                     CROSS_DOMAIN_CSRF_COOKIE_DOMAIN: {edxapp_config.require_object("domains")["lms"]}
                     CROSS_DOMAIN_CSRF_COOKIE_NAME: {env_name}-edxapp-csrftoken
