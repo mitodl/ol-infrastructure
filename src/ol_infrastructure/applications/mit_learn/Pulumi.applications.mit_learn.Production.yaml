@@ -67,7 +67,6 @@ config:
     MITOL_NEW_USER_LOGIN_URL: "https://learn.mit.edu/onboarding"
     MITOL_SUPPORT_EMAIL: "mitlearn-support@mit.edu"
     MITX_ONLINE_BASE_URL: "https://mitxonline.mit.edu/"
-    MITX_ONLINE_LEARNING_COURSE_BUCKET_NAME: "mitx-etl-mitxonline-production"
     MITX_ONLINE_COURSES_API_URL: "https://mitxonline.mit.edu/api/v2/courses/"
     MITX_ONLINE_PROGRAMS_API_URL: "https://mitxonline.mit.edu/api/v2/programs/"
     MITPE_API_ENABLED: "true"
