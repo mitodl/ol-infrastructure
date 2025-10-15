@@ -33,11 +33,7 @@ atlas_config = pulumi.Config("mongodb_atlas")
 env_config = pulumi.Config("environment")
 data_vpc_access_config = pulumi.Config("data_vpc_access")
 stack_info = parse_stack()
-dagster_env_name = stack_info.name
-if stack_info.name == "CI":
-    dagster_env_name = "QA"
 network_stack = pulumi.StackReference(f"infrastructure.aws.network.{stack_info.name}")
-dagster_stack = pulumi.StackReference(f"applications.dagster.{dagster_env_name}")
 
 #############
 # VARIABLES #
@@ -47,7 +43,7 @@ target_vpc = network_stack.require_output(env_config.require("target_vpc"))
 k8s_vpc = network_stack.require_output(
     env_config.get("target_k8s_vpc") or "applications_vpc"
 )
-dagster_ip = dagster_stack.require_output("dagster_app")["elastic_ip"]
+dagster_ips = network_stack.require_output("data_vpc")["k8s_nat_gateway_public_ips"]
 business_unit = env_config.get("business_unit") or "operations"
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
 max_disk_size = atlas_config.get_int("disk_autoscale_max_gb")
@@ -326,13 +322,18 @@ if atlas_config.get_bool("ready_for_traffic"):
 ########################
 # Data Pipeline Access #
 ########################
-atlas_data_cidr_network_access = atlas.ProjectIpAccessList(
-    "mongo-atlas-data-network-cidr-block-permissions",
-    project_id=atlas_project.id,
-    cidr_block=dagster_ip.apply("{}/32".format),
-    opts=pulumi.ResourceOptions(
-        depends_on=[atlas_aws_network_peer, accept_atlas_network_peer]
-    ).merge(atlas_provider),
+dagster_ips.apply(
+    lambda ips: [
+        atlas.ProjectIpAccessList(
+            f"mongo-atlas-data-network-permissions-{dagster_ip}",
+            project_id=atlas_project.id,
+            ip_address=dagster_ip,
+            opts=pulumi.ResourceOptions(
+                depends_on=[atlas_aws_network_peer, accept_atlas_network_peer]
+            ).merge(atlas_provider),
+        )
+        for dagster_ip in ips
+    ]
 )
 
 consul.Keys(
