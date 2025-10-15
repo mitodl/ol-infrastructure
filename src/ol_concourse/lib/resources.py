@@ -258,6 +258,7 @@ def registry_image(  # noqa: PLR0913
     username=None,
     password=None,
     check_every: str | None = None,
+    ecr_region: str | None = None,
 ) -> Resource:
     image_source: dict[str, Any] = {"repository": image_repository, "tag": image_tag}
     if username and password:
@@ -269,6 +270,8 @@ def registry_image(  # noqa: PLR0913
         image_source["tag_regex"] = tag_regex
     if sort_by_creation is not None:
         image_source["created_at_sort"] = sort_by_creation
+    if ecr_region is not None:
+        image_source["aws_region"] = ecr_region
     return Resource(
         name=name,
         type="registry-image",

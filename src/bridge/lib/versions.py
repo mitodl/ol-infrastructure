@@ -33,6 +33,8 @@ AWS_NODE_TERMINATION_HANDLER_CHART_VERSION = "0.27.2"
 BOTKUBE_CHART_VERSION = "v1.14.0"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager
 CERT_MANAGER_CHART_VERSION = "v1.16.1"
+# renovate: datasource=helm depName=dagster packageName=dagster registryUrl=https://dagster-io.github.io/helm
+DAGSTER_CHART_VERSION = "1.11.14"
 # renovate: datasource=aws-eks-addon depName=ebs-csi-driver
 EBS_CSI_DRIVER_VERSION = "v1.40.1-eksbuild.1"
 # renovate: datasource=aws-eks-addon depName=efs-csi-driver
