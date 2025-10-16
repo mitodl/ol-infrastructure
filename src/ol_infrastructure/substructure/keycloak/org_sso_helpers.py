@@ -80,6 +80,7 @@ def create_org_for_learn(org_config: OrgConfig) -> keycloak.Organization:
             for org_domain in org_config.org_domains
         ],
         enabled=True,
+        description=org_config.org_name,
         name=org_config.org_name,
         alias=org_config.org_alias.lower(),
         redirect_url=f"https://{org_config.learn_domain}/dashboard/organization/{org_config.org_alias.lower()}",

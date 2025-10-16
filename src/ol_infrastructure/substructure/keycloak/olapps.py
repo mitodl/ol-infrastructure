@@ -676,6 +676,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         domains=[
             keycloak.organization.OrganizationDomainArgs(name="mit.edu", verified=True)
         ],
+        description="Massachusetts Institute of Technology",
         enabled=True,
         name="MIT",
         alias="mit",
