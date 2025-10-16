@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions
+from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from bridge.lib.magic_numbers import SECONDS_IN_ONE_DAY
 from ol_infrastructure.substructure.keycloak.org_flows import (
@@ -581,6 +581,83 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     )
 
     # MITXONLINE SCIM [END]
+
+    # MITXONLINE B2B [START]
+    # This client is used by MITx Online for B2B operations via the Keycloak
+    # Admin API. It requires service account roles to view realms, users, and
+    # organizations.
+    olapps_mitxonline_b2b_client = keycloak.openid.Client(
+        "olapps-mitxonline-b2b-client",
+        name="mitxonline-b2b-client",
+        realm_id=ol_apps_realm.id,
+        client_id="mitxonline-b2b-client",
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=False,
+        implicit_flow_enabled=False,
+        direct_access_grants_enabled=False,
+        service_accounts_enabled=True,
+        valid_redirect_uris=[],
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+
+    # Get realm-management client to assign roles
+    realm_management_client = keycloak.openid.get_client(
+        realm_id=ol_apps_realm.id,
+        client_id="realm-management",
+        opts=InvokeOptions(provider=keycloak_provider),
+    )
+
+    # Assign required service account roles for Keycloak Admin API access
+    # These roles allow the client to list/view realms, users, and organizations
+    keycloak.openid.ClientServiceAccountRole(
+        "olapps-mitxonline-b2b-client-view-realm-role",
+        realm_id=ol_apps_realm.id,
+        service_account_user_id=olapps_mitxonline_b2b_client.service_account_user_id,
+        client_id=realm_management_client.id,
+        role="view-realm",
+        opts=resource_options,
+    )
+    keycloak.openid.ClientServiceAccountRole(
+        "olapps-mitxonline-b2b-client-view-users-role",
+        realm_id=ol_apps_realm.id,
+        service_account_user_id=olapps_mitxonline_b2b_client.service_account_user_id,
+        client_id=realm_management_client.id,
+        role="view-users",
+        opts=resource_options,
+    )
+    keycloak.openid.ClientServiceAccountRole(
+        "olapps-mitxonline-b2b-client-query-users-role",
+        realm_id=ol_apps_realm.id,
+        service_account_user_id=olapps_mitxonline_b2b_client.service_account_user_id,
+        client_id=realm_management_client.id,
+        role="query-users",
+        opts=resource_options,
+    )
+    keycloak.openid.ClientServiceAccountRole(
+        "olapps-mitxonline-b2b-client-view-organizations-role",
+        realm_id=ol_apps_realm.id,
+        service_account_user_id=olapps_mitxonline_b2b_client.service_account_user_id,
+        client_id=realm_management_client.id,
+        role="view-organizations",
+        opts=resource_options,
+    )
+
+    vault.generic.Secret(
+        "olapps-mitxonline-b2b-client-vault-credentials",
+        path="secret-mitxonline/keycloak-admin-b2b",
+        data_json=Output.all(
+            url=olapps_mitxonline_b2b_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
+            client_id=olapps_mitxonline_b2b_client.client_id,
+            client_secret=olapps_mitxonline_b2b_client.client_secret,
+            realm_id=olapps_mitxonline_b2b_client.realm_id,
+            realm_name="olapps",
+        ).apply(json.dumps),
+    )
+
+    # MITXONLINE B2B [END]
 
     # OLAPPS REALM- First login flow [START]
 

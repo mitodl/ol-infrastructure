@@ -277,6 +277,17 @@ def create_mitxonline_k8s_secrets(
                 "MITOL_SCIM_KEYCLOAK_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
             },
         },
+        {
+            "base_name": "keycloak-admin-b2b",
+            "path": "keycloak-admin-b2b",
+            "templates": {
+                "KEYCLOAK_DISCOVERY_URL": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
+                "KEYCLOAK_ADMIN_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+                "KEYCLOAK_ADMIN_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+                "KEYCLOAK_ADMIN_CLIENT_SCOPES": "openid profile email",
+                "KEYCLOAK_ADMIN_CLIENT_NO_VERIFY_SSL": "False",
+            },
+        },
     ]
 
     for config in mitxonline_secrets_configs:
