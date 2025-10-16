@@ -5,7 +5,6 @@ import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference
 from pulumi_aws import ec2, get_caller_identity
-from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
@@ -34,7 +33,6 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
-from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
@@ -53,7 +51,6 @@ dns_stack = StackReference("infrastructure.aws.dns")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
-consul_stack = StackReference(f"infrastructure.consul.operations.{stack_info.name}")
 opensearch_stack = StackReference(
     f"infrastructure.aws.opensearch.open_metadata.{stack_info.name}"
 )
@@ -70,7 +67,6 @@ aws_config = AWSBase(
 
 vault_config = Config("vault")
 
-consul_provider = get_consul_provider(stack_info)
 setup_vault_provider(stack_info)
 
 k8s_global_labels = K8sGlobalLabels(
@@ -81,7 +77,6 @@ k8s_global_labels = K8sGlobalLabels(
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
-consul_security_groups = consul_stack.require_output("security_groups")
 aws_account = get_caller_identity()
 
 open_metadata_namespace = "open-metadata"
@@ -97,7 +92,6 @@ open_metadata_database_security_group = ec2.SecurityGroup(
         ec2.SecurityGroupIngressArgs(
             security_groups=[
                 # add k8s ingress?
-                consul_security_groups["consul_server"],
                 vault_stack.require_output("vault_server")["security_group"],
             ],
             protocol="tcp",
@@ -174,40 +168,6 @@ open_metadata_db_vault_backend = OLVaultDatabaseBackend(
     open_metadata_db_vault_backend_config,
     opts=ResourceOptions(delete_before_replace=True, parent=open_metadata_db),
 )
-
-open_metadata_db_consul_node = Node(
-    "open-metadata-postgres-db",
-    name="open-metadata-postgres-db",
-    address=open_metadata_db.db_instance.address,
-    opts=consul_provider,
-)
-
-open_metadata_db_consul_service = Service(
-    "open-metadata-instance-db-service",
-    node=open_metadata_db_consul_node.name,
-    name="open-metadata-db",
-    port=open_metadata_db_config.port,
-    meta={
-        "external-node": True,
-        "external-probe": True,
-    },
-    checks=[
-        ServiceCheckArgs(
-            check_id="open-metadata-instance-db",
-            interval="10s",
-            name="open-metadata-instance-id",
-            timeout="60s",
-            status="passing",
-            tcp=open_metadata_db.db_instance.address.apply(
-                lambda address: f"{address}:{open_metadata_db_config.port}"
-            ),
-        )
-    ],
-    opts=consul_provider,
-)
-
-## Begin block for migrating to pyinfra images
-consul_datacenter = consul_stack.require_output("datacenter")
 
 # Create a vault policy and associate it with an auth backend role
 # on the vault k8s cluster auth endpoint
