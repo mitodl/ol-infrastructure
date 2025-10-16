@@ -1,5 +1,6 @@
 # ruff: noqa: F841, E501, PLR0913, FIX002, PLR0915
 import os
+from pathlib import Path
 
 import pulumi
 import pulumi_aws as aws
@@ -123,6 +124,23 @@ def create_k8s_resources(
         ou=BusinessUnit(stack_info.env_prefix),
         stack=stack_info,
     ).model_dump()
+
+    # Create ConfigMap for Vector configuration
+    vector_config_path = Path(__file__).parent / "files/vector/edxapp_tracking_log.yaml"
+    with vector_config_path.open() as f:
+        vector_config_content = f.read()
+
+    vector_configmap = kubernetes.core.v1.ConfigMap(
+        f"ol-{stack_info.env_prefix}-edxapp-vector-config-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{env_name}-edxapp-vector-config",
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        data={
+            "vector.yaml": vector_config_content,
+        },
+    )
 
     # We need to "guess" service account name here because there is a loop with
     # needing the service account name for the trust role, but needing the trustrole
@@ -593,6 +611,14 @@ def create_k8s_resources(
             ),
         )
     )
+    lms_edxapp_volumes.append(
+        kubernetes.core.v1.VolumeArgs(
+            name="vector-config",
+            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                name=f"{env_name}-edxapp-vector-config",
+            ),
+        )
+    )
     lms_edxapp_volumes.extend(staticfiles_volumes)
 
     # Define the volumemounts for the init container that aggregates the config files
@@ -687,6 +713,43 @@ def create_k8s_resources(
                             ],
                             volume_mounts=webapp_volume_mounts,
                         ),
+                        kubernetes.core.v1.ContainerArgs(
+                            name="vector",
+                            image="timberio/vector:0.34.1-alpine",
+                            env=[
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="ENVIRONMENT",
+                                    value=stack_info.env_prefix,
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="TIER",
+                                    value=stack_info.env_suffix,
+                                ),
+                            ],
+                            resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                requests={
+                                    "cpu": "100m",
+                                    "memory": "128Mi",
+                                },
+                                limits={
+                                    "cpu": "200m",
+                                    "memory": "256Mi",
+                                },
+                            ),
+                            volume_mounts=[
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="openedx-logs",
+                                    mount_path="/opt/data/lms/logs",
+                                    read_only=True,
+                                ),
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="vector-config",
+                                    mount_path="/etc/vector",
+                                    read_only=True,
+                                ),
+                            ],
+                            args=["--config", "/etc/vector/vector.yaml"],
+                        ),
                     ],
                 ),
             ),
@@ -696,6 +759,7 @@ def create_k8s_resources(
                 *lms_edxapp_config_sources.values(),
                 lms_pre_deploy_migrate_job,
                 lms_pre_deploy_waffleflag_job,
+                vector_configmap,
             ]
         ),
     )
@@ -1019,6 +1083,14 @@ def create_k8s_resources(
             ),
         )
     )
+    cms_edxapp_volumes.append(
+        kubernetes.core.v1.VolumeArgs(
+            name="vector-config",
+            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                name=f"{env_name}-edxapp-vector-config",
+            ),
+        )
+    )
     cms_edxapp_volumes.extend(staticfiles_volumes)
 
     # Define the volume mounts for the init container that aggregates the config files
@@ -1106,7 +1178,44 @@ def create_k8s_resources(
                                 )
                             ],
                             volume_mounts=webapp_volume_mounts,
-                        )
+                        ),
+                        kubernetes.core.v1.ContainerArgs(
+                            name="vector",
+                            image="timberio/vector:0.34.1-alpine",
+                            env=[
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="ENVIRONMENT",
+                                    value=stack_info.env_prefix,
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="TIER",
+                                    value=stack_info.tier,
+                                ),
+                            ],
+                            resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                requests={
+                                    "cpu": "100m",
+                                    "memory": "128Mi",
+                                },
+                                limits={
+                                    "cpu": "200m",
+                                    "memory": "256Mi",
+                                },
+                            ),
+                            volume_mounts=[
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="openedx-logs",
+                                    mount_path="/opt/data/cms/logs",
+                                    read_only=True,
+                                ),
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="vector-config",
+                                    mount_path="/etc/vector",
+                                    read_only=True,
+                                ),
+                            ],
+                            args=["--config", "/etc/vector/vector.yaml"],
+                        ),
                     ],
                 ),
             ),
@@ -1115,6 +1224,7 @@ def create_k8s_resources(
             depends_on=[
                 *cms_edxapp_config_sources.values(),
                 cms_pre_deploy_migrate_job,
+                vector_configmap,
             ]
         ),
     )

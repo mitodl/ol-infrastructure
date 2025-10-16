@@ -184,6 +184,7 @@ def create_k8s_configmaps(
                       TOS_AND_HONOR: ''
                     NOTIFICATIONS_DEFAULT_FROM_EMAIL: {edxapp_config.get("bulk_email_default_from_email") or edxapp_config.require("sender_email_address")}
                     PAYMENT_SUPPORT_EMAIL: {edxapp_config.require("sender_email_address")}
+                    PREVIEW_LMS_BASE: {edxapp_config.require_object("domains")["preview"]}
                     SENTRY_ENVIRONMENT: {env_name}
                     # Removing the session cookie domain as it is no longer needed for sharing the cookie
                     # between LMS and Studio (TMM 2021-10-22)
