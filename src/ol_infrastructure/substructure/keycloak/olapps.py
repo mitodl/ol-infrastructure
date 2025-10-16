@@ -616,6 +616,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         ("olapps-mitxonline-b2b-client-view-users-role", "view-users"),
         ("olapps-mitxonline-b2b-client-query-users-role", "query-users"),
         ("olapps-mitxonline-b2b-client-view-organizations-role", "view-organizations"),
+        ("olapps-mitxonline-b2b-client-manage-realm-role", "manage-realm"),
     ]:
         keycloak.openid.ClientServiceAccountRole(
             resource_name,
