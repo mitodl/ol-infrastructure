@@ -84,7 +84,16 @@ else:
             to_port=DEFAULT_HTTPS_PORT,
             cidr_blocks=[target_vpc["cidr"]],
             protocol="tcp",
-        )
+        ),
+        *[
+            aws.ec2.SecurityGroupIngressArgs(
+                from_port=DEFAULT_HTTPS_PORT,
+                to_port=DEFAULT_HTTPS_PORT,
+                cidr_blocks=[cidr],
+                protocol="tcp",
+            )
+            for cidr in search_config.get_object("additional_trusted_cidrs") or []
+        ],
     ]
 search_security_group = aws.ec2.SecurityGroup(
     "opensearch-security-group",
