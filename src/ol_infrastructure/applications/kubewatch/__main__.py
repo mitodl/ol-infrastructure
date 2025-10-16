@@ -40,9 +40,8 @@ setup_vault_provider(stack_info)
 kubewatch_config = Config("config_kubewatch")
 vault_config = Config("vault")
 
-cluster_stack = StackReference(
-    f"infrastructure.aws.eks.{stack_info.env_prefix}.{stack_info.name}"
-)
+cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 aws_config = AWSBase(
     tags={"OU": BusinessUnit.operations, "Environment": Environment.operations},
@@ -101,7 +100,7 @@ vault_k8s_resources = OLVaultK8SResources(
 )
 
 # Load the static secrets into a k8s secret via VSO
-static_secrets_name = "communication-slack"  # pragma: allowlist secret
+static_secrets_name = "kubewatch-slack"  # pragma: allowlist secret
 static_secrets = OLVaultK8SSecret(
     name=f"kubewatch-{stack_info.env_suffix}-static-secrets",
     resource_config=OLVaultK8SStaticSecretConfig(
@@ -146,14 +145,8 @@ kubewatch_application = kubernetes.helm.v3.Release(
             repo="https://github.com/robusta-dev/kubewatch",
         ),
         values={
-            "global": {"imageRegistry": "", "imagePullSecrets": []},
-            "kubeVersion": "",
-            "nameOverride": "",
-            "fullnameOverride": "",
-            "commonLabels": {},
-            "commonAnnotations": {},
             "diagnosticMode": {
-                "enabled": False,
+                "enabled": True,
                 "command": ["sleep"],
                 "args": ["infinity"],
             },
@@ -164,8 +157,7 @@ kubewatch_application = kubernetes.helm.v3.Release(
                 "pullPolicy": "IfNotPresent",
                 "pullSecrets": [],
             },
-            "hostAliases": [],
-            "slack": {"enabled": True, "channel": "XXXX", "token": "XXXX"},
+            "slack": {"enabled": True, "channel": slack_channel, "token": "XXXX"},
             "slackwebhook": {
                 "enabled": False,
                 "channel": "XXXX",

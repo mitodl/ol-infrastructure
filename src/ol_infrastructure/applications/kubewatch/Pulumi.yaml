@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-kubewatch-application
+name: ol-infrastructure-kubewatch
 runtime: python
 description: A project to forward select k8s events to Slack
 backend:
