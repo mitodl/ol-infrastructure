@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pulumi
@@ -63,9 +64,26 @@ consul_service_name = (
     search_config.get("consul_service_name") or "elasticsearch"
 )  # Default is for legacy compatability
 
+# If there are additional_trusted_subnets specified,
+# verify they are from our VPCs and not the internet
+#
+# We're doing this with regular expressions because there is a seemingly unavoidable
+# mypy error when using the ipaddress module.
+octet_regex = r"([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])"
+mask_regex = r"([0-9]|[12][0-9]|3[0-2])"
+cidr_regex = re.compile(
+    f"^(10|172)\\.({octet_regex})\\.({octet_regex})\\.({octet_regex})/({mask_regex})$"
+)
+for cidr in search_config.get_object("additional_trusted_cidrs") or []:
+    if not cidr_regex.match(cidr):
+        msg = f"additional_trusted_cidr {cidr} is not a valid CIDR in 10.0.0.0/8 or 172.0.0.0/8"  # noqa: E501
+        raise ValueError(msg)
+
+
 ##########
 # CREATE #
 ##########
+
 
 # Networking
 if is_public_web:
