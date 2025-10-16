@@ -610,38 +610,21 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
 
     # Assign required service account roles for Keycloak Admin API access
     # These roles allow the client to list/view realms, users, and organizations
-    keycloak.openid.ClientServiceAccountRole(
-        "olapps-mitxonline-b2b-client-view-realm-role",
-        realm_id=ol_apps_realm.id,
-        service_account_user_id=olapps_mitxonline_b2b_client.service_account_user_id,
-        client_id=realm_management_client.id,
-        role="view-realm",
-        opts=resource_options,
-    )
-    keycloak.openid.ClientServiceAccountRole(
-        "olapps-mitxonline-b2b-client-view-users-role",
-        realm_id=ol_apps_realm.id,
-        service_account_user_id=olapps_mitxonline_b2b_client.service_account_user_id,
-        client_id=realm_management_client.id,
-        role="view-users",
-        opts=resource_options,
-    )
-    keycloak.openid.ClientServiceAccountRole(
-        "olapps-mitxonline-b2b-client-query-users-role",
-        realm_id=ol_apps_realm.id,
-        service_account_user_id=olapps_mitxonline_b2b_client.service_account_user_id,
-        client_id=realm_management_client.id,
-        role="query-users",
-        opts=resource_options,
-    )
-    keycloak.openid.ClientServiceAccountRole(
-        "olapps-mitxonline-b2b-client-view-organizations-role",
-        realm_id=ol_apps_realm.id,
-        service_account_user_id=olapps_mitxonline_b2b_client.service_account_user_id,
-        client_id=realm_management_client.id,
-        role="view-organizations",
-        opts=resource_options,
-    )
+    # Refactored repetitive role assignments into a loop for maintainability
+    for resource_name, role in [
+        ("olapps-mitxonline-b2b-client-view-realm-role", "view-realm"),
+        ("olapps-mitxonline-b2b-client-view-users-role", "view-users"),
+        ("olapps-mitxonline-b2b-client-query-users-role", "query-users"),
+        ("olapps-mitxonline-b2b-client-view-organizations-role", "view-organizations"),
+    ]:
+        keycloak.openid.ClientServiceAccountRole(
+            resource_name,
+            realm_id=ol_apps_realm.id,
+            service_account_user_id=olapps_mitxonline_b2b_client.service_account_user_id,
+            client_id=realm_management_client.id,
+            role=role,
+            opts=resource_options,
+        )
 
     vault.generic.Secret(
         "olapps-mitxonline-b2b-client-vault-credentials",
