@@ -33,11 +33,10 @@ run_launcher:
   module: dagster_k8s
   class: K8sRunLauncher
   config:
-    k8sRunLauncher:
-      runK8sConfig:
-        podTemplateSpecMetadata:
-          annotations:
-            karpenter.sh/do-not-disrupt: "true"
+    run_k8s_config:
+      pod_template_spec_metadata:
+        annotations:
+          karpenter.sh/do-not-disrupt: "true"
     load_incluster_config: true
     job_namespace: dagster
     image_pull_policy: IfNotPresent
