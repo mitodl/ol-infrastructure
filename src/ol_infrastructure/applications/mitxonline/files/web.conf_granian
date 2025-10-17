@@ -14,18 +14,16 @@ server {
     #     try_files /static/images/favicon.ico /favicon.ico;
     # }
 
+    location ~* /static/hash.txt {
+        expires -1;
+        add_header Cache-Control private;
+    }
+
     location ~* /static/(.*$) {
         expires max;
         add_header Access-Control-Allow-Origin *;
         # Serve static files directly if they exist, otherwise return 404
         try_files $uri $uri/ /staticfiles/$1 /staticfiles/$1/ =404;
-    }
-
-    location ~* /media/(.*$) {
-        expires max;
-        add_header Access-Control-Allow-Origin *;
-        # Serve media files directly if they exist, otherwise return 404
-        try_files $uri $uri/ /django_media/$1 /django_media/$1/ =404;
     }
 
     location / {
