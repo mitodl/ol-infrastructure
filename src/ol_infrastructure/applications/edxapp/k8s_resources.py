@@ -693,6 +693,22 @@ def create_k8s_resources(
                         kubernetes.core.v1.ContainerArgs(
                             name="lms-edxapp",
                             image=edxapp_image,
+                            command=["granian"],
+                            args=[
+                                "--interface",
+                                "wsgi",
+                                "--host",
+                                "0.0.0.0",  # noqa: S104
+                                "--port",
+                                "8000",
+                                "--workers",
+                                "1",
+                                "--log-level",
+                                "warn",
+                                "--static-path-mount",
+                                "/openedx/staticfiles",
+                                "lms.wsgi:application",
+                            ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="SERVICE_VARIANT", value="lms"
@@ -1159,6 +1175,22 @@ def create_k8s_resources(
                         kubernetes.core.v1.ContainerArgs(
                             name="cms-edxapp",
                             image=edxapp_image,
+                            command=["granian"],
+                            args=[
+                                "--interface",
+                                "wsgi",
+                                "--host",
+                                "0.0.0.0",  # noqa: S104
+                                "--port",
+                                "8000",
+                                "--workers",
+                                "1",
+                                "--log-level",
+                                "warn",
+                                "--static-path-mount",
+                                "/openedx/staticfiles",
+                                "cms.wsgi:application",
+                            ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="SERVICE_VARIANT", value="cms"
