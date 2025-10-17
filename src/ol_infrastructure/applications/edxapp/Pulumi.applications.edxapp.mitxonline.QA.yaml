@@ -122,7 +122,7 @@ config:
         memory_request: "1Gi"
         memory_limit: "2Gi"
   edxapp:k8s_deployment: true
-  edxapp:k8s_cutover: false
+  edxapp:k8s_cutover: true
   edxapp:disable_ec2_deployment: false
   redis:instance_type: cache.r7g.large
   mongodb:atlas_project_id: 61a8fd80284fd30a660f2699
