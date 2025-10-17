@@ -77,7 +77,7 @@ class OLEKSAuthBinding(ComponentResource):
             opts,
         )
         aws_account = get_caller_identity()
-        iam_policy = iam.Policy(
+        self.iam_policy = iam.Policy(
             f"{config.application_name}-policy-{config.stack_info.env_suffix}",
             name=f"{config.application_name}-policy-{config.stack_info.env_suffix}",
             path=f"/ol-data/{config.application_name}-policy-{config.stack_info.env_suffix}/",
@@ -93,7 +93,7 @@ class OLEKSAuthBinding(ComponentResource):
             opts=ResourceOptions(parent=self),
         )
 
-        trust_role = OLEKSTrustRole(
+        self.trust_role = OLEKSTrustRole(
             f"{config.application_name}-irsa-trust-role-{config.stack_info.env_suffix}",
             role_config=OLEKSTrustRoleConfig(
                 account_id=aws_account.account_id,
@@ -113,11 +113,11 @@ class OLEKSAuthBinding(ComponentResource):
 
         iam.RolePolicyAttachment(
             f"{config.application_name}-irsa-policy-attach-{config.stack_info.env_suffix}",
-            policy_arn=iam_policy.arn,
-            role=trust_role.role.name,
+            policy_arn=self.iam_policy.arn,
+            role=self.trust_role.role.name,
             opts=ResourceOptions(parent=self),
         )
-        self.irsa_role = trust_role.role
+        self.irsa_role = self.trust_role.role
 
         vault_policy = Policy(
             f"{config.application_name}-server-vault-policy",
@@ -163,7 +163,7 @@ class OLEKSAuthBinding(ComponentResource):
 
         self.register_outputs(
             {
-                "iam_policy": iam_policy,
+                "iam_policy": self.iam_policy,
                 "irsa_role": self.irsa_role,
                 "vault_policy": vault_policy,
                 "vault_k8s_auth_role": k8s_auth_backend_role,
