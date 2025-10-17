@@ -584,6 +584,7 @@ for location in code_locations:
         "annotations": dagster_auth_binding.irsa_role.arn.apply(
             lambda arn: {
                 "eks.amazonaws.com/role-arn": arn,
+                "karpenter.sh/do-not-disrupt": "true",
             }
         ),
         "resources": {
