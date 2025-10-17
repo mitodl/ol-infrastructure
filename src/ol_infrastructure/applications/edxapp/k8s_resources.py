@@ -1189,7 +1189,7 @@ def create_k8s_resources(
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="TIER",
-                                    value=stack_info.tier,
+                                    value=stack_info.env_suffix,
                                 ),
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
