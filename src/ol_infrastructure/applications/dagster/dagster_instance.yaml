@@ -44,6 +44,9 @@ run_launcher:
     - dagster-static-secrets
     - dagster-dbt-secrets
     - dagster-postgresql-secret
+    podTemplateSpecMetadata:
+      annotations:
+        karpenter.sh/do-not-disrupt: "true"
 
 run_storage:
   module: dagster_postgres.run_storage
