@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
+import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi.config import get_config
 from pulumi_aws import ec2, get_caller_identity, s3
@@ -59,12 +60,11 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
-setup_vault_provider(skip_child_token=True)
 stack_info = parse_stack()
+setup_vault_provider(stack_info)
 
 # Config
 dagster_config = Config("dagster")
-vault_config = Config("vault")
 
 # Stack references
 dns_stack = StackReference("infrastructure.aws.dns")
@@ -103,24 +103,13 @@ cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(dagster_namespace, ns)
 )
 
-# Stack references for accessing other application databases
-mitxonline_stack = StackReference(f"applications.edxapp.mitxonline.{stack_info.name}")
-mitxonline_mongodb_stack = StackReference(
-    f"infrastructure.mongodb_atlas.mitxonline.{stack_info.name}"
-)
-residential_mongodb_stack = StackReference(
-    f"infrastructure.mongodb_atlas.mitx.{stack_info.name}"
-)
-xpro_stack = StackReference(f"applications.edxapp.xpro.{stack_info.name}")
-xpro_mongodb_stack = StackReference(
-    f"infrastructure.mongodb_atlas.xpro.{stack_info.name}"
-)
-
 dagster_bucket_name = f"dagster-{dagster_environment}"
 s3_tracking_logs_buckets = [
     f"{edxapp_deployment}-{stack_info.env_suffix}-edxapp-tracking"
     for edxapp_deployment in ("mitxonline", "mitx", "mitx-staging", "xpro")
 ]
+app_buckets = [f"ol-mitlearn-app-storage-{stack_info.env_suffix}"]
+dagster_pipeline_buckets = s3_tracking_logs_buckets + app_buckets
 dagster_s3_permissions: list[dict[str, str | list[str]]] = [
     {
         "Effect": "Allow",
@@ -199,9 +188,9 @@ dagster_s3_permissions: list[dict[str, str | list[str]]] = [
             "s3:PutObject",
         ],
         "Resource": [
-            f"arn:aws:s3:::{bucket_name}" for bucket_name in s3_tracking_logs_buckets
+            f"arn:aws:s3:::{bucket_name}" for bucket_name in dagster_pipeline_buckets
         ]
-        + [f"arn:aws:s3:::{bucket_name}/*" for bucket_name in s3_tracking_logs_buckets],
+        + [f"arn:aws:s3:::{bucket_name}/*" for bucket_name in dagster_pipeline_buckets],
     },
 ]
 
@@ -378,6 +367,16 @@ dagster_auth_binding = OLEKSAuthBinding(
         parliament_config=parliament_config,
     )
 )
+
+dagster_vault_iam_role = vault.aws.SecretBackendRole(
+    f"ol-mitopen-iam-permissions-vault-policy-{stack_info.env_suffix}",
+    name="dagster",
+    backend="aws-mitx",
+    credential_type="iam_user",
+    iam_tags={"OU": "data", "vault_managed": "True"},
+    policy_arns=[dagster_auth_binding.iam_policy.arn],
+)
+
 
 # Create Vault secrets for Dagster configuration
 dagster_static_secrets = OLVaultK8SSecret(
