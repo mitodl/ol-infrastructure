@@ -902,6 +902,25 @@ dagster_user_code_release = kubernetes.helm.v3.Release(
     ),
 )
 
+# Pod Disruption Budget for run workers
+dagster_run_worker_pdb = kubernetes.policy.v1.PodDisruptionBudget(
+    f"dagster-run-worker-pdb-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-run-worker-pdb",
+        namespace=dagster_namespace,
+        labels=k8s_global_labels.model_dump(),
+    ),
+    spec=kubernetes.policy.v1.PodDisruptionBudgetSpecArgs(
+        max_unavailable=0,
+        selector=kubernetes.meta.v1.LabelSelectorArgs(
+            match_labels={
+                "app.kubernetes.io/component": "run_worker",
+            },
+        ),
+    ),
+    opts=ResourceOptions(depends_on=[dagster_helm_release, dagster_user_code_release]),
+)
+
 # APISix route configuration
 dagster_tls_secret_name = "dagster-tls-pair"  # pragma: allowlist secret # noqa: S105
 cert_manager_certificate = OLCertManagerCert(
