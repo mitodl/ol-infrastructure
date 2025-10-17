@@ -156,6 +156,7 @@ def create_k8s_configmaps(
                     MIT_LEARN_AI_XBLOCK_CHAT_API_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai/http/canvas_syllabus_agent/
                     MIT_LEARN_AI_XBLOCK_TUTOR_CHAT_API_URL:  https://{edxapp_config.require("mit_learn_api_domain")}/ai/http/canvas_tutor_agent/
                     MIT_LEARN_AI_XBLOCK_PROBLEM_SET_LIST_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai/api/v0/problem_set_list  # Added for ol_openedx_chat_xblock
+                    MIT_LEARN_AI_XBLOCK_CHAT_RATING_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai/api/v0/chat_sessions/  # Added for ol_openedx_chat_xblock
                     MIT_LEARN_LOGO: https://{edxapp_config.require_object("domains")["lms"]}/static/mitxonline/images/mit-learn-logo.svg
                     LEARNING_MICROFRONTEND_URL: https://{edxapp_config.require_object("domains")["lms"]}/learn
                     LMS_BASE: {edxapp_config.require_object("domains")["lms"]}
