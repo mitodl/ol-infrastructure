@@ -40,7 +40,9 @@ setup_vault_provider(stack_info)
 kubewatch_config = Config("config_kubewatch")
 vault_config = Config("vault")
 
-cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+cluster_stack = StackReference(
+    f"infrastructure.aws.eks.{stack_info.env_prefix}.{stack_info.name}"
+)
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 aws_config = AWSBase(
@@ -142,7 +144,7 @@ kubewatch_application = kubernetes.helm.v3.Release(
         namespace=kubewatch_namespace,
         cleanup_on_fail=True,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-            repo="https://github.com/robusta-dev/kubewatch",
+            repo="https://robusta-charts.storage.googleapis.com",
         ),
         values={
             "diagnosticMode": {
@@ -158,13 +160,6 @@ kubewatch_application = kubernetes.helm.v3.Release(
                 "pullSecrets": [],
             },
             "slack": {"enabled": True, "channel": slack_channel, "token": "XXXX"},
-            "slackwebhook": {
-                "enabled": False,
-                "channel": "XXXX",
-                "username": "",
-                "emoji": "",
-                "slackwebhookurl": "XXXX",
-            },
             "extraHandlers": {},
             "namespaceToWatch": "",
             "resourcesToWatch": {
@@ -243,7 +238,19 @@ kubewatch_application = kubernetes.helm.v3.Release(
                 "automountServiceAccountToken": True,
                 "annotations": {},
             },
+            "extraEnv": [
+                {
+                    "name": ("KW_SLACK_CHANNEL"),
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "kubewatch-slack",
+                            "key": "slack-bot-token",
+                        },
+                    },
+                },
+            ],
         },
+        skip_await=False,
     ),
     opts=ResourceOptions(
         depends_on=[static_secrets],

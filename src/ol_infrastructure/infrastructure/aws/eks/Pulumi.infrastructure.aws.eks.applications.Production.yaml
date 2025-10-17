@@ -35,6 +35,7 @@ config:
   - "botkube"
   - "ecommerce"
   - "jupyter"
+  - "kubewatch"
   - "learn-ai"
   - "mitlearn"
   - "mitxonline"

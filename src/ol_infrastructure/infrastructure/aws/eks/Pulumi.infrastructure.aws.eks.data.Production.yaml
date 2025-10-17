@@ -21,10 +21,11 @@ config:
   eks:efs_csi_provisioner: "true"
   eks:gateway_release_channel: "experimental"
   eks:namespaces:
-  - airbyte
-  - dagster
-  - open-metadata
-  - superset
+  - "airbyte"
+  - "dagster"
+  - "kubewatch"
+  - "open-metadata"
+  - "superset"
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 500
