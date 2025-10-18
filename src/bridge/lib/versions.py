@@ -62,4 +62,4 @@ PROMETHEUS_OPERATOR_CRD_VERSION = "v0.86.1"
 # renovate: datasource=github-releases depName=keycloak-k8s-resources packageName=keycloak/keycloak-k8s-resources
 KEYCLOAK_OPERATOR_CRD_VERSION = "26.2.4"
 # renovate: datasource=helm depName=jupyterhub packageName=jupyterhub registryUrl=https://hub.jupyter.org/helm-chart
-JUPYTERHUB_CHART_VERSION = "4.3.0"
+JUPYTERHUB_CHART_VERSION = "4.3.1"
