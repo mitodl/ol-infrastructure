@@ -24,7 +24,25 @@ KNOWN_COURSES = [
 KNOWN_COURSES.extend(
     [
         f"uai_source-uai.{i}"
-        for i in ["intro", 0, "0a", 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, "st1"]
+        for i in [
+            "intro",
+            0,
+            "0a",
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            11,
+            12,
+            13,
+            "st1",
+            "mltl1",
+        ]
     ]
 )
 # All courses which use the CUDA pytorch or tensorflow base image are below
@@ -41,6 +59,7 @@ GPU_ENABLED_COURSES = {
     "uai_source-uai.12",
     "uai_source-uai.13",
     "uai_source-uai.st1",
+    "uai_source-uai.mltl1",
 }
 
 
