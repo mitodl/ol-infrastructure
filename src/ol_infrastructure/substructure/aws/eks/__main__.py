@@ -9,12 +9,7 @@ import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 
-from bridge.lib.magic_numbers import (
-    DEFAULT_HTTPS_PORT,
-    DEFAULT_KEDA_PORT,
-)
 from bridge.lib.versions import (
-    KEDA_CHART_VERSION,
     KUBE_STATE_METRICS_CHART_VERSION,
     VANTAGE_K8S_AGENT_CHART_VERSION,
 )
@@ -24,11 +19,11 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
-from ol_infrastructure.lib.aws.eks_helper import default_psg_egress_args
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 from ol_infrastructure.substructure.aws.eks.karpenter import setup_karpenter
+from ol_infrastructure.substructure.aws.eks.keda import setup_keda
 
 env_config = Config("environment")
 
@@ -809,129 +804,16 @@ setup_karpenter(
     k8s_global_labels=k8s_global_labels,
 )
 
-keda_security_group = aws.ec2.SecurityGroup(
-    f"{cluster_name}-keda-security-group",
-    description="Security group for KEDA operator",
-    vpc_id=target_vpc["id"],
-    ingress=[
-        aws.ec2.SecurityGroupIngressArgs(
-            self=True,
-            from_port=DEFAULT_KEDA_PORT,
-            to_port=DEFAULT_KEDA_PORT,
-            protocol="tcp",
-        ),
-        aws.ec2.SecurityGroupIngressArgs(
-            self=True,
-            from_port=DEFAULT_HTTPS_PORT,
-            to_port=DEFAULT_HTTPS_PORT,
-            protocol="tcp",
-        ),
-        aws.ec2.SecurityGroupIngressArgs(
-            self=True,
-            from_port=8080,
-            to_port=8080,
-            protocol="tcp",
-        ),
-        aws.ec2.SecurityGroupIngressArgs(
-            from_port=6443,
-            to_port=6443,
-            security_groups=[cluster_stack.require_output("cluster_security_group_id")],
-            protocol="tcp",
-        ),
-    ],
-    egress=default_psg_egress_args,
-    tags={
-        **aws_config.tags,
-        "Name": f"{cluster_name}-keda-security-group",
-    },
-)
-export("cluster_keda_security_group_id", keda_security_group.id)
-
-keda_release = kubernetes.helm.v3.Release(
-    f"{cluster_name}-keda-helm-release",
-    kubernetes.helm.v3.ReleaseArgs(
-        name="keda",
-        chart="keda",
-        version=KEDA_CHART_VERSION,
-        namespace="operations",
-        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-            repo="https://kedacore.github.io/charts"
-        ),
-        cleanup_on_fail=True,
-        skip_await=True,
-        values={
-            "podLabels": {
-                "keda": {
-                    "ol.mit.edu/pod-security-group": keda_security_group.id,
-                },
-                "metricsAdapter": {
-                    "ol.mit.edu/pod-security-group": keda_security_group.id,
-                },
-                "webhooks": {
-                    "ol.mit.edu/pod-security-group": keda_security_group.id,
-                },
-            },
-            "resources": {
-                "operator": {
-                    "requests": {
-                        "cpu": "100m",
-                        "memory": "200Mi",
-                    },
-                    "limits": {
-                        "cpu": "200m",
-                        "memory": "400Mi",
-                    },
-                },
-                "metricServer": {
-                    "requests": {
-                        "cpu": "100m",
-                        "memory": "100Mi",
-                    },
-                    "limits": {
-                        "cpu": "200m",
-                        "memory": "200Mi",
-                    },
-                },
-                "webhooks": {
-                    "requests": {
-                        "cpu": "100m",
-                        "memory": "100Mi",
-                    },
-                    "limits": {
-                        "cpu": "200m",
-                        "memory": "200Mi",
-                    },
-                },
-            },
-        },
-    ),
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        parent=k8s_provider,
-        delete_before_replace=True,
-    ),
-)
-
-keda_security_group_policy = kubernetes.apiextensions.CustomResource(
-    f"{cluster_name}-keda-helm-release",
-    api_version="vpcresources.k8s.aws/v1beta1",
-    kind="SecurityGroupPolicy",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="keda-operator",
-        namespace="operations",
-        labels=k8s_global_labels,
-    ),
-    spec={
-        "podSelector": {
-            "matchLabels": {
-                "ol.mit.edu/pod-security-group": keda_security_group.id,
-            }
-        },
-        "securityGroups": {
-            "groupIds": [keda_security_group.id],
-        },
-    },
-    opts=ResourceOptions(depends_on=keda_release, provider=k8s_provider),
+############################################################
+# KEDA (Kubernetes Event Driven Autoscaling)
+############################################################
+setup_keda(
+    cluster_name=cluster_name,
+    cluster_stack=cluster_stack,
+    target_vpc=target_vpc,
+    aws_config=aws_config,
+    k8s_provider=k8s_provider,
+    k8s_global_labels=k8s_global_labels,
 )
 
 nvidia_k8s_device_plugin_release = kubernetes.helm.v3.Release(
