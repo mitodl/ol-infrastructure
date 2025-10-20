@@ -108,8 +108,11 @@ s3_tracking_logs_buckets = [
     f"{edxapp_deployment}-{stack_info.env_suffix}-edxapp-tracking"
     for edxapp_deployment in ("mitxonline", "mitx", "mitx-staging", "xpro")
 ]
-app_buckets = [f"ol-mitlearn-app-storage-{stack_info.env_suffix}"]
-dagster_pipeline_buckets = s3_tracking_logs_buckets + app_buckets
+mitlearn_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
+    stack_info.env_suffix
+]
+mitlearn_app_buckets = [f"ol-mitlearn-app-storage-{mitlearn_env_suffix}"]
+dagster_pipeline_buckets = s3_tracking_logs_buckets + mitlearn_app_buckets
 dagster_s3_permissions: list[dict[str, str | list[str]]] = [
     {
         "Effect": "Allow",
