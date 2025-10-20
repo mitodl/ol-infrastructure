@@ -240,11 +240,11 @@ kubewatch_application = kubernetes.helm.v3.Release(
             },
             "extraEnv": [
                 {
-                    "name": ("KW_SLACK_CHANNEL"),
+                    "name": ("KW_SLACK_TOKEN"),
                     "valueFrom": {
                         "secretKeyRef": {
                             "name": "kubewatch-slack",
-                            "key": "slack-bot-token",
+                            "key": "slack-token",
                         },
                     },
                 },
