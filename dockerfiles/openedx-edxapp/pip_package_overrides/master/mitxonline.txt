@@ -2,3 +2,10 @@ git+https://github.com/anupdhabarde/edx-proctoring-proctortrack.git@31c6c9923a51
 # Fix issues with lxml and xmlsec mismatches
 lxml==5.3.2 --no-binary lxml
 xmlsec==1.3.14 --no-binary xmlsec
+# Django 5 MariaDB UUIDField migration fixes
+git+https://github.com/mitodl/django-user-tasks.git@4e08ee355ac7978f566a0a88f66e4d07d5b05a31#egg=django-user-tasks
+git+https://github.com/mitodl/edx-enterprise.git@7a62e58560f2c0cbe3e071c8055f27883dedf376#egg=edx-enterprise
+git+https://github.com/mitodl/edx-submissions.git@24ac6829bda137be5570d2e593ca7ad816fd4571#egg=edx-submissions
+git+https://github.com/mitodl/enterprise-integrated-channels.git@a2d15cd15b5973c23edcd9c920f64b90d0b2eae0#egg=enterprise-integrated-channels
+git+https://github.com/mitodl/xblock-lti-consumer.git@1a3f6be20b7446ba7a2847527c2effa2aa1aa9d5#egg=lti-consumer-xblock
+git+https://github.com/mitodl/edx-ora2.git@088e56393c85561222a703bdd7f4915dca126fc2#egg=ora2

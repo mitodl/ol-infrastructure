@@ -306,8 +306,6 @@ ReleaseMap: dict[
                 application="edx-platform",
                 application_type="IDA",
                 release="master",
-                branch_override="mariadb_uuid_field_conversion",
-                origin_override="https://github.com/mitodl/edx-platform",
             ),
             OpenEdxApplicationVersion(
                 application="edxapp_theme",
