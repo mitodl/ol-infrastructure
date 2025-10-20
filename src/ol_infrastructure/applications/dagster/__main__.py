@@ -584,6 +584,12 @@ for location in code_locations:
             module,
         ],
         "port": port,
+        "startupProbe": {
+            "enabled": True,
+            "periodSeconds": 10,
+            "timeoutSeconds": 3,
+            "failureThreshold": 60,
+        },
         "annotations": dagster_auth_binding.irsa_role.arn.apply(
             lambda arn: {
                 "eks.amazonaws.com/role-arn": arn,
@@ -603,6 +609,14 @@ for location in code_locations:
             {
                 "name": "DAGSTER_SENSOR_GRPC_TIMEOUT_SECONDS",
                 "value": "300",
+            },
+            {
+                "name": "GRPC_MAX_SEND_MESSAGE_LENGTH",
+                "value": "268435456",
+            },
+            {
+                "name": "GRPC_MAX_RECEIVE_MESSAGE_LENGTH",
+                "value": "268435456",
             },
             {"name": "DAGSTER_PG_HOST", "value": dagster_db.db_instance.address},
             {"name": "DAGSTER_PG_DB", "value": "dagster"},
@@ -727,6 +741,14 @@ dagster_helm_values = {
                 "name": "DAGSTER_SENSOR_GRPC_TIMEOUT_SECONDS",
                 "value": "300",
             },
+            {
+                "name": "GRPC_MAX_SEND_MESSAGE_LENGTH",
+                "value": "268435456",
+            },
+            {
+                "name": "GRPC_MAX_RECEIVE_MESSAGE_LENGTH",
+                "value": "268435456",
+            },
             {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
         ],
         "envSecrets": [
@@ -747,6 +769,14 @@ dagster_helm_values = {
             {
                 "name": "DAGSTER_SENSOR_GRPC_TIMEOUT_SECONDS",
                 "value": "300",
+            },
+            {
+                "name": "GRPC_MAX_SEND_MESSAGE_LENGTH",
+                "value": "268435456",
+            },
+            {
+                "name": "GRPC_MAX_RECEIVE_MESSAGE_LENGTH",
+                "value": "268435456",
             },
             {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
         ],
