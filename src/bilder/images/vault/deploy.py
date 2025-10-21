@@ -25,7 +25,6 @@ from bilder.components.hashicorp.vault.models import (
     VaultServiceRegistration,
     VaultTCPListener,
     VaultTelemetryConfig,
-    VaultTelemetryListener,
 )
 from bilder.components.traefik.models import traefik_file_provider, traefik_static
 from bilder.components.traefik.models.component import TraefikConfig
@@ -95,9 +94,6 @@ vault = Vault(
                         cluster_address=f"127.0.0.1:{VAULT_CLUSTER_PORT + 2}",
                         tls_cert_file=Path("/etc/vault/ssl/vault.cert"),
                         tls_key_file=Path("/etc/vault/ssl/vault.key"),
-                        telemetry=VaultTelemetryListener(
-                            unauthenticated_metrics_access=True
-                        ),
                     )
                 ),
             ],
@@ -150,9 +146,6 @@ files.put(
 vector_config = VectorConfig()
 vector_config.configuration_templates[
     TEMPLATES_DIRECTORY.joinpath("vector", "vault_logs.yaml")
-] = {}
-vector_config.configuration_templates[
-    TEMPLATES_DIRECTORY.joinpath("vector", "vault_metrics.yaml")
 ] = {}
 install_vector(vector_config)
 configure_vector(vector_config)

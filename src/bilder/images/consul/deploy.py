@@ -77,9 +77,6 @@ vector_config = VectorConfig()
 vector_config.configuration_templates[
     TEMPLATES_DIRECTORY.joinpath("vector", "consul_logs.yaml")
 ] = {}
-vector_config.configuration_templates[
-    TEMPLATES_DIRECTORY.joinpath("vector", "consul_metrics.yaml")
-] = {}
 install_vector(vector_config)
 configure_vector(vector_config)
 
