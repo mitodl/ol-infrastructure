@@ -85,3 +85,4 @@ c.Authenticator.allow_all = True  # type: ignore[name-defined] # noqa: F821
 c.JupyterHub.db_url = os.environ["DATABASE_URL"]  # type: ignore[name-defined] # noqa: F821
 c.JupyterHub.tornado_settings["cookie_options"] = {"expires_days": 1}  # type: ignore[name-defined] # noqa: F821
 c.JupyterHub.logo_file = "/opt/mit_learn.svg"  # type: ignore[name-defined] # noqa: F821
+c.JupyterHub.template_vars = {"logo_url": "https://learn.mit.edu/dashboard"}  # type: ignore[name-defined] # noqa: F821
