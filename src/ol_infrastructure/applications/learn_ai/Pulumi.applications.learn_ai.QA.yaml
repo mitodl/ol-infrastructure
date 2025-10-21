@@ -37,7 +37,7 @@ config:
     MITOL_FEATURES_DEFAULT: "true"
     NODE_ENV: "development"
     OPENTELEMETRY_ENABLED: "true"
-    OPENTELEMETRY_ENDPOINT: "grafana-alloy.operations.svc.cluster.local:4317"
+    OPENTELEMETRY_ENDPOINT: "grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4317"
     POSTHOG_API_HOST: "https://app.posthog.com"
     POSTHOG_ENABLE_SESSION_RECORDING: "true"
     POSTHOG_ENABLED: "true"

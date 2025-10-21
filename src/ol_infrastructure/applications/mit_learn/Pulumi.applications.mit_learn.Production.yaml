@@ -71,7 +71,7 @@ config:
     OCW_ITERATOR_CHUNK_SIZE: 300
     OIDC_ENDPOINT: "https://sso.ol.mit.edu/realms/olapps"
     OPENTELEMETRY_ENABLED: "true"
-    OPENTELEMETRY_ENDPOINT: "http://grafana-alloy.operations.svc.cluster.local:4318/v1/traces"
+    OPENTELEMETRY_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces"
     OPENSEARCH_INDEX: "mitlearn"
     OPENSEARCH_SHARD_COUNT: 3
     OPENSEARCH_URL: "https://search-opensearch-mitlearn-producti-qjtnw2dcoampmbtscs3wdfci6y.us-east-1.es.amazonaws.com"

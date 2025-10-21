@@ -65,7 +65,7 @@ config:
     MITOL_LOG_LEVEL: "INFO"
     MITOL_NEW_USER_LOGIN_URL: "https://ci.learn.mit.edu/onboarding"
     OPENTELEMETRY_ENABLED: "true"
-    OPENTELEMETRY_ENDPOINT: "http://grafana-alloy.operations.svc.cluster.local:4318/v1/traces"
+    OPENTELEMETRY_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces"
     MITOL_SUPPORT_EMAIL: "odl-learn-ci-support@mit.edu" # Need to verify
     MITPE_API_ENABLED: "true"
     OCW_ITERATOR_CHUNK_SIZE: 300

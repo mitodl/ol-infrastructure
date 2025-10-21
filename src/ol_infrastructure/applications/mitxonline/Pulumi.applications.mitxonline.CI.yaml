@@ -42,7 +42,7 @@ config:
     OPENEDX_SOCIAL_LOGIN_PATH: "/auth/login/ol-oauth2/?auth_entry=login"
     OPENEDX_STUDIO_API_BASE_URL: "https://studio.courses.ci.learn.mit.edu"
     OPENTELEMETRY_ENABLED: "true"
-    OPENTELEMETRY_ENDPOINT: "http://grafana-alloy.operations.svc.cluster.local:4318/v1/traces"
+    OPENTELEMETRY_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces"
     SENTRY_LOG_LEVEL: "ERROR"
     SESSION_COOKIE_NAME: "session_mitxonline_ci"
     MIT_LEARN_FROM_EMAIL: "MIT Learn <mitlearn-support@mit.edu>"
