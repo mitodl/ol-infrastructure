@@ -1,3 +1,5 @@
+import React, { useContext } from "react";
+import { AppContext } from '@edx/frontend-platform/react';
 import { PLUGIN_OPERATIONS, DIRECT_PLUGIN } from '@openedx/frontend-plugin-framework';
 import { getConfig } from '@edx/frontend-platform';
 import Footer, { Logo, MenuLinks, CopyrightNotice } from './Footer.jsx';
@@ -11,6 +13,8 @@ const SLOT_IDS = {
     learning_user_menu: 'org.openedx.frontend.layout.header_learning_user_menu.v1',
     desktop_user_menu: 'org.openedx.frontend.layout.header_desktop_user_menu.v1',
     learning_course_info: 'org.openedx.frontend.layout.header_learning_course_info.v1',
+    learning_user_menu_toggle: 'org.openedx.frontend.layout.header_learning_user_menu_toggle.v1',
+    desktop_user_menu_toggle: 'org.openedx.frontend.layout.header_desktop_user_menu_toggle.v1',
   },
   footer: {
     slot: 'footer_slot',
@@ -214,9 +218,48 @@ const LearningHeaderUserMenu = (widget) => {
   return widget;
 };
 
+const displayFullNameInMenu = (widget) => {
+  const { authenticatedUser } = useContext(AppContext);
+
+  if (authenticatedUser) {
+    const { RenderWidget } = widget;
+
+    widget.RenderWidget = React.cloneElement(RenderWidget, {
+      ...RenderWidget.props,
+      label: authenticatedUser.name,
+    });
+  }
+
+  return widget;
+};
+
 const addUserMenuSlotOverride = (config) => {
   const learningApps = ['learning', 'discussions', 'ora-grading', 'communications'];
   const dashboardApps = ['gradebook', 'learner-dashboard'];
+
+  config.pluginSlots = {
+    ...config.pluginSlots,
+      [SLOT_IDS.header.learning_user_menu_toggle]: {
+        keepDefault: true,
+        plugins: [
+          {
+            op: PLUGIN_OPERATIONS.Modify,
+            widgetId: 'default_contents',
+              fn: displayFullNameInMenu,
+          },
+        ]
+      },
+      [SLOT_IDS.header.desktop_user_menu_toggle]: {
+        keepDefault: true,
+        plugins: [
+          {
+            op: PLUGIN_OPERATIONS.Modify,
+            widgetId: 'default_contents',
+              fn: displayFullNameInMenu,
+          },
+        ]
+      }
+  };
 
   if (learningApps.includes(CURRENT_MFE_APP_ID)) {
 
