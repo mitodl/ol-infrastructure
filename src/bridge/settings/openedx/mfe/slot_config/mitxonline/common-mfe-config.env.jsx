@@ -322,6 +322,16 @@ const addLearningCourseInfoSlotOverride = (config) => {
   return config;
 }
 
+const addEnvOverrides = (config) => {
+  if (isLearnCourse()) {
+    return {
+      ...config,
+        SUPPORT_URL: 'mailto:mitlearn-support@mit.edu',
+    }
+  }
+  return config;
+}
+
 let config = {
   ...process.env,
   // Override the proctoring info panel 'Review instructions and system requirements' link
@@ -334,5 +344,6 @@ config = addFooterSubSlotsOverride(config);
 config = addFooterSlotOverride(config);
 config = addLearningCourseInfoSlotOverride(config);
 config = addUserMenuSlotOverride(config);
+config = addEnvOverrides(config);
 
 export default config;
