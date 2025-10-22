@@ -41,7 +41,7 @@ config:
   mitlearn:max_replicas: 30
   mitlearn:nextjs_heroku_domain: "next.learn.mit.edu"
   mitlearn:posthog_proxy: "ph.ol.mit.edu"
-  mitlearn:use_granian: false
+  mitlearn:use_granian: true
   mitlearn:vars:
     AI_MIT_SYLLABUS_URL: "https://api.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.learn.mit.edu/api/v0/vector_content_files_search/"
