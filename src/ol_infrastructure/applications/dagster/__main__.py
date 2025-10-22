@@ -601,8 +601,8 @@ for location in code_locations:
                 "memory": "1Gi",
             },
             "limits": {
-                "cpu": "2000m",
-                "memory": "4Gi",
+                "cpu": "3000m",
+                "memory": "8Gi",
             },
         },
         "env": [
