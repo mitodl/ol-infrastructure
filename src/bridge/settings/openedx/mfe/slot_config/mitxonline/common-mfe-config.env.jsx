@@ -220,16 +220,9 @@ const LearningHeaderUserMenu = (widget) => {
 
 const displayFullNameInMenu = (widget) => {
   const { authenticatedUser } = useContext(AppContext);
-
   if (authenticatedUser) {
-    const { RenderWidget } = widget;
-
-    widget.RenderWidget = React.cloneElement(RenderWidget, {
-      ...RenderWidget.props,
-      label: authenticatedUser.name,
-    });
+    widget.content.label = authenticatedUser.name || authenticatedUser.username;
   }
-
   return widget;
 };
 
