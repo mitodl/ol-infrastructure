@@ -84,7 +84,9 @@ def create_k8s_configmaps(
                     - {edxapp_config.require_object("domains")["lms"]}
                     - {edxapp_config.require_object("domains")["preview"]}
                     - {edxapp_config.require_object("domains")["studio"]}
+                    # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
                     AWS_S3_CUSTOM_DOMAIN: {storage_bucket_name}.s3.amazonaws.com
+                    # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
                     AWS_STORAGE_BUCKET_NAME: {storage_bucket_name}
                     AWS_SES_CONFIGURATION_SET: {ses_configuration_set}
                     BASE_COOKIE_DOMAIN: {edxapp_config.require_object("domains")["lms"]}
@@ -93,8 +95,10 @@ def create_k8s_configmaps(
                       PRUNING_ACTIVE: true  # MODIFIED
                       TASK_DEFAULT_RETRY_DELAY: 30
                       TASK_MAX_RETRIES: 5
+                      # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
                       STORAGE_CLASS: storages.backends.s3boto3.S3Boto3Storage
                       DIRECTORY_PREFIX: coursestructure/
+                      # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
                       STORAGE_KWARGS:
                         bucket_name: {storage_bucket_name}
                         default_acl: public-read
@@ -129,6 +133,7 @@ def create_k8s_configmaps(
                     - host: {runtime_config["opensearch_hostname"]}
                       port: 443
                       use_ssl: true
+                    # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
                     FILE_UPLOAD_STORAGE_BUCKET_NAME: {storage_bucket_name}
                     FORUM_ELASTIC_SEARCH_CONFIG:
                     - host: {runtime_config["opensearch_hostname"]}
@@ -140,9 +145,12 @@ def create_k8s_configmaps(
                     GRADES_DOWNLOAD:
                       BUCKET: {grades_bucket_name}  # MODIFIED
                       ROOT_PATH: grades  # MODIFIED
+                      # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
                       STORAGE_CLASS: django.core.files.storage.S3Storage  # MODIFIED
+                      # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
                       STORAGE_KWARGS:
                         location: grades/
+                      # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
                       STORAGE_TYPE: S3  # MODIFIED
                     IDA_LOGOUT_URI_LIST:
                     - https://{edxapp_config.require("marketing_domain")}/logout
@@ -194,6 +202,28 @@ def create_k8s_configmaps(
                     SESSION_COOKIE_DOMAIN: {".{}".format(edxapp_config.require_object("domains")["lms"].split(".", 1)[-1])}
                     UNIVERSITY_EMAIL: {edxapp_config.require("sender_email_address")}
                     ECOMMERCE_PUBLIC_URL_ROOT: {edxapp_config.require_object("domains")["lms"]}
+                    # Django 4.2+ storage configuration
+                    STORAGES:
+                      default:
+                        BACKEND: storages.backends.s3.S3Storage
+                        OPTIONS:
+                          bucket_name: {storage_bucket_name}
+                          custom_domain: {storage_bucket_name}.s3.amazonaws.com
+                          file_overwrite: false
+                          default_acl: null
+                      staticfiles:
+                        BACKEND: django.contrib.staticfiles.storage.StaticFilesStorage
+                      block_structures:
+                        BACKEND: storages.backends.s3.S3Storage
+                        OPTIONS:
+                          bucket_name: {storage_bucket_name}
+                          location: coursestructure/
+                          default_acl: public-read
+                      grades:
+                        BACKEND: storages.backends.s3.S3Storage
+                        OPTIONS:
+                          bucket_name: {grades_bucket_name}
+                          location: grades/
             """),
             },
             opts=ResourceOptions(delete_before_replace=True),
