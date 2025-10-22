@@ -565,27 +565,27 @@ SOCIAL_SHARING_SETTINGS:
 STATIC_URL_BASE: /static/
 STATIC_ROOT_BASE: /openedx/staticfiles/
 # Django 4.2+ storage configuration
-STORAGES:
-  default:
-    BACKEND: storages.backends.s3.S3Storage
-    OPTIONS:
-      bucket_name: {{ key "edxapp/s3-storage-bucket" }}
-      custom_domain: {{ key "edxapp/s3-storage-bucket" }}.s3.amazonaws.com
-      file_overwrite: false
-      default_acl: null
-  staticfiles:
-    BACKEND: django.contrib.staticfiles.storage.StaticFilesStorage
-  block_structures:
-    BACKEND: storages.backends.s3.S3Storage
-    OPTIONS:
-      bucket_name: {{ key "edxapp/s3-storage-bucket" }}
-      location: coursestructure/
-      default_acl: public-read
-  grades:
-    BACKEND: storages.backends.s3.S3Storage
-    OPTIONS:
-      bucket_name: {{ key "edxapp/s3-grades-bucket" }}
-      location: grades/
+# STORAGES:
+#   default:
+#     BACKEND: storages.backends.s3.S3Storage
+#     OPTIONS:
+#       bucket_name: {{ key "edxapp/s3-storage-bucket" }}
+#       custom_domain: {{ key "edxapp/s3-storage-bucket" }}.s3.amazonaws.com
+#       file_overwrite: false
+#       default_acl: null
+#   staticfiles:
+#     BACKEND: django.contrib.staticfiles.storage.StaticFilesStorage
+#   block_structures:
+#     BACKEND: storages.backends.s3.S3Storage
+#     OPTIONS:
+#       bucket_name: {{ key "edxapp/s3-storage-bucket" }}
+#       location: coursestructure/
+#       default_acl: public-read
+#   grades:
+#     BACKEND: storages.backends.s3.S3Storage
+#     OPTIONS:
+#       bucket_name: {{ key "edxapp/s3-grades-bucket" }}
+#       location: grades/
 STUDIO_NAME: Studio
 STUDIO_SHORT_NAME: Studio
 SYSTEM_WIDE_ROLE_CLASSES: []

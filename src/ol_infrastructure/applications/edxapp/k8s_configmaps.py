@@ -206,27 +206,27 @@ def create_k8s_configmaps(
                     UNIVERSITY_EMAIL: {edxapp_config.require("sender_email_address")}
                     ECOMMERCE_PUBLIC_URL_ROOT: {edxapp_config.require_object("domains")["lms"]}
                     # Django 4.2+ storage configuration
-                    STORAGES:
-                      default:
-                        BACKEND: storages.backends.s3.S3Storage
-                        OPTIONS:
-                          bucket_name: {storage_bucket_name}
-                          custom_domain: {storage_bucket_name}.s3.amazonaws.com
-                          file_overwrite: false
-                          default_acl: null
-                      staticfiles:
-                        BACKEND: django.contrib.staticfiles.storage.StaticFilesStorage
-                      block_structures:
-                        BACKEND: storages.backends.s3.S3Storage
-                        OPTIONS:
-                          bucket_name: {storage_bucket_name}
-                          location: coursestructure/
-                          default_acl: public-read
-                      grades:
-                        BACKEND: storages.backends.s3.S3Storage
-                        OPTIONS:
-                          bucket_name: {grades_bucket_name}
-                          location: grades/
+                    # STORAGES:
+                    #   default:
+                    #     BACKEND: storages.backends.s3.S3Storage
+                    #     OPTIONS:
+                    #       bucket_name: {storage_bucket_name}
+                    #       custom_domain: {storage_bucket_name}.s3.amazonaws.com
+                    #       file_overwrite: false
+                    #       default_acl: null
+                    #   staticfiles:
+                    #     BACKEND: django.contrib.staticfiles.storage.StaticFilesStorage
+                    #   block_structures:
+                    #     BACKEND: storages.backends.s3.S3Storage
+                    #     OPTIONS:
+                    #       bucket_name: {storage_bucket_name}
+                    #       location: coursestructure/
+                    #       default_acl: public-read
+                    #   grades:
+                    #     BACKEND: storages.backends.s3.S3Storage
+                    #     OPTIONS:
+                    #       bucket_name: {grades_bucket_name}
+                    #       location: grades/
             """),
             },
             opts=ResourceOptions(delete_before_replace=True),
