@@ -9,7 +9,7 @@ import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 
 from bridge.lib.versions import (
-    KUBE_STATE_METRICS_CHART_VERSION,
+    GRAFANA_K8S_MONITORING_CHART_VERSION,
     VANTAGE_K8S_AGENT_CHART_VERSION,
 )
 from bridge.secrets.sops import read_yaml_secrets
@@ -33,8 +33,8 @@ VERSIONS = {
     "VANTAGE_K8S_AGENT_VERSION": os.environ.get(
         "VANTAGE_K8S_AGENT_CHART_VERSION", VANTAGE_K8S_AGENT_CHART_VERSION
     ),
-    "KUBE_STATE_METRICS_VERSION": os.environ.get(
-        "KUBE_STATE_METRICS_CHART_VERSION", KUBE_STATE_METRICS_CHART_VERSION
+    "GRAFANA_K8S_MONITORING_VERSION": os.environ.get(
+        "GRAFANA_K8S_MONITORING_CHART_VERSION", GRAFANA_K8S_MONITORING_CHART_VERSION
     ),
 }
 
@@ -400,7 +400,7 @@ grafana_k8s_monitoring_helm_release = kubernetes.helm.v3.Release(
     kubernetes.helm.v3.ReleaseArgs(
         name="grafana-k8s-monitoring",
         chart="k8s-monitoring",
-        version="3.5.3",
+        version=VERSIONS["GRAFANA_K8S_MONITORING_VERSION"],
         namespace="grafana",
         create_namespace=True,  # Important
         cleanup_on_fail=True,

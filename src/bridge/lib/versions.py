@@ -47,8 +47,6 @@ GATEWAY_API_VERSION = "v1.4.0"
 KARPENTER_CHART_VERSION = "1.8.1"
 # renoavate: datasource=helm depName=keda registryUrl=https://kedacore.github.io/charts packageName=keda
 KEDA_CHART_VERSION = "2.17.1"
-# renovate: datasource=docker depName=kube-state-metrics packageName=registry-1.docker.io/bitnamicharts/kube-state-metrics
-KUBE_STATE_METRICS_CHART_VERSION = "5.1.0"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
 TRAEFIK_CHART_VERSION = "37.1.2"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
@@ -63,3 +61,5 @@ PROMETHEUS_OPERATOR_CRD_VERSION = "v0.86.1"
 KEYCLOAK_OPERATOR_CRD_VERSION = "26.2.4"
 # renovate: datasource=helm depName=jupyterhub packageName=jupyterhub registryUrl=https://hub.jupyter.org/helm-chart
 JUPYTERHUB_CHART_VERSION = "4.3.1"
+# renovate: datasource=helm depName=grafana-k8s-monitoring packageName=grafana-k8s-monitoring registryUrl=https://grafana.github.io/helm-charts
+GRAFANA_K8S_MONITORING_CHART_VERSION = "3.5.3"
