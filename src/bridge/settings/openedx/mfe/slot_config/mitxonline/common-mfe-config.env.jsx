@@ -355,7 +355,7 @@ const addEnvOverrides = (config) => {
   if (isLearnCourse()) {
     return {
       ...config,
-        SUPPORT_URL: 'mailto:mitlearn-support@mit.edu',
+        SUPPORT_URL: process.env.CONTACT_URL || 'mailto:mitlearn-support@mit.edu',
     }
   }
   return config;
