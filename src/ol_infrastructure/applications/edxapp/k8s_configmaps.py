@@ -84,6 +84,9 @@ def create_k8s_configmaps(
                     - {edxapp_config.require_object("domains")["lms"]}
                     - {edxapp_config.require_object("domains")["preview"]}
                     - {edxapp_config.require_object("domains")["studio"]}
+                    - {edxapp_config.require("backend_lms_domain")}
+                    - {edxapp_config.require("backend_studio_domain")}
+                    - {edxapp_config.require("backend_preview_domain")}
                     # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
                     AWS_S3_CUSTOM_DOMAIN: {storage_bucket_name}.s3.amazonaws.com
                     # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
