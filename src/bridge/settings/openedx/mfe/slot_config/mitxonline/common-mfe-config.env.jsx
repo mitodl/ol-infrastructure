@@ -15,6 +15,7 @@ const SLOT_IDS = {
     learning_course_info: 'org.openedx.frontend.layout.header_learning_course_info.v1',
     learning_user_menu_toggle: 'org.openedx.frontend.layout.header_learning_user_menu_toggle.v1',
     desktop_user_menu_toggle: 'org.openedx.frontend.layout.header_desktop_user_menu_toggle.v1',
+    logo: 'org.openedx.frontend.layout.header_logo.v1',
   },
   footer: {
     slot: 'footer_slot',
@@ -322,6 +323,44 @@ const addLearningCourseInfoSlotOverride = (config) => {
   return config;
 }
 
+const modifyLogoHref = ( widget ) => {
+  if (isLearnCourse()) {
+    widget.content.href = `${process.env.MIT_LEARN_BASE_URL}/dashboard` || "https://learn.mit.edu/dashboard";
+  } else {
+    widget.content.href = `${configData.MARKETING_SITE_BASE_URL}/dashboard/` || "https://mitxonline.mit.edu/dashboard/";
+  }
+  return widget;
+};
+
+const addLogoSlotOverride = (config) => {
+  return  {
+    ...config,
+    pluginSlots: {
+      ...config.pluginSlots,
+      [SLOT_IDS.header.logo]: {
+        keepDefault: true,
+        plugins: [
+            {
+              op: PLUGIN_OPERATIONS.Modify,
+              widgetId: 'default_contents',
+              fn: modifyLogoHref,
+            },
+        ]
+      },
+    },
+  }
+}
+
+const addEnvOverrides = (config) => {
+  if (isLearnCourse()) {
+    return {
+      ...config,
+      SUPPORT_URL: process.env.CONTACT_URL || 'mailto:mitlearn-support@mit.edu',
+    }
+  }
+  return config;
+}
+
 let config = {
   ...process.env,
   // Override the proctoring info panel 'Review instructions and system requirements' link
@@ -334,5 +373,7 @@ config = addFooterSubSlotsOverride(config);
 config = addFooterSlotOverride(config);
 config = addLearningCourseInfoSlotOverride(config);
 config = addUserMenuSlotOverride(config);
+config = addLogoSlotOverride(config);
+config = addEnvOverrides(config);
 
 export default config;
