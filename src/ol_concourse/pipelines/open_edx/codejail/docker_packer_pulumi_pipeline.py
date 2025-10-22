@@ -135,11 +135,22 @@ def build_codejail_pipeline(
             project_source_path=PULUMI_CODE_PATH.joinpath("applications/codejail/"),
             dependencies=[
                 GetStep(
+                    get=codejail_registry_image.name,
+                    trigger=True,
+                    passed=[image_build_job.name],
+                    params={"skip_download": True},
+                ),
+                GetStep(
                     get=ami_fragment.resources[-1].name,
                     trigger=True,
                     passed=[ami_fragment.jobs[-1].name],
                 ),
             ],
+            env_vars_from_files={
+                "CODEJAIL_DOCKER_IMAGE_DIGEST": (
+                    f"{codejail_registry_image.name}/digest"
+                ),
+            },
         )
         loop_fragments.append(pulumi_fragment)
 
