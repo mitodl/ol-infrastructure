@@ -30,14 +30,19 @@ AUTH_PASSWORD_VALIDATORS:
 - NAME: common.djangoapps.util.password_policy_validators.MaximumLengthValidator
   OPTIONS:
     max_length: 75
+# TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
 AWS_ACCESS_KEY_ID: "" # MODIFIED - not setting as we will use IAM Instance Profiles
 # AWS_QUERYSTRING_AUTH: false
+# TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
 AWS_SECRET_ACCESS_KEY: ""  # MODIFIED - not setting as we will use IAM Instance Profiles
 AWS_SES_REGION_ENDPOINT: email.us-east-1.amazonaws.com
 AWS_SES_REGION_NAME: us-east-1
 BLOCKSTORE_USE_BLOCKSTORE_APP_API: true
+# TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
 BUNDLE_ASSET_STORAGE_SETTINGS:
+  # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
   STORAGE_CLASS: storages.backends.s3boto3.S3Boto3Storage
+  # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
   STORAGE_KWARGS:
     location: blockstore/
 BRANCH_IO_KEY: ''
@@ -118,6 +123,7 @@ CSRF_COOKIE_SAMESITE: 'None'
 DASHBOARD_COURSE_LIMIT: null
 DATA_DIR: /openedx/data  # Filesystem path where edx puts files for course export/import
 DEFAULT_COURSE_VISIBILITY_IN_CATALOG: both
+# TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
 DEFAULT_FILE_STORAGE: storages.backends.s3boto3.S3Boto3Storage  # MODIFIED
 DEFAULT_MOBILE_AVAILABLE: false
 DEFAULT_SITE_THEME: mitxonline  # MODIFIED
@@ -357,6 +363,7 @@ SOCIAL_SHARING_SETTINGS:
   DASHBOARD_TWITTER: false
 STATIC_URL_BASE: /static/
 STATIC_ROOT_BASE: /openedx/staticfiles/
+# Django 4.2+ storage configuration
 STUDIO_NAME: Studio
 STUDIO_SHORT_NAME: Studio
 SUPPORT_SITE_LINK: https://mitxonline.zendesk.com/hc/
@@ -369,6 +376,9 @@ USE_X_FORWARDED_HOST: false  # MODIFIED
 VIDEO_IMAGE_MAX_AGE: 31536000
 VIDEO_IMAGE_SETTINGS:
   DIRECTORY_PREFIX: video-images/
+  # STORAGE_CLASS is required by edx-val and should NOT be removed
+  # Reference: https://github.com/openedx/edx-val/blob/master/edxval/utils.py#L160-L163
+  STORAGE_CLASS: storages.backends.s3boto3.S3Boto3Storage
   STORAGE_KWARGS:
     location: media/  # MODIFIED
   VIDEO_IMAGE_MAX_BYTES: 2097152
@@ -377,6 +387,9 @@ VIDEO_IMAGE_SETTINGS:
 VIDEO_TRANSCRIPTS_MAX_AGE: 31536000
 VIDEO_TRANSCRIPTS_SETTINGS:
   DIRECTORY_PREFIX: video-transcripts/
+  # STORAGE_CLASS is required by edx-val and should NOT be removed
+  # Reference: https://github.com/openedx/edx-val/blob/master/edxval/utils.py#L160-L163
+  STORAGE_CLASS: storages.backends.s3boto3.S3Boto3Storage
   STORAGE_KWARGS:
     location: media/  # MODIFIED
   VIDEO_TRANSCRIPTS_MAX_BYTES: 3145728
