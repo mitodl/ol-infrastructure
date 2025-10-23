@@ -7,6 +7,8 @@ config:
     desired: 3
     max: 5
     min: 2
+  codejail:deploy_to_k8s: false
+  codejail:replicas: 3
   codejail:business_unit: mitxonline
   codejail:target_vpc: mitxonline_vpc
   consul:address: https://consul-mitxonline-production.odl.mit.edu
