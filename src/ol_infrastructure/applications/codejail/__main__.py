@@ -79,7 +79,11 @@ if codejail_config.get("deploy_to_k8s"):
 
     # Ensure that the docker image digest is set in the environment
     if "CODEJAIL_DOCKER_IMAGE_DIGEST" not in os.environ:
-        msg = "Environment variable CODEJAIL_DOCKER_IMAGE_DIGEST is not set. "
+        msg = (
+            "Environment variable CODEJAIL_DOCKER_IMAGE_DIGEST is not set. "
+            "This variable is only required when deploying to Kubernetes (K8s). "
+            "Please set the environment variable or check your CI/CD pipeline configuration."
+        )
         raise OSError(msg)
     CODEJAIL_DOCKER_IMAGE_DIGEST = os.environ["CODEJAIL_DOCKER_IMAGE_DIGEST"]
     codejail_image = cached_image_uri(f"mitodl/codejail@{CODEJAIL_DOCKER_IMAGE_DIGEST}")
