@@ -147,13 +147,13 @@ if codejail_config.get("deploy_to_k8s"):
     codejail_service = kubernetes.core.v1.Service(
         f"codejail-service-{env_name}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=f"codejail-{env_name}",
+            name="codejail",
             labels=app_labels,
             namespace=namespace,
         ),
         spec=kubernetes.core.v1.ServiceSpecArgs(
             type="ClusterIP",
-            selector={"app": "codejail"},
+            selector=app_labels,
             ports=[
                 kubernetes.core.v1.ServicePortArgs(
                     port=CODEJAIL_SERVICE_PORT,
