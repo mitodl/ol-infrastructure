@@ -826,7 +826,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 org_saml_metadata_xml=Path(__file__)
                 .parent.joinpath("files/olapps/ceide_metadata.xml")
                 .read_text(),
-                principal_type="FRIENDLY_ATTRIBUTE",
+                principal_type="ATTRIBUTE",
                 principal_attribute="Email",
                 name_id_format=NameIdFormat.unspecified,
                 keycloak_url=keycloak_url,
