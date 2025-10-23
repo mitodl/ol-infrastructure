@@ -364,7 +364,7 @@ class OLEKSTrustRole(pulumi.ComponentResource):
 
         self.role = aws.iam.Role(
             f"{role_config.cluster_name}-{role_config.role_name}-trust-role",
-            name=f"{role_config.cluster_name}-{role_config.role_name}-trust-role",
+            name=f"{role_config.cluster_name}-{role_config.role_name}-trust-role"[:63],
             path=f"/ol-infrastructure/eks/{role_config.cluster_name}/",
             assume_role_policy=role_config.cluster_identities.apply(
                 lambda ids: oidc_trust_policy_template(
