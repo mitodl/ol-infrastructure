@@ -81,7 +81,7 @@ config:
   edxapp:framework: "earthly"
   edxapp:web_instance_type: m7a.2xlarge
   edxapp:web_node_capacity: "9"
-  edxapp:worker_node_capacity: "5"
+  edxapp:worker_node_capacity: "2"
   edxapp:worker_instance_type: "r7a.large"
   edxapp:backend_lms_domain: courses-backend.learn.mit.edu
   edxapp:backend_studio_domain: studio-backend.learn.mit.edu
