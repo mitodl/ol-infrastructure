@@ -46,6 +46,7 @@ mitx = [
         studio_domain="studio.mitx.mit.edu",
         support_url="odl.zendesk.com/hc/en-us/requests/new",
         terms_of_service_url="https://lms.mitx.mit.edu/tos",
+        appzi_url="https://w.appzi.io/w.js?token=Q2pSI",
     ),
 ]
 
@@ -182,6 +183,7 @@ mitxonline = [
         logo_trademark_url="https://courses.learn.mit.edu/static/mitxonline/images/mit-logo.svg",
         enable_video_upload_page_link_in_content_dropdown="true",
         enable_jumpnav="true",
+        appzi_url="https://w.appzi.io/w.js?token=Q2pSI",
     ),
 ]
 
@@ -251,6 +253,7 @@ xpro = [
         trademark_text="© MIT xPRO. All rights reserved except where noted.",
         logo_trademark_url="https://courses.xpro.mit.edu/static/xpro/images/mit-ol-logo.svg",
         enable_video_upload_page_link_in_content_dropdown="true",
+        appzi_url="https://w.appzi.io/w.js?token=Q2pSI",
     ),
 ]
 
