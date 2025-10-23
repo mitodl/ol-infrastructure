@@ -779,11 +779,15 @@ dagster_helm_values = {
                 "value": "300",
             },
             {
-                "name": "GRPC_MAX_SEND_MESSAGE_LENGTH",
+                "name": "DAGSTER_GRPC_TIMEOUT_SECONDS",
+                "value": "300",
+            },
+            {
+                "name": "DAGSTER_GRPC_MAX_SEND_BYTES",
                 "value": "268435456",
             },
             {
-                "name": "GRPC_MAX_RECEIVE_MESSAGE_LENGTH",
+                "name": "DAGSTER_GRPC_MAX_RX_BYTES",
                 "value": "268435456",
             },
             {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
