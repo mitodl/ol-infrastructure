@@ -2,8 +2,8 @@ import { useContext } from "react";
 import { AppContext } from '@edx/frontend-platform/react';
 import { PLUGIN_OPERATIONS, DIRECT_PLUGIN } from '@openedx/frontend-plugin-framework';
 import { getConfig } from '@edx/frontend-platform';
-import { faHome } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { Icon } from "@openedx/paragon";
+import { Home } from '@openedx/paragon/icons';
 import Footer, { Logo, MenuLinks, CopyrightNotice } from './Footer.jsx';
 
 const configData = getConfig();
@@ -367,11 +367,9 @@ const SecondaryMenu = () => {
     <div style={{
       display: 'flex',
       alignItems: 'center',
-      gap: '10px',
-      marginRight: '10px'
     }}>
       <a
-        className="nav-link"
+        className="nav-link custom-help-link"
         href={helpURL}
         target="_blank"
         rel="noopener noreferrer"
@@ -383,7 +381,7 @@ const SecondaryMenu = () => {
         href={dashboardURL}
         style={{
         height: '3rem',
-        width: '133px',
+        width: '160px',
         backgroundColor: '#40464C',
         color: 'white',
         display: 'flex',
@@ -394,9 +392,24 @@ const SecondaryMenu = () => {
         gap: '8px'
       }}
       >
-        <FontAwesomeIcon icon={faHome} />
-        Dashboard
+        <Icon src={Home} className="dashboard-icon" />
+        <p style={{ margin: 0 }}>Dashboard</p>
       </a>
+      <style>
+      {`
+        .dashboard-icon svg path {
+          fill: transparent;
+          stroke: #fff;
+          stroke-width: 2;
+        }
+        .custom-help-link {
+          &:hover, &:focus {
+            background-color: transparent !important;
+            color: #454545FF !important;
+          }
+        }
+      `}
+      </style>
     </div>
   );
 }
