@@ -23,3 +23,6 @@ ol-openedx-chat-xblock
 
 # Allow for copying courses to children to support UAI
 ol-openedx-course-sync
+
+# Open Telemetry support
+opentelemetry-api>=1.38.0
