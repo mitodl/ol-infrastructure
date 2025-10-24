@@ -579,6 +579,10 @@ for location in code_locations:
             "tag": image_tag_or_digest,
             "pullPolicy": "IfNotPresent",
         },
+        "strategy": {
+            "type": "RollingUpdate",
+            "rollingUpdate": {"maxSurge": 1, "maxUnavailable": 0},
+        },
         "dagsterApiGrpcArgs": [
             "-m",
             module,
