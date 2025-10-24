@@ -67,10 +67,11 @@ run_storage:
 # Opt in to run monitoring
 run_monitoring:
   enabled: true
-  start_timeout_seconds: 300
+  start_timeout_seconds: 900
   cancel_timeout_seconds: 300
   max_resume_run_attempts: 3
   poll_interval_seconds: 120
+  max_runtime_seconds: 0
 
 run_retries:
   enabled: true
