@@ -135,6 +135,22 @@ const ForceLoginRedirect = () => {
   return null;
 };
 
+const AppziScript = () => {
+  const appziUrl = process.env.APPZI_URL;
+
+  useEffect(() => {
+    if (!appziUrl) {
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = appziUrl;
+    script.async = true;
+    document.head.appendChild(script);
+  }, []);
+
+  return null;
+};
+
 const Footer = () => {
 
   const {
@@ -147,6 +163,7 @@ const Footer = () => {
   return (
     <footer className="d-flex flex-column align-items-stretch">
       <ForceLoginRedirect />
+      <AppziScript />
         <PluginSlot id="frontend.shell.footer.desktop.top.ui">
             <RevealLinks label={"Reveal Button"} />
         </PluginSlot>

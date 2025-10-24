@@ -132,18 +132,25 @@ AUTH_PASSWORD_VALIDATORS:
 -   NAME: common.djangoapps.util.password_policy_validators.MaximumLengthValidator
     OPTIONS:
         max_length: 75
+# TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
 AWS_ACCESS_KEY_ID: "" # MODIFIED - not setting as we will use IAM Instance Profiles
 # AWS_QUERYSTRING_AUTH: false
+# TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
 AWS_S3_CUSTOM_DOMAIN: {{ key "edxapp/s3-storage-bucket" }}.s3.amazonaws.com
+# TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
 AWS_SECRET_ACCESS_KEY: ""  # MODIFIED - not setting as we will use IAM Instance Profiles
 AWS_SES_CONFIGURATION_SET: {{ key "edxapp/ses-configuration-set" }}  # ADDED KEY
 AWS_SES_REGION_ENDPOINT: email.us-east-1.amazonaws.com
 AWS_SES_REGION_NAME: us-east-1
+# TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
 AWS_STORAGE_BUCKET_NAME: {{ key "edxapp/s3-storage-bucket" }}  # MODIFIED
 BASE_COOKIE_DOMAIN: {{ key "edxapp/lms-domain" }} # MODIFIED
 BLOCKSTORE_USE_BLOCKSTORE_APP_API: true
+# TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
 BUNDLE_ASSET_STORAGE_SETTINGS:
+  # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
   STORAGE_CLASS: storages.backends.s3boto3.S3Boto3Storage
+  # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
   STORAGE_KWARGS:
     location: blockstore/
 BLOCK_STRUCTURES_SETTINGS:
@@ -151,8 +158,10 @@ BLOCK_STRUCTURES_SETTINGS:
     PRUNING_ACTIVE: true  # MODIFIED
     TASK_DEFAULT_RETRY_DELAY: 30
     TASK_MAX_RETRIES: 5
+    # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
     STORAGE_CLASS: storages.backends.s3boto3.S3Boto3Storage
     DIRECTORY_PREFIX: coursestructure/
+    # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
     STORAGE_KWARGS:
       bucket_name: {{ key "edxapp/s3-storage-bucket" }}
       default_acl: public-read
@@ -244,6 +253,7 @@ COURSE_MODE_DEFAULTS:
     sku: null
     slug: honor
     suggested_prices: ''
+# TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
 COURSE_IMPORT_EXPORT_BUCKET: {{ key "edxapp/s3-course-bucket" }}  # MODIFIED
 CREDENTIALS_INTERNAL_SERVICE_URL: http://localhost:8005
 CREDENTIALS_PUBLIC_SERVICE_URL: http://localhost:8005
@@ -257,6 +267,7 @@ DASHBOARD_COURSE_LIMIT: null
 DATA_DIR: /openedx/data  # Filesystem path where edx puts files for course export/import
 DEFAULT_COURSE_VISIBILITY_IN_CATALOG: both
 DEFAULT_FEEDBACK_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
+# TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
 DEFAULT_FILE_STORAGE: storages.backends.s3boto3.S3Boto3Storage  # MODIFIED
 DEFAULT_FROM_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 DEFAULT_MOBILE_AVAILABLE: false
@@ -374,7 +385,9 @@ FEATURES:
     SEGMENT_IO: false
     STAFF_EMAIL: mitx-support@mit.edu
 FEEDBACK_SUBMISSION_EMAIL: ''
+# TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
 FILE_UPLOAD_STORAGE_BUCKET_NAME: {{ key "edxapp/s3-storage-bucket" }}
+# TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
 FILE_UPLOAD_STORAGE_PREFIX: submissions_attachments
 FINANCIAL_REPORTS:
     BUCKET: null
@@ -408,9 +421,12 @@ GOOGLE_ANALYTICS_ACCOUNT: {{ key "edxapp/google-analytics-id" }}
 GRADES_DOWNLOAD:
     BUCKET: {{ key "edxapp/s3-grades-bucket" }}  # MODIFIED
     ROOT_PATH: grades  # MODIFIED
+    # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
     STORAGE_CLASS: django.core.files.storage.S3Storage  # MODIFIED
+    # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
     STORAGE_KWARGS:
         location: grades/
+    # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
     STORAGE_TYPE: S3  # MODIFIED
 HELP_TOKENS_BOOKS:
     course_author: http://edx.readthedocs.io/projects/open-edx-building-and-running-a-course
@@ -446,6 +462,7 @@ MIT_LEARN_SUMMARY_FLASHCARD_URL: https://{{ key "edxapp/learn-api-domain" }}/lea
 MIT_LEARN_AI_XBLOCK_CHAT_API_URL: https://{{ key "edxapp/learn-api-domain" }}/ai/http/canvas_syllabus_agent/  # Added for ol_openedx_chat_xblock
 MIT_LEARN_AI_XBLOCK_TUTOR_CHAT_API_URL: https://{{ key "edxapp/learn-api-domain" }}/ai/http/canvas_tutor_agent/  # Added for ol_openedx_chat_xblock
 MIT_LEARN_AI_XBLOCK_PROBLEM_SET_LIST_URL: https://{{ key "edxapp/learn-api-domain" }}/ai/api/v0/problem_set_list  # Added for ol_openedx_chat_xblock
+MIT_LEARN_AI_XBLOCK_CHAT_RATING_URL: https://{{ key "edxapp/learn-api-domain" }}/ai/api/v0/chat_sessions/  # Added for ol_openedx_chat_xblock
 MAINTENANCE_BANNER_TEXT: Sample banner message
 MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within the bucket. No leading / allowed
 MEDIA_URL: /media/
@@ -542,6 +559,28 @@ SOCIAL_SHARING_SETTINGS:
     DASHBOARD_TWITTER: false
 STATIC_URL_BASE: /static/
 STATIC_ROOT_BASE: /openedx/staticfiles/
+# Django 4.2+ storage configuration
+# STORAGES:
+#   default:
+#     BACKEND: storages.backends.s3.S3Storage
+#     OPTIONS:
+#       bucket_name: {{ key "edxapp/s3-storage-bucket" }}
+#       custom_domain: {{ key "edxapp/s3-storage-bucket" }}.s3.amazonaws.com
+#       file_overwrite: false
+#       default_acl: null
+#   staticfiles:
+#     BACKEND: django.contrib.staticfiles.storage.StaticFilesStorage
+#   block_structures:
+#     BACKEND: storages.backends.s3.S3Storage
+#     OPTIONS:
+#       bucket_name: {{ key "edxapp/s3-storage-bucket" }}
+#       location: coursestructure/
+#       default_acl: public-read
+#   grades:
+#     BACKEND: storages.backends.s3.S3Storage
+#     OPTIONS:
+#       bucket_name: {{ key "edxapp/s3-grades-bucket" }}
+#       location: grades/
 STUDIO_NAME: Studio
 STUDIO_SHORT_NAME: Studio
 SYSTEM_WIDE_ROLE_CLASSES: []
@@ -553,7 +592,9 @@ VIDEO_IMAGE_MAX_AGE: 31536000
 VIDEO_IMAGE_SETTINGS:
     DIRECTORY_PREFIX: video-images/
     BASE_URL: /media/
-    BUCKET: {{ key "edxapp/s3-storage-bucket" }} # MODIFIED
+    # STORAGE_CLASS is required by edx-val and should NOT be removed
+    # Reference: https://github.com/openedx/edx-val/blob/master/edxval/utils.py#L160-L163
+    STORAGE_CLASS: storages.backends.s3boto3.S3Boto3Storage
     STORAGE_KWARGS:
         location: media/  # MODIFIED
     VIDEO_IMAGE_MAX_BYTES: 2097152
@@ -561,8 +602,10 @@ VIDEO_IMAGE_SETTINGS:
 VIDEO_TRANSCRIPTS_MAX_AGE: 31536000
 VIDEO_TRANSCRIPTS_SETTINGS:
     DIRECTORY_PREFIX: video-transcripts/
+    # STORAGE_CLASS is required by edx-val and should NOT be removed
+    # Reference: https://github.com/openedx/edx-val/blob/master/edxval/utils.py#L160-L163
+    STORAGE_CLASS: storages.backends.s3boto3.S3Boto3Storage
     BASE_URL: /media/
-    BUCKET: {{ key "edxapp/s3-storage-bucket" }} # MODIFIED
     STORAGE_KWARGS:
         location: media/  # MODIFIED
     VIDEO_TRANSCRIPTS_MAX_BYTES: 3145728

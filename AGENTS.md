@@ -1,128 +1,298 @@
-# Repository Conventions
+# Agent Instructions for ol-infrastructure Repository
 
-## Introduction
+## Repository Overview
 
-This document outlines the conventions and structure of this repository. It is intended
-to be used as a guide for developers and as a shared context for AI-powered development
-tools to ensure consistency and maintainability of the codebase.
+This is a **large-scale infrastructure-as-code monorepo** (467 Python files, ~91K lines of code) for managing MIT Open Learning's cloud infrastructure. The repository combines **Pulumi** for infrastructure provisioning, **Packer/PyInfra** for building AMIs, and **Concourse** for CI/CD pipelines—all managed through Python.
 
-The repository manages cloud infrastructure using a combination of Concourse for CI/CD,
-Pulumi for infrastructure as code (IaC), and Packer for building machine images (AMIs).
+**Trust these instructions.** They are comprehensive and validated. Only search for additional information if these instructions are incomplete or incorrect.
 
-## Core Technologies
+## Essential Build & Validation Commands
 
-*   **CI/CD**: [Concourse CI](https://concourse-ci.org/)
-*   **Infrastructure as Code**: [Pulumi](https://www.pulumi.com/) (using Python)
-*   **Image Building**: [HashiCorp Packer](https://www.packer.io/) (using HCL and
-    PyInfra for provisioning)
-*   **Secrets Management**: [HashiCorp Vault](https://www.vaultproject.io/) and
-    [SOPS](https://github.com/getsops/sops)
-*   **Primary Language**: Python 3
-*   **Configuration & Data Validation**: [Pydantic](https://docs.pydantic.dev/)
+### Environment Setup (One-Time)
+```bash
+# Install dependencies (ALWAYS run first after cloning)
+uv sync
 
-## Repository Structure
+# Login to Pulumi state backend (required for Pulumi operations)
+pulumi login s3://mitol-pulumi-state
+```
 
-The `src/` directory contains all the source code, organized by function:
+### Linting & Formatting (Fast: <1 second)
+```bash
+# Format code (auto-fixes formatting issues)
+uv run ruff format src/
 
-*   `src/bilder/`: Contains Packer configurations for building AMIs.
-    *   `components/`: Reusable Packer provisioners and configurations (e.g., installing
-        Vault, Consul, Vector).
-    *   `images/`: Definitions for specific AMIs, which compose components from
-        `src/bilder/components/`.
-*   `src/ol_concourse/`: Contains Concourse pipeline definitions, written in Python.
-    *   `lib/`: A custom library for generating Concourse pipeline YAML from Python
-        objects.
-    *   `pipelines/`: The definitions for each CI/CD pipeline.
-*   `src/ol_infrastructure/`: Contains Pulumi code for defining and managing cloud
-    infrastructure.
-    *   `applications/`: Pulumi stacks for specific applications (e.g., `xqwatcher`).
-    *   `components/`: Reusable Pulumi components (e.g., an auto-scaling group).
-    *   `infrastructure/`: Foundational infrastructure stacks (e.g., AWS networking,
-        IAM, EKS).
-    *   `lib/`: Helper functions and classes for working with Pulumi and AWS.
-*   `src/bridge/`: Utility code that bridges other components, often for handling
-    secrets or settings.
+# Check code style and quality (completes in <0.1s)
+uv run ruff check src/
 
-## Secrets Management
+# Check code with auto-fixes
+uv run ruff check --fix src/
 
-Secrets are managed using [HashiCorp Vault](https://www.vaultproject.io/) as the central
-secrets store. Static secrets that need to be stored in the repository (e.g., initial
-passwords, API keys) are encrypted using [SOPS](https://github.com/getsops/sops).
+# Format Packer HCL files
+packer fmt -recursive src/bilder/
+```
 
-The general workflow is as follows:
-1. A static secret is added to a YAML file and encrypted with SOPS. These files are
-   often located in `src/bridge/secrets/<context>/` directories within the relevant
-   Pulumi project, where the `<context>` is generally scoped to the project that the
-   secrets are destined for.
-2. During a `pulumi up`, the `src/bridge/secrets/sops.py` utility is used to decrypt the
-   SOPS file in memory.
-3. The Pulumi program then writes the secret to the appropriate mount and path in Vault.
+### Type Checking (Slow: ~75 seconds)
+```bash
+# Run mypy type checking (this is SLOW, budget 75+ seconds)
+uv run mypy src/
+```
 
-This approach ensures that secrets are stored securely at rest within the git repository
-and are only exposed to authorized systems during infrastructure
-deployment. Applications and services then authenticate with Vault to retrieve the
-secrets they need at runtime.
+**Note:** Expect ~1316 type errors and ~809 ruff errors in the codebase. Your changes should not introduce NEW errors.
 
-## Pulumi Conventions (`src/ol_infrastructure/`)
+### Pre-commit Hooks
+```bash
+# Run all pre-commit hooks (includes ruff, mypy, shellcheck, yamllint, etc.)
+# Note: hadolint may fail on existing Docker issues—ignore if unrelated to your changes
+uv run pre-commit run --all-files
+```
 
-*   **Language**: All Pulumi code is written in Python.
-*   **Structure**: Infrastructure is organized into projects and stacks. Each directory
-    within `src/ol_infrastructure/infrastructure/` and
-    `src/ol_infrastructure/applications/` typically represents a Pulumi project.
-*   **Configuration**: Pydantic models, often inheriting from
-    `ol_infrastructure.lib.ol_types.AWSBase`, are used to define the configuration for
-    infrastructure components. This provides type safety and validation.
-*   **Stack Information**: The `ol_infrastructure.lib.pulumi_helper.StackInfo` dataclass
-    provides context about the current Pulumi stack (e.g., name, environment). It is
-    instantiated via `parse_stack()`.
-*   **Naming**: Pulumi resources should be given a descriptive name that includes the
-    component and purpose. Tags are automatically applied, including `business_unit` and
-    `environment`.
-*   **Kubernetes Resources**: Kubernetes resources (e.g., Helm charts, custom resources,
-    operators) are managed using Pulumi's Kubernetes provider. Custom
-    `ComponentResource` classes are used to encapsulate common patterns and
-    abstractions. Examples include `OLApisixRoute` for managing APISix routes and
-    `OLVaultK8SSecret` for creating Kubernetes secrets from Vault.
-*   **IAM Policies**: IAM policies are linted using Parliament via
-    `ol_infrastructure.lib.aws.iam_helper.lint_iam_policy`.
+### Testing
+```bash
+# Run tests (minimal test coverage exists)
+uv run pytest tests/
+```
 
-## Packer Conventions (`src/bilder/`)
+## Critical Build Constraints
 
-*   **Templates**: Packer templates are defined using HCL (`.pkr.hcl` files). Variables
-    are used extensively to parameterize builds.
-*   **Provisioning**: Provisioning is primarily done using Python scripts, which often
-    leverage `pyinfra` for executing commands and managing state on the instance being
-    built. These scripts are found in `steps.py` files within component directories.
-*   **Components**: Builds are composed of reusable components found in
-    `src/bilder/components/`. An image definition in `src/bilder/images/` will typically
-    include one or more of these components.
-*   **Naming**: AMI names are constructed from variables defined in the HCL files,
-    typically including `app_name`, `build_environment`, and a timestamp.
+1. **Dependencies:** Use `uv` (v0.9.3+), NOT Poetry. README mentions Poetry but repository uses `uv`.
+2. **Python Version:** Python 3.12.x required (specified in `pyproject.toml`)
+3. **Linting:** Code MUST pass `ruff format` and minimize new `ruff check` errors
+4. **Type Checking:** Run `mypy` but expect many existing errors (1316+)—only fix new ones
+5. **Pre-commit:** Tests may fail on unrelated Docker linting—ignore if not your changes
 
-## Concourse Conventions (`src/ol_concourse/`)
+## Repository Structure (What's Where)
 
-*   **Pipeline Generation**: Concourse pipeline YAML files are not written by
-    hand. Instead, they are generated from Python code located in
-    `src/ol_concourse/pipelines/`.
-*   **Modeling**: The `src/ol_concourse/lib/models/` directory contains Pydantic models
-    that represent Concourse concepts (e.g., `Pipeline`, `Job`, `GetStep`,
-    `TaskStep`). Pipelines are constructed by instantiating and composing these models.
-*   **Fragments**: The `PipelineFragment` model is used to create reusable pieces of
-    pipelines that can be combined. This is useful for standardizing resource types or
-    groups of jobs.
-*   **Resources**: Helper functions like `ol_concourse.lib.resources.git_repo` and
-    `ol_concourse.lib.resources.registry_image` should be used to define resources in a
-    consistent manner.
-*   **Jobs**: Helper functions like `ol_concourse.lib.jobs.infrastructure.packer_jobs`
-    and `ol_concourse.lib.jobs.infrastructure.pulumi_jobs_chain` are used to generate
-    standard job patterns for building images and deploying infrastructure.
+### Core Source Directories (`src/`)
 
-## General Python Conventions
+```
+src/ol_infrastructure/         # Pulumi infrastructure-as-code (68 projects)
+├── applications/              # App-specific infrastructure (40+ apps)
+│   ├── airbyte/              # Example: Airbyte deployment
+│   ├── mit_learn/            # Example: MIT Learn platform
+│   └── ...                   # Each dir is a Pulumi project
+├── infrastructure/            # Foundational infrastructure
+│   ├── aws/                  # AWS resources (networking, IAM, EKS, etc.)
+│   ├── vault/                # HashiCorp Vault setup
+│   └── monitoring/           # Monitoring infrastructure
+├── components/                # Reusable Pulumi components
+│   ├── aws/                  # AWS component resources
+│   └── services/             # Service abstractions
+├── lib/                       # Helper libraries
+│   ├── aws/                  # AWS helpers (IAM, EC2, RDS, etc.)
+│   ├── pulumi_helper.py      # Stack parsing utilities
+│   └── ol_types.py           # Pydantic models & enums
+└── substructure/             # Supporting infrastructure
 
-*   **Type Hinting**: All code should be fully type-hinted.
-*   **Pydantic**: Pydantic is the standard for data modeling, configuration management,
-    and data validation. Use `BaseModel` for data structures and `BaseSettings` for
-    configuration loaded from the environment.
-*   **Dependencies**: Project dependencies are managed with `uv`.
-*   **Formatting**: Code should be formatted using `ruff format`.
-*   **Linting**: Code should pass `ruff` checks.
+src/bilder/                    # Packer AMI building (21 HCL files)
+├── components/               # Reusable provisioning components
+│   ├── hashicorp/           # Consul, Vault installers
+│   ├── vector/              # Vector log agent
+│   └── baseline/            # Base system setup
+├── images/                  # AMI definitions
+│   ├── consul/              # Example: Consul server AMI
+│   │   ├── deploy.py        # PyInfra provisioning script
+│   │   ├── files/           # Static files
+│   │   └── templates/       # Config templates
+│   └── ...                  # Each dir is a Packer build
+
+src/ol_concourse/             # Concourse CI/CD pipeline generation
+├── lib/                     # Pipeline generation library
+│   ├── models/              # Pydantic models for Concourse resources
+│   └── jobs/                # Job templates
+└── pipelines/               # Pipeline definitions
+    ├── infrastructure/      # Infra deployment pipelines
+    └── applications/        # App deployment pipelines
+
+src/bridge/                   # Shared utilities
+├── secrets/                 # SOPS secret handling
+├── lib/versions.py          # Version constants
+└── settings/                # Shared settings
+```
+
+### Configuration Files (Root)
+
+- `pyproject.toml` — Python dependencies (uv format), ruff/mypy config
+- `.pre-commit-config.yaml` — Pre-commit hook definitions
+- `.sops.yaml` — SOPS encryption rules (KMS key mappings)
+- `uv.lock` — Locked dependency versions
+
+## Pulumi Project Structure
+
+Each directory with a `Pulumi.yaml` is a **Pulumi project** (68 total). Example: `src/ol_infrastructure/infrastructure/aws/network/`
+
+```
+network/
+├── Pulumi.yaml                                      # Project definition
+├── __main__.py                                      # Entrypoint (deployment code)
+├── Pulumi.infrastructure.aws.network.QA.yaml        # QA environment stack config
+├── Pulumi.infrastructure.aws.network.Production.yaml # Production stack config
+└── ...additional modules
+```
+
+**Stack naming convention:** `<namespace>.<environment>` where environment is `QA`, `Production`, `CI`, or `Dev`.
+
+### Running Pulumi Commands
+
+```bash
+# Navigate to project directory
+cd src/ol_infrastructure/infrastructure/aws/network/
+
+# List available stacks
+pulumi stack ls
+
+# Select a stack
+pulumi stack select infrastructure.aws.network.QA
+
+# Preview changes (like terraform plan)
+pulumi preview
+
+# Deploy changes (CAREFUL: affects real infrastructure)
+pulumi up
+
+# Or run from repo root
+pulumi -C src/ol_infrastructure/infrastructure/aws/network/ preview
+```
+
+**Key Pulumi Helpers:**
+- `ol_infrastructure.lib.pulumi_helper.parse_stack()` — Returns `StackInfo` dataclass with stack name/environment
+- `ol_infrastructure.lib.ol_types` — Pydantic models for configurations (inherit from `AWSBase`)
+
+## Packer AMI Building
+
+Packer images in `src/bilder/images/` use HCL definitions and PyInfra for provisioning.
+
+**Build workflow (not typically run locally):**
+1. Packer reads `.pkr.hcl` files (variables, builder config)
+2. Launches EC2 instance from base AMI
+3. Runs `deploy.py` using PyInfra to configure instance
+4. Creates AMI snapshot
+
+**Common operations:**
+```bash
+# Format Packer files
+packer fmt src/bilder/images/
+
+# Validate a Packer template (requires AWS credentials)
+cd src/bilder/images/consul/
+packer validate .
+```
+
+**PyInfra provisioning (`deploy.py`):** Pure Python scripts that define system state (install packages, configure services, etc.). See `src/bilder/images/consul/deploy.py` for example.
+
+## Secrets Management (SOPS + Vault)
+
+**Workflow:**
+1. Secrets stored in git as SOPS-encrypted YAML files (`src/bridge/secrets/<context>/`)
+2. SOPS config (`.sops.yaml`) defines KMS keys by environment (QA/Production/CI)
+3. During `pulumi up`, `bridge.secrets.sops.set_env_secrets()` decrypts secrets in-memory
+4. Pulumi writes secrets to HashiCorp Vault
+5. Applications read secrets from Vault at runtime
+
+**Required tools:** `sops` CLI (v3.11.0+), AWS credentials for KMS access
+
+## Common Issues & Workarounds
+
+### Issue: README mentions Poetry but `poetry.lock` doesn't exist
+**Solution:** Repository has migrated to `uv`. Always use `uv sync` and `uv run <command>`.
+
+### Issue: pre-commit hook `hadolint-docker` fails with existing Docker warnings
+**Solution:** Ignore hadolint failures if your changes don't affect Dockerfiles. These are pre-existing issues.
+
+### Issue: `mypy` reports 1316 errors
+**Solution:** Expected. Only fix new errors introduced by your changes. Many legacy type issues exist.
+
+### Issue: `ruff check` reports 809 errors
+**Solution:** Expected. Focus on not introducing NEW errors. Consider using `--fix` for auto-fixable issues.
+
+### Issue: Pulumi operation requires AWS credentials
+**Solution:** Ensure AWS CLI is configured (`aws configure`) or environment variables are set.
+
+### Issue: `uv` warns about `~=3.12` in `requires-python`
+**Solution:** This is a warning, not an error. Ignore it—fixing requires changing project config.
+
+### Issue: Timeout running commands
+**Solution:**
+- `mypy src/` takes 75+ seconds—increase timeout to 120s
+- `uv run pytest` may need 60s timeout depending on test scope
+
+## Code Style & Conventions
+
+### Python
+- **Type hints required:** All functions/methods must have type annotations
+- **Pydantic for models:** Use `BaseModel` for data, `BaseSettings` for config
+- **Imports:** Follow `ruff` isort rules (run `ruff format` to auto-fix)
+- **Docstrings:** PEP 257 style (enforced by ruff)
+
+### Pulumi
+- **Projects:** Each `Pulumi.yaml` directory is a project
+- **Stacks:** Named as `<namespace>.<environment>` (e.g., `infrastructure.aws.network.QA`)
+- **Tags:** Use `ol_infrastructure.lib.ol_types.BusinessUnit` enum for OU tags
+- **IAM policies:** Lint with `ol_infrastructure.lib.aws.iam_helper.lint_iam_policy()`
+
+### Packer
+- **HCL formatting:** Always run `packer fmt -recursive src/bilder/` before committing
+- **Components:** Reuse components from `src/bilder/components/` instead of duplicating logic
+
+## File Modification Cheatsheet
+
+| Task | Files to Modify | Validation |
+|------|----------------|------------|
+| Add AWS resource | `src/ol_infrastructure/infrastructure/aws/<service>/__main__.py` | `pulumi preview` |
+| Create new app infra | Create `src/ol_infrastructure/applications/<app>/` with `Pulumi.yaml` + `__main__.py` | `pulumi stack init` then `preview` |
+| Add reusable component | `src/ol_infrastructure/components/<category>/` | Used in other projects |
+| Modify AMI build | `src/bilder/images/<image>/deploy.py` or `.pkr.hcl` | Packer build (CI only) |
+| Add CI/CD pipeline | `src/ol_concourse/pipelines/<category>/` | Generate YAML, deploy to Concourse |
+| Add secret | Encrypt with `sops`, place in `src/bridge/secrets/<context>/`, decrypt in Pulumi | `sops` CLI |
+
+## Environment Requirements
+
+**Installed tools (verified available):**
+- Python 3.12.7
+- uv 0.9.3
+- Pulumi 3.199.0
+- Packer 1.14.2
+- AWS CLI 2.31.17
+- Vault CLI 1.20.4
+- SOPS 3.11.0
+- PyInfra 3.5.1 (via uv)
+
+**Not required locally:** Consul CLI (used in deployed infrastructure only)
+
+## Key Files Reference
+
+- `pyproject.toml` — Dependencies, tool config (ruff/mypy settings)
+- `.pre-commit-config.yaml` — Pre-commit hooks (ruff, mypy, yamllint, shellcheck, packer fmt, hadolint)
+- `README.md` — High-level overview (mentions outdated Poetry workflow)
+- `src/ol_infrastructure/lib/pulumi_helper.py` — Stack parsing utilities
+- `src/ol_infrastructure/lib/ol_types.py` — Core Pydantic types, enums
+- `src/bridge/secrets/sops.py` — SOPS decryption helper
+- `.sops.yaml` — SOPS encryption rules
+
+## Validation Checklist
+
+Before submitting changes:
+1. ✅ `uv sync` — Ensure dependencies are installed
+2. ✅ `uv run ruff format src/` — Auto-format code
+3. ✅ `uv run ruff check src/` — Check for new linting errors
+4. ✅ `uv run mypy src/` — Verify no new type errors (75s runtime)
+5. ✅ `packer fmt -recursive src/bilder/` — Format Packer files (if modified)
+6. ✅ `pulumi preview` — Validate Pulumi changes (if applicable)
+7. ✅ `uv run pytest tests/` — Run tests (if applicable)
+
+**Optional but recommended:**
+- `uv run pre-commit run --all-files` — Run all hooks (may take 2+ minutes)
+
+## When to Search vs. Trust Instructions
+
+**Trust instructions for:**
+- Build commands (validated and documented above)
+- Tool versions (verified in environment)
+- Repository structure (exhaustively mapped)
+- Common issues (based on actual testing)
+
+**Search/explore when:**
+- Finding specific Pulumi resource implementations
+- Understanding complex component logic
+- Tracing dependencies between projects
+- Debugging unfamiliar error messages

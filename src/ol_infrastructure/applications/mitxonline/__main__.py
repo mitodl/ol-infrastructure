@@ -15,7 +15,11 @@ import pulumi_vault as vault
 from pulumi import Alias, Config, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, iam, s3
 
-from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT, DEFAULT_REDIS_PORT
+from bridge.lib.magic_numbers import (
+    DEFAULT_POSTGRES_PORT,
+    DEFAULT_REDIS_PORT,
+    DEFAULT_WSGI_PORT,
+)
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.mitxonline.k8s_secrets import (
     create_mitxonline_k8s_secrets,
@@ -307,7 +311,7 @@ env_vars = {
     "MITX_ONLINE_FROM_EMAIL": "MITx Online <mitxonline-support@mit.edu>",
     "MITX_ONLINE_OAUTH_PROVIDER": "mitxonline-oauth2",
     "MITX_ONLINE_REPLY_TO_ADDRESS": "MITx Online <mitxonline-support@mit.edu>",
-    "MITX_ONLINE_SECURE_SSL_REDIRECT": "True",
+    "MITX_ONLINE_SECURE_SSL_REDIRECT": "False",
     "MITX_ONLINE_SUPPORT_EMAIL": "mitxonline-support@mit.edu",
     "MITX_ONLINE_USE_S3": "True",
     "NODE_MODULES_CACHE": "False",
@@ -456,6 +460,28 @@ if "MITXONLINE_DOCKER_TAG" not in os.environ:
     msg = "MITXONLINE_DOCKER_TAG must be set."
     raise OSError(msg)
 MITXONLINE_DOCKER_TAG = os.environ["MITXONLINE_DOCKER_TAG"]
+if mitxonline_config.get_bool("use_granian"):
+    cmd_array = [
+        "granian",
+    ]
+    arg_array = [
+        "--interface",
+        "wsgi",
+        "--host",
+        "0.0.0.0",  # noqa: S104
+        "--port",
+        f"{DEFAULT_WSGI_PORT}",
+        "--workers",
+        "1",
+        "--log-level",
+        "warning",
+        "main.wsgi:application",
+    ]
+    nginx_config_path = "files/web.conf_granian"
+else:
+    cmd_array = ["uwsgi"]
+    arg_array = ["/tmp/uwsgi.ini"]  # noqa: S108
+    nginx_config_path = "files/web.conf_uwsgi"
 
 mitxonline_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
@@ -473,12 +499,11 @@ mitxonline_k8s_app = OLApplicationK8s(
         application_security_group_name=mitxonline_app_security_group.name,
         application_image_repository="mitodl/mitxonline-app",
         application_docker_tag=MITXONLINE_DOCKER_TAG,
-        application_cmd_array=[
-            "uwsgi",
-            "/tmp/uwsgi.ini",  # noqa: S108
-        ],
+        application_cmd_array=cmd_array,
+        application_arg_array=arg_array,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,
+        import_nginx_config_path=nginx_config_path,
         import_uwsgi_config=True,
         init_migrations=False,
         init_collectstatic=True,

@@ -288,8 +288,8 @@ class OLEKSTrustRoleConfig(AWSBase):
     description: str
     policy_operator: Literal["StringEquals", "StringLike"]
     role_name: str
-    service_account_identifier: str | None = None
-    service_account_name: str | None = None
+    service_account_identifier: str | list[str] | None = None
+    service_account_name: str | list[str] | None = None
     service_account_namespace: str | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -307,13 +307,17 @@ class OLEKSTrustRoleConfig(AWSBase):
             msg = "Both service_account_name and service_account_namespace "
             "should be specified."
             raise ValueError(msg)
-        if (
-            self.service_account_identifier
-            and not self.service_account_identifier.startswith("system:serviceaccount:")
-        ):
-            msg = "If specifying service_account_identifier "
-            "it should start with 'system:serviceaccount'"
-            raise ValueError(msg)
+        # Validate service_account_identifier format(s)
+        identifiers = (
+            [self.service_account_identifier]
+            if isinstance(self.service_account_identifier, str)
+            else self.service_account_identifier or []
+        )
+        for identifier in identifiers:
+            if not identifier.startswith("system:serviceaccount:"):
+                msg = "If specifying service_account_identifier "
+                "it should start with 'system:serviceaccount'"
+                raise ValueError(msg)
         return self
 
 
@@ -337,19 +341,36 @@ class OLEKSTrustRole(pulumi.ComponentResource):
             opts,
         )
 
-        self.__service_account_identifier = (
-            role_config.service_account_identifier
-            or f"system.serviceaccount:{role_config.service_account_namespace}:{role_config.service_account_name}"  # noqa: E501
-        )
+        # Build service account identifier(s)
+        if role_config.service_account_identifier:
+            service_account_identifiers = role_config.service_account_identifier
+        else:
+            # Convert service account name(s) to identifier(s)
+            # Note: validation ensures service_account_name is not None here
+            sa_name = role_config.service_account_name
+            if sa_name is None:
+                msg = (
+                    "service_account_name must be provided when "
+                    "service_account_identifier is not"
+                )
+                raise ValueError(msg)
+            service_account_names: list[str] = (
+                [sa_name] if isinstance(sa_name, str) else sa_name
+            )
+            service_account_identifiers = [
+                f"system:serviceaccount:{role_config.service_account_namespace}:{sa_name}"
+                for sa_name in service_account_names
+            ]
+
         self.role = aws.iam.Role(
             f"{role_config.cluster_name}-{role_config.role_name}-trust-role",
-            name=f"{role_config.cluster_name}-{role_config.role_name}-trust-role",
+            name=f"{role_config.cluster_name}-{role_config.role_name}-trust-role"[:63],
             path=f"/ol-infrastructure/eks/{role_config.cluster_name}/",
             assume_role_policy=role_config.cluster_identities.apply(
                 lambda ids: oidc_trust_policy_template(
                     oidc_identifier=ids[0]["oidcs"][0]["issuer"],
                     account_id=str(role_config.account_id),
-                    k8s_service_account_identifier=self.__service_account_identifier,
+                    k8s_service_account_identifier=service_account_identifiers,
                     operator=role_config.policy_operator,
                 )
             ),

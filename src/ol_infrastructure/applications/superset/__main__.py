@@ -139,7 +139,7 @@ superset_app = OLEKSAuthBinding(
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
         irsa_service_account_name="superset",
-        vault_sync_service_account_name="superset-vault",
+        vault_sync_service_account_names="superset-vault",
         k8s_labels=k8s_labels,
     )
 )
@@ -545,8 +545,8 @@ superset_chart = kubernetes.helm.v3.Release(
                     "targetMemoryUtilizationPercentage": "80",
                 },
                 "resources": {
-                    "limits": {"cpu": "8000m", "memory": "1Gi"},
-                    "requests": {"cpu": "100m", "memory": "256Mi"},
+                    "limits": {"cpu": "2000m", "memory": "2Gi"},
+                    "requests": {"cpu": "500m", "memory": "768Mi"},
                 },
             },
             "supersetWorker": {

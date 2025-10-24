@@ -1,0 +1,99 @@
+---
+telemetry:
+  enabled: true
+
+scheduler:
+  module: dagster.core.scheduler
+  class: DagsterDaemonScheduler
+
+compute_logs:
+  module: dagster_aws.s3.compute_log_manager
+  class: S3ComputeLogManager
+  config:
+    bucket:
+      env: DAGSTER_BUCKET_NAME
+    prefix: compute-logs/
+
+schedule_storage:
+  module: dagster_postgres.schedule_storage
+  class: PostgresScheduleStorage
+  config:
+    postgres_db:
+      username:
+        env: DAGSTER_PG_USER
+      password:
+        env: DAGSTER_PG_PASSWORD
+      hostname:
+        env: DAGSTER_PG_HOST
+      db_name:
+        env: DAGSTER_PG_DB
+      port: 5432
+
+run_launcher:
+  module: dagster_k8s
+  class: K8sRunLauncher
+  config:
+    run_k8s_config:
+      pod_template_spec_metadata:
+        annotations:
+          karpenter.sh/do-not-disrupt: "true"
+    load_incluster_config: true
+    job_namespace: dagster
+    image_pull_policy: IfNotPresent
+    service_account_name: dagster
+    dagster_home: "/opt/dagster/dagster_home"
+    instance_config_map: "dagster-instance"
+    postgres_password_secret: "dagster-postgresql-secret" # pragma: allowlist secret
+    env_secrets:
+    - dagster-static-secrets
+    - dagster-dbt-secrets
+    - dagster-postgresql-secret
+
+run_storage:
+  module: dagster_postgres.run_storage
+  class: PostgresRunStorage
+  config:
+    postgres_db:
+      username:
+        env: DAGSTER_PG_USER
+      password:
+        env: DAGSTER_PG_PASSWORD
+      hostname:
+        env: DAGSTER_PG_HOST
+      db_name:
+        env: DAGSTER_PG_DB
+      port: 5432
+
+# Opt in to run monitoring
+run_monitoring:
+  enabled: true
+  start_timeout_seconds: 900
+  cancel_timeout_seconds: 300
+  max_resume_run_attempts: 3
+  poll_interval_seconds: 120
+  max_runtime_seconds: 0
+
+run_retries:
+  enabled: true
+  max_retries: 3
+
+event_log_storage:
+  module: dagster_postgres.event_log
+  class: PostgresEventLogStorage
+  config:
+    postgres_db:
+      username:
+        env: DAGSTER_PG_USER
+      password:
+        env: DAGSTER_PG_PASSWORD
+      hostname:
+        env: DAGSTER_PG_HOST
+      db_name:
+        env: DAGSTER_PG_DB
+      port: 5432
+
+run_coordinator:
+  module: dagster.core.run_coordinator
+  class: QueuedRunCoordinator
+  config:
+    max_concurrent_runs: 50

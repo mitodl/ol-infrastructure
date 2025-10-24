@@ -1,7 +1,6 @@
 # ruff: noqa: E501
 
 import os
-import textwrap
 from pathlib import Path
 
 import pulumi_aws as aws
@@ -9,26 +8,22 @@ import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 
-from bridge.lib.magic_numbers import (
-    DEFAULT_HTTPS_PORT,
-    DEFAULT_KEDA_PORT,
-)
 from bridge.lib.versions import (
-    KEDA_CHART_VERSION,
-    KUBE_STATE_METRICS_CHART_VERSION,
+    GRAFANA_K8S_MONITORING_CHART_VERSION,
     VANTAGE_K8S_AGENT_CHART_VERSION,
 )
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
-from ol_infrastructure.lib.aws.eks_helper import default_psg_egress_args
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 from ol_infrastructure.substructure.aws.eks.karpenter import setup_karpenter
+from ol_infrastructure.substructure.aws.eks.keda import setup_keda
 
 env_config = Config("environment")
 
@@ -38,8 +33,8 @@ VERSIONS = {
     "VANTAGE_K8S_AGENT_VERSION": os.environ.get(
         "VANTAGE_K8S_AGENT_CHART_VERSION", VANTAGE_K8S_AGENT_CHART_VERSION
     ),
-    "KUBE_STATE_METRICS_VERSION": os.environ.get(
-        "KUBE_STATE_METRICS_CHART_VERSION", KUBE_STATE_METRICS_CHART_VERSION
+    "GRAFANA_K8S_MONITORING_VERSION": os.environ.get(
+        "GRAFANA_K8S_MONITORING_CHART_VERSION", GRAFANA_K8S_MONITORING_CHART_VERSION
     ),
 }
 
@@ -364,439 +359,251 @@ if cluster_stack.require_output("has_ebs_storage"):
         ),
     )
 
-############################################################
-# Install Grafana-Alloy for log and metric collection
-############################################################
-alloy_env_vars_secret_name = "alloy-env-vars"  # pragma: allowlist secret #  noqa: S105
-alloy_env_vars_static_secret_config = OLVaultK8SStaticSecretConfig(
-    name=alloy_env_vars_secret_name,
-    namespace="operations",
-    labels=k8s_global_labels,
-    dest_secret_labels=k8s_global_labels,
-    dest_secret_name=alloy_env_vars_secret_name,
-    mount="secret-global",
-    mount_type="kv-v2",
-    path="grafana",
-    restart_target_kind="DaemonSet",
-    restart_target_name="grafana-alloy",
-    templates={
-        "GRAFANA_CLOUD_LOKI_URL": '{{ get .Secrets "loki_endpoint" }}',
-        "GRAFANA_CLOUD_LOKI_PASSWORD": '{{ get .Secrets "loki_api_key" }}',
-        "GRAFANA_CLOUD_LOKI_USERNAME": '{{ get .Secrets "loki_user_id" }}',
-        "GRAFANA_CLOUD_PROMETHEUS_URL": '{{ get .Secrets "prometheus_endpoint" }}',
-        "GRAFANA_CLOUD_PROMETHEUS_PASSWORD": '{{ get .Secrets "prometheus_api_key" }}',
-        "GRAFANA_CLOUD_PROMETHEUS_USERNAME": '{{ get .Secrets "prometheus_user_id" }}',
-        "GRAFANA_CLOUD_TEMPO_URL": '{{ get .Secrets "tempo_endpoint" }}',
-        "GRAFANA_CLOUD_TEMPO_PASSWORD": '{{ get .Secrets "tempo_api_key" }}',
-        "GRAFANA_CLOUD_TEMPO_USERNAME": '{{ get .Secrets "tempo_user_id" }}',
+# Grafana k8s-monitoring
+grafana_vault_secrets = read_yaml_secrets(
+    Path(f"alloy/grafana.{stack_info.env_suffix}.yaml")
+)
+
+alloy_extra_env_vars = [
+    {
+        "name": "GCLOUD_RW_API_KEY",
+        "valueFrom": {
+            "secretKeyRef": {
+                "name": "alloy-metrics-remote-cfg-grafana-k8s-monitoring",
+                "key": "password",
+            }
+        },
     },
-    refresh_after="1m",
-    vaultauth=operations_vault_k8s_resources.auth_name,
-)
-
-alloy_env_vars_static_secret = OLVaultK8SSecret(
-    f"{cluster_name}-star-odl-mit-edu-static-secret",
-    resource_config=alloy_env_vars_static_secret_config,
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        parent=operations_vault_k8s_resources,
-        delete_before_replace=True,
-    ),
-)
-
-alloy_configmap_name = "alloy-config"
-alloy_configmap = kubernetes.core.v1.ConfigMap(
-    f"{cluster_name}-grafana-alloy-configmap",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=alloy_configmap_name,
-        namespace="operations",
-        labels=k8s_global_labels,
-    ),
-    immutable=False,
-    data={
-        "config.alloy": textwrap.dedent(
-            f"""
-            // ----------------------------------------------------------
-            // General configuration of loki
-            logging {{
-              level = "info"
-              format = "logfmt"
-            }}
-
-            // ----------------------------------------------------------
-            // Discover servicemonitor and podmonitor resources in the
-            // cluster and ship their metrics to prometheus @ grafana cloud
-            prometheus.remote_write "publish_to_grafana" {{
-              endpoint {{
-                url = env("GRAFANA_CLOUD_PROMETHEUS_URL")
-                basic_auth {{
-                  username = env("GRAFANA_CLOUD_PROMETHEUS_USERNAME")
-                  password = env("GRAFANA_CLOUD_PROMETHEUS_PASSWORD")
-                }}
-                write_relabel_config {{
-                  source_labels = ["__name__"]
-                  regex         = "go_.*"
-                  action        = "drop"
-                }}
-                write_relabel_config {{
-                    source_labels = ["exported_namespace", "exported_container"]
-                    regex         = "jupyter;(binder|chp|dind|image-cleaner-dind|pause|kube-scheduler)"
-                    action        = "drop"
-                }}
-
-                // Collapse some labels that include UUIDs and are not useful
-                write_relabel_config {{
-                    source_labels = ["__name__"]
-                    regex         = "(kube_pod_container_info|kube_pod_container_status_restarts_total|kube_pod_status_reason)"
-                    action        = "replace"
-                    target_label  = "uid"
-                    replacement   = ""
-                }}
-                write_relabel_config {{
-                    source_labels = ["__name__"]
-                    regex         = "kube_pod_container_info"
-                    action        = "replace"
-                    target_label  = "image_spec"
-                    replacement   = ""
-                }}
-                write_relabel_config {{
-                    source_labels = ["__name__"]
-                    regex         = "kube_pod_container_info"
-                    action        = "replace"
-                    target_label  = "image_id"
-                    replacement   = ""
-                }}
-                write_relabel_config {{
-                    source_labels = ["__name__"]
-                    regex         = "kube_pod_container_info"
-                    action        = "replace"
-                    target_label  = "container_id"
-                    replacement   = ""
-                }}
-              }}
-            }}
-
-            prometheus.operator.servicemonitors "servicemonitors" {{
-              forward_to = [prometheus.remote_write.publish_to_grafana.receiver]
-              // Drop metrics that start with go_
-              // These are usually metrics about the exporter itself rather than
-              // the application / service we are interested in.
-
-              // Add cluster label
-              rule {{
-                target_label = "cluster"
-                replacement  = "{cluster_name}"
-                action       = "replace"
-              }}
-            }}
-
-            // ----------------------------------------------------------
-            // Collect all pod logs and cluster events and ship to loki
-            // @ grafana cloud
-
-
-            discovery.kubernetes "pods" {{
-              role = "pod"
-            }}
-
-            discovery.relabel "pods" {{
-              targets = discovery.kubernetes.pods.targets
-              // OL Standard Stuff (application, service, environment)
-              // We're going to use the namespace as 'application'
-              rule {{
-                source_labels = ["__meta_kubernetes_namespace"]
-                action = "replace"
-                target_label = "application"
-              }}
-              rule {{
-                source_labels = ["application"]
-                action = "lowercase"
-                target_label = "application"
-              }}
-
-            // Select a pod label -> service
-              rule {{
-                source_labels = [
-                    "__meta_kubernetes_pod_label_ol_mit_edu_service",
-                    "__meta_kubernetes_pod_label_ol_mit_edu_component",
-                    "__meta_kubernetes_pod_label_app_kubernetes_io_component",
-                    "__meta_kubernetes_pod_label_app_kubernetes_io_name",
-                    "__meta_kubernetes_pod_label_app_kubernetes_io_instance",
-                ]
-                replacement = "$1"
-                regex = ";*([^;]+).*"
-                action = "replace"
-                target_label = "service"
-              }}
-              rule {{
-                source_labels = ["service"]
-                action = "lowercase"
-                target_label = "service"
-              }}
-
-              rule {{
-                source_labels = ["__meta_kubernetes_namespace"]
-                action = "replace"
-                target_label = "environment"
-                replacement = "$1-{stack_info.env_suffix}"
-              }}
-              rule {{
-                source_labels = ["environment"]
-                action = "lowercase"
-                target_label = "environment"
-              }}
-
-              // Extras
-              rule {{
-                source_labels = ["__meta_kubernetes_namespace"]
-                action = "replace"
-                target_label = "namespace"
-              }}
-              rule {{
-                source_labels = ["namespace"]
-                action = "lowercase"
-                target_label = "namespace"
-              }}
-
-              rule {{
-                source_labels = ["__meta_kubernetes_pod_container_name"]
-                action = "replace"
-                target_label = "container"
-              }}
-              rule {{
-                source_labels = ["container"]
-                action = "lowercase"
-                target_label = "container"
-              }}
-
-                // Add a pod name label for easier searching / troubleshooting
-              rule {{
-                source_labels = ["__meta_kubernetes_pod_name"]
-                action = "replace"
-                target_label = "pod"
-              }}
-
-                // Select k8s label -> stack label
-                // From least desirable to most desireable
-              rule {{
-                source_labels = [
-                    "__meta_kubernetes_pod_label_ol_mit_edu_stack",
-                    "__meta_kubernetes_pod_label_pulumi_stack",
-                ]
-                replacement = "$1"
-                regex = ";*([^;]+).*"
-                action = "replace"
-                target_label = "stack"
-              }}
-              // Intentionally not doing a lowercase on stack
-            }}
-
-            loki.source.kubernetes "pod_logs" {{
-              targets = discovery.relabel.pods.output
-              forward_to = [loki.process.pod_logs.receiver]
-            }}
-
-            loki.process "pod_logs" {{
-              stage.static_labels {{
-                values = {{
-                  cluster = "{cluster_name}",
-                }}
-              }}
-
-              stage.label_keep {{
-                values = ["application", "cluster", "container", "environment", "namespace", "service", "stack", "pod"]
-              }}
-              forward_to = [loki.write.publish_to_grafana.receiver]
-            }}
-
-            loki.source.kubernetes_events "cluster_events" {{
-              job_name   = "integrations/kubernetes/eventhandler"
-              log_format = "json"
-              forward_to = [loki.process.cluster_events.receiver]
-            }}
-
-            loki.process "cluster_events" {{
-              stage.static_labels {{
-                values = {{
-                  cluster = "{cluster_name}",
-                  service = "kubernetes-events",
-                  application = "eks",
-                  environment = "{cluster_name}",
-                }}
-              }}
-
-              stage.label_keep {{
-                values = ["application", "cluster", "environment", "namespace", "service"]
-              }}
-              forward_to = [loki.write.publish_to_grafana.receiver]
-            }}
-
-            loki.write "publish_to_grafana" {{
-              endpoint {{
-                url = env("GRAFANA_CLOUD_LOKI_URL")
-                basic_auth {{
-                  username = env("GRAFANA_CLOUD_LOKI_USERNAME")
-                  password = env("GRAFANA_CLOUD_LOKI_PASSWORD")
-                }}
-              }}
-            }}
-
-            // ----------------------------------------------------------
-            // OpenTelemetry trace collection
-            otelcol.receiver.otlp "kubernetes_traces" {{
-              grpc {{
-                endpoint = "0.0.0.0:4317"
-              }}
-
-              http {{
-                endpoint = "0.0.0.0:4318"
-              }}
-
-              output {{
-                traces = [otelcol.processor.batch.kubernetes_traces.input]
-              }}
-            }}
-
-            otelcol.processor.batch "kubernetes_traces" {{
-              output {{
-                traces = [otelcol.exporter.otlp.grafana_cloud_traces.input]
-              }}
-            }}
-
-            otelcol.exporter.otlp "grafana_cloud_traces" {{
-              client {{
-                endpoint = env("GRAFANA_CLOUD_TEMPO_URL")
-                auth = otelcol.auth.basic.grafana_cloud_traces.handler
-              }}
-            }}
-
-            otelcol.auth.basic "grafana_cloud_traces" {{
-              username = env("GRAFANA_CLOUD_TEMPO_USERNAME")
-              password = env("GRAFANA_CLOUD_TEMPO_PASSWORD")
-            }}
-            """  # noqa: S608
-        )
+    {
+        "name": "CLUSTER_NAME",
+        "value": cluster_name,
     },
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        parent=k8s_provider,
-        depends_on=[alloy_env_vars_static_secret],
-        delete_before_replace=True,
-    ),
-)
-
-alloy_release = kubernetes.helm.v3.Release(
-    f"{cluster_name}-grafana-alloy-helm-release",
+    {
+        "name": "NAMESPACE",
+        "valueFrom": {
+            "fieldRef": {"fieldPath": "metadata.namespace"},
+        },
+    },
+    {
+        "name": "POD_NAME",
+        "valueFrom": {
+            "fieldRef": {"fieldPath": "metadata.name"},
+        },
+    },
+    {
+        "name": "GCLOUD_FM_COLLECTOR_ID",
+        "value": "grafana-k8s-monitoring-$(CLUSTER_NAME)-$(NAMESPACE)-$(POD_NAME)",
+    },
+]
+grafana_k8s_monitoring_helm_release = kubernetes.helm.v3.Release(
+    f"{cluster_name}-grafana-k8s-monitoring-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
-        name="grafana-alloy",
-        chart="alloy",
-        version="",
-        namespace="operations",
+        name="grafana-k8s-monitoring",
+        chart="k8s-monitoring",
+        version=VERSIONS["GRAFANA_K8S_MONITORING_VERSION"],
+        namespace="grafana",
+        create_namespace=True,  # Important
+        cleanup_on_fail=True,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://grafana.github.io/helm-charts",
         ),
-        cleanup_on_fail=True,
-        skip_await=True,
         values={
-            "alloy": {
-                "configMap": {
-                    "create": False,
-                    "name": alloy_configmap_name,
-                    "key": "config.alloy",
+            "cluster": {
+                "name": cluster_name,
+            },
+            "destinations": [
+                {
+                    "name": "grafana-cloud-metrics",
+                    "type": "prometheus",
+                    "url": "https://prometheus-prod-10-prod-us-central-0.grafana.net./api/prom/push",
+                    "auth": {
+                        "type": "basic",
+                        "username": grafana_vault_secrets[
+                            "k8s_monitoring_metrics_username"
+                        ],
+                        "password": grafana_vault_secrets["k8s_monitoring_api_key"],
+                    },
                 },
-                "clustering": {
+                {
+                    "name": "grafana-cloud-logs",
+                    "type": "loki",
+                    "url": "https://logs-prod-us-central1.grafana.net./loki/api/v1/push",
+                    "auth": {
+                        "type": "basic",
+                        "username": grafana_vault_secrets[
+                            "k8s_monitoring_logs_username"
+                        ],
+                        "password": grafana_vault_secrets["k8s_monitoring_api_key"],
+                    },
+                },
+                {
+                    "name": "gc-otlp-endpoint",
+                    "type": "otlp",
+                    "url": "https://otlp-gateway-prod-us-central-0.grafana.net./otlp",
+                    "protocol": "http",
+                    "auth": {
+                        "type": "basic",
+                        "username": grafana_vault_secrets[
+                            "k8s_monitoring_tracing_username"
+                        ],
+                        "password": grafana_vault_secrets["k8s_monitoring_api_key"],
+                    },
+                    "metrics": {
+                        "enabled": True,
+                    },
+                    "logs": {
+                        "enabled": True,
+                    },
+                    "traces": {
+                        "enabled": True,
+                    },
+                },
+            ],
+            "clusterMetrics": {
+                "enabled": True,
+                "opencost": {
                     "enabled": True,
-                },
-                "envFrom": [
-                    {
-                        "secretRef": {
-                            "name": alloy_env_vars_secret_name,
+                    "metricsSource": "grafana-cloud-metrics",
+                    "opencost": {
+                        "exporter": {
+                            "defaultClusterId": cluster_name,
+                        },
+                        "prometheus": {
+                            "existingSecretName": "grafana-cloud-metrics-grafana-k8s-monitoring",  # pragma: allowlist secret
+                            "external": {
+                                "url": "https://prometheus-prod-10-prod-us-central-0.grafana.net./api/prom"
+                            },
                         },
                     },
-                ],
-                "extraPorts": [
-                    {
-                        "name": "otlp",
-                        "port": 4317,
-                        "targetPort": 4317,
-                        "appProtocol": "grpc",
-                    },
-                    {
-                        "name": "otlp-http",
-                        "port": 4318,
-                        "targetPort": 4318,
-                    },
-                ],
+                },
+                "kepler": {
+                    "enabled": True,
+                },
             },
-            "serviceAccount": {
-                "create": True,
-                "additionalLabels": k8s_global_labels,
-            },
-            "configReloader": {
+            "annotationAutodiscover": {
                 "enabled": True,
-                "resources": {
-                    "requests": {
-                        "memory": "10Mi",
-                        "cpu": "1m",
+            },
+            "prometheusOperatorObjects": {
+                "enabled": True,
+            },
+            "clusterEvents": {
+                "enabled": True,
+            },
+            "podLogs": {
+                "enabled": True,
+            },
+            "applicationObservability": {
+                "enabled": True,
+                "receivers": {
+                    "otlp": {
+                        "grpc": {
+                            "enabled": True,
+                            "port": 4317,
+                        },
+                        "http": {
+                            "enabled": True,
+                            "port": 4318,
+                        },
                     },
-                    "limits": {
-                        "memory": "10Mi",
-                        "cpu": "1m",
+                    "zipkin": {
+                        "enabled": True,
+                        "port": 9411,
                     },
                 },
             },
-            "controller": {
-                "type": "daemonset",
-                "podLabels": k8s_global_labels,
-            },
-            "service": {
+            "alloy-metrics": {
                 "enabled": True,
+                "alloy": {
+                    "extraEnv": alloy_extra_env_vars,
+                },
+                "remoteConfig": {
+                    "enabled": True,
+                    "url": "https://fleet-management-prod-001.grafana.net",
+                    "auth": {
+                        "type": "basic",
+                        "username": grafana_vault_secrets[
+                            "k8s_monitoring_tracing_username"
+                        ],
+                        "password": grafana_vault_secrets["k8s_monitoring_api_key"],
+                    },
+                },
             },
-            "serviceMonitor": {
-                "enabled": False,
+            "alloy-singleton": {
+                "enabled": True,
+                "alloy": {
+                    "extraEnv": alloy_extra_env_vars,
+                },
+                "remoteConfig": {
+                    "enabled": True,
+                    "url": "https://fleet-management-prod-001.grafana.net",
+                    "auth": {
+                        "type": "basic",
+                        "username": grafana_vault_secrets[
+                            "k8s_monitoring_tracing_username"
+                        ],
+                        "password": grafana_vault_secrets["k8s_monitoring_api_key"],
+                    },
+                },
             },
-            "ingress": {
-                "enabled": False,
+            "alloy-logs": {
+                "enabled": True,
+                "alloy": {
+                    "extraEnv": alloy_extra_env_vars,
+                },
+                "remoteConfig": {
+                    "enabled": True,
+                    "url": "https://fleet-management-prod-001.grafana.net",
+                    "auth": {
+                        "type": "basic",
+                        "username": grafana_vault_secrets[
+                            "k8s_monitoring_tracing_username"
+                        ],
+                        "password": grafana_vault_secrets["k8s_monitoring_api_key"],
+                    },
+                },
+            },
+            "alloy-receiver": {
+                "enabled": True,
+                "alloy": {
+                    "extraEnv": alloy_extra_env_vars,
+                    "extraPorts": [
+                        {
+                            "name": "otlp-grpc",
+                            "port": 4317,
+                            "targetPort": 4317,
+                            "protocol": "TCP",
+                        },
+                        {
+                            "name": "otlp-http",
+                            "port": 4318,
+                            "targetPort": 4318,
+                            "protocol": "TCP",
+                        },
+                        {
+                            "name": "zipkin",
+                            "port": 9411,
+                            "targetPort": 9411,
+                            "protocol": "TCP",
+                        },
+                    ],
+                },
+                "remoteConfig": {
+                    "enabled": True,
+                    "url": "https://fleet-management-prod-001.grafana.net",
+                    "auth": {
+                        "type": "basic",
+                        "username": grafana_vault_secrets[
+                            "k8s_monitoring_tracing_username"
+                        ],
+                        "password": grafana_vault_secrets["k8s_monitoring_api_key"],
+                    },
+                },
             },
         },
     ),
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        parent=k8s_provider,
-        depends_on=[alloy_configmap],
-        delete_before_replace=True,
-    ),
+    opts=ResourceOptions(provider=k8s_provider, delete_before_replace=True),
 )
 
-ksm_release = kubernetes.helm.v3.Release(
-    f"{cluster_name}-kube-state-metrics-helm-release",
-    kubernetes.helm.v3.ReleaseArgs(
-        name="kube-state-metrics",
-        chart="oci://registry-1.docker.io/bitnamicharts/kube-state-metrics",
-        version=VERSIONS["KUBE_STATE_METRICS_VERSION"],
-        namespace="operations",
-        cleanup_on_fail=True,
-        skip_await=True,
-        values={
-            "serviceMonitor": {
-                "enabled": True,
-            },
-            "image": {
-                "repository": "bitnamilegacy/kube-state-metrics",
-                "tag": "2.16.0-debian-12-r5",
-            },
-            "namespaces": "jupyter",
-            "extraArgs": {
-                "metric-allowlist": "kube_pod_container_info,kube_pod_container_status_restarts_total,kube_pod_status_reason",
-            },
-        },
-    ),
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        parent=k8s_provider,
-        delete_before_replace=True,
-    ),
-)
 
 # Setup Karpenter
 setup_karpenter(
@@ -809,129 +616,16 @@ setup_karpenter(
     k8s_global_labels=k8s_global_labels,
 )
 
-keda_security_group = aws.ec2.SecurityGroup(
-    f"{cluster_name}-keda-security-group",
-    description="Security group for KEDA operator",
-    vpc_id=target_vpc["id"],
-    ingress=[
-        aws.ec2.SecurityGroupIngressArgs(
-            self=True,
-            from_port=DEFAULT_KEDA_PORT,
-            to_port=DEFAULT_KEDA_PORT,
-            protocol="tcp",
-        ),
-        aws.ec2.SecurityGroupIngressArgs(
-            self=True,
-            from_port=DEFAULT_HTTPS_PORT,
-            to_port=DEFAULT_HTTPS_PORT,
-            protocol="tcp",
-        ),
-        aws.ec2.SecurityGroupIngressArgs(
-            self=True,
-            from_port=8080,
-            to_port=8080,
-            protocol="tcp",
-        ),
-        aws.ec2.SecurityGroupIngressArgs(
-            from_port=6443,
-            to_port=6443,
-            security_groups=[cluster_stack.require_output("cluster_security_group_id")],
-            protocol="tcp",
-        ),
-    ],
-    egress=default_psg_egress_args,
-    tags={
-        **aws_config.tags,
-        "Name": f"{cluster_name}-keda-security-group",
-    },
-)
-export("cluster_keda_security_group_id", keda_security_group.id)
-
-keda_release = kubernetes.helm.v3.Release(
-    f"{cluster_name}-keda-helm-release",
-    kubernetes.helm.v3.ReleaseArgs(
-        name="keda",
-        chart="keda",
-        version=KEDA_CHART_VERSION,
-        namespace="operations",
-        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-            repo="https://kedacore.github.io/charts"
-        ),
-        cleanup_on_fail=True,
-        skip_await=True,
-        values={
-            "podLabels": {
-                "keda": {
-                    "ol.mit.edu/pod-security-group": keda_security_group.id,
-                },
-                "metricsAdapter": {
-                    "ol.mit.edu/pod-security-group": keda_security_group.id,
-                },
-                "webhooks": {
-                    "ol.mit.edu/pod-security-group": keda_security_group.id,
-                },
-            },
-            "resources": {
-                "operator": {
-                    "requests": {
-                        "cpu": "100m",
-                        "memory": "200Mi",
-                    },
-                    "limits": {
-                        "cpu": "200m",
-                        "memory": "400Mi",
-                    },
-                },
-                "metricServer": {
-                    "requests": {
-                        "cpu": "100m",
-                        "memory": "100Mi",
-                    },
-                    "limits": {
-                        "cpu": "200m",
-                        "memory": "200Mi",
-                    },
-                },
-                "webhooks": {
-                    "requests": {
-                        "cpu": "100m",
-                        "memory": "100Mi",
-                    },
-                    "limits": {
-                        "cpu": "200m",
-                        "memory": "200Mi",
-                    },
-                },
-            },
-        },
-    ),
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        parent=k8s_provider,
-        delete_before_replace=True,
-    ),
-)
-
-keda_security_group_policy = kubernetes.apiextensions.CustomResource(
-    f"{cluster_name}-keda-helm-release",
-    api_version="vpcresources.k8s.aws/v1beta1",
-    kind="SecurityGroupPolicy",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="keda-operator",
-        namespace="operations",
-        labels=k8s_global_labels,
-    ),
-    spec={
-        "podSelector": {
-            "matchLabels": {
-                "ol.mit.edu/pod-security-group": keda_security_group.id,
-            }
-        },
-        "securityGroups": {
-            "groupIds": [keda_security_group.id],
-        },
-    },
-    opts=ResourceOptions(depends_on=keda_release, provider=k8s_provider),
+############################################################
+# KEDA (Kubernetes Event Driven Autoscaling)
+############################################################
+setup_keda(
+    cluster_name=cluster_name,
+    cluster_stack=cluster_stack,
+    target_vpc=target_vpc,
+    aws_config=aws_config,
+    k8s_provider=k8s_provider,
+    k8s_global_labels=k8s_global_labels,
 )
 
 nvidia_k8s_device_plugin_release = kubernetes.helm.v3.Release(

@@ -60,6 +60,11 @@ courses = [
         image_name="uai_source-uai.0a",
     ),
     CourseImageInfo(
+        course_name="uai_source-uai.st1",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.ST.1-1T2026.git",
+        image_name="uai_source-uai.st1",
+    ),
+    CourseImageInfo(
         course_name="uai_source-uai.1",
         repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.1-2T2025.git",
         image_name="uai_source-uai.1",
@@ -118,6 +123,11 @@ courses = [
         course_name="uai_source-uai.13",
         repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.13-3T2025.git",
         image_name="uai_source-uai.13",
+    ),
+    CourseImageInfo(
+        course_name="uai_source-uai.mltl1",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.MLTL.1-1T2026 ",
+        image_name="uai_source-uai.mltl1",
     ),
 ]
 

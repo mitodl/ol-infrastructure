@@ -24,10 +24,28 @@ KNOWN_COURSES = [
 KNOWN_COURSES.extend(
     [
         f"uai_source-uai.{i}"
-        for i in ["intro", 0, "0a", 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13]
+        for i in [
+            "intro",
+            0,
+            "0a",
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            11,
+            12,
+            13,
+            "st1",
+            "mltl1",
+        ]
     ]
 )
-# All courses which use the CUDA pytorch base image are below
+# All courses which use the CUDA pytorch or tensorflow base image are below
 GPU_ENABLED_COURSES = {
     "deep_learning_foundations_and_applications",
     "uai_source-uai.1",
@@ -40,6 +58,8 @@ GPU_ENABLED_COURSES = {
     "uai_source-uai.11",
     "uai_source-uai.12",
     "uai_source-uai.13",
+    "uai_source-uai.st1",
+    "uai_source-uai.mltl1",
 }
 
 
@@ -84,3 +104,4 @@ c.Authenticator.allow_all = True  # type: ignore[name-defined] # noqa: F821
 c.JupyterHub.db_url = os.environ["DATABASE_URL"]  # type: ignore[name-defined] # noqa: F821
 c.JupyterHub.tornado_settings["cookie_options"] = {"expires_days": 1}  # type: ignore[name-defined] # noqa: F821
 c.JupyterHub.logo_file = "/opt/mit_learn.svg"  # type: ignore[name-defined] # noqa: F821
+c.JupyterHub.template_vars = {"logo_url": "https://learn.mit.edu/dashboard"}  # type: ignore[name-defined] # noqa: F821

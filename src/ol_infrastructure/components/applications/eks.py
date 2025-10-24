@@ -37,12 +37,16 @@ class OLEKSAuthBindingConfig(BaseModel):
     # From cluster stack reference
     cluster_identities: Output[Any]
     vault_auth_endpoint: Output[str]
-    # Name of the k8s service account that will be used for IRSA
-    irsa_service_account_name: str
-    # Name of the k8s service account used for vault secret sync
-    vault_sync_service_account_name: str = "vault-secrets"
+    # Name(s) of the k8s service account(s) that will be used for IRSA
+    # Can be a single string or a list of strings
+    irsa_service_account_name: str | list[str]
+    # Name(s) of the k8s service account(s) used for vault secret sync
+    # Can be a single string or a list of strings
+    vault_sync_service_account_names: str | list[str] = "vault-secrets"
     # Labels to apply to k8s resources created by the component
     k8s_labels: K8sGlobalLabels
+    # Optional parliament config for IAM policy linting
+    parliament_config: dict[str, Any] | None = None
 
     class Config:
         """Pydantic model configuration."""
@@ -73,11 +77,15 @@ class OLEKSAuthBinding(ComponentResource):
             opts,
         )
         aws_account = get_caller_identity()
-        iam_policy = iam.Policy(
+        self.iam_policy = iam.Policy(
             f"{config.application_name}-policy-{config.stack_info.env_suffix}",
             name=f"{config.application_name}-policy-{config.stack_info.env_suffix}",
             path=f"/ol-data/{config.application_name}-policy-{config.stack_info.env_suffix}/",
-            policy=lint_iam_policy(config.iam_policy_document, stringify=True),
+            policy=lint_iam_policy(
+                config.iam_policy_document,
+                stringify=True,
+                parliament_config=config.parliament_config,
+            ),
             description=(
                 f"Policy for granting access for {config.application_name} to AWS"
                 " resources"
@@ -85,7 +93,7 @@ class OLEKSAuthBinding(ComponentResource):
             opts=ResourceOptions(parent=self),
         )
 
-        trust_role = OLEKSTrustRole(
+        self.trust_role = OLEKSTrustRole(
             f"{config.application_name}-irsa-trust-role-{config.stack_info.env_suffix}",
             role_config=OLEKSTrustRoleConfig(
                 account_id=aws_account.account_id,
@@ -105,11 +113,11 @@ class OLEKSAuthBinding(ComponentResource):
 
         iam.RolePolicyAttachment(
             f"{config.application_name}-irsa-policy-attach-{config.stack_info.env_suffix}",
-            policy_arn=iam_policy.arn,
-            role=trust_role.role.name,
+            policy_arn=self.iam_policy.arn,
+            role=self.trust_role.role.name,
             opts=ResourceOptions(parent=self),
         )
-        self.irsa_role = trust_role.role
+        self.irsa_role = self.trust_role.role
 
         vault_policy = Policy(
             f"{config.application_name}-server-vault-policy",
@@ -118,11 +126,18 @@ class OLEKSAuthBinding(ComponentResource):
             opts=ResourceOptions(parent=self),
         )
 
+        # Convert service account names to list if it's a single string
+        service_account_names = (
+            [config.vault_sync_service_account_names]
+            if isinstance(config.vault_sync_service_account_names, str)
+            else config.vault_sync_service_account_names
+        )
+
         k8s_auth_backend_role = vault_kubernetes.AuthBackendRole(
             f"{config.application_name}-k8s-vault-auth-backend-role-{config.stack_info.env_suffix}",
             role_name=config.application_name,
             backend=config.vault_auth_endpoint,
-            bound_service_account_names=[config.vault_sync_service_account_name],
+            bound_service_account_names=service_account_names,
             bound_service_account_namespaces=[config.namespace],
             token_policies=[vault_policy.name],
             opts=ResourceOptions(parent=self),
@@ -135,7 +150,7 @@ class OLEKSAuthBinding(ComponentResource):
             vault_address=Config("vault").require("address"),
             vault_auth_endpoint=config.vault_auth_endpoint,
             vault_auth_role_name=k8s_auth_backend_role.role_name,
-            service_account_name=config.vault_sync_service_account_name,
+            service_account_name=service_account_names[0],
         )
         self.vault_k8s_resources = OLVaultK8SResources(
             resource_config=vault_k8s_resources_config,
@@ -148,7 +163,7 @@ class OLEKSAuthBinding(ComponentResource):
 
         self.register_outputs(
             {
-                "iam_policy": iam_policy,
+                "iam_policy": self.iam_policy,
                 "irsa_role": self.irsa_role,
                 "vault_policy": vault_policy,
                 "vault_k8s_auth_role": k8s_auth_backend_role,

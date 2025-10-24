@@ -12,10 +12,6 @@ from bilder.components.hashicorp.consul.models import (
     ConsulTelemetry,
 )
 from bilder.components.hashicorp.consul.steps import proxy_consul_dns
-from bilder.components.hashicorp.consul_esm.models import (
-    ConsulExternalServicesMonitor,
-    ConsulExternalServicesMonitorConfig,
-)
 from bilder.components.hashicorp.steps import (
     configure_hashicorp_product,
     install_hashicorp_products,
@@ -58,12 +54,6 @@ consul_configuration = {
     )
 }
 
-# TODO ACL token  # noqa: FIX002, TD002, TD004
-consul_esm_configuration = {
-    Path("00-default.json"): ConsulExternalServicesMonitorConfig(token=""),
-}
-
-
 # Install Traefik
 traefik_config = TraefikConfig(
     static_configuration=traefik_static.TraefikStaticConfig.model_validate(
@@ -87,16 +77,12 @@ vector_config = VectorConfig()
 vector_config.configuration_templates[
     TEMPLATES_DIRECTORY.joinpath("vector", "consul_logs.yaml")
 ] = {}
-vector_config.configuration_templates[
-    TEMPLATES_DIRECTORY.joinpath("vector", "consul_metrics.yaml")
-] = {}
 install_vector(vector_config)
 configure_vector(vector_config)
 
 # Install Consul and Consul ESM
 hashicorp_products = [
     Consul(version=VERSIONS["consul"], configuration=consul_configuration),
-    ConsulExternalServicesMonitor(configuration=consul_esm_configuration),
 ]
 install_hashicorp_products(hashicorp_products)
 for product in hashicorp_products:

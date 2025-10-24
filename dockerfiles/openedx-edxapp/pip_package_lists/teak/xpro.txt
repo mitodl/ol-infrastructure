@@ -1,11 +1,11 @@
 celery-redbeat==2.3.3  # Support for using Redis as the lock for Celery schedules
 granian==2.5.5
 django-redis==6.0.0
-ol-openedx-git-auto-export==0.5.0
+ol-openedx-git-auto-export==0.6.0
 edx-sysadmin==0.4.0
 edx-username-changer==0.4.0
 git+https://github.com/ubc/ubcpi.git@1.0.0#egg=ubcpi-xblock
-openedx-companion-auth==1.1.0
+openedx-companion-auth==1.2.0
 nodeenv>=1.7.0
 ol-openedx-checkout-external
 ol-openedx-course-export==0.2.0

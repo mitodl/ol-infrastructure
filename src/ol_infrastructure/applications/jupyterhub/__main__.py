@@ -50,7 +50,6 @@ setup_vault_provider(stack_info)
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
 jupyterhub_config = Config("jupyterhub")
-binderhub_config = Config("binderhub")
 
 dns_stack = StackReference("infrastructure.aws.dns")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
@@ -213,18 +212,17 @@ shared_apisix_plugins = OLApisixSharedPlugins(
 )
 
 jupyterhub_domain = jupyterhub_config.require("domain")
-binderhub_domain = binderhub_config.require("domain")
 
 api_tls_secret_name = "api-jupyterhub-tls-pair"  # noqa: S105  # pragma: allowlist secret
 shared_cert_manager_certificate = OLCertManagerCert(
-    f"ol-jupyterhub-binderhub-cert-manager-certificate-{stack_info.env_suffix}",
+    f"ol-jupyterhub-cert-manager-certificate-{stack_info.env_suffix}",
     cert_config=OLCertManagerCertConfig(
         application_name="jupyterhub",
         k8s_namespace=namespace,
         k8s_labels=application_labels,
         create_apisixtls_resource=True,
         dest_secret_name=api_tls_secret_name,
-        dns_names=[jupyterhub_domain, binderhub_domain],
+        dns_names=[jupyterhub_domain],
     ),
 )
 
@@ -264,19 +262,6 @@ apisix_route = OLApisixRoute(
             backend_service_port="http",
             websocket=True,
         ),
-        OLApisixRouteConfig(
-            route_name="binderhub",
-            priority=1,
-            shared_plugin_config_name=shared_apisix_plugins.resource_name,
-            plugins=[
-                oidc_resources.get_full_oidc_plugin_config(unauth_action="auth"),
-            ],
-            hosts=[binderhub_domain],
-            paths=["/*"],
-            backend_service_name="binder",
-            backend_service_port=80,
-            websocket=True,
-        ),
     ],
     opts=ResourceOptions(
         delete_before_replace=True,
@@ -299,246 +284,237 @@ COURSE_NAMES = [
 COURSE_NAMES.extend(
     [
         f"uai_source-uai.{i}"
-        for i in ["intro", 0, "0a", 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13]
+        for i in [
+            "intro",
+            0,
+            "0a",
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            11,
+            12,
+            13,
+            "st1",
+            "mltl1",
+        ]
     ]
 )
 EXTRA_IMAGES = {
     course_name.replace(".", "-").replace("_", "-"): {
         "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
         "tag": course_name,
-        "pullPolicy": "Always",
+        # "pullPolicy": "Always",
     }
     for course_name in COURSE_NAMES
 }
 
-# Binderhub and jupyterhub installation
-# Installing the binderhub will come with a subchart installation of jupyterhub
-#
-# Ref: https://github.com/jupyterhub/binderhub/blob/main/helm-chart/binderhub/values.yaml
 # Ref: https://github.com/jupyterhub/zero-to-jupyterhub-k8s/blob/main/jupyterhub/values.yaml
-binderhub_application = kubernetes.helm.v3.Release(
-    f"binderhub-{stack_info.name}-application-helm-release",
+jupyterhub_application = kubernetes.helm.v3.Release(
+    f"jupyterhub-{stack_info.name}-application-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
-        name="binderhub",
-        chart="binderhub",
+        name="jupyterhub",
+        chart="jupyterhub",
         namespace=namespace,
         cleanup_on_fail=True,
-        version="1.0.0-0.dev.git.3782.he87eff2d",  # TODO(Mike): Put this in versions.py
+        version="4.2.0",  # TODO(Mike): Put this in versions.py
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://hub.jupyter.org/helm-chart/",
         ),
         values={
-            "service": {"type": "NodePort", "nodePort": 30001},
-            # Use dockerhub as the registry for now.
-            "registry": {
-                "username": dockerhub_secret.data.apply(
-                    lambda data: "{}".format(data["username"])
-                ),
-                "password": dockerhub_secret.data.apply(
-                    lambda data: "{}".format(data["password"])
-                ),
-            },
             "ingress": {
                 "enabled": False,
             },
-            "jupyterhub": {
-                "cull": {
+            "cull": {
+                "enabled": True,
+                "every": 300,
+                "timeout": 900,
+                "maxAge": 14400,
+                "users": True,
+            },
+            "proxy": {
+                "service": {
+                    "type": "NodePort",
+                    "nodePorts": {
+                        "http": 30000,
+                        "https": 30443,
+                    },
+                },
+                "chp": {
+                    "resources": {
+                        "requests": {
+                            "cpu": "100m",
+                            "memory": "64Mi",
+                        },
+                        "limits": {
+                            "cpu": "100m",
+                            "memory": "64Mi",
+                        },
+                    },
+                },
+            },
+            "scheduling": {
+                "podPriority": {"enabled": True},
+                "userPlaceholder": {
                     "enabled": True,
-                    "every": 300,
-                    "timeout": 900,
-                    "maxAge": 14400,
-                    "users": True,
+                    "replicas": jupyterhub_config.get_int("user_placeholder_replicas")
+                    or 4,
                 },
-                "proxy": {
-                    "service": {
-                        "type": "NodePort",
-                        "nodePorts": {
-                            "http": 30000,
-                            "https": 30443,
-                        },
-                    },
-                    "chp": {
-                        "resources": {
-                            "requests": {
-                                "cpu": "100m",
-                                "memory": "64Mi",
-                            },
-                            "limits": {
-                                "cpu": "100m",
-                                "memory": "64Mi",
-                            },
-                        },
-                    },
-                },
-                "scheduling": {
-                    "podPriority": {"enabled": True},
-                    "userPlaceholder": {
-                        "enabled": True,
-                        "replicas": jupyterhub_config.get_int(
-                            "user_placeholder_replicas"
-                        )
-                        or 4,
-                    },
-                    "userScheduler": {
-                        "enabled": True,
-                        "resources": {
-                            "requests": {
-                                "cpu": "100m",
-                                "memory": "64Mi",
-                            },
-                            "limits": {
-                                "cpu": "100m",
-                                "memory": "64Mi",
-                            },
-                        },
-                    },
-                },
-                # extraConfig is executed as python at the end of the JH config. For more details see
-                # https://z2jh.jupyter.org/en/latest/administrator/advanced.html#hub-extraconfig
-                "hub": {
-                    "extraFiles": {
-                        "mit_learn_svg": {
-                            "mountPath": "/opt/mit_learn.svg",
-                            "stringData": Path(__file__)
-                            .parent.joinpath("mit_learn.svg")
-                            .read_text(),
-                        }
-                    },
-                    "extraEnv": [
-                        {
-                            "name": "DATABASE_URL",
-                            "valueFrom": {
-                                "secretKeyRef": {
-                                    "name": jupyterhub_creds_secret_name,
-                                    "key": "DATABASE_URL",
-                                }
-                            },
-                        }
-                    ],
-                    "extraConfig": {
-                        "dynamicImageConfig.py": Path(__file__)
-                        .parent.joinpath("dynamicImageConfig.py")
-                        .read_text()
-                    },
-                    "config": {
-                        "BinderSpawner": {
-                            "auth_enabled": True,
-                        },
-                        "Authenticator": {
-                            "admin_users": jupyterhub_config.get_object(
-                                "admin_users", default=[]
-                            ),
-                            "allowed_users": jupyterhub_config.get_object(
-                                "allowed_users", default=[]
-                            ),
-                        },
-                        # Uncomment to set the password from config.
-                        # "DummyAuthenticator": {
-                        #     "password": jupyterhub_config.require("shared_password"),
-                        # },
-                        "JupyterHub": {
-                            "authenticator_class": "tmp",
-                        },
-                    },
-                    "db": {"type": "postgres"},
+                "userScheduler": {
+                    "enabled": True,
                     "resources": {
                         "requests": {
                             "cpu": "100m",
-                            "memory": "256Mi",
+                            "memory": "64Mi",
                         },
                         "limits": {
                             "cpu": "100m",
-                            "memory": "256Mi",
+                            "memory": "64Mi",
                         },
                     },
                 },
-                "prePuller": {
-                    "continuous": {
-                        "enabled": True,
-                    },
-                    "extraImages": EXTRA_IMAGES,
-                    "resources": {
-                        "requests": {
-                            "cpu": "10m",
-                            "memory": "10Mi",
-                        },
-                        "limits": {
-                            "cpu": "10m",
-                            "memory": "10Mi",
-                        },
-                    },
+            },
+            # extraConfig is executed as python at the end of the JH config. For more details see
+            # https://z2jh.jupyter.org/en/latest/administrator/advanced.html#hub-extraconfig
+            "hub": {
+                "extraFiles": {
+                    "mit_learn_svg": {
+                        "mountPath": "/opt/mit_learn.svg",
+                        "stringData": Path(__file__)
+                        .parent.joinpath("mit_learn.svg")
+                        .read_text(),
+                    }
                 },
-                "singleuser": {
-                    # This is where we would do our own notebook image
-                    # ref: https://z2jh.jupyter.org/en/stable/jupyterhub/customizing/user-environment.html#customize-an-existing-docker-image
-                    # "image": {
-                    #     "name": "mitodl/some-special-image"
-                    #     "tag": "some-tag",
+                "extraEnv": [
+                    {
+                        "name": "DATABASE_URL",
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": jupyterhub_creds_secret_name,
+                                "key": "DATABASE_URL",
+                            }
+                        },
+                    }
+                ],
+                "extraConfig": {
+                    "dynamicImageConfig.py": Path(__file__)
+                    .parent.joinpath("dynamicImageConfig.py")
+                    .read_text()
+                },
+                "config": {
+                    "Authenticator": {
+                        "admin_users": jupyterhub_config.get_object(
+                            "admin_users", default=[]
+                        ),
+                        "allowed_users": jupyterhub_config.get_object(
+                            "allowed_users", default=[]
+                        ),
+                    },
+                    # Uncomment to set the password from config.
+                    # "DummyAuthenticator": {
+                    #     "password": jupyterhub_config.require("shared_password"),
                     # },
-                    # Below is similar but not the same as k8s resource declarations.
-                    # These are on a PER-USER-BASIS, so they can quickly grow with lots of
-                    # users. Numbers are conservative to start with.
-                    "extraFiles": {
-                        "menu_override": {
-                            "mountPath": "/opt/conda/share/jupyter/lab/settings/overrides.json",
-                            "stringData": Path(__file__)
-                            .parent.joinpath("menu_override.json")
-                            .read_text(),
-                        },
-                        "disabled_extensions": {
-                            "mountPath": "/home/jovyan/.jupyter/labconfig/page_config.json",
-                            "stringData": Path(__file__)
-                            .parent.joinpath("disabled_extensions.json")
-                            .read_text(),
-                        },
+                    "JupyterHub": {
+                        "authenticator_class": "tmp",
                     },
-                    "image": {
-                        "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
-                        "tag": "clustering_and_descriptive_ai",
-                        "pullPolicy": "Always",
+                },
+                "db": {"type": "postgres"},
+                "resources": {
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "256Mi",
                     },
-                    "extraTolerations": [
-                        {
-                            "key": "ol.mit.edu/gpu_node",
-                            "operator": "Equal",
-                            "value": "true",
-                            "effect": "NoSchedule",
-                        }
-                    ],
-                    "allowPrivilegeEscalation": True,
-                    "cmd": [
-                        "jupyterhub-singleuser",
-                    ],
-                    "startTimeout": 600,
-                    "networkPolicy": {
-                        "enabled": False,
-                    },
-                    "memory": {
-                        "limit": "4G",
-                        "guarantee": "1G",
-                    },
-                    "cpu": {
-                        "limit": 1,
-                        "guarantee": 0.25,
-                    },
-                    "extraEnv": {
-                        # This is the modern UI experience
-                        "JUPYTERHUB_SINGLEUSER_APP": "jupyter_server.serverapp.ServerApp"
-                    },
-                    "cloudMetadata": {
-                        "blockWithIptables": False,  # this should really be true but it isn't working right now
+                    "limits": {
+                        "cpu": "100m",
+                        "memory": "256Mi",
                     },
                 },
             },
-            "config": {
-                "BinderHub": {
-                    "hub_url": f"https://{jupyterhub_domain}/",
-                    "hub_url_local": "http://proxy-public.jupyter.svc.cluster.local/",
-                    "use_registry": True,
-                    "image_prefix": "mitodl/binderhub-",
+            "prePuller": {
+                "continuous": {
+                    "enabled": True,
+                },
+                "extraImages": EXTRA_IMAGES,
+                "resources": {
+                    "requests": {
+                        "cpu": "10m",
+                        "memory": "10Mi",
+                    },
+                    "limits": {
+                        "cpu": "10m",
+                        "memory": "10Mi",
+                    },
                 },
             },
-            "imageBuilderType": "dind",
+            "singleuser": {
+                # This is where we would do our own notebook image
+                # ref: https://z2jh.jupyter.org/en/stable/jupyterhub/customizing/user-environment.html#customize-an-existing-docker-image
+                # "image": {
+                #     "name": "mitodl/some-special-image"
+                #     "tag": "some-tag",
+                # },
+                # Below is similar but not the same as k8s resource declarations.
+                # These are on a PER-USER-BASIS, so they can quickly grow with lots of
+                # users. Numbers are conservative to start with.
+                "extraFiles": {
+                    "menu_override": {
+                        "mountPath": "/opt/conda/share/jupyter/lab/settings/overrides.json",
+                        "stringData": Path(__file__)
+                        .parent.joinpath("menu_override.json")
+                        .read_text(),
+                    },
+                    "disabled_extensions": {
+                        "mountPath": "/home/jovyan/.jupyter/labconfig/page_config.json",
+                        "stringData": Path(__file__)
+                        .parent.joinpath("disabled_extensions.json")
+                        .read_text(),
+                    },
+                },
+                "image": {
+                    "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
+                    "tag": "clustering_and_descriptive_ai",
+                    "pullPolicy": "Always",
+                },
+                "extraTolerations": [
+                    {
+                        "key": "ol.mit.edu/gpu_node",
+                        "operator": "Equal",
+                        "value": "true",
+                        "effect": "NoSchedule",
+                    }
+                ],
+                "allowPrivilegeEscalation": True,
+                "cmd": [
+                    "jupyterhub-singleuser",
+                ],
+                "startTimeout": 600,
+                "networkPolicy": {
+                    "enabled": False,
+                },
+                "memory": {
+                    "limit": "4G",
+                    "guarantee": "1G",
+                },
+                "cpu": {
+                    "limit": 1,
+                    "guarantee": 0.25,
+                },
+                "storage": {
+                    "type": "none",
+                },
+                "extraEnv": {
+                    # This is the modern UI experience
+                    "JUPYTERHUB_SINGLEUSER_APP": "jupyter_server.serverapp.ServerApp"
+                },
+                "cloudMetadata": {
+                    "blockWithIptables": False,  # this should really be true but it isn't working right now
+                },
+            },
         },
         skip_await=False,
     ),

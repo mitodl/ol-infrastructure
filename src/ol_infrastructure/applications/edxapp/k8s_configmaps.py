@@ -84,7 +84,12 @@ def create_k8s_configmaps(
                     - {edxapp_config.require_object("domains")["lms"]}
                     - {edxapp_config.require_object("domains")["preview"]}
                     - {edxapp_config.require_object("domains")["studio"]}
+                    - {edxapp_config.require("backend_lms_domain")}
+                    - {edxapp_config.require("backend_studio_domain")}
+                    - {edxapp_config.require("backend_preview_domain")}
+                    # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
                     AWS_S3_CUSTOM_DOMAIN: {storage_bucket_name}.s3.amazonaws.com
+                    # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
                     AWS_STORAGE_BUCKET_NAME: {storage_bucket_name}
                     AWS_SES_CONFIGURATION_SET: {ses_configuration_set}
                     BASE_COOKIE_DOMAIN: {edxapp_config.require_object("domains")["lms"]}
@@ -93,8 +98,10 @@ def create_k8s_configmaps(
                       PRUNING_ACTIVE: true  # MODIFIED
                       TASK_DEFAULT_RETRY_DELAY: 30
                       TASK_MAX_RETRIES: 5
+                      # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
                       STORAGE_CLASS: storages.backends.s3boto3.S3Boto3Storage
                       DIRECTORY_PREFIX: coursestructure/
+                      # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
                       STORAGE_KWARGS:
                         bucket_name: {storage_bucket_name}
                         default_acl: public-read
@@ -109,7 +116,7 @@ def create_k8s_configmaps(
                     - https://{edxapp_config.require_object("domains")["preview"]}
                     - https://{edxapp_config.require("marketing_domain")}
                     - https://{runtime_config["notes_domain"]}
-                    # - https://{{{{ key "edxapp/learn-ai-frontend-domain" }}}} # I don't think this is needed
+                    - https://{edxapp_config.require("learn_ai_frontend_domain")}
                     COURSE_IMPORT_EXPORT_BUCKET: {course_bucket_name}
                     CROSS_DOMAIN_CSRF_COOKIE_DOMAIN: {edxapp_config.require_object("domains")["lms"]}
                     CROSS_DOMAIN_CSRF_COOKIE_NAME: {env_name}-edxapp-csrftoken
@@ -129,6 +136,7 @@ def create_k8s_configmaps(
                     - host: {runtime_config["opensearch_hostname"]}
                       port: 443
                       use_ssl: true
+                    # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
                     FILE_UPLOAD_STORAGE_BUCKET_NAME: {storage_bucket_name}
                     FORUM_ELASTIC_SEARCH_CONFIG:
                     - host: {runtime_config["opensearch_hostname"]}
@@ -140,9 +148,12 @@ def create_k8s_configmaps(
                     GRADES_DOWNLOAD:
                       BUCKET: {grades_bucket_name}  # MODIFIED
                       ROOT_PATH: grades  # MODIFIED
+                      # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
                       STORAGE_CLASS: django.core.files.storage.S3Storage  # MODIFIED
+                      # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
                       STORAGE_KWARGS:
                         location: grades/
+                      # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
                       STORAGE_TYPE: S3  # MODIFIED
                     IDA_LOGOUT_URI_LIST:
                     - https://{edxapp_config.require("marketing_domain")}/logout
@@ -156,6 +167,7 @@ def create_k8s_configmaps(
                     MIT_LEARN_AI_XBLOCK_CHAT_API_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai/http/canvas_syllabus_agent/
                     MIT_LEARN_AI_XBLOCK_TUTOR_CHAT_API_URL:  https://{edxapp_config.require("mit_learn_api_domain")}/ai/http/canvas_tutor_agent/
                     MIT_LEARN_AI_XBLOCK_PROBLEM_SET_LIST_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai/api/v0/problem_set_list  # Added for ol_openedx_chat_xblock
+                    MIT_LEARN_AI_XBLOCK_CHAT_RATING_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai/api/v0/chat_sessions/  # Added for ol_openedx_chat_xblock
                     MIT_LEARN_LOGO: https://{edxapp_config.require_object("domains")["lms"]}/static/mitxonline/images/mit-learn-logo.svg
                     LEARNING_MICROFRONTEND_URL: https://{edxapp_config.require_object("domains")["lms"]}/learn
                     LMS_BASE: {edxapp_config.require_object("domains")["lms"]}
@@ -184,6 +196,7 @@ def create_k8s_configmaps(
                       TOS_AND_HONOR: ''
                     NOTIFICATIONS_DEFAULT_FROM_EMAIL: {edxapp_config.get("bulk_email_default_from_email") or edxapp_config.require("sender_email_address")}
                     PAYMENT_SUPPORT_EMAIL: {edxapp_config.require("sender_email_address")}
+                    PREVIEW_LMS_BASE: {edxapp_config.require_object("domains")["preview"]}
                     SENTRY_ENVIRONMENT: {env_name}
                     # Removing the session cookie domain as it is no longer needed for sharing the cookie
                     # between LMS and Studio (TMM 2021-10-22)
@@ -192,6 +205,28 @@ def create_k8s_configmaps(
                     SESSION_COOKIE_DOMAIN: {".{}".format(edxapp_config.require_object("domains")["lms"].split(".", 1)[-1])}
                     UNIVERSITY_EMAIL: {edxapp_config.require("sender_email_address")}
                     ECOMMERCE_PUBLIC_URL_ROOT: {edxapp_config.require_object("domains")["lms"]}
+                    # Django 4.2+ storage configuration
+                    # STORAGES:
+                    #   default:
+                    #     BACKEND: storages.backends.s3.S3Storage
+                    #     OPTIONS:
+                    #       bucket_name: {storage_bucket_name}
+                    #       custom_domain: {storage_bucket_name}.s3.amazonaws.com
+                    #       file_overwrite: false
+                    #       default_acl: null
+                    #   staticfiles:
+                    #     BACKEND: django.contrib.staticfiles.storage.StaticFilesStorage
+                    #   block_structures:
+                    #     BACKEND: storages.backends.s3.S3Storage
+                    #     OPTIONS:
+                    #       bucket_name: {storage_bucket_name}
+                    #       location: coursestructure/
+                    #       default_acl: public-read
+                    #   grades:
+                    #     BACKEND: storages.backends.s3.S3Storage
+                    #     OPTIONS:
+                    #       bucket_name: {grades_bucket_name}
+                    #       location: grades/
             """),
             },
             opts=ResourceOptions(delete_before_replace=True),

@@ -10,13 +10,13 @@ ol-openedx-canvas-integration==0.6.0
 ol-openedx-course-export==0.2.0
 ol-openedx-course-structure-api
 ol-openedx-logging==0.2.0
-ol-openedx-git-auto-export==0.5.0
-ol-openedx-rapid-response-reports==0.3.0
-ol-openedx-sentry==0.2.1
+ol-openedx-git-auto-export==0.6.0
+ol-openedx-rapid-response-reports==0.4.0
+ol-openedx-sentry==0.3.0
 openedx-scorm-xblock>=19.0.1,<19.1.0
 pip==25.2
 pydantic-settings==2.11.0
-rapid-response-xblock==0.10.1
+rapid-response-xblock==0.11.0
 uwsgi==2.0.31
 wheel==0.45.1
 

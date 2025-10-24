@@ -40,7 +40,8 @@ class OrgConfig(BaseModel):
 
 
 class SamlIdpConfig(OrgConfig):
-    org_saml_metadata_url: str
+    org_saml_metadata_url: str | None = None
+    org_saml_metadata_xml: str | None = None
     keycloak_url: str
     first_login_flow: keycloak.authentication.Flow
     name_id_format: NameIdFormat = NameIdFormat.unspecified
@@ -57,6 +58,17 @@ class SamlIdpConfig(OrgConfig):
                 "principal attribute."
             )
             raise ValueError(msg)
+        if not self.org_saml_metadata_url and not self.org_saml_metadata_xml:
+            msg = (
+                "Either org_saml_metadata_url or org_saml_metadata_xml must be provided"
+            )
+            raise ValueError(msg)
+        if self.org_saml_metadata_url and self.org_saml_metadata_xml:
+            msg = (
+                "Only one of org_saml_metadata_url or org_saml_metadata_xml "
+                "should be provided"
+            )
+            raise ValueError(msg)
         return self
 
 
@@ -68,6 +80,7 @@ def create_org_for_learn(org_config: OrgConfig) -> keycloak.Organization:
             for org_domain in org_config.org_domains
         ],
         enabled=True,
+        description=org_config.org_name,
         name=org_config.org_name,
         alias=org_config.org_alias.lower(),
         redirect_url=f"https://{org_config.learn_domain}/dashboard/organization/{org_config.org_alias.lower()}",
@@ -82,14 +95,24 @@ def onboard_saml_org(
 ) -> None:
     org = create_org_for_learn(saml_config)
 
-    saml_args = generate_pulumi_args_dict(
-        extract_saml_metadata(saml_config.org_saml_metadata_url)
+    metadata_source = (
+        saml_config.org_saml_metadata_xml or saml_config.org_saml_metadata_url
     )
+    saml_args = generate_pulumi_args_dict(extract_saml_metadata(metadata_source))
     mappers = get_saml_attribute_mappers(
-        saml_config.org_saml_metadata_url,
+        metadata_source,
         saml_config.org_alias.lower(),
         saml_config.attribute_map,
     )
+
+    # Build extra_config based on whether URL or XML is provided
+    extra_config = {}
+    if saml_config.org_saml_metadata_url:
+        extra_config = {
+            "metadataDescriptorUrl": saml_config.org_saml_metadata_url,
+            "useMetadataDescriptorUrl": True,
+        }
+
     org_idp = keycloak.saml.IdentityProvider(
         f"ol-apps-{saml_config.org_alias}-saml-idp",
         alias=saml_config.org_alias.lower(),
@@ -106,14 +129,12 @@ def onboard_saml_org(
         principal_type=saml_config.principal_type,
         principal_attribute=saml_config.principal_attribute,
         realm=saml_config.realm_id,
-        sync_mode="IMPORT",
+        login_hint=True,
+        sync_mode="FORCE",
         trust_email=True,
         validate_signature=True,
         opts=saml_config.resource_options,
-        extra_config={
-            "metadataDescriptorUrl": saml_config.org_saml_metadata_url,
-            "useMetadataDescriptorUrl": True,
-        },
+        extra_config=extra_config,
         **saml_args,
     )
     for attr, args in mappers.items():
@@ -156,6 +177,9 @@ def onboard_oidc_org(
     oidc_idp_arg_map = oidc_identity_provider_args_from_discovery_url(
         oidc_config.org_oidc_metadata_url
     )
+    oidc_idp_arg_map["extra_config"] = {
+        "jwtX509HeadersEnabled": True,
+    } | oidc_idp_arg_map.get("extra_config", {})
     keycloak.oidc.IdentityProvider(
         f"ol-apps-{oidc_config.org_alias}-oidc-idp",
         alias=oidc_config.org_alias.lower(),
@@ -164,7 +188,8 @@ def onboard_oidc_org(
         realm=oidc_config.realm_id,
         display_name=oidc_config.org_name,
         enabled=True,
-        sync_mode="IMPORT",
+        login_hint=True,
+        sync_mode="FORCE",
         hide_on_login_page=True,
         org_domain="ANY",
         org_redirect_mode_email_matches=True,

@@ -1,0 +1,28 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAGE+ekHl2+Q0CfqgeicuwobAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMTc11/jY/OuRgx0mOAgEQgDvsnLeEuQqogXOjan0WTEQMiSukWRjFgavB0mMbaxM2GnS+isRvoujJpmi+qf9YLgkd9Q6mfsWK8EgAEw==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-data-ci.odl.mit.edu
+  dagster:db_password:
+    secure: v1:IPKfNisITCCH9aqx:fpyUnCHGQCke2c1FXLVGHwX2+N44gd+/NuE8fQ2uwnj1pahjQv80dg4ZuFl1pGbJqoX+uwU2IpP3/xU=
+  dagster:domain: pipelines-ci.odl.mit.edu
+  dagster:docker_repo_name: mitodl/mono-dagster
+  dagster:docker_image_tag: latest
+  dagster:edx_pipeline_gcs_courses_bucket_name: edxorg-ci-edxapp-courses
+  dagster:edx_pipeline_micromasters_bucket_name: ol-data-lake-mit-open-ci
+  dagster:edx_pipeline_micromasters_postgres_db_hostname: micromasters-db-read-replica.cbnm7ajau6mi.us-east-1.rds.amazonaws.com
+  dagster:edx_pipeline_micromasters_postgres_db_name: micromasters
+  dagster:edx_pipeline_mit_open_bucket_name: ol-data-lake-mit-open-ci
+  dagster:edx_pipeline_mit_open_postgres_db_hostname: ci-apps-rds-postgresql-opendiscussions.cbnm7ajau6mi.us-east-1.rds.amazonaws.com
+  dagster:edx_pipeline_mitx_enrollments_bucket_name: dagster-data-ci
+  dagster:edx_pipeline_mitx_online_edx_course_bucket: mitx-ci-edxapp-courses
+  dagster:edx_pipeline_mitx_online_purpose: current-residential-live-mitx
+  dagster:edx_pipeline_mitxonline_edx_course_bucket_name: mitxonline-ci-edxapp-courses
+  dagster:edx_pipeline_mitxonline_purpose: mitxonline
+  dagster:edx_pipeline_residential_mysql_db_hostname: edxapp-db-mitx-ci.cbnm7ajau6mi.us-east-1.rds.amazonaws.com
+  dagster:edx_pipeline_xpro_edx_bucket_name: dagster-data-ci
+  dagster:edx_pipeline_xpro_edx_course_bucket_name: xpro-ci-edxapp-courses
+  dagster:edx_pipeline_xpro_edx_xpro_purpose: mitx-etl-xpro-ci
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci

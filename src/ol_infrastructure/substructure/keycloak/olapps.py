@@ -1,10 +1,11 @@
 """Keycloak realm definition for OL applications."""
 
 import json
+from pathlib import Path
 
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions
+from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from bridge.lib.magic_numbers import SECONDS_IN_ONE_DAY
 from ol_infrastructure.substructure.keycloak.org_flows import (
@@ -581,6 +582,66 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
 
     # MITXONLINE SCIM [END]
 
+    # MITXONLINE B2B [START]
+    # This client is used by MITx Online for B2B operations via the Keycloak
+    # Admin API. It requires service account roles to view realms, users, and
+    # organizations.
+    olapps_mitxonline_b2b_client = keycloak.openid.Client(
+        "olapps-mitxonline-b2b-client",
+        name="mitxonline-b2b-client",
+        realm_id=ol_apps_realm.id,
+        client_id="mitxonline-b2b-client",
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=False,
+        implicit_flow_enabled=False,
+        direct_access_grants_enabled=False,
+        service_accounts_enabled=True,
+        valid_redirect_uris=[],
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+
+    # Get realm-management client to assign roles
+    realm_management_client = keycloak.openid.get_client(
+        realm_id=ol_apps_realm.id,
+        client_id="realm-management",
+        opts=InvokeOptions(provider=keycloak_provider),
+    )
+
+    # Assign required service account roles for Keycloak Admin API access
+    # These roles allow the client to list/view realms, users, and organizations
+    # Refactored repetitive role assignments into a loop for maintainability
+    for resource_name, role in [
+        ("olapps-mitxonline-b2b-client-view-realm-role", "view-realm"),
+        ("olapps-mitxonline-b2b-client-view-users-role", "view-users"),
+        ("olapps-mitxonline-b2b-client-query-users-role", "query-users"),
+        ("olapps-mitxonline-b2b-client-manage-realm-role", "manage-realm"),
+    ]:
+        keycloak.openid.ClientServiceAccountRole(
+            resource_name,
+            realm_id=ol_apps_realm.id,
+            service_account_user_id=olapps_mitxonline_b2b_client.service_account_user_id,
+            client_id=realm_management_client.id,
+            role=role,
+            opts=resource_options,
+        )
+
+    vault.generic.Secret(
+        "olapps-mitxonline-b2b-client-vault-credentials",
+        path="secret-mitxonline/keycloak-admin-b2b",
+        data_json=Output.all(
+            url=olapps_mitxonline_b2b_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
+            client_id=olapps_mitxonline_b2b_client.client_id,
+            client_secret=olapps_mitxonline_b2b_client.client_secret,
+            realm_id=olapps_mitxonline_b2b_client.realm_id,
+            realm_name="olapps",
+        ).apply(json.dumps),
+    )
+
+    # MITXONLINE B2B [END]
+
     # OLAPPS REALM- First login flow [START]
 
     # Does not require email verification or confirmation to connect with existing
@@ -614,6 +675,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         domains=[
             keycloak.organization.OrganizationDomainArgs(name="mit.edu", verified=True)
         ],
+        description="Massachusetts Institute of Technology",
         enabled=True,
         name="MIT",
         alias="mit",
@@ -718,6 +780,17 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         )
     )
 
+    create_org_for_learn(
+        OrgConfig(
+            org_domains=["company-x.mit.edu"],
+            org_name="Company X",
+            org_alias="company-x",
+            learn_domain=mitlearn_domain,
+            realm_id=ol_apps_realm.id,
+            resource_options=resource_options,
+        )
+    )
+
     if stack_info.env_suffix == "production":
         onboard_saml_org(
             SamlIdpConfig(
@@ -753,6 +826,30 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                     "firstName": "givenName",
                     "lastName": "sn",
                     "fullName": "cn",
+                },
+            )
+        )
+        onboard_saml_org(
+            SamlIdpConfig(
+                org_domains=["ceide.unam.mx"],
+                org_name="Coordinación de Evaluación, Innovación y Desarrollo Educativos, UNAM",  # noqa: E501
+                org_alias="CEIDE",
+                org_saml_metadata_xml=Path(__file__)
+                .parent.joinpath("files/olapps/ceide_metadata.xml")
+                .read_text(),
+                principal_type="ATTRIBUTE",
+                principal_attribute="Email",
+                name_id_format=NameIdFormat.unspecified,
+                keycloak_url=keycloak_url,
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                attribute_map={
+                    "email": "Email",
+                    "firstName": "Given Name",
+                    "lastName": "Surname",
+                    "fullName": "Display Name",
                 },
             )
         )
@@ -819,6 +916,48 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 resource_options=resource_options,
                 org_oidc_metadata_url="https://sso.duth.gr/realms/main/.well-known/openid-configuration",
                 client_id="mit-learn",
+            )
+        )
+        onboard_oidc_org(
+            OIDCIdpConfig(
+                org_domains=["athenscollege.edu.gr"],
+                org_name="Hellenic American Educational Foundation",
+                org_alias="HAEF",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                keycloak_url=keycloak_url,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                org_oidc_metadata_url="https://login.microsoftonline.com/35a07f23-c5cb-4b42-81ad-10d269586c9a/v2.0/.well-known/openid-configuration",
+                client_id="1b380514-33ff-4dca-a26f-ddd0600b2f02",
+            )
+        )
+        onboard_oidc_org(
+            OIDCIdpConfig(
+                org_domains=["nust.na"],
+                org_name="Namibia University of Science and Technology",
+                org_alias="NUST",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                keycloak_url=keycloak_url,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                org_oidc_metadata_url="https://login.microsoftonline.com/d5cf20c2-4a84-4902-a3e6-c4a3190ea239/v2.0/.well-known/openid-configuration",
+                client_id="a5c7a2f3-47ce-4e3c-b4ce-fe79b86660b7",
+            )
+        )
+        onboard_oidc_org(
+            OIDCIdpConfig(
+                org_domains=["upgrad.com"],
+                org_name="upGrad",
+                org_alias="UPGRAD",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                keycloak_url=keycloak_url,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                org_oidc_metadata_url="https://stage-idp.upgrad.dev/realms/upgrad-stage/.well-known/openid-configuration",
+                client_id="ira-frontend",
             )
         )
 

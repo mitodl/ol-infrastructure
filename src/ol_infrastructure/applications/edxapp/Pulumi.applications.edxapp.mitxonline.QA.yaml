@@ -54,6 +54,7 @@ config:
   edxapp:dns_zone: learn
   edxapp:mit_learn_domain: rc.learn.mit.edu
   edxapp:mit_learn_api_domain: api.rc.learn.mit.edu
+  edxapp:learn_ai_frontend_domain: "learn-ai-qa.ol.mit.edu"
   edxapp:domains:
     lms: courses.rc.learn.mit.edu
     preview: preview.courses.rc.learn.mit.edu
@@ -61,7 +62,7 @@ config:
   edxapp:backend_lms_domain: courses-backend.rc.learn.mit.edu
   edxapp:backend_studio_domain: studio-backend.rc.learn.mit.edu
   edxapp:backend_preview_domain: preview-backend.rc.learn.mit.edu
-  edxapp:marketing_domain: rc.learn.mit.edu
+  edxapp:marketing_domain: rc.mitxonline.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:IqXRArQveCV+9lkE:cRaraFuN2dDmI29PD4QifOU7MrRFdszOoaUb7o3pDJordt4TSjw8fIxldWfMzNhZRLC+NS291DorO1IuN6ASdCbt5d53aMvHVt+3hA6wyuI11OFjk7U=
   edxapp:elb_healthcheck_interval: "30"
@@ -85,17 +86,17 @@ config:
   edxapp:k8s_replicas:
     webapp:
       lms:
-        max: 2
-        min: 1
+        max: 5
+        min: 2
       cms:
-        max: 2
-        min: 1
+        max: 3
+        min: 2
     celery:
       lms:
-        max: 1
+        max: 3
         min: 1
       cms:
-        max: 1
+        max: 3
         min: 1
   edxapp:k8s_resources:
     webapp:

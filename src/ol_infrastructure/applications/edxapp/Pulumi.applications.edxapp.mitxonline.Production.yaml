@@ -58,9 +58,9 @@ config:
     lms: courses.learn.mit.edu
     preview: preview.courses.learn.mit.edu
     studio: studio.courses.learn.mit.edu
-  edxapp:k8s_deployment: false
-  edxapp:k8s_cutover: false
-  edxapp:disable_ec2_deployment: false
+  edxapp:mit_learn_domain: learn.mit.edu
+  edxapp:mit_learn_api_domain: api.learn.mit.edu
+  edxapp:learn_ai_frontend_domain: "learn-ai.ol.mit.edu"
   edxapp:marketing_domain: mitxonline.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:qzfe99Jb8n0TnEQS:Y6fSOS8lksj7WvED+V7kCtV7arDtwx7184Fw330Mwh9JDHW72rVd8y7Nm0fF8ANCcFCwDV5EwSU2Fcc+X47NHDOLCOQv16lyB6jWOF2mTr/veRax6MbXY9NlLmsfp9EBQesDCitULbkz9hyHcHT3GPI=
@@ -81,8 +81,52 @@ config:
   edxapp:framework: "earthly"
   edxapp:web_instance_type: m7a.2xlarge
   edxapp:web_node_capacity: "9"
-  edxapp:worker_node_capacity: "5"
+  edxapp:worker_node_capacity: "2"
   edxapp:worker_instance_type: "r7a.large"
+  edxapp:backend_lms_domain: courses-backend.learn.mit.edu
+  edxapp:backend_studio_domain: studio-backend.learn.mit.edu
+  edxapp:backend_preview_domain: preview-backend.learn.mit.edu
+  edxapp:k8s_replicas:
+    webapp:
+      lms:
+        max: 30
+        min: 4
+      cms:
+        max: 10
+        min: 2
+    celery:
+      lms:
+        max: 10
+        min: 1
+      cms:
+        max: 10
+        min: 1
+  edxapp:k8s_resources:
+    webapp:
+      lms:
+        cpu_request: "250m"
+        cpu_limit: "500m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+      cms:
+        cpu_request: "250m"
+        cpu_limit: "500m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+    celery:
+      lms:
+        cpu_request: "250m"
+        cpu_limit: "500m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+      cms:
+        cpu_request: "250m"
+        cpu_limit: "500m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+  edxapp:k8s_deployment: true
+  edxapp:k8s_cutover: false
+  edxapp:disable_ec2_deployment: false
   mongodb:atlas_project_id: 61f0a63f8bc1f86a073a7148
   redis:instance_type: cache.r7g.2xlarge
   vault:address: https://vault-production.odl.mit.edu

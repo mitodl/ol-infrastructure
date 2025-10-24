@@ -52,6 +52,9 @@ path "postgres-micromasters/creds/readonly/*" {
 path "postgres-micromasters/creds/readonly" {
   capabilities = ["read"]
 }
+path "secret-data/" {
+  capabilities = ["list"]
+}
 path "secret-data/dagster/*" {
   capabilities = ["read"]
 }
@@ -91,7 +94,6 @@ path "secret-xpro/mongodb-forum/*" {
 path "secret-xpro/mongodb-forum" {
   capabilities = ["read"]
 }
-
 path "secret-operations/data/institutional-research-bigquery-service-account" {
   capabilities = ["read"]
 }

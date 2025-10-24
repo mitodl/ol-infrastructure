@@ -8,6 +8,7 @@ config:
   mitxonline:domain: "api.ci.mitxonline.mit.edu"
   mitxonline:k8s_deploy: "true"
   mitxonline:learn_backend_domain: "api.ci.learn.mit.edu"
+  mitxonline:use_granian: true
   mitxonline:vars:
     AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-ci"
     CORS_ALLOWED_ORIGINS: "https://ci.mitxonline.mit.edu,https://ci.learn.mit.edu"
@@ -41,7 +42,7 @@ config:
     OPENEDX_SOCIAL_LOGIN_PATH: "/auth/login/ol-oauth2/?auth_entry=login"
     OPENEDX_STUDIO_API_BASE_URL: "https://studio.courses.ci.learn.mit.edu"
     OPENTELEMETRY_ENABLED: "true"
-    OPENTELEMETRY_ENDPOINT: "http://grafana-alloy.operations.svc.cluster.local:4318/v1/traces"
+    OPENTELEMETRY_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces"
     SENTRY_LOG_LEVEL: "ERROR"
     SESSION_COOKIE_NAME: "session_mitxonline_ci"
     MIT_LEARN_FROM_EMAIL: "MIT Learn <mitlearn-support@mit.edu>"

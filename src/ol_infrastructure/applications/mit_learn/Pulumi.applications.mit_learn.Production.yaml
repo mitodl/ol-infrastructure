@@ -41,7 +41,7 @@ config:
   mitlearn:max_replicas: 30
   mitlearn:nextjs_heroku_domain: "next.learn.mit.edu"
   mitlearn:posthog_proxy: "ph.ol.mit.edu"
-  mitlearn:use_granian: false
+  mitlearn:use_granian: true
   mitlearn:vars:
     AI_MIT_SYLLABUS_URL: "https://api.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.learn.mit.edu/api/v0/vector_content_files_search/"
@@ -67,11 +67,14 @@ config:
     MITOL_LOG_LEVEL: "INFO"
     MITOL_NEW_USER_LOGIN_URL: "https://learn.mit.edu/onboarding"
     MITOL_SUPPORT_EMAIL: "mitlearn-support@mit.edu"
+    MITX_ONLINE_BASE_URL: "https://mitxonline.mit.edu/"
+    MITX_ONLINE_COURSES_API_URL: "https://mitxonline.mit.edu/api/v2/courses/"
+    MITX_ONLINE_PROGRAMS_API_URL: "https://mitxonline.mit.edu/api/v2/programs/"
     MITPE_API_ENABLED: "true"
     OCW_ITERATOR_CHUNK_SIZE: 300
     OIDC_ENDPOINT: "https://sso.ol.mit.edu/realms/olapps"
     OPENTELEMETRY_ENABLED: "true"
-    OPENTELEMETRY_ENDPOINT: "http://grafana-alloy.operations.svc.cluster.local:4318/v1/traces"
+    OPENTELEMETRY_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces"
     OPENSEARCH_INDEX: "mitlearn"
     OPENSEARCH_SHARD_COUNT: 3
     OPENSEARCH_URL: "https://search-opensearch-mitlearn-producti-qjtnw2dcoampmbtscs3wdfci6y.us-east-1.es.amazonaws.com"
