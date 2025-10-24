@@ -82,7 +82,7 @@ if codejail_config.get("deploy_to_k8s"):
         msg = (
             "Environment variable CODEJAIL_DOCKER_IMAGE_DIGEST is not set. "
             "This variable is only required when deploying to Kubernetes (K8s). "
-            "Please set the environment variable or check your CI/CD pipeline configuration."
+            "Please set the environment variable or check your CI/CD pipeline configuration."  # noqa: E501
         )
         raise OSError(msg)
     CODEJAIL_DOCKER_IMAGE_DIGEST = os.environ["CODEJAIL_DOCKER_IMAGE_DIGEST"]
