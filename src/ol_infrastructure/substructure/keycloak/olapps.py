@@ -782,7 +782,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
 
     create_org_for_learn(
         OrgConfig(
-            org_domains=[""],
+            org_domains=["company-x.mit.edu"],
             org_name="Company X",
             org_alias="company-x",
             learn_domain=mitlearn_domain,
@@ -948,7 +948,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         )
         onboard_oidc_org(
             OIDCIdpConfig(
-                org_domains=[""],
+                org_domains=["upgrad.com"],
                 org_name="upGrad",
                 org_alias="UPGRAD",
                 learn_domain=mitlearn_domain,
