@@ -780,6 +780,17 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         )
     )
 
+    create_org_for_learn(
+        OrgConfig(
+            org_domains=[""],
+            org_name="Company X",
+            org_alias="company-x",
+            learn_domain=mitlearn_domain,
+            realm_id=ol_apps_realm.id,
+            resource_options=resource_options,
+        )
+    )
+
     if stack_info.env_suffix == "production":
         onboard_saml_org(
             SamlIdpConfig(
