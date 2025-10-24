@@ -73,6 +73,7 @@ class OpenEdxVars(BaseModel):
         Literal["true", "false"] | None
     ) = None
     enable_jumpnav: Literal["true", "false"] | None = None
+    appzi_url: str | None = None
 
     @property
     def release_name(self) -> OpenEdxSupportedRelease:
@@ -140,6 +141,7 @@ def mfe_params(
         ),
         "PARAGON_THEME_URLS": "{}",
         "ENABLE_JUMPNAV": open_edx.enable_jumpnav,
+        "APPZI_URL": open_edx.appzi_url,
     }
 
 
