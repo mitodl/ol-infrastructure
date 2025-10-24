@@ -935,6 +935,20 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 client_id="a5c7a2f3-47ce-4e3c-b4ce-fe79b86660b7",
             )
         )
+        onboard_oidc_org(
+            OIDCIdpConfig(
+                org_domains=[""],
+                org_name="upGrad",
+                org_alias="UPGRAD",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                keycloak_url=keycloak_url,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                org_oidc_metadata_url="https://stage-idp.upgrad.dev/realms/upgrad-stage/.well-known/openid-configuration",
+                client_id="ira-frontend",
+            )
+        )
 
     # B2B Organizations [END]
 
