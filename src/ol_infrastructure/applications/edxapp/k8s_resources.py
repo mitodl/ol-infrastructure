@@ -93,7 +93,6 @@ def create_k8s_resources(
     apps_vpc = network_stack.require_output("applications_vpc")
     k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 
-    # Verify that the namespace exists in the EKS cluster
     data_vpc = network_stack.require_output("data_vpc")
     operations_vpc = network_stack.require_output("operations_vpc")
     edxapp_target_vpc = (
