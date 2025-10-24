@@ -10,7 +10,7 @@ const configData = getConfig();
 const UAI_COURSE_KEYS = ['course-v1:uai_'];
 const AUTHORING_APP_ID = 'authoring';
 const LEARNING_APPS = ['learning', 'discussions', 'ora-grading', 'communications'];
-const DASHBOARD_APS = ['gradebook', 'learner-dashboard'];
+const DASHBOARD_APPS = ['gradebook', 'learner-dashboard'];
 
 const CURRENT_MFE_APP_ID = configData.APP_ID;
 const SLOT_IDS = {
@@ -22,6 +22,7 @@ const SLOT_IDS = {
     desktop_user_menu_toggle: 'org.openedx.frontend.layout.header_desktop_user_menu_toggle.v1',
     logo: 'org.openedx.frontend.layout.header_logo.v1',
     learning_help: 'org.openedx.frontend.layout.header_learning_help.v1',
+    desktop_secondary_user_menu: 'org.openedx.frontend.layout.header_desktop_secondary_menu.v1',
   },
   footer: {
     slot: 'footer_slot',
@@ -277,7 +278,7 @@ const addUserMenuSlotOverride = (config) => {
       },
     }
   }
-  else if (DASHBOARD_APS.includes(CURRENT_MFE_APP_ID)) {
+  else if (DASHBOARD_APPS.includes(CURRENT_MFE_APP_ID)) {
 
     return {
       ...config,
@@ -433,6 +434,42 @@ const addLearningHelpSlotOverride = (config) => {
   }
 }
 
+const addSecondaryMenuSlotOverride = (config) => {
+  if (!DASHBOARD_APPS.includes(CURRENT_MFE_APP_ID)) {
+    return config;
+  }
+
+  return {
+    ...config,
+    pluginSlots: {
+      ...config.pluginSlots,
+      [SLOT_IDS.header.desktop_secondary_user_menu]: {
+        keepDefault: false,
+        plugins: [
+          {
+            op: PLUGIN_OPERATIONS.Insert,
+            widget: {
+              id: 'custom_secondary_menu_component',
+              type: DIRECT_PLUGIN,
+              RenderWidget: () => {
+                let dashboardURL = process.env.MIT_LEARN_BASE_URL ? `${process.env.MIT_LEARN_BASE_URL}/dashboard` : 'https://learn.mit.edu/dashboard';
+
+                if (!isLearnCourse()) {
+                  dashboardURL = configData.MARKETING_SITE_BASE_URL ? `${configData.MARKETING_SITE_BASE_URL}/dashboard/` : 'https://mitxonline.mit.edu/dashboard/';
+                }
+
+                return (
+                  <div style={{marginRight: '16px'}}><DashboardButton dashboardURL={dashboardURL} /></div>
+                );
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+
 const addEnvOverrides = (config) => {
   if (isLearnCourse()) {
     return {
@@ -457,6 +494,7 @@ config = addLearningCourseInfoSlotOverride(config);
 config = addUserMenuSlotOverride(config);
 config = addLogoSlotOverride(config);
 config = addLearningHelpSlotOverride(config);
+config = addSecondaryMenuSlotOverride(config);
 config = addEnvOverrides(config);
 
 export default config;
