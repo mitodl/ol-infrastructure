@@ -136,14 +136,14 @@ const ForceLoginRedirect = () => {
 };
 
 const AppziScript = () => {
-  const config = getConfig();
+  const appziUrl = process.env.APPZI_URL;
 
   useEffect(() => {
-    if (!config.APPZI_URL) {
+    if (!appziUrl) {
       return;
     }
     const script = document.createElement('script');
-    script.src = config.APPZI_URL;
+    script.src = appziUrl;
     script.async = true;
     document.head.appendChild(script);
   }, []);
