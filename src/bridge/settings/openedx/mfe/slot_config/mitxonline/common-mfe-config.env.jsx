@@ -355,8 +355,30 @@ const addLogoSlotOverride = (config) => {
   }
 }
 
-const DashboardButton = ({ dashboardURL }) => {
+const SecondaryMenu = () => {
+  let helpURL = (process.env.CONTACT_URL || 'mailto:mitlearn-support@mit.edu')
+  let dashboardURL = process.env.MIT_LEARN_BASE_URL ? `${process.env.MIT_LEARN_BASE_URL}/dashboard` : 'https://learn.mit.edu/dashboard';
+  if (!isLearnCourse()) {
+    helpURL = (process.env.SUPPORT_URL || 'https://mitxonline.zendesk.com/hc/')
+    dashboardURL = configData.MARKETING_SITE_BASE_URL ? `${configData.MARKETING_SITE_BASE_URL}/dashboard/` : 'https://mitxonline.mit.edu/dashboard/';
+  }
+
   return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      marginRight: '10px'
+    }}>
+      <a
+        className="nav-link"
+        href={helpURL}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Help
+      </a>
+
       <a
         href={dashboardURL}
         style={{
@@ -370,12 +392,13 @@ const DashboardButton = ({ dashboardURL }) => {
         textDecoration: 'none',
         borderRadius: '4px',
         gap: '8px'
-    }}
-    >
-      <FontAwesomeIcon icon={faHome} />
-      Dashboard
-    </a>
-  )
+      }}
+      >
+        <FontAwesomeIcon icon={faHome} />
+        Dashboard
+      </a>
+    </div>
+  );
 }
 
 const addLearningHelpSlotOverride = (config) => {
@@ -395,37 +418,7 @@ const addLearningHelpSlotOverride = (config) => {
             widget: {
               id: 'custom_learning_help',
               type: DIRECT_PLUGIN,
-              RenderWidget: () => {
-
-                let helpURL = (process.env.CONTACT_URL || 'mailto:mitlearn-support@mit.edu')
-                let dashboardURL = process.env.MIT_LEARN_BASE_URL ? `${process.env.MIT_LEARN_BASE_URL}/dashboard` : 'https://learn.mit.edu/dashboard';
-
-                if (!isLearnCourse()) {
-                  helpURL = (process.env.SUPPORT_URL || 'https://mitxonline.zendesk.com/hc/')
-                  dashboardURL = configData.MARKETING_SITE_BASE_URL ? `${configData.MARKETING_SITE_BASE_URL}/dashboard/` : 'https://mitxonline.mit.edu/dashboard/';
-                }
-
-                return (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    marginRight: '10px'
-                  }}>
-                    <a
-                      className="nav-link"
-                      href={helpURL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Help
-                    </a>
-
-                    <DashboardButton dashboardURL={dashboardURL} />
-                  </div>
-                );
-              }
-
+              RenderWidget: () => <SecondaryMenu />
             }
           }
         ]
@@ -451,17 +444,7 @@ const addSecondaryMenuSlotOverride = (config) => {
             widget: {
               id: 'custom_secondary_menu_component',
               type: DIRECT_PLUGIN,
-              RenderWidget: () => {
-                let dashboardURL = process.env.MIT_LEARN_BASE_URL ? `${process.env.MIT_LEARN_BASE_URL}/dashboard` : 'https://learn.mit.edu/dashboard';
-
-                if (!isLearnCourse()) {
-                  dashboardURL = configData.MARKETING_SITE_BASE_URL ? `${configData.MARKETING_SITE_BASE_URL}/dashboard/` : 'https://mitxonline.mit.edu/dashboard/';
-                }
-
-                return (
-                  <div style={{marginRight: '16px'}}><DashboardButton dashboardURL={dashboardURL} /></div>
-                );
-              }
+              RenderWidget: () => <div style={{marginRight: '16px'}}><SecondaryMenu /></div>
             }
           }
         ]
