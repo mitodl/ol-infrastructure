@@ -545,8 +545,8 @@ superset_chart = kubernetes.helm.v3.Release(
                     "targetMemoryUtilizationPercentage": "80",
                 },
                 "resources": {
-                    "limits": {"cpu": "8000m", "memory": "1Gi"},
-                    "requests": {"cpu": "100m", "memory": "256Mi"},
+                    "limits": {"cpu": "2000m", "memory": "2Gi"},
+                    "requests": {"cpu": "500m", "memory": "768Mi"},
                 },
             },
             "supersetWorker": {
