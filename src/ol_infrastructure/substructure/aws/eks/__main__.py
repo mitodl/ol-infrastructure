@@ -601,7 +601,7 @@ grafana_k8s_monitoring_helm_release = kubernetes.helm.v3.Release(
             },
         },
     ),
-    opts=ResourceOptions(delete_before_replace=True),
+    opts=ResourceOptions(provider=k8s_provider, delete_before_replace=True),
 )
 
 
