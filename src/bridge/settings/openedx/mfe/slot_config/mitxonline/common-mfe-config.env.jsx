@@ -390,7 +390,7 @@ const SecondaryMenu = () => {
         alignItems: 'center',
         justifyContent: 'center',
         textDecoration: 'none',
-        borderRadius: '4px',
+        borderRadius: '0.375rem',
         gap: '8px'
       }}
       >
