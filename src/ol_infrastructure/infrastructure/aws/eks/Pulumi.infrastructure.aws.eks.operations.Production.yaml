@@ -17,6 +17,7 @@ config:
   eks:namespaces:
   - "keycloak"
   - "botkube"
+  - "kubewatch"
   eks:nodegroups:
     worker-xlarge:
       instance_type: "r7a.xlarge"
