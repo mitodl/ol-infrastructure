@@ -857,6 +857,8 @@ class OLApplicationK8s(ComponentResource):
                                         "-Q",  # queue name
                                         celery_worker_config.queue_name,
                                         "-B",  # beat (scheduler?)
+                                        "--scheduler",
+                                        "redbeat.RedBeatScheduler",
                                         "-l",  # set log level
                                         celery_worker_config.log_level,
                                         "--max-tasks-per-child",  # Max number of tasks the pool worker will process before being replaced
