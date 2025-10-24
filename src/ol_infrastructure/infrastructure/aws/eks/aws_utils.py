@@ -396,11 +396,11 @@ def setup_aws_integrations(
                 "podTerminationGracePeriod": 30,
                 "resources": {
                     "requests": {
-                        "cpu": "10m",
+                        "cpu": "50m",
                         "memory": "24Mi",
                     },
                     "limits": {
-                        "cpu": "10m",
+                        "cpu": "50m",
                         "memory": "24Mi",
                     },
                 },
