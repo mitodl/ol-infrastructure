@@ -72,6 +72,10 @@ run_monitoring:
   max_resume_run_attempts: 3
   poll_interval_seconds: 120
 
+run_retries:
+  enabled: true
+  max_retries: 3
+
 event_log_storage:
   module: dagster_postgres.event_log
   class: PostgresEventLogStorage
