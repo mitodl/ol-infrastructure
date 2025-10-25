@@ -20,7 +20,7 @@ VAULT_VERSION = "1.20.4"
 
 # EKS Specific Versions
 # renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/charts
-AIRBYTE_CHART_VERSION = "2.0.18"
+AIRBYTE_CHART_VERSION = "2.0.19"
 # renovate: datasource=helm depName=superset packageName=superset registryUrl=https://apache.github.io/superset
 SUPERSET_CHART_VERSION = "0.15.0"
 # renovate: datasource=docker depName=apisix packageName=registry-1.docker.io/bitnamicharts/apisix
