@@ -1,4 +1,5 @@
 # ruff: noqa: PLR0913, E501
+"""Generate Concourse pipeline definitions for building and deploying dockerized applications to Kubernetes via Pulumi."""
 
 import sys
 from typing import Any
@@ -118,30 +119,53 @@ def _define_git_resources(
     )
 
 
-def _define_registry_image_resources(app_name: str) -> tuple[Resource, Resource]:
+def _define_registry_image_resources(
+    app_name: str,
+) -> tuple[Resource, Resource, Resource, Resource]:
     """Define the registry image resources needed for the pipeline."""
+    dockerhub_kwargs = {
+        "username": "((dockerhub.username))",
+        "password": "((dockerhub.password))",
+    }
+    ecr_kwargs = {"ecr_region": "us-east-1"}
     # CI image resource - tagged 'latest' and git short ref, pushed by main build
-    ci_image = registry_image(
+    docker_ci_image = registry_image(
         name=Identifier(f"{app_name}-app-ci-image"),
         image_repository=f"mitodl/{app_name}-app",
-        username="((dockerhub.username))",
-        password="((dockerhub.password))",  # noqa: S106
         check_every="never",  # Only updated via put step from main build job
+        **dockerhub_kwargs,
     )
     # RC/Production image resource - tagged with version, pushed by RC build
-    rc_image = registry_image(
+    docker_rc_image = registry_image(
         name=Identifier(f"{app_name}-app-release-image"),
         image_repository=f"mitodl/{app_name}-app",
-        username="((dockerhub.username))",
-        password="((dockerhub.password))",  # noqa: S106
         check_every="never",  # Only updated via put step from rc build job
         image_tag=None,
         # While check_every=never, defining tag_regex helps Concourse UI understand
         # resource versions
         tag_regex=r"[0-9]+\.[0-9]+\.[0-9]+",  # examples 0.24.0, 0.26.3
         sort_by_creation=True,
+        **dockerhub_kwargs,
     )
-    return ci_image, rc_image
+
+    ecr_ci_image = registry_image(
+        name=Identifier(f"{app_name}-app-ci-ecr-image"),
+        image_repository=f"mitodl/{app_name}-app",
+        check_every="never",  # Only updated via put step from main build job
+        **ecr_kwargs,
+    )
+    ecr_rc_image = registry_image(
+        name=Identifier(f"{app_name}-app-release-ecr-image"),
+        image_repository=f"mitodl/{app_name}-app",
+        check_every="never",  # Only updated via put step from rc build job
+        image_tag=None,
+        # While check_every=never, defining tag_regex helps Concourse UI understand
+        # resource versions
+        tag_regex=r"[0-9]+\.[0-9]+\.[0-9]+",  # examples 0.24.0, 0.26.3
+        sort_by_creation=True,
+        **ecr_kwargs,
+    )
+    return docker_ci_image, docker_rc_image, ecr_ci_image, ecr_rc_image
 
 
 def _define_pulumi_resources(
@@ -165,7 +189,8 @@ def _build_image_job(
     branch_type: str,
     dockerfile_path: str,
     git_repo_resource: Resource,
-    registry_image_resource: Resource,
+    dockerhub_registry_image_resource: Resource,
+    ecr_registry_image_resource: Resource,
     build_target: str | None = None,
 ) -> Job:
     """Generate an image build job for a specific branch type (main or rc)."""
@@ -245,12 +270,41 @@ def _build_image_job(
         put_params["version"] = f"((.:{version_var}))"
         put_params["bump_aliases"] = True
 
-    plan.append(PutStep(put=registry_image_resource.name, params=put_params))
+    plan.append(
+        TaskStep(
+            task=Identifier("ensure-ecr-repository"),
+            config=TaskConfig(
+                platform=Platform.linux,
+                image_resource=AnonymousResource(
+                    type="registry-image",
+                    source={"repository": "amazon/aws-cli", "tag": "latest"},
+                ),
+                params={
+                    "REPO_NAME": ecr_registry_image_resource.source["repository"],
+                    "AWS_PAGER": "cat",
+                },
+                run=Command(
+                    path="sh",
+                    args=[
+                        "-exc",
+                        "aws ecr describe-repositories --repository-names ${REPO_NAME} || aws ecr create-repository --repository-name ${REPO_NAME}",
+                    ],
+                ),
+            ),
+        )
+    )
+    plan.append(PutStep(put=dockerhub_registry_image_resource.name, params=put_params))
+    plan.append(PutStep(put=ecr_registry_image_resource.name, params=put_params))
 
     return Job(name=Identifier(job_name), build_log_retention={"builds": 10}, plan=plan)
 
 
 def build_app_pipeline(app_name: str) -> Pipeline:
+    """Generate the full Concourse pipeline for a given application.
+
+    This function orchestrates all the resources and jobs required to build, test,
+    and deploy a dockerized application to Kubernetes.
+    """
     pipeline_parameters = pipeline_params.get(
         app_name, AppPipelineParams(app_name=app_name)
     )
@@ -261,7 +315,12 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         release_repo,
         ol_infra_repo,
     ) = _define_git_resources(app_name, pipeline_parameters.repo_name)
-    app_ci_image, app_rc_image = _define_registry_image_resources(app_name)
+    (
+        docker_ci_image,
+        docker_rc_image,
+        app_ci_image,
+        app_rc_image,
+    ) = _define_registry_image_resources(app_name)
     pulumi_resource_type, pulumi_resource = _define_pulumi_resources(
         app_name, ol_infra_repo.name
     )
@@ -275,7 +334,8 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         branch_type="main",
         dockerfile_path=pipeline_parameters.dockerfile_path,
         git_repo_resource=main_repo,
-        registry_image_resource=app_ci_image,
+        dockerhub_registry_image_resource=docker_ci_image,
+        ecr_registry_image_resource=app_ci_image,
         build_target=pipeline_parameters.build_target,
     )
     rc_image_build_job = _build_image_job(
@@ -283,7 +343,8 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         branch_type="release_candidate",
         dockerfile_path=pipeline_parameters.dockerfile_path,
         git_repo_resource=release_candidate_repo,
-        registry_image_resource=app_rc_image,
+        dockerhub_registry_image_resource=docker_rc_image,
+        ecr_registry_image_resource=app_rc_image,
         build_target=pipeline_parameters.build_target,
     )
 
@@ -414,11 +475,12 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     # Group into Fragments
 
     main_branch_container_fragement = PipelineFragment(
-        resources=[main_repo, app_ci_image], jobs=[main_image_build_job]
+        resources=[main_repo, app_ci_image, docker_ci_image],
+        jobs=[main_image_build_job],
     )
 
     release_candidate_container_fragment = PipelineFragment(
-        resources=[release_candidate_repo, app_rc_image],
+        resources=[release_candidate_repo, app_rc_image, docker_rc_image],
         jobs=[rc_image_build_job],
     )
 
@@ -429,6 +491,8 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         release_repo,
         app_ci_image,  # Needed for CI deployment trigger
         app_rc_image,  # Needed for QA/Prod deployment trigger
+        docker_ci_image,
+        docker_rc_image,
     ]
 
     ci_deployment_fragment = PipelineFragment(

@@ -31,7 +31,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
-from ol_infrastructure.lib.aws.eks_helper import cached_image_uri
+from ol_infrastructure.lib.aws.eks_helper import cached_image_uri, ecr_image_uri
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
@@ -83,7 +83,7 @@ class OLApplicationK8sConfig(BaseModel):
     application_arg_array: list[str] | None = None
     deployment_notifications: bool = False
     vault_k8s_resource_auth_name: str
-    use_pullthrough_cache: bool = True
+    registry: Literal["dockerhub", "ecr"] = "ecr"
     image_pull_policy: str = "IfNotPresent"
     # You get CPU and memory autoscaling by default
     hpa_scaling_metrics: list[kubernetes.autoscaling.v2.MetricSpecArgs] = [
@@ -236,8 +236,10 @@ class OLApplicationK8s(ComponentResource):
             app_image = f"{ol_app_k8s_config.application_image_repository}{ol_app_k8s_config.application_image_repository_suffix}:{ol_app_k8s_config.application_docker_tag}"
         else:
             app_image = f"{ol_app_k8s_config.application_image_repository}:{ol_app_k8s_config.application_docker_tag}"
-        if ol_app_k8s_config.use_pullthrough_cache:
+        if ol_app_k8s_config.registry == "dockerhub":
             app_image = cached_image_uri(app_image)
+        else:
+            app_image = ecr_image_uri(app_image)
 
         volumes = [
             kubernetes.core.v1.VolumeArgs(
