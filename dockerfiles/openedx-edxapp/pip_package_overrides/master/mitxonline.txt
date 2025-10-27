@@ -9,3 +9,4 @@ git+https://github.com/mitodl/edx-submissions.git@f655c2219b5c32342aaf16f0a513e2
 git+https://github.com/mitodl/enterprise-integrated-channels.git@a8e5c2d8f5f961918d37175a60dc31b7d72ed105#egg=enterprise-integrated-channels
 git+https://github.com/mitodl/xblock-lti-consumer.git@1a3f6be20b7446ba7a2847527c2effa2aa1aa9d5#egg=lti-consumer-xblock
 git+https://github.com/mitodl/edx-ora2.git@088e56393c85561222a703bdd7f4915dca126fc2#egg=ora2
+openedx-forum==0.3.8
