@@ -20,7 +20,7 @@ config:
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
   - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
   - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
-  - ["legacy_studio.advanced_settings",  "--deactivate"]
+  - ["legacy_studio.advanced_settings", "--deactivate"]
   - ["legacy_studio.certificates", "--deactivate"]
   - ["legacy_studio.configurations", "--deactivate"]
   - ["legacy_studio.course_outline", "--deactivate"]
