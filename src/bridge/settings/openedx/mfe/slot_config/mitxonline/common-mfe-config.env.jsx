@@ -165,7 +165,6 @@ const isLearnCourse = () => {
 
 const getUserMenu = () => {
   const userMenuLinkTitles = {
-    dashboard: 'Dashboard',
     profile: 'Profile',
     account: 'Settings',
     logout: 'Sign Out',
@@ -174,20 +173,12 @@ const getUserMenu = () => {
   if (isLearnCourse()) {
     return [
       {
-        url: `${process.env.MIT_LEARN_BASE_URL}/dashboard`,
-        title: userMenuLinkTitles.dashboard,
-      },
-      {
         url: `${configData.LMS_BASE_URL}/logout`,
         title: userMenuLinkTitles.logout,
       },
     ];
   }
   return [
-    {
-      url: `${configData.MARKETING_SITE_BASE_URL}/dashboard`,
-      title: userMenuLinkTitles.dashboard,
-    },
     {
       url: `${configData.MARKETING_SITE_BASE_URL}/profile/`,
       title: userMenuLinkTitles.profile,
