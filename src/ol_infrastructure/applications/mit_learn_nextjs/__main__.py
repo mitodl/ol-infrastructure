@@ -152,7 +152,7 @@ mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
                         volume_mounts=[efs_volume_mount],
                         image_pull_policy="Always",
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                            requests={"cpu": "500m", "memory": "2Gi"},
+                            requests={"cpu": "1000m", "memory": "8Gi"},
                             limits={"cpu": "2000m", "memory": "8Gi"},
                         ),
                         env=env_vars,
