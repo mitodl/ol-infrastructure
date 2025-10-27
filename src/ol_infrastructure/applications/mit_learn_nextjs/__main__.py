@@ -132,7 +132,7 @@ mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
         },
     ),
     spec=kubernetes.batch.v1.JobSpecArgs(
-        active_deadline_seconds=600,  # 10 minute timeout
+        active_deadline_seconds=1200,  # 20 minute timeout
         template=kubernetes.core.v1.PodTemplateSpecArgs(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
                 labels=k8s_global_labels
