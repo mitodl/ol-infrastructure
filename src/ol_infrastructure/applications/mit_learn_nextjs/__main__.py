@@ -134,6 +134,7 @@ mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
         },
     ),
     spec=kubernetes.batch.v1.JobSpecArgs(
+        active_deadline_seconds=600,  # 10 minute timeout
         template=kubernetes.core.v1.PodTemplateSpecArgs(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
                 labels=k8s_global_labels
@@ -151,7 +152,9 @@ mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
                         command=["yarn", "build", "--no-lint"],
                         volume_mounts=[efs_volume_mount],
                         image_pull_policy="Always",
-                        resources=kubernetes.core.v1.ResourceRequirementsArgs(),
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            limits={"memory": "8Gi"},
+                        ),
                         env=env_vars,
                     ),
                 ],
