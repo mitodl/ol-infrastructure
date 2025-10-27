@@ -476,6 +476,7 @@ grafana_k8s_monitoring_helm_release = kubernetes.helm.v3.Release(
                         },
                     },
                 },
+                "kube-state-metrics": {"deploy": True},
                 "kepler": {
                     "enabled": True,
                 },
