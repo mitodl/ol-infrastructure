@@ -138,6 +138,7 @@ mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
                 labels=k8s_global_labels
                 | {
                     "ol.mit.edu/job": "nextjs_build",
+                    "karpenter.sh/do-not-disrupt": "true",
                 },
             ),
             spec=kubernetes.core.v1.PodSpecArgs(
