@@ -262,6 +262,12 @@ def get_cluster_karpenter_iam_policy_document(  # noqa: PLR0913
                 "Action": "iam:GetInstanceProfile",
             },
             {
+                "Sid": "AllowUnscopedInstanceProfileListAction",
+                "Effect": "Allow",
+                "Resource": "*",
+                "Action": "iam:ListInstanceProfiles",
+            },
+            {
                 "Sid": "AllowAPIServerEndpointDiscovery",
                 "Effect": "Allow",
                 "Resource": f"arn:{aws_partition}:eks:{aws_region}:{aws_account_id}:cluster/{cluster_name}",
