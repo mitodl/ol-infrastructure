@@ -21,9 +21,11 @@ config:
   - "api-learn-ai-ci.ol.mit.edu"
   - "api.ci.learn.mit.edu"
   - "nb.ci.learn.mit.edu"
-  - "binder.ci.learn.mit.edu"
   - "ci.mitxonline.mit.edu"
   - "api.ci.mitxonline.mit.edu"
+  - "studio-backend.ci.learn.mit.edu"
+  - "courses-backend.ci.learn.mit.edu"
+  - "preview.courses.ci.learn.mit.edu"
   eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
   eks:developer_role_kubernetes_groups: ["admin"]
   eks:developer_role_scope: "cluster"
