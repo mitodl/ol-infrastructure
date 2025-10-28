@@ -653,6 +653,19 @@ for location in code_locations:
             },
         }
 
+    # Increase RAM for legacy edX because of studentmodule loading to memory
+    if name == "legacy_openedx":
+        deployment["resources"] = {
+            "requests": {
+                "cpu": "1000m",
+                "memory": "4Gi",
+            },
+            "limits": {
+                "cpu": "4000m",
+                "memory": "32Gi",
+            },
+        }
+
     # Add AWS profile configuration for edxorg deployment to handle cross-account access
     if name == "edxorg":
         deployment["volumes"] = [
