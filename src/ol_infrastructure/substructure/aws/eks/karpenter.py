@@ -413,6 +413,12 @@ def setup_karpenter(  # noqa: PLR0913
                                 InstanceClasses.compute_optimized_intel,
                             ],
                         },
+                        # Keep out the smallest instance sizes
+                        {
+                            "key": "karpenter.k8s.aws/instance-size",
+                            "operator": "NotIn",
+                            "values": ["nano", "micro", "small", "medium"],
+                        },
                         {
                             "key": "kubernetes.io/arch",
                             "operator": "In",
@@ -433,7 +439,7 @@ def setup_karpenter(  # noqa: PLR0913
             },
             "disruption": {
                 "consolidationPolicy": "WhenEmptyOrUnderutilized",
-                "consolidateAfter": "2m",
+                "consolidateAfter": "1h",
             },
             "limits": {
                 "cpu": "64",
@@ -481,7 +487,7 @@ def setup_karpenter(  # noqa: PLR0913
                             "effect": "NoSchedule",
                         }
                     ],
-                    "expireAfter": "24h",
+                    "expireAfter": "168h",
                     "terminationGracePeriod": "30m",
                     "requirements": [
                         {
@@ -512,7 +518,7 @@ def setup_karpenter(  # noqa: PLR0913
             },
             "disruption": {
                 "consolidationPolicy": "WhenEmptyOrUnderutilized",
-                "consolidateAfter": "2m",
+                "consolidateAfter": "1h",
             },
             "limits": {
                 "cpu": "32",
