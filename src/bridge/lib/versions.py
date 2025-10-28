@@ -25,7 +25,7 @@ AIRBYTE_CHART_VERSION = "2.0.19"
 SUPERSET_CHART_VERSION = "0.15.0"
 # renovate: datasource=docker depName=apisix packageName=registry-1.docker.io/bitnamicharts/apisix
 APISIX_CHART_VERSION = "6.0.0"
-# renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://charts.apiseven.com
+# renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://apache.github.io/apisix-helm-chart
 APISIX_OFFICIAL_CHART_VERSION = "2.12.2"
 # renovate: datasource=helm depName=aws-load-balancer-controller packageName=aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts
 AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION = "1.14.1"
