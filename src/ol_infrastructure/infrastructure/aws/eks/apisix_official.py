@@ -15,7 +15,6 @@ from pulumi import Config, ResourceOptions
 
 from bridge.lib.magic_numbers import AWS_LOAD_BALANCER_NAME_MAX_LENGTH
 from ol_infrastructure.lib.aws.eks_helper import (
-    ECR_DOCKERHUB_REGISTRY,
     cached_image_uri,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
