@@ -159,7 +159,7 @@ kubewatch_application = kubernetes.helm.v3.Release(
                 "pullPolicy": "IfNotPresent",
                 "pullSecrets": [],
             },
-            "slack": {"enabled": True, "channel": slack_channel, "token": "XXXX"},
+            "slack": {"enabled": True, "channel": slack_channel},
             "extraHandlers": {},
             "namespaceToWatch": "",
             "resourcesToWatch": {
@@ -240,7 +240,7 @@ kubewatch_application = kubernetes.helm.v3.Release(
             },
             "extraEnv": [
                 {
-                    "name": ("KW_SLACK_WEBHOOK_URL"),
+                    "name": ("KUBEWATCH_SLACK_WEBHOOK_URL"),
                     "valueFrom": {
                         "secretKeyRef": {
                             "name": "kubewatch-slack",
@@ -249,13 +249,17 @@ kubewatch_application = kubernetes.helm.v3.Release(
                     },
                 },
                 {
-                    "name": ("KW_SLACK_TOKEN"),
+                    "name": ("KUBEWATCH_SLACK_TOKEN"),
                     "valueFrom": {
                         "secretKeyRef": {
                             "name": "kubewatch-slack",
                             "key": "slack-token",
                         },
                     },
+                },
+                {
+                    "name": "KUBEWATCH_LOG_LEVEL",
+                    "value": "debug",
                 },
             ],
         },
