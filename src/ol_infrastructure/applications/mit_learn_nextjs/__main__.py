@@ -200,7 +200,10 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
                             )
                         ],
                         image_pull_policy="Always",
-                        resources=kubernetes.core.v1.ResourceRequirementsArgs(),
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            requests={"cpu": "250m", "memory": "500Mi"},
+                            limits={"cpu": "1000m", "memory": "2Gi"},
+                        ),
                         env=env_vars,
                         volume_mounts=[efs_volume_mount],  # Mount EFS volume
                         liveness_probe=kubernetes.core.v1.ProbeArgs(
