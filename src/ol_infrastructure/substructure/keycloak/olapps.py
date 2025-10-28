@@ -827,6 +827,8 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                     "lastName": "sn",
                     "fullName": "cn",
                 },
+                want_assertions_encrypted=True,
+                want_assertions_signed=True,
             )
         )
         onboard_saml_org(
