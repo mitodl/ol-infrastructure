@@ -220,33 +220,6 @@ def setup_apisix_official(
                 # --- Etcd Configuration ---
                 "etcd": {
                     "enabled": False,
-                    "image": {
-                        "registry": ECR_DOCKERHUB_REGISTRY,
-                        "repository": "bitnamilegacy/etcd",
-                        "tag": "latest",
-                    },
-                    "replicaCount": 3,
-                    "persistence": {
-                        "enabled": True,
-                        "storageClass": "efs-sc",
-                        "size": "8Gi",
-                    },
-                    "tolerations": operations_tolerations,
-                    "resources": {
-                        "requests": {
-                            "cpu": "50m",
-                            "memory": "100Mi",
-                        },
-                        "limits": {
-                            "cpu": "100m",
-                            "memory": "300Mi",
-                        },
-                    },
-                    "auth": {
-                        "rbac": {
-                            "create": False,
-                        },
-                    },
                 },
                 # --- Ingress Controller Configuration ---
                 "ingress-controller": {
