@@ -39,7 +39,10 @@ from ol_infrastructure.infrastructure.aws.eks.traefik import setup_traefik
 from ol_infrastructure.infrastructure.aws.eks.vault_secrets_operator import (
     setup_vault_secrets_operator,
 )
-from ol_infrastructure.lib.aws.eks_helper import get_cluster_version
+from ol_infrastructure.lib.aws.eks_helper import (
+    get_cluster_version,
+    get_eks_addon_version,
+)
 from ol_infrastructure.lib.aws.iam_helper import (
     EKS_ADMIN_USERNAMES,
     IAM_POLICY_VERSION,
@@ -695,7 +698,7 @@ if eks_config.get_bool("ebs_csi_provisioner"):
         f"{cluster_name}-eks-addon-ebs-cni-driver-addon",
         cluster=cluster,
         addon_name="aws-ebs-csi-driver",
-        addon_version=VERSIONS["EBS_CSI_DRIVER"],
+        addon_version=get_eks_addon_version("aws-ebs-csi-driver"),
         service_account_role_arn=ebs_csi_driver_role.role.arn,
         opts=ResourceOptions(
             parent=cluster,
@@ -794,7 +797,7 @@ if eks_config.get_bool("efs_csi_provisioner"):
         f"{cluster_name}-eks-addon-efs-cni-driver-addon",
         cluster=cluster,
         addon_name="aws-efs-csi-driver",
-        addon_version=VERSIONS["EFS_CSI_DRIVER"],
+        addon_version=get_eks_addon_version("aws-efs-csi-driver"),
         service_account_role_arn=efs_csi_driver_role.role.arn,
         opts=ResourceOptions(
             parent=cluster,

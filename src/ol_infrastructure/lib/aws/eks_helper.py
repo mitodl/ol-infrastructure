@@ -72,6 +72,18 @@ def get_cluster_version(*, use_default: bool = True) -> str:
 
 
 @lru_cache
+def get_eks_addon_version(addon_name: str, cluster_version: str | None = None) -> str:
+    if cluster_version is None:
+        cluster_version = get_cluster_version()
+    version_info = eks_client.describe_addon_versions(
+        kubernetesVersion=cluster_version,
+        addonName=addon_name,
+    )["addons"][0]
+    versions = [version["addonVersion"] for version in version_info["addonVersions"]]
+    return sorted(versions, reverse=True)[0]
+
+
+@lru_cache
 def get_k8s_provider(
     kubeconfig: str,
     provider_name: str | None,
