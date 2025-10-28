@@ -69,7 +69,7 @@ k8s_global_labels = K8sGlobalLabels(
 ).model_dump()
 
 # Deploy to k8s
-if codejail_config.get("deploy_to_k8s"):
+if codejail_config.get_bool("deploy_to_k8s"):
     setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
     # Figure out the namespace and ensure it exists in the cluster
     namespace = f"{stack_info.env_prefix}-openedx"
@@ -168,7 +168,7 @@ if codejail_config.get("deploy_to_k8s"):
         ),
     )
 # Deploy to ec2
-else:
+if codejail_config.get_bool("deploy_to_ec2") or True:
     codejail_server_ami = ec2.get_ami(
         filters=[
             ec2.GetAmiFilterArgs(name="name", values=["open-edx-codejail-*"]),
