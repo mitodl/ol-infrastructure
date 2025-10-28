@@ -7,7 +7,7 @@ config:
     desired: 3
     max: 5
     min: 2
-  codejail:deploy_to_k8s: false
+  codejail:deploy_to_k8s: true
   codejail:deploy_to_ec2: true
   codejail:replicas: 3
   codejail:business_unit: mitxonline
