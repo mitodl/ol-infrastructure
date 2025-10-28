@@ -20,7 +20,7 @@ config:
     CSRF_TRUSTED_ORIGINS: "https://mitxonline.mit.edu,https://learn.mit.edu"
     CSRF_COOKIE_DOMAIN: "mitxonline.mit.edu"
     CSRF_COOKIE_NAME: csrf_mitxonline
-    CRON_COURSE_CERTIFICATES_HOURS: "18"
+    CRON_COURSE_CERTIFICATES_HOURS: "*/6"
     CRON_PROCESS_REFUND_REQUESTS_MINUTES: "*/5"
     FEATURE_ENABLE_ADDL_PROFILE_FIELDS: "true"
     FEATURE_ENABLE_UPGRADE_DIALOG: "true"
