@@ -41,7 +41,7 @@ def setup_apisix_official(
     Configure and install the official Apache APISIX ingress controller.
 
     This deploys APISIX using the official Apache chart from https://apache.github.io/apisix-helm-chart
-    in traditional mode (combined control plane and data plane).
+    in API-driven standalone mode.
 
     :param cluster_name: The name of the EKS cluster.
     :param k8s_provider: The Kubernetes provider for Pulumi.
