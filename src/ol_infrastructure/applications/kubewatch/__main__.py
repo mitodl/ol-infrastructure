@@ -177,9 +177,14 @@ kubewatch_application = kubernetes.helm.v3.Release(
             "command": [],
             "args": [],
             "lifecycleHooks": {},
-            "extraEnvVars": [],
+            "extraEnvVarsSecret": static_secrets_name,
+            "extraEnvVars": [
+                {
+                    "name": "LOG_LEVEL",
+                    "value": "debug",
+                },
+            ],
             "extraEnvVarsCM": "",
-            "extraEnvVarsSecret": "",
             "replicaCount": 1,
             "podSecurityContext": {"enabled": False, "fsGroup": ""},
             "containerSecurityContext": {
@@ -238,30 +243,6 @@ kubewatch_application = kubernetes.helm.v3.Release(
                 "automountServiceAccountToken": True,
                 "annotations": {},
             },
-            "extraEnv": [
-                {
-                    "name": ("KUBEWATCH_SLACK_WEBHOOK_URL"),
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": "kubewatch-slack",
-                            "key": "slack-webhook-url",
-                        },
-                    },
-                },
-                {
-                    "name": ("KUBEWATCH_SLACK_TOKEN"),
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": "kubewatch-slack",
-                            "key": "slack-token",
-                        },
-                    },
-                },
-                {
-                    "name": "KUBEWATCH_LOG_LEVEL",
-                    "value": "debug",
-                },
-            ],
         },
         skip_await=False,
     ),
