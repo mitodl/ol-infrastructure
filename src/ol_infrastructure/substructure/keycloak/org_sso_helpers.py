@@ -49,6 +49,8 @@ class SamlIdpConfig(OrgConfig):
     principal_attribute: str | None = None
     mapper_attribute_format: AttributeFormat = AttributeFormat.uri
     attribute_map: dict[str, str] | None = None
+    want_assertions_encrypted: bool = False
+    want_assertions_signed: bool | None = None  # Optional, no default
 
     @model_validator(mode="after")
     def ensure_principal_types(self):
@@ -113,29 +115,39 @@ def onboard_saml_org(
             "useMetadataDescriptorUrl": True,
         }
 
+    # Build kwargs conditionally to avoid passing None values
+    idp_kwargs = {
+        "alias": saml_config.org_alias.lower(),
+        "display_name": saml_config.org_name,
+        "entity_id": f"{saml_config.keycloak_url}/realms/olapps",
+        "first_broker_login_flow_alias": saml_config.first_login_flow.alias,
+        "hide_on_login_page": True,
+        "name_id_policy_format": saml_config.name_id_format,
+        "org_domain": "ANY",
+        "org_redirect_mode_email_matches": True,
+        "organization_id": org.id,
+        "post_binding_authn_request": True,
+        "post_binding_response": True,
+        "principal_type": saml_config.principal_type,
+        "principal_attribute": saml_config.principal_attribute,
+        "realm": saml_config.realm_id,
+        "login_hint": True,
+        "sync_mode": "FORCE",
+        "trust_email": True,
+        "validate_signature": True,
+        "want_assertions_encrypted": saml_config.want_assertions_encrypted,
+        "opts": saml_config.resource_options,
+        "extra_config": extra_config,
+        **saml_args,
+    }
+
+    # Only add want_assertions_signed if explicitly set
+    if saml_config.want_assertions_signed is not None:
+        idp_kwargs["want_assertions_signed"] = saml_config.want_assertions_signed
+
     org_idp = keycloak.saml.IdentityProvider(
         f"ol-apps-{saml_config.org_alias}-saml-idp",
-        alias=saml_config.org_alias.lower(),
-        display_name=saml_config.org_name,
-        entity_id=f"{saml_config.keycloak_url}/realms/olapps",
-        first_broker_login_flow_alias=saml_config.first_login_flow.alias,
-        hide_on_login_page=True,
-        name_id_policy_format=saml_config.name_id_format,
-        org_domain="ANY",
-        org_redirect_mode_email_matches=True,
-        organization_id=org.id,
-        post_binding_authn_request=True,
-        post_binding_response=True,
-        principal_type=saml_config.principal_type,
-        principal_attribute=saml_config.principal_attribute,
-        realm=saml_config.realm_id,
-        login_hint=True,
-        sync_mode="FORCE",
-        trust_email=True,
-        validate_signature=True,
-        opts=saml_config.resource_options,
-        extra_config=extra_config,
-        **saml_args,
+        **idp_kwargs,
     )
     for attr, args in mappers.items():
         keycloak.AttributeImporterIdentityProviderMapper(
