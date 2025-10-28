@@ -204,6 +204,12 @@ def create_k8s_configmaps(
                     # preview subdomain to share authentication with LMS (TMM 2021-12-20)
                     SESSION_COOKIE_DOMAIN: {".{}".format(edxapp_config.require_object("domains")["lms"].split(".", 1)[-1])}
                     UNIVERSITY_EMAIL: {edxapp_config.require("sender_email_address")}
+                    # OpenTelemetry configuration
+                    OPENEDX_TELEMETRY:
+                    - edx_django_utils.monitoring.OpenTelemetryBackend
+                    OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318
+                    OTEL_SERVICE_NAME: {env_name}-edxapp
+                    OTEL_LOG_LEVEL: info
                     ECOMMERCE_PUBLIC_URL_ROOT: {edxapp_config.require_object("domains")["lms"]}
                     # Django 4.2+ storage configuration
                     # STORAGES:
