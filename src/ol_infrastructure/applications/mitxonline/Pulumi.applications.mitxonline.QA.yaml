@@ -20,7 +20,7 @@ config:
     CSRF_TRUSTED_ORIGINS: "https://rc.mitxonline.mit.edu,https://rc.learn.mit.edu"
     CSRF_COOKIE_DOMAIN: ".rc.mitxonline.mit.edu"
     CSRF_COOKIE_NAME: csrf_mitxonline
-    CRON_COURSE_CERTIFICATES_HOURS: "18"
+    CRON_COURSE_CERTIFICATES_HOURS: "*/6"
     GA_TRACKING_ID: "UA-5145472-46"
     GTM_TRACKING_ID: "GTM-TW97MNR"
     KEYCLOAK_BASE_URL: "https://sso-qa.ol.mit.edu"
