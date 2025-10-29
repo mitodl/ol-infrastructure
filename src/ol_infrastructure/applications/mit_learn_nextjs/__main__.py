@@ -3,6 +3,7 @@
 import os
 
 import pulumi_kubernetes as kubernetes
+from kubernetes import client, config
 from pulumi import Config, Output, ResourceOptions, StackReference, export
 
 from bridge.lib.magic_numbers import DEFAULT_NEXTJS_PORT
@@ -51,9 +52,36 @@ auto_toggle = nextjs_config.get_bool("auto_toggle")
 if auto_toggle is None:
     auto_toggle = True  # Default to automatic toggling
 
-# Track the last active deployment via config
-# On first run, this will be None, so we start with blue
-last_active = nextjs_config.get("last_active") or "blue"
+
+# Function to read last_active from ConfigMap in the cluster
+def get_last_active_from_configmap() -> str:
+    """Read the last active deployment color from ConfigMap state store."""
+    try:
+        # Use the kubernetes client library to read from the cluster
+        # This requires KUBECONFIG to be set or default kubeconfig to exist
+        config.load_kube_config()
+        v1 = client.CoreV1Api()
+
+        try:
+            cm = v1.read_namespaced_config_map(
+                name="mit-learn-nextjs-deployment-state",
+                namespace=learn_namespace,
+            )
+            return cm.data.get("last_active", "blue")
+        except client.exceptions.ApiException as e:
+            NOT_FOUND = 404
+            if e.status == NOT_FOUND:
+                # ConfigMap doesn't exist yet (first run), default to blue
+                return "blue"
+            # For other API errors, return default
+            return "blue"
+    except (OSError, ValueError):
+        # If we can't connect to cluster (no kubeconfig, etc), default to blue
+        return "blue"
+
+
+# Try to read last_active from ConfigMap, fall back to blue for first deployment
+last_active = get_last_active_from_configmap()
 
 # Determine which color gets the new deployment
 # If auto_toggle is enabled, we deploy to the opposite color and will switch to it
@@ -280,65 +308,29 @@ mit_learn_nextjs_new_deployment = kubernetes.apps.v1.Deployment(
     ),
 )
 
-# Scale down or delete the old deployment if auto_toggle is enabled
-old_deployment = None
-if auto_toggle and old_color != new_color:
-    # Create old deployment with 0 replicas to clean it up
-    old_deployment = kubernetes.apps.v1.Deployment(
-        f"mit-learn-nextjs-{stack_info.name}-deployment-{old_color}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=f"mit-learn-nextjs-{old_color}",
-            namespace=learn_namespace,
-            labels=old_deployment_labels,
-        ),
-        spec=kubernetes.apps.v1.DeploymentSpecArgs(
-            replicas=0,  # Scale to 0
-            selector=kubernetes.meta.v1.LabelSelectorArgs(
-                match_labels=old_deployment_labels,
-            ),
-            template=kubernetes.core.v1.PodTemplateSpecArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=old_deployment_labels,
-                ),
-                spec=kubernetes.core.v1.PodSpecArgs(
-                    volumes=[
-                        kubernetes.core.v1.VolumeArgs(
-                            name=f"nextjs-build-cache-efs-{old_color}",
-                            persistent_volume_claim=kubernetes.core.v1.PersistentVolumeClaimVolumeSourceArgs(
-                                claim_name=f"nextjs-build-cache-efs-{old_color}",
-                            ),
-                        )
-                    ],
-                    dns_policy="ClusterFirst",
-                    containers=[
-                        kubernetes.core.v1.ContainerArgs(
-                            name="nextjs-app",
-                            image=app_image,
-                            ports=[
-                                kubernetes.core.v1.ContainerPortArgs(
-                                    container_port=DEFAULT_NEXTJS_PORT,
-                                    name="http",
-                                )
-                            ],
-                            image_pull_policy="Always",
-                            resources=kubernetes.core.v1.ResourceRequirementsArgs(),
-                            env=env_vars,
-                            volume_mounts=[
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name=f"nextjs-build-cache-efs-{old_color}",
-                                    mount_path="/app/frontends/main/.next",
-                                )
-                            ],
-                        ),
-                    ],
-                ),
-            ),
-        ),
-        opts=ResourceOptions(
-            delete_before_replace=True,
-            depends_on=[mit_learn_nextjs_new_deployment],
-        ),
-    )
+# In blue/green deployment, we leave the old deployment running.
+# Traffic is switched by updating the service selector to point to active_color.
+# The old deployment can be manually scaled down or deleted after
+# validating the new one.
+
+# Create/Update ConfigMap to track deployment state
+# This ConfigMap stores which deployment color is currently active
+deployment_state_configmap = kubernetes.core.v1.ConfigMap(
+    f"mit-learn-nextjs-{stack_info.name}-deployment-state",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="mit-learn-nextjs-deployment-state",
+        namespace=learn_namespace,
+        labels=application_labels,
+    ),
+    data={
+        "last_active": active_color,
+        "previous_active": last_active,
+        "auto_toggle": str(auto_toggle),
+    },
+    opts=ResourceOptions(
+        depends_on=[mit_learn_nextjs_new_deployment],
+    ),
+)
 
 # Create a Kubernetes Service that routes to the active deployment
 # With auto_toggle enabled, this automatically routes to the new deployment
@@ -404,21 +396,12 @@ gateway = OLEKSGateway(
     ),
 )
 
-# Export deployment information and new state
-# After each deployment, update the config to persist the new active color:
-#   pulumi config set nextjs:last_active <active_color>
-# Or use the post-deploy command shown in the output
+# Export deployment information
+# State is automatically tracked in the ConfigMap, no manual updates needed
 export("current_active_deployment", active_color)
 export("previous_deployment", last_active)
 export("auto_toggle_enabled", auto_toggle)
-
-# Add a post-deployment instruction
-if auto_toggle:
-    export(
-        "post_deploy_command",
-        f"pulumi config set nextjs:last_active {active_color} && echo 'Config "
-        "updated for next deployment'",
-    )
+export("state_configmap", "mit-learn-nextjs-deployment-state")
 
 Output.all(active_color, new_color, last_active, auto_toggle).apply(
     lambda vals: {
@@ -434,16 +417,22 @@ Output.all(active_color, new_color, last_active, auto_toggle).apply(
             f"- Previous deployment: {vals[2]}\n"
             "\n"
             + (
-                "Automatic Mode (IMPORTANT):\n"
+                "Automatic Mode:\n"
                 "  The system toggles between blue and green on each run.\n"
                 f"  Service is now routing to: {vals[0]}\n"
-                f"  Old deployment ({vals[2]}) has been scaled to 0 replicas.\n"
+                f"  Old deployment ({vals[2]}) is still running but not "
+                "receiving traffic.\n"
                 "\n"
-                "  REQUIRED: After deployment completes, run:\n"
-                f"  pulumi config set nextjs:last_active {vals[0]}\n"
+                "  State is automatically tracked in ConfigMap:\n"
+                "  kubectl get configmap mit-learn-nextjs-deployment-state "
+                "-n mitlearn -o yaml\n"
                 "\n"
-                "  On next 'pulumi up', traffic will switch back to "
-                f"{vals[2]}.\n"
+                "  Optional: Scale down old deployment manually:\n"
+                f"  kubectl scale deployment mit-learn-nextjs-{vals[2]} "
+                "--replicas=0 -n mitlearn\n"
+                "\n"
+                "  On next 'pulumi up', traffic will automatically switch "
+                f"back to {vals[2]}.\n"
                 "\n"
                 "To disable auto-toggle:\n"
                 "  pulumi config set nextjs:auto_toggle false\n"
