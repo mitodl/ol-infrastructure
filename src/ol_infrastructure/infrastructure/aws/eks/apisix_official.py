@@ -123,7 +123,7 @@ def setup_apisix_official(
                         "external-dns.alpha.kubernetes.io/hostname": ",".join(
                             apisix_domains
                         ),
-                        "service.beta.kubernetes.io/aws-load-balancer-name": f"{cluster_name}-apisix"[
+                        "service.beta.kubernetes.io/aws-load-balancer-name": f"{cluster_name}-apache-apisix"[
                             :AWS_LOAD_BALANCER_NAME_MAX_LENGTH
                         ],
                         "service.beta.kubernetes.io/aws-load-balancer-type": "external",
