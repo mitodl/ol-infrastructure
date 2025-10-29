@@ -79,6 +79,14 @@ def setup_apisix_official(
     # Chart version 2.12.x contains APISIX 3.14.x
     apisix_chart_version = versions["APISIX_OFFICIAL_CHART"]
 
+    # Create apache-apisix specific labels that include both global labels
+    # and app-specific labels for proper service selector matching
+    apisix_labels = {
+        **k8s_global_labels,
+        "app.kubernetes.io/name": "apache-apisix",
+        "app.kubernetes.io/component": "gateway",
+    }
+
     kubernetes.helm.v3.Release(
         f"{cluster_name}-apisix-official-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
@@ -154,7 +162,7 @@ def setup_apisix_official(
                         "servicePort": 443,
                         "containerPort": 9443,
                     },
-                    "labelsOverride": k8s_global_labels,
+                    "labelsOverride": apisix_labels,
                 },
                 # --- APISIX Configuration ---
                 "apisix": {
@@ -254,7 +262,7 @@ def setup_apisix_official(
                         },
                         "kubernetes": {
                             "ingressClass": "apache-apisix",
-                            "enableGatewayAPI": False,
+                            "enableGatewayAPI": True,
                         },
                     },
                     "apisix": {
