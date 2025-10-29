@@ -26,6 +26,7 @@ config:
   - "api.ci.mitxonline.mit.edu"
   - "studio-backend.ci.learn.mit.edu"
   - "courses-backend.ci.learn.mit.edu"
+  eks:apisix_official_domains:
   - "preview.courses.ci.learn.mit.edu"
   eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
   eks:developer_role_kubernetes_groups: ["admin"]

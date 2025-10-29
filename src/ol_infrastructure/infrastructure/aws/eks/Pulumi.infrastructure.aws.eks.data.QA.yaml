@@ -12,7 +12,7 @@ config:
   eks:apisix_domains:
   - "airbyte-qa.ol.mit.edu"
   - "pipelines-qa.odl.mit.edu"
-  eks:apisix_ingress_enabled: "true"
+  eks:apisix_ingress_enabled: "false"
   eks:apisix_official_enabled: "true"
   eks:apisix_viewer_key:
     secure: v1:FXn/5LA92VaA0LDu:+M5NNNgprjafZJTssawGZoRrI9ZEoiGKbRa3oVh4YjtZO4B5MLwXgfRvfWyY1zSbT0LJxxMJT90KQtWN3MsWobIseTYXLrdnPcpcYXY9lmg=

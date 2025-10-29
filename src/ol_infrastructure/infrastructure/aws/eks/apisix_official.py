@@ -61,9 +61,16 @@ def setup_apisix_official(
     """
     # Support separate domains for blue-green migration
     # Use apisix_official_domains if provided, otherwise fall back to apisix_domains
-    apisix_domains = eks_config.get_object(
-        "apisix_official_domains"
-    ) or eks_config.require_object("apisix_domains")
+    if not eks_config.get_bool("apisix_ingress_enabled"):
+        apisix_domains = [
+            *(eks_config.get_object("apisix_official_domains") or []),
+            *eks_config.require_object("apisix_domains"),
+        ]
+    else:
+        apisix_domains = eks_config.get_object(
+            "apisix_official_domains"
+        ) or eks_config.require_object("apisix_domains")
+
     session_cookie_name = f"{stack_info.env_suffix}_gateway_session".removeprefix(
         "production"
     ).strip("_")
