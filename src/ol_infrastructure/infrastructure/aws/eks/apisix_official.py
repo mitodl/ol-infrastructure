@@ -40,7 +40,10 @@ def setup_apisix_official(
     Configure and install the official Apache APISIX ingress controller.
 
     This deploys APISIX using the official Apache chart from https://apache.github.io/apisix-helm-chart
-    in API-driven standalone mode.
+    in standalone mode with YAML-based configuration provider and apisix-standalone ingress controller.
+
+    Note: The "worker has not received configuration" message in /status/ready is expected during initial
+    startup until the ingress controller pushes the first configuration via the Admin API.
 
     :param cluster_name: The name of the EKS cluster.
     :param k8s_provider: The Kubernetes provider for Pulumi.
@@ -95,6 +98,14 @@ def setup_apisix_official(
                 },
                 # --- Pod Configuration ---
                 "tolerations": operations_tolerations,
+                "readinessProbe": {
+                    # Temporarily relax readiness to break chicken-egg problem
+                    # Workers need to be in service to receive config via Admin API
+                    "initialDelaySeconds": 10,
+                    "periodSeconds": 10,
+                    "timeoutSeconds": 1,
+                    "failureThreshold": 30,  # Allow 5 minutes before marking unhealthy
+                },
                 "resources": {
                     "requests": {
                         "cpu": "100m",
@@ -105,8 +116,8 @@ def setup_apisix_official(
                         "memory": "400Mi",
                     },
                 },
-                # --- Gateway Service (LoadBalancer) ---
-                "gateway": {
+                # --- Service (LoadBalancer) ---
+                "service": {
                     "type": "LoadBalancer",
                     "annotations": {
                         "external-dns.alpha.kubernetes.io/hostname": ",".join(
@@ -223,19 +234,51 @@ def setup_apisix_official(
                 # --- Ingress Controller Configuration ---
                 "ingress-controller": {
                     "enabled": True,
+                    "rbac": {
+                        "create": True,
+                    },
+                    "serviceAccount": {
+                        "create": True,
+                        "name": "apache-apisix-ingress-controller",
+                    },
                     "config": {
-                        "apisix": {
-                            "serviceNamespace": "operations",
-                            "serviceName": "apache-apisix-admin",
-                            "adminKey": eks_config.require_secret("apisix_admin_key"),
+                        "provider": {
+                            "type": "apisix-standalone",
                         },
                         "kubernetes": {
                             "ingressClass": "apache-apisix",
                             "enableGatewayAPI": False,
                         },
                     },
+                    "apisix": {
+                        "adminService": {
+                            "name": "apache-apisix-admin",
+                            "namespace": "operations",
+                            "port": 9180,
+                        },
+                    },
+                    "gatewayProxy": {
+                        "createDefault": True,
+                        "provider": {
+                            "type": "ControlPlane",
+                            "controlPlane": {
+                                "service": {
+                                    "name": "apache-apisix-admin",
+                                    "port": 9180,
+                                },
+                                "auth": {
+                                    "type": "AdminKey",
+                                    "adminKey": {
+                                        "value": eks_config.require_secret(
+                                            "apisix_admin_key"
+                                        ),
+                                    },
+                                },
+                            },
+                        },
+                    },
                     "deployment": {
-                        "replicas": 2,
+                        "replicas": 3,  # Makes it easier to get quorum
                         "tolerations": operations_tolerations,
                         "resources": {
                             "requests": {

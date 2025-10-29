@@ -1056,6 +1056,7 @@ class OLApisixRoute(ComponentResource):
                 namespace=k8s_namespace,
             ),
             spec={
+                "ingressClassName": "apache-apisix",
                 "http": self.__build_route_list(route_configs),
             },
             opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
