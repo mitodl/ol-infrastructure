@@ -34,6 +34,7 @@ dependencies = [
     "pulumi-aws-native>=1.25.0,<2",
     "packaging>=24.2",
     "pulumiverse-time>=0.1.1",
+    "kubernetes>=34.1.0",
 ]
 
 [project.urls]
