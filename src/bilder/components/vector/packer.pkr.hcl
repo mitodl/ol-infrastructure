@@ -51,7 +51,7 @@ source "amazon-ebs" "vector" {
 }
 
 source "docker" "vector" {
-  image  = "debian:bookworm"
+  image  = "debian:trixie"
   commit = true
 }
 

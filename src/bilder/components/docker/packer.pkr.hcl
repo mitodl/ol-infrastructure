@@ -50,7 +50,7 @@ source "amazon-ebs" "docker" {
 }
 
 source "docker" "docker" {
-  image      = "debian:bookworm"
+  image      = "debian:trixie"
   discard    = true
   privileged = true
   changes = [

@@ -51,7 +51,7 @@ source "amazon-ebs" "caddy" {
 }
 
 source "docker" "caddy" {
-  image  = "debian:bookworm"
+  image  = "debian:trixie"
   commit = true
 }
 

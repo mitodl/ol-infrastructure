@@ -56,7 +56,7 @@ source "amazon-ebs" "concourse" {
 }
 
 source "docker" "concourse" {
-  image  = "debian:bookworm"
+  image  = "debian:trixie"
   commit = true
   changes = [
     "USER concourse",

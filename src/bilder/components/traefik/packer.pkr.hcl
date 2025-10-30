@@ -51,7 +51,7 @@ source "amazon-ebs" "traefik" {
 }
 
 source "docker" "traefik" {
-  image  = "debian:bookworm"
+  image  = "debian:trixie"
   commit = true
 }
 

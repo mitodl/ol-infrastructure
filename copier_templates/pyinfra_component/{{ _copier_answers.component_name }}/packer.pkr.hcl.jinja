@@ -51,7 +51,7 @@ source "amazon-ebs" "{{_copier_answers.component_name }}" {
 }
 
 source "docker" "{{_copier_answers.component_name }}" {
-  image = "debian:bookworm"
+  image = "debian:trixie"
   commit = true
 }
 

@@ -12,7 +12,7 @@ resources:
   check_every: 1h
   source:
     repository: node
-    tag: 22-bookworm-slim
+    tag: 22-trixie-slim
 - name: ocw-course-publisher-image
   type: docker-image
   source:
@@ -41,7 +41,7 @@ jobs:
         name: ""
         source:
           repository: node
-          tag: 22-bookworm-slim
+          tag: 22-trixie-slim
         type: docker-image
       inputs:
       - name: ocw-course-publisher-image

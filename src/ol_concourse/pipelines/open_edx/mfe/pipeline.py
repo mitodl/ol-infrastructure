@@ -242,7 +242,7 @@ def mfe_job(
                 platform=Platform.linux,
                 image_resource=AnonymousResource(
                     type="registry-image",
-                    source={"repository": "debian", "tag": "bookworm-slim"},
+                    source={"repository": "debian", "tag": "trixie-slim"},
                 ),
                 inputs=[Input(name=mfe_repo.name), Input(name=mfe_configs.name)],
                 outputs=[mfe_build_dir],
@@ -264,7 +264,7 @@ def mfe_job(
                     type="registry-image",
                     source={
                         "repository": "node",
-                        "tag": f"{mfe.runtime_version}-bookworm-slim",
+                        "tag": f"{mfe.runtime_version}-trixie-slim",
                     },
                 ),
                 inputs=[Input(name=mfe_build_dir.name)],
