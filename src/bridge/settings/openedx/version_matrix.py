@@ -16,7 +16,7 @@ class OpenLearningOpenEdxDeployment(Enum):
             # Residential environments want to track master in CI for testing new
             # features as they land. (TMM 2025-05-20)
             EnvRelease("CI", OpenEdxSupportedRelease["master"]),
-            EnvRelease("QA", OpenEdxSupportedRelease["teak"]),
+            EnvRelease("QA", OpenEdxSupportedRelease["ulmo"]),
             EnvRelease("Production", OpenEdxSupportedRelease["teak"]),
         ],
     )
@@ -26,7 +26,7 @@ class OpenLearningOpenEdxDeployment(Enum):
             # Residential environments want to track master in CI for testing new
             # features as they land. (TMM 2025-05-20)
             EnvRelease("CI", OpenEdxSupportedRelease["master"]),
-            EnvRelease("QA", OpenEdxSupportedRelease["teak"]),
+            EnvRelease("QA", OpenEdxSupportedRelease["ulmo"]),
             EnvRelease("Production", OpenEdxSupportedRelease["teak"]),
         ],
     )
@@ -42,7 +42,7 @@ class OpenLearningOpenEdxDeployment(Enum):
         deployment_name="xpro",
         env_release_map=[
             EnvRelease("CI", OpenEdxSupportedRelease["teak"]),
-            EnvRelease("QA", OpenEdxSupportedRelease["teak"]),
+            EnvRelease("QA", OpenEdxSupportedRelease["ulmo"]),
             EnvRelease("Production", OpenEdxSupportedRelease["teak"]),
         ],
     )
