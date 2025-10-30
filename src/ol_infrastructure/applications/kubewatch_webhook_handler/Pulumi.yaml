@@ -1,0 +1,7 @@
+---
+name: ol-infrastructure-kubewatch-webhook-handler
+runtime: python
+description: Custom webhook handler for kubewatch to provide rich Slack notifications
+  with deployment details
+backend:
+  url: s3://mitol-pulumi-state/
