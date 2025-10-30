@@ -20,14 +20,6 @@ Make notifications of deployments to CI configurable.
 4. **Reduced noise** - Disabled pod and generic event watching to focus on deployments
 5. **Documentation** - Comprehensive README.md and IMPLEMENTATION_NOTES.md added
 
-### ⚠️ Limitations & Notes
-1. **Slack token** - Current token shows `invalid_auth` errors and needs to be refreshed
-2. **Single channel** - Current implementation sends all notifications to one Slack channel
-   - Per-project channels require either multiple kubewatch instances or a custom webhook router
-   - See README.md for detailed multi-channel implementation options
-3. **Notification format** - Stock kubewatch provides basic notifications; labels are in event payload but not prominently formatted
-   - For richer formatting, would need custom webhook handler
-
 ### Files Modified
 - `__main__.py` - Added namespace filtering, improved resource watching configuration
 - `Pulumi.applications.kubewatch.applications.CI.yaml` - Added watched_namespaces parameter
@@ -37,11 +29,9 @@ Make notifications of deployments to CI configurable.
 
 ## Next Steps (Required for Full Functionality)
 
-1. **Fix Slack Token** (REQUIRED)
-   - Generate new Slack Bot OAuth token at https://api.slack.com/apps
-   - Update `src/bridge/secrets/kubewatch/secrets.applications.ci.yaml`
-   - Redeploy: `cd src/ol_infrastructure/applications/kubewatch && pulumi up`
+- Right now we are only seeing notifications that a given deployment has been Updated. Please add deployment start time, deployment end time, labels, and deployment status to the notifications.
 
+1. Impl
 2. **Test Deployment**
    ```bash
    # Verify kubewatch is running
