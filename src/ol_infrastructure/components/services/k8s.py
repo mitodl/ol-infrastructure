@@ -401,6 +401,10 @@ class OLApplicationK8s(ComponentResource):
             ),
         }
 
+        # Add deployment notification label if enabled
+        if ol_app_k8s_config.deployment_notifications:
+            application_labels["ol.mit.edu/notify-deployments"] = "true"
+
         pod_spec_args = {}
         if ol_app_k8s_config.application_deployment_use_anti_affinity:
             pod_spec_args["affinity"] = kubernetes.core.v1.AffinityArgs(

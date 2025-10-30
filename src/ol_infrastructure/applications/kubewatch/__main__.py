@@ -62,7 +62,11 @@ slack_channel = Config("slack").require("channel_name")
 
 # Get configurable namespace filters for notifications
 # Format: comma-separated list of namespaces to monitor (empty = all)
-watched_namespaces = kubewatch_config.get("watched_namespaces") or ""
+# Default to watching namespaces with OLApplicationK8s deployments
+watched_namespaces = (
+    kubewatch_config.get("watched_namespaces")
+    or "ecommerce,learn-ai,mitlearn,mitxonline"
+)
 
 # Install the kubewatch helm chart
 kubewatch_application = kubernetes.helm.v3.Release(
