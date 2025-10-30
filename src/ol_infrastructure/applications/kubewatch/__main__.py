@@ -61,12 +61,10 @@ cluster_stack.require_output("namespaces").apply(
 slack_channel = Config("slack").require("channel_name")
 
 # Get configurable namespace filters for notifications
-# Format: comma-separated list of namespaces to monitor (empty = all)
-# Default to watching namespaces with OLApplicationK8s deployments
-watched_namespaces = (
-    kubewatch_config.get("watched_namespaces")
-    or "ecommerce,learn-ai,mitlearn,mitxonline"
-)
+# Note: Kubewatch only supports watching a single namespace or all namespaces
+# For multiple specific namespaces, we watch all and let users filter in Slack
+# or deploy multiple kubewatch instances
+watched_namespaces = kubewatch_config.get("watched_namespaces") or ""
 
 # Install the kubewatch helm chart
 kubewatch_application = kubernetes.helm.v3.Release(
@@ -97,9 +95,14 @@ kubewatch_application = kubernetes.helm.v3.Release(
                 "enabled": False,  # Disabled - using slackwebhook instead
             },
             "slackwebhook": {
-                "enabled": True,
+                "enabled": False,
                 "channel": slack_channel,
                 "slackwebhookurl": kubewatch_sops_secrets["slack-webhook-url"],
+            },
+            # Enable our custom webhook handler
+            "webhook": {
+                "enabled": True,
+                "url": "http://kubewatch-webhook.kubewatch.svc.cluster.local/webhook/kubewatch",
             },
             "extraHandlers": {},
             "namespaceToWatch": watched_namespaces,
