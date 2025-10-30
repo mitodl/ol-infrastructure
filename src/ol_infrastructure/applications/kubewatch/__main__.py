@@ -60,6 +60,10 @@ cluster_stack.require_output("namespaces").apply(
 
 slack_channel = Config("slack").require("channel_name")
 
+# Get configurable namespace filters for notifications
+# Format: comma-separated list of namespaces to monitor (empty = all)
+watched_namespaces = kubewatch_config.get("watched_namespaces") or ""
+
 # Install the kubewatch helm chart
 kubewatch_application = kubernetes.helm.v3.Release(
     f"kubewatch-{stack_info.name}-application-helm-release",
@@ -91,17 +95,17 @@ kubewatch_application = kubernetes.helm.v3.Release(
                 "token": kubewatch_sops_secrets["slack-token"],
             },
             "extraHandlers": {},
-            "namespaceToWatch": "",
+            "namespaceToWatch": watched_namespaces,
             "resourcesToWatch": {
                 "deployment": True,
                 "replicationcontroller": False,
                 "replicaset": False,
                 "daemonset": False,
                 "services": False,
-                "pod": True,
-                "job": False,
+                "pod": False,  # Disable pod notifications to reduce noise
+                "job": True,  # Enable job notifications for deployment tracking
                 "persistentvolume": False,
-                "event": True,
+                "event": False,  # Disable generic events to reduce noise
             },
             "customresources": [],
             "command": [],

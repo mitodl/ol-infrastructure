@@ -4,3 +4,4 @@ encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAEoJNGp4OLrn8WtCu
 config:
   vault:address: https://vault-ci.odl.mit.edu
   slack:channel_name: kubewatch-applications-ci
+  config_kubewatch:watched_namespaces: ""  # Empty = watch all namespaces; comma-separated list to filter
