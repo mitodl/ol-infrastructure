@@ -293,7 +293,7 @@ def setup_apisix_official(
                         },
                     },
                     "deployment": {
-                        "replicas": 3,  # Makes it easier to get quorum
+                        "replicas": 3,  # For high availability and load distribution
                         "tolerations": operations_tolerations,
                         "resources": {
                             "requests": {
