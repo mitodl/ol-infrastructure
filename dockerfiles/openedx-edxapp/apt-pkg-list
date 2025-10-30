@@ -4,9 +4,9 @@ gettext
 gfortran
 git
 graphviz
-graphviz-dev
+libgraphviz-dev
 libffi-dev
-libfreetype6-dev
+libfreetype-dev
 libgeos-dev
 libjpeg-dev
 liblapack-dev
@@ -15,6 +15,5 @@ libsqlite3-dev
 libxmlsec1-dev
 libxmlsec1-openssl
 lynx
-ntp
 pkg-config
 rdfind
