@@ -1,10 +1,11 @@
 """Pulumi program for deploying the MIT Learn Next.js application to Kubernetes."""
 
 import os
+from typing import Any
 
 import pulumi_kubernetes as kubernetes
 from kubernetes import client, config
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi import Config, ResourceOptions, StackReference, export
 
 from bridge.lib.magic_numbers import DEFAULT_NEXTJS_PORT
 from ol_infrastructure.components.aws.eks import (
@@ -54,12 +55,12 @@ if auto_toggle is None:
 
 
 # Function to read last_active from ConfigMap in the cluster
-def get_last_active_from_configmap() -> str:
+def get_last_active_from_configmap(kube_config_dict: dict[str, Any]) -> str:
     """Read the last active deployment color from ConfigMap state store."""
     try:
         # Use the kubernetes client library to read from the cluster
-        # This requires KUBECONFIG to be set or default kubeconfig to exist
-        config.load_kube_config()
+        # Load kubeconfig from the provided dictionary
+        config.load_kube_config_from_dict(kube_config_dict)
         v1 = client.CoreV1Api()
 
         try:
@@ -81,17 +82,36 @@ def get_last_active_from_configmap() -> str:
 
 
 # Try to read last_active from ConfigMap, fall back to blue for first deployment
-last_active = get_last_active_from_configmap()
+# This is done asynchronously via Output.apply() to handle Pulumi's async nature
+last_active = cluster_stack.require_output("kube_config").apply(
+    get_last_active_from_configmap
+)
+
 
 # Determine which color gets the new deployment
 # If auto_toggle is enabled, we deploy to the opposite color and will switch to it
 # If auto_toggle is disabled, we always deploy to last_active (traditional deployment)
-if auto_toggle:
-    new_color = "green" if last_active == "blue" else "blue"
-    active_color = new_color  # Will become active once deployment is ready
-else:
-    new_color = last_active
-    active_color = last_active
+def determine_colors(last_active_color: str) -> dict[str, str]:
+    """Determine new_color and active_color based on auto_toggle setting."""
+    if auto_toggle:
+        new = "green" if last_active_color == "blue" else "blue"
+        return {
+            "new_color": new,
+            "active_color": new,
+            "last_active": last_active_color,
+        }
+    else:
+        return {
+            "new_color": last_active_color,
+            "active_color": last_active_color,
+            "last_active": last_active_color,
+        }
+
+
+colors = last_active.apply(determine_colors)
+new_color = colors.apply(lambda c: c["new_color"])
+active_color = colors.apply(lambda c: c["active_color"])
+last_active_resolved = colors.apply(lambda c: c["last_active"])
 
 raw_env_vars = {
     # Env vars available only on server
@@ -164,149 +184,160 @@ def create_pvc_for_color(color: str) -> kubernetes.core.v1.PersistentVolumeClaim
 blue_pvc = create_pvc_for_color("blue")
 green_pvc = create_pvc_for_color("green")
 
-# Get the PVC name for the new deployment
-new_pvc_name = f"nextjs-build-cache-efs-{new_color}"
-
-# Define the volume to be used by the new deployment and job
-efs_volume = kubernetes.core.v1.VolumeArgs(
-    name=new_pvc_name,
-    persistent_volume_claim=kubernetes.core.v1.PersistentVolumeClaimVolumeSourceArgs(
-        claim_name=new_pvc_name,
-    ),
-)
-
-# Define the volume mount for the EFS volume
-efs_volume_mount = kubernetes.core.v1.VolumeMountArgs(
-    name=new_pvc_name,
-    mount_path="/app/frontends/main/.next",
-)
-
-# Create labels for the new deployment
-new_deployment_labels = application_labels | {"deployment-color": new_color}
-
-# Create labels for the old deployment (if different)
-old_color = "blue" if new_color == "green" else "green"
-old_deployment_labels = application_labels | {"deployment-color": old_color}
-
 # Create a Kubernetes Job to build the static assets for the new deployment
 mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
-    f"mit-learn-nextjs-{stack_info.name}-build-job-{new_color}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=f"mit-learn-nextjs-build-{new_color}",
-        namespace=learn_namespace,
-        labels=new_deployment_labels,
+    f"mit-learn-nextjs-{stack_info.name}-build-job",
+    metadata=new_color.apply(
+        lambda c: kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"mit-learn-nextjs-build-{c}",
+            namespace=learn_namespace,
+            labels=application_labels | {"deployment-color": c},
+        )
     ),
-    spec=kubernetes.batch.v1.JobSpecArgs(
-        backoff_limit=3,
-        ttl_seconds_after_finished=300,
-        active_deadline_seconds=1200,
-        template=kubernetes.core.v1.PodTemplateSpecArgs(
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                labels=new_deployment_labels,
-            ),
-            spec=kubernetes.core.v1.PodSpecArgs(
-                restart_policy="OnFailure",
-                volumes=[efs_volume],
-                containers=[
-                    kubernetes.core.v1.ContainerArgs(
-                        name="nextjs-build",
-                        image=app_image,
-                        command=["yarn", "build", "--no-lint"],
-                        env=env_vars,
-                        volume_mounts=[efs_volume_mount],
-                        image_pull_policy="Always",
-                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                            requests={"cpu": "1000m", "memory": "8Gi"},
-                            limits={"cpu": "3000m", "memory": "8Gi"},
+    spec=new_color.apply(
+        lambda c: kubernetes.batch.v1.JobSpecArgs(
+            backoff_limit=3,
+            ttl_seconds_after_finished=300,
+            active_deadline_seconds=1200,
+            template=kubernetes.core.v1.PodTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    labels=application_labels | {"deployment-color": c}
+                ),
+                spec=kubernetes.core.v1.PodSpecArgs(
+                    restart_policy="OnFailure",
+                    volumes=[
+                        kubernetes.core.v1.VolumeArgs(
+                            name=f"nextjs-build-cache-efs-{c}",
+                            persistent_volume_claim=kubernetes.core.v1.PersistentVolumeClaimVolumeSourceArgs(
+                                claim_name=f"nextjs-build-cache-efs-{c}",
+                            ),
+                        )
+                    ],
+                    containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="nextjs-build",
+                            image=app_image,
+                            command=["yarn", "build", "--no-lint"],
+                            env=env_vars,
+                            volume_mounts=[
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name=f"nextjs-build-cache-efs-{c}",
+                                    mount_path="/app/frontends/main/.next",
+                                )
+                            ],
+                            image_pull_policy="Always",
+                            resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                requests={"cpu": "1000m", "memory": "8Gi"},
+                                limits={"cpu": "3000m", "memory": "8Gi"},
+                            ),
                         ),
-                    ),
-                ],
+                    ],
+                ),
             ),
-        ),
+        )
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
-        depends_on=[blue_pvc if new_color == "blue" else green_pvc],
+        depends_on=[blue_pvc, green_pvc],
     ),
 )
 
-# Create the new deployment (blue or green based on new_color)
-mit_learn_nextjs_new_deployment = kubernetes.apps.v1.Deployment(
-    f"mit-learn-nextjs-{stack_info.name}-deployment-{new_color}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=f"mit-learn-nextjs-{new_color}",
-        namespace=learn_namespace,
-        labels=new_deployment_labels,
-    ),
-    spec=kubernetes.apps.v1.DeploymentSpecArgs(
-        selector=kubernetes.meta.v1.LabelSelectorArgs(
-            match_labels=new_deployment_labels,
+
+# Helper function to create a deployment for a specific color
+def create_deployment_for_color(color: str) -> kubernetes.apps.v1.Deployment:
+    """Create a blue or green deployment."""
+    color_labels = application_labels | {"deployment-color": color}
+    pvc_name = f"nextjs-build-cache-efs-{color}"
+
+    volume = kubernetes.core.v1.VolumeArgs(
+        name=pvc_name,
+        persistent_volume_claim=kubernetes.core.v1.PersistentVolumeClaimVolumeSourceArgs(
+            claim_name=pvc_name,
         ),
-        replicas=nextjs_config.get_int("pod_count") or 2,
-        template=kubernetes.core.v1.PodTemplateSpecArgs(
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                labels=new_deployment_labels,
+    )
+
+    volume_mount = kubernetes.core.v1.VolumeMountArgs(
+        name=pvc_name,
+        mount_path="/app/frontends/main/.next",
+    )
+
+    return kubernetes.apps.v1.Deployment(
+        f"mit-learn-nextjs-{stack_info.name}-deployment-{color}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"mit-learn-nextjs-{color}",
+            namespace=learn_namespace,
+            labels=color_labels,
+        ),
+        spec=kubernetes.apps.v1.DeploymentSpecArgs(
+            selector=kubernetes.meta.v1.LabelSelectorArgs(
+                match_labels=color_labels,
             ),
-            spec=kubernetes.core.v1.PodSpecArgs(
-                volumes=[efs_volume],
-                dns_policy="ClusterFirst",
-                containers=[
-                    kubernetes.core.v1.ContainerArgs(
-                        name="nextjs-app",
-                        image=app_image,
-                        ports=[
-                            kubernetes.core.v1.ContainerPortArgs(
-                                container_port=DEFAULT_NEXTJS_PORT,
-                                name="http",
-                            )
-                        ],
-                        image_pull_policy="Always",
-                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                            requests={"cpu": "250m", "memory": "500Mi"},
-                            limits={"cpu": "1000m", "memory": "2Gi"},
-                        ),
-                        env=env_vars,
-                        volume_mounts=[efs_volume_mount],
-                        liveness_probe=kubernetes.core.v1.ProbeArgs(
-                            tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
-                                port=DEFAULT_NEXTJS_PORT,
+            replicas=nextjs_config.get_int("pod_count") or 2,
+            template=kubernetes.core.v1.PodTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    labels=color_labels,
+                ),
+                spec=kubernetes.core.v1.PodSpecArgs(
+                    volumes=[volume],
+                    dns_policy="ClusterFirst",
+                    containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="nextjs-app",
+                            image=app_image,
+                            ports=[
+                                kubernetes.core.v1.ContainerPortArgs(
+                                    container_port=DEFAULT_NEXTJS_PORT,
+                                    name="http",
+                                )
+                            ],
+                            image_pull_policy="Always",
+                            resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                requests={"cpu": "250m", "memory": "500Mi"},
+                                limits={"cpu": "1000m", "memory": "2Gi"},
                             ),
-                            initial_delay_seconds=30,
-                            period_seconds=30,
-                            failure_threshold=3,
-                        ),
-                        # Readiness probe to check if the application is ready to serve
-                        # traffic
-                        readiness_probe=kubernetes.core.v1.ProbeArgs(
-                            tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
-                                port=DEFAULT_NEXTJS_PORT,
+                            env=env_vars,
+                            volume_mounts=[volume_mount],
+                            liveness_probe=kubernetes.core.v1.ProbeArgs(
+                                tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
+                                    port=DEFAULT_NEXTJS_PORT,
+                                ),
+                                initial_delay_seconds=30,
+                                period_seconds=30,
+                                failure_threshold=3,
                             ),
-                            initial_delay_seconds=15,
-                            period_seconds=15,
-                            failure_threshold=3,
-                        ),
-                        # Startup probe to ensure the application is fully initialized
-                        # before other probes start
-                        startup_probe=kubernetes.core.v1.ProbeArgs(
-                            tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
-                                port=DEFAULT_NEXTJS_PORT,
+                            readiness_probe=kubernetes.core.v1.ProbeArgs(
+                                tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
+                                    port=DEFAULT_NEXTJS_PORT,
+                                ),
+                                initial_delay_seconds=15,
+                                period_seconds=15,
+                                failure_threshold=3,
                             ),
-                            initial_delay_seconds=10,
-                            period_seconds=10,
-                            failure_threshold=30,
-                            success_threshold=1,
-                            timeout_seconds=5,
+                            startup_probe=kubernetes.core.v1.ProbeArgs(
+                                tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
+                                    port=DEFAULT_NEXTJS_PORT,
+                                ),
+                                initial_delay_seconds=10,
+                                period_seconds=10,
+                                failure_threshold=30,
+                                success_threshold=1,
+                                timeout_seconds=5,
+                            ),
                         ),
-                    ),
-                ],
+                    ],
+                ),
             ),
         ),
-    ),
-    opts=ResourceOptions(
-        delete_before_replace=True,
-        depends_on=[mit_learn_nextjs_build_job],
-    ),
-)
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=[mit_learn_nextjs_build_job],
+        ),
+    )
+
+
+# Create both blue and green deployments
+blue_deployment = create_deployment_for_color("blue")
+green_deployment = create_deployment_for_color("green")
 
 # In blue/green deployment, we leave the old deployment running.
 # Traffic is switched by updating the service selector to point to active_color.
@@ -324,18 +355,20 @@ deployment_state_configmap = kubernetes.core.v1.ConfigMap(
     ),
     data={
         "last_active": active_color,
-        "previous_active": last_active,
+        "previous_active": last_active_resolved,
         "auto_toggle": str(auto_toggle),
     },
     opts=ResourceOptions(
-        depends_on=[mit_learn_nextjs_new_deployment],
+        depends_on=[blue_deployment, green_deployment],
     ),
 )
 
 # Create a Kubernetes Service that routes to the active deployment
 # With auto_toggle enabled, this automatically routes to the new deployment
 mit_learn_nextjs_service_name = "mit-learn-nextjs"
-active_deployment_labels = application_labels | {"deployment-color": active_color}
+active_deployment_labels = active_color.apply(
+    lambda color: application_labels | {"deployment-color": color}
+)
 
 mit_learn_nextjs_service = kubernetes.core.v1.Service(
     f"mit-learn-nextjs-{stack_info.name}-service-resource",
@@ -357,7 +390,7 @@ mit_learn_nextjs_service = kubernetes.core.v1.Service(
         type="ClusterIP",
     ),
     opts=ResourceOptions(
-        parent=mit_learn_nextjs_new_deployment,
+        depends_on=[blue_deployment, green_deployment],
     ),
 )
 
@@ -399,53 +432,6 @@ gateway = OLEKSGateway(
 # Export deployment information
 # State is automatically tracked in the ConfigMap, no manual updates needed
 export("current_active_deployment", active_color)
-export("previous_deployment", last_active)
+export("previous_deployment", last_active_resolved)
 export("auto_toggle_enabled", auto_toggle)
 export("state_configmap", "mit-learn-nextjs-deployment-state")
-
-Output.all(active_color, new_color, last_active, auto_toggle).apply(
-    lambda vals: {
-        "active_deployment": vals[0],
-        "new_deployment": vals[1],
-        "last_active": vals[2],
-        "auto_toggle_enabled": vals[3],
-        "instructions": (
-            "Blue/Green Deployment Status:\n"
-            f"- Auto-toggle: {'ENABLED' if vals[3] else 'DISABLED'}\n"
-            f"- Current ACTIVE deployment: {vals[0]}\n"
-            f"- New deployment: {vals[1]}\n"
-            f"- Previous deployment: {vals[2]}\n"
-            "\n"
-            + (
-                "Automatic Mode:\n"
-                "  The system toggles between blue and green on each run.\n"
-                f"  Service is now routing to: {vals[0]}\n"
-                f"  Old deployment ({vals[2]}) is still running but not "
-                "receiving traffic.\n"
-                "\n"
-                "  State is automatically tracked in ConfigMap:\n"
-                "  kubectl get configmap mit-learn-nextjs-deployment-state "
-                "-n mitlearn -o yaml\n"
-                "\n"
-                "  Optional: Scale down old deployment manually:\n"
-                f"  kubectl scale deployment mit-learn-nextjs-{vals[2]} "
-                "--replicas=0 -n mitlearn\n"
-                "\n"
-                "  On next 'pulumi up', traffic will automatically switch "
-                f"back to {vals[2]}.\n"
-                "\n"
-                "To disable auto-toggle:\n"
-                "  pulumi config set nextjs:auto_toggle false\n"
-                if vals[3]
-                else "Manual Mode:\n"
-                f"  Service is routing to: {vals[0]}\n"
-                f"  To switch to {vals[1]}, run:\n"
-                f"  pulumi config set nextjs:last_active {vals[1]}\n"
-                "  pulumi up\n"
-                "\n"
-                "To enable auto-toggle:\n"
-                "  pulumi config set nextjs:auto_toggle true\n"
-            )
-        ),
-    }
-)
