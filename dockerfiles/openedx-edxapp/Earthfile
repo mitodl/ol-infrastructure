@@ -1,6 +1,6 @@
 VERSION 0.7
 ARG PYTHON_VERSION="3.11"
-FROM python:$PYTHON_VERSION"-bookworm"
+FROM python:$PYTHON_VERSION"-trixie"
 
 apt-base:
   ENV DEBIAN_FRONTEND=noninteractive

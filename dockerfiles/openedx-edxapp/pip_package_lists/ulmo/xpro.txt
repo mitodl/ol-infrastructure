@@ -1,9 +1,9 @@
 celery-redbeat==2.3.3  # Support for using Redis as the lock for Celery schedules
 granian==2.5.5
 django-redis==6.0.0
-ol-openedx-git-auto-export<0.6.1
+ol-openedx-git-auto-export==0.6.0
 edx-sysadmin==0.4.0
-edx-username-changer==0.4.0
+edx-username-changer==0.5.0
 git+https://github.com/ubc/ubcpi.git@1.0.0#egg=ubcpi-xblock
 openedx-companion-auth==1.2.0
 nodeenv>=1.7.0
@@ -18,6 +18,7 @@ pydantic-settings==2.11.0
 uwsgi==2.0.31
 wheel==0.45.1
 ol-openedx-chat
+ol-openedx-chat-xblock
 
 # Open Telemetry support
 opentelemetry-api>=1.38.0
