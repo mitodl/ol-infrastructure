@@ -4,14 +4,15 @@ gettext
 gfortran
 git
 graphviz
-libgraphviz-dev
 libffi-dev
 libfreetype-dev
 libgeos-dev
+libgraphviz-dev
 libjpeg-dev
 liblapack-dev
 libpng-dev
 libsqlite3-dev
+libxml2-dev
 libxmlsec1-dev
 libxmlsec1-openssl
 lynx
