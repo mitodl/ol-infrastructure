@@ -101,9 +101,9 @@ class OpenEdxSupportedRelease(str, Enum):
         enum_element.node_version = node_version
         return enum_element
 
-    master = ("master", "master", "3.13", "24")
+    master = ("master", "master", "3.12", "24")
     teak = ("teak", "release/teak", "3.11", "24")
-    ulmo = ("ulmo", "release/ulmo", "3.13", "24")
+    ulmo = ("ulmo", "release/ulmo", "3.12", "24")
 
     def __str__(self):
         return self.value
