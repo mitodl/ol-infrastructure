@@ -4,21 +4,13 @@ Stack to build kubewatch service.
 This service will echo select k8s events to Slack.
 """
 
-import json
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
-import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference, log
+from pulumi import Config, StackReference, log
 
 from bridge.lib.versions import KUBEWATCH_CHART_VERSION
 from bridge.secrets.sops import read_yaml_secrets
-from ol_infrastructure.components.services.vault import (
-    OLVaultK8SResources,
-    OLVaultK8SResourcesConfig,
-    OLVaultK8SSecret,
-    OLVaultK8SStaticSecretConfig,
-)
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
@@ -58,81 +50,15 @@ k8s_global_labels = K8sGlobalLabels(
 ).model_dump()
 
 # Begin vault hoo-ha.
-kubewatch_vault_secrets = read_yaml_secrets(
+kubewatch_sops_secrets = read_yaml_secrets(
     Path(f"kubewatch/secrets.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml"),
 )
-
-kubewatch_static_vault_secrets = vault.generic.Secret(
-    f"kubewatch-secrets-operations-{stack_info.env_suffix}",
-    path=f"secret-operations/kubewatch/{stack_info.env_prefix}",
-    data_json=json.dumps(kubewatch_vault_secrets),
-)
-
-kubewatch_vault_policy = vault.Policy(
-    f"kubewatch-vault-policy-{stack_info.env_suffix}",
-    name="kubewatch",
-    policy=Path(__file__).parent.joinpath("kubewatch_policy.hcl").read_text(),
-)
-
-kubewatch_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
-    f"kubewatch-vault-auth-backend-role-{stack_info.env_suffix}",
-    role_name="kubewatch",
-    backend=cluster_stack.require_output("vault_auth_endpoint"),
-    bound_service_account_names=["*"],
-    bound_service_account_namespaces=[kubewatch_namespace],
-    token_policies=[kubewatch_vault_policy.name],
-)
-
-# Stopped at: Make a kubernetes auth backend role that uses the policy we just installed
-vault_k8s_resources_config = OLVaultK8SResourcesConfig(
-    application_name="kubewatch",
-    namespace=kubewatch_namespace,
-    labels=k8s_global_labels,
-    vault_address=vault_config.require("address"),
-    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
-    vault_auth_role_name=kubewatch_vault_auth_backend_role.role_name,
-)
-
-vault_k8s_resources = OLVaultK8SResources(
-    resource_config=vault_k8s_resources_config,
-    opts=ResourceOptions(
-        delete_before_replace=True,
-        depends_on=[kubewatch_vault_auth_backend_role],
-    ),
-)
-
-# Load the static secrets into a k8s secret via VSO
-static_secrets_name = "kubewatch-slack"  # pragma: allowlist secret
-static_secrets = OLVaultK8SSecret(
-    name=f"kubewatch-{stack_info.env_suffix}-static-secrets",
-    resource_config=OLVaultK8SStaticSecretConfig(
-        name="kubewatch-static-secrets",
-        namespace=kubewatch_namespace,
-        labels=k8s_global_labels,
-        dest_secret_name=static_secrets_name,
-        dest_secret_labels=k8s_global_labels,
-        mount="secret-operations",
-        mount_type="kv-v1",
-        path=f"kubewatch/{stack_info.env_prefix}",
-        includes=["*"],
-        excludes=[],
-        exclude_raw=True,
-        vaultauth=vault_k8s_resources.auth_name,
-    ),
-    opts=ResourceOptions(
-        delete_before_replace=True,
-        depends_on=[kubewatch_static_vault_secrets],
-    ),
-)
-# end Vault hoo-ha
 
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(kubewatch_namespace, ns)
 )
 
 slack_channel = Config("slack").require("channel_name")
-
-log.info(f"Botkube Slack channel name: {slack_channel}")
 
 # Install the kubewatch helm chart
 kubewatch_application = kubernetes.helm.v3.Release(
@@ -148,7 +74,7 @@ kubewatch_application = kubernetes.helm.v3.Release(
         ),
         values={
             "diagnosticMode": {
-                "enabled": True,
+                "enabled": False,
                 "command": ["sleep"],
                 "args": ["infinity"],
             },
@@ -159,7 +85,11 @@ kubewatch_application = kubernetes.helm.v3.Release(
                 "pullPolicy": "IfNotPresent",
                 "pullSecrets": [],
             },
-            "slack": {"enabled": True, "channel": slack_channel},
+            "slack": {
+                "enabled": True,
+                "channel": slack_channel,
+                "token": kubewatch_sops_secrets["slack-token"],
+            },
             "extraHandlers": {},
             "namespaceToWatch": "",
             "resourcesToWatch": {
@@ -177,14 +107,12 @@ kubewatch_application = kubernetes.helm.v3.Release(
             "command": [],
             "args": [],
             "lifecycleHooks": {},
-            "extraEnvVarsSecret": static_secrets_name,
-            "extraEnvVars": [
+            "extraEnv": [
                 {
                     "name": "LOG_LEVEL",
                     "value": "debug",
                 },
             ],
-            "extraEnvVarsCM": "",
             "replicaCount": 1,
             "podSecurityContext": {"enabled": False, "fsGroup": ""},
             "containerSecurityContext": {
@@ -236,7 +164,7 @@ kubewatch_application = kubernetes.helm.v3.Release(
             "updateStrategy": {"type": "RollingUpdate"},
             "initContainers": [],
             "sidecars": [],
-            "rbac": {"create": False, "customRoles": []},
+            "rbac": {"create": True, "customRoles": []},
             "serviceAccount": {
                 "create": True,
                 "name": "",
@@ -245,8 +173,5 @@ kubewatch_application = kubernetes.helm.v3.Release(
             },
         },
         skip_await=False,
-    ),
-    opts=ResourceOptions(
-        depends_on=[static_secrets],
     ),
 )
