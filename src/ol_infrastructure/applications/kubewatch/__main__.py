@@ -164,7 +164,16 @@ kubewatch_application = kubernetes.helm.v3.Release(
             "updateStrategy": {"type": "RollingUpdate"},
             "initContainers": [],
             "sidecars": [],
-            "rbac": {"create": True, "customRoles": []},
+            "rbac": {
+                "create": True,
+                "customRoles": [
+                    {
+                        "apiGroups": ["events.k8s.io"],
+                        "resources": ["events"],
+                        "verbs": ["get", "list", "watch"],
+                    }
+                ],
+            },
             "serviceAccount": {
                 "create": True,
                 "name": "",
