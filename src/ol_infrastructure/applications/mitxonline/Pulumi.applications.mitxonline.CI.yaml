@@ -3,6 +3,7 @@ secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAGATRsIirydH1w01TqfxPTVAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMyIKdYiGvV8KezL+IAgEQgDv8uw8x7fPHAeOojyIORtV8iT3vdaQZEGqdifXrupig2b2B3e5/jsdi+zaB9WyUL3aXomvONEP7SlCjsA==
 config:
   aws:region: us-east-1
+  mitxonline:apisix_ingress_class: apache-apisix
   mitxonline:db_password:
     secure: v1:vEeGgZVBjWBklqb3:FWrkz0af0N+bAW/Faye1raC5aSL7fJwcJgBk3DtWmQCZ95k1v8pRzMyGmPG6FQ10Q2VWNMS0yBO4PMZVp7bSIRz18OiCPwmfVv5wa347Fms=
   mitxonline:domain: "api.ci.mitxonline.mit.edu"

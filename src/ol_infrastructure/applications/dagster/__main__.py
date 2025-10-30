@@ -65,6 +65,8 @@ setup_vault_provider(stack_info)
 
 # Config
 dagster_config = Config("dagster")
+vault_config = Config("vault")
+apisix_ingress_class = dagster_config.get("apisix_ingress_class") or "apisix"
 
 # Stack references
 dns_stack = StackReference("infrastructure.aws.dns")
@@ -991,6 +993,7 @@ cert_manager_certificate = OLCertManagerCert(
         k8s_namespace=dagster_namespace,
         k8s_labels=k8s_global_labels.model_dump(),
         create_apisixtls_resource=True,
+        apisixtls_ingress_class=apisix_ingress_class,
         dest_secret_name=dagster_tls_secret_name,
         dns_names=[dagster_config.require("domain")],
     ),
@@ -998,6 +1001,7 @@ cert_manager_certificate = OLCertManagerCert(
 
 dagster_apisix_route = OLApisixRoute(
     f"dagster-apisix-route-{stack_info.env_suffix}",
+    ingress_class_name=apisix_ingress_class,
     route_configs=[
         OLApisixRouteConfig(
             route_name="dagster",

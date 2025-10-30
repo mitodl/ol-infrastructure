@@ -1031,12 +1031,13 @@ class OLApisixRoute(ComponentResource):
     Defines and creates an "ApisixRoute" resource in the k8s cluster
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         name: str,
         route_configs: list[OLApisixRouteConfig],
         k8s_namespace: str,
         k8s_labels: dict[str, str],
+        ingress_class_name: str = "apisix",
         opts: ResourceOptions | None = None,
     ):
         """Initialize the OLApisixRoute component resource."""
@@ -1056,7 +1057,7 @@ class OLApisixRoute(ComponentResource):
                 namespace=k8s_namespace,
             ),
             spec={
-                "ingressClassName": "apache-apisix",
+                "ingressClassName": ingress_class_name,
                 "http": self.__build_route_list(route_configs),
             },
             opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),

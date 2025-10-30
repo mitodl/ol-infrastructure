@@ -88,6 +88,7 @@ github_provider = github.Provider(
 
 mitlearn_config = Config("mitlearn")
 vault_config = Config("vault")
+apisix_ingress_class = mitlearn_config.get("apisix_ingress_class") or "apisix"
 
 stack_info = parse_stack()
 
@@ -1213,6 +1214,7 @@ cert_manager_certificate = OLCertManagerCert(
         k8s_namespace=learn_namespace,
         k8s_labels=application_labels,
         create_apisixtls_resource=True,
+        apisixtls_ingress_class=apisix_ingress_class,
         dest_secret_name=api_tls_secret_name,
         dns_names=[mitlearn_config.require("api_domain")],
     ),
@@ -1531,6 +1533,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
     name=f"ol-mitlearn-k8s-apisix-route-no-prefix-{stack_info.env_suffix}",
     k8s_namespace=learn_namespace,
     k8s_labels=application_labels,
+    ingress_class_name=apisix_ingress_class,
     route_configs=[
         OLApisixRouteConfig(
             route_name="passauth",
@@ -1588,6 +1591,7 @@ learn_external_service_apisix_route = OLApisixRoute(
     name=f"ol-mitlearn-k8s-apisix-route-{stack_info.env_suffix}",
     k8s_namespace=learn_namespace,
     k8s_labels=application_labels,
+    ingress_class_name=apisix_ingress_class,
     route_configs=[
         OLApisixRouteConfig(
             route_name="passauth",
