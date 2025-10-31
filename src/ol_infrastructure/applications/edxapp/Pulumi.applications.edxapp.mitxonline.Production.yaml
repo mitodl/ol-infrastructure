@@ -86,6 +86,7 @@ config:
   edxapp:backend_lms_domain: courses-backend.learn.mit.edu
   edxapp:backend_studio_domain: studio-backend.learn.mit.edu
   edxapp:backend_preview_domain: preview-backend.learn.mit.edu
+  edxapp:apisix_ingress_class: apache-apisix
   edxapp:k8s_replicas:
     webapp:
       lms:

@@ -83,6 +83,7 @@ config:
   edxapp:framework: "earthly"
   edxapp:web_node_capacity: "3"
   edxapp:worker_node_capacity: "5"
+  edxapp:apisix_ingress_class: apache-apisix
   edxapp:k8s_replicas:
     webapp:
       lms:
