@@ -7,6 +7,7 @@ config:
   consul:http_auth:
     secure: v1:RNlPmxc0q/5pq3c8:pXsI73JRWV2rdfxwCJGDunjn6a3qOEmhJzSJ+Y0sIRe3DyRYcAGIkwtlCdkeS1+pY8YFsZlSSUJbzKC03ZwZXkSwcOqsnEcIjTkJ4xLCfHYQx0eXF9SvWXshLMHpDRK1yQ==
   consul:scheme: https
+  mitxonline:apisix_ingress_class: apisix
   mitxonline:db_password:
     secure: v1:1SGxkH66kKNXMVc0:P9FztYdyzfxIrapGHU3pD5gz9ZkW6Of/zTqhaZf4O+L+Y8yAbcissYxogKfyDMxSJYSSUxI12K0=
   mitxonline:domain: "api.mitxonline.mit.edu"
