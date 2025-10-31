@@ -4,8 +4,6 @@ SHELL ["/bin/bash", "-c"]
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBCONF_NONINTERACTIVE_SEEN=true
-RUN apt-get update && apt-get install --no-install-recommends -y python3-virtualenv python3-pip git sudo libxslt-dev && apt-get clean
-
 # Define Environment Variables
 ENV CODEJAIL_GROUP=sandbox
 ENV CODEJAIL_SANDBOX_CALLER=debian
@@ -16,15 +14,17 @@ ARG OPENEDX_RELEASE
 ENV OPEN_EDX_RELEASE=$OPENEDX_RELEASE
 ENV OPEN_EDX_BRANCH=$OPENEDX_BRANCH
 
-RUN virtualenv -p "python${PYTHON_VERSION}" --always-copy "$CODEJAIL_VENV"
-ENV PATH="$CODEJAIL_VENV/bin:$PATH"
-
-# Create Sandbox user & group and switch to non root user inside Docker container
-RUN addgroup $CODEJAIL_GROUP && \
+RUN apt-get update && apt-get install --no-install-recommends -y build-essential python3-virtualenv python3-pip git sudo libxslt-dev && \
+    apt-get clean && rm -r /var/lib/apt/lists/* && \
+    virtualenv -p "python${PYTHON_VERSION}" --always-copy "$CODEJAIL_VENV" && \
+    # Create Sandbox user & group and switch to non root user inside Docker container
+    addgroup $CODEJAIL_GROUP && \
     adduser --disabled-login --disabled-password $CODEJAIL_USER --ingroup $CODEJAIL_GROUP && \
     addgroup debian && \
     adduser --disabled-login --disabled-password debian --ingroup debian && \
     chown -R $CODEJAIL_USER:$CODEJAIL_GROUP $CODEJAIL_VENV
+
+ENV PATH="$CODEJAIL_VENV/bin:$PATH"
 
 WORKDIR /codejail
 RUN git clone https://github.com/eduNEXT/codejailservice/ --branch main --depth 1 /codejail
