@@ -50,145 +50,49 @@ Rich Slack Messages (Block Kit format)
 - `IMPLEMENTATION_NOTES.md` - Created detailed implementation notes and next steps
 - `project_plan.md` - This file (updated with status)
 
-## Next Steps Implementation
+## Next Steps
 
-### ✅ COMPLETED: Separate Pulumi Project for Webhook Handler
+### ✅ COMPLETED: Configurable Event Filtering
 
-**Requirement:** Create a separate Pulumi project and pipeline to build the custom slack webhook handler container.
+**Requirements:**
+- Filter on the Image field to ignore nginx deployments ✓
+- Filter on the ol.mit.edu label and ignore celery deployments ✓
 
 **Implementation:**
 
-Created a standalone Pulumi project at `src/ol_infrastructure/applications/kubewatch_webhook_handler/` that:
+Added configurable filtering to the webhook handler with two types of filters:
 
-1. **Builds Docker Image** ✓
-   - Builds from Dockerfile
-   - Tags and pushes to ECR
-   - Automated on every `pulumi up`
+1. **Image Pattern Filtering** ✓
+   - Configuration: `kubewatch_webhook:ignored_image_patterns`
+   - Default: `"nginx"`
+   - Behavior: Ignores deployments where container image contains any specified pattern
+   - Example: Pattern `nginx` filters out `nginx:1.21`, `myapp/nginx-sidecar:latest`
 
-2. **Manages ECR Repository** ✓
-   - Creates dedicated ECR repository
-   - Configures lifecycle policy (keep last 10 images)
-   - Enables image scanning
+2. **Label Pattern Filtering** ✓
+   - Configuration: `kubewatch_webhook:ignored_label_patterns`
+   - Default: `"celery"`
+   - Behavior: Ignores deployments where any `ol.mit.edu/*` label value contains the pattern
+   - Example: Pattern `celery` filters out deployments with `ol.mit.edu/process: celery-worker`
 
-3. **Deploys to Kubernetes** ✓
-   - Creates Kubernetes Secret for Slack webhook URL
-   - Deploys webhook handler (2 replicas for HA)
-   - Creates Service to expose webhook endpoint
-   - Configures health checks and resource limits
+**Files Modified:**
+- `kubewatch_webhook_handler/webhook_handler.py` - Added `should_ignore_deployment()` function
+- `kubewatch_webhook_handler/__main__.py` - Added environment variables for filter patterns
+- `kubewatch_webhook_handler/Pulumi.*.yaml` - Added configuration parameters
+- `kubewatch_webhook_handler/README.md` - Documented filtering behavior
 
-4. **Integrates with EKS** ✓
-   - References EKS cluster stack
-   - Uses kubewatch ServiceAccount
-   - Deploys to kubewatch namespace
-
-**Files Created:**
-
-- `kubewatch_webhook_handler/__init__.py` - Python package marker
-- `kubewatch_webhook_handler/__main__.py` - Pulumi deployment program (8KB)
-- `kubewatch_webhook_handler/Pulumi.yaml` - Project definition
-- `kubewatch_webhook_handler/Pulumi.applications.kubewatch_webhook_handler.applications.CI.yaml` - Stack configuration
-- `kubewatch_webhook_handler/README.md` - Complete deployment and usage documentation (8KB)
-- `kubewatch_webhook_handler/webhook_handler.py` - Flask application (moved from kubewatch/)
-- `kubewatch_webhook_handler/Dockerfile` - Container image definition (moved from kubewatch/)
-- `kubewatch_webhook_handler/requirements.txt` - Python dependencies (moved from kubewatch/)
-
-**Deployment:**
-
-```bash
-cd src/ol_infrastructure/applications/kubewatch_webhook_handler
-pulumi up
+**Configuration Example:**
+```yaml
+config:
+  kubewatch_webhook:ignored_image_patterns: "nginx,redis"
+  kubewatch_webhook:ignored_label_patterns: "celery,worker"
 ```
 
-This will:
-1. Create ECR repository
-2. Build and push Docker image
-3. Deploy webhook handler to Kubernetes
-4. Output service URL for kubewatch integration
-
-**Status:**
-- ✅ Pulumi project created and tested
-- ✅ Linting passes
-- ✅ Documentation complete
-- ⏳ Ready for deployment
-
-**Next Step:** Deploy the webhook handler project, then update main kubewatch to use the webhook endpoint.
+**Status:** Ready to deploy. Run `pulumi up` in `kubewatch_webhook_handler/` to enable filtering.
 
 ---
 
-### Previous: Rich Notification Capability
+**No further action items at this time.**
 
-**Requirement:** Add deployment start time, deployment end time, labels, and deployment status to notifications.
-
-**Solution Implemented:**
-
-Created a custom webhook handler (`webhook_handler.py`) that provides rich deployment notifications:
-
-1. **Deployment Start/End Times** ✓
-   - Shows deployment creation timestamp
-   - Shows last update timestamp from Kubernetes API
-
-2. **Deployment Labels** ✓
-   - Extracts and displays all `ol.mit.edu/*` labels
-   - Highlights application name, process type, notification flags
-
-3. **Deployment Status** ✓
-   - Detects: Successfully Deployed ✅, Rolling Out 🔄, Failed ❌
-   - Shows replica status (ready/desired counts)
-   - Displays progressing messages from Kubernetes
-
-4. **Additional Details** ✓
-   - Container image information
-   - Event types with emoji indicators
-   - Rich Slack Block Kit formatting
-
-**Alternative:** The native kubewatch slackwebhook integration is currently active and working, providing basic notifications. Deploy the webhook handler when rich details are needed.
-
-### ✅ Testing Completed
-
-1. **Verified kubewatch is running**
-   ```bash
-   kubectl get pods -n kubewatch
-   # STATUS: Running
-   ```
-
-2. **Checked logs**
-   ```bash
-   kubectl logs -n kubewatch deployment/kubewatch
-   # Controllers synced and ready
-   ```
-
-3. **Triggered test deployment**
-   ```bash
-   kubectl rollout restart deployment/mitlearn-app -n mitlearn
-   # Deployment successfully rolled out
-   ```
-
-4. **Verified notifications in Slack** ✓
-   - Notifications posting to #kubewatch-applications-ci
-   - Basic format: [namespace] deployment name was updated
-
-### Optional: Per-Project Channels
-
-- Current: Single channel (#kubewatch-applications-ci) - Working well for CI
-- Future: See README.md for multi-channel implementation options
-- Alternative: Webhook handler supports namespace filtering
-
-## Implementation Summary
-
-The project successfully implements Kubernetes deployment notifications with two tiers:
-
-**Tier 1: Basic Notifications (Currently Active)**
-- Native kubewatch slackwebhook integration
-- Notifications for deployment create/update/delete events
-- Simple, reliable, working now
-
-**Tier 2: Rich Notifications (Code Ready, Deployment Pending)**
-- Custom webhook handler with full deployment details
-- Deployment start/end times, labels, status, replicas
-- Rich Slack formatting with Block Kit
-- Namespace filtering for OLApplicationK8s deployments
-
-Choose the tier based on notification detail requirements.
 ## Documentation
 - https://github.com/robusta-dev/kubewatch
 
