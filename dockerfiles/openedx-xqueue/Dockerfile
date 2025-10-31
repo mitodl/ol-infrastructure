@@ -4,7 +4,6 @@ ARG OPENEDX_COMMON_VERSION=open-release/quince.master
 ENV DJANGO_SETTINGS_MODULE=xqueue.production
 
 RUN apt-get update && \
-  apt-get install --no-install-recommends -y software-properties-common && \
   apt-get install --no-install-recommends -y git-core mariadb-client default-libmysqlclient-dev build-essential ntp libssl-dev pkg-config && \
   rm -rf /var/lib/apt/lists/* && \
   useradd -m --shell /bin/false app && \
