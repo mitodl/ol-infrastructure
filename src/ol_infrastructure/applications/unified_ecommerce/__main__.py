@@ -786,7 +786,7 @@ mit_learn_oidc_secret = OLVaultK8SSecret(
 
 ecommerce_api_domain = ecommerce_config.require("backend_domain")
 learn_api_domain = ecommerce_config.require("learn_backend_domain")
-
+apisix_ingress_class = ecommerce_config.get("apisix_ingress_class") or "apisix"
 # ApisixUpstream resources don't seem to work but we don't really need them?
 # Ref: https://github.com/apache/apisix-ingress-controller/issues/1655
 # Ref: https://github.com/apache/apisix-ingress-controller/issues/1855
@@ -804,6 +804,7 @@ ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
         labels=k8s_global_labels,
     ),
     spec={
+        "ingressClassName": apisix_ingress_class,
         "http": [
             {
                 # unauthenticated routes, including assests and checkout callback API
@@ -899,7 +900,7 @@ ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
                     }
                 ],
             },
-        ]
+        ],
     },
     opts=ResourceOptions(
         delete_before_replace=True,
@@ -931,6 +932,7 @@ mit_learn_ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource
         labels=k8s_global_labels,
     ),
     spec={
+        "ingressClassName": apisix_ingress_class,
         "http": [
             {
                 # unauthenticated routes, including assests and checkout callback API
@@ -1029,7 +1031,7 @@ mit_learn_ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource
                     }
                 ],
             },
-        ]
+        ],
     },
     opts=ResourceOptions(
         delete_before_replace=True,
@@ -1051,6 +1053,7 @@ ecommerce_https_apisix_tls = kubernetes.apiextensions.CustomResource(
         labels=k8s_global_labels,
     ),
     spec={
+        "ingressClassName": apisix_ingress_class,
         "hosts": [ecommerce_config.require("backend_domain")],
         # Use the shared ol-wildcard cert loaded into every cluster
         "secret": {
