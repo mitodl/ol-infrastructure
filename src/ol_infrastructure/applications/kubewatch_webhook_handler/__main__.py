@@ -48,6 +48,10 @@ vault_config = Config("vault")
 default_namespaces = "ecommerce,learn-ai,mitlearn,mitxonline"
 watched_namespaces = webhook_config.get("watched_namespaces") or default_namespaces
 
+# Get filtering patterns from config
+ignored_image_patterns = webhook_config.get("ignored_image_patterns") or "nginx"
+ignored_label_patterns = webhook_config.get("ignored_label_patterns") or "celery"
+
 # Read secrets
 webhook_secrets = read_yaml_secrets(
     Path(f"kubewatch/secrets.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml"),
@@ -166,6 +170,14 @@ webhook_deployment = kubernetes.apps.v1.Deployment(
                             kubernetes.core.v1.EnvVarArgs(
                                 name="WATCHED_NAMESPACES",
                                 value=watched_namespaces,
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="IGNORED_IMAGE_PATTERNS",
+                                value=ignored_image_patterns,
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="IGNORED_LABEL_PATTERNS",
+                                value=ignored_label_patterns,
                             ),
                         ],
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(

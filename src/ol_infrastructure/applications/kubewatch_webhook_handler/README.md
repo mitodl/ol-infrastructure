@@ -77,7 +77,39 @@ Edit `Pulumi.applications.kubewatch_webhook_handler.applications.CI.yaml`:
 config:
   vault:address: https://vault-ci.odl.mit.edu
   kubewatch_webhook:watched_namespaces: "ecommerce,learn-ai,mitlearn,mitxonline"
+  kubewatch_webhook:ignored_image_patterns: "nginx"  # Optional: comma-separated patterns
+  kubewatch_webhook:ignored_label_patterns: "celery"  # Optional: comma-separated patterns
 ```
+
+#### Configuration Parameters
+
+- **watched_namespaces**: Comma-separated list of namespaces to monitor
+- **ignored_image_patterns**: (Optional) Comma-separated patterns to filter out from container images (default: "nginx")
+- **ignored_label_patterns**: (Optional) Comma-separated patterns to filter out from `ol.mit.edu/*` label values (default: "celery")
+
+#### Filtering Behavior
+
+The webhook handler applies two types of filters to reduce notification noise:
+
+1. **Image Pattern Filtering**
+   - Ignores deployments where the container image name contains any specified pattern
+   - Case-insensitive matching
+   - Example: `"nginx"` ignores `nginx:1.21`, `myapp-nginx:latest`, `registry.io/nginx-proxy`
+
+2. **Label Pattern Filtering**
+   - Ignores deployments where any `ol.mit.edu/*` label value contains any specified pattern
+   - Only checks labels starting with `ol.mit.edu/`
+   - Case-insensitive matching
+   - Example: `"celery"` ignores deployments with `ol.mit.edu/process: celery-worker`
+
+3. **Multiple Patterns**
+   - Use comma-separated values to specify multiple patterns
+   - Example: `"nginx,redis,memcached"` ignores any deployment matching any of these patterns
+
+**Common Use Cases:**
+- Ignore sidecar containers: `ignored_image_patterns: "nginx,envoy,istio-proxy"`
+- Ignore worker deployments: `ignored_label_patterns: "celery,worker,background"`
+- Combined: Filter both image and label patterns for comprehensive noise reduction
 
 ### Secrets
 
