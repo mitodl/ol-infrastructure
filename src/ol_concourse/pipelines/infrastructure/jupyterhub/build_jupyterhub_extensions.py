@@ -22,6 +22,7 @@ pypi_type = pypi_resource()
 # repository. The build happens via uv package manager (https://docs.astral.sh/uv/)
 plugins = [
     "ol-themed-jupyter",
+    "ol-jupyter-authoring",
 ]
 
 fragments = []
