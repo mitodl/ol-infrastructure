@@ -1161,6 +1161,7 @@ learn_ai_https_apisix_tls = kubernetes.apiextensions.CustomResource(
     ),
     spec={
         "hosts": [learn_ai_api_domain],
+        "ingressClassName": apisix_ingress_class,
         # Use the shared ol-wildcard cert loaded into every cluster
         "secret": {
             "name": "ol-wildcard-cert",
