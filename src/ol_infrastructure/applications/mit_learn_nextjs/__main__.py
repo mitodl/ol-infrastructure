@@ -261,18 +261,39 @@ def create_deployment_for_color(color: str) -> kubernetes.apps.v1.Deployment:
         mount_path="/app/frontends/main/.next",
     )
 
+    # Determine replica count: active deployment gets configured count, inactive gets 0
+    def get_replicas(active: str) -> int:
+        if color == active:
+            return nextjs_config.get_int("pod_count") or 2
+        return 0
+
+    # Determine the value for the skipAwait annotation
+    def get_skip_await_annotation(active: str) -> bool:
+        return color != active
+
+    replicas = active_color.apply(get_replicas)
+    skip_await_annotation = active_color.apply(get_skip_await_annotation)
+
     return kubernetes.apps.v1.Deployment(
         f"mit-learn-nextjs-{stack_info.name}-deployment-{color}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=f"mit-learn-nextjs-{color}",
             namespace=learn_namespace,
             labels=color_labels,
+            annotations={
+                "deployment.kubernetes.io/description": (
+                    f"Blue/green deployment for MIT Learn Next.js ({color})"
+                ),
+                "pulumi.com/skipAwait": skip_await_annotation.apply(
+                    lambda skip: "true" if skip else "false"
+                ),
+            },
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             selector=kubernetes.meta.v1.LabelSelectorArgs(
                 match_labels=color_labels,
             ),
-            replicas=nextjs_config.get_int("pod_count") or 2,
+            replicas=replicas,
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
                     labels=color_labels,
@@ -376,6 +397,7 @@ mit_learn_nextjs_service = kubernetes.core.v1.Service(
         name="mit-learn-nextjs",
         namespace=learn_namespace,
         labels=application_labels,
+        annotations={"pulumi.com/patchForce": "true"},
     ),
     spec=kubernetes.core.v1.ServiceSpecArgs(
         selector=active_deployment_labels,
