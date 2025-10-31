@@ -12,7 +12,8 @@ config:
   eks:apisix_domains:
   - "airbyte-ci.ol.mit.edu"
   - "pipelines-ci.odl.mit.edu"
-  eks:apisix_ingress_enabled: "true"
+  eks:apisix_ingress_enabled: "false"
+  eks:apisix_official_enabled: "true"
   eks:apisix_viewer_key:
     secure: v1:ZFN4gG/xa7D+1wDe:qwerlKPydX7u54UjHLBvNUCT2Oha5e4EgXs5Uf+8tMOMUtf4yz/5SYy4rfpfls1HDMgroXWwRUY9U21sgKsGF+YJ5lexA+Fo9VSStrw9zPc=
   eks:developer_role_kubernetes_groups: ["admin"]

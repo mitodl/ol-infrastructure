@@ -14,6 +14,7 @@ config:
   eks:apisix_admin_key:
     secure: v1:AndQEZrEKm/Q3QyP:60BdyhdeUbx2ds+YdP3vN5+Q0nIA0AyqLjtUo0XSj0f4vQQc6f5PsLJOKwZj1/4T
   eks:apisix_ingress_enabled: "true"
+  eks:apisix_official_enabled: "true"
   eks:apisix_viewer_key:
     secure: v1:T9I4WZSeg3lYawlD:d59YkDPqEo372v1ibNCtyYcGjxW0xXC2eXyTADHHZ4QeQ+gD8JuN3pCv78nNVQ/d
   eks:apisix_domains:
@@ -24,6 +25,7 @@ config:
   - "api.rc.mitxonline.mit.edu"
   - "studio-backend.rc.learn.mit.edu"
   - "courses-backend.rc.learn.mit.edu"
+  eks:apisix_official_domains:
   - "preview.courses.rc.learn.mit.edu"
   eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
   eks:developer_role_kubernetes_groups: ["admin"]

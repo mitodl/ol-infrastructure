@@ -48,6 +48,8 @@ from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_pr
 stack_info = parse_stack()
 setup_vault_provider(stack_info)
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+jupyterhub_config = Config("jupyterhub")
+apisix_ingress_class = jupyterhub_config.get("apisix_ingress_class") or "apisix"
 
 jupyterhub_config = Config("jupyterhub")
 
@@ -221,6 +223,7 @@ shared_cert_manager_certificate = OLCertManagerCert(
         k8s_namespace=namespace,
         k8s_labels=application_labels,
         create_apisixtls_resource=True,
+        apisixtls_ingress_class=apisix_ingress_class,
         dest_secret_name=api_tls_secret_name,
         dns_names=[jupyterhub_domain],
     ),
@@ -248,6 +251,7 @@ apisix_route = OLApisixRoute(
     name=f"ol-jupyterhub-k8s-apisix-route-{stack_info.env_suffix}",
     k8s_namespace=namespace,
     k8s_labels=application_labels,
+    ingress_class_name=apisix_ingress_class,
     route_configs=[
         OLApisixRouteConfig(
             route_name="jupyterhub",

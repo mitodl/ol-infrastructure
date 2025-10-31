@@ -12,6 +12,7 @@ class OLCertManagerCertConfig(BaseModel):
     resource_suffix: str = "cert"
 
     create_apisixtls_resource: bool = False
+    apisixtls_ingress_class: str = "apisix"
     dest_secret_name: str
     dns_names: list[str]
     letsencrypt_env: Literal["staging", "production"] = "production"
@@ -101,6 +102,8 @@ class OLCertManagerCert(pulumi.ComponentResource):
         if cert_config.create_apisixtls_resource:
             # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_tls/
             # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_tls_v2/
+            # Note: ingressClassName is required for the Apache APISix helm chart
+            # when using standalone mode with GatewayProxy provider
             self.apisix_tls_resource = kubernetes.apiextensions.CustomResource(
                 f"ol-cert-manager-apisix-tls-{self.resource_name}",
                 api_version="apisix.apache.org/v2",
@@ -112,6 +115,7 @@ class OLCertManagerCert(pulumi.ComponentResource):
                 },
                 spec={
                     "hosts": cert_config.dns_names,
+                    "ingressClassName": cert_config.apisixtls_ingress_class,
                     "secret": {
                         "name": cert_config.dest_secret_name,
                         "namespace": cert_config.k8s_namespace,
