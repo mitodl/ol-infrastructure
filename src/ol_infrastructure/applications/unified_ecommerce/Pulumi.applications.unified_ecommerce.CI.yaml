@@ -4,6 +4,7 @@ encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAFb8B9KFDK2X+gl09
 config:
   aws:region: us-east-1
   consul:address: https://consul-apps-ci.odl.mit.edu
+  ecommerce:apisix_ingress_class: apache-apisix
   ecommerce:backend_domain: "api-pay-ci.ol.mit.edu"
   ecommerce:learn_backend_domain: "api.ci.learn.mit.edu"
   ecommerce:db_password:
