@@ -52,9 +52,7 @@ install-deps:
     RUN pip uninstall --yes "edx-name-affirmation"
     # This is a hack to address issues with lxml and xmlsec compatibilities with libxml2 (2024-11-21 TMM)
   END
-  IF [ "$RELEASE_NAME" = "teak" ]
-    RUN pip uninstall --yes lxml xmlsec
-  END
+  RUN pip uninstall --yes lxml xmlsec
   RUN pip install --no-warn-script-location --user --no-cache-dir -r /root/pip_package_overrides/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
   WORKDIR /openedx/edx-platform
   ENV PATH /root/.local/bin:/openedx/nodeenv/bin:${PATH}
