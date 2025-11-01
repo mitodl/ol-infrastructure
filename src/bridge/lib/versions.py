@@ -3,7 +3,7 @@ CONCOURSE_VERSION = "7.14.2"
 # renovate: datasource=github-releases depName=consul-template packageName=hashicorp/consul-template
 CONSUL_TEMPLATE_VERSION = "0.41.2"
 # renovate: datasource=github-releases depName=consul packageName=hashicorp/consul
-CONSUL_VERSION = "1.21.5"
+CONSUL_VERSION = "1.22.0"
 # renovate: datasource=pypi depName=jupyterhub packageName=jupyterhub
 JUPYTERHUB_VERSION = "5.4.2"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
