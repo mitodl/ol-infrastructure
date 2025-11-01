@@ -198,48 +198,57 @@ def setup_apisix_official(
                         "containerPort": 9091,
                         "path": "/apisix/prometheus/metrics",
                     },
-                },
-                # --- NGINX Configuration ---
-                "nginx": {
-                    "workerProcesses": "auto",
-                    "workerConnections": "10620",
-                    "configurationSnippet": {
-                        "httpStart": textwrap.dedent(
-                            """\
-                            client_header_buffer_size 8k;
-                            large_client_header_buffers 4 32k;
-                            """
-                        ),
-                        "httpSrv": textwrap.dedent(
-                            f"""\
-                            set $session_compressor zlib;
-                            set $session_name {session_cookie_name};
-                            """
-                        ),
-                    },
-                    "customLogs": {
-                        "enabled": True,
-                        "accessLog": 'time_local="$time_local" '
-                        "body_bytes_sent=$body_bytes_sent "
-                        "bytes_sent=$bytes_sent "
-                        "client=$remote_addr "
-                        "host=$host "
-                        "remote_addr=$remote_addr "
-                        "request_id=$request_id "
-                        "request_length=$request_length "
-                        "request_method=$request_method "
-                        "request_time=$request_time "
-                        "request_uri=$request_uri "
-                        "status=$status "
-                        "upstream_addr=$upstream_addr "
-                        "upstream_connect_time=$upstream_connect_time "
-                        "upstream_header_time=$upstream_header_time "
-                        "upstream_response_time=$upstream_response_time "
-                        "upstream_status=$upstream_status "
-                        'http_referer="$http_referer" '
-                        'http_user_agent="$http_user_agent" '
-                        "method=$request_method "
-                        'request="$request"',
+                    # --- NGINX Configuration (nested under apisix) ---
+                    "nginx": {
+                        "workerProcesses": "auto",
+                        "enableCPUAffinity": True,
+                        "workerConnections": "10620",
+                        "logs": {
+                            "enableAccessLog": True,
+                            "accessLog": "/dev/stdout",
+                            "accessLogFormat": 'time_local="$time_local" '
+                            "body_bytes_sent=$body_bytes_sent "
+                            "bytes_sent=$bytes_sent "
+                            "client=$remote_addr "
+                            "host=$host "
+                            "remote_addr=$remote_addr "
+                            "request_id=$request_id "
+                            "request_length=$request_length "
+                            "request_method=$request_method "
+                            "request_time=$request_time "
+                            "request_uri=$request_uri "
+                            "status=$status "
+                            "upstream_addr=$upstream_addr "
+                            "upstream_connect_time=$upstream_connect_time "
+                            "upstream_header_time=$upstream_header_time "
+                            "upstream_response_time=$upstream_response_time "
+                            "upstream_status=$upstream_status "
+                            'http_referer="$http_referer" '
+                            'http_user_agent="$http_user_agent" '
+                            "method=$request_method "
+                            'request="$request"',
+                            "accessLogFormatEscape": "default",
+                            "errorLog": "/dev/stderr",
+                            "errorLogLevel": "warn",
+                        },
+                        "configurationSnippet": {
+                            "main": "",
+                            "httpStart": textwrap.dedent(
+                                """\
+                                client_header_buffer_size 8k;
+                                large_client_header_buffers 4 32k;
+                                """
+                            ),
+                            "httpEnd": "",
+                            "httpSrv": textwrap.dedent(
+                                f"""\
+                                set $session_compressor zlib;
+                                set $session_name {session_cookie_name};
+                                """
+                            ),
+                            "httpAdmin": "",
+                            "stream": "",
+                        },
                     },
                 },
                 # --- Etcd Configuration ---
