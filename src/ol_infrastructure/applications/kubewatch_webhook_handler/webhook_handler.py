@@ -49,22 +49,16 @@ WATCHED_NAMESPACES = os.environ.get("WATCHED_NAMESPACES", "").split(",")
 WATCHED_NAMESPACES = [ns.strip() for ns in WATCHED_NAMESPACES if ns.strip()]
 
 # Filtering configuration
-IGNORED_IMAGE_PATTERNS = os.environ.get("IGNORED_IMAGE_PATTERNS", "nginx").split(",")
-IGNORED_IMAGE_PATTERNS = [
-    pattern.strip() for pattern in IGNORED_IMAGE_PATTERNS if pattern.strip()
-]
-
 IGNORED_LABEL_PATTERNS = os.environ.get("IGNORED_LABEL_PATTERNS", "celery").split(",")
 IGNORED_LABEL_PATTERNS = [
     pattern.strip() for pattern in IGNORED_LABEL_PATTERNS if pattern.strip()
 ]
 
 logger.info("Watching namespaces: %s", WATCHED_NAMESPACES)
-logger.info("Ignoring image patterns: %s", IGNORED_IMAGE_PATTERNS)
 logger.info("Ignoring label patterns: %s", IGNORED_LABEL_PATTERNS)
 
 
-def should_ignore_deployment(  # noqa: C901, PLR0912
+def should_ignore_deployment(
     deployment_details: dict[str, Any] | None,
 ) -> tuple[bool, str]:
     """
@@ -78,35 +72,6 @@ def should_ignore_deployment(  # noqa: C901, PLR0912
     """
     if not deployment_details:
         return False, ""
-
-    # Check image patterns - look for non-sidecar containers
-    # Strategy: Check if ANY non-nginx/non-infrastructure image exists
-    # If there's a main application image, don't filter even if nginx exists
-    all_images = deployment_details.get("all_images", [])
-
-    if all_images:
-        # Find application containers (not infrastructure sidecars)
-        app_images = _filter_application_images(all_images)
-
-        # If there are application containers, check if they match ignored
-        if app_images:
-            for app_img in app_images:
-                for pattern in IGNORED_IMAGE_PATTERNS:
-                    if pattern.lower() in app_img.lower():
-                        return (
-                            True,
-                            f"application image {app_img} matches ignored "
-                            f"pattern '{pattern}'",
-                        )
-        # If no app images found (all are infrastructure), check deployment name
-        elif all_images:
-            deployment_name = deployment_details.get("name", "").lower()
-            for pattern in IGNORED_IMAGE_PATTERNS:
-                if pattern.lower() in deployment_name:
-                    return (
-                        True,
-                        f"infrastructure-only deployment name contains '{pattern}'",
-                    )
 
     # Check label patterns (check if any label value contains the pattern)
     labels = deployment_details.get("labels", {})
@@ -122,27 +87,6 @@ def should_ignore_deployment(  # noqa: C901, PLR0912
                     )
 
     return False, ""
-
-
-def _filter_application_images(all_images: list[str]) -> list[str]:
-    """Filter out known infrastructure/sidecar images from a list."""
-    app_images = []
-    infrastructure_patterns = [
-        "nginx",
-        "envoy",
-        "istio-proxy",
-        "redis",
-        "memcached",
-    ]
-
-    for img in all_images:
-        img_lower = img.lower()
-        # Skip known infrastructure/sidecar patterns
-        is_infrastructure = any(infra in img_lower for infra in infrastructure_patterns)
-        if not is_infrastructure:
-            app_images.append(img)
-
-    return app_images
 
 
 def get_deployment_details(namespace: str, name: str) -> dict[str, Any] | None:
