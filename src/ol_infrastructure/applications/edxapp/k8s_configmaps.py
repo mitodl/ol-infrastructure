@@ -301,8 +301,10 @@ def create_k8s_configmaps(
         },
         data={
             "82-lms-interpolated-config.yaml": textwrap.dedent(f"""
+                APPZI_URL: {edxapp_config.get("appzi_url", "")}
                 SITE_NAME: {edxapp_config.require_object("domains")["lms"]}
                 SESSION_COOKIE_NAME: {env_name}-edx-lms-sessionid
+                MIT_LEARN_SUPPORT_SITE_LINK: mailto:{edxapp_config.require("sender_email_address")}
             """)
         },
         opts=ResourceOptions(delete_before_replace=True),
