@@ -10,7 +10,8 @@ config:
   mitxonline:apisix_ingress_class: apache-apisix
   mitxonline:db_password:
     secure: v1:72AVczMFP7U0adTg:qiVKioH1VjNf38HfLkNIZsCdc8RqKs0bkaou+fU6SSRK9W4kbS1do2PwdD3JWYlc37eojd+sdAL8npp+tyEeQ66q5mHmWDQK3WlqgdWbf8G41fizyMwoy2AQdZmtZtJe40IoeqaSX3ntfJvhI0uP7YWmpge4G9e6KMNBmhZ0wl0T6qHU4z180aId1ZpjCM4=
-  mitxonline:domain: "api.rc.mitxonline.mit.edu"
+  mitxonline:backend_domain: "api.rc.mitxonline.mit.edu"
+  mitxonline:frontend_domain: "rc.mitxonline.mit.edu"
   mitxonline:k8s_deploy: "true"
   mitxonline:learn_backend_domain: "api.rc.learn.mit.edu"
   mitxonline:min_replicas: 4
@@ -42,7 +43,7 @@ config:
     MITX_ONLINE_BASE_URL: "https://rc.mitxonline.mit.edu"
     MITX_ONLINE_ENVIRONMENT: "rc"
     MITX_ONLINE_LOG_LEVEL: "INFO"
-    MITX_ONLINE_SECURE_SSL_HOST: "api.rc.mitxonline.mit.edu"
+    MITX_ONLINE_SECURE_SSL_HOST: "rc.mitxonline.mit.edu"
     OPENEDX_API_BASE_URL: "https://courses.rc.learn.mit.edu"
     OPENEDX_COURSE_BASE_URL: "https://courses.rc.learn.mit.edu/learn/course/"
     OPENEDX_OAUTH_PROVIDER: "ol-oauth2"

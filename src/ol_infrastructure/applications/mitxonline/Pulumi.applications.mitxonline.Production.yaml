@@ -10,7 +10,8 @@ config:
   mitxonline:apisix_ingress_class: apache-apisix
   mitxonline:db_password:
     secure: v1:1SGxkH66kKNXMVc0:P9FztYdyzfxIrapGHU3pD5gz9ZkW6Of/zTqhaZf4O+L+Y8yAbcissYxogKfyDMxSJYSSUxI12K0=
-  mitxonline:domain: "api.mitxonline.mit.edu"
+  mitxonline:backend_domain: "api.mitxonline.mit.edu"
+  mitxonline:frontend_domain: "mitxonline.mit.edu"
   mitxonline:k8s_deploy: "true"
   mitxonline:learn_backend_domain: "api.learn.mit.edu"
   mitxonline:min_replicas: 4
