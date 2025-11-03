@@ -7,9 +7,13 @@
 """
 
 import json
+import mimetypes
 import os
+import textwrap
 from pathlib import Path
 
+import pulumi
+import pulumi_fastly as fastly
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Alias, Config, ResourceOptions, StackReference, export
@@ -59,6 +63,10 @@ from ol_infrastructure.lib.aws.eks_helper import (
 )
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
+from ol_infrastructure.lib.aws.route53_helper import (
+    fastly_certificate_validation_records,
+)
+from ol_infrastructure.lib.fastly import get_fastly_provider
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
@@ -74,6 +82,7 @@ setup_vault_provider(skip_child_token=True)
 mitxonline_config = Config("mitxonline")
 vault_config = Config("vault")
 apisix_ingress_class = mitxonline_config.get("apisix_ingress_class") or "apisix"
+fastly_provider = get_fastly_provider()
 
 stack_info = parse_stack()
 cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
@@ -555,7 +564,8 @@ mitxonline_k8s_app = OLApplicationK8s(
         depends_on=[mitxonline_app_security_group, *secret_resources]
     ),
 )
-api_domain = mitxonline_config.require("domain")
+api_domain = mitxonline_config.require("backend_domain")
+frontend_domain = mitxonline_config.require("frontend_domain")
 api_path_prefix = "mitxonline"
 frontend_tls_secret_name = "mitxonline-tls-pair"  # noqa: S105  # pragma: allowlist secret
 cert_manager_certificate = OLCertManagerCert(
@@ -567,7 +577,7 @@ cert_manager_certificate = OLCertManagerCert(
         create_apisixtls_resource=True,
         apisixtls_ingress_class=apisix_ingress_class,
         dest_secret_name=frontend_tls_secret_name,
-        dns_names=[api_domain],
+        dns_names=[api_domain, frontend_domain],
     ),
 )
 application_labels = k8s_global_labels | {
@@ -647,7 +657,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="passauth",
             priority=0,
-            hosts=[api_domain],
+            hosts=[api_domain, frontend_domain],
             paths=["/*"],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             plugins=[
@@ -662,7 +672,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="logout-redirect",
             priority=10,
-            hosts=[api_domain],
+            hosts=[api_domain, frontend_domain],
             paths=["/logout/oidc/*"],
             plugins=[
                 OLApisixPluginConfig(name="redirect", config={"uri": "/logout/oidc"}),
@@ -675,7 +685,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="reqauth",
             priority=10,
-            hosts=[api_domain],
+            hosts=[api_domain, frontend_domain],
             paths=["/login/", "/admin/login/*", "/login", "/login/oidc*"],
             plugins=[
                 mitxonline_direct_oidc.get_full_oidc_plugin_config(
@@ -756,6 +766,157 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
         delete_before_replace=True,
     ),
 )
+
+## Fastly Service
+gzip_settings: dict[str, set[str]] = {"extensions": set(), "content_types": set()}
+for k, v in mimetypes.types_map.items():
+    if k in (
+        ".json",
+        ".pdf",
+        ".jpeg",
+        ".jpg",
+        ".html",
+        ".css",
+        ".js",
+        ".svg",
+        ".png",
+        ".gif",
+        ".xml",
+        ".vtt",
+        ".srt",
+    ):
+        gzip_settings["extensions"].add(k.strip("."))
+        gzip_settings["content_types"].add(v)
+bucket_backend_name = f"MITx Online {stack_info.name} S3 bucket"
+mitxonline_service = fastly.ServiceVcl(
+    "mitxonline-service",
+    backends=[
+        fastly.ServiceVclBackendArgs(
+            address=api_domain,
+            connect_timeout=15000,
+            first_byte_timeout=30000,
+            name=f"MITx Online {stack_info.name} K8s App",
+            port=443,
+            ssl_cert_hostname=api_domain,
+            ssl_sni_hostname=api_domain,
+            use_ssl=True,
+        ),
+        fastly.ServiceVclBackendArgs(
+            address=f"{mitxonline_bucket_name}.s3.us-east-1.amazonaws.com",
+            name=bucket_backend_name,
+            override_host=f"{mitxonline_bucket_name}.s3.us-east-1.amazonaws.com",
+            port=443,
+            request_condition="Media asset requests",
+            ssl_cert_hostname=f"{mitxonline_bucket_name}.s3.us-east-1.amazonaws.com",
+            ssl_sni_hostname=f"{mitxonline_bucket_name}.s3.us-east-1.amazonaws.com",
+            use_ssl=True,
+        ),
+    ],
+    comment="Managed by Pulumi",
+    conditions=[
+        fastly.ServiceVclConditionArgs(
+            name="Media asset requests",
+            statement="var.is_media_request",
+            type="REQUEST",
+        )
+    ],
+    domains=[
+        fastly.ServiceVclDomainArgs(
+            comment=f"MITx Online dashboard and course catalog application {stack_info.name} environment",
+            name=frontend_domain,
+        )
+    ],
+    gzips=[
+        fastly.ServiceVclGzipArgs(
+            name="enable-gzip-compression",
+            extensions=list(gzip_settings["extensions"]),
+            content_types=list(gzip_settings["content_types"]),
+        )
+    ],
+    product_enablement=fastly.ServiceVclProductEnablementArgs(
+        brotli_compression=True,
+    ),
+    headers=[
+        fastly.ServiceVclHeaderArgs(
+            action="set",
+            destination="http.Strict-Transport-Security",
+            name="Generated by force TLS and enable HSTS",
+            source='"max-age=300"',
+            type="response",
+        ),
+    ],
+    name=f"MITx Online Application {stack_info.name}",
+    request_settings=[
+        fastly.ServiceVclRequestSettingArgs(
+            force_ssl=True,
+            name="Generated by force TLS and enable HSTS",
+            xff="",
+        ),
+    ],
+    snippets=[
+        fastly.ServiceVclSnippetArgs(
+            content=textwrap.dedent(r"""
+            declare local var.is_media_request BOOL;
+            set var.is_media_request = false;
+            if( req.url ~ "^/media" ) {
+              set var.is_media_request = true;
+              set req.url = regsub(req.url, "^/media/(.*)$", "/\1");
+              unset req.http.Cookie;
+            }"""),
+            name="Route media requests to S3",
+            priority=200,
+            type="recv",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            content=textwrap.dedent(f"""\
+            if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
+              unset bereq.http.Authorization;
+            }}"""),
+            name="Strip auth headers in S3 miss requests",
+            type="miss",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            content=textwrap.dedent(f"""\
+            if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
+              unset bereq.http.Authorization;
+            }}"""),
+            name="Strip auth headers in S3 pass requests",
+            type="pass",
+        ),
+    ],
+    stale_if_error=True,
+    opts=fastly_provider,
+)
+
+tls_configuration = fastly.get_tls_configuration(
+    default=False,
+    name="TLS v1.3",
+    tls_protocols=["1.2", "1.3"],
+    opts=pulumi.InvokeOptions(provider=fastly_provider.provider),
+)
+
+mitxonline_fastly_tls = fastly.TlsSubscription(
+    f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-tls-subscription",
+    # valid values are certainly, lets-encrypt, or globalsign
+    certificate_authority="certainly",
+    domains=mitxonline_service.domains.apply(
+        lambda domains: [domain.name for domain in domains]
+    ),
+    # Retrieved from https://manage.fastly.com/network/tls-configurations
+    configuration_id=tls_configuration.id,
+    opts=fastly_provider,
+)
+
+mitxonline_fastly_tls.managed_dns_challenges.apply(
+    fastly_certificate_validation_records
+)
+
+validated_tls_subscription = fastly.TlsSubscriptionValidation(
+    "mitxonline-tls-subscription-validation",
+    subscription_id=mitxonline_fastly_tls.id,
+    opts=fastly_provider,
+)
+
 
 export(
     "mitxonline",
