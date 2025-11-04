@@ -18,7 +18,6 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.lib.versions import (
     APISIX_CHART_VERSION,
-    APISIX_OFFICIAL_CHART_VERSION,
     AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION,
     AWS_NODE_TERMINATION_HANDLER_CHART_VERSION,
     CERT_MANAGER_CHART_VERSION,
@@ -32,7 +31,7 @@ from bridge.lib.versions import (
 )
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.infrastructure.aws.eks.apisix_official import (
-    setup_apisix_official,
+    setup_apisix,
 )
 from ol_infrastructure.infrastructure.aws.eks.aws_utils import setup_aws_integrations
 from ol_infrastructure.infrastructure.aws.eks.cert_manager import setup_cert_manager
@@ -93,9 +92,6 @@ namespaces = eks_config.get_object("namespaces") or []
 # Centralize version numbers
 VERSIONS = {
     "APISIX_CHART": os.environ.get("APISIX_CHART", APISIX_CHART_VERSION),
-    "APISIX_OFFICIAL_CHART": os.environ.get(
-        "APISIX_OFFICIAL_CHART", APISIX_OFFICIAL_CHART_VERSION
-    ),
     "AWS_LOAD_BALANCER_CONTROLLER_CHART": os.environ.get(
         "AWS_LOAD_BALANCER_CONTROLLER_CHART", AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION
     ),
@@ -841,23 +837,21 @@ gateway_api_crds = setup_traefik(
     cluster=cluster,
 )
 
-# Deploy official Apache chart if enabled
-if eks_config.get_bool("apisix_official_enabled"):
-    setup_apisix_official(
-        cluster_name=cluster_name,
-        k8s_provider=k8s_provider,
-        operations_namespace=operations_namespace,
-        node_groups=node_groups,
-        gateway_api_crds=gateway_api_crds,
-        stack_info=stack_info,
-        k8s_global_labels=k8s_global_labels,
-        operations_tolerations=operations_tolerations,
-        versions=VERSIONS,
-        eks_config=eks_config,
-        target_vpc=target_vpc,
-        aws_config=aws_config,
-        cluster=cluster,
-    )
+setup_apisix(
+    cluster_name=cluster_name,
+    k8s_provider=k8s_provider,
+    operations_namespace=operations_namespace,
+    node_groups=node_groups,
+    gateway_api_crds=gateway_api_crds,
+    stack_info=stack_info,
+    k8s_global_labels=k8s_global_labels,
+    operations_tolerations=operations_tolerations,
+    versions=VERSIONS,
+    eks_config=eks_config,
+    target_vpc=target_vpc,
+    aws_config=aws_config,
+    cluster=cluster,
+)
 
 setup_external_dns(
     cluster_name=cluster_name,
