@@ -74,7 +74,7 @@ def tubular_pipeline() -> Pipeline:
                         type=REGISTRY_IMAGE,
                         source=RegistryImage(repository="mitodl/openedx-tubular"),
                     ),
-                    inputs=[tubular_retirees],
+                    inputs=[Input(name=tubular_retirees.name)],
                     # inline bash script to generate retirees yaml
                     run=Command(
                         path="python",
@@ -118,7 +118,10 @@ def tubular_pipeline() -> Pipeline:
                         type=REGISTRY_IMAGE,
                         source=RegistryImage(repository="mitodl/openedx-tubular"),
                     ),
-                    inputs=[tubular_retirees, Input(name=tubular_config_repo.name)],
+                    inputs=[
+                        Input(name=tubular_retirees.name),
+                        Input(name=tubular_config_repo.name),
+                    ],
                     params={
                         "TUBULAR_OAUTH_CLIENT_ID": "((tubular_oauth_client.id))",
                         "TUBULAR_OAUTH_CLIENT_SECRET": (
