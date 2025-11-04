@@ -16,6 +16,7 @@ mitx = [
         studio_domain="studio-ci.mitx.mit.edu",
         support_url="odl.zendesk.com/hc/en-us/requests/new",
         terms_of_service_url="https://lms-ci.mitx.mit.edu/tos",
+        mit_open_learning_site_link="https://openlearning.mit.edu",
     ),
     OpenEdxVars(
         environment="mitx-qa",
@@ -31,6 +32,7 @@ mitx = [
         studio_domain="studio-mitx-qa.mitx.mit.edu",
         support_url="odl.zendesk.com/hc/en-us/requests/new",
         terms_of_service_url="https://mitx-qa.mitx.mit.edu/tos",
+        mit_open_learning_site_link="https://openlearning.mit.edu",
     ),
     OpenEdxVars(
         environment="mitx-production",
@@ -46,6 +48,7 @@ mitx = [
         studio_domain="studio.mitx.mit.edu",
         support_url="odl.zendesk.com/hc/en-us/requests/new",
         terms_of_service_url="https://lms.mitx.mit.edu/tos",
+        mit_open_learning_site_link="https://openlearning.mit.edu",
     ),
 ]
 
