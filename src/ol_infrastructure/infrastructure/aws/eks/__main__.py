@@ -31,7 +31,6 @@ from bridge.lib.versions import (
     VAULT_SECRETS_OPERATOR_CHART_VERSION,
 )
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
-from ol_infrastructure.infrastructure.aws.eks.apisix import setup_apisix
 from ol_infrastructure.infrastructure.aws.eks.apisix_official import (
     setup_apisix_official,
 )
@@ -842,33 +841,7 @@ gateway_api_crds = setup_traefik(
     cluster=cluster,
 )
 
-# Deploy APISix ingress controller with blue-green migration support
-# This allows running both Bitnami and official charts simultaneously
-# Migration phases:
-#   1. Both disabled: No APISix
-#   2. Bitnami only (legacy): apisix_ingress_enabled=true, apisix_official_enabled=false
-#   3. Blue-green (migration): Both enabled, different domains
-#   4. Official only (target): apisix_ingress_enabled=false, apisix_official_enabled=true
-
-# Deploy Bitnami chart (legacy) if enabled
-if eks_config.get_bool("apisix_ingress_enabled"):
-    setup_apisix(
-        cluster_name=cluster_name,
-        k8s_provider=k8s_provider,
-        operations_namespace=operations_namespace,
-        node_groups=node_groups,
-        gateway_api_crds=gateway_api_crds,
-        stack_info=stack_info,
-        k8s_global_labels=k8s_global_labels,
-        operations_tolerations=operations_tolerations,
-        versions=VERSIONS,
-        eks_config=eks_config,
-        target_vpc=target_vpc,
-        aws_config=aws_config,
-        cluster=cluster,
-    )
-
-# Deploy official Apache chart if enabled (can coexist with Bitnami)
+# Deploy official Apache chart if enabled
 if eks_config.get_bool("apisix_official_enabled"):
     setup_apisix_official(
         cluster_name=cluster_name,
