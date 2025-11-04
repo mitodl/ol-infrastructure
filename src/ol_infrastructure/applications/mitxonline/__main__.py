@@ -799,6 +799,7 @@ mitxonline_service = fastly.ServiceVcl(
             port=443,
             ssl_cert_hostname=api_domain,
             ssl_sni_hostname=api_domain,
+            override_host=api_domain,
             use_ssl=True,
         ),
         fastly.ServiceVclBackendArgs(
