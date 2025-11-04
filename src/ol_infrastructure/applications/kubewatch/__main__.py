@@ -61,10 +61,9 @@ cluster_stack.require_output("namespaces").apply(
 slack_channel = Config("slack").require("channel_name")
 
 # Get configurable namespace filters for notifications
-# Note: Kubewatch only supports watching a single namespace or all namespaces
-# For multiple specific namespaces, we watch all and let users filter in Slack
-# or deploy multiple kubewatch instances
-watched_namespaces = kubewatch_config.get("watched_namespaces") or ""
+# Kubewatch's namespace field only supports a single namespace or "" for all.
+# To watch multiple namespaces, we watch all and filter in webhook handler.
+watched_namespaces = ""  # Always watch all namespaces in kubewatch
 
 # Install the kubewatch helm chart
 kubewatch_application = kubernetes.helm.v3.Release(

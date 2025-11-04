@@ -47,6 +47,8 @@ apps_v1 = client.AppsV1Api()
 # Configuration from environment variables
 SLACK_TOKEN = os.environ.get("SLACK_TOKEN")
 SLACK_CHANNEL = os.environ.get("SLACK_CHANNEL")
+
+# Namespace filtering (kubewatch watches all, we filter here for multiple namespaces)
 WATCHED_NAMESPACES = os.environ.get("WATCHED_NAMESPACES", "").split(",")
 WATCHED_NAMESPACES = [ns.strip() for ns in WATCHED_NAMESPACES if ns.strip()]
 
@@ -59,7 +61,7 @@ IGNORED_LABEL_PATTERNS = [
     pattern.strip() for pattern in IGNORED_LABEL_PATTERNS if pattern.strip()
 ]
 
-logger.info("Watching namespaces: %s", WATCHED_NAMESPACES)
+logger.info("Watching namespaces: %s", WATCHED_NAMESPACES or "ALL")
 logger.info("Ignoring label patterns: %s", IGNORED_LABEL_PATTERNS)
 
 
@@ -320,6 +322,14 @@ def webhook_handler():
         event_type = event_meta.get(
             "reason", ""
         )  # kubewatch uses "reason" not "eventType"
+
+        logger.info(
+            "Processing event: kind=%s, namespace=%s, name=%s, event_type=%s",
+            kind,
+            namespace,
+            name,
+            event_type,
+        )
 
         # Filter by namespace if configured
         if WATCHED_NAMESPACES and namespace not in WATCHED_NAMESPACES:

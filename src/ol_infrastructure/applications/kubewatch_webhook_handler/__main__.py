@@ -44,12 +44,10 @@ setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 webhook_config = Config("kubewatch_webhook")
 vault_config = Config("vault")
 
-# Get watched namespaces from config
-default_namespaces = "ecommerce,learn-ai,mitlearn,mitxonline"
-watched_namespaces = webhook_config.get("watched_namespaces") or default_namespaces
+# Namespace filtering (kubewatch watches all, webhook handler filters)
+watched_namespaces = webhook_config.get("watched_namespaces") or ""
 
 # Get filtering patterns from config
-ignored_image_patterns = webhook_config.get("ignored_image_patterns") or "nginx"
 ignored_label_patterns = webhook_config.get("ignored_label_patterns") or "celery"
 
 # Read secrets
@@ -176,10 +174,6 @@ webhook_deployment = kubernetes.apps.v1.Deployment(
                                 value=watched_namespaces,
                             ),
                             kubernetes.core.v1.EnvVarArgs(
-                                name="IGNORED_IMAGE_PATTERNS",
-                                value=ignored_image_patterns,
-                            ),
-                            kubernetes.core.v1.EnvVarArgs(
                                 name="IGNORED_LABEL_PATTERNS",
                                 value=ignored_label_patterns,
                             ),
@@ -252,4 +246,3 @@ export(
         ".svc.cluster.local/webhook/kubewatch",
     ),
 )
-export("watched_namespaces", watched_namespaces)
