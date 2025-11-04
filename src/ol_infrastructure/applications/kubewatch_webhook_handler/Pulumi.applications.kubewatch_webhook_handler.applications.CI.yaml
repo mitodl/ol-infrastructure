@@ -4,5 +4,5 @@ encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAEoJNGp4OLrn8WtCu
 config:
   vault:address: https://vault-ci.odl.mit.edu
   kubewatch_webhook:watched_namespaces: "ecommerce,learn-ai,mitlearn,mitxonline"
-  kubewatch_webhook:ignored_image_patterns: "nginx"  # Comma-separated patterns to ignore in image names
   kubewatch_webhook:ignored_label_patterns: "celery"  # Comma-separated patterns to ignore in ol.mit.edu/* labels
+  slack:channel_name: kubewatch-applications-ci

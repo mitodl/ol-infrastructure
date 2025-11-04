@@ -92,12 +92,7 @@ kubewatch_application = kubernetes.helm.v3.Release(
                 "pullSecrets": [],
             },
             "slack": {
-                "enabled": False,  # Disabled - using slackwebhook instead
-            },
-            "slackwebhook": {
-                "enabled": False,
-                "channel": slack_channel,
-                "slackwebhookurl": kubewatch_sops_secrets["slack-webhook-url"],
+                "enabled": False,  # Disabled - using custom webhook handler
             },
             # Enable our custom webhook handler
             "webhook": {

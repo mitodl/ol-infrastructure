@@ -14,9 +14,10 @@ import os
 from http import HTTPStatus
 from typing import Any
 
-import requests
 from flask import Flask, jsonify, request
 from kubernetes import client, config
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
 
 # Constants
 MAX_IMAGE_LENGTH = 50
@@ -44,9 +45,13 @@ except config.ConfigException:
 apps_v1 = client.AppsV1Api()
 
 # Configuration from environment variables
-SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL")
+SLACK_TOKEN = os.environ.get("SLACK_TOKEN")
+SLACK_CHANNEL = os.environ.get("SLACK_CHANNEL")
 WATCHED_NAMESPACES = os.environ.get("WATCHED_NAMESPACES", "").split(",")
 WATCHED_NAMESPACES = [ns.strip() for ns in WATCHED_NAMESPACES if ns.strip()]
+
+# Initialize Slack client
+slack_client = WebClient(token=SLACK_TOKEN) if SLACK_TOKEN else None
 
 # Filtering configuration
 IGNORED_LABEL_PATTERNS = os.environ.get("IGNORED_LABEL_PATTERNS", "celery").split(",")
@@ -361,29 +366,30 @@ def webhook_handler():
         logger.info("Sending Slack message: %s", message_preview)
 
         # Send to Slack
-        if SLACK_WEBHOOK_URL:
-            response = requests.post(
-                SLACK_WEBHOOK_URL,
-                json=slack_message,
-                headers={"Content-Type": "application/json"},
-                timeout=10,
-            )
-            if response.status_code != HTTPStatus.OK:
-                logger.error(
-                    "Slack API error: %s - %s",
-                    response.status_code,
-                    response.text,
+        if slack_client and SLACK_CHANNEL:
+            try:
+                slack_client.chat_postMessage(
+                    channel=SLACK_CHANNEL,
+                    text=slack_message.get("text", "Deployment notification"),
+                    blocks=slack_message.get("blocks", []),
                 )
-            response.raise_for_status()
-            logger.info(
-                "Successfully sent notification to Slack for %s/%s (status: %s)",
-                namespace,
-                name,
-                response.status_code,
-            )
+                logger.info(
+                    "Successfully sent notification to Slack for %s/%s (channel: %s)",
+                    namespace,
+                    name,
+                    SLACK_CHANNEL,
+                )
+            except SlackApiError as e:
+                logger.exception(
+                    "Slack API error: %s - %s",
+                    e.response["error"],
+                    e.response.get("error", "Unknown error"),
+                )
+                raise
         else:
             logger.warning(
-                "SLACK_WEBHOOK_URL not configured, skipping Slack notification"
+                "SLACK_TOKEN or SLACK_CHANNEL not configured, "
+                "skipping Slack notification"
             )
 
         return jsonify({"status": "success"}), HTTPStatus.OK

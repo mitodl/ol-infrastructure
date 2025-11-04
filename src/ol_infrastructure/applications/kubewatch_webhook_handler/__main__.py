@@ -112,7 +112,7 @@ webhook_image = docker.Image(
 # Kubernetes namespace
 kubewatch_namespace = "kubewatch"
 
-# Create Kubernetes secret for Slack webhook URL
+# Create Kubernetes secret for Slack token
 webhook_secret = kubernetes.core.v1.Secret(
     "kubewatch-webhook-secret",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -120,7 +120,7 @@ webhook_secret = kubernetes.core.v1.Secret(
         namespace=kubewatch_namespace,
     ),
     string_data={
-        "slack-webhook-url": webhook_secrets["slack-webhook-url"],
+        "slack-token": webhook_secrets["slack-token"],
     },
 )
 
@@ -159,13 +159,17 @@ webhook_deployment = kubernetes.apps.v1.Deployment(
                         ],
                         env=[
                             kubernetes.core.v1.EnvVarArgs(
-                                name="SLACK_WEBHOOK_URL",
+                                name="SLACK_TOKEN",
                                 value_from=kubernetes.core.v1.EnvVarSourceArgs(
                                     secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
                                         name="kubewatch-webhook-secret",
-                                        key="slack-webhook-url",
+                                        key="slack-token",
                                     ),
                                 ),
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="SLACK_CHANNEL",
+                                value=Config("slack").require("channel_name"),
                             ),
                             kubernetes.core.v1.EnvVarArgs(
                                 name="WATCHED_NAMESPACES",
