@@ -23,6 +23,8 @@ config:
   - "api.learn.mit.edu"
   - "nb.learn.mit.edu"
   - "api.mitxonline.mit.edu"
+  - "studio-backend.learn.mit.edu"
+  - "courses-backend.learn.mit.edu"
   eks:apisix_official_domains:
   - "binder.learn.mit.edu"
   eks:apisix_min_replicas: "5"
