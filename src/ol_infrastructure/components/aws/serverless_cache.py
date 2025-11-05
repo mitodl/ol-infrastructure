@@ -50,6 +50,7 @@ class OLAmazonServerlessCacheConfig(AWSBase):
     security_group_ids: list[PulumiString] | None = None
     subnet_ids: list[PulumiString] | pulumi.Output[Any] | None = None
     user_group_id: str | None = None
+    auth_token: str | None = None  # Password for default user authentication
     daily_snapshot_time: str | None = None
     snapshot_retention_limit: PositiveInt | None = None
     max_data_storage_gb: PositiveInt | None = None
@@ -128,7 +129,9 @@ class OLAmazonServerlessCache(pulumi.ComponentResource):
             None,
             opts,
         )
-        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)
+        resource_options = (opts or pulumi.ResourceOptions()).merge(
+            pulumi.ResourceOptions(parent=self)
+        )
 
         # Build usage limits for cost control if specified
         cache_usage_limits = None
@@ -145,6 +148,30 @@ class OLAmazonServerlessCache(pulumi.ComponentResource):
                 }
             cache_usage_limits = cache_usage_limits_args
 
+        # Handle authentication - create user group if auth_token provided
+        user_group_id = cache_config.user_group_id
+        if cache_config.auth_token and not user_group_id:
+            # Create a user with the specified password
+            default_user = elasticache.User(
+                f"{cache_config.cache_name}-default-user",
+                user_id=f"{cache_config.cache_name}-default"[:40],
+                user_name="default",
+                access_string="on ~* &* +@all",  # Full access
+                engine=cache_config.engine,
+                passwords=[cache_config.auth_token],
+                opts=resource_options,
+            )
+
+            # Create user group with the user
+            user_group = elasticache.UserGroup(
+                f"{cache_config.cache_name}-user-group",
+                user_group_id=f"{cache_config.cache_name}-users",
+                engine=cache_config.engine,
+                user_ids=[default_user.user_id],
+                opts=resource_options,
+            )
+            user_group_id = user_group.user_group_id
+
         # Create the serverless cache
         self.serverless_cache = elasticache.ServerlessCache(
             f"{cache_config.cache_name}-serverless-cache",
@@ -155,7 +182,7 @@ class OLAmazonServerlessCache(pulumi.ComponentResource):
             kms_key_id=cache_config.kms_key_id,
             security_group_ids=cache_config.security_group_ids,
             subnet_ids=cache_config.subnet_ids,
-            user_group_id=cache_config.user_group_id,
+            user_group_id=user_group_id,  # Use the created or provided user group
             daily_snapshot_time=cache_config.daily_snapshot_time,
             snapshot_retention_limit=cache_config.snapshot_retention_limit,
             cache_usage_limits=cache_usage_limits,
@@ -166,8 +193,22 @@ class OLAmazonServerlessCache(pulumi.ComponentResource):
         # Expose address and port for connection string building
         # ServerlessCache.endpoints returns a list of endpoint objects
         # In serverless mode, there's typically one primary endpoint
-        self.address = self.serverless_cache.endpoints[0].address
-        self.port = self.serverless_cache.endpoints[0].port
+        self.address = self.serverless_cache.endpoints.apply(
+            lambda endpoints: endpoints[0].address
+        )
+        self.port = self.serverless_cache.endpoints.apply(
+            lambda endpoints: endpoints[0].port
+        )
+        self.auth_token = cache_config.auth_token  # Direct access to auth token
+
+        # Add compatibility property for code that accesses cache_cluster.auth_token
+        # Create a simple object that has the auth_token attribute
+        class CacheClusterCompat:
+            def __init__(self, auth_token, endpoint_addr):
+                self.auth_token = auth_token
+                self.primary_endpoint_address = endpoint_addr
+
+        self.cache_cluster = CacheClusterCompat(cache_config.auth_token, self.address)
 
         self.register_outputs(
             {

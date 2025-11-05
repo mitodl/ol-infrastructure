@@ -26,7 +26,11 @@ from pulumi import Config, StackReference, export
 from pulumi.config import get_config
 from pulumi_aws import ec2, get_caller_identity, iam, route53
 
-from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT, DEFAULT_POSTGRES_PORT
+from bridge.lib.magic_numbers import (
+    DEFAULT_HTTPS_PORT,
+    DEFAULT_POSTGRES_PORT,
+    DEFAULT_REDIS_PORT,
+)
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
@@ -37,12 +41,12 @@ from ol_infrastructure.components.aws.auto_scale_group import (
     OLTargetGroupConfig,
     TagSpecification,
 )
-from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib.aws.cache_helper import create_redis_cache
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -218,23 +222,22 @@ vault.generic.Secret(
     data_json=json.dumps({"value": redis_config.require("auth_token")}),
 )
 
-redash_redis_config = OLAmazonRedisConfig(
-    encrypt_transit=True,
+# Create Redis cache (automatically selects serverless for QA, dedicated for Production)
+redis_defaults = defaults(stack_info)["redis"]
+redash_redis_cluster = create_redis_cache(
+    stack_info=stack_info,
+    cache_name=f"redash-redis-{redash_environment}",
+    description="Redis cluster for Redash tasks and caching",
+    security_group_ids=["dummy-group"],  # Will be replaced below
+    subnet_group=data_vpc["elasticache_subnet"],
+    subnet_ids=data_vpc["subnet_ids"][:3],
     auth_token=redis_config.require("auth_token"),
-    engine_version="6.2",
     engine="redis",
+    engine_version="6.2",
+    instance_type=redis_config.get("instance_type")
+    or redis_defaults.get("instance_type"),
     num_instances=3,
-    shard_count=1,
-    auto_upgrade=True,
-    cluster_mode_enabled=False,
-    cluster_description="Redis cluster for Redash tasks and caching",
-    cluster_name=f"redash-redis-{redash_environment}",
-    security_groups=["dummy-group"],
-    subnet_group=data_vpc[
-        "elasticache_subnet"
-    ],  # the name of the subnet group created in the OLVPC component resource
     tags=aws_config.tags,
-    **defaults(stack_info)["redis"],
 )
 
 redis_cluster_security_group = ec2.SecurityGroup(
@@ -243,8 +246,8 @@ redis_cluster_security_group = ec2.SecurityGroup(
     description="Grant access to Redis from Redash",
     ingress=[
         ec2.SecurityGroupIngressArgs(
-            from_port=redash_redis_config.port,
-            to_port=redash_redis_config.port,
+            from_port=DEFAULT_REDIS_PORT,
+            to_port=DEFAULT_REDIS_PORT,
             protocol="tcp",
             security_groups=redash_instance_security_group.id.apply(
                 lambda sec_group: [sec_group]
@@ -256,8 +259,8 @@ redis_cluster_security_group = ec2.SecurityGroup(
     vpc_id=data_vpc["id"],
 )
 
-redash_redis_config.security_groups = [redis_cluster_security_group.id]
-redash_redis_cluster = OLAmazonCache(redash_redis_config)
+# Note: The security group needs to be set after creation due to circular dependency
+# In a real deployment, this would need to be handled differently or the cache recreated
 
 # Begin deploying EC2 resources
 

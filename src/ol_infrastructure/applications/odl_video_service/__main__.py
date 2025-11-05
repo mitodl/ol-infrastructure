@@ -30,7 +30,6 @@ from ol_infrastructure.components.aws.auto_scale_group import (
     OLTargetGroupConfig,
     TagSpecification,
 )
-from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.mediaconvert import (
     MediaConvertConfig,
@@ -40,6 +39,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib.aws.cache_helper import create_redis_cache
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.consul import consul_key_helper, get_consul_provider
@@ -454,24 +454,22 @@ ovs_db_consul_service = Service(
 redis_auth_token = secrets["redis"]["auth_token"]
 redis_config = Config("redis")
 
-ovs_server_redis_config = OLAmazonRedisConfig(
-    encrypt_transit=True,
-    auth_token=redis_auth_token,
-    engine_version="7.2",
-    engine="valkey",
-    num_instances=3,
-    shard_count=1,
-    auto_upgrade=True,
-    cluster_mode_enabled=False,
-    cluster_description="Redis cluster for ODL Video Service.",
-    cluster_name=f"odl-video-service-redis-{stack_info.env_suffix}",
-    security_groups=[ovs_redis_security_group.id],
+# Create Redis cache (automatically selects serverless for CI, dedicated for Production)
+redis_defaults = defaults(stack_info)["redis"]
+ovs_server_redis_cluster = create_redis_cache(
+    stack_info=stack_info,
+    cache_name=f"odl-video-service-redis-{stack_info.env_suffix}",
+    description="Redis cluster for ODL Video Service",
+    security_group_ids=[ovs_redis_security_group.id],
     subnet_group=target_vpc["elasticache_subnet"],
+    subnet_ids=target_vpc["subnet_ids"][:3],
+    auth_token=redis_auth_token,
+    engine="valkey",
+    engine_version="7.2",
+    instance_type=redis_config.get("instance_type")
+    or redis_defaults.get("instance_type"),
+    num_instances=3,
     tags=aws_config.tags,
-    **defaults(stack_info)["redis"],
-)
-ovs_server_redis_cluster = OLAmazonCache(
-    ovs_server_redis_config,
     opts=ResourceOptions(
         aliases=[
             Alias(
