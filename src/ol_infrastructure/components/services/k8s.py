@@ -1037,7 +1037,7 @@ class OLApisixRoute(ComponentResource):
         route_configs: list[OLApisixRouteConfig],
         k8s_namespace: str,
         k8s_labels: dict[str, str],
-        ingress_class_name: str = "apisix",
+        ingress_class_name: str = "apache-apisix",
         opts: ResourceOptions | None = None,
     ):
         """Initialize the OLApisixRoute component resource."""

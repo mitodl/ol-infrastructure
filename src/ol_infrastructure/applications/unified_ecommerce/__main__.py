@@ -787,7 +787,7 @@ mit_learn_oidc_secret = OLVaultK8SSecret(
 
 ecommerce_api_domain = ecommerce_config.require("backend_domain")
 learn_api_domain = ecommerce_config.require("learn_backend_domain")
-apisix_ingress_class = ecommerce_config.get("apisix_ingress_class") or "apisix"
+apisix_ingress_class = ecommerce_config.get("apisix_ingress_class") or "apache-apisix"
 # ApisixUpstream resources don't seem to work but we don't really need them?
 # Ref: https://github.com/apache/apisix-ingress-controller/issues/1655
 # Ref: https://github.com/apache/apisix-ingress-controller/issues/1855

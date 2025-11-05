@@ -13,8 +13,6 @@ config:
   - ".mitxonline.mit.edu"
   eks:apisix_admin_key:
     secure: v1:PafPE9cAPNoOSOrU:8V16zZH9OGc1jgfZffXRDLvb6ROksZLULaYJvdjHgPCG/zmB/8nA8EMZb8X2/O74
-  eks:apisix_ingress_enabled: "false"
-  eks:apisix_official_enabled: "true"
   eks:apisix_viewer_key:
     secure: v1:Iozn2qrhdgmfpCXw:1H82fWngqaTZzOrgGp+jykq0+p/YOKTs5KE7rIPxhGZ1PbjCQ8Clz9+JzXqLQfCu
   eks:apisix_domains:
@@ -25,7 +23,6 @@ config:
   - "api.mitxonline.mit.edu"
   - "studio-backend.learn.mit.edu"
   - "courses-backend.learn.mit.edu"
-  eks:apisix_official_domains:
   - "binder.learn.mit.edu"
   eks:apisix_min_replicas: "5"
   eks:apisix_max_replicas: "10"
