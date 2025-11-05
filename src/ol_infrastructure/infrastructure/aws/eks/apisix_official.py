@@ -75,7 +75,7 @@ def setup_apisix(
     }
 
     kubernetes.helm.v3.Release(
-        f"{cluster_name}-apisix-helm-release",
+        f"{cluster_name}-apisix-official-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
             name="apache-apisix",
             version=apisix_chart_version,
