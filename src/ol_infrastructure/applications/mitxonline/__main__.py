@@ -686,7 +686,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
             route_name="reqauth",
             priority=10,
             hosts=[api_domain, frontend_domain],
-            paths=["/login/", "/admin/login/*", "/login", "/login/oidc*"],
+            paths=["/login/*", "/admin/login/*", "/login*", "/login/oidc*"],
             plugins=[
                 mitxonline_direct_oidc.get_full_oidc_plugin_config(
                     unauth_action="auth"
