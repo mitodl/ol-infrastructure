@@ -10,7 +10,7 @@ COMPREHENSIVE_THEME_DIRS.append("/openedx/themes")
 
 STATIC_ROOT_BASE = "/openedx/staticfiles"
 NODE_MODULES_ROOT = "/openedx/edx-platform/node_modules"
-ENV_ROOT = "/openedx/edx-platform"
+ENV_ROOT = "/openedx"
 
 SECRET_KEY = "secret"  # pragma: allowlist secret
 XQUEUE_INTERFACE = {
