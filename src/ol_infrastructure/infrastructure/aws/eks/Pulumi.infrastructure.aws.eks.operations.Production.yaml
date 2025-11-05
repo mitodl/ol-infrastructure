@@ -40,3 +40,5 @@ config:
   eks:traefik_max_replicas: "10"
   eks:apisix_admin_key:
     secure: v1:NTLLGGbH5LPu0xN5:hfDvIZrarmefhVVvakAX6steeTZsYusUMlDWdjSmBhyJFfEBlIj9rAxP/hbci4Li3sN8wF7KBf+L6Tk=
+  eks:apisix_viewer_key:
+    secure: v1:c+PjkZDQd+Q1lcd5:Z9nOTMl3DuYNmPs7cxUKdCHxDhiNMV68pQFnm/JmzP2HTw6JiWKBoX1ETubVmVPPgNt0JxHT0vaPY3Q=

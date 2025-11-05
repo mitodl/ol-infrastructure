@@ -38,3 +38,5 @@ config:
       node_group_options: {}
   eks:apisix_admin_key:
     secure: v1:jlQfCCW1I6BH+pX7:f1Fjuxa3EmTmc/fnPrdo5nSg3jXxApfskxygh7c9dA7Wu0EUb1skNnC+GXsPeZfVUfykocgOqVM06I4=
+  eks:apisix_viewer_key:
+    secure: v1:8OFSU3lVfq7lILyv:019qfjbXXpMKH7I3yKb4FHlUu5RotlawwTZM7oNnonH7WVHubLTH691s1p+WeTOEGf8BNlVn6zaByNE=
