@@ -13,8 +13,8 @@ config:
   - "celery-monitoring-ci.odl.mit.edu"
   eks:developer_role_policy_name: "AmazonEKSAdminPolicy"
   eks:developer_role_kubernetes_groups: ["admin"]
-  eks:ebs_csi_provisioner: true
-  eks:efs_csi_provisioner: true
+  eks:ebs_csi_provisioner: "true"
+  eks:efs_csi_provisioner: "true"
   eks:gateway_release_channel: "experimental"
   eks:namespaces:
   - "keycloak"
@@ -36,3 +36,5 @@ config:
       tags: {}
       taints: {}
       node_group_options: {}
+  eks:apisix_admin_key:
+    secure: v1:h22m6AHU+aWuLEtY:jQk46e+l7TIkrek+E1s0bUyandaskDxepMhTzmMorO83eqvHQyYjAkphJT/NeaZNVRaq9/ei3y5sqOI=
