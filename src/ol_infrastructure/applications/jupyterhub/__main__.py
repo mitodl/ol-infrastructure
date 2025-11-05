@@ -447,11 +447,11 @@ jupyterhub_application = kubernetes.helm.v3.Release(
                 "resources": {
                     "requests": {
                         "cpu": "10m",
-                        "memory": "10Mi",
+                        "memory": "128Mi",
                     },
                     "limits": {
-                        "cpu": "10m",
-                        "memory": "10Mi",
+                        "cpu": "100m",
+                        "memory": "512Mi",
                     },
                 },
             },
