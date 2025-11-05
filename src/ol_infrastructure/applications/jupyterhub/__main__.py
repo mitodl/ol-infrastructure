@@ -440,6 +440,9 @@ jupyterhub_application = kubernetes.helm.v3.Release(
                 },
             },
             "prePuller": {
+                "hook": {
+                    "enabled": False,
+                },
                 "continuous": {
                     "enabled": True,
                 },
