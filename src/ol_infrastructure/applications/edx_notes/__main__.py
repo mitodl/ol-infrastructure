@@ -2,6 +2,7 @@
 
 import base64
 import json
+import os
 import textwrap
 from pathlib import Path
 
@@ -9,7 +10,7 @@ import pulumi_consul as consul
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, get_caller_identity, iam, route53
 
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
@@ -30,7 +31,11 @@ from ol_infrastructure.components.services.k8s import (
     OLApplicationK8sConfig,
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
-from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
+from ol_infrastructure.lib.aws.eks_helper import (
+    default_psg_egress_args,
+    get_default_psg_ingress_args,
+    setup_k8s_provider,
+)
 from ol_infrastructure.lib.consul import consul_key_helper, get_consul_provider
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
@@ -186,15 +191,32 @@ if deploy_to_k8s:
     # Configure namespace
     namespace = notes_config.get("namespace") or f"{stack_info.env_prefix}-openedx"
 
-    # Get security group from cluster stack
-    notes_security_group_id = cluster_stack.require_output(
-        "application_security_groups"
-    )["edx_notes"]
-    notes_security_group_name = Output.concat("edx-notes-", stack_info.env_prefix)
+    # Determine docker image tag - use digest from environment if available (set by CI),
+    # otherwise fall back to the openedx release tag
+    docker_image_tag = os.environ.get("EDX_NOTES_DOCKER_DIGEST", openedx_release)
+
+    # Get the VPC that the EKS cluster uses (which has k8s subnets configured)
+    # The cluster is typically deployed in the applications VPC
+    cluster_vpc = network_stack.require_output("applications_vpc")
+    cluster_vpc_id = cluster_vpc["id"]
+    k8s_pod_subnet_cidrs = cluster_vpc["k8s_pod_subnet_cidrs"]
+
+    # Create security group for edx-notes application pods
+    notes_app_security_group = ec2.SecurityGroup(
+        f"edx-notes-app-sg-{env_name}",
+        name=f"edx-notes-app-sg-{env_name}",
+        description="Security group for edx-notes application pods",
+        egress=default_psg_egress_args,
+        ingress=get_default_psg_ingress_args(k8s_pod_subnet_cidrs=k8s_pod_subnet_cidrs),
+        vpc_id=cluster_vpc_id,
+        tags=aws_config.merged_tags({"Name": f"edx-notes-app-{env_name}"}),
+    )
 
     # Get service URLs from stack references
-    opensearch_endpoint = opensearch_stack.require_output("opensearch_domain_endpoint")
-    edxapp_db_address = edxapp_stack.require_output("rds_host")
+    opensearch_cluster = opensearch_stack.require_output("cluster")
+    opensearch_endpoint = opensearch_cluster["endpoint"]
+    edxapp_output = edxapp_stack.require_output("edxapp")
+    edxapp_db_address = edxapp_output["mariadb"]
 
     # Application configuration (non-sensitive)
     application_config = {
@@ -244,11 +266,11 @@ if deploy_to_k8s:
         application_deployment_use_anti_affinity=True,
         k8s_global_labels=k8s_global_labels,
         env_from_secret_names=["edx-notes-secrets"],
-        application_security_group_id=notes_security_group_id,
-        application_security_group_name=notes_security_group_name,
+        application_security_group_id=notes_app_security_group.id,
+        application_security_group_name=notes_app_security_group.name,
         application_service_account_name=None,
         application_image_repository="mitodl/openedx-notes",
-        application_docker_tag=openedx_release,
+        application_docker_tag=docker_image_tag,
         application_cmd_array=None,
         application_arg_array=None,
         vault_k8s_resource_auth_name=f"edx-notes-{stack_info.env_prefix}",
@@ -345,6 +367,7 @@ if deploy_to_k8s:
     export("k8s_service_name", "edx-notes")
     export("k8s_namespace", namespace)
     export("notes_domain", dns_name)
+    export("security_group_id", notes_app_security_group.id)
 
 # Deploy to EC2 (original implementation)
 if not deploy_to_k8s:
