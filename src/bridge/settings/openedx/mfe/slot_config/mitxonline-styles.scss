@@ -1,0 +1,153 @@
+.learning-header, .site-header-desktop {
+  background-color: #303337 !important;
+  color: #FFF !important;
+  font-family: neue-haas-grotesk-text, sans-serif !important;
+  font-style: normal !important;
+  font-size: 14px !important;
+  line-height: 18px !important;
+
+  .font-weight-bold {
+    font-weight: 400 !important;
+  }
+
+  .course-title-lockup {
+    margin-left: 10px !important;
+  }
+  .dropdown-toggle, .menu-trigger {
+    display: flex !important;
+    padding: 4px 8px !important;
+    align-items: center !important;
+    gap: 8px !important;
+    color: #FFF !important;
+    border-radius: 4px !important;
+    border: 1px solid var(--dark-silver-gray-text-secondary, #626A73) !important;
+    opacity: 0.75 !important;
+    font-family: neue-haas-grotesk-text, sans-serif !important;
+    font-weight: 400 !important;
+    font-style: normal !important;
+    font-size: 0.875rem !important;
+    line-height: 1.125rem !important;
+    opacity: 0.75 !important;
+    height: auto !important;
+
+    &:hover, &:focus {
+      display: flex !important;
+      padding: 4px 8px !important;
+      align-items: center !important;
+      gap: 8px !important;
+      color: #FFF !important;
+      border-radius: 4px !important;
+      border: 1px solid var(--dark-silver-gray-text-secondary, #626A73) !important;
+      opacity: 0.75 !important;
+      opacity: 1 !important;
+      background-color: transparent !important;
+    }
+    &:btn:not(:disabled, .disabled, .btn-link).focus::before, .btn:not(:disabled, .disabled, .btn-link):focus::before {
+      border: none !important;
+    }
+  }
+  .dashboard-btn{
+    display: inline-flex !important;
+    height: 32px !important;
+    padding: 18px 12px !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 10px !important;
+    flex-shrink: 0 !important;
+    border-radius: 4px !important;
+    border: 1px solid var(--Light-Gray-2, #DDE1E6) !important;
+    background: var(--Light-Gray-2, #DDE1E6) !important;
+    p {
+      color: #212326 !important;
+      &:hover {
+        text-decoration: none !important;
+        color: #212326 !important;
+      }
+    }
+  &:hover{
+    border-radius: 4px !important;
+    border: 0 solid var(--dark-gray-2-text-primary, #212326) !important;
+    background: var(--white-mit-brand, #FFF) !important;
+    text-decoration: none !important;
+  }
+  }
+  .dropdown-menu-right{
+    display: flex !important;
+    padding: 12px 16px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 16px !important;
+    align-self: stretch !important;
+    border-radius: 4px !important;
+    border-bottom: 1px solid var(--Light-Gray-2, #DDE1E6) !important;
+    background: var(--white-mit-brand, #FFF) !important;
+    /* Shadow/02dp */
+    box-shadow: 0 2px 4px 0 rgba(37, 38, 43, 0.10), 0 2px 4px 0 rgba(37, 38, 43, 0.10) !important;
+    min-width: 10rem;
+  }
+  .btn-outline-primary:not(.dropdown-toggle, .menu-trigger), .btn-primary:not(.dropdown-toggle, .menu-trigger), .nav-link{
+    display: inline-flex !important;
+    height: 32px !important;
+    padding: 18px 12px !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 10px !important;
+    flex-shrink: 0 !important;
+    border-radius: 4px !important;
+    border: 1px solid var(--Light-Gray-2, #DDE1E6) !important;
+    background: var(--Light-Gray-2, #DDE1E6) !important;
+    color: #212326 !important;
+    margin-left: 10px !important;
+    &:hover {
+      text-decoration: none !important;
+      color: #212326 !important;
+    }
+    p {
+      color: #212326;
+      &:hover {
+        text-decoration: none !important;
+        color: #212326 !important;
+      }
+    }
+  &:hover{
+    border-radius: 4px !important;
+    border: 0 solid var(--dark-gray-2-text-primary, #212326) !important;
+    background: var(--white-mit-brand, #FFF) !important;
+    text-decoration: none !important;
+  }
+  }
+}
+.btn:not(:disabled, .disabled, .btn-link).focus::before, .btn:not(:disabled, .disabled, .btn-link):focus::before {
+  border: none !important;
+}
+// Mobile responsive adjustments
+@media (max-width: 767px) {
+  .learning-header, .site-header-desktop {
+    // Hide standalone dashboard button; moved into user dropdown
+    .dashboard-btn { display: none !important; }
+
+    // Hide the username to conserve space; keep icon only
+    .dropdown-toggle  .user-menu-name, .menu-trigger .user-menu-name { display: none; }
+    .dropdown-toggle {
+      border: none !important;
+      &:hover, &:focus {
+        border: none !important;
+      }
+    }
+    // Constrain long course titles to prevent overflow; allow ellipsis
+    .course-title {
+      max-width: 160px !important; // adjust as needed for available width
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+    }
+
+    // Tighten spacing within dropdown for smaller screens
+    .dropdown-menu-right {
+      padding: 8px 12px !important;
+      gap: 12px !important;
+    }
+  }
+}
