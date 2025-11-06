@@ -63,6 +63,12 @@ def _build_general_secrets_template(
         SYSADMIN_GITHUB_WEBHOOK_KEY: {{{{ get .Secrets "sysadmin_git_webhook_secret" }}}}"""
     ]
 
+    if stack_info.env_prefix == "mitxonline":
+        template_parts.append(
+            """
+        GITHUB_ACCESS_TOKEN: {{{{ get .Secrets "github_access_token" }}}}"""
+        )
+
     # Conditional: xpro-specific email configuration
     if stack_info.env_prefix == "xpro":
         template_parts.append(
