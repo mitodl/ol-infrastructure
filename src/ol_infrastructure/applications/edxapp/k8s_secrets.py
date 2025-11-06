@@ -244,7 +244,7 @@ def create_k8s_secrets(
                           OPTIONS:
                             CLIENT_CLASS: django_redis.client.DefaultClient
                             PASSWORD: {{{{ get .Secrets "redis_auth_token" }}}}
-                        SECRET_KEY: {{{{ get .Secrets "django_secret_key" }}}}
+                        GITHUB_ACCESS_TOKEN: {{{{ get .Secrets "github_access_token" }}}}
                         JWT_AUTH:  # NEEDS ATTENTION
                           JWT_ALGORITHM: HS256
                           JWT_AUDIENCE: mitxonline
@@ -265,6 +265,7 @@ def create_k8s_secrets(
                         OPENAI_SECRET_KEY: {{{{ get .Secrets "openai_api_key" }}}}
                         OPENAI_API_KEY: {{{{ get .Secrets "openai_api_key" }}}}
                         RETIRED_USER_SALTS: {{{{ get .Secrets "user_retirement_salts" }}}}
+                        SECRET_KEY: {{{{ get .Secrets "django_secret_key" }}}}
                         SENTRY_DSN: {{{{ get .Secrets "sentry_dsn" }}}}
                         SYSADMIN_GITHUB_WEBHOOK_KEY: {{{{ get .Secrets "sysadmin_git_webhook_secret" }}}}
                         PROCTORING_BACKENDS:
