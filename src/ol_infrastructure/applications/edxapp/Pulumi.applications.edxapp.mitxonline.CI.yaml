@@ -85,6 +85,7 @@ config:
     secure: v1:lC3eiftPkXDB9eI/:PxRgffKu9kJjB78ijeLeJgS3fSC0kT80n5GurGDVELGh80RHA31t/VW/4EgwSK00ZlAkCYVKyNSgsDNMwkMzbOP20YcRKvp46olDgdo0Yk2Krou4BzBax5/9
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
+  edxapp:enable_xqueue: true
   edxapp:framework: "earthly"
   edxapp:min_web_nodes: "1"
   edxapp:min_worker_nodes: "1"

@@ -22,7 +22,7 @@ class EdxappSecrets:
     mongo_db_creds: OLVaultK8SSecret
     mongo_db_forum: OLVaultK8SSecret
     general: Output
-    xqueue: OLVaultK8SSecret
+    xqueue: OLVaultK8SSecret | None
     forum: OLVaultK8SSecret
     learn_ai_canvas_syllabus_token: OLVaultK8SSecret
     cms_oauth: OLVaultK8SSecret
@@ -33,7 +33,7 @@ class EdxappSecrets:
     mongo_db_creds_secret_name: str
     mongo_db_forum_secret_name: str
     general_secrets_name: str
-    xqueue_secret_name: str
+    xqueue_secret_name: str | None
     forum_secret_name: str
     learn_ai_canvas_syllabus_token_secret_name: str
     cms_oauth_secret_name: str
@@ -239,7 +239,9 @@ def create_k8s_secrets(
                         FERNET_KEYS: {{{{ get .Secrets "fernet_keys" }}}}
                         redis_cache_config: &redis_cache_config
                           BACKEND: django_redis.cache.RedisCache
-                          LOCATION: rediss://default@{redis_cache["redis_hostname"]}:6379/0
+                          LOCATION: rediss://default@{
+                        redis_cache["redis_hostname"]
+                    }:6379/0
                           KEY_FUNCTION: common.djangoapps.util.memcache.safe_key
                           OPTIONS:
                             CLIENT_CLASS: django_redis.client.DefaultClient
@@ -248,10 +250,18 @@ def create_k8s_secrets(
                         JWT_AUTH:  # NEEDS ATTENTION
                           JWT_ALGORITHM: HS256
                           JWT_AUDIENCE: mitxonline
-                          JWT_AUTH_COOKIE: {stack_info.env_prefix}-{stack_info.env_suffix}-edx-jwt-cookie
-                          JWT_AUTH_COOKIE_HEADER_PAYLOAD: {stack_info.env_prefix}-{stack_info.env_suffix}-edx-jwt-cookie-header-payload
-                          JWT_AUTH_COOKIE_SIGNATURE: {stack_info.env_prefix}-{stack_info.env_suffix}-edx-jwt-cookie-signature
-                          JWT_ISSUER: 'https://{edxapp_config.require_object("domains")["lms"]}/oauth2'
+                          JWT_AUTH_COOKIE: {stack_info.env_prefix}-{
+                        stack_info.env_suffix
+                    }-edx-jwt-cookie
+                          JWT_AUTH_COOKIE_HEADER_PAYLOAD: {stack_info.env_prefix}-{
+                        stack_info.env_suffix
+                    }-edx-jwt-cookie-header-payload
+                          JWT_AUTH_COOKIE_SIGNATURE: {stack_info.env_prefix}-{
+                        stack_info.env_suffix
+                    }-edx-jwt-cookie-signature
+                          JWT_ISSUER: 'https://{
+                        edxapp_config.require_object("domains")["lms"]
+                    }/oauth2'
                           JWT_LOGIN_CLIENT_ID: login-service-client-id
                           JWT_LOGIN_SERVICE_USERNAME: login_service_user
                           JWT_PRIVATE_SIGNING_JWK: '{{{{ get .Secrets "private_signing_jwk" }}}}'
@@ -259,7 +269,9 @@ def create_k8s_secrets(
                           JWT_SECRET_KEY: {{{{ get .Secrets "django_secret_key" }}}}
                           JWT_SIGNING_ALGORITHM: RS512
                           JWT_ISSUERS:
-                            - ISSUER: https://{edxapp_config.require_object("domains")["lms"]}/oauth2
+                            - ISSUER: https://{
+                        edxapp_config.require_object("domains")["lms"]
+                    }/oauth2
                               AUDIENCE: mitxonline
                               SECRET_KEY: {{{{ get .Secrets "django_secret_key" }}}}
                         OPENAI_SECRET_KEY: {{{{ get .Secrets "openai_api_key" }}}}
@@ -269,12 +281,25 @@ def create_k8s_secrets(
                         SYSADMIN_GITHUB_WEBHOOK_KEY: {{{{ get .Secrets "sysadmin_git_webhook_secret" }}}}
                         PROCTORING_BACKENDS:
                           DEFAULT: 'proctortrack'
+                        {
+                        f'''
                           'proctortrack':
                             'client_id': '{{{{ get .Secrets "proctortrack_client_id" }}}}'
                             'client_secret': '{{{{ get .Secrets "proctortrack_client_secret" }}}}'
                             'base_url': '{edxapp_config.require("proctortrack_url")}'
+                        '''
+                        if edxapp_config.get("proctortrack_url")
+                        else ""
+                    }
                           'null': {{}}
-                        PROCTORING_USER_OBFUSCATION_KEY: {{{{ get .Secrets "proctortrack_user_obfuscation_key" }}}}
+                        {
+                        (
+                            'PROCTORING_USER_OBFUSCATION_KEY: {{{{ get .Secrets "proctortrack_user_obfuscation_key" }}}}'
+                            + chr(10)
+                        )
+                        if edxapp_config.get("proctortrack_url")
+                        else ""
+                    }
                     """),
                 },
                 vaultauth=vault_k8s_resources.auth_name,
@@ -285,33 +310,37 @@ def create_k8s_secrets(
         ),
     )
 
-    xqueue_secret_name = "11-xqueue-secrets-yaml"  # pragma: allowlist secret
-    xqueue_secret_secret = OLVaultK8SSecret(
-        f"ol-{stack_info.env_prefix}-edxapp-xqueue-secret-{stack_info.env_suffix}",
-        OLVaultK8SStaticSecretConfig(
-            name=xqueue_secret_name,
-            namespace=namespace,
-            dest_secret_labels=k8s_global_labels,
-            dest_secret_name=xqueue_secret_name,
-            labels=k8s_global_labels,
-            mount=f"secret-{stack_info.env_prefix}",
-            mount_type="kv-v1",
-            path="edx-xqueue",
-            templates={
-                "11-xqueue-secrets.yaml": textwrap.dedent("""
-                        XQUEUE_INTERFACE:
-                          django_auth:
-                            password: {{ get .Secrets "edxapp_password" }}
-                            username: edxapp
-                          url: http://xqueue:8040 # Assumes Xqueue is running in K8S
-                    """),
-            },
-            vaultauth=vault_k8s_resources.auth_name,
-        ),
-        opts=ResourceOptions(
-            delete_before_replace=True, depends_on=[vault_k8s_resources]
-        ),
-    )
+    if edxapp_config.get_bool("enable_xqueue"):
+        xqueue_secret_name = "11-xqueue-secrets-yaml"  # pragma: allowlist secret
+        xqueue_secret_secret = OLVaultK8SSecret(
+            f"ol-{stack_info.env_prefix}-edxapp-xqueue-secret-{stack_info.env_suffix}",
+            OLVaultK8SStaticSecretConfig(
+                name=xqueue_secret_name,
+                namespace=namespace,
+                dest_secret_labels=k8s_global_labels,
+                dest_secret_name=xqueue_secret_name,
+                labels=k8s_global_labels,
+                mount=f"secret-{stack_info.env_prefix}",
+                mount_type="kv-v1",
+                path="edx-xqueue",
+                templates={
+                    "11-xqueue-secrets.yaml": textwrap.dedent("""
+                            XQUEUE_INTERFACE:
+                              django_auth:
+                                password: {{ get .Secrets "edxapp_password" }}
+                                username: edxapp
+                              url: http://xqueue:8040 # Assumes Xqueue is running in K8S
+                        """),
+                },
+                vaultauth=vault_k8s_resources.auth_name,
+            ),
+            opts=ResourceOptions(
+                delete_before_replace=True, depends_on=[vault_k8s_resources]
+            ),
+        )
+    else:
+        xqueue_secret_name = None
+        xqueue_secret_secret = None
 
     forum_secret_name = "12-forum-secrets-yaml"  # pragma: allowlist secret
     forum_secret_secret = OLVaultK8SSecret(

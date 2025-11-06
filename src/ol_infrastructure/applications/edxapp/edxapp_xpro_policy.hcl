@@ -37,3 +37,11 @@ path "secret-operations/global/github-enterprise-ssh" {
 path "secret-xpro/xpro-wildcard-certificate" {
   capabilities = ["read"]
 }
+
+path "secret-global/learn_ai" {
+  capabilities = ["read"]
+}
+
+path "secret-global/data/learn_ai" {
+  capabilities = ["read"]
+}

@@ -50,6 +50,7 @@ config:
   edxapp:k8s_deployment: false
   edxapp:k8s_cutover: false
   edxapp:disable_ec2_deployment: false
+  edxapp:enable_xqueue: false
   edxapp:framework: "earthly"
   edxapp:mail_domain: edxapp-mail-production.xpro.mit.edu
   edxapp:min_web_nodes: "3"
