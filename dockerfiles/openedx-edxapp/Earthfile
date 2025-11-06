@@ -58,7 +58,8 @@ install-deps:
   ENV PATH /root/.local/bin:/openedx/nodeenv/bin:${PATH}
   ENV NPM_REGISTRY "https://registry.npmjs.org/"
   RUN nodeenv /openedx/nodeenv --node=$NODE_VERSION --prebuilt \
-    && npm clean-install -s --registry=$NPM_REGISTRY
+    && npm clean-install -s --registry=$NPM_REGISTRY \
+    && npm install git+https://git@github.com/verificient/edx-proctoring-proctortrack.git#f0fa9edbd16aa5af5a41ac309d2609e529ea8732
   SAVE ARTIFACT /openedx/edx-platform
   SAVE ARTIFACT /openedx/nodeenv
   SAVE ARTIFACT /root/.local
@@ -108,7 +109,9 @@ collected:
   ENV PATH /openedx/.local/bin:/openedx/bin:/openedx/edx-platform/node_modules/.bin:/openedx/nodeenv/bin:${PATH}
   WORKDIR /openedx/edx-platform
   RUN pip install --no-warn-script-location --user --no-cache-dir -e . \
-    && mkdir -p /openedx/config ./lms/envs/mitol ./cms/envs/mitol
+    && mkdir -p /openedx/config ./lms/envs/mitol ./cms/envs/mitol \
+    && touch ./lms/envs/mitol/__init__.py \
+    && touch ./cms/envs/mitol/__init__.py
   COPY settings/lms.env.yml /openedx/config/lms.env.yml
   COPY settings/cms.env.yml /openedx/config/cms.env.yml
 
@@ -165,9 +168,6 @@ build-static-assets-nonprod:
   FROM +fetch-translations
   # ENV JS_ENV_EXTRA_CONFIG '{"PROCTORTRACK_CDN_URL": "\"https://verificientstatic-preprod.storage.googleapis.com/cdn/fb_cjs/edx_preprod_cjs.IQEQWWZ2.js\"", "PROCTORTRACK_CONFIG_KEY": "\"1PKRwFPezxXj3TsD\""}'
   # ENV JS_ENV_EXTRA_CONFIG='{"PROCTORTRACK_CDN_URL":"\"\"","PROCTORTRACK_CONFIG_KEY":"\"\""}'
-  RUN pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/codejail.git@babbe784b48bb9888aa159d8b401cbe5e07f0af4#egg=codejail" \
-    && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/django-wiki.git@0a1d555a1fa2834cc46367968aad907a5667317b#egg=django_wiki" \
-    && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/olxcleaner.git@2f0d6c7f126cbd69c9724b7b57a0b2565330a297#egg=olxcleaner"
   ENV STATIC_ROOT_LMS=/openedx/staticfiles/
   ENV NODE_ENV=prod
   ARG --required DEPLOYMENT_NAME
@@ -189,9 +189,6 @@ build-static-assets-production:
   FROM +fetch-translations
   # ENV JS_ENV_EXTRA_CONFIG '{"PROCTORTRACK_CDN_URL": "\"https://verificientstatic.storage.googleapis.com/cdn/fb_cjs/edx_us_cjs.IQEQWWZ2.js\"", "PROCTORTRACK_CONFIG_KEY": "\"1PKRwFPezxXj3TsD\""}'
   # ENV JS_ENV_EXTRA_CONFIG='{"PROCTORTRACK_CDN_URL":"\"\"","PROCTORTRACK_CONFIG_KEY":"\"\""}'
-  RUN pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/codejail.git@babbe784b48bb9888aa159d8b401cbe5e07f0af4#egg=codejail" \
-    && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/django-wiki.git@0a1d555a1fa2834cc46367968aad907a5667317b#egg=django_wiki" \
-    && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/olxcleaner.git@2f0d6c7f126cbd69c9724b7b57a0b2565330a297#egg=olxcleaner"
   ENV STATIC_ROOT_LMS=/openedx/staticfiles/
   ENV NODE_ENV=prod
   ARG --required DEPLOYMENT_NAME
