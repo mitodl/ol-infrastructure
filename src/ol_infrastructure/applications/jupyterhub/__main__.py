@@ -305,7 +305,7 @@ apisix_route = OLApisixRoute(
 )
 
 #####  START AUTHORING #####
-authoring_namespace = "jupyter_authoring"
+authoring_namespace = "jupyter-authoring"
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(authoring_namespace, ns)
 )

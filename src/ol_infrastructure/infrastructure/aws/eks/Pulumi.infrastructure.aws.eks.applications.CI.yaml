@@ -41,6 +41,7 @@ config:
   - "digital-credentials"
   - "ecommerce"
   - "jupyter"
+  - "jupyter-authoring"
   - "kubewatch"
   - "learn-ai"
   - "mitlearn"

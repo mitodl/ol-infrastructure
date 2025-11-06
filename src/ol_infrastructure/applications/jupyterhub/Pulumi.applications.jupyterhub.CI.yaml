@@ -17,3 +17,5 @@ config:
   jupyterhub:shared_password:
     secure: v1:sKBL3tBJ/EGDkmrt:5sJUBSl6ehXuwdMvMpwILzdsvHkycmXCUt43ru1SsO9sePH9WQNlVy6giJ1Y2wXiYu9dQx9NfGYb+Nnk4t7T90Gjz5Ouc2NKGT05rKuDMjk=
   jupyterhub:authoring_domain: authoring.nb.ci.learn.mit.edu
+  jupyterhub:authoring_rds_password:
+    secure: v1:dn0ZiUd5Sh1yo10s:cszutsZ3CGMAWotL2K3AjNFEjhxi2vZYVaP56iF7BeDrt0gEj/6g6zy6q/hzq4vd1E7fyJZ6wm0zZS8=
