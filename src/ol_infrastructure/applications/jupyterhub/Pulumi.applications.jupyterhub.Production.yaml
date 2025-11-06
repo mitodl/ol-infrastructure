@@ -16,3 +16,4 @@ config:
     secure: v1:utJI/U+DtdYl9Jwt:GWCMQMGxYW8eUPD4DLvyX+JmPfxkAFuwT/lzNmG9+ylC8lmzu2Fvs8L0wPIdHJ+gT373Afzg8j3TjYJZQXmX4GEzaMYL6SC88NrCvnK3cPs=
   jupyterhub:rds_password:
     secure: v1:VZ01V+/2C2yb/lcs:qtABxx15MJluKv/+MEWyow7SrnPKaVMuUlUpLwell4+EBv1rvMDotKGEK9SYegTP7zLwqxYJVzgJxpI=
+  jupyterhub:authoring_domain: authoring.nb.learn.mit.edu
