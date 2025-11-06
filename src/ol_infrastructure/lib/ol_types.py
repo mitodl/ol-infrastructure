@@ -55,6 +55,7 @@ class Services(str, Enum):
     superset = "superset"
     bootcamps = "bootcamps"
     botkube = "botkube"
+    celery_monitoring = "celery-monitoring"
     codejail = "codejail"
     dagster = "dagster"
     ecommerce = "unified-ecommerce"

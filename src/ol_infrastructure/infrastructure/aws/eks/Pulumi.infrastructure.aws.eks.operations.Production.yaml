@@ -13,8 +13,8 @@ config:
   - "celery-monitoring.odl.mit.edu"
   eks:apisix_min_replicas: "3"
   eks:apisix_max_replicas: "10"
-  eks:ebs_csi_provisioner: "true"
-  eks:efs_csi_provisioner: "true"
+  eks:ebs_csi_provisioner: true
+  eks:efs_csi_provisioner: true
   eks:gateway_release_channel: "experimental"
   eks:namespaces:
   - "keycloak"
