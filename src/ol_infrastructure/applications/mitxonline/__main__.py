@@ -406,7 +406,7 @@ redis_cluster_security_group = ec2.SecurityGroup(
         ec2.SecurityGroupIngressArgs(
             security_groups=[
                 mitxonline_app_security_group.id,
-                operations_vpc["security_groups"]["celery_monitoring"],
+                operations_vpc["security_groups"]["celery_monitoring"]["id"],
                 cluster_substructure_stack.require_output(
                     "cluster_keda_security_group_id"
                 ),

@@ -436,19 +436,24 @@ operations_vpc_exports = vpc_exports(
         "xpro_vpc",
     ],
 )
+celery_monitoring_security_group = ec2.SecurityGroup(
+    "operations-celery-monitoring",
+    description="Security group for Leek service for Celery Monitoring",
+    vpc_id=operations_vpc.olvpc.id,
+    ingress=[],
+    egress=[],
+    tags=operations_vpc_config.merged_tags(
+        {"Name": f"operations-{stack_info.env_suffix}-celery-monitoring"}
+    ),
+)
+
 operations_vpc_exports.update(
     {
         "security_groups": {
-            "celery_monitoring": ec2.SecurityGroup(
-                "operations-celery-monitoring",
-                description="Security group for Leek service for Celery Monitoring",
-                vpc_id=operations_vpc.olvpc.id,
-                ingress=[],
-                egress=[],
-                tags=operations_vpc_config.merged_tags(
-                    {"Name": f"operations-{stack_info.env_suffix}-celery-monitoring"}
-                ),
-            ).id,
+            "celery_monitoring": {
+                "id": celery_monitoring_security_group.id,
+                "name": celery_monitoring_security_group.name,
+            },
             "default": operations_vpc.olvpc.id.apply(default_group).id,
             "web": public_web(operations_vpc_config.vpc_name, operations_vpc.olvpc)(
                 tags=operations_vpc_config.merged_tags(

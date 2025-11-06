@@ -327,7 +327,9 @@ redis_cluster_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,
             protocol="tcp",
-            security_groups=[operations_vpc["security_groups"]["celery_monitoring"]],
+            security_groups=[
+                operations_vpc["security_groups"]["celery_monitoring"]["id"]
+            ],
             description="Allow access from celery monitoring",
         ),
     ],

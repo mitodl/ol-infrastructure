@@ -50,6 +50,8 @@ opensearch_stack = StackReference(
 vault_mount_stack = StackReference(
     f"substructure.vault.static_mounts.operations.{stack_info.name}"
 )
+network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+operations_vpc = network_stack.require_output("operations_vpc")
 
 # K8s stack references
 cluster_stack = StackReference(f"infrastructure.aws.eks.operations.{stack_info.name}")
@@ -272,7 +274,12 @@ leek_deployment = kubernetes.apps.v1.Deployment(
         ),
         template=kubernetes.core.v1.PodTemplateSpecArgs(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                labels=application_labels,
+                labels=application_labels
+                | {
+                    "ol.mit.edu/pod-security-group": operations_vpc["security_groups"][
+                        "celery_monitoring"
+                    ]["name"],
+                },
             ),
             spec=kubernetes.core.v1.PodSpecArgs(
                 service_account_name=celery_monitoring_auth_binding.vault_k8s_resources.service_account_name,
@@ -302,7 +309,7 @@ leek_deployment = kubernetes.apps.v1.Deployment(
                             ),
                             kubernetes.core.v1.EnvVarArgs(
                                 name="LEEK_API_URL",
-                                value=f"https://{celery_monitoring_domain}/v1",
+                                value=f"https://{celery_monitoring_domain}/",
                             ),
                             kubernetes.core.v1.EnvVarArgs(
                                 name="LEEK_AGENT_API_SECRET",
@@ -398,7 +405,12 @@ leek_service = kubernetes.core.v1.Service(
             kubernetes.core.v1.ServicePortArgs(
                 port=5000,
                 target_port=5000,
-                name="http",
+                name="api",
+            ),
+            kubernetes.core.v1.ServicePortArgs(
+                port=8000,
+                target_port=8000,
+                name="web",
             ),
         ],
     ),
@@ -416,12 +428,23 @@ leek_apisix_route = OLApisixRoute(
     route_configs=[
         OLApisixRouteConfig(
             route_name="web",
-            priority=0,
+            priority=10,
             plugins=[
                 oidc_plugin,
             ],
             hosts=[celery_monitoring_domain],
             paths=["/*"],
+            backend_service_name="celery-monitoring",
+            backend_service_port=8000,
+        ),
+        OLApisixRouteConfig(
+            route_name="api",
+            priority=0,
+            plugins=[
+                oidc_plugin,
+            ],
+            hosts=[celery_monitoring_domain],
+            paths=["/v1/*"],
             backend_service_name="celery-monitoring",
             backend_service_port=5000,
         ),
