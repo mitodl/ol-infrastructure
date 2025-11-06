@@ -164,10 +164,10 @@ fetch-translations:
   END
   SAVE ARTIFACT /openedx/edx-platform /edx-platform
 
-build-static-assets-nonprod:
+build-static-assets:
   FROM +fetch-translations
   # ENV JS_ENV_EXTRA_CONFIG '{"PROCTORTRACK_CDN_URL": "\"https://verificientstatic-preprod.storage.googleapis.com/cdn/fb_cjs/edx_preprod_cjs.IQEQWWZ2.js\"", "PROCTORTRACK_CONFIG_KEY": "\"1PKRwFPezxXj3TsD\""}'
-  # ENV JS_ENV_EXTRA_CONFIG='{"PROCTORTRACK_CDN_URL":"\"\"","PROCTORTRACK_CONFIG_KEY":"\"\""}'
+  ENV JS_ENV_EXTRA_CONFIG='{"PROCTORTRACK_CDN_URL":"\"\"","PROCTORTRACK_CONFIG_KEY":"\"\""}'
   ENV STATIC_ROOT_LMS=/openedx/staticfiles/
   ENV NODE_ENV=prod
   ARG --required DEPLOYMENT_NAME
@@ -184,6 +184,7 @@ build-static-assets-nonprod:
     && ls -ltrah /openedx/staticfiles \
     && tar czf - /openedx/staticfiles > /openedx/staticfiles-nonprod.tar.gz
   SAVE ARTIFACT /openedx/staticfiles-nonprod.tar.gz AS LOCAL staticfiles-nonprod.tar.gz
+  SAVE ARTIFACT /openedx/staticfiles-nonprod.tar.gz AS LOCAL staticfiles-production.tar.gz
 
 build-static-assets-production:
   FROM +fetch-translations
@@ -207,7 +208,7 @@ build-static-assets-production:
   SAVE ARTIFACT /openedx/staticfiles-production.tar.gz AS LOCAL staticfiles-production.tar.gz
 
 docker-image:
-  FROM +fetch-translations
+  FROM +build-static-assets
   ARG --required DEPLOYMENT_NAME
   ARG --required RELEASE_NAME
   ENV DJANGO_SETTINGS_MODULE="invalid"
@@ -222,5 +223,4 @@ docker-image:
 
 all:
   BUILD +docker-image
-  BUILD +build-static-assets-production
-  BUILD +build-static-assets-nonprod
+  BUILD +build-static-assets
