@@ -246,6 +246,7 @@ celery_monitoring_oidc_resources = OLApisixOIDCResources(
         oidc_post_logout_redirect_uri=f"https://{celery_monitoring_domain}/",
         oidc_session_cookie_lifetime=60 * 20160,  # 2 weeks
         oidc_use_session_secret=True,
+        oidc_scope="openid profile email",
         vault_mount="secret-operations",
         vault_mount_type="kv-v1",
         vault_path="sso/leek",
@@ -392,35 +393,26 @@ leek_service = kubernetes.core.v1.Service(
     ),
     spec=kubernetes.core.v1.ServiceSpecArgs(
         type="ClusterIP",
-        selector={"app": "celery-monitoring"},
+        selector=application_labels,
         ports=[
             kubernetes.core.v1.ServicePortArgs(
                 port=5000,
                 target_port=5000,
-                name="api",
-            ),
-            kubernetes.core.v1.ServicePortArgs(
-                port=8000,
-                target_port=8000,
-                name="web",
+                name="http",
             ),
         ],
     ),
 )
 
-# APISIX Routes for Leek (API and Web UI with OIDC)
-apisix_ingress_class = celery_monitoring_config.get("apisix_ingress_class") or "apisix"
-
 # Get OIDC plugin config as dict and wrap in OLApisixPluginConfig
 oidc_plugin = OLApisixPluginConfig(
-    **celery_monitoring_oidc_resources.get_full_oidc_plugin_config(unauth_action="deny")
+    **celery_monitoring_oidc_resources.get_full_oidc_plugin_config(unauth_action="auth")
 )
 
 leek_apisix_route = OLApisixRoute(
     name=f"celery-monitoring-apisix-route-{stack_info.env_suffix}",
     k8s_namespace=celery_monitoring_namespace,
     k8s_labels=application_labels,
-    ingress_class_name=apisix_ingress_class,
     route_configs=[
         OLApisixRouteConfig(
             route_name="web",
