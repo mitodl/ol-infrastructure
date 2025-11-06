@@ -52,8 +52,6 @@ env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 jupyterhub_config = Config("jupyterhub")
 apisix_ingress_class = jupyterhub_config.get("apisix_ingress_class") or "apisix"
 
-jupyterhub_config = Config("jupyterhub")
-
 dns_stack = StackReference("infrastructure.aws.dns")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
@@ -129,6 +127,7 @@ rds_defaults["instance_size"] = (
     jupyterhub_config.get("db_instance_size") or rds_defaults["instance_size"]
 )
 rds_defaults["use_blue_green"] = False
+# As I understand we don't need to override this.
 rds_password = jupyterhub_config.require("rds_password")
 
 jupyterhub_db_security_group = ec2.SecurityGroup(
@@ -304,6 +303,196 @@ apisix_route = OLApisixRoute(
         delete_before_replace=True,
     ),
 )
+
+#####  START AUTHORING #####
+authoring_namespace = "jupyter_authoring"
+cluster_stack.require_output("namespaces").apply(
+    lambda ns: check_cluster_namespace(authoring_namespace, ns)
+)
+authoring_rds_password = jupyterhub_config.require("authoring_rds_password")
+jupyterhub_authoring_creds_secret_name = "jupyterhub-authoring-db-creds"  # noqa: S105  # pragma: allowlist secret
+
+jupyterhub_authoring_db_security_group = ec2.SecurityGroup(
+    f"jupyterhub-authoring-db-security-group-{env_name}",
+    name=f"jupyterhub-authoring-db-{target_vpc_name}-{env_name}",
+    description="Access from authoring jupyterhub to its own postgres database.",
+    ingress=[
+        ec2.SecurityGroupIngressArgs(
+            security_groups=[
+                vault_stack.require_output("vault_server")["security_group"],
+            ],
+            cidr_blocks=[target_vpc["cidr"]],
+            protocol="tcp",
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
+            description="Access to Postgres from authoring jupyterhub nodes.",
+        ),
+        ec2.SecurityGroupIngressArgs(
+            cidr_blocks=k8s_pod_subnet_cidrs,
+            description="Allow k8s cluster ipblocks to talk to DB",
+            from_port=DEFAULT_POSTGRES_PORT,
+            protocol="tcp",
+            security_groups=[],
+            to_port=DEFAULT_POSTGRES_PORT,
+        ),
+    ],
+    tags=aws_config.tags,
+    vpc_id=target_vpc_id,
+)
+
+jupyterhub_authoring_db_config = OLPostgresDBConfig(
+    instance_name=f"jupyterhub-authoring-db-{stack_info.env_suffix}",
+    password=authoring_rds_password,
+    subnet_group_name=target_vpc["rds_subnet"],
+    security_groups=[jupyterhub_authoring_db_security_group],
+    tags=aws_config.tags,
+    db_name="jupyterhub-authoring",
+    **rds_defaults,
+)
+jupyterhub_authoring_db = OLAmazonDB(jupyterhub_authoring_db_config)
+
+jupyterhub_authoring_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
+    db_name=jupyterhub_authoring_db_config.db_name,
+    mount_point=f"{jupyterhub_authoring_db_config.engine}-jupyterhub",
+    db_admin_username=jupyterhub_authoring_db_config.username,
+    db_admin_password=authoring_rds_password,
+    db_host=jupyterhub_authoring_db.db_instance.address,
+    role_statements=postgres_role_statements,
+)
+jupyterhub_authoring_db_vault_backend = OLVaultDatabaseBackend(
+    jupyterhub_authoring_db_vault_backend_config,
+    opts=ResourceOptions(depends_on=[jupyterhub_authoring_db]),
+)
+jupyterhub_authoring_creds_secret_name = "jupyterhub-authoring-db-creds"  # noqa: S105  # pragma: allowlist secret
+
+# Create vault_k8s_resources to allow jupyter hub to access secrets in vault
+jupyterhub_authoring_vault_policy = vault.Policy(
+    f"ol-jupyterhub-authoring-vault-policy-{stack_info.env_suffix}",
+    name="jupyterhub-authoring",
+    # TODO(dansubak): Separate policy file? Or add authoring policy to existing hcl?
+    policy=Path(__file__).parent.joinpath("jupyterhub_policy.hcl").read_text(),
+)
+
+jupyterhub_authoring_vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
+    f"ol-jupyterhub-authoring-vault-k8s-auth-backend-role-{stack_info.env_suffix}",
+    role_name="jupyterhub-authoring",
+    backend=cluster_stack.require_output("vault_auth_endpoint"),
+    bound_service_account_names=["*"],
+    bound_service_account_namespaces=[authoring_namespace],
+    token_policies=[jupyterhub_authoring_vault_policy.name],
+)
+
+authoring_vault_k8s_resources = OLVaultK8SResources(
+    resource_config=OLVaultK8SResourcesConfig(
+        application_name="jupyterhub-authoring",
+        namespace=authoring_namespace,
+        labels=k8s_global_labels,
+        vault_address=vault_config.require("address"),
+        vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+        vault_auth_role_name=jupyterhub_authoring_vault_k8s_auth_backend_role.role_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[jupyterhub_authoring_vault_k8s_auth_backend_role],
+    ),
+)
+
+authoring_app_db_creds_dynamic_secret_config = OLVaultK8SDynamicSecretConfig(
+    name="jupyterhub-authoring-app-db-creds",
+    dest_secret_labels=k8s_global_labels,
+    dest_secret_name=jupyterhub_authoring_creds_secret_name,
+    exclude_raw=True,
+    labels=k8s_global_labels,
+    mount=jupyterhub_authoring_db_vault_backend_config.mount_point,
+    namespace=authoring_namespace,
+    path="creds/app",  # TODO(dansubak): Depends on how we set up secret in vault
+    templates={
+        "DATABASE_URL": f'postgresql://{{{{ get .Secrets "username" }}}}:{{{{ get .Secrets "password" }}}}@jupyterhub-db-{stack_info.env_suffix}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:{DEFAULT_POSTGRES_PORT}/jupyterhub'
+    },
+    vaultauth=authoring_vault_k8s_resources.auth_name,
+)
+authoring_app_db_creds_dynamic_secret = OLVaultK8SSecret(
+    "jupyterhub-authoring-app-db-creds-vaultdynamicsecret",
+    resource_config=authoring_app_db_creds_dynamic_secret_config,
+    opts=ResourceOptions(depends_on=jupyterhub_db_vault_backend),
+)
+
+# TODO(dansubak): From here on out I'm mostly guessing and pattern matching. Coding blind
+# Its unclear to me how APISix and OIDC are set up so this definitely needs to be checked before I run anything.
+# Not sure how much, if anything, should be reused.
+
+shared_authoring_apisix_plugins = OLApisixSharedPlugins(
+    name="ol-jupyterhub-authoring-external-service-apisix-plugins",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name="jupyterhub-authoring",
+        resource_suffix="ol-shared-plugins",
+        k8s_namespace=authoring_namespace,
+        k8s_labels=application_labels,
+        enable_defaults=True,
+    ),
+)
+
+jupyterhub_authoring_domain = jupyterhub_config.require("authoring_domain")
+
+authoring_api_tls_secret_name = "api-jupyterhub-authoring-tls-pair"  # noqa: S105  # pragma: allowlist secret
+shared_authoring_cert_manager_certificate = OLCertManagerCert(
+    f"ol-jupyterhub-authoring-cert-manager-certificate-{stack_info.env_suffix}",
+    cert_config=OLCertManagerCertConfig(
+        application_name="jupyterhub-authoring",
+        k8s_namespace=authoring_namespace,
+        k8s_labels=application_labels,
+        create_apisixtls_resource=True,
+        apisixtls_ingress_class=apisix_ingress_class,
+        dest_secret_name=authoring_api_tls_secret_name,
+        dns_names=[jupyterhub_authoring_domain],
+    ),
+)
+
+authoring_oidc_resources = OLApisixOIDCResources(
+    f"ol-k8s-apisix-authoring-olapisixoidcresources-{stack_info.env_suffix}",
+    oidc_config=OLApisixOIDCConfig(
+        application_name="jupyterhub-authoring",
+        k8s_labels=application_labels,
+        k8s_namespace=authoring_namespace,
+        oidc_logout_path="hub/logout",
+        # There is no hookied in logout so this doesn't matter ATM
+        oidc_post_logout_redirect_uri=f"https://{jupyterhub_authoring_domain}/hub/login",
+        oidc_session_cookie_lifetime=60 * 20160,
+        oidc_use_session_secret=True,
+        oidc_scope="openid email",
+        vault_mount="secret-operations",
+        vault_path="sso/mitlearn",
+        vaultauth=authoring_vault_k8s_resources.auth_name,
+    ),
+)
+
+authoring_apisix_route = OLApisixRoute(
+    name=f"ol-jupyterhub-authoring-k8s-apisix-route-{stack_info.env_suffix}",
+    k8s_namespace=authoring_namespace,
+    k8s_labels=application_labels,
+    ingress_class_name=apisix_ingress_class,
+    route_configs=[
+        OLApisixRouteConfig(
+            route_name="jupyterhub-authoring",
+            priority=0,
+            shared_plugin_config_name=shared_authoring_apisix_plugins.resource_name,
+            plugins=[
+                authoring_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="auth"
+                ),
+            ],
+            hosts=[jupyterhub_authoring_domain],
+            paths=["/*"],
+            backend_service_name="proxy-public",
+            backend_service_port="http",
+            websocket=True,
+        ),
+    ],
+    opts=ResourceOptions(
+        delete_before_replace=True,
+    ),
+)
+
 
 # We need to know the dockerhub creds at stack run time.
 # Chart provides no provisions for sourcing these from a secret in k8s.
@@ -563,5 +752,215 @@ jupyterhub_application = kubernetes.helm.v3.Release(
     ),
     opts=ResourceOptions(
         delete_before_replace=True, depends_on=[app_db_creds_dynamic_secret]
+    ),
+)
+
+# Ref: https://github.com/jupyterhub/zero-to-jupyterhub-k8s/blob/main/jupyterhub/values.yaml
+jupyterhub_authoring_application = kubernetes.helm.v3.Release(
+    f"jupyterhub-{stack_info.name}-authoring-application-helm-release",
+    kubernetes.helm.v3.ReleaseArgs(
+        name="jupyterhub-authoring",
+        chart="jupyterhub",
+        # TODO(dansubak): Should this be in its own authoring namespace? I think yes but only because resources
+        # need to be unique per namespace and I don't know if I can easily control the names of deployments (hub, etc)?
+        namespace=namespace,
+        cleanup_on_fail=True,
+        version="4.2.0",  # TODO(Mike): Put this in versions.py
+        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+            repo="https://hub.jupyter.org/helm-chart/",
+        ),
+        values={
+            "ingress": {
+                "enabled": False,
+            },
+            "cull": {
+                "enabled": True,
+                "every": 1200,
+                # Cull users if they've been inactive for a day.
+                "timeout": 60 & 60 * 24 * 1,
+                "maxAge": 60 * 60 * 24 * 7,
+                "users": True,
+            },
+            "proxy": {
+                "service": {
+                    "type": "NodePort",
+                    "nodePorts": {
+                        "http": 30000,
+                        "https": 30443,
+                    },
+                },
+                "chp": {
+                    "resources": {
+                        "requests": {
+                            "cpu": "100m",
+                            "memory": "64Mi",
+                        },
+                        "limits": {
+                            "cpu": "100m",
+                            "memory": "64Mi",
+                        },
+                    },
+                },
+            },
+            "scheduling": {
+                "podPriority": {"enabled": True},
+                "userPlaceholder": {
+                    # We may not need this for authoring since this primarily affects startup time
+                    "enabled": True,
+                    "replicas": jupyterhub_config.get_int("user_placeholder_replicas")
+                    or 1,
+                },
+                "userScheduler": {
+                    "enabled": True,
+                    "resources": {
+                        "requests": {
+                            "cpu": "100m",
+                            "memory": "64Mi",
+                        },
+                        "limits": {
+                            "cpu": "100m",
+                            "memory": "64Mi",
+                        },
+                    },
+                },
+            },
+            # extraConfig is executed as python at the end of the JH config. For more details see
+            # https://z2jh.jupyter.org/en/latest/administrator/advanced.html#hub-extraconfig
+            "hub": {
+                "extraFiles": {
+                    "mit_learn_svg": {
+                        "mountPath": "/opt/mit_learn.svg",
+                        "stringData": Path(__file__)
+                        .parent.joinpath("mit_learn.svg")
+                        .read_text(),
+                    }
+                },
+                "extraEnv": [
+                    {
+                        "name": "DATABASE_URL",
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": jupyterhub_authoring_creds_secret_name,
+                                "key": "DATABASE_URL",
+                            }
+                        },
+                    }
+                ],
+                "extraConfig": {
+                    "dynamicImageConfig.py": Path(__file__)
+                    .parent.joinpath("dynamicImageConfig.py")
+                    .read_text()
+                },
+                "config": {
+                    "Authenticator": {
+                        "admin_users": jupyterhub_config.get_object(
+                            "admin_users", default=[]
+                        ),
+                        "allowed_users": jupyterhub_config.get_object(
+                            "allowed_users", default=[]
+                        ),
+                    },
+                    # TODO(dansubak): This will need to be revisited and subclassed to ensure we can grab the user according to keycloak
+                    "JupyterHub": {
+                        "authenticator_class": "tmp",
+                    },
+                },
+                "db": {"type": "postgres"},
+                "resources": {
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "256Mi",
+                    },
+                    "limits": {
+                        "cpu": "100m",
+                        "memory": "256Mi",
+                    },
+                },
+            },
+            "prePuller": {
+                "continuous": {
+                    "enabled": True,
+                },
+                "extraImages": EXTRA_IMAGES,
+                "resources": {
+                    "requests": {
+                        "cpu": "10m",
+                        "memory": "10Mi",
+                    },
+                    "limits": {
+                        "cpu": "10m",
+                        "memory": "10Mi",
+                    },
+                },
+            },
+            "singleuser": {
+                # This is where we would do our own notebook image
+                # ref: https://z2jh.jupyter.org/en/stable/jupyterhub/customizing/user-environment.html#customize-an-existing-docker-image
+                # "image": {
+                #     "name": "mitodl/some-special-image"
+                #     "tag": "some-tag",
+                # },
+                # Below is similar but not the same as k8s resource declarations.
+                # These are on a PER-USER-BASIS, so they can quickly grow with lots of
+                # users. Numbers are conservative to start with.
+                "extraFiles": {
+                    "menu_override": {
+                        "mountPath": "/opt/conda/share/jupyter/lab/settings/overrides.json",
+                        "stringData": Path(__file__)
+                        .parent.joinpath("author_menu_override.json")
+                        .read_text(),
+                    },
+                    "disabled_extensions": {
+                        "mountPath": "/home/jovyan/.jupyter/labconfig/page_config.json",
+                        "stringData": Path(__file__)
+                        .parent.joinpath("author_disabled_extensions.json")
+                        .read_text(),
+                    },
+                },
+                "image": {
+                    "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
+                    "tag": "clustering_and_descriptive_ai",  # TODO(dansubak): Use a base authoring image.
+                    "pullPolicy": "Always",
+                },
+                "extraTolerations": [
+                    {
+                        "key": "ol.mit.edu/gpu_node",
+                        "operator": "Equal",
+                        "value": "true",
+                        "effect": "NoSchedule",
+                    }
+                ],
+                "allowPrivilegeEscalation": True,
+                "cmd": [
+                    "jupyterhub-singleuser",
+                ],
+                "startTimeout": 600,
+                "networkPolicy": {
+                    "enabled": False,
+                },
+                "memory": {
+                    "limit": "4G",
+                    "guarantee": "1G",
+                },
+                "cpu": {
+                    "limit": 1,
+                    "guarantee": 0.25,
+                },
+                "storage": {
+                    "type": "none",
+                },
+                "extraEnv": {
+                    # This is the modern UI experience
+                    "JUPYTERHUB_SINGLEUSER_APP": "jupyter_server.serverapp.ServerApp"
+                },
+                "cloudMetadata": {
+                    "blockWithIptables": False,  # this should really be true but it isn't working right now
+                },
+            },
+        },
+        skip_await=False,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True, depends_on=[authoring_app_db_creds_dynamic_secret]
     ),
 )
