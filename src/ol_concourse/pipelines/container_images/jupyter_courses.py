@@ -1,3 +1,4 @@
+# ruff: noqa: E501, FIX002, ERA001
 import dataclasses
 import sys
 
@@ -11,14 +12,16 @@ from ol_concourse.lib.models.pipeline import (
     PutStep,
     Resource,
 )
-from ol_concourse.lib.resources import ssh_git_repo
+from ol_concourse.lib.resources import s3_object, ssh_git_repo
 
 
 @dataclasses.dataclass
 class CourseImageInfo:
     course_name: str
-    repo_uri: str
     image_name: str
+    repo_uri: str | None = None
+    s3_bucket: str | None = None
+    s3_object_path: str | None = None
 
 
 # Used to make a parameterized pipeline which builds
@@ -126,61 +129,144 @@ courses = [
     ),
     CourseImageInfo(
         course_name="uai_source-uai.mltl1",
-        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.MLTL.1-1T2026 ",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.MLTL.1-1T2026",
         image_name="uai_source-uai.mltl1",
+    ),
+    CourseImageInfo(
+        course_name="base_notebook_image",
+        s3_bucket="ol-infrastructure-artifacts",
+        s3_object_path="jupyterhub/base_notebook_image/base_image.tar.gz",
+        image_name="base_notebook_image",
     ),
 ]
 
-course_repository = ssh_git_repo(
-    name=Identifier("course_name"),
-    uri="((course_repo))",
-    branch="main",
-    private_key="((github.ol_notebooks_private_ssh_key))",
-)
 
-# This infers the ECR url from the AWS account,
-# the region and the repository name
-course_image = Resource(
-    name=Identifier("course_image"),
-    type="registry-image",
-    icon="docker",
-    source={
-        "repository": "ol-course-notebooks",
-        "tag": "((image_name))",
-        "aws_region": "us-east-1",
-    },
-)
+def pipeline_for_github():
+    course_repository = ssh_git_repo(
+        name=Identifier("course_name"),
+        uri="((course_repo))",
+        branch="main",
+        private_key="((github.ol_notebooks_private_ssh_key))",
+    )
 
-build_task = container_build_task(
-    inputs=[Input(name=course_repository.name)],
-    build_parameters={"CONTEXT": course_repository.name},
-)
+    # This infers the ECR url from the AWS account,
+    # the region and the repository name
+    course_image = Resource(
+        name=Identifier("course_image"),
+        type="registry-image",
+        icon="docker",
+        source={
+            "repository": "ol-course-notebooks",
+            "tag": "((image_name))",
+            "aws_region": "us-east-1",
+        },
+    )
 
-docker_pipeline = Pipeline(
-    resources=[course_repository, course_image],
-    jobs=[
-        Job(
-            name=Identifier("build-and-publish-container"),
-            plan=[
-                GetStep(get=course_repository.name, trigger=True),
-                build_task,
-                PutStep(
-                    put=course_image.name,
-                    params={
-                        "image": "image/image.tar",
-                        "additional_tags": f"./{course_repository.name}/.git/describe_ref",  # noqa: E501
-                    },
-                ),
-            ],
-        )
-    ],
-)
+    build_task = container_build_task(
+        inputs=[Input(name=course_repository.name)],
+        build_parameters={"CONTEXT": course_repository.name},
+    )
+
+    return Pipeline(
+        resources=[course_repository, course_image],
+        jobs=[
+            Job(
+                name=Identifier("build-and-publish-container"),
+                plan=[
+                    GetStep(get=course_repository.name, trigger=True),
+                    build_task,
+                    PutStep(
+                        put=course_image.name,
+                        params={
+                            "image": "image/image.tar",
+                            "additional_tags": f"./{course_repository.name}/.git/describe_ref",
+                        },
+                    ),
+                ],
+            )
+        ],
+    )
+
+
+def pipeline_for_s3():
+    s3_archive = s3_object(
+        name=Identifier("course_name"),
+        bucket="((s3_bucket))",
+        object_path="((s3_object_path))",
+    )
+
+    # This infers the ECR url from the AWS account,
+    # the region and the repository name
+    course_image = Resource(
+        name=Identifier("course_image"),
+        type="registry-image",
+        icon="docker",
+        source={
+            "repository": "ol-course-notebooks",
+            "tag": "((image_name))",
+            "aws_region": "us-east-1",
+        },
+    )
+    # TODO(dansubak): Unsure if I'll need this.
+    # unzip_task = TaskStep(
+    #     task=Identifier("unzip-s3-archive"),
+    #     config=TaskConfig(
+    #         inputs=[Input(name=s3_archive.name)],
+    #         platform=Platform.linux,
+    #         image_resource=AnonymousResource(
+    #             type=REGISTRY_IMAGE,
+    #             source=RegistryImage(repository="busybox"),
+    #         ),
+    #         params={
+    #             "ARCHIVE_NAME": f"{s3_archive.name}",
+    #         },
+    #         run=Command(path="sh", args=["-exc"
+    #                                      "tar -xzf ${ARCHIVE_NAME}"]),
+    #     ),
+    # )
+    build_task = container_build_task(
+        inputs=[Input(name=s3_archive.name)],
+        build_parameters={"CONTEXT": s3_archive.name},
+    )
+
+    return Pipeline(
+        resources=[s3_archive, course_image],
+        jobs=[
+            Job(
+                name=Identifier("build-and-publish-container"),
+                plan=[
+                    GetStep(get=s3_archive.name, trigger=True, params={"unpack": True}),
+                    build_task,
+                    PutStep(
+                        put=course_image.name,
+                        params={
+                            "image": "image/image.tar",
+                            # TODO(dansubak): - this definitely isn't gonna work.
+                            "additional_tags": f"./{s3_archive.name}/.git/describe_ref",
+                        },
+                    ),
+                ],
+            )
+        ],
+    )
+
 
 if __name__ == "__main__":
-    with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(docker_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(docker_pipeline.model_dump_json(indent=2))
+    github_pipeline = pipeline_for_github()
+    with open("github_definition.json", "w") as definition:  # noqa: PTH123
+        definition.write(github_pipeline.model_dump_json(indent=2))
+    sys.stdout.write(github_pipeline.model_dump_json(indent=2))
+    s3_pipeline = pipeline_for_s3()
+    with open("s3_definition.json", "w") as definition:  # noqa: PTH123
+        definition.write(s3_pipeline.model_dump_json(indent=2))
+    sys.stdout.write(s3_pipeline.model_dump_json(indent=2))
     for course in courses:
-        sys.stdout.write(
-            f"fly -t <prod_target> set-pipeline -p jupyter_notebook_docker_image_build -c definition.json --var course_repo={course.repo_uri} --instance-var image_name={course.image_name}\n"  # noqa: E501
-        )
+        if course.repo_uri:
+            sys.stdout.write(
+                f"fly -t <prod_target> set-pipeline -p jupyter_notebook_docker_image_build -c github_definition.json --var course_repo={course.repo_uri} --instance-var image_name={course.image_name}\n"
+            )
+        else:
+            # TODO(dansubak): I might need to make a whole new job for this. Not sure if I can specify a different definition with the same pipeline name # noqa: 501
+            sys.stdout.write(
+                f"fly -t <prod_target> set-pipeline -p jupyter_notebook_docker_image_build -c s3_definition.json --var s3_bucket={course.s3_bucket} --var s3_object_path={course.s3_object_path} --instance-var image_name={course.image_name}\n"
+            )
