@@ -185,6 +185,7 @@ build-static-assets:
     && tar czf - /openedx/staticfiles > /openedx/staticfiles-nonprod.tar.gz
   SAVE ARTIFACT /openedx/staticfiles-nonprod.tar.gz AS LOCAL staticfiles-nonprod.tar.gz
   SAVE ARTIFACT /openedx/staticfiles-nonprod.tar.gz AS LOCAL staticfiles-production.tar.gz
+  RUN rm /openedx/staticfiles-nonprod.tar.gz
 
 build-static-assets-production:
   FROM +fetch-translations
