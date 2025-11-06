@@ -237,6 +237,7 @@ class OLAmazonCache(pulumi.ComponentResource):
 
         self.cache_cluster = cache_cluster
         self.address = address
+        self.auth_token = cache_config.auth_token  # Direct access to auth token
 
         self.register_outputs(
             {

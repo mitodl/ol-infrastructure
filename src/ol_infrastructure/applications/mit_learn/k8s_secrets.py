@@ -14,6 +14,7 @@ from pulumi_vault import Mount
 
 from bridge.lib.magic_numbers import DEFAULT_REDIS_PORT
 from ol_infrastructure.components.aws.cache import OLAmazonCache
+from ol_infrastructure.components.aws.serverless_cache import OLAmazonServerlessCache
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SDynamicSecretConfig,
@@ -133,7 +134,7 @@ def create_mitlearn_k8s_secrets(
     mitlearn_vault_mount: Mount,
     db_config: OLVaultDatabaseBackend,
     redis_password: str,
-    redis_cache: OLAmazonCache,
+    redis_cache: OLAmazonCache | OLAmazonServerlessCache,
 ) -> tuple[list[str], list[OLVaultK8SSecret | kubernetes.core.v1.Secret]]:
     """
     Create all Kubernetes secrets required by the mitlearn application.

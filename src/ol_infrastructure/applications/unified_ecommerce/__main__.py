@@ -28,7 +28,6 @@ from bridge.lib.magic_numbers import (
     ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.services import appdb
 from ol_infrastructure.components.services.k8s import (
     OLApplicationK8s,
@@ -41,7 +40,10 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
-from ol_infrastructure.lib.aws.cache_helper import CacheInstanceTypes
+from ol_infrastructure.lib.aws.cache_helper import (
+    CacheInstanceTypes,
+    create_redis_cache,
+)
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     default_psg_egress_args,
@@ -517,25 +519,20 @@ redis_cluster_security_group = ec2.SecurityGroup(
     tags=aws_config.tags,
 )
 
-redis_cache_config = OLAmazonRedisConfig(
-    encrypt_transit=True,
+# Create Redis cache (auto-selects serverless for CI/QA, dedicated for Prod)
+redis_cache = create_redis_cache(
+    stack_info=stack_info,
+    cache_name=f"unified-ecommerce-redis-{stack_info.env_suffix}",
+    description="Redis cluster for unified-ecommerce tasks and caching",
+    security_group_ids=[redis_cluster_security_group.id],
+    subnet_group=apps_vpc["elasticache_subnet"],
+    subnet_ids=apps_vpc["subnet_ids"][:3],
     auth_token=redis_config.require("password"),
-    cluster_mode_enabled=False,
-    encrypted=True,
-    engine_version="7.2",
     engine="valkey",
+    engine_version="7.2",
     instance_type=redis_instance_type,
     num_instances=3,
-    shard_count=1,
-    auto_upgrade=True,
-    cluster_description="Redis cluster for unified-ecommerce tasks and caching.",
-    cluster_name=f"unified-ecommerce-redis-{stack_info.env_suffix}",
-    subnet_group=apps_vpc["elasticache_subnet"],
-    security_groups=[redis_cluster_security_group.id],
     tags=aws_config.tags,
-)
-redis_cache = OLAmazonCache(
-    redis_cache_config,
     opts=ResourceOptions(
         aliases=[
             Alias(
