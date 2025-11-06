@@ -55,14 +55,16 @@ webhook_secrets = read_yaml_secrets(
     Path(f"kubewatch/secrets.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml"),
 )
 
-# ECR repository for webhook handler image
+# ECR repository for webhook handler image (per-environment)
+ecr_repository_name = f"kubewatch-webhook-handler-{stack_info.env_suffix.lower()}"
 ecr_repository = aws.ecr.Repository(
-    "kubewatch-webhook-handler-ecr-repository",
-    name="kubewatch-webhook-handler",
+    f"kubewatch-webhook-handler-ecr-repository-{stack_info.env_suffix}",
+    name=ecr_repository_name,
     image_tag_mutability="MUTABLE",
     image_scanning_configuration=aws.ecr.RepositoryImageScanningConfigurationArgs(
         scan_on_push=True,
     ),
+    force_delete=True,  # Allow deletion even when images are present
     tags=aws_config.tags,
 )
 
@@ -110,11 +112,17 @@ webhook_image = docker.Image(
 # Kubernetes namespace
 kubewatch_namespace = "kubewatch"
 
+# Per-environment resource names
+webhook_resource_name = f"kubewatch-webhook-{stack_info.env_suffix.lower()}"
+webhook_secret_name = f"kubewatch-webhook-secret-{stack_info.env_suffix.lower()}"
+# ServiceAccount name will match the kubewatch Helm release name
+kubewatch_service_account = f"kubewatch-{stack_info.env_suffix.lower()}"
+
 # Create Kubernetes secret for Slack token
 webhook_secret = kubernetes.core.v1.Secret(
-    "kubewatch-webhook-secret",
+    f"kubewatch-webhook-secret-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="kubewatch-webhook-secret",
+        name=webhook_secret_name,
         namespace=kubewatch_namespace,
     ),
     string_data={
@@ -124,12 +132,12 @@ webhook_secret = kubernetes.core.v1.Secret(
 
 # Create Kubernetes deployment for webhook handler
 webhook_deployment = kubernetes.apps.v1.Deployment(
-    "kubewatch-webhook-deployment",
+    f"kubewatch-webhook-deployment-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="kubewatch-webhook",
+        name=webhook_resource_name,
         namespace=kubewatch_namespace,
         labels={
-            "app": "kubewatch-webhook",
+            "app": webhook_resource_name,
             "ou": BusinessUnit.operations,
             "environment": stack_info.env_suffix,
         },
@@ -137,14 +145,14 @@ webhook_deployment = kubernetes.apps.v1.Deployment(
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
         replicas=2,
         selector=kubernetes.meta.v1.LabelSelectorArgs(
-            match_labels={"app": "kubewatch-webhook"},
+            match_labels={"app": webhook_resource_name},
         ),
         template=kubernetes.core.v1.PodTemplateSpecArgs(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                labels={"app": "kubewatch-webhook"},
+                labels={"app": webhook_resource_name},
             ),
             spec=kubernetes.core.v1.PodSpecArgs(
-                service_account_name="kubewatch",
+                service_account_name=kubewatch_service_account,
                 containers=[
                     kubernetes.core.v1.ContainerArgs(
                         name="webhook-handler",
@@ -160,7 +168,7 @@ webhook_deployment = kubernetes.apps.v1.Deployment(
                                 name="SLACK_TOKEN",
                                 value_from=kubernetes.core.v1.EnvVarSourceArgs(
                                     secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
-                                        name="kubewatch-webhook-secret",
+                                        name=webhook_secret_name,
                                         key="slack-token",
                                     ),
                                 ),
@@ -213,16 +221,16 @@ webhook_deployment = kubernetes.apps.v1.Deployment(
 
 # Create Kubernetes service for webhook handler
 webhook_service = kubernetes.core.v1.Service(
-    "kubewatch-webhook-service",
+    f"kubewatch-webhook-service-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="kubewatch-webhook",
+        name=webhook_resource_name,
         namespace=kubewatch_namespace,
         labels={
-            "app": "kubewatch-webhook",
+            "app": webhook_resource_name,
         },
     ),
     spec=kubernetes.core.v1.ServiceSpecArgs(
-        selector={"app": "kubewatch-webhook"},
+        selector={"app": webhook_resource_name},
         ports=[
             kubernetes.core.v1.ServicePortArgs(
                 port=80,
@@ -241,7 +249,9 @@ export("webhook_image", webhook_image.image_name)
 export(
     "webhook_service_url",
     Output.concat(
-        "http://kubewatch-webhook.",
+        "http://",
+        webhook_resource_name,
+        ".",
         kubewatch_namespace,
         ".svc.cluster.local/webhook/kubewatch",
     ),

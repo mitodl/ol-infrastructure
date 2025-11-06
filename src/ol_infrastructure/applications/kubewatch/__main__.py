@@ -36,6 +36,11 @@ cluster_stack = StackReference(
     f"infrastructure.aws.eks.{stack_info.env_prefix}.{stack_info.name}"
 )
 
+# Reference the webhook handler stack to get the service URL
+webhook_handler_stack = StackReference(
+    f"applications.kubewatch_webhook_handler.{stack_info.env_prefix}.{stack_info.name}"
+)
+
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 aws_config = AWSBase(
     tags={"OU": BusinessUnit.operations, "Environment": Environment.operations},
@@ -65,11 +70,17 @@ slack_channel = Config("slack").require("channel_name")
 # To watch multiple namespaces, we watch all and filter in webhook handler.
 watched_namespaces = ""  # Always watch all namespaces in kubewatch
 
+# Get webhook URL from webhook handler stack
+webhook_url = webhook_handler_stack.require_output("webhook_service_url")
+
+# Per-environment Helm release name
+helm_release_name = f"kubewatch-{stack_info.env_suffix.lower()}"
+
 # Install the kubewatch helm chart
 kubewatch_application = kubernetes.helm.v3.Release(
     f"kubewatch-{stack_info.name}-application-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
-        name="kubewatch",
+        name=helm_release_name,
         chart="kubewatch",
         version=KUBEWATCH_CHART_VERSION,
         namespace=kubewatch_namespace,
@@ -96,7 +107,7 @@ kubewatch_application = kubernetes.helm.v3.Release(
             # Enable our custom webhook handler
             "webhook": {
                 "enabled": True,
-                "url": "http://kubewatch-webhook.kubewatch.svc.cluster.local/webhook/kubewatch",
+                "url": webhook_url,
             },
             "extraHandlers": {},
             "namespaceToWatch": watched_namespaces,
