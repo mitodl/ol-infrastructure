@@ -974,11 +974,17 @@ redis_cluster_security_group = ec2.SecurityGroup(
             protocol="tcp",
             security_groups=[
                 edxapp_security_group.id,
-                operations_vpc["security_groups"]["celery_monitoring"]["id"],
             ],
             cidr_blocks=k8s_pod_subnet_cidrs.apply(lambda pod_cidrs: pod_cidrs),
             description="Allow access from edX to Redis for caching and queueing",
-        )
+        ),
+        ec2.SecurityGroupIngressArgs(
+            from_port=DEFAULT_REDIS_PORT,
+            to_port=DEFAULT_REDIS_PORT,
+            protocol="tcp",
+            cidr_blocks=operations_vpc["k8s_pod_subnet_cidrs"],
+            description="Allow access from Operations VPC celery monitoring pods to Redis",
+        ),
     ],
     tags=aws_config.merged_tags({"Name": f"edxapp-redis-{env_name}"}),
     vpc_id=edxapp_vpc_id,

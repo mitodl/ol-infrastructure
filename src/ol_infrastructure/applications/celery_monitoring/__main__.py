@@ -274,12 +274,7 @@ leek_deployment = kubernetes.apps.v1.Deployment(
         ),
         template=kubernetes.core.v1.PodTemplateSpecArgs(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                labels=application_labels
-                | {
-                    "ol.mit.edu/pod-security-group": operations_vpc["security_groups"][
-                        "celery_monitoring"
-                    ]["name"],
-                },
+                labels=application_labels,
             ),
             spec=kubernetes.core.v1.PodSpecArgs(
                 service_account_name=celery_monitoring_auth_binding.vault_k8s_resources.service_account_name,
@@ -317,7 +312,7 @@ leek_deployment = kubernetes.apps.v1.Deployment(
                             ),
                             kubernetes.core.v1.EnvVarArgs(
                                 name="LEEK_AGENT_LOG_LEVEL",
-                                value="INFO",
+                                value="DEBUG",
                             ),
                             kubernetes.core.v1.EnvVarArgs(
                                 name="LEEK_ENABLE_API", value="true"
@@ -414,32 +409,6 @@ leek_service = kubernetes.core.v1.Service(
             ),
         ],
     ),
-)
-
-# Security Group Policy
-celery_monitoring_security_group_policy = kubernetes.apiextensions.CustomResource(
-    f"celery-monitoring-security-group-policy-{stack_info.env_suffix}",
-    api_version="vpcresources.k8s.aws/v1beta1",
-    kind="SecurityGroupPolicy",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=operations_vpc["security_groups"]["celery_monitoring"]["name"],
-        namespace=celery_monitoring_namespace,
-        labels=application_labels,
-    ),
-    spec={
-        "podSelector": {
-            "matchLabels": {
-                "ol.mit.edu/pod-security-group": operations_vpc["security_groups"][
-                    "celery_monitoring"
-                ]["name"],
-            },
-        },
-        "securityGroups": {
-            "groupIds": [
-                operations_vpc["security_groups"]["celery_monitoring"]["id"],
-            ],
-        },
-    },
 )
 
 # Get OIDC plugin config as dict and wrap in OLApisixPluginConfig

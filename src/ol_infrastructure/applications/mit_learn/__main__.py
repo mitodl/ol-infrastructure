@@ -1326,7 +1326,6 @@ redis_cluster_security_group = ec2.SecurityGroup(
         ec2.SecurityGroupIngressArgs(
             security_groups=[
                 mitlearn_app_security_group.id,
-                operations_vpc["security_groups"]["celery_monitoring"]["id"],
                 cluster_substructure_stack.require_output(
                     "cluster_keda_security_group_id"
                 ),
@@ -1335,6 +1334,13 @@ redis_cluster_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,
             description="Allow application pods to talk to Redis",
+        ),
+        ec2.SecurityGroupIngressArgs(
+            cidr_blocks=operations_vpc["k8s_pod_subnet_cidrs"],
+            protocol="tcp",
+            from_port=DEFAULT_REDIS_PORT,
+            to_port=DEFAULT_REDIS_PORT,
+            description="Allow Operations VPC celery monitoring pods to talk to Redis",
         ),
     ],
     vpc_id=apps_vpc["id"],
