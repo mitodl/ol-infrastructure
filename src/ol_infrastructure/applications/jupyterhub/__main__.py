@@ -487,6 +487,14 @@ jupyterhub_application = kubernetes.helm.v3.Release(
                     "tag": "clustering_and_descriptive_ai",
                     "pullPolicy": "Always",
                 },
+                "extraTolerations": [
+                    {
+                        "key": "ol.mit.edu/gpu_node",
+                        "operator": "Equal",
+                        "value": "true",
+                        "effect": "NoSchedule",
+                    }
+                ],
                 "profileList": [
                     {
                         "display_name": "Standard CPU Instance (1 CPU, 4GB RAM)",
