@@ -24,6 +24,7 @@ const SLOT_IDS = {
     logo: 'org.openedx.frontend.layout.header_logo.v1',
     learning_help: 'org.openedx.frontend.layout.header_learning_help.v1',
     desktop_secondary_user_menu: 'org.openedx.frontend.layout.header_desktop_secondary_menu.v1',
+    desktop_main_menu_slot: 'org.openedx.frontend.layout.header_desktop_main_menu.v1',
   },
   footer: {
     slot: 'footer_slot',
@@ -482,6 +483,29 @@ const addEnvOverrides = (config) => {
   return config;
 }
 
+const addDesktopMainMenuSlotOverride = (config) => {
+  if (!DASHBOARD_APPS.includes(CURRENT_MFE_APP_ID)) {
+    return config;
+  }
+
+  return {
+    ...config,
+    pluginSlots: {
+      ...config.pluginSlots,
+      [SLOT_IDS.header.desktop_main_menu_slot]: {
+        keepDefault: true,
+        plugins: [
+          {
+            op: PLUGIN_OPERATIONS.Hide,
+            widgetId: 'default_contents',
+          },
+        ]
+      }
+    },
+  }
+}
+
+
 let config = {
   ...process.env,
   // Override the proctoring info panel 'Review instructions and system requirements' link
@@ -497,6 +521,7 @@ config = addUserMenuSlotOverride(config);
 config = addLogoSlotOverride(config);
 config = addLearningHelpSlotOverride(config);
 config = addSecondaryMenuSlotOverride(config);
+config = addDesktopMainMenuSlotOverride(config);
 config = addEnvOverrides(config);
 
 export default config;

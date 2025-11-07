@@ -129,8 +129,8 @@
     .dashboard-btn { display: none !important; }
 
     // Hide the username to conserve space; keep icon only
-    .dropdown-toggle  .user-menu-name, .menu-trigger .user-menu-name { display: none; }
-    .dropdown-toggle {
+    .dropdown-toggle, .menu-trigger .user-menu-name { display: none; }
+    .dropdown-toggle, .menu-trigger {
       border: none !important;
       &:hover, &:focus {
         border: none !important;
