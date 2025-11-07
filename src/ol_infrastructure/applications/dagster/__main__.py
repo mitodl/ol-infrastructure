@@ -949,6 +949,9 @@ dagster_user_code_release = kubernetes.helm.v3.Release(
             repo="https://dagster-io.github.io/helm",
         ),
         cleanup_on_fail=True,
+        skip_crds=False,
+        skip_await=False,
+        disable_openapi_validation=True,
         values=dagster_user_code_values,
     ),
     opts=ResourceOptions(
