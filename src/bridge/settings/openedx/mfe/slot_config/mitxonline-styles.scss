@@ -6,6 +6,10 @@
   font-size: 14px !important;
   line-height: 18px !important;
 
+  .dropdown-toggle::after{
+    display: none !important;
+  }
+
   .container-xl {
     height: 72px !important;
   }
@@ -56,7 +60,7 @@
   }
   .dashboard-btn{
     display: inline-flex !important;
-    height: 32px !important;
+    height: 40px !important;
     padding: 18px 12px !important;
     flex-direction: column !important;
     justify-content: center !important;

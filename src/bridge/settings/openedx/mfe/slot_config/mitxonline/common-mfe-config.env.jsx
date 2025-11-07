@@ -237,15 +237,6 @@ const LearningHeaderUserMenu = (widget) => {
   return widget;
 };
 
-const displayFullNameInMenu = (widget) => {
-  const { authenticatedUser } = useContext(AppContext);
-  if (authenticatedUser) {
-    widget.content.label = authenticatedUser.name || authenticatedUser.username;
-    
-  }
-  return widget;
-};
-
 const UserMenuOverride = () => {
   const { authenticatedUser } = useContext(AppContext);
   if (!authenticatedUser) {
@@ -258,12 +249,10 @@ const UserMenuOverride = () => {
       </svg>
       {/* Username hidden on mobile via CSS; remains for larger screens */}
       <span className="user-menu-name">{authenticatedUser.name || authenticatedUser.username}</span>
-      {DASHBOARD_APPS.includes(CURRENT_MFE_APP_ID) && 
-      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="remixicon "><path d="M11.9999 13.1714L16.9497 8.22168L18.3639 9.63589L11.9999 15.9999L5.63599 9.63589L7.0502 8.22168L11.9999 13.1714Z"></path></svg>}
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="remixicon "><path d="M11.9999 13.1714L16.9497 8.22168L18.3639 9.63589L11.9999 15.9999L5.63599 9.63589L7.0502 8.22168L11.9999 13.1714Z"></path></svg>
     </>
   );
 };
-
 
 const addUserMenuSlotOverride = (config) => {
   config.pluginSlots = {
