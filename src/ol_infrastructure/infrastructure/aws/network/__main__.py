@@ -22,7 +22,6 @@ from ol_infrastructure.components.aws.olvpc import (
     OLVPCPeeringConnection,
 )
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
-from ol_infrastructure.lib.aws.eks_helper import get_default_psg_ingress_args
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
@@ -441,7 +440,7 @@ celery_monitoring_security_group = ec2.SecurityGroup(
     "operations-celery-monitoring",
     description="Security group for Leek service for Celery Monitoring",
     vpc_id=operations_vpc.olvpc.id,
-    ingress=get_default_psg_ingress_args([ops_config.get("k8s_service_subnet")]),
+    ingress=[],
     egress=default_egress_args,
     tags=operations_vpc_config.merged_tags(
         {"Name": f"operations-{stack_info.env_suffix}-celery-monitoring"}
