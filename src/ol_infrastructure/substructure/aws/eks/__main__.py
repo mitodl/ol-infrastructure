@@ -668,7 +668,24 @@ nvidia_k8s_device_plugin_release = kubernetes.helm.v3.Release(
                 }
             ],
             "gfd": {
-                "enabled": False,
+                "enabled": True,
+            },
+            "nfd": {
+                "worker": {
+                    "tolerations": [
+                        {
+                            "key": "ol.mit.edu/gpu_node",
+                            "operator": "Equal",
+                            "value": "true",
+                            "effect": "NoSchedule",
+                        },
+                    ]
+                },
+            },
+            "config": {
+                "map": {
+                    "default": "version: v1\nsharing:\n  mps:\n    resources:\n    - name: nvidia.com/gpu\n      replicas: 10\n    failRequestsGreaterThanOne: false\n",
+                }
             },
             "resources": {
                 "requests": {
