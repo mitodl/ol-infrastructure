@@ -141,6 +141,20 @@ courses = [
     ),
 ]
 
+# This infers the ECR url from the AWS account,
+# the region and the repository name
+# This part is common between both pipelines
+course_image = Resource(
+    name=Identifier("course_image"),
+    type="registry-image",
+    icon="docker",
+    source={
+        "repository": "ol-course-notebooks",
+        "tag": "((image_name))",
+        "aws_region": "us-east-1",
+    },
+)
+
 
 def pipeline_for_github():
     course_repository = ssh_git_repo(
@@ -148,19 +162,6 @@ def pipeline_for_github():
         uri="((course_repo))",
         branch="main",
         private_key="((github.ol_notebooks_private_ssh_key))",
-    )
-
-    # This infers the ECR url from the AWS account,
-    # the region and the repository name
-    course_image = Resource(
-        name=Identifier("course_image"),
-        type="registry-image",
-        icon="docker",
-        source={
-            "repository": "ol-course-notebooks",
-            "tag": "((image_name))",
-            "aws_region": "us-east-1",
-        },
     )
 
     build_task = container_build_task(
@@ -195,19 +196,6 @@ def pipeline_for_s3():
         name=Identifier("course_name"),
         bucket="((s3_bucket))",
         object_path="((s3_object_path))",
-    )
-
-    # This infers the ECR url from the AWS account,
-    # the region and the repository name
-    course_image = Resource(
-        name=Identifier("course_image"),
-        type="registry-image",
-        icon="docker",
-        source={
-            "repository": "ol-course-notebooks",
-            "tag": "((image_name))",
-            "aws_region": "us-east-1",
-        },
     )
 
     # We may want to remove the cruft that the S3 resource
