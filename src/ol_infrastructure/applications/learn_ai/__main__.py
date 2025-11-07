@@ -1185,6 +1185,7 @@ learn_ai_https_apisix_consumer = kubernetes.apiextensions.CustomResource(
         labels=k8s_global_labels,
     ),
     spec={
+        "ingressClassName": apisix_ingress_class,
         "authParameter": {
             "keyAuth": {
                 "value": {
