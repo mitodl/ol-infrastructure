@@ -117,6 +117,7 @@ def create_k8s_configmaps(
                     - https://{edxapp_config.require("marketing_domain")}
                     - https://{runtime_config["notes_domain"]}
                     - https://{edxapp_config.require("learn_ai_frontend_domain")}
+                    - https://{stack_info.env_prefix}-{stack_info.env_suffix}-edxapp-storage.s3.amazonaws.com  # Fix ORA upload bug
                     COURSE_IMPORT_EXPORT_BUCKET: {course_bucket_name}
                     CROSS_DOMAIN_CSRF_COOKIE_DOMAIN: {edxapp_config.require_object("domains")["lms"]}
                     CROSS_DOMAIN_CSRF_COOKIE_NAME: {env_name}-edxapp-csrftoken

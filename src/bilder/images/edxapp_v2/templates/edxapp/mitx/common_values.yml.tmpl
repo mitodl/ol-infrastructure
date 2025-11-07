@@ -236,6 +236,7 @@ CORS_ORIGIN_WHITELIST:
   - https://canvas.mit.edu
   - https://{{ key "edxapp/learn-ai-frontend-domain" }}
   - https://{{ key "edx/notes-api-host" }}
+  - https://{{ env "ENVIRONMENT" }}-edxapp-storage.s3.amazonaws.com  # Fix ORA upload bug
 COURSES_WITH_UNSAFE_CODE: []
 COURSE_ABOUT_VISIBILITY_PERMISSION: see_exists
 COURSE_CATALOG_API_URL: http://localhost:8008/api/v1
