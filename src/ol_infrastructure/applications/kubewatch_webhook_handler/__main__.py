@@ -115,8 +115,51 @@ kubewatch_namespace = "kubewatch"
 # Per-environment resource names
 webhook_resource_name = f"kubewatch-webhook-{stack_info.env_suffix.lower()}"
 webhook_secret_name = f"kubewatch-webhook-secret-{stack_info.env_suffix.lower()}"
-# ServiceAccount name will match the kubewatch Helm release name
-kubewatch_service_account = f"kubewatch-{stack_info.env_suffix.lower()}"
+webhook_service_account_name = f"kubewatch-webhook-{stack_info.env_suffix.lower()}"
+
+# Create ServiceAccount for webhook handler
+webhook_service_account = kubernetes.core.v1.ServiceAccount(
+    f"kubewatch-webhook-serviceaccount-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=webhook_service_account_name,
+        namespace=kubewatch_namespace,
+    ),
+)
+
+# Create ClusterRole with permissions to read deployments across all namespaces
+webhook_cluster_role = kubernetes.rbac.v1.ClusterRole(
+    f"kubewatch-webhook-clusterrole-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=f"kubewatch-webhook-{stack_info.env_suffix.lower()}",
+    ),
+    rules=[
+        kubernetes.rbac.v1.PolicyRuleArgs(
+            api_groups=["apps"],
+            resources=["deployments"],
+            verbs=["get", "list", "watch"],
+        ),
+    ],
+)
+
+# Bind the ClusterRole to the ServiceAccount
+webhook_cluster_role_binding = kubernetes.rbac.v1.ClusterRoleBinding(
+    f"kubewatch-webhook-clusterrolebinding-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=f"kubewatch-webhook-{stack_info.env_suffix.lower()}",
+    ),
+    role_ref=kubernetes.rbac.v1.RoleRefArgs(
+        api_group="rbac.authorization.k8s.io",
+        kind="ClusterRole",
+        name=f"kubewatch-webhook-{stack_info.env_suffix.lower()}",
+    ),
+    subjects=[
+        kubernetes.rbac.v1.SubjectArgs(
+            kind="ServiceAccount",
+            name=webhook_service_account_name,
+            namespace=kubewatch_namespace,
+        ),
+    ],
+)
 
 # Create Kubernetes secret for Slack token
 webhook_secret = kubernetes.core.v1.Secret(
@@ -152,7 +195,7 @@ webhook_deployment = kubernetes.apps.v1.Deployment(
                 labels={"app": webhook_resource_name},
             ),
             spec=kubernetes.core.v1.PodSpecArgs(
-                service_account_name=kubewatch_service_account,
+                service_account_name=webhook_service_account_name,
                 containers=[
                     kubernetes.core.v1.ContainerArgs(
                         name="webhook-handler",

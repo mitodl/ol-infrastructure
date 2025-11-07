@@ -1,6 +1,6 @@
 ---
 secretsprovider: awskms://alias/infrastructure-secrets-production
-encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAEoJNGp4OLrn8WtCu3UPe9tAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM/tdoNVVjiN/KLL/1AgEQgDuRKAjMdhaZ2Iv1QEk/FRiDpnBrYAIUt/lkqnQf5B4XKgWjwSfkpUxMLP3VKB394geLeSsp/1V9KAAcZw==
 config:
   vault:address: https://vault-production.odl.mit.edu
   slack:channel_name: kubewatch-applications-production
+encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAFCdRPVlsWoP5ZLXtsZ9ia9AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMNpndOSZtgrW8rRe+AgEQgDvwR49U/70xmPR4Bf7Dt4TjXMGtxDDHrNp7VOFSlN7oeL8/nPaygpS14dC+tgnZZiPcL5+WUzFSr9g0mg==
