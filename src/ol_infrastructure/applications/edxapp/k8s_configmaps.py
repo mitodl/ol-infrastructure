@@ -212,6 +212,7 @@ def create_k8s_configmaps(
                     OTEL_SERVICE_NAME: {env_name}-edxapp
                     OTEL_LOG_LEVEL: info
                     ECOMMERCE_PUBLIC_URL_ROOT: {edxapp_config.require_object("domains")["lms"]}
+                    {f'''XPRO_BASE_URL: https://{edxapp_config.require("xpro_domain")}''' if stack_info.env_prefix == "xpro" else ""}
                     # Django 4.2+ storage configuration
                     # STORAGES:
                     #   default:

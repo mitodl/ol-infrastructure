@@ -249,7 +249,7 @@ def create_k8s_secrets(
                         SECRET_KEY: {{{{ get .Secrets "django_secret_key" }}}}
                         JWT_AUTH:  # NEEDS ATTENTION
                           JWT_ALGORITHM: HS256
-                          JWT_AUDIENCE: mitxonline
+                          JWT_AUDIENCE: {stack_info.env_prefix}
                           JWT_AUTH_COOKIE: {stack_info.env_prefix}-{
                         stack_info.env_suffix
                     }-edx-jwt-cookie
@@ -272,7 +272,7 @@ def create_k8s_secrets(
                             - ISSUER: https://{
                         edxapp_config.require_object("domains")["lms"]
                     }/oauth2
-                              AUDIENCE: mitxonline
+                              AUDIENCE: {stack_info.env_prefix}
                               SECRET_KEY: {{{{ get .Secrets "django_secret_key" }}}}
                         OPENAI_SECRET_KEY: {{{{ get .Secrets "openai_api_key" }}}}
                         OPENAI_API_KEY: {{{{ get .Secrets "openai_api_key" }}}}
@@ -430,9 +430,9 @@ def create_k8s_secrets(
             mount_type="kv-v1",
             path="edxapp",
             templates={
-                "80-lms-oauth-credentials.yaml": textwrap.dedent("""
+                "80-lms-oauth-credentials.yaml": textwrap.dedent(f"""
                     SOCIAL_AUTH_OAUTH_SECRETS:
-                        ol-oauth2: {{ get .Secrets "mitxonline_oauth_secret" }}
+                        ol-oauth2: {{{{ get .Secrets "{stack_info.env_prefix}_oauth_secret" }}}}
                 """),
             },
             vaultauth=vault_k8s_resources.auth_name,
