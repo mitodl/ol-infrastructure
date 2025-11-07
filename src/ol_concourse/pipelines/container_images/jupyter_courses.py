@@ -1,4 +1,3 @@
-# ruff: noqa: E501, FIX002, ERA001
 import dataclasses
 import sys
 
@@ -134,6 +133,8 @@ courses = [
     ),
     CourseImageInfo(
         course_name="base_notebook_image",
+        # This needs to be provisioned as a versioned bucket.
+        # Alternatively, we need to encode versioning into the object path.
         s3_bucket="ol-infrastructure-artifacts",
         s3_object_path="jupyterhub/base_notebook_image/base_image.tar.gz",
         image_name="base_notebook_image",
@@ -179,7 +180,8 @@ def pipeline_for_github():
                         put=course_image.name,
                         params={
                             "image": "image/image.tar",
-                            "additional_tags": f"./{course_repository.name}/.git/describe_ref",
+                            "additional_tags": f"./{course_repository.name}"
+                            f"/.git/describe_ref",
                         },
                     ),
                 ],
@@ -207,26 +209,15 @@ def pipeline_for_s3():
             "aws_region": "us-east-1",
         },
     )
-    # TODO(dansubak): Unsure if I'll need this.
-    # unzip_task = TaskStep(
-    #     task=Identifier("unzip-s3-archive"),
-    #     config=TaskConfig(
-    #         inputs=[Input(name=s3_archive.name)],
-    #         platform=Platform.linux,
-    #         image_resource=AnonymousResource(
-    #             type=REGISTRY_IMAGE,
-    #             source=RegistryImage(repository="busybox"),
-    #         ),
-    #         params={
-    #             "ARCHIVE_NAME": f"{s3_archive.name}",
-    #         },
-    #         run=Command(path="sh", args=["-exc"
-    #                                      "tar -xzf ${ARCHIVE_NAME}"]),
-    #     ),
-    # )
+
+    # We may want to remove the cruft that the S3 resource
+    # provides alongside the unzipped archive:
+    # s3_uri, url, version files as detailed at
+    # https://github.com/concourse/s3-resource?tab=readme-ov-file#in-fetch-an-object-from-the-bucket
+
     build_task = container_build_task(
         inputs=[Input(name=s3_archive.name)],
-        build_parameters={"CONTEXT": s3_archive.name},
+        build_parameters={"CONTEXT": f"{s3_archive.name}"},
     )
 
     return Pipeline(
@@ -241,8 +232,6 @@ def pipeline_for_s3():
                         put=course_image.name,
                         params={
                             "image": "image/image.tar",
-                            # TODO(dansubak): - this definitely isn't gonna work.
-                            "additional_tags": f"./{s3_archive.name}/.git/describe_ref",
                         },
                     ),
                 ],
@@ -263,10 +252,16 @@ if __name__ == "__main__":
     for course in courses:
         if course.repo_uri:
             sys.stdout.write(
-                f"fly -t <prod_target> set-pipeline -p jupyter_notebook_docker_image_build -c github_definition.json --var course_repo={course.repo_uri} --instance-var image_name={course.image_name}\n"
+                f"fly -t <prod_target> set-pipeline "
+                f"-p jupyter_notebook_docker_image_build "
+                f"-c github_definition.json --var course_repo={course.repo_uri} "
+                f"--instance-var image_name={course.image_name}\n"
             )
         else:
-            # TODO(dansubak): I might need to make a whole new job for this. Not sure if I can specify a different definition with the same pipeline name # noqa: 501
             sys.stdout.write(
-                f"fly -t <prod_target> set-pipeline -p jupyter_notebook_docker_image_build -c s3_definition.json --var s3_bucket={course.s3_bucket} --var s3_object_path={course.s3_object_path} --instance-var image_name={course.image_name}\n"
+                f"fly -t <prod_target> set-pipeline "
+                f"-p jupyter_notebook_docker_image_build "
+                f"-c s3_definition.json --var s3_bucket={course.s3_bucket} "
+                f"--var s3_object_path={course.s3_object_path} "
+                f"--instance-var image_name={course.image_name}\n"
             )
