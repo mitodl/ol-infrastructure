@@ -306,62 +306,26 @@ apisix_route = OLApisixRoute(
 
 #####  START AUTHORING #####
 authoring_namespace = "jupyter-authoring"
-cluster_stack.require_output("namespaces").apply(
-    lambda ns: check_cluster_namespace(authoring_namespace, ns)
-)
-authoring_rds_password = jupyterhub_config.require("authoring_rds_password")
+# cluster_stack.require_output("namespaces").apply(
+#     lambda ns: check_cluster_namespace(authoring_namespace, ns)
+# )
 jupyterhub_authoring_creds_secret_name = "jupyterhub-authoring-db-creds"  # noqa: S105  # pragma: allowlist secret
 
-jupyterhub_authoring_db_security_group = ec2.SecurityGroup(
-    f"jupyterhub-authoring-db-security-group-{env_name}",
-    name=f"jupyterhub-authoring-db-{target_vpc_name}-{env_name}",
-    description="Access from authoring jupyterhub to its own postgres database.",
-    ingress=[
-        ec2.SecurityGroupIngressArgs(
-            security_groups=[
-                vault_stack.require_output("vault_server")["security_group"],
-            ],
-            cidr_blocks=[target_vpc["cidr"]],
-            protocol="tcp",
-            from_port=DEFAULT_POSTGRES_PORT,
-            to_port=DEFAULT_POSTGRES_PORT,
-            description="Access to Postgres from authoring jupyterhub nodes.",
-        ),
-        ec2.SecurityGroupIngressArgs(
-            cidr_blocks=k8s_pod_subnet_cidrs,
-            description="Allow k8s cluster ipblocks to talk to DB",
-            from_port=DEFAULT_POSTGRES_PORT,
-            protocol="tcp",
-            security_groups=[],
-            to_port=DEFAULT_POSTGRES_PORT,
-        ),
-    ],
-    tags=aws_config.tags,
-    vpc_id=target_vpc_id,
-)
-
-jupyterhub_authoring_db_config = OLPostgresDBConfig(
-    instance_name=f"jupyterhub-authoring-db-{stack_info.env_suffix}",
-    password=authoring_rds_password,
-    subnet_group_name=target_vpc["rds_subnet"],
-    security_groups=[jupyterhub_authoring_db_security_group],
-    tags=aws_config.tags,
-    db_name="jupyterhub-authoring",
-    **rds_defaults,
-)
-jupyterhub_authoring_db = OLAmazonDB(jupyterhub_authoring_db_config)
-
+# TODO(dansubak): Can't tell if this is the right thing to do, possibly weird
+# Is this the right thing to do for configuring a logical database?
+# We only override the db_name and mount_point
 jupyterhub_authoring_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
-    db_name=jupyterhub_authoring_db_config.db_name,
-    mount_point=f"{jupyterhub_authoring_db_config.engine}-jupyterhub",
-    db_admin_username=jupyterhub_authoring_db_config.username,
-    db_admin_password=authoring_rds_password,
-    db_host=jupyterhub_authoring_db.db_instance.address,
+    db_name="jupyterhub_authoring",
+    mount_point=f"{jupyterhub_db_config.engine}-jupyterhub-authoring",
+    db_admin_username=jupyterhub_db_config.username,
+    db_admin_password=rds_password,
+    # We use the same physical host for authoring and regular Jupyterhub DB
+    db_host=jupyterhub_db.db_instance.address,
     role_statements=postgres_role_statements,
 )
 jupyterhub_authoring_db_vault_backend = OLVaultDatabaseBackend(
     jupyterhub_authoring_db_vault_backend_config,
-    opts=ResourceOptions(depends_on=[jupyterhub_authoring_db]),
+    opts=ResourceOptions(depends_on=[jupyterhub_db]),
 )
 jupyterhub_authoring_creds_secret_name = "jupyterhub-authoring-db-creds"  # noqa: S105  # pragma: allowlist secret
 
@@ -407,7 +371,7 @@ authoring_app_db_creds_dynamic_secret_config = OLVaultK8SDynamicSecretConfig(
     namespace=authoring_namespace,
     path="creds/app",  # TODO(dansubak): Depends on how we set up secret in vault
     templates={
-        "DATABASE_URL": f'postgresql://{{{{ get .Secrets "username" }}}}:{{{{ get .Secrets "password" }}}}@jupyterhub-db-{stack_info.env_suffix}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:{DEFAULT_POSTGRES_PORT}/jupyterhub'
+        "DATABASE_URL": f'postgresql://{{{{ get .Secrets "username" }}}}:{{{{ get .Secrets "password" }}}}@jupyterhub-db-{stack_info.env_suffix}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:{DEFAULT_POSTGRES_PORT}/jupyterhub_authoring'
     },
     vaultauth=authoring_vault_k8s_resources.auth_name,
 )
