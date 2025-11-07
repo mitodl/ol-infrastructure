@@ -942,16 +942,13 @@ dagster_user_code_release = kubernetes.helm.v3.Release(
     f"dagster-user-code-release-{stack_info.env_suffix}",
     kubernetes.helm.v3.ReleaseArgs(
         name="dagster-user-code",
-        version=DAGSTER_CHART_VERSION,
+        version="1.11.16",  # DAGSTER_CHART_VERSION, - temporarily hardcode to <1.12
         namespace=dagster_namespace,
         chart="dagster-user-deployments",
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://dagster-io.github.io/helm",
         ),
         cleanup_on_fail=True,
-        skip_crds=False,
-        skip_await=False,
-        disable_openapi_validation=True,
         values=dagster_user_code_values,
     ),
     opts=ResourceOptions(
