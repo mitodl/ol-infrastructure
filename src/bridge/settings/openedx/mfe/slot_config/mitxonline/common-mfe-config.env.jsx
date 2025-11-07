@@ -359,7 +359,7 @@ const addLearningCourseInfoSlotOverride = (config) => {
               id: 'custom_header_learning_course_info',
               type: DIRECT_PLUGIN,
               RenderWidget: ({ courseTitle }) => (
-                <div style={{ paddingTop: '14px', minWidth: 0 }}>
+                <div style={{ paddingTop: '7px', minWidth: 0 }}>
                   <span className='d-block m-0 font-weight-bold course-title'>{courseTitle}</span>
                 </div>
               ),
