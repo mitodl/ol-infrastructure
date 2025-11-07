@@ -131,14 +131,6 @@ courses = [
         repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.MLTL.1-1T2026",
         image_name="uai_source-uai.mltl1",
     ),
-    CourseImageInfo(
-        course_name="base_notebook_image",
-        # This needs to be provisioned as a versioned bucket.
-        # Alternatively, we need to encode versioning into the object path.
-        s3_bucket="ol-infrastructure-artifacts",
-        s3_object_path="jupyterhub/base_notebook_image/base_image.tar.gz",
-        image_name="base_notebook_image",
-    ),
 ]
 
 # This infers the ECR url from the AWS account,
