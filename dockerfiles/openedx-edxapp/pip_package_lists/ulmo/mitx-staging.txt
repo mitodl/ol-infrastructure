@@ -9,7 +9,7 @@ nodeenv>=1.7.0
 ol-openedx-canvas-integration==0.6.0
 ol-openedx-course-export==0.2.0
 ol-openedx-course-structure-api
-ol-openedx-git-auto-export==0.6.0
+ol-openedx-git-auto-export==0.7.0
 ol-openedx-logging==0.2.0
 ol-openedx-rapid-response-reports==0.4.0
 ol-openedx-sentry==0.3.0
