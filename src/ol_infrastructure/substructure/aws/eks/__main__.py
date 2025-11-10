@@ -10,6 +10,8 @@ from pulumi import Config, ResourceOptions, StackReference, export
 
 from bridge.lib.versions import (
     GRAFANA_K8S_MONITORING_CHART_VERSION,
+    NVIDIA_DCGM_EXPORTER_CHART_VERSION,
+    NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION,
     VANTAGE_K8S_AGENT_CHART_VERSION,
 )
 from bridge.secrets.sops import read_yaml_secrets
@@ -35,6 +37,12 @@ VERSIONS = {
     ),
     "GRAFANA_K8S_MONITORING_VERSION": os.environ.get(
         "GRAFANA_K8S_MONITORING_CHART_VERSION", GRAFANA_K8S_MONITORING_CHART_VERSION
+    ),
+    "NVIDIA_DCGM_EXPORTER_VERSION": os.environ.get(
+        "NVIDIA_DCGM_EXPORTER_VERSION", NVIDIA_DCGM_EXPORTER_CHART_VERSION
+    ),
+    "NVIDIA_K8S_DEVICE_PLUGIN_VERSION": os.environ.get(
+        "NVIDIA_K8S_DEVICE_PLUGIN_VERSION", NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION
     ),
 }
 
@@ -600,6 +608,18 @@ grafana_k8s_monitoring_helm_release = kubernetes.helm.v3.Release(
                     },
                 },
             },
+            "integrations": {
+                "dcgm-exporter": {
+                    "instances": [
+                        {
+                            "name": "dcgm-exporter",
+                            "labelSelectors": {
+                                "app.kubernetes.io/name": "dcgm-exporter",
+                            },
+                        }
+                    ],
+                },
+            },
         },
     ),
     opts=ResourceOptions(provider=k8s_provider, delete_before_replace=True),
@@ -634,7 +654,7 @@ nvidia_k8s_device_plugin_release = kubernetes.helm.v3.Release(
     kubernetes.helm.v3.ReleaseArgs(
         name="nvidia-device-plugin",
         chart="nvidia-device-plugin",
-        version="0.17.3",
+        version=VERSIONS["NVIDIA_K8S_DEVICE_PLUGIN_VERSION"],
         namespace="operations",
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://nvidia.github.io/k8s-device-plugin"
@@ -668,7 +688,24 @@ nvidia_k8s_device_plugin_release = kubernetes.helm.v3.Release(
                 }
             ],
             "gfd": {
-                "enabled": False,
+                "enabled": True,
+            },
+            "nfd": {
+                "worker": {
+                    "tolerations": [
+                        {
+                            "key": "ol.mit.edu/gpu_node",
+                            "operator": "Equal",
+                            "value": "true",
+                            "effect": "NoSchedule",
+                        },
+                    ]
+                },
+            },
+            "config": {
+                "map": {
+                    "default": "version: v1\nsharing:\n  mps:\n    resources:\n    - name: nvidia.com/gpu\n      replicas: 10\n    failRequestsGreaterThanOne: false\n",
+                }
             },
             "resources": {
                 "requests": {
@@ -679,6 +716,42 @@ nvidia_k8s_device_plugin_release = kubernetes.helm.v3.Release(
                     "cpu": "200m",
                     "memory": "200Mi",
                 },
+            },
+        },
+    ),
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=k8s_provider,
+        delete_before_replace=True,
+    ),
+)
+
+nvidia_dcgm_exporter_release = kubernetes.helm.v3.Release(
+    f"{cluster_name}-nvidia-dcgm-exporter-helm-release",
+    kubernetes.helm.v3.ReleaseArgs(
+        name="nvidia-dcgm-exporter",
+        chart="dcgm-exporter",
+        version=VERSIONS["NVIDIA_DCGM_EXPORTER_VERSION"],
+        namespace="operations",
+        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+            repo="https://nvidia.github.io/dcgm-exporter/helm-charts"
+        ),
+        cleanup_on_fail=True,
+        skip_await=True,
+        values={
+            "tolerations": [
+                {
+                    "key": "ol.mit.edu/gpu_node",
+                    "operator": "Equal",
+                    "value": "true",
+                    "effect": "NoSchedule",
+                }
+            ],
+            "nodeSelector": {
+                "ol.mit.edu/gpu_node": "true",
+            },
+            "serviceMonitor": {
+                "enabled": False,
             },
         },
     ),

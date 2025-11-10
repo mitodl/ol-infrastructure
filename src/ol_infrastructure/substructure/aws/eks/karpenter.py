@@ -373,6 +373,7 @@ def setup_karpenter(  # noqa: PLR0913
         ),
     )
 
+    default_node_labels = {**k8s_global_labels, "ol.mit.edu/gpu_node": "false"}
     kubernetes.apiextensions.CustomResource(
         f"{cluster_name}-karpenter-default-node-pool",
         api_version="karpenter.sh/v1",
@@ -385,7 +386,7 @@ def setup_karpenter(  # noqa: PLR0913
         spec={
             "template": {
                 "metadata": {
-                    "labels": k8s_global_labels,
+                    "labels": default_node_labels,
                 },
                 "spec": {
                     "nodeClassRef": {
