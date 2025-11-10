@@ -393,7 +393,7 @@ def webhook_handler():
                 logger.exception(
                     "Slack API error: %s - %s",
                     e.response["error"],
-                    e.response.get("detail", str(e)),
+                    e.response.get("detail"),
                 )
                 raise
         else:
