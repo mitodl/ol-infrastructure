@@ -91,6 +91,8 @@ class QueryStringKubeSpawner(KubeSpawner):
                     # This course requires a GPU, so we are adding a node affinity
                     # rule to schedule the pod on a node with a GPU.
                     self.node_affinity_required = GPU_NODE_AFFINITY_LIST
+                    self.extra_resource_limits = {"nvidia.com/gpu": "1"}
+                    self.extra_resource_guarantees = {"nvidia.com/gpu": "1"}
 
                 # If we don't have a notebook, don't muck with default_url
                 # This falls back to the tree view in Jupyterhub if not specified

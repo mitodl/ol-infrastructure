@@ -600,6 +600,18 @@ grafana_k8s_monitoring_helm_release = kubernetes.helm.v3.Release(
                     },
                 },
             },
+            "integrations": {
+                "dcgm-exporter": {
+                    "instances": [
+                        {
+                            "name": "dcgm-exporter",
+                            "labelSelectors": {
+                                "app.kubernetes.io/name": "dcgm-exporter",
+                            },
+                        }
+                    ],
+                },
+            },
         },
     ),
     opts=ResourceOptions(provider=k8s_provider, delete_before_replace=True),
@@ -696,6 +708,42 @@ nvidia_k8s_device_plugin_release = kubernetes.helm.v3.Release(
                     "cpu": "200m",
                     "memory": "200Mi",
                 },
+            },
+        },
+    ),
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=k8s_provider,
+        delete_before_replace=True,
+    ),
+)
+
+nvidia_dcgm_exporter_release = kubernetes.helm.v3.Release(
+    f"{cluster_name}-nvidia-dcgm-exporter-helm-release",
+    kubernetes.helm.v3.ReleaseArgs(
+        name="nvidia-dcgm-exporter",
+        chart="dcgm-exporter",
+        version="3.6.0",
+        namespace="operations",
+        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+            repo="https://nvidia.github.io/dcgm-exporter/helm-charts"
+        ),
+        cleanup_on_fail=True,
+        skip_await=True,
+        values={
+            "tolerations": [
+                {
+                    "key": "ol.mit.edu/gpu_node",
+                    "operator": "Equal",
+                    "value": "true",
+                    "effect": "NoSchedule",
+                }
+            ],
+            "nodeSelector": {
+                "ol.mit.edu/gpu_node": "true",
+            },
+            "serviceMonitor": {
+                "enabled": False,
             },
         },
     ),
