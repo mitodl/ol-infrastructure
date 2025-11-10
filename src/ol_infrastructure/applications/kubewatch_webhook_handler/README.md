@@ -77,19 +77,7 @@ Edit `Pulumi.applications.kubewatch_webhook_handler.applications.CI.yaml`:
 config:
   vault:address: https://vault-ci.odl.mit.edu
   kubewatch_webhook:watched_namespaces: "ecommerce,learn-ai,mitlearn,mitxonline"
-  kubewatch_webhook:ignored_image_patterns: "nginx"  # Optional: comma-separated patterns
   kubewatch_webhook:ignored_label_patterns: "celery"  # Optional: comma-separated patterns
-```
-
-#### Configuration Parameters
-
-- **watched_namespaces**: Comma-separated list of namespaces to monitor
-- **ignored_image_patterns**: (Optional) Comma-separated patterns to filter out from container images (default: "nginx")
-- **ignored_label_patterns**: (Optional) Comma-separated patterns to filter out from `ol.mit.edu/*` label values (default: "celery")
-
-#### Filtering Behavior
-
-The webhook handler applies two types of filters to reduce notification noise:
 
 1. **Image Pattern Filtering**
    - Ignores deployments where the container image name contains any specified pattern
