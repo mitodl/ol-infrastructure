@@ -101,9 +101,9 @@ config:
 
 ### Secrets
 
-Slack webhook URL is stored in SOPS-encrypted secrets:
+Slack token is stored in SOPS-encrypted secrets:
 - Location: `src/bridge/secrets/kubewatch/secrets.applications.ci.yaml`
-- Key: `slack-webhook-url`
+- Key: `slack-token`
 
 ## Deployment
 
