@@ -943,7 +943,9 @@ dagster_user_code_values = {
 # removes values.schema.json that references https://kubernetesjsonschema.dev
 # (those URLs return 404 in Concourse CI environment due to network restrictions)
 dagster_user_deployments_chart_path = str(
-    Path(__file__).parent.parent.parent.parent / "charts" / "dagster-user-deployments"
+    Path(__file__).parent.parent.parent.parent.parent
+    / "charts"
+    / "dagster-user-deployments"
 )
 
 dagster_user_code_release = kubernetes.helm.v3.Release(
