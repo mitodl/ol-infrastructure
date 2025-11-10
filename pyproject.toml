@@ -34,7 +34,7 @@ dependencies = [
     "packaging>=24.2",
     "pulumiverse-time>=0.1.1",
     "kubernetes>=34.1.0",
-    "parliament",
+    "parliament@git+https://github.com/mitodl/parliament",
 ]
 
 [project.urls]
@@ -73,6 +73,10 @@ include = [
 "src/bridge" = "bridge"
 "src/bilder" = "bilder"
 "src/ol_concourse" = "ol_concourse"
+
+# Allow for installing dependencies from git
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [build-system]
 requires = ["hatchling"]
@@ -200,6 +204,3 @@ inline-quotes = "double"
 "src/ol_infrastructure/substructure/vault/pki/__main__.py" = ["E501"]
 "src/ol_infrastructure/lib/fastly.py" = ["E501"]
 "src/bridge/lib/versions.py" = ["E501"]
-
-[tool.uv.sources]
-parliament = { git = "https://github.com/mitodl/parliament" }
