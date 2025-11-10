@@ -495,46 +495,6 @@ jupyterhub_application = kubernetes.helm.v3.Release(
                         "effect": "NoSchedule",
                     }
                 ],
-                "profileList": [
-                    {
-                        "display_name": "Standard CPU Instance (1 CPU, 4GB RAM)",
-                        "description": "General purpose computing",
-                        "default": True,
-                        "kubespawner_override": {
-                            "cpu_limit": 1,
-                            "cpu_guarantee": 0.25,
-                            "mem_limit": "4G",
-                            "mem_guarantee": "1G",
-                        },
-                    },
-                    {
-                        "display_name": "GPU Instance (1 GPU, 4 CPU, 16GB RAM)",
-                        "description": "For machine learning and GPU-accelerated workloads",
-                        "kubespawner_override": {
-                            "cpu_limit": 4,
-                            "cpu_guarantee": 1,
-                            "mem_limit": "16G",
-                            "mem_guarantee": "4G",
-                            "extra_resource_limits": {
-                                "nvidia.com/gpu": "1",
-                            },
-                            "extra_resource_guarantees": {
-                                "nvidia.com/gpu": "1",
-                            },
-                            "tolerations": [
-                                {
-                                    "key": "ol.mit.edu/gpu_node",
-                                    "operator": "Equal",
-                                    "value": "true",
-                                    "effect": "NoSchedule",
-                                }
-                            ],
-                            "node_selector": {
-                                "ol.mit.edu/gpu_node": "true",
-                            },
-                        },
-                    },
-                ],
                 "allowPrivilegeEscalation": True,
                 "cmd": [
                     "jupyterhub-singleuser",
