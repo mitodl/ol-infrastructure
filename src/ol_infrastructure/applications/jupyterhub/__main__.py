@@ -1,6 +1,7 @@
 """JupyterHub application deployment for MIT Open Learning."""
 
 from pulumi import Config, StackReference
+from pulumi_aws import ec2
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
@@ -31,9 +32,12 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResourcesConfig,
     OLVaultK8SSecret,
     OLVaultPostgresDatabaseConfig,
+)
+from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from ol_infrastructure.applications.jupyterhub.deployment import (
     provision_jupyterhub_deployment,
 )
+from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
@@ -51,10 +55,12 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 # Parse stack and setup providers
 stack_info = parse_stack()
 setup_vault_provider(stack_info)
+env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
 # Configuration
 jupyterhub_config = Config("jupyterhub")
 vault_config = Config("vault")
+
 
 # Stack references
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
@@ -62,6 +68,8 @@ vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}
 cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
 
 # AWS configuration
+apps_vpc = network_stack.require_output("applications_vpc")
+k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 aws_config = AWSBase(
     tags={"OU": BusinessUnit.mit_learn, "Environment": stack_info.env_suffix}
 )
@@ -129,6 +137,11 @@ rds_defaults["instance_size"] = (
     jupyterhub_config.get("db_instance_size") or rds_defaults["instance_size"]
 )
 rds_defaults["use_blue_green"] = False
+rds_password = jupyterhub_config.require("rds_password")
+
+target_vpc_name = jupyterhub_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
+target_vpc = network_stack.require_output(target_vpc_name)
+target_vpc_id = target_vpc["id"]
 
 # Extra images for pre-pulling
 COURSE_NAMES = [
@@ -171,6 +184,59 @@ EXTRA_IMAGES = {
     for course_name in COURSE_NAMES
 }
 
+#### Database setup ####
+# The physical database for Jupyterhub is shared across both the main and authoring
+# deployments, but we create separate Vault backends for each to manage credentials
+# and roles separately.
+jupyterhub_db_security_group = ec2.SecurityGroup(
+    f"jupyterhub-db-security-group-{env_name}",
+    name=f"jupyterhub-db-{target_vpc_name}-{env_name}",
+    description="Access from jupyterhub to its own postgres database.",
+    ingress=[
+        ec2.SecurityGroupIngressArgs(
+            security_groups=[
+                vault_stack.require_output("vault_server")["security_group"],
+            ],
+            cidr_blocks=[target_vpc["cidr"]],
+            protocol="tcp",
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
+            description="Access to Postgres from jupyterhub nodes.",
+        ),
+        ec2.SecurityGroupIngressArgs(
+            cidr_blocks=k8s_pod_subnet_cidrs,
+            description="Allow k8s cluster ipblocks to talk to DB",
+            from_port=DEFAULT_POSTGRES_PORT,
+            protocol="tcp",
+            security_groups=[],
+            to_port=DEFAULT_POSTGRES_PORT,
+        ),
+    ],
+    tags=aws_config.tags,
+    vpc_id=target_vpc_id,
+)
+
+jupyterhub_db_config = OLPostgresDBConfig(
+    instance_name=f"jupyterhub-db-{stack_info.env_suffix}",
+    password=rds_password,
+    subnet_group_name=target_vpc["rds_subnet"],
+    security_groups=[jupyterhub_db_security_group],
+    tags=aws_config.tags,
+    db_name="jupyterhub",
+    **rds_defaults,
+)
+jupyterhub_db = OLAmazonDB(jupyterhub_db_config)
+
+jupyterhub_authoring_db_config = OLPostgresDBConfig(
+    instance_name=f"jupyterhub-authoring-db-{stack_info.env_suffix}",
+    password=rds_password,
+    subnet_group_name=target_vpc["rds_subnet"],
+    security_groups=[jupyterhub_db_security_group],
+    tags=aws_config.tags,
+    db_name="jupyterhub_authoring",
+    **rds_defaults,
+)
+
 # Provision main JupyterHub deployment
 jupyterhub_deployment = provision_jupyterhub_deployment(
     base_name="jupyterhub",
@@ -179,10 +245,10 @@ jupyterhub_deployment = provision_jupyterhub_deployment(
     stack_info=stack_info,
     jupyterhub_config=jupyterhub_config,
     vault_config=vault_config,
+    db_config=jupyterhub_db_config,
+    app_db=jupyterhub_db,
     network_stack=network_stack,
-    vault_stack=vault_stack,
     cluster_stack=cluster_stack,
-    aws_config=aws_config,
     application_labels=application_labels,
     k8s_global_labels=k8s_global_labels,
     extra_images=EXTRA_IMAGES,
@@ -196,10 +262,10 @@ jupyterhub_authoring_deployment = provision_jupyterhub_deployment(
     stack_info=stack_info,
     jupyterhub_config=jupyterhub_config,
     vault_config=vault_config,
+    db_config=jupyterhub_authoring_db_config,
+    app_db=jupyterhub_db,
     network_stack=network_stack,
-    vault_stack=vault_stack,
     cluster_stack=cluster_stack,
-    aws_config=aws_config,
     application_labels=application_labels,
     k8s_global_labels=k8s_global_labels,
     extra_images=EXTRA_IMAGES,
