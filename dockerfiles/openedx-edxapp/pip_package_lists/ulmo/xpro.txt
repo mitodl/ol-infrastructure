@@ -29,3 +29,6 @@ ol-openedx-chat-xblock
 # opentelemetry-sdk
 # opentelemetry-semantic-conventions
 # opentelemetry-util-http
+
+# Utilities to help with schema debugging and other common tasks
+django-extensions
