@@ -44,6 +44,7 @@ const addFooterSubSlotsOverride = (config) => {
   const accessibilityURL = process.env.ACCESSIBILITY_URL || 'https://accessibility.mit.edu/';
   const contactUsURL = process.env.CONTACT_URL || 'mailto:mitlearn-support@mit.edu';
   const copyRightText = 'Massachusetts Institute of Technology';
+  const supportURL = process.env.SUPPORT_URL || 'https://mitxonline.zendesk.com/hc/en-us';
   const footerLogo = <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={process.env.MIT_BASE_URL} />;
 
   const footerLegalLinks = [
@@ -63,7 +64,11 @@ const addFooterSubSlotsOverride = (config) => {
       url: contactUsURL,
       title: 'Contact Us',
     },
-  ];
+    isLearnCourse() ? null : {
+      url: supportURL,
+      title: 'Help',
+    },
+  ].filter(link => link !== null);
 
   const footerSubSlotsConfig = {
     [SLOT_IDS.footer.desktop_left_links]: {
