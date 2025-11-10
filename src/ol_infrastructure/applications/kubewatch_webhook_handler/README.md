@@ -63,7 +63,7 @@ kubewatch_webhook_handler/
 
 1. **ECR Repository** - Stores Docker images
 2. **Docker Image** - Built from Dockerfile and pushed to ECR
-3. **Kubernetes Secret** - Contains Slack webhook URL
+3. **Kubernetes Secret** - Contains Slack token
 4. **Kubernetes Deployment** - Runs the webhook handler (2 replicas)
 5. **Kubernetes Service** - Exposes the webhook endpoint
 
