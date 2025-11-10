@@ -3,7 +3,7 @@ name = "ol-infrastructure"
 version = "0.1.0"
 description = "Infrastructure management, configuration management logic, and Packer templates for building and deploying images to run services in a production environment."
 authors = [{ name = "MIT Open Learning Engineering", email = "oldevops@mit.edu" }]
-requires-python = "~=3.12"
+requires-python = ">=3.13,<3.15"
 readme = "README.md"
 license = "BSD-3-Clause"
 classifiers = [
