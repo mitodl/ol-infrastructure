@@ -942,7 +942,7 @@ dagster_user_code_release = kubernetes.helm.v3.Release(
     f"dagster-user-code-release-{stack_info.env_suffix}",
     kubernetes.helm.v3.ReleaseArgs(
         name="dagster-user-code",
-        version="1.11.16",  # DAGSTER_CHART_VERSION, - temporarily hardcode to <1.12
+        version=DAGSTER_CHART_VERSION,
         namespace=dagster_namespace,
         chart="dagster-user-deployments",
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
