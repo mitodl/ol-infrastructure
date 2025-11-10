@@ -99,7 +99,7 @@ def _define_git_resources(
         uri=f"http://github.com/mitodl/{repo_name}",
         branch="release",
         fetch_tags=True,
-        tag_regex=r"v[0-9]\.[0-9]*\.[0-9]",  # examples v0.24.0, v0.26.3
+        tag_regex=r"v[0-9]+\.[0-9]+\.[0-9]+",  # examples v0.24.0, v0.26.3
     )
 
     ol_infra_repo = git_repo(
