@@ -5,7 +5,7 @@ from pathlib import Path
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, ResourceOptions, StackReference
-from pulumi_aws import ec2, get_caller_identity, s3
+from pulumi_aws import ec2, get_caller_identity, iam, s3
 
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
@@ -114,26 +114,27 @@ jupyter_bucket_public_access = s3.BucketPublicAccessBlock(
     ignore_public_acls=True,
     restrict_public_access=True,
 )
-# Need to figure out policy for this.
-# Concourse needs R/W access, k8s needs write access at the moment.
-# s3.BucketPolicy(
-#     "jupyter-course-bucket-policy",
-#     bucket=jupyter_course_bucket.id,
-#     policy=iam.get_policy_document(
-#         statements=[
-#             iam.GetPolicyDocumentStatementArgs(
-#                 effect="Allow",
-#                 principals=[
-#                     iam.GetPolicyDocumentStatementPrincipalArgs(
-#                         type="AWS", identifiers=["*"]
-#                     )
-#                 ],
-#                 actions=["s3:GetObject"],
-#                 resources=[jupyter_course_bucket.arn.apply("{}/*".format)],
-#             )
-#         ]
-#     ).json,
-# )
+
+# Allow full access to the bucket from the account root user.
+s3.BucketPolicy(
+    "jupyter-course-bucket-policy",
+    bucket=jupyter_course_bucket.id,
+    policy=iam.get_policy_document(
+        statements=[
+            iam.GetPolicyDocumentStatementArgs(
+                effect="Allow",
+                principals=[
+                    iam.GetPolicyDocumentStatementPrincipalArgs(
+                        type="AWS",
+                        identifiers=[f"arn:aws:iam::{aws_account.account_id}:root"],
+                    )
+                ],
+                actions=["s3:*"],
+                resources=[f"arn:aws:s3:::[{jupyterhub_course_bucket_name}]/*"],
+            )
+        ]
+    ).json,
+)
 
 
 rds_defaults = defaults(stack_info)["rds"]
