@@ -10,6 +10,8 @@ from pulumi import Config, ResourceOptions, StackReference, export
 
 from bridge.lib.versions import (
     GRAFANA_K8S_MONITORING_CHART_VERSION,
+    NVIDIA_DCGM_EXPORTER_CHART_VERSION,
+    NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION,
     VANTAGE_K8S_AGENT_CHART_VERSION,
 )
 from bridge.secrets.sops import read_yaml_secrets
@@ -35,6 +37,12 @@ VERSIONS = {
     ),
     "GRAFANA_K8S_MONITORING_VERSION": os.environ.get(
         "GRAFANA_K8S_MONITORING_CHART_VERSION", GRAFANA_K8S_MONITORING_CHART_VERSION
+    ),
+    "NVIDIA_DCGM_EXPORTER_VERSION": os.environ.get(
+        "NVIDIA_DCGM_EXPORTER_VERSION", NVIDIA_DCGM_EXPORTER_CHART_VERSION
+    ),
+    "NVIDIA_K8S_DEVICE_PLUGIN_VERSION": os.environ.get(
+        "NVIDIA_K8S_DEVICE_PLUGIN_VERSION", NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION
     ),
 }
 
@@ -646,7 +654,7 @@ nvidia_k8s_device_plugin_release = kubernetes.helm.v3.Release(
     kubernetes.helm.v3.ReleaseArgs(
         name="nvidia-device-plugin",
         chart="nvidia-device-plugin",
-        version="0.17.3",
+        version=VERSIONS["NVIDIA_K8S_DEVICE_PLUGIN_VERSION"],
         namespace="operations",
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://nvidia.github.io/k8s-device-plugin"
@@ -723,7 +731,7 @@ nvidia_dcgm_exporter_release = kubernetes.helm.v3.Release(
     kubernetes.helm.v3.ReleaseArgs(
         name="nvidia-dcgm-exporter",
         chart="dcgm-exporter",
-        version="3.6.0",
+        version=VERSIONS["NVIDIA_DCGM_EXPORTER_VERSION"],
         namespace="operations",
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://nvidia.github.io/dcgm-exporter/helm-charts"
