@@ -500,6 +500,8 @@ ReleaseMap: dict[
                 application="discussions",
                 application_type="MFE",
                 release="master",
+                origin_override="https://github.com/mitodl/frontend-app-discussions",
+                branch_override="tmacey/fix_learner_posts_link",
             ),
             OpenEdxApplicationVersion(
                 application="edx-platform",
