@@ -4,6 +4,8 @@ import { PLUGIN_OPERATIONS, DIRECT_PLUGIN } from '@openedx/frontend-plugin-frame
 import { getConfig } from '@edx/frontend-platform';
 
 import Footer, { Logo, MenuLinks, CopyrightNotice } from './Footer.jsx';
+import { Icon } from "@openedx/paragon";
+import { AccountCircle } from '@openedx/paragon/icons';
 import './mitxonline-styles.scss';
 
 const configData = getConfig();
@@ -244,9 +246,7 @@ const UserMenuOverride = () => {
   }
   return (
     <>
-      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
-        <path d="M15.9998 2.66797C23.3598 2.66797 29.3332 8.6413 29.3332 16.0013C29.3332 23.3613 23.3598 29.3346 15.9998 29.3346C8.63984 29.3346 2.6665 23.3613 2.6665 16.0013C2.6665 8.6413 8.63984 2.66797 15.9998 2.66797ZM8.03093 20.5564C9.98761 23.4772 12.9267 25.3346 16.2128 25.3346C19.4989 25.3346 22.438 23.4772 24.3946 20.5564C22.2512 18.5576 19.3748 17.3346 16.2128 17.3346C13.0508 17.3346 10.1744 18.5576 8.03093 20.5564ZM15.9998 14.668C18.209 14.668 19.9998 12.8771 19.9998 10.668C19.9998 8.45884 18.209 6.66797 15.9998 6.66797C13.7906 6.66797 11.9998 8.45884 11.9998 10.668C11.9998 12.8771 13.7906 14.668 15.9998 14.668Z" fill="white"/>
-      </svg>
+      <Icon src={AccountCircle} style={{width: "32px", height: "32px"}}/>
       {/* Username hidden on mobile via CSS; remains for larger screens */}
       <span className="user-menu-name">{authenticatedUser.name || authenticatedUser.username}</span>
       <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="remixicon "><path d="M11.9999 13.1714L16.9497 8.22168L18.3639 9.63589L11.9999 15.9999L5.63599 9.63589L7.0502 8.22168L11.9999 13.1714Z"></path></svg>
