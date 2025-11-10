@@ -5,7 +5,7 @@ from pathlib import Path
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, ResourceOptions, StackReference
-from pulumi_aws import ec2, get_caller_identity
+from pulumi_aws import ec2, get_caller_identity, s3
 
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
@@ -89,6 +89,51 @@ namespace = "jupyter"
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(namespace, ns)
 )
+
+# S3 bucket for storing image assets.
+# We still host actual images in ECR, but we store assets to build those
+# In S3 and Github.
+jupyterhub_course_bucket_name = f"jupyter-courses-{stack_info.env_suffix}"
+jupyter_course_bucket = s3.Bucket(
+    "jupyter-course-bucket",
+    bucket=jupyterhub_course_bucket_name,
+    tags=aws_config.tags,
+)
+s3.BucketVersioning(
+    "jupyter-course-bucket-versioning",
+    bucket=jupyter_course_bucket.id,
+    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
+        status="Enabled"
+    ),
+)
+jupyter_bucket_public_access = s3.BucketPublicAccessBlock(
+    "jupyter-course-bucket-public-access",
+    bucket=jupyter_course_bucket.id,
+    block_public_acls=True,
+    block_public_policy=True,
+    ignore_public_acls=True,
+    restrict_public_access=True,
+)
+# Need to figure out policy for this.
+# Concourse needs R/W access, k8s needs write access at the moment.
+# s3.BucketPolicy(
+#     "jupyter-course-bucket-policy",
+#     bucket=jupyter_course_bucket.id,
+#     policy=iam.get_policy_document(
+#         statements=[
+#             iam.GetPolicyDocumentStatementArgs(
+#                 effect="Allow",
+#                 principals=[
+#                     iam.GetPolicyDocumentStatementPrincipalArgs(
+#                         type="AWS", identifiers=["*"]
+#                     )
+#                 ],
+#                 actions=["s3:GetObject"],
+#                 resources=[jupyter_course_bucket.arn.apply("{}/*".format)],
+#             )
+#         ]
+#     ).json,
+# )
 
 
 rds_defaults = defaults(stack_info)["rds"]
