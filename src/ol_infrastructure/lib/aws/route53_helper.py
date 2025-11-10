@@ -110,7 +110,7 @@ def fastly_certificate_validation_records(
         if zone_id := lookup_zone_id_from_domain(challenge.record_name):
             records_array.append(
                 route53.Record(
-                    f"fastly-cert-validation-route53-record-{index}",
+                    f"fastly-cert-validation-route53-record-{challenge.record_name}-{index}",
                     name=challenge.record_name,
                     zone_id=zone_id,
                     type=challenge.record_type,
