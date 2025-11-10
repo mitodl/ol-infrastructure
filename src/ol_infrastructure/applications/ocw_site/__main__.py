@@ -14,7 +14,6 @@ from pulumi import (
 )
 from pulumi_aws import iam, route53, s3
 
-from bridge.lib.constants import FASTLY_A_TLS_1_2, FASTLY_CNAME_TLS_1_3
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     FIVE_MINUTES,
@@ -992,17 +991,16 @@ for purpose in ("draft", "live", "test"):
         # record. If it's deeper than 3 levels then it's a subdomain of ocw.mit.edu and
         # we can use a CNAME.
         record_type = "A" if len(domain.split(".")) == 3 else "CNAME"  # noqa: PLR2004
-        record_value = (
-            [str(addr) for addr in FASTLY_A_TLS_1_2]
-            if record_type == "A"
-            else [FASTLY_CNAME_TLS_1_3]
-        )
         route53.Record(
             f"ocw-site-dns-record-{domain}",
             name=domain,
             type=record_type,
             ttl=FIVE_MINUTES,
-            records=record_value,
+            records=[
+                record.record_value
+                for record in tls_configuration.dns_records
+                if record.record_type == record_type
+            ],
             zone_id=ocw_zone["id"],
         )
 
