@@ -312,7 +312,7 @@ leek_deployment = kubernetes.apps.v1.Deployment(
                             ),
                             kubernetes.core.v1.EnvVarArgs(
                                 name="LEEK_AGENT_LOG_LEVEL",
-                                value="DEBUG",
+                                value="INFO",
                             ),
                             kubernetes.core.v1.EnvVarArgs(
                                 name="LEEK_ENABLE_API", value="true"
