@@ -257,6 +257,7 @@ def setup_apisix(
                             "type": "apisix-standalone",
                         },
                         "kubernetes": {
+                            "ingressClass": "apache-apisix",
                             "enableGatewayAPI": True,
                         },
                     },
