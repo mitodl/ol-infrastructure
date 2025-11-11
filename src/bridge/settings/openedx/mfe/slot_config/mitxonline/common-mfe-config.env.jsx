@@ -64,11 +64,16 @@ const addFooterSubSlotsOverride = (config) => {
       url: contactUsURL,
       title: 'Contact Us',
     },
-    isLearnCourse() ? null : {
-      url: supportURL,
-      title: 'Help',
-    },
-  ].filter(link => link !== null);
+  ]
+
+  if (!isLearnCourse()) {
+    footerLegalLinks.push(
+      {
+        url: supportURL,
+        title: 'Help',
+      }
+    );
+  } 
 
   const footerSubSlotsConfig = {
     [SLOT_IDS.footer.desktop_left_links]: {
