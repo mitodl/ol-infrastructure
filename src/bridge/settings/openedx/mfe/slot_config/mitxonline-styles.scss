@@ -5,13 +5,9 @@
   font-style: normal !important;
   font-size: 14px !important;
   line-height: 18px !important;
-
+  
   .dropdown-toggle::after{
     display: none !important;
-  }
-
-  .container-xl {
-    height: 72px !important;
   }
 
   .logo img{
@@ -29,7 +25,7 @@
     display: flex !important;
     padding: 4px 8px !important;
     align-items: center !important;
-    gap: 8px !important;
+    gap: 2px !important;
     color: #FFF !important;
     border-radius: 4px !important;
     border: 1px solid var(--dark-silver-gray-text-secondary, #626A73) !important;
@@ -50,7 +46,6 @@
       color: #FFF !important;
       border-radius: 4px !important;
       border: 1px solid var(--dark-silver-gray-text-secondary, #626A73) !important;
-      opacity: 0.75 !important;
       opacity: 1 !important;
       background-color: transparent !important;
     }
@@ -122,7 +117,7 @@
     }
 
     a + a, .dropdown-item + .dropdown-item, button.dropdown-item + button.dropdown-item {
-      border-top: 1px solid #DDE1E6 !important;
+      border-top: 1px solid #DDE1E6;
     }
   }
   .btn-outline-primary:not(.dropdown-toggle, .menu-trigger), .btn-primary:not(.dropdown-toggle, .menu-trigger), .nav-link{
@@ -162,7 +157,7 @@
   border: none !important;
 }
 // Mobile responsive adjustments
-@media (max-width: 767px) {
+@media (max-width: 991px) {
   .learning-header, .site-header-desktop {
     // Hide standalone dashboard button; moved into user dropdown
     .dashboard-btn { display: none !important; }
@@ -184,7 +179,7 @@
     // Tighten spacing within dropdown for smaller screens
     .dropdown-menu-right {
       min-width: 180px !important;
-      a, .dropdown-item, button.dropdown-item { padding: 10px 14px !important; }
+      a, .dropdown-item, button.dropdown-item { padding: 10px 14px !important; border-top: none !important; }
     }
   }
 }
