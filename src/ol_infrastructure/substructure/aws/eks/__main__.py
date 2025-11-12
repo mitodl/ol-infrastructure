@@ -354,8 +354,8 @@ if cluster_stack.require_output("has_ebs_storage"):
                         "memory": "100Mi",
                     },
                     "limits": {
-                        "cpu": "100m",
-                        "memory": "100Mi",
+                        "cpu": "200m",
+                        "memory": "256Mi",
                     },
                 },
             },
