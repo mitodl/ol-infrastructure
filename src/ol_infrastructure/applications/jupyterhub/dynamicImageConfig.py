@@ -42,6 +42,7 @@ KNOWN_COURSES.extend(
             13,
             "st1",
             "mltl1",
+            "pm1",
         ]
     ]
 )
