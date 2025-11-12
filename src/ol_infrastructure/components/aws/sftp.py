@@ -16,6 +16,7 @@ class SFTPUserConfig(BaseModel):
     username: str
     role_arn: str | None = None
     public_keys: list[str] = Field(default_factory=list)
+    aws_account_id: str | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -138,18 +139,34 @@ class SFTPServer(ComponentResource):
                     ),
                 )
 
+                # Build assume role policy - include partner AWS account if provided
+                assume_role_principals = {"Service": "transfer.amazonaws.com"}
+                assume_role_statements = [
+                    {
+                        "Effect": "Allow",
+                        "Principal": assume_role_principals,
+                        "Action": "sts:AssumeRole",
+                    }
+                ]
+
+                # Add cross-account access if AWS account ID is provided
+                if user_config.aws_account_id:
+                    assume_role_statements.append(
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": f"arn:aws:iam::{user_config.aws_account_id}:root"
+                            },
+                            "Action": "sts:AssumeRole",
+                        }
+                    )
+
                 user_role = iam.Role(
                     f"{sftp_config.server_name}-sftp-{user_config.username}-role",
                     assume_role_policy=json.dumps(
                         {
                             "Version": "2012-10-17",
-                            "Statement": [
-                                {
-                                    "Effect": "Allow",
-                                    "Principal": {"Service": "transfer.amazonaws.com"},
-                                    "Action": "sts:AssumeRole",
-                                }
-                            ],
+                            "Statement": assume_role_statements,
                         }
                     ),
                     tags=sftp_config.merged_tags(
