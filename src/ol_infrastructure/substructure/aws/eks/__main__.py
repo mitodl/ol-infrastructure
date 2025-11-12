@@ -649,6 +649,16 @@ setup_keda(
     k8s_global_labels=k8s_global_labels,
 )
 
+node_feature_discovery_crds = kubernetes.yaml.v2.ConfigGroup(
+    f"{cluster_name}-nfd-crds",
+    files=[
+        "https://raw.githubusercontent.com/kubernetes-sigs/node-feature-discovery/master/deployment/base/nfd-crds/nfd-api-crds.yaml",
+    ],
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        delete_before_replace=True,
+    ),
+)
 nvidia_k8s_device_plugin_release = kubernetes.helm.v3.Release(
     f"{cluster_name}-nvidia-k8s-device-plugin-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
@@ -758,6 +768,7 @@ nvidia_dcgm_exporter_release = kubernetes.helm.v3.Release(
     opts=ResourceOptions(
         provider=k8s_provider,
         parent=k8s_provider,
+        depends_on=[node_feature_discovery_crds],
         delete_before_replace=True,
     ),
 )
