@@ -437,3 +437,19 @@ ZENDESK_USER: ''
 ##############################################
 # ECOMMERCE_API_SIGNING_KEY: SET-ME-PLEASE
 # ECOMMERCE_API_URL: http://localhost:8002/api/v2
+
+COURSE_MODE_DEFAULTS:
+  name: Professional
+  android_sku: null
+  bulk_sku: null
+  currency: usd
+  description: null
+  expiration_datetime: null
+  ios_sku: null
+  min_price: 0
+  sku: null
+  slug: no-id-professional
+  suggested_prices:
+EMAIL_HOST: smtp.mailgun.org
+EMAIL_PORT: 587
+EMAIL_USE_TLS: true
