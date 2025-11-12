@@ -112,7 +112,7 @@ jupyter_bucket_public_access = s3.BucketPublicAccessBlock(
     block_public_acls=True,
     block_public_policy=True,
     ignore_public_acls=True,
-    restrict_public_access=True,
+    restrict_public_buckets=True,
 )
 
 # Allow full access to the bucket from the account root user.
