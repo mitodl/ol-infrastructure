@@ -46,8 +46,9 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     application_labels: dict[str, str],
     k8s_global_labels: dict[str, str],
     extra_images: dict[str, dict[str, str]] | None = None,
-    menu_override_file: str = "menu_override.json",
-    disabled_extensions_file: str = "disabled_extensions.json",
+    menu_override_json: str | None = None,
+    disabled_extensions_json: str | None = None,
+    extra_config: str | None = None,
 ) -> kubernetes.helm.v3.Release:
     """Provision a JupyterHub deployment with all required AWS and Kubernetes resources.
 
@@ -60,17 +61,13 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
         stack_info: Stack information from parse_stack()
         jupyterhub_config: Pulumi config for jupyterhub
         vault_config: Pulumi config for vault
-        network_stack: Network stack reference
-        vault_stack: Vault stack reference
         cluster_stack: EKS cluster stack reference
-        aws_config: AWS configuration with tags
         application_labels: Labels to apply to Kubernetes resources
         k8s_global_labels: Global Kubernetes labels
         extra_images: List of extra images to pre-pull (optional)
-        menu_override_file: Path to menu override JSON file relative to
-            deployment directory
-        disabled_extensions_file: Path to disabled extensions JSON file
-            relative to deployment directory
+        menu_override_json: JSON contents for menu override Jupyter config
+        disabled_extensions_json: JSON contents for disabled extensions Jupyter config
+        extra_config: Extra configuration values to merge into the Helm chart values
 
     Returns:
         The JupyterHub Helm release resource
@@ -237,8 +234,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     # JupyterHub Helm Release
     extra_images_list = extra_images or {}
     admin_users_list = jupyterhub_config.get_object("admin_users", default=[])
-    allowed_users_list = (jupyterhub_config.get_object("allowed_users", default=[]),)
-    #'jupyterhub-CI-application-helm-release'
+    allowed_users_list = jupyterhub_config.get_object("allowed_users", default=[])
     return kubernetes.helm.v3.Release(
         f"{base_name}-{env_name.upper()}-application-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
@@ -327,11 +323,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                             .read_text(),
                         }
                     },
-                    "extraConfig": {
-                        "dynamicImageConfig.py": Path(__file__)
-                        .parent.joinpath("dynamicImageConfig.py")
-                        .read_text()
-                    },
+                    "extraConfig": {"dynamicImageConfig.py": extra_config},
                     "config": {
                         "Authenticator": {
                             "admin_users": admin_users_list,
@@ -377,17 +369,13 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                             "mountPath": (
                                 "/opt/conda/share/jupyter/lab/settings/overrides.json"
                             ),
-                            "stringData": Path(__file__)
-                            .parent.joinpath(menu_override_file)
-                            .read_text(),
+                            "stringData": menu_override_json,
                         },
                         "disabled_extensions": {
                             "mountPath": (
                                 "/home/jovyan/.jupyter/labconfig/page_config.json"
                             ),
-                            "stringData": Path(__file__)
-                            .parent.joinpath(disabled_extensions_file)
-                            .read_text(),
+                            "stringData": disabled_extensions_json,
                         },
                     },
                     "image": {

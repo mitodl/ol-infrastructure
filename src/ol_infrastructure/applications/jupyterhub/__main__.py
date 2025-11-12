@@ -1,5 +1,7 @@
 """JupyterHub application deployment for MIT Open Learning."""
 
+from pathlib import Path
+
 from pulumi import Config, StackReference
 from pulumi_aws import ec2
 
@@ -90,6 +92,7 @@ setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 # Check namespaces
 namespace = "jupyter"
+authoring_namespace = "jupyter-authoring"
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(namespace, ns)
 )
@@ -237,6 +240,13 @@ jupyterhub_authoring_db_config = OLPostgresDBConfig(
     **rds_defaults,
 )
 
+menu_override = Path(__file__).parent.joinpath("menu_override.json").read_text()
+disabled_extensions = (
+    Path(__file__).parent.joinpath("disabled_extensions.json").read_text()
+)
+dynamic_image_config = (
+    Path(__file__).parent.joinpath("dynamicImageConfig.py").read_text()
+)
 # Provision main JupyterHub deployment
 jupyterhub_deployment = provision_jupyterhub_deployment(
     base_name="jupyterhub",
@@ -247,13 +257,21 @@ jupyterhub_deployment = provision_jupyterhub_deployment(
     vault_config=vault_config,
     db_config=jupyterhub_db_config,
     app_db=jupyterhub_db,
-    network_stack=network_stack,
     cluster_stack=cluster_stack,
     application_labels=application_labels,
     k8s_global_labels=k8s_global_labels,
     extra_images=EXTRA_IMAGES,
+    menu_override_json=menu_override,
+    disabled_extensions_json=disabled_extensions,
+    extra_config=dynamic_image_config,
 )
 
+author_menu_override = (
+    Path(__file__).parent.joinpath("author_menu_override.json").read_text()
+)
+author_disabled_extensions = (
+    Path(__file__).parent.joinpath("author_disabled_extensions.json").read_text()
+)
 # Provision JupyterHub authoring deployment
 jupyterhub_authoring_deployment = provision_jupyterhub_deployment(
     base_name="jupyterhub-authoring",
@@ -264,11 +282,11 @@ jupyterhub_authoring_deployment = provision_jupyterhub_deployment(
     vault_config=vault_config,
     db_config=jupyterhub_authoring_db_config,
     app_db=jupyterhub_db,
-    network_stack=network_stack,
     cluster_stack=cluster_stack,
     application_labels=application_labels,
     k8s_global_labels=k8s_global_labels,
     extra_images=EXTRA_IMAGES,
-    menu_override_file="author_menu_override.json",
-    disabled_extensions_file="author_disabled_extensions.json",
+    menu_override_json=author_menu_override,
+    disabled_extensions_json=author_disabled_extensions,
+    extra_config=dynamic_image_config,
 )
