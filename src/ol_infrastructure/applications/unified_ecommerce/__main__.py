@@ -73,6 +73,9 @@ stack_info = parse_stack()
 
 ecommerce_config = Config("ecommerce")
 cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+cluster_substructure_stack = StackReference(
+    f"substructure.aws.eks.applications.{stack_info.name}"
+)
 dns_stack = StackReference("infrastructure.aws.dns")
 monitoring_stack = StackReference("infrastructure.monitoring")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
@@ -83,6 +86,7 @@ vector_log_proxy_stack = StackReference(
 )
 
 apps_vpc = network_stack.require_output("applications_vpc")
+operations_vpc = network_stack.require_output("operations_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 ecommerce_environment = f"applications-{stack_info.env_suffix}"
 
@@ -506,11 +510,23 @@ redis_cluster_security_group = ec2.SecurityGroup(
     description="Access control for the unified ecommerce redis cluster.",
     ingress=[
         ec2.SecurityGroupIngressArgs(
-            security_groups=[ecommerce_application_security_group.id],
+            security_groups=[
+                ecommerce_application_security_group.id,
+                cluster_substructure_stack.require_output(
+                    "cluster_keda_security_group_id"
+                ),
+            ],
             protocol="tcp",
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,
-            description="Allow application pods to talk to redis",
+            description="Allow application pods to talk to Redis",
+        ),
+        ec2.SecurityGroupIngressArgs(
+            cidr_blocks=operations_vpc["k8s_pod_subnet_cidrs"],
+            protocol="tcp",
+            from_port=DEFAULT_REDIS_PORT,
+            to_port=DEFAULT_REDIS_PORT,
+            description="Allow Operations VPC celery monitoring pods to talk to Redis",
         ),
     ],
     vpc_id=apps_vpc["id"],
