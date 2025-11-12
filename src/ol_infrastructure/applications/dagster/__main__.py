@@ -852,6 +852,9 @@ dagster_helm_values = {
         "type": "K8sRunLauncher",
         "config": {
             "k8sRunLauncher": {
+                "imagePullPolicy": "IfNotPresent",
+                "loadInclusterConfig": True,
+                "envConfigMaps": [],
                 "envVars": dagster_db.db_instance.address.apply(
                     lambda db_host: [
                         f"DAGSTER_PG_HOST={db_host}",
@@ -866,6 +869,8 @@ dagster_helm_values = {
                     {"name": "dagster-dbt-secrets"},
                     {"name": "dagster-postgresql-secret"},
                 ],
+                "volumeMounts": [],
+                "volumes": [],
                 "jobNamespace": dagster_namespace,
             },
         },
@@ -938,22 +943,16 @@ dagster_user_code_values = {
     },
 }
 
-# Use local chart to avoid schema validation issues with external URLs
-# The chart is fetched via bin/fetch-dagster-user-deployments-chart.sh which
-# removes values.schema.json that references https://kubernetesjsonschema.dev
-# (those URLs return 404 in Concourse CI environment due to network restrictions)
-dagster_user_deployments_chart_path = str(
-    Path(__file__).parent.parent.parent.parent.parent
-    / "charts"
-    / "dagster-user-deployments"
-)
-
 dagster_user_code_release = kubernetes.helm.v3.Release(
     f"dagster-user-code-release-{stack_info.env_suffix}",
     kubernetes.helm.v3.ReleaseArgs(
         name="dagster-user-code",
         namespace=dagster_namespace,
-        chart=dagster_user_deployments_chart_path,
+        chart="dagster-user-code",
+        version=DAGSTER_CHART_VERSION,
+        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+            repo="https://dagster-io.github.io/helm",
+        ),
         cleanup_on_fail=True,
         disable_openapi_validation=True,
         values=dagster_user_code_values,
