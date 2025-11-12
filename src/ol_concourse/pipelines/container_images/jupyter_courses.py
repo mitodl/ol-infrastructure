@@ -131,6 +131,11 @@ courses = [
         repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.MLTL.1-1T2026",
         image_name="uai_source-uai.mltl1",
     ),
+    CourseImageInfo(
+        course_name="uai_source-uai.pm1",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.PM.1-1T2026",
+        image_name="uai_source-uai.pm1",
+    ),
 ]
 
 # This infers the ECR url from the AWS account,
