@@ -1,0 +1,6 @@
+---
+config:
+  vault:address: https://vault-qa.odl.mit.edu
+  slack:channel_name: kubewatch-applications-qa
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHjZAY5LtmRWGljev0oiDGn0jR5cRwD4IVXCn50TW5i0qQFT4DFIx6YtXdws4gaqEwhcAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMMqu+Nhp2gwFrNVX8AgEQgDu7D1YFC2rERT3sa03Icxvj3gDvNc05CwpB4lBMzRd8OaQ7HTcdg45s9MCnGXuOzW11kqQo1nT92ZpSzA==

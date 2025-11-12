@@ -36,6 +36,11 @@ cluster_stack = StackReference(
     f"infrastructure.aws.eks.{stack_info.env_prefix}.{stack_info.name}"
 )
 
+# Reference the webhook handler stack to get the service URL
+webhook_handler_stack = StackReference(
+    f"applications.kubewatch_webhook_handler.{stack_info.env_prefix}.{stack_info.name}"
+)
+
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 aws_config = AWSBase(
     tags={"OU": BusinessUnit.operations, "Environment": Environment.operations},
@@ -60,11 +65,22 @@ cluster_stack.require_output("namespaces").apply(
 
 slack_channel = Config("slack").require("channel_name")
 
+# Get configurable namespace filters for notifications
+# Kubewatch's namespace field only supports a single namespace or "" for all.
+# To watch multiple namespaces, we watch all and filter in webhook handler.
+watched_namespaces = ""  # Always watch all namespaces in kubewatch
+
+# Get webhook URL from webhook handler stack
+webhook_url = webhook_handler_stack.require_output("webhook_service_url")
+
+# Per-environment Helm release name
+helm_release_name = f"kubewatch-{stack_info.env_suffix.lower()}"
+
 # Install the kubewatch helm chart
 kubewatch_application = kubernetes.helm.v3.Release(
     f"kubewatch-{stack_info.name}-application-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
-        name="kubewatch",
+        name=helm_release_name,
         chart="kubewatch",
         version=KUBEWATCH_CHART_VERSION,
         namespace=kubewatch_namespace,
@@ -86,22 +102,25 @@ kubewatch_application = kubernetes.helm.v3.Release(
                 "pullSecrets": [],
             },
             "slack": {
+                "enabled": False,  # Disabled - using custom webhook handler
+            },
+            # Enable our custom webhook handler
+            "webhook": {
                 "enabled": True,
-                "channel": slack_channel,
-                "token": kubewatch_sops_secrets["slack-token"],
+                "url": webhook_url,
             },
             "extraHandlers": {},
-            "namespaceToWatch": "",
+            "namespaceToWatch": watched_namespaces,
             "resourcesToWatch": {
                 "deployment": True,
                 "replicationcontroller": False,
                 "replicaset": False,
                 "daemonset": False,
                 "services": False,
-                "pod": True,
-                "job": False,
+                "pod": False,  # Disable pod notifications to reduce noise
+                "job": True,  # Enable job notifications for deployment tracking
                 "persistentvolume": False,
-                "event": True,
+                "event": False,  # Disable generic events to reduce noise
             },
             "customresources": [],
             "command": [],
@@ -164,7 +183,16 @@ kubewatch_application = kubernetes.helm.v3.Release(
             "updateStrategy": {"type": "RollingUpdate"},
             "initContainers": [],
             "sidecars": [],
-            "rbac": {"create": True, "customRoles": []},
+            "rbac": {
+                "create": True,
+                "customRoles": [
+                    {
+                        "apiGroups": ["events.k8s.io"],
+                        "resources": ["events"],
+                        "verbs": ["get", "list", "watch"],
+                    }
+                ],
+            },
             "serviceAccount": {
                 "create": True,
                 "name": "",

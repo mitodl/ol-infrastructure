@@ -1,6 +1,6 @@
 ---
 secretsprovider: awskms://alias/infrastructure-secrets-ci
-encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAEoJNGp4OLrn8WtCu3UPe9tAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM/tdoNVVjiN/KLL/1AgEQgDuRKAjMdhaZ2Iv1QEk/FRiDpnBrYAIUt/lkqnQf5B4XKgWjwSfkpUxMLP3VKB394geLeSsp/1V9KAAcZw==
+encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagFTJi+CTcIkt99X+nBUyHZtAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMMlrxVpWJh0ZeaLf9AgEQgDueau/6fxismCHgjDagynXJCxDv4CIGU4pG+BU6DdshEiYAVUJUWBaAUVWCeRA1vuYHZfSmoDEAa9LX2Q==
 config:
   vault:address: https://vault-ci.odl.mit.edu
   slack:channel_name: kubewatch-applications-ci

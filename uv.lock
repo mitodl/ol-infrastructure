@@ -193,7 +193,7 @@ name = "cffi"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pycparser", marker = "implementation_name != 'PyPy'" },
+    { name = "pycparser", marker = "implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/eb/56/b1ba7935a17738ae8453301356628e8147c79dbb825bcbc73dc7401f9846/cffi-2.0.0.tar.gz", hash = "sha256:44d1b5909021139fe36001ae048dbdde8214afa20200eda0f64c068cac5d5529", size = 523588, upload-time = "2025-09-08T23:24:04.541Z" }
 wheels = [
@@ -931,6 +931,7 @@ dependencies = [
     { name = "pulumi-aws" },
     { name = "pulumi-aws-native" },
     { name = "pulumi-consul" },
+    { name = "pulumi-docker" },
     { name = "pulumi-eks" },
     { name = "pulumi-fastly" },
     { name = "pulumi-github" },
@@ -971,6 +972,7 @@ requires-dist = [
     { name = "pulumi-aws", specifier = ">=7.1,<8" },
     { name = "pulumi-aws-native", specifier = ">=1.25.0,<2" },
     { name = "pulumi-consul", specifier = ">=3.5.0,<4" },
+    { name = "pulumi-docker", specifier = ">=4.0.0,<5" },
     { name = "pulumi-eks", specifier = ">=4,<5" },
     { name = "pulumi-fastly", specifier = ">=11,<12" },
     { name = "pulumi-github", specifier = ">=6.0.0,<7" },
@@ -1192,6 +1194,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/45/36/20bc8d3651c6ef97cc8d0791b39e5f380620133fb0d000e50e9f176c511f/pulumi_consul-3.13.2.tar.gz", hash = "sha256:317456d16a04dac858adb0edea7fd03397462beba834c4701a4ed2c02841f8c2", size = 133985, upload-time = "2025-10-22T17:31:19.647Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/83/6e/b8927f96ca6cdf0a2a3ae9ad1c41c29470502dfb6fa72fa3b39049da5692/pulumi_consul-3.13.2-py3-none-any.whl", hash = "sha256:2151003e6620c5cc204540eb3c5170402bd8c898eb8e41a9d69c09df7f822aaa", size = 205631, upload-time = "2025-10-22T17:31:17.147Z" },
+]
+
+[[package]]
+name = "pulumi-docker"
+version = "4.9.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "parver" },
+    { name = "pulumi" },
+    { name = "semver" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/99/37/b89a1992308609620e8225449940e70bd9a227435ccf42c39938668058c5/pulumi_docker-4.9.0.tar.gz", hash = "sha256:335cb42097e05ed15f940fc5d44e31bcb856e067354639b670775ce88029276b", size = 108365, upload-time = "2025-09-26T04:04:35.867Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/45/23/90a7c2735445c04fb8443a576baf9e914cc3b50f5f3603389e48f33868fa/pulumi_docker-4.9.0-py3-none-any.whl", hash = "sha256:d1bdd85f8292d2901b40ae1ae2742b325b1eda807bc9b658bfb6353cb043501a", size = 129825, upload-time = "2025-09-26T04:04:33.921Z" },
 ]
 
 [[package]]
