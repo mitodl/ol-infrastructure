@@ -674,6 +674,8 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         "ll.mit.edu",
         "mit.edu",
         "mtl.mit.edu",
+        "media.mit.edu",
+        "sloan.mit.edu",
     ]
     ol_apps_mit_org = keycloak.organization.Organization(
         "ol-apps-mit-organization",
