@@ -669,11 +669,18 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     create_organization_scope(ol_apps_realm.id, "olapps", resource_options)
     mitlearn_domain = keycloak_realm_config.require("learn_domain")
     # Touchstone SAML [START]
+    mit_mail_domains = [
+        "csail.mit.edu",
+        "ll.mit.edu",
+        "mit.edu",
+        "mtl.mit.edu",
+    ]
     ol_apps_mit_org = keycloak.organization.Organization(
         "ol-apps-mit-organization",
         opts=resource_options,
         domains=[
-            keycloak.organization.OrganizationDomainArgs(name="mit.edu", verified=True)
+            keycloak.organization.OrganizationDomainArgs(name=mit_domain, verified=True)
+            for mit_domain in mit_mail_domains
         ],
         description="Massachusetts Institute of Technology",
         enabled=True,
@@ -704,7 +711,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         want_assertions_signed=True,
         opts=resource_options,
         first_broker_login_flow_alias=ol_first_login_flow.alias,
-        org_domain="mit.edu",
+        org_domain="ANY",
         organization_id=ol_apps_mit_org.id,
         org_redirect_mode_email_matches=True,
         hide_on_login_page=True,
