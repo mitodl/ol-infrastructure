@@ -1,12 +1,15 @@
+import logging
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 def oidc_identity_provider_args_from_discovery_url(
     discovery_url: str,
     client_secret: str | None = None,
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
     """Build a dictionary of arguments for a Keycloak OIDC Identity Provider.
 
     This helper function is used to simplify the process of registering an OIDC identity
@@ -19,18 +22,21 @@ def oidc_identity_provider_args_from_discovery_url(
         If provided, uses client_secret_basic instead of private_key_jwt.
     :type client_secret: str | None
 
-    :raises RuntimeError: If there is an error fetching or parsing the discovery
-        document.
-
     :return: A dictionary of arguments that can be passed to the constructor of a
-        keycloak.oidc.IdentityProvider Pulumi resource.
-    :rtype: Dict[str, Any]
+        keycloak.oidc.IdentityProvider Pulumi resource, or None if the metadata URL
+        is inaccessible.
+    :rtype: Dict[str, Any] | None
     """
     try:
         oidc_provider_metadata = httpx.get(discovery_url, timeout=10).json()
     except (httpx.RequestError, ValueError) as e:
-        msg = f"Unable to fetch and parse OIDC discovery document from {discovery_url}"
-        raise RuntimeError(msg) from e
+        logger.warning(
+            "Unable to fetch OIDC discovery document from %s: %s. "
+            "Skipping this provider.",
+            discovery_url,
+            e,
+        )
+        return None
     keycloak_arg_map = {
         "authorization_endpoint": "authorization_url",
         "token_endpoint": "token_url",
