@@ -1,11 +1,11 @@
 ---
-ecretsprovider: awskms://alias/infrastructure-secrets-ci
-encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagGEGi/4KBrqjP+AKCI4BCGUAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMj3L4zSUYlkvNeBU8AgEQgDuM1q9C8nFIMRWb4dpAoifS76R2cFflqwCMP9y6QuAncZfZpuJyWf3VMnbEK5zZfSqHVATuZ+eNZIL1QA==
 config:
   uai_partners:partners:
     # Example partner configuration
     # Add your partners here following this format:
-  - name: UAI Test Partner
+  - name: UAI Test Partner 1
     username: uaitestpartner1
-    aws_account_id: "123456789012"   # Partner's AWS account ID for cross-account S3 access
-    ssh_public_key: moof
+    aws_account_id: "713545616749"   # Partner's AWS account ID for cross-account S3 access
+    ssh_public_key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINEE3btBObBRVXPPA0mIDC1R+wlIy+1KSOcxjAU/+3dL
+      feoh@prometheus
+encryptionsalt: v1:zMO+mSswQEs=:v1:RZJ4JTLuNKCiai6Z:S89TkxRFrVFG9SWZEH+GkZW/qb+hQw==
