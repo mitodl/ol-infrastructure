@@ -25,7 +25,7 @@
     display: flex !important;
     padding: 4px 8px !important;
     align-items: center !important;
-    gap: 2px !important;
+    gap: 8px;
     color: #FFF !important;
     border-radius: 4px !important;
     border: 1px solid var(--dark-silver-gray-text-secondary, #626A73) !important;
@@ -42,7 +42,7 @@
       display: flex !important;
       padding: 4px 8px !important;
       align-items: center !important;
-      gap: 8px !important;
+      gap: 8px;
       color: #FFF !important;
       border-radius: 4px !important;
       border: 1px solid var(--dark-silver-gray-text-secondary, #626A73) !important;
@@ -165,6 +165,7 @@
     // Hide the username to conserve space; keep icon only
     .dropdown-toggle .user-menu-name, .menu-trigger .user-menu-name { display: none !important; }
     .dropdown-toggle, .menu-trigger {
+      gap: 2px !important;
       border: none !important;
       &:hover, &:focus { border: none !important; }
     }
