@@ -280,7 +280,9 @@ def create_k8s_secrets(
                         SENTRY_DSN: {{{{ get .Secrets "sentry_dsn" }}}}
                         SYSADMIN_GITHUB_WEBHOOK_KEY: {{{{ get .Secrets "sysadmin_git_webhook_secret" }}}}
                         PROCTORING_BACKENDS:
-                          DEFAULT: 'proctortrack'
+                          DEFAULT: '{
+                        "null" if stack_info.env_prefix == "xpro" else "proctortrack"
+                    }'
                         {
                         f'''
                           'proctortrack':
