@@ -670,14 +670,23 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     mitlearn_domain = keycloak_realm_config.require("learn_domain")
     # Touchstone SAML [START]
     mit_mail_domains = [
+        "broad.mit.edu",
         "cag.csail.mit.edu",
         "csail.mit.edu",
+        "education.mit.edu",
         "ll.mit.edu",
+        "math.mit.edu",
+        "med.mit.edu",
         "media.mit.edu",
         "mit.edu",
+        "mitimco.mit.edu",
         "mtl.mit.edu",
+        "professional.mit.edu",
+        "retired.mitxonline.mit.edu",
         "sloan.mit.edu",
         "smart.mit.edu",
+        "solve.mit.edu",
+        "wi.mit.edu",
     ]
     ol_apps_mit_org = keycloak.organization.Organization(
         "ol-apps-mit-organization",
