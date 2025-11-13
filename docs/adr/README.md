@@ -160,8 +160,10 @@ graph LR
 |-----|-------|--------|------|
 | [0001](0001-use-adr-for-architecture-decisions.md) | Use ADR for Architecture Decisions | Accepted | 2025-10-29 |
 | [0002](0002-migrate-to-gateway-api-httproute.md) | Migrate to Gateway API HTTPRoute | Proposed | 2025-10-29 |
+| [0003](0003-use-hybrid-httproute-apisixtls-for-per-app-tls.md) | Use Hybrid HTTPRoute + ApisixTls for Per-App TLS | Accepted | 2025-11-13 |
+| [0004](0004-keep-oleksgateway-olapisixhttproute-separate.md) | Keep OLEKSGateway and OLApisixHTTPRoute Separate | Accepted | 2025-11-13 |
 | [0005](0005-high-performance-stateful-applications-eks.md) | High Performance Stateful Applications on EKS | Proposed | 2025-11-20 |
-| [0003](0003-label-based-slack-channel-routing-for-kubewatch.md) | Label-Based Slack Channel Routing for Kubewatch | Proposed | 2025-11-20 |
+| [0006](0003-label-based-slack-channel-routing-for-kubewatch.md) | Label-Based Slack Channel Routing for Kubewatch | Proposed | 2025-11-20 |
 
 ## Creating a New ADR
 
