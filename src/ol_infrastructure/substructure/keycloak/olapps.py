@@ -682,7 +682,6 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         "mitimco.mit.edu",
         "mtl.mit.edu",
         "professional.mit.edu",
-        "retired.mitxonline.mit.edu",
         "sloan.mit.edu",
         "smart.mit.edu",
         "solve.mit.edu",
