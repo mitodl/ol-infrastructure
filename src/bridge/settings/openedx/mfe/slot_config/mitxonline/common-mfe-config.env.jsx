@@ -71,7 +71,7 @@ const addFooterSubSlotsOverride = (config) => {
         title: 'Help',
       }
     );
-  } 
+  }
 
   const footerSubSlotsConfig = {
     [SLOT_IDS.footer.desktop_left_links]: {
