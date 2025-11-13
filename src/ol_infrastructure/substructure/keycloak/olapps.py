@@ -967,6 +967,21 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 client_id="ira-frontend",
             )
         )
+        onboard_oidc_org(
+            OIDCIdpConfig(
+                org_domains=["dynideas.com"],
+                org_name="Dynamic Ideas, LLC.",
+                org_alias="DYNIDEAS",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                keycloak_url=keycloak_url,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                org_oidc_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+                client_id="393621505200-fb5rhjqvvmdodn5jdjdv1h1fbpk6rgq7.apps.googleusercontent.com",
+                client_secret=keycloak_realm_config.require("dynideas_client_secret"),
+            )
+        )
 
     # B2B Organizations [END]
 

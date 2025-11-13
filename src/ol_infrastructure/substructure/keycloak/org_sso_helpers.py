@@ -179,6 +179,7 @@ class OIDCIdpConfig(OrgConfig):
     keycloak_url: str
     first_login_flow: keycloak.authentication.Flow
     client_id: str
+    client_secret: str | None = None
 
 
 def onboard_oidc_org(
@@ -187,7 +188,8 @@ def onboard_oidc_org(
     org = create_org_for_learn(oidc_config)
 
     oidc_idp_arg_map = oidc_identity_provider_args_from_discovery_url(
-        oidc_config.org_oidc_metadata_url
+        oidc_config.org_oidc_metadata_url,
+        client_secret=oidc_config.client_secret,
     )
     oidc_idp_arg_map["extra_config"] = {
         "jwtX509HeadersEnabled": True,
