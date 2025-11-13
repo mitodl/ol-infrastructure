@@ -101,8 +101,8 @@ path "sys/leases/renew" {
   capabilities = ["update"]
 }
 path "secret-mitlearn/*" {
-  cpabilities = ["read"]
+  capabilities = ["read"]
 }
 path "secret-mitlearn/data/*" {
-  cpabilities = ["read"]
+  capabilities = ["read"]
 }
