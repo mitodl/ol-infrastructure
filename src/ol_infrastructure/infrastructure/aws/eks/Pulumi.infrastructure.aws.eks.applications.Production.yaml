@@ -73,9 +73,9 @@ config:
         ol.mit.edu/gpu_node: true
       node_group_options: {}
       scaling:
-        desired: 1
-        max: 2
-        min: 1
+        desired: 2
+        max: 4
+        min: 2
       tags:
         cluster: applications-production
         gpu: "true"
