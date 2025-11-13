@@ -234,6 +234,13 @@ def mfe_job(
             f"mitx-styles.scss {mfe_build_dir.name}/mitx-styles.scss"
         )
 
+    # Add styles.scss copy for MITx Online deployment
+    if open_edx_deployment.deployment_name == "mitxonline":
+        mfe_setup_steps.append(
+            f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+            f"mitxonline-styles.scss {mfe_build_dir.name}/mitxonline-styles.scss"
+        )
+
     # Join all commands with newlines
     mfe_setup_command = textwrap.dedent("\n".join(mfe_setup_steps))
 
