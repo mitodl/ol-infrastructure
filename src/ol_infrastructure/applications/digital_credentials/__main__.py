@@ -4,9 +4,11 @@ This module deploys the issuer-coordinator and signing-service for issuing
 verifiable credentials using the DCC microservices architecture.
 """
 
+import json
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
+import pulumi_vault as vault
 from pulumi import (
     Config,
     Output,
@@ -17,10 +19,18 @@ from pulumi import (
 from pulumi_aws import ec2, get_caller_identity
 
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.components.applications.eks import (
+    OLEKSAuthBinding,
+    OLEKSAuthBindingConfig,
+)
 from ol_infrastructure.components.services.k8s import (
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
+)
+from ol_infrastructure.components.services.vault import (
+    OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
@@ -28,6 +38,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
     get_default_psg_ingress_args,
     setup_k8s_provider,
 )
+from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
@@ -35,7 +46,9 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.vault import setup_vault_provider
 
+setup_vault_provider()
 aws_account = get_caller_identity()
 stack_info = parse_stack()
 digital_credentials_config = Config("digital-credentials")
@@ -43,9 +56,15 @@ digital_credentials_config = Config("digital-credentials")
 # Stack references
 cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+vault_mount_stack = StackReference(
+    f"substructure.vault.static_mounts.operations.{stack_info.name}"
+)
 
 apps_vpc = network_stack.require_output("applications_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
+digital_credentials_vault_kv_path = vault_mount_stack.require_output(
+    "digital_credentials_kv"
+)["path"]
 
 aws_config = AWSBase(
     tags={"OU": "operations", "Environment": f"applications-{stack_info.env_suffix}"}
@@ -78,22 +97,108 @@ dcc_security_group = ec2.SecurityGroup(
 )
 
 ################################################
-# Signing Service Deployment
+# OLEKSAuthBinding for Vault Integration
 ################################################
 
+# IAM policy for DCC services (currently no AWS resources needed)
+dcc_policy_document = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": "s3:ListAllMyBuckets",
+            "Resource": "*",
+        }
+    ],
+}
+
+digital_credentials_app = OLEKSAuthBinding(
+    OLEKSAuthBindingConfig(
+        application_name="digital-credentials",
+        namespace=dcc_namespace,
+        stack_info=stack_info,
+        aws_config=aws_config,
+        iam_policy_document=dcc_policy_document,
+        vault_policy_path=Path(__file__).parent.joinpath(
+            "digital_credentials_server_policy.hcl"
+        ),
+        cluster_identities=cluster_stack.require_output("cluster_identities"),
+        vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+        irsa_service_account_name=[
+            "signing-service",
+            "issuer-coordinator",
+        ],
+        vault_sync_service_account_names="digital-credentials-vault",
+        k8s_labels=K8sGlobalLabels(
+            ou=BusinessUnit.operations,
+            service=Services.digital_credentials,
+            stack=stack_info,
+        ),
+    )
+)
+
+################################################
+# Populate Vault with secrets from SOPS
+################################################
+
+# Read secrets from SOPS-encrypted files
 signing_service_secrets = read_yaml_secrets(
     Path(f"digital_credentials/signing_service.{stack_info.env_suffix}.yaml")
 )
+issuer_coordinator_secrets = read_yaml_secrets(
+    Path(f"digital_credentials/issuer_coordinator.{stack_info.env_suffix}.yaml")
+)
 
-# ConfigMap for signing keys (multi-tenant support)
-signing_service_configmap = kubernetes.core.v1.ConfigMap(
-    f"signing-service-config-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="signing-service-config",
+# Write signing service secrets to Vault KV
+vault.kv.SecretV2(
+    f"signing-service-vault-secret-{stack_info.env_suffix}",
+    mount=digital_credentials_vault_kv_path,
+    name="signing-service",
+    data_json=json.dumps(signing_service_secrets),
+)
+
+# Write issuer coordinator secrets to Vault KV
+vault.kv.SecretV2(
+    f"issuer-coordinator-vault-secret-{stack_info.env_suffix}",
+    mount=digital_credentials_vault_kv_path,
+    name="issuer-coordinator",
+    data_json=json.dumps(issuer_coordinator_secrets),
+)
+
+################################################
+# K8s/Vault Resources
+################################################
+
+vault_k8s_resources = digital_credentials_app.vault_k8s_resources
+
+################################################
+# Signing Service Deployment
+################################################
+
+# ConfigMap for signing keys (multi-tenant support) - synced from Vault
+signing_service_secret_name = (
+    "signing-service-secrets"  # pragma: allowlist secret  # noqa: S105
+)
+signing_service_vault_secret = OLVaultK8SSecret(
+    f"signing-service-vault-secret-sync-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name="signing-service-vault-secret",
         namespace=dcc_namespace,
         labels=k8s_global_labels,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name=signing_service_secret_name,
+        dest_secret_type="Opaque",  # pragma: allowlist secret  # noqa: S106
+        mount=digital_credentials_vault_kv_path,
+        mount_type="kv-v2",
+        path="signing-service",
+        templates={
+            key: f'{{{{ get .Secrets.tenants "{key}" }}}}'
+            for key in signing_service_secrets.get("tenants", {})
+        },
+        refresh_after="1h",
+        vaultauth=vault_k8s_resources.auth_name,
     ),
-    data=signing_service_secrets.get("tenants", {}),
+    opts=ResourceOptions(delete_before_replace=True, depends_on=vault_k8s_resources),
 )
 
 signing_service_deployment = kubernetes.apps.v1.Deployment(
@@ -125,8 +230,8 @@ signing_service_deployment = kubernetes.apps.v1.Deployment(
                         ],
                         env_from=[
                             kubernetes.core.v1.EnvFromSourceArgs(
-                                config_map_ref=kubernetes.core.v1.ConfigMapEnvSourceArgs(
-                                    name=signing_service_configmap.metadata.name
+                                secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+                                    name=signing_service_secret_name
                                 )
                             )
                         ],
@@ -136,14 +241,14 @@ signing_service_deployment = kubernetes.apps.v1.Deployment(
                         ),
                         liveness_probe=kubernetes.core.v1.ProbeArgs(
                             http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                                path="/", port=4006
+                                path="/did-key-generator", port=4006
                             ),
                             initial_delay_seconds=10,
                             period_seconds=30,
                         ),
                         readiness_probe=kubernetes.core.v1.ProbeArgs(
                             http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                                path="/", port=4006
+                                path="/did-key-generator", port=4006
                             ),
                             initial_delay_seconds=5,
                             period_seconds=10,
@@ -153,6 +258,7 @@ signing_service_deployment = kubernetes.apps.v1.Deployment(
             ),
         ),
     ),
+    opts=ResourceOptions(depends_on=[signing_service_vault_secret]),
 )
 
 signing_service_service = kubernetes.core.v1.Service(
@@ -177,19 +283,33 @@ signing_service_service = kubernetes.core.v1.Service(
 # Issuer Coordinator Deployment
 ################################################
 
-issuer_coordinator_secrets = read_yaml_secrets(
-    Path(f"digital_credentials/issuer_coordinator.{stack_info.env_suffix}.yaml")
+# Issuer coordinator secrets synced from Vault
+issuer_coordinator_secret_name = (
+    "issuer-coordinator-secrets"  # pragma: allowlist secret  # noqa: S105
 )
-
-# Secret for tenant tokens
-issuer_coordinator_secret = kubernetes.core.v1.Secret(
-    f"issuer-coordinator-secret-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="issuer-coordinator-secret",
+issuer_coordinator_vault_secret = OLVaultK8SSecret(
+    f"issuer-coordinator-vault-secret-sync-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name="issuer-coordinator-vault-secret",
         namespace=dcc_namespace,
         labels=k8s_global_labels,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name=issuer_coordinator_secret_name,
+        dest_secret_type="Opaque",  # pragma: allowlist secret  # noqa: S106
+        mount=digital_credentials_vault_kv_path,
+        mount_type="kv-v2",
+        path="issuer-coordinator",
+        templates={
+            **{
+                key: f'{{{{ get .Secrets.tenant_tokens "{key}" }}}}'
+                for key in issuer_coordinator_secrets.get("tenant_tokens", {})
+            },
+            "APISIX_TOKEN": '{{ get .Secrets "apisix_token" }}',
+        },
+        refresh_after="1h",
+        vaultauth=vault_k8s_resources.auth_name,
     ),
-    string_data=issuer_coordinator_secrets.get("tenant_tokens", {}),
+    opts=ResourceOptions(delete_before_replace=True, depends_on=vault_k8s_resources),
 )
 
 # APISix Consumer for ingress authentication
@@ -258,7 +378,7 @@ issuer_coordinator_deployment = kubernetes.apps.v1.Deployment(
                         env_from=[
                             kubernetes.core.v1.EnvFromSourceArgs(
                                 secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
-                                    name=issuer_coordinator_secret.metadata.name
+                                    name=issuer_coordinator_secret_name
                                 )
                             )
                         ],
@@ -285,7 +405,9 @@ issuer_coordinator_deployment = kubernetes.apps.v1.Deployment(
             ),
         ),
     ),
-    opts=ResourceOptions(depends_on=[signing_service_service]),
+    opts=ResourceOptions(
+        depends_on=[signing_service_service, issuer_coordinator_vault_secret]
+    ),
 )
 
 issuer_coordinator_service = kubernetes.core.v1.Service(
