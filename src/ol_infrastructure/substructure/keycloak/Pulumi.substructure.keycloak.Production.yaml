@@ -101,4 +101,4 @@ config:
   keycloak_realm:session_secret:
     secure: v1:iTCu9uKpnLGZe88a:Eq7sfBEJas2LCl3zY0+gDxhyo0VehCPHQmBe7ZykP4TNUge2QbPpqwZ9VeSQ97klu3jSw9ReNjdAVH4=
   keycloak_realm:dynideas_client_secret:
-    secure: v1:glXjAnB/MFHnLLtt:UNx6iVbgvGu26bm3R+W9BhGkefGpNWkRnxi7ZT0i5qBFkJoOZJ2AQxikxtX4ERdR8mi4
+    secure: v1:MiHrklsdHBBmM+x/:AKedvrwKVQYvoPpZat06SQ12Bzem8a7EGwPh0411HuW2PCMaU+yfDWebdmQ4msGLJPua
