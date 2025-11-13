@@ -9,6 +9,7 @@ from pathlib import Path
 import pulumi_kubernetes as kubernetes
 from pulumi import (
     Config,
+    Output,
     ResourceOptions,
     StackReference,
     export,
@@ -16,6 +17,11 @@ from pulumi import (
 from pulumi_aws import ec2, get_caller_identity
 
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.components.services.k8s import (
+    OLApisixPluginConfig,
+    OLApisixRoute,
+    OLApisixRouteConfig,
+)
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     default_psg_egress_args,
@@ -186,6 +192,29 @@ issuer_coordinator_secret = kubernetes.core.v1.Secret(
     string_data=issuer_coordinator_secrets.get("tenant_tokens", {}),
 )
 
+# APISix Consumer for ingress authentication
+issuer_coordinator_apisix_consumer = kubernetes.apiextensions.CustomResource(
+    f"issuer-coordinator-{stack_info.env_suffix}-apisix-consumer",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixConsumer",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="issuer-coordinator-client",
+        namespace=dcc_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        "authParameter": {
+            "keyAuth": {
+                "value": {
+                    "key": Output.secret(
+                        issuer_coordinator_secrets.get("apisix_token", "")
+                    ),
+                },
+            },
+        },
+    },
+)
+
 issuer_coordinator_deployment = kubernetes.apps.v1.Deployment(
     f"issuer-coordinator-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -278,6 +307,49 @@ issuer_coordinator_service = kubernetes.core.v1.Service(
 )
 
 ################################################
+# APISix Ingress Route
+################################################
+
+# Get domain configuration
+issuer_coordinator_domain = (
+    digital_credentials_config.get("issuer_coordinator_domain")
+    or f"issuer-coordinator-{stack_info.env_suffix}.odl.mit.edu"
+)
+apisix_ingress_class = (
+    digital_credentials_config.get("apisix_ingress_class") or "apisix"
+)
+
+# Create APISix route with key-auth authentication
+issuer_coordinator_apisix_route = OLApisixRoute(
+    f"issuer-coordinator-{stack_info.env_suffix}-apisix-route",
+    k8s_namespace=dcc_namespace,
+    k8s_labels=k8s_global_labels,
+    ingress_class_name=apisix_ingress_class,
+    route_configs=[
+        OLApisixRouteConfig(
+            route_name="issuer-coordinator-protected",
+            priority=10,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="key-auth",
+                    config={
+                        "header": "X-API-Key",
+                    },
+                ),
+            ],
+            hosts=[issuer_coordinator_domain],
+            paths=["/*"],
+            backend_service_name=issuer_coordinator_service.metadata.name,
+            backend_service_port="http",
+            backend_resolve_granularity="service",
+        ),
+    ],
+    opts=ResourceOptions(
+        depends_on=[issuer_coordinator_service, issuer_coordinator_apisix_consumer]
+    ),
+)
+
+################################################
 # Exports
 ################################################
 
@@ -285,6 +357,7 @@ export(
     "digital_credentials",
     {
         "issuer_coordinator_service": issuer_coordinator_service.metadata.name,
+        "issuer_coordinator_domain": issuer_coordinator_domain,
         "signing_service_service": signing_service_service.metadata.name,
         "namespace": dcc_namespace,
     },
