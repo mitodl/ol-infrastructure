@@ -1,4 +1,6 @@
-"""Reusable function for provisioning a JupyterHub deployment."""
+"""Function for provisioning a JupyterHub deployment
+with values consistently derived from its name.
+"""
 
 from pathlib import Path
 
