@@ -325,3 +325,37 @@ def setup_apisix(
             ],
         ),
     )
+
+    # Create GatewayClass resource for Gateway API
+    gateway_class = kubernetes.apiextensions.CustomResource(
+        f"{cluster_name}-gateway-class",
+        api_version="gateway.networking.k8s.io/v1",
+        kind="GatewayClass",
+        metadata={"name": "apisix"},
+        spec={"controllerName": "apisix.apache.org/apisix-ingress-controller"},
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=operations_namespace,
+            depends_on=[gateway_api_crds],
+        ),
+    )
+
+    # Create Gateway resource for Gateway API
+    kubernetes.apiextensions.CustomResource(
+        f"{cluster_name}-gateway",
+        api_version="gateway.networking.k8s.io/v1",
+        kind="Gateway",
+        metadata={"name": "apisix", "namespace": "operations"},
+        spec={
+            "gatewayClassName": "apisix",
+            "listeners": [
+                {"name": "http", "protocol": "HTTP", "port": 80},
+                {"name": "https", "protocol": "HTTPS", "port": 443},
+            ],
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=operations_namespace,
+            depends_on=[gateway_api_crds, gateway_class],
+        ),
+    )
