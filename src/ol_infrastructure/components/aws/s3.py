@@ -7,13 +7,15 @@ and intelligent tiering for cost optimization.
 
 import pulumi
 from pulumi_aws import s3
-from pydantic import Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from ol_infrastructure.lib.ol_types import AWSBase
 
 
 class S3BucketConfig(AWSBase):
     """Configuration for an S3 bucket component."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     bucket_name: str | None = Field(
         default=None,

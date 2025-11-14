@@ -11,6 +11,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
@@ -94,31 +95,19 @@ cluster_stack.require_output("namespaces").apply(
 # We still host actual images in ECR, but we store assets to build those
 # In S3 and Github.
 jupyterhub_course_bucket_name = f"jupyter-courses-{stack_info.env_suffix}"
-jupyter_course_bucket = s3.Bucket(
-    "jupyter-course-bucket",
-    bucket=jupyterhub_course_bucket_name,
+jupyter_course_bucket_config = S3BucketConfig(
+    bucket_name=jupyterhub_course_bucket_name,
+    versioning_enabled=True,
     tags=aws_config.tags,
+    region=aws_config.region,
 )
-s3.BucketVersioning(
-    "jupyter-course-bucket-versioning",
-    bucket=jupyter_course_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Enabled"
-    ),
+jupyter_course_bucket = OLBucket(
+    f"jupyter-course-bucket-{env_name}", config=jupyter_course_bucket_config
 )
-jupyter_bucket_public_access = s3.BucketPublicAccessBlock(
-    "jupyter-course-bucket-public-access",
-    bucket=jupyter_course_bucket.id,
-    block_public_acls=True,
-    block_public_policy=True,
-    ignore_public_acls=True,
-    restrict_public_buckets=True,
-)
-
 # Allow full access to the bucket from the account root user.
 s3.BucketPolicy(
     "jupyter-course-bucket-policy",
-    bucket=jupyter_course_bucket.id,
+    bucket=jupyter_course_bucket.bucket_v2.id,
     policy=iam.get_policy_document(
         statements=[
             iam.GetPolicyDocumentStatementArgs(
