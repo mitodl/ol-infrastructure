@@ -658,9 +658,6 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                     },
                     "kube": {"annotations": {"karpenter.sh/do-not-disrupt": "true"}},
                 },
-                "env_vars": {
-                    "SYNC_JOB_MAX_TIMEOUT_DAYS": "7",
-                },
             },
             "postgresql": {"enabled": False},
             "serviceAccount": {
@@ -697,6 +694,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                     "requests": {"memory": "500Mi", "cpu": "100m"},
                     "limits": {"memory": "1Gi", "cpu": "200m"},
                 },
+                "syncJobMaxTimeoutDays": 15,
             },
             "workloadLauncher": {
                 "enabled": True,
