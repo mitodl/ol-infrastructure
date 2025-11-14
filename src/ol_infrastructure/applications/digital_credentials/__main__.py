@@ -11,7 +11,6 @@ import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import (
     Config,
-    Output,
     ResourceOptions,
     StackReference,
     export,
@@ -24,7 +23,6 @@ from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBindingConfig,
 )
 from ol_infrastructure.components.services.k8s import (
-    OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
 )
@@ -312,29 +310,6 @@ issuer_coordinator_vault_secret = OLVaultK8SSecret(
     opts=ResourceOptions(delete_before_replace=True, depends_on=vault_k8s_resources),
 )
 
-# APISix Consumer for ingress authentication
-issuer_coordinator_apisix_consumer = kubernetes.apiextensions.CustomResource(
-    f"issuer-coordinator-{stack_info.env_suffix}-apisix-consumer",
-    api_version="apisix.apache.org/v2",
-    kind="ApisixConsumer",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="issuer-coordinator-client",
-        namespace=dcc_namespace,
-        labels=k8s_global_labels,
-    ),
-    spec={
-        "authParameter": {
-            "keyAuth": {
-                "value": {
-                    "key": Output.secret(
-                        issuer_coordinator_secrets.get("apisix_token", "")
-                    ),
-                },
-            },
-        },
-    },
-)
-
 issuer_coordinator_deployment = kubernetes.apps.v1.Deployment(
     f"issuer-coordinator-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -437,28 +412,16 @@ issuer_coordinator_domain = (
     digital_credentials_config.get("issuer_coordinator_domain")
     or f"issuer-coordinator-{stack_info.env_suffix}.odl.mit.edu"
 )
-apisix_ingress_class = (
-    digital_credentials_config.get("apisix_ingress_class") or "apisix"
-)
 
 # Create APISix route with key-auth authentication
 issuer_coordinator_apisix_route = OLApisixRoute(
     f"issuer-coordinator-{stack_info.env_suffix}-apisix-route",
     k8s_namespace=dcc_namespace,
     k8s_labels=k8s_global_labels,
-    ingress_class_name=apisix_ingress_class,
     route_configs=[
         OLApisixRouteConfig(
             route_name="issuer-coordinator-protected",
             priority=10,
-            plugins=[
-                OLApisixPluginConfig(
-                    name="key-auth",
-                    config={
-                        "header": "X-API-Key",
-                    },
-                ),
-            ],
             hosts=[issuer_coordinator_domain],
             paths=["/*"],
             backend_service_name=issuer_coordinator_service.metadata.name,
@@ -466,9 +429,7 @@ issuer_coordinator_apisix_route = OLApisixRoute(
             backend_resolve_granularity="service",
         ),
     ],
-    opts=ResourceOptions(
-        depends_on=[issuer_coordinator_service, issuer_coordinator_apisix_consumer]
-    ),
+    opts=ResourceOptions(depends_on=[issuer_coordinator_service]),
 )
 
 ################################################
