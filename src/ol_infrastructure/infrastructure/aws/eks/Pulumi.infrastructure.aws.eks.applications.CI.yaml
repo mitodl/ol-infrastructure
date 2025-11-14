@@ -11,6 +11,8 @@ config:
   - "ol.mit.edu"
   - "mitxonline.mit.edu"
   - ".mitxonline.mit.edu"
+  - "xpro.mit.edu"
+  - ".xpro.mit.edu"
   eks:apisix_admin_key:
     secure: v1:sDse8RY8sLFEsPSE:8jqIrqb4BJHNipDXmbh4KXpVrAUUOmiLEV4aKjXqhIr2RvFqOks4pVz+km0wF1hh
   eks:apisix_viewer_key:
@@ -26,6 +28,8 @@ config:
   - "nb.ci.learn.mit.edu"
   - "preview.courses.ci.learn.mit.edu"
   - "studio-backend.ci.learn.mit.edu"
+  - "studio-backend.ci.xpro.mit.edu"
+  - "courses-backend.ci.xpro.mit.edu"
   eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
   eks:developer_role_kubernetes_groups: ["admin"]
   eks:developer_role_scope: "cluster"

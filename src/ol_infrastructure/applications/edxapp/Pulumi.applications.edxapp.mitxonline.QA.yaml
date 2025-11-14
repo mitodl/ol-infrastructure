@@ -83,6 +83,7 @@ config:
   edxapp:sender_email_address: mitlearn-support+rc@mit.edu
   edxapp:email_use_course_id_from_for_bulk: "True"
   edxapp:bulk_email_default_from_email: no-reply@edxapp-mail.rc.learn.mit.edu
+  edxapp:enable_xqueue: true
   edxapp:framework: "earthly"
   edxapp:web_node_capacity: "3"
   edxapp:worker_node_capacity: "5"

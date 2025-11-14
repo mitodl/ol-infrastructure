@@ -10,7 +10,7 @@ config:
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
   - ["course_experience.relative_dates_disable_reset", "--create", "--everyone"]
   - ["course_home.course_home_mfe_progress_tab", "--create", "--everyone"]
-  - ["discussions.enable_forum_v2", "--deactivate"]
+  #- ["discussions.enable_forum_v2", "--deactivate"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
   - ["effort_estimation.disabled", "--create", "--superusers", "--everyone"]
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
@@ -26,6 +26,7 @@ config:
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["studio.library_authoring_mfe", "--deactivate"]
   - ["legacy_studio.certificates", "--create", "--everyone"]
+  edxapp:apisix_ingress_class: apache-apisix
   edxapp:business_unit: mitxpro
   edxapp:db_password:
     secure: v1:gkXc0/WssuL5whQt:/28AEA/UN9lAkRHEl1B6D6OjWjysfgzUTG0KGFd6aYvrAU5bbBxUsZUe6RMI9wyKFA5f0l9z3hQ=
@@ -34,6 +35,12 @@ config:
     lms: courses-ci.xpro.mit.edu
     preview: preview-ci.xpro.mit.edu
     studio: studio-ci.xpro.mit.edu
+  edxapp:backend_lms_domain: courses-backend.ci.xpro.mit.edu
+  edxapp:backend_studio_domain: studio-backend.ci.xpro.mit.edu
+  edxapp:backend_preview_domain: preview-backend.ci.xpro.mit.edu
+  edxapp:learn_ai_frontend_domain: "learn-ai-ci.ol.mit.edu"
+  edxapp:mit_learn_api_domain: api.ci.learn.mit.edu
+  edxapp:mit_learn_domain: ci.learn.mit.edu
   edxapp:marketing_domain: xpro-ci.odl.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:QSW6gq7cQ6t65Glo:OGJ5X4YYEi2ZdyrpnML25p10mQrodNNLaF5zyV1242ZcQz1TkRsTdpmv9HghIhgHxykYd2NK7kyRkvphd5pfI56xAg/de/8PuHNuPx5kg3IZCrFktYuE2Nyzjxhg7aGHNhA6JQEf95925WPwAG3V
@@ -47,16 +54,56 @@ config:
     learning: learn
     ora_grading: ora-grading
   edxapp:google_analytics_id: ""
-  edxapp:k8s_deployment: false
-  edxapp:k8s_cutover: false
-  edxapp:disable_ec2_deployment: false
   edxapp:mail_domain: edxapp-mail-ci.xpro.mit.edu
   edxapp:min_web_nodes: "1"
   edxapp:min_worker_nodes: "1"
   edxapp:sender_email_address: support@edxapp-mail-ci.xpro.mit.edu
   edxapp:web_node_capacity: "2"
   edxapp:worker_node_capacity: "1"
+  edxapp:enable_xqueue: false
   edxapp:framework: "earthly"
+  edxapp:apisix_ingres_class: apache-apisix
+  edxapp:k8s_replicas:
+    webapp:
+      cms:
+        min: 1
+        max: 2
+      lms:
+        min: 1
+        max: 2
+    celery:
+      lms:
+        min: 1
+        max: 1
+      cms:
+        min: 1
+        max: 1
+  edxapp:k8s_resources:
+    webapp:
+      lms:
+        cpu_request: "250m"
+        cpu_limit: "500m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+      cms:
+        cpu_request: "250m"
+        cpu_limit: "500m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+    celery:
+      lms:
+        cpu_request: "250m"
+        cpu_limit: "500m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+      cms:
+        cpu_request: "250m"
+        cpu_limit: "500m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+  edxapp:k8s_deployment: true
+  edxapp:k8s_cutover: true
+  edxapp:disable_ec2_deployment: false
   mongodb:atlas_project_id: 619395b5ab3fc40d5942a23c
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci

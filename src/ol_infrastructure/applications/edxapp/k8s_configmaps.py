@@ -179,21 +179,21 @@ def create_k8s_configmaps(
                     - {edxapp_config.require_object("domains")["lms"]}
                     - {edxapp_config.require_object("domains")["preview"]}
                     - {edxapp_config.require("marketing_domain")}
-                    LOGO_URL: https://{edxapp_config.require_object("domains")["lms"]}/static/mitxonline/images/logo.svg
-                    LOGO_URL_PNG_FOR_EMAIL: https://{edxapp_config.require_object("domains")["lms"]}/static/mitxonline/images/logo.png
-                    LOGO_TRADEMARK_URL: https://{edxapp_config.require_object("domains")["lms"]}/static/mitxonline/images/mit-logo.svg
+                    LOGO_URL: https://{edxapp_config.require_object("domains")["lms"]}/static/{stack_info.env_prefix}/images/logo.svg
+                    LOGO_URL_PNG_FOR_EMAIL: https://{edxapp_config.require_object("domains")["lms"]}/static/{stack_info.env_prefix}/images/logo.png
+                    LOGO_TRADEMARK_URL: https://{edxapp_config.require_object("domains")["lms"]}/static/{stack_info.env_prefix}/images/{"mit-ol-logo" if stack_info.env_prefix == "xpro" else "mit-logo"}.svg
                     MARKETING_SITE_BASE_URL: https://{edxapp_config.require("marketing_domain")}/ # ADDED - to support mitxonline-theme
                     MARKETING_SITE_CHECKOUT_URL: https://{edxapp_config.require("marketing_domain")}/cart/add/ # ADDED - to support mitxonline checkout
                     MKTG_URLS:
                       ROOT: https://{edxapp_config.require("marketing_domain")}/
                     MKTG_URL_OVERRIDES:
-                      COURSES: https://{edxapp_config.require("marketing_domain")}/
-                      PRIVACY: https://{edxapp_config.require("marketing_domain")}/privacy
-                      TOS: https://{edxapp_config.require("marketing_domain")}/terms
-                      ABOUT: https://{edxapp_config.require("marketing_domain")}/about
-                      HONOR: https://{edxapp_config.require("marketing_domain")}/honor-code
+                      COURSES: https://{edxapp_config.require("marketing_domain")}/{"catalog/" if stack_info.env_prefix == "xpro" else ""}
+                      PRIVACY: https://{edxapp_config.require("marketing_domain")}/privacy{"-policy/" if stack_info.env_prefix == "xpro" else ""}
+                      TOS: https://{edxapp_config.require("marketing_domain")}/terms{"-of-service/" if stack_info.env_prefix == "xpro" else ""}
+                      ABOUT: https://{edxapp_config.require("marketing_domain")}/about{"-us" if stack_info.env_prefix == "xpro" else ""}
+                      HONOR: https://{edxapp_config.require("marketing_domain")}/honor-code/
                       ACCESSIBILITY: https://accessibility.mit.edu/
-                      CONTACT: https://mitxonline.zendesk.com/hc/en-us/requests/new/
+                      CONTACT: https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/
                       TOS_AND_HONOR: ''
                     NOTIFICATIONS_DEFAULT_FROM_EMAIL: {edxapp_config.get("bulk_email_default_from_email") or edxapp_config.require("sender_email_address")}
                     PAYMENT_SUPPORT_EMAIL: {edxapp_config.require("sender_email_address")}
@@ -212,6 +212,7 @@ def create_k8s_configmaps(
                     OTEL_SERVICE_NAME: {env_name}-edxapp
                     OTEL_LOG_LEVEL: info
                     ECOMMERCE_PUBLIC_URL_ROOT: {edxapp_config.require_object("domains")["lms"]}
+                    {f'''XPRO_BASE_URL: https://{edxapp_config.require("marketing_domain")}''' if stack_info.env_prefix == "xpro" else ""}
                     # Django 4.2+ storage configuration
                     # STORAGES:
                     #   default:

@@ -49,7 +49,7 @@ from ol_infrastructure.lib.ol_types import (
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
-def create_k8s_resources(
+def create_k8s_resources(  # noqa: C901
     aws_config: AWSBase,
     cluster_stack: StackReference,
     edxapp_cache: OLAmazonCache,
@@ -118,9 +118,13 @@ def create_k8s_resources(
     opensearch_hostname = opensearch_stack.require_output("cluster")["endpoint"]
 
     # Configure reusable global labels
+    if stack_info.env_prefix == "xpro":
+        ou = BusinessUnit.xpro
+    else:
+        ou = BusinessUnit(stack_info.env_prefix)
     k8s_global_labels = K8sGlobalLabels(
         service=Services.edxapp,
-        ou=BusinessUnit(stack_info.env_prefix),
+        ou=ou,
         stack=stack_info,
     ).model_dump()
 
@@ -518,7 +522,6 @@ def create_k8s_resources(
         secrets.mongo_db_creds_secret_name: secrets.mongo_db_creds,
         secrets.mongo_db_forum_secret_name: secrets.mongo_db_forum,
         secrets.general_secrets_name: secrets.general,
-        secrets.xqueue_secret_name: secrets.xqueue,
         secrets.forum_secret_name: secrets.forum,
         secrets.learn_ai_canvas_syllabus_token_secret_name: secrets.learn_ai_canvas_syllabus_token,
         configmaps.general_config_name: configmaps.general,
@@ -528,18 +531,21 @@ def create_k8s_resources(
         configmaps.lms_general_config_name: configmaps.lms_general,
         configmaps.lms_interpolated_config_name: configmaps.lms_interpolated,
     }
+    if secrets.xqueue_secret_name:
+        lms_edxapp_config_sources[secrets.xqueue_secret_name] = secrets.xqueue
     lms_edxapp_secret_names = [
         secrets.db_creds_secret_name,
         secrets.db_connections_secret_name,
         secrets.mongo_db_creds_secret_name,
         secrets.mongo_db_forum_secret_name,
         secrets.general_secrets_name,
-        secrets.xqueue_secret_name,
         secrets.forum_secret_name,
         secrets.learn_ai_canvas_syllabus_token_secret_name,
         # Just LMS specific resources below this line
         secrets.lms_oauth_secret_name,
     ]
+    if secrets.xqueue_secret_name:
+        lms_edxapp_secret_names.append(secrets.xqueue_secret_name)
     lms_edxapp_configmap_names = [
         configmaps.general_config_name,
         configmaps.interpolated_config_name,
@@ -998,7 +1004,6 @@ def create_k8s_resources(
         secrets.mongo_db_creds_secret_name: secrets.mongo_db_creds,
         secrets.mongo_db_forum_secret_name: secrets.mongo_db_forum,
         secrets.general_secrets_name: secrets.general,
-        secrets.xqueue_secret_name: secrets.xqueue,
         secrets.forum_secret_name: secrets.forum,
         configmaps.general_config_name: configmaps.general,
         configmaps.interpolated_config_name: configmaps.interpolated,
@@ -1007,18 +1012,21 @@ def create_k8s_resources(
         configmaps.cms_general_config_name: configmaps.cms_general,
         configmaps.cms_interpolated_config_name: configmaps.cms_interpolated,
     }
+    if secrets.xqueue_secret_name:
+        cms_edxapp_config_sources[secrets.xqueue_secret_name] = secrets.xqueue
     cms_edxapp_secret_names = [
         secrets.db_creds_secret_name,
         secrets.db_connections_secret_name,
         secrets.mongo_db_creds_secret_name,
         secrets.mongo_db_forum_secret_name,
         secrets.general_secrets_name,
-        secrets.xqueue_secret_name,
         secrets.forum_secret_name,
         secrets.learn_ai_canvas_syllabus_token_secret_name,
         # Just CMS specific resources below this line
         secrets.cms_oauth_secret_name,
     ]
+    if secrets.xqueue_secret_name:
+        cms_edxapp_secret_names.append(secrets.xqueue_secret_name)
     cms_edxapp_configmap_names = [
         configmaps.general_config_name,
         configmaps.interpolated_config_name,
