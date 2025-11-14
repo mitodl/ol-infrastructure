@@ -9,6 +9,7 @@ import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
+from bridge.lib.versions import JUPYTERHUB_CHART_VERSION
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -242,7 +243,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
         kubernetes.helm.v3.ReleaseArgs(
             chart="jupyterhub",
             cleanup_on_fail=True,
-            version="4.2.0",
+            version=JUPYTERHUB_CHART_VERSION,
             namespace=namespace,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 repo="https://hub.jupyter.org/helm-chart/",
