@@ -302,7 +302,6 @@ issuer_coordinator_vault_secret = OLVaultK8SSecret(
                 key: f'{{{{ get .Secrets.tenant_tokens "{key}" }}}}'
                 for key in issuer_coordinator_secrets.get("tenant_tokens", {})
             },
-            "APISIX_TOKEN": '{{ get .Secrets "apisix_token" }}',
         },
         refresh_after="1h",
         vaultauth=vault_k8s_resources.auth_name,
