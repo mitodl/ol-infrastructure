@@ -69,7 +69,7 @@ aws_config = AWSBase(
 )
 
 k8s_global_labels = K8sGlobalLabels(
-    ou=BusinessUnit.operations, service=Services.digital_credentials, stack=stack_info
+    ou=BusinessUnit.mit_learn, service=Services.digital_credentials, stack=stack_info
 ).model_dump()
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
@@ -385,10 +385,11 @@ issuer_coordinator_deployment = kubernetes.apps.v1.Deployment(
     ),
 )
 
+issuer_coordinator_service_name = "issuer-coordinator"
 issuer_coordinator_service = kubernetes.core.v1.Service(
     f"issuer-coordinator-svc-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="issuer-coordinator",
+        name=issuer_coordinator_service_name,
         namespace=dcc_namespace,
         labels=k8s_global_labels,
     ),
@@ -424,7 +425,7 @@ issuer_coordinator_apisix_route = OLApisixRoute(
             priority=10,
             hosts=[issuer_coordinator_domain],
             paths=["/*"],
-            backend_service_name=issuer_coordinator_service.metadata.name,
+            backend_service_name=issuer_coordinator_service_name,
             backend_service_port="http",
             backend_resolve_granularity="service",
         ),
