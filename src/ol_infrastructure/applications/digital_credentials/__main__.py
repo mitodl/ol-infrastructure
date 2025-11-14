@@ -174,7 +174,7 @@ vault_k8s_resources = digital_credentials_app.vault_k8s_resources
 # Signing Service Deployment
 ################################################
 
-# ConfigMap for signing keys (multi-tenant support) - synced from Vault
+# Secret for signing keys (multi-tenant support) - synced from Vault
 signing_service_secret_name = (
     "signing-service-secrets"  # pragma: allowlist secret  # noqa: S105
 )
