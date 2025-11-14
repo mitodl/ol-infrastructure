@@ -5,7 +5,7 @@ from pathlib import Path
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, ResourceOptions, StackReference
-from pulumi_aws import ec2, get_caller_identity, iam, s3
+from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
@@ -98,17 +98,7 @@ jupyterhub_course_bucket_name = f"jupyter-courses-{stack_info.env_suffix}"
 jupyter_course_bucket_config = S3BucketConfig(
     bucket_name=jupyterhub_course_bucket_name,
     versioning_enabled=True,
-    tags=aws_config.tags,
-    region=aws_config.region,
-)
-jupyter_course_bucket = OLBucket(
-    f"jupyter-course-bucket-{env_name}", config=jupyter_course_bucket_config
-)
-# Allow full access to the bucket from the account root user.
-s3.BucketPolicy(
-    "jupyter-course-bucket-policy",
-    bucket=jupyter_course_bucket.bucket_v2.id,
-    policy=iam.get_policy_document(
+    bucket_policy_document=iam.get_policy_document(
         statements=[
             iam.GetPolicyDocumentStatementArgs(
                 effect="Allow",
@@ -123,6 +113,11 @@ s3.BucketPolicy(
             )
         ]
     ).json,
+    tags=aws_config.tags,
+    region=aws_config.region,
+)
+jupyter_course_bucket = OLBucket(
+    f"jupyter-course-bucket-{env_name}", config=jupyter_course_bucket_config
 )
 
 
