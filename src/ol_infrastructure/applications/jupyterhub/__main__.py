@@ -134,6 +134,8 @@ cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(authoring_namespace, ns)
 )
 
+deployment_configs = jupyterhub_config.require_object("deployments")
+
 # RDS defaults
 rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["instance_size"] = (
@@ -240,53 +242,48 @@ jupyterhub_authoring_db_config = OLPostgresDBConfig(
     **rds_defaults,
 )
 
-menu_override = Path(__file__).parent.joinpath("menu_override.json").read_text()
-disabled_extensions = (
-    Path(__file__).parent.joinpath("disabled_extensions.json").read_text()
-)
-dynamic_image_config = (
-    Path(__file__).parent.joinpath("dynamicImageConfig.py").read_text()
-)
-# Provision main JupyterHub deployment
-jupyterhub_deployment = provision_jupyterhub_deployment(
-    base_name="jupyterhub",
-    domain_name=jupyterhub_config.require("domain"),
-    namespace=namespace,
-    stack_info=stack_info,
-    jupyterhub_config=jupyterhub_config,
-    vault_config=vault_config,
-    db_config=jupyterhub_db_config,
-    app_db=jupyterhub_db,
-    cluster_stack=cluster_stack,
-    application_labels=application_labels,
-    k8s_global_labels=k8s_global_labels,
-    extra_images=EXTRA_IMAGES,
-    menu_override_json=menu_override,
-    disabled_extensions_json=disabled_extensions,
-    extra_config=dynamic_image_config,
-)
+# Need to rethink this. We do stuff w/ rds_password
+# in and out of the function
+# ATM I've duplicated the variable, but that is messy and error-prone.
+deployment_to_db_config = {
+    "jupyterhub": jupyterhub_db_config,
+    "jupyterhub-authoring": jupyterhub_authoring_db_config,
+}
 
-author_menu_override = (
-    Path(__file__).parent.joinpath("author_menu_override.json").read_text()
-)
-author_disabled_extensions = (
-    Path(__file__).parent.joinpath("author_disabled_extensions.json").read_text()
-)
-# Provision JupyterHub authoring deployment
-jupyterhub_authoring_deployment = provision_jupyterhub_deployment(
-    base_name="jupyterhub-authoring",
-    domain_name=jupyterhub_config.require("authoring_domain"),
-    namespace=authoring_namespace,
-    stack_info=stack_info,
-    jupyterhub_config=jupyterhub_config,
-    vault_config=vault_config,
-    db_config=jupyterhub_authoring_db_config,
-    app_db=jupyterhub_db,
-    cluster_stack=cluster_stack,
-    application_labels=application_labels,
-    k8s_global_labels=k8s_global_labels,
-    extra_images=EXTRA_IMAGES,
-    menu_override_json=author_menu_override,
-    disabled_extensions_json=author_disabled_extensions,
-    extra_config=dynamic_image_config,
-)
+# Provision JupyterHub deployments
+for deployment_config in deployment_configs:
+    namespace = deployment_config["namespace"]
+    cluster_stack.require_output("namespaces").apply(
+        lambda ns, namespace=namespace: check_cluster_namespace(namespace, ns)
+    )
+    # Need to decide if this is the best way to handle
+    # these overrides/revisit values merged into helm charts
+    menu_override = (
+        Path(__file__)
+        .parent.joinpath(deployment_config["menu_override_file"])
+        .read_text()
+    )
+    disabled_extensions = (
+        Path(__file__)
+        .parent.joinpath(deployment_config["disabled_extension_file"])
+        .read_text()
+    )
+    dynamic_image_config = (
+        Path(__file__)
+        .parent.joinpath(deployment_config["extra_config_file"])
+        .read_text()
+    )
+    jupyterhub_deployment = provision_jupyterhub_deployment(
+        stack_info=stack_info,
+        jupyterhub_deployment_config=deployment_config,
+        vault_config=vault_config,
+        db_config=deployment_to_db_config[deployment_config["name"]],
+        app_db=jupyterhub_db,
+        cluster_stack=cluster_stack,
+        application_labels=application_labels,
+        k8s_global_labels=k8s_global_labels,
+        extra_images=EXTRA_IMAGES,
+        menu_override_json=menu_override,
+        disabled_extensions_json=disabled_extensions,
+        extra_config=dynamic_image_config,
+    )
