@@ -16,14 +16,15 @@ config:
   eks:apisix_viewer_key:
     secure: v1:Iozn2qrhdgmfpCXw:1H82fWngqaTZzOrgGp+jykq0+p/YOKTs5KE7rIPxhGZ1PbjCQ8Clz9+JzXqLQfCu
   eks:apisix_domains:
-  - "api-pay.ol.mit.edu"
   - "api-learn-ai.ol.mit.edu"
+  - "api-pay.ol.mit.edu"
   - "api.learn.mit.edu"
-  - "nb.learn.mit.edu"
   - "api.mitxonline.mit.edu"
-  - "studio-backend.learn.mit.edu"
-  - "courses-backend.learn.mit.edu"
   - "binder.learn.mit.edu"
+  - "courses-backend.learn.mit.edu"
+  - "dcc.learn.mit.edu"
+  - "nb.learn.mit.edu"
+  - "studio-backend.learn.mit.edu"
   eks:apisix_min_replicas: "5"
   eks:apisix_max_replicas: "10"
   eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"

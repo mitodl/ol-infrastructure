@@ -1,3 +1,9 @@
+"""Vault static KV mounts for application secrets.
+
+This module creates and exports Vault KV v2 mounts for applications
+that need to store static secrets in Vault.
+"""
+
 import pulumi_vault as vault
 from pulumi import ResourceOptions, export
 
@@ -41,6 +47,17 @@ xqwatcher_vault_kv_mount = vault.Mount(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
+digital_credentials_vault_kv_mount = vault.Mount(
+    "digital-credentials-vault-kv-secrets-mount",
+    path="secret-digital-credentials",
+    description=("Static secrets storage for Digital Credentials Consortium services"),
+    type="kv-v2",
+    options={
+        "version": 2,
+    },
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
 export(
     "superset_kv",
     {
@@ -62,5 +79,13 @@ export(
     {
         "path": xqwatcher_vault_kv_mount.path,
         "type": xqwatcher_vault_kv_mount.type,
+    },
+)
+
+export(
+    "digital_credentials_kv",
+    {
+        "path": digital_credentials_vault_kv_mount.path,
+        "type": digital_credentials_vault_kv_mount.type,
     },
 )

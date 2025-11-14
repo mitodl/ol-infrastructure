@@ -16,14 +16,15 @@ config:
   eks:apisix_viewer_key:
     secure: v1:T9I4WZSeg3lYawlD:d59YkDPqEo372v1ibNCtyYcGjxW0xXC2eXyTADHHZ4QeQ+gD8JuN3pCv78nNVQ/d
   eks:apisix_domains:
-  - "api-pay-qa.ol.mit.edu"
   - "api-learn-ai-qa.ol.mit.edu"
+  - "api-pay-qa.ol.mit.edu"
   - "api.rc.learn.mit.edu"
-  - "nb.rc.learn.mit.edu"
   - "api.rc.mitxonline.mit.edu"
-  - "studio-backend.rc.learn.mit.edu"
   - "courses-backend.rc.learn.mit.edu"
+  - "dcc.rc.learn.mit.edu"
+  - "nb.rc.learn.mit.edu"
   - "preview.courses.rc.learn.mit.edu"
+  - "studio-backend.rc.learn.mit.edu"
   eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
   eks:developer_role_kubernetes_groups: ["admin"]
   eks:developer_role_scope: "cluster"

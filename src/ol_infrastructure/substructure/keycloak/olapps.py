@@ -669,11 +669,30 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     create_organization_scope(ol_apps_realm.id, "olapps", resource_options)
     mitlearn_domain = keycloak_realm_config.require("learn_domain")
     # Touchstone SAML [START]
+    mit_mail_domains = [
+        "broad.mit.edu",
+        "cag.csail.mit.edu",
+        "csail.mit.edu",
+        "education.mit.edu",
+        "ll.mit.edu",
+        "math.mit.edu",
+        "med.mit.edu",
+        "media.mit.edu",
+        "mit.edu",
+        "mitimco.mit.edu",
+        "mtl.mit.edu",
+        "professional.mit.edu",
+        "sloan.mit.edu",
+        "smart.mit.edu",
+        "solve.mit.edu",
+        "wi.mit.edu",
+    ]
     ol_apps_mit_org = keycloak.organization.Organization(
         "ol-apps-mit-organization",
         opts=resource_options,
         domains=[
-            keycloak.organization.OrganizationDomainArgs(name="mit.edu", verified=True)
+            keycloak.organization.OrganizationDomainArgs(name=mit_domain, verified=True)
+            for mit_domain in mit_mail_domains
         ],
         description="Massachusetts Institute of Technology",
         enabled=True,
@@ -704,7 +723,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         want_assertions_signed=True,
         opts=resource_options,
         first_broker_login_flow_alias=ol_first_login_flow.alias,
-        org_domain="mit.edu",
+        org_domain="ANY",
         organization_id=ol_apps_mit_org.id,
         org_redirect_mode_email_matches=True,
         hide_on_login_page=True,
@@ -965,6 +984,21 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 resource_options=resource_options,
                 org_oidc_metadata_url="https://stage-idp.upgrad.dev/realms/upgrad-stage/.well-known/openid-configuration",
                 client_id="ira-frontend",
+            )
+        )
+        onboard_oidc_org(
+            OIDCIdpConfig(
+                org_domains=["dynideas.com"],
+                org_name="Dynamic Ideas, LLC.",
+                org_alias="DYNIDEAS",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                keycloak_url=keycloak_url,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                org_oidc_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+                client_id="393621505200-fb5rhjqvvmdodn5jdjdv1h1fbpk6rgq7.apps.googleusercontent.com",
+                client_secret=keycloak_realm_config.require("dynideas_client_secret"),
             )
         )
 

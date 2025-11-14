@@ -65,6 +65,7 @@ config:
   edxapp:backend_studio_domain: studio-backend.ci.learn.mit.edu
   edxapp:backend_preview_domain: preview-backend.ci.learn.mit.edu
   edxapp:marketing_domain: ci.mitxonline.mit.edu
+  edxapp:mitxonline_domain: ci.mitxonline.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:+8kgTH+x98kC+Lxc:bW03E5mk8wRB+FxZYtj06FPx/MEJuEiKO5ekaDTZKmqmfklisVhidp0fhX+So2Eygf/Aiyqp5L03RCzA8k7I4ZmlNss19//pdGgBDwa3HAbw
   edxapp:enable_notes: "True"

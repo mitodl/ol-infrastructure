@@ -1,0 +1,7 @@
+---
+name: ol-infrastructure-digital-credentials-application
+runtime: python
+description: Services to support the creation and validation of digitally signed verifiable
+  credentials
+backend:
+  url: s3://mitol-pulumi-state/
