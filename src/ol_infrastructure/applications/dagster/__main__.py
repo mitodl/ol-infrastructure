@@ -26,6 +26,10 @@ from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBindingConfig,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.services.apisix_gateway_api import (
+    OLApisixHTTPRoute,
+    OLApisixHTTPRouteConfig,
+)
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
@@ -1025,6 +1029,36 @@ dagster_apisix_route = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="dagster",
             priority=10,
+            hosts=[dagster_config.require("domain")],
+            paths=["/*"],
+            backend_service_name="dagster-dagster-webserver",
+            backend_service_port=3000,
+            plugins=[
+                OLApisixPluginConfig(
+                    **dagster_oidc_resources.get_full_oidc_plugin_config(
+                        unauth_action="auth"
+                    )
+                ),
+            ],
+        ),
+    ],
+    k8s_namespace=dagster_namespace,
+    k8s_labels=k8s_global_labels.model_dump(),
+    opts=ResourceOptions(
+        depends_on=[
+            dagster_helm_release,
+            dagster_user_code_release,
+            dagster_oidc_resources,
+        ]
+    ),
+)
+
+# HTTPRoute (Gateway API) for APISIX - Phase 3 pilot migration
+dagster_apisix_httproute = OLApisixHTTPRoute(
+    f"dagster-apisix-httproute-{stack_info.env_suffix}",
+    route_configs=[
+        OLApisixHTTPRouteConfig(
+            route_name="dagster",
             hosts=[dagster_config.require("domain")],
             paths=["/*"],
             backend_service_name="dagster-dagster-webserver",

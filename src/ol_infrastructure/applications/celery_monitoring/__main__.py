@@ -11,6 +11,10 @@ from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
 )
+from ol_infrastructure.components.services.apisix_gateway_api import (
+    OLApisixHTTPRoute,
+    OLApisixHTTPRouteConfig,
+)
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
@@ -19,8 +23,6 @@ from ol_infrastructure.components.services.k8s import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixPluginConfig,
-    OLApisixRoute,
-    OLApisixRouteConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
@@ -417,12 +419,12 @@ oidc_plugin = OLApisixPluginConfig(
     **celery_monitoring_oidc_resources.get_full_oidc_plugin_config(unauth_action="auth")
 )
 
-leek_apisix_route = OLApisixRoute(
-    name=f"celery-monitoring-apisix-route-{stack_info.env_suffix}",
+leek_http_route = OLApisixHTTPRoute(
+    name=f"celery-monitoring-httproute-{stack_info.env_suffix}",
     k8s_namespace=celery_monitoring_namespace,
     k8s_labels=application_labels,
     route_configs=[
-        OLApisixRouteConfig(
+        OLApisixHTTPRouteConfig(
             route_name="web",
             priority=10,
             plugins=[
@@ -433,7 +435,7 @@ leek_apisix_route = OLApisixRoute(
             backend_service_name="celery-monitoring",
             backend_service_port=8000,
         ),
-        OLApisixRouteConfig(
+        OLApisixHTTPRouteConfig(
             route_name="api",
             priority=0,
             plugins=[
@@ -448,6 +450,5 @@ leek_apisix_route = OLApisixRoute(
 )
 
 
-# DNS is managed by external-dns via annotations on the APISIX service
-# Domain must be added to eks:apisix_domains in the EKS stack configuration
-# (infrastructure.aws.eks.operations.{env})
+# DNS is automatically managed by external-dns via HTTPRoute.spec.hostnames
+# No manual EKS stack configuration needed!

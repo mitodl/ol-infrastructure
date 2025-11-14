@@ -308,5 +308,5 @@ If you're unsure whether something needs an ADR:
 
 ---
 
-**Last Updated:** 2025-10-29
+**Last Updated:** 2025-11-13  
 **Maintainers:** Platform Team

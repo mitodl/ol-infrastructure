@@ -1,8 +1,8 @@
 # 0004. Keep OLEKSGateway and OLApisixHTTPRoute Components Separate
 
-**Status:** Accepted  
-**Date:** 2025-11-13  
-**Deciders:** AI Agent (GitHub Copilot CLI) + Human validation pending  
+**Status:** Accepted
+**Date:** 2025-11-13
+**Deciders:** AI Agent (GitHub Copilot CLI) + Human validation pending
 **Technical Story:** Consolidation analysis for Gateway API components
 
 ## Context
