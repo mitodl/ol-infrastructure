@@ -15,10 +15,29 @@ This project enables Universal AI partners to consume data via S3 directly or th
 ### Security Model
 - Each partner can only access their own prefix via S3 and SFTP
 - IAM policies enforce path-based access control
-- Cross-account S3 access enabled via partner AWS account ID in IAM role trust policy
+- **S3 Bucket Policy** grants cross-account read access to partner AWS accounts
+- **IAM Role Trust Policy** allows partner AWS account to assume SFTP access role
 - SSH public key authentication required (no passwords)
 - Public access to bucket blocked
 - Versioning enabled for data recovery
+
+### Cross-Account Access Flow
+
+1. **MIT (Bucket Owner)** creates:
+   - S3 bucket with bucket policy allowing partner AWS accounts
+   - Partner-specific prefixes (directories)
+   - SFTP users with IAM roles
+
+2. **Partner** must create in their AWS account:
+   - IAM policy granting their users S3 permissions to the MIT bucket
+   - Attach policy to IAM users/roles who need access
+
+3. **Access Pattern**:
+   ```
+   Partner IAM User → Partner IAM Policy → MIT Bucket Policy → S3 Objects
+   ```
+
+See [Partner Setup Guide](../../../../docs/uai_partners_storage_partner_setup.md) for detailed partner-side configuration.
 
 ## Configuration
 
@@ -89,10 +108,38 @@ pulumi stack output sftp_endpoint
 ```
 
 ### S3 Direct Access
-Partners with S3 credentials can access:
+
+**Important**: Cross-account S3 access requires configuration in BOTH AWS accounts.
+
+#### MIT Side (Already Configured)
+The bucket policy grants access to partner AWS account roots:
+```json
+{
+  "Effect": "Allow",
+  "Principal": {"AWS": "arn:aws:iam::{partner_account_id}:root"},
+  "Action": ["s3:ListBucket", "s3:GetObject"],
+  "Resource": ["arn:aws:s3:::bucket", "arn:aws:s3:::bucket/{username}/*"]
+}
 ```
-s3://ol-uai-partners-storage-{environment}/{username}/
+
+#### Partner Side (Required)
+Partners must create an IAM policy in their own AWS account and attach it to users/roles:
+
+**See [Partner Setup Guide](../../../../docs/uai_partners_storage_partner_setup.md)** for complete instructions and IAM policy templates.
+
+**Quick Test**:
+```bash
+# From partner AWS account
+aws s3 ls s3://ol-uai-partners-storage-{environment}/{username}/
+aws s3 cp s3://ol-uai-partners-storage-{environment}/{username}/file.txt ./
 ```
+
+**Troubleshooting**:
+If partners get "Access Denied":
+1. Verify partner account ID is in Pulumi configuration
+2. Partner must create IAM policy in their account (see guide)
+3. Partner must attach policy to their IAM users/roles
+4. Run test script: `./scripts/test_partner_s3_access.sh`
 
 ## Acceptance Criteria
 
