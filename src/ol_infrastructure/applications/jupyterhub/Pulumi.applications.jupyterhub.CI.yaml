@@ -10,8 +10,6 @@ config:
     apisix_ingress_class: apache-apisix
     admin_users:
     - "admin"
-    rds_password:
-      secure: v1:ae+uadhbZC0VnnI5:p0QKNNy8xscV8K69VTTcLIca6BfvEoarQ4ZsRsa2pGAGoU3IDDe48fJVCYvVLwDvufpvbLUnR88MJP4=
     menu_override_file: menu_override.json
     disabled_extension_file: disabled_extensions.json
     extra_config_file: dynamicImageConfig.py
@@ -22,8 +20,6 @@ config:
     apisix_ingress_class: apache-apisix
     admin_users:
     - "admin"
-    rds_password:
-      secure: v1:ae+uadhbZC0VnnI5:p0QKNNy8xscV8K69VTTcLIca6BfvEoarQ4ZsRsa2pGAGoU3IDDe48fJVCYvVLwDvufpvbLUnR88MJP4=
     menu_override_file: author_menu_override.json
     disabled_extension_file: author_disabled_extensions.json
     extra_config_file: dynamicImageConfig.py

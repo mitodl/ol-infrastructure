@@ -83,9 +83,6 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
         jupyterhub_deployment_config.get("apisix_ingress_class") or "apisix"
     )
 
-    # Need to rethink DB config bits.
-    # We have to do some stuff here and some stuff inside the function
-    rds_password = jupyterhub_deployment_config.get("rds_password")
     rds_defaults = defaults(stack_info)["rds"]
     rds_defaults["instance_size"] = (
         jupyterhub_deployment_config.get("db_instance_size")
@@ -98,7 +95,8 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
         db_name=db_config.db_name,
         mount_point=f"{db_config.engine}-{base_name}",
         db_admin_username=db_config.username,
-        db_admin_password=rds_password,
+        # Not sure if this is allowed or not
+        db_admin_password=db_config.password.get_secret_value(),
         db_host=app_db.db_instance.address,
         role_statements=postgres_role_statements,
     )
