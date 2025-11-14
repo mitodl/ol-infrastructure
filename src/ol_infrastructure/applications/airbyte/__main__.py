@@ -655,7 +655,8 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                     "resources": {
                         "limits": {"memory": "15Gi", "cpu": "4000m"},
                         "requests": {"memory": "10Gi", "cpu": "2000m"},
-                    }
+                    },
+                    "kube": {"annotations": {"karpenter.sh/do-not-disrupt": "true"}},
                 },
                 "env_vars": {
                     "SYNC_JOB_MAX_TIMEOUT_DAYS": "7",
