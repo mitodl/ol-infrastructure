@@ -453,6 +453,7 @@ MITX_REDIRECT_ALLOW_RE_LIST:  # ADDED VALUE
   - "^/courses/course-v1:.*?/xqueue/.*$"  # TODO (TMM 2025-07-22): Remove this once the xqueue -> submissions migration is complete
   - "^/courses/.*/courseware-navigation-sidebar/toggles/?$"
   - "^/courses/.*/courseware-search/enabled/?$"
+MITXONLINE_BASE_URL: https://{{ key "edxapp/mitxonline-domain" }}/ # ADDED - to support mitxonline-theme
 MKTG_URLS:
     ROOT: https://{{ key "edxapp/marketing-domain" }}/
 MKTG_URL_LINK_MAP:

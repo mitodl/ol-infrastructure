@@ -58,6 +58,7 @@ class Services(str, Enum):
     celery_monitoring = "celery-monitoring"
     codejail = "codejail"
     dagster = "dagster"
+    digital_credentials = "digital-credentials"
     ecommerce = "unified-ecommerce"
     edxapp = "edxapp"
     keycloak = "keycloak"

@@ -100,3 +100,9 @@ path "secret-operations/data/institutional-research-bigquery-service-account" {
 path "sys/leases/renew" {
   capabilities = ["update"]
 }
+path "secret-mitlearn/*" {
+  capabilities = ["read"]
+}
+path "secret-mitlearn/data/*" {
+  capabilities = ["read"]
+}
