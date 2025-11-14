@@ -974,7 +974,6 @@ redis_cluster_security_group = ec2.SecurityGroup(
             protocol="tcp",
             security_groups=[
                 edxapp_security_group.id,
-                # operations_vpc["security_groups"]["celery_monitoring"],  # noqa: ERA001
             ],
             cidr_blocks=k8s_pod_subnet_cidrs.apply(lambda pod_cidrs: pod_cidrs),
             description="Allow access from edX to Redis for caching and queueing",
