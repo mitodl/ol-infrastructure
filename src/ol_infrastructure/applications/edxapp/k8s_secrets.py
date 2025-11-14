@@ -279,6 +279,14 @@ def create_k8s_secrets(
                         RETIRED_USER_SALTS: {{{{ get .Secrets "user_retirement_salts" }}}}
                         SENTRY_DSN: {{{{ get .Secrets "sentry_dsn" }}}}
                         SYSADMIN_GITHUB_WEBHOOK_KEY: {{{{ get .Secrets "sysadmin_git_webhook_secret" }}}}
+                        {
+                        '''
+                        EMAIL_HOST_USER: {{{{ get .Secrets "email_username" }}}}
+                        EMAIL_HOST_PASSWORD: {{{{ get .Secrets "email_password" }}}}
+                        '''
+                        if stack_info.env_prefix == "xpro"
+                        else ""
+                    }
                         PROCTORING_BACKENDS:
                           DEFAULT: '{
                         "null" if stack_info.env_prefix == "xpro" else "proctortrack"
@@ -293,10 +301,10 @@ def create_k8s_secrets(
                         if edxapp_config.get("proctortrack_url")
                         else ""
                     }
-                          'null': {{}}
+                        'null': {{}}
                         {
                         (
-                            'PROCTORING_USER_OBFUSCATION_KEY: {{{{ get .Secrets "proctortrack_user_obfuscation_key" }}}}'
+                            'PROCTORING_USER_OBFUSCATION_KEY: {{ get .Secrets "proctortrack_user_obfuscation_key" }}'
                             + chr(10)
                         )
                         if edxapp_config.get("proctortrack_url")

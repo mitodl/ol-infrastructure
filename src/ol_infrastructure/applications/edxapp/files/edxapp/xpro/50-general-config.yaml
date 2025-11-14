@@ -75,12 +75,6 @@ CACHES:  # MODIFIED
   staticfiles:
     <<: *redis_cache_config
     KEY_PREFIX: staticfiles
-CELERYBEAT_SCHEDULE:
-  send-email-digest:
-    task: openedx.core.djangoapps.notifications.email.tasks.send_digest_email_to_all_users
-    schedule: 86400 # 24 hours in seconds
-    args:
-    - "Daily"
 CELERYBEAT_SCHEDULER: redbeat.RedBeatScheduler  # MODIFIED
 CELERY_BROKER_TRANSPORT: rediss  # MODIFIED - second "s" indicates "secure"
 CELERY_BROKER_USER: default # MODIFIED
@@ -133,12 +127,12 @@ DEPRECATED_ADVANCED_COMPONENT_TYPES: []
 EDXNOTES_INTERNAL_API: http://localhost:18120/api/v1
 EDXNOTES_PUBLIC_API: http://localhost:18120/api/v1
 EDX_PLATFORM_REVISION: release
-EMAIL_BACKEND: django_ses.SESBackend  # MODIFIED
-# EMAIL_HOST: localhost
+EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST: smtp.mailgun.org
+EMAIL_PORT: 587
+EMAIL_USE_TLS: true
 # EMAIL_HOST_PASSWORD: ''
 # EMAIL_HOST_USER: ''
-# EMAIL_PORT: 25
-# EMAIL_USE_TLS: false
 ENABLE_COMPREHENSIVE_THEMING: true  # MODIFIED
 EVENT_TRACKING_SEGMENTIO_EMIT_WHITELIST: []
 EXTRA_MIDDLEWARE_CLASSES: []
@@ -243,7 +237,7 @@ LEARNER_PORTAL_URL_ROOT: https://learner-portal-localhost:18000
 LEARNER_HOME_MICROFRONTEND_URL: '/dashboard/'
 LOCAL_LOGLEVEL: INFO
 LOGGING_ENV: sandbox
-LOG_DIR: /openedx/data/var/log/ed/openedx/data/var/log/edx
+LOG_DIR: /openedx/data/var/log/edx
 MAINTENANCE_BANNER_TEXT: Sample banner message
 MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within the bucket. No leading / allowed
 MEDIA_URL: /media/
@@ -333,15 +327,15 @@ REGISTRATION_EXTRA_FIELDS:
   country: hidden
   gender: optional
   goals: optional
-  honor_code: required
+  honor_code: hidden
   level_of_education: optional
   mailing_address: hidden
   terms_of_service: hidden
   year_of_birth: optional
 RETIRED_EMAIL_DOMAIN: retired.invalid
-RETIRED_EMAIL_PREFIX: retired__user__
-RETIRED_USERNAME_PREFIX: retired__user__
-RETIREMENT_SERVICE_WORKER_USERNAME: retirement_service_worker
+RETIRED_EMAIL_PREFIX: retired__user_
+RETIRED_USERNAME_PREFIX: retired__user_
+RETIREMENT_SERVICE_WORKER_USERNAME: retirement_worker
 RETIREMENT_STATES:
 - PENDING
 - RETIRING_FORUMS
@@ -387,7 +381,7 @@ STATIC_ROOT_BASE: /openedx/staticfiles/
 STUDIO_NAME: Studio
 STUDIO_SHORT_NAME: Studio
 SUPPORT_SITE_LINK: https://xpro.zendesk.com/hc/
-SYSADMIN_DEFAULT_BRANCH: live
+SYSADMIN_DEFAULT_BRANCH: None
 SYSTEM_WIDE_ROLE_CLASSES: []
 TECH_SUPPORT_EMAIL: odl-devops@mit.edu  # MODIFIED
 TIME_ZONE: America/New_York
@@ -422,7 +416,7 @@ XBLOCK_FS_STORAGE_BUCKET: null
 XBLOCK_FS_STORAGE_PREFIX: null
 XBLOCK_SETTINGS: {}
 # Needed for showing pages in Canvas via LTI
-X_FRAME_OPTIONS: "ALLOW-FROM canvas.mit.edu"
+X_FRAME_OPTIONS: "DENY"
 YOUTUBE_API_KEY: null  # pragma: allowlist secret
 ZENDESK_API_KEY: ''
 ZENDESK_CUSTOM_FIELDS: {}
@@ -449,6 +443,3 @@ COURSE_MODE_DEFAULTS:
   sku: null
   slug: no-id-professional
   suggested_prices:
-EMAIL_HOST: smtp.mailgun.org
-EMAIL_PORT: 587
-EMAIL_USE_TLS: true
