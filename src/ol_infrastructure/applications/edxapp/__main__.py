@@ -388,15 +388,11 @@ s3.BucketPolicy(
 )
 s3.BucketCorsConfiguration(
     "edxapp-storage-bucket-cors-rules",
-    bucket=edxapp_mfe_bucket.id,
+    bucket=edxapp_storage_bucket.id,
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_headers=["*"],
-            allowed_methods=[
-                "GET",
-                "PUT",
-                "POST",
-            ],
+            allowed_methods=["GET", "PUT", "POST", "HEAD"],
             allowed_origins=[f"https://{domain}" for domain in edxapp_domains.values()],
             expose_headers=["ETag"],
             max_age_seconds=3000,
