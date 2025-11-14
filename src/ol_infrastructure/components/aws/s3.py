@@ -7,13 +7,15 @@ and intelligent tiering for cost optimization.
 
 import pulumi
 from pulumi_aws import s3
-from pydantic import Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from ol_infrastructure.lib.ol_types import AWSBase
 
 
 class S3BucketConfig(AWSBase):
     """Configuration for an S3 bucket component."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     bucket_name: str | None = Field(
         default=None,
@@ -123,6 +125,10 @@ class S3BucketConfig(AWSBase):
             "BucketOwnerPreferred, ObjectWriter, BucketOwnerEnforced."
         ),
     )
+    bucket_policy_document: str | None = Field(
+        default=None,
+        description="The bucket policy document as a JSON string.",
+    )
 
     @model_validator(mode="after")
     def check_acl_and_public_access_blocks(self) -> "S3BucketConfig":
@@ -190,6 +196,7 @@ class OLBucket(pulumi.ComponentResource):
     bucket_encryption: s3.BucketServerSideEncryptionConfiguration | None = None
     bucket_cors: s3.BucketCorsConfiguration | None = None
     bucket_ownership_controls: s3.BucketOwnershipControls | None = None
+    bucket_policy: s3.BucketPolicy | None = None
 
     def __init__(
         self,
@@ -340,6 +347,14 @@ class OLBucket(pulumi.ComponentResource):
             ),
             opts=child_opts,
         )
+
+        if config.bucket_policy_document:
+            self.bucket_policy = s3.BucketPolicy(
+                f"{name}-policy",
+                bucket=self.bucket_v2.id,
+                policy=config.bucket_policy_document,
+                opts=child_opts,
+            )
 
         # Register outputs for the component
         self.register_outputs(
