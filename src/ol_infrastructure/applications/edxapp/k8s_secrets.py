@@ -15,6 +15,95 @@ from ol_infrastructure.components.services.vault import (
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
+def _build_general_secrets_template(
+    stack_info: StackInfo,
+    redis_hostname: str,
+    lms_domain: str,
+    proctortrack_url: str | None,
+) -> str:
+    """Build the general secrets YAML template with conditional sections.
+
+    This function generates the 10-general-secrets.yaml template, extracting
+    complex conditionals out of nested f-strings for better readability.
+    """
+    # Base template with common configuration
+    template_parts = [
+        f"""
+        CELERY_BROKER_PASSWORD: {{{{ get .Secrets "redis_auth_token" }}}}
+        FERNET_KEYS: {{{{ get .Secrets "fernet_keys" }}}}
+        redis_cache_config: &redis_cache_config
+          BACKEND: django_redis.cache.RedisCache
+          LOCATION: rediss://default@{redis_hostname}:6379/0
+          KEY_FUNCTION: common.djangoapps.util.memcache.safe_key
+          OPTIONS:
+            CLIENT_CLASS: django_redis.client.DefaultClient
+            PASSWORD: {{{{ get .Secrets "redis_auth_token" }}}}
+        SECRET_KEY: {{{{ get .Secrets "django_secret_key" }}}}
+        JWT_AUTH:  # NEEDS ATTENTION
+          JWT_ALGORITHM: HS256
+          JWT_AUDIENCE: {stack_info.env_prefix}
+          JWT_AUTH_COOKIE: {stack_info.env_prefix}-{stack_info.env_suffix}-edx-jwt-cookie
+          JWT_AUTH_COOKIE_HEADER_PAYLOAD: {stack_info.env_prefix}-{stack_info.env_suffix}-edx-jwt-cookie-header-payload
+          JWT_AUTH_COOKIE_SIGNATURE: {stack_info.env_prefix}-{stack_info.env_suffix}-edx-jwt-cookie-signature
+          JWT_ISSUER: 'https://{lms_domain}/oauth2'
+          JWT_LOGIN_CLIENT_ID: login-service-client-id
+          JWT_LOGIN_SERVICE_USERNAME: login_service_user
+          JWT_PRIVATE_SIGNING_JWK: '{{{{ get .Secrets "private_signing_jwk" }}}}'
+          JWT_PUBLIC_SIGNING_JWK_SET: '{{{{ get .Secrets "public_signing_jwk" }}}}'
+          JWT_SECRET_KEY: {{{{ get .Secrets "django_secret_key" }}}}
+          JWT_SIGNING_ALGORITHM: RS512
+          JWT_ISSUERS:
+            - ISSUER: https://{lms_domain}/oauth2
+              AUDIENCE: {stack_info.env_prefix}
+              SECRET_KEY: {{{{ get .Secrets "django_secret_key" }}}}
+        OPENAI_SECRET_KEY: {{{{ get .Secrets "openai_api_key" }}}}
+        OPENAI_API_KEY: {{{{ get .Secrets "openai_api_key" }}}}
+        RETIRED_USER_SALTS: {{{{ get .Secrets "user_retirement_salts" }}}}
+        SENTRY_DSN: {{{{ get .Secrets "sentry_dsn" }}}}
+        SYSADMIN_GITHUB_WEBHOOK_KEY: {{{{ get .Secrets "sysadmin_git_webhook_secret" }}}}"""
+    ]
+
+    # Conditional: xpro-specific email configuration
+    if stack_info.env_prefix == "xpro":
+        template_parts.append(
+            """
+        EMAIL_HOST_USER: {{{{ get .Secrets "email_username" }}}}
+        EMAIL_HOST_PASSWORD: {{{{ get .Secrets "email_password" }}}}"""
+        )
+
+    # Proctoring backend configuration
+    default_backend = "null" if stack_info.env_prefix == "xpro" else "proctortrack"
+    template_parts.append(
+        f"""
+        PROCTORING_BACKENDS:
+          DEFAULT: '{default_backend}'"""
+    )
+
+    # Conditional: proctortrack configuration
+    if proctortrack_url:
+        template_parts.append(
+            f"""
+          'proctortrack':
+            'client_id': '{{{{ get .Secrets "proctortrack_client_id" }}}}'
+            'client_secret': '{{{{ get .Secrets "proctortrack_client_secret" }}}}'
+            'base_url': '{proctortrack_url}'"""
+        )
+
+    template_parts.append(
+        """
+          'null': {}"""
+    )
+
+    # Conditional: proctortrack user obfuscation key
+    if proctortrack_url:
+        template_parts.append(
+            """
+        PROCTORING_USER_OBFUSCATION_KEY: {{ get .Secrets "proctortrack_user_obfuscation_key" }}"""
+        )
+
+    return textwrap.dedent("".join(template_parts))
+
+
 @dataclass
 class EdxappSecrets:
     db_creds: Output
@@ -234,83 +323,12 @@ def create_k8s_secrets(
                 mount_type="kv-v1",
                 path="edxapp",
                 templates={
-                    "10-general-secrets.yaml": textwrap.dedent(f"""
-                        CELERY_BROKER_PASSWORD: {{{{ get .Secrets "redis_auth_token" }}}}
-                        FERNET_KEYS: {{{{ get .Secrets "fernet_keys" }}}}
-                        redis_cache_config: &redis_cache_config
-                          BACKEND: django_redis.cache.RedisCache
-                          LOCATION: rediss://default@{
-                        redis_cache["redis_hostname"]
-                    }:6379/0
-                          KEY_FUNCTION: common.djangoapps.util.memcache.safe_key
-                          OPTIONS:
-                            CLIENT_CLASS: django_redis.client.DefaultClient
-                            PASSWORD: {{{{ get .Secrets "redis_auth_token" }}}}
-                        SECRET_KEY: {{{{ get .Secrets "django_secret_key" }}}}
-                        JWT_AUTH:  # NEEDS ATTENTION
-                          JWT_ALGORITHM: HS256
-                          JWT_AUDIENCE: {stack_info.env_prefix}
-                          JWT_AUTH_COOKIE: {stack_info.env_prefix}-{
-                        stack_info.env_suffix
-                    }-edx-jwt-cookie
-                          JWT_AUTH_COOKIE_HEADER_PAYLOAD: {stack_info.env_prefix}-{
-                        stack_info.env_suffix
-                    }-edx-jwt-cookie-header-payload
-                          JWT_AUTH_COOKIE_SIGNATURE: {stack_info.env_prefix}-{
-                        stack_info.env_suffix
-                    }-edx-jwt-cookie-signature
-                          JWT_ISSUER: 'https://{
-                        edxapp_config.require_object("domains")["lms"]
-                    }/oauth2'
-                          JWT_LOGIN_CLIENT_ID: login-service-client-id
-                          JWT_LOGIN_SERVICE_USERNAME: login_service_user
-                          JWT_PRIVATE_SIGNING_JWK: '{{{{ get .Secrets "private_signing_jwk" }}}}'
-                          JWT_PUBLIC_SIGNING_JWK_SET: '{{{{ get .Secrets "public_signing_jwk" }}}}'
-                          JWT_SECRET_KEY: {{{{ get .Secrets "django_secret_key" }}}}
-                          JWT_SIGNING_ALGORITHM: RS512
-                          JWT_ISSUERS:
-                            - ISSUER: https://{
-                        edxapp_config.require_object("domains")["lms"]
-                    }/oauth2
-                              AUDIENCE: {stack_info.env_prefix}
-                              SECRET_KEY: {{{{ get .Secrets "django_secret_key" }}}}
-                        OPENAI_SECRET_KEY: {{{{ get .Secrets "openai_api_key" }}}}
-                        OPENAI_API_KEY: {{{{ get .Secrets "openai_api_key" }}}}
-                        RETIRED_USER_SALTS: {{{{ get .Secrets "user_retirement_salts" }}}}
-                        SENTRY_DSN: {{{{ get .Secrets "sentry_dsn" }}}}
-                        SYSADMIN_GITHUB_WEBHOOK_KEY: {{{{ get .Secrets "sysadmin_git_webhook_secret" }}}}
-                        {
-                        '''
-                        EMAIL_HOST_USER: {{{{ get .Secrets "email_username" }}}}
-                        EMAIL_HOST_PASSWORD: {{{{ get .Secrets "email_password" }}}}
-                        '''
-                        if stack_info.env_prefix == "xpro"
-                        else ""
-                    }
-                        PROCTORING_BACKENDS:
-                          DEFAULT: '{
-                        "null" if stack_info.env_prefix == "xpro" else "proctortrack"
-                    }'
-                        {
-                        f'''
-                          'proctortrack':
-                            'client_id': '{{{{ get .Secrets "proctortrack_client_id" }}}}'
-                            'client_secret': '{{{{ get .Secrets "proctortrack_client_secret" }}}}'
-                            'base_url': '{edxapp_config.require("proctortrack_url")}'
-                        '''
-                        if edxapp_config.get("proctortrack_url")
-                        else ""
-                    }
-                        'null': {{}}
-                        {
-                        (
-                            'PROCTORING_USER_OBFUSCATION_KEY: {{ get .Secrets "proctortrack_user_obfuscation_key" }}'
-                            + chr(10)
-                        )
-                        if edxapp_config.get("proctortrack_url")
-                        else ""
-                    }
-                    """),
+                    "10-general-secrets.yaml": _build_general_secrets_template(
+                        stack_info=stack_info,
+                        redis_hostname=redis_cache["redis_hostname"],
+                        lms_domain=edxapp_config.require_object("domains")["lms"],
+                        proctortrack_url=edxapp_config.get("proctortrack_url"),
+                    ),
                 },
                 vaultauth=vault_k8s_resources.auth_name,
             ),
