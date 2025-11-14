@@ -31,6 +31,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SStaticSecretConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
+    cached_image_uri,
     check_cluster_namespace,
     default_psg_egress_args,
     get_default_psg_ingress_args,
@@ -219,8 +220,10 @@ signing_service_deployment = kubernetes.apps.v1.Deployment(
                 containers=[
                     kubernetes.core.v1.ContainerArgs(
                         name="signing-service",
-                        image=digital_credentials_config.get("signing_service_image")
-                        or "digitalcredentials/signing-service:1.0.0",
+                        image=cached_image_uri(
+                            digital_credentials_config.get("signing_service_image")
+                            or "digitalcredentials/signing-service:1.2.0"
+                        ),
                         ports=[
                             kubernetes.core.v1.ContainerPortArgs(
                                 container_port=4006, name="http"
@@ -329,8 +332,10 @@ issuer_coordinator_deployment = kubernetes.apps.v1.Deployment(
                 containers=[
                     kubernetes.core.v1.ContainerArgs(
                         name="issuer-coordinator",
-                        image=digital_credentials_config.get("issuer_coordinator_image")
-                        or "digitalcredentials/issuer-coordinator:1.0.0",
+                        image=cached_image_uri(
+                            digital_credentials_config.get("issuer_coordinator_image")
+                            or "digitalcredentials/issuer-coordinator:1.0.0"
+                        ),
                         ports=[
                             kubernetes.core.v1.ContainerPortArgs(
                                 container_port=4005, name="http"
