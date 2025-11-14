@@ -37,11 +37,8 @@ from ol_infrastructure.lib.vault import postgres_role_statements
 
 
 def provision_jupyterhub_deployment(  # noqa: PLR0913
-    base_name: str,
-    domain_name: str,
-    namespace: str,
     stack_info: StackInfo,
-    jupyterhub_config: Config,
+    jupyterhub_deployment_config: Config,
     vault_config: Config,
     db_config: OLPostgresDBConfig,
     cluster_stack: StackReference,
@@ -62,7 +59,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
         domain_name: Domain name for the deployment (e.g., "jupyter.mitlearn.mit.edu")
         namespace: Kubernetes namespace for the deployment
         stack_info: Stack information from parse_stack()
-        jupyterhub_config: Pulumi config for jupyterhub
+        jupyterhub_deployment_config: Pulumi config for jupyterhub deployment
         vault_config: Pulumi config for vault
         cluster_stack: EKS cluster stack reference
         application_labels: Labels to apply to Kubernetes resources
@@ -75,15 +72,24 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     Returns:
         The JupyterHub Helm release resource
     """
+    base_name = jupyterhub_deployment_config["name"]
+    domain_name = jupyterhub_deployment_config["domain"]
+    namespace = jupyterhub_deployment_config["namespace"]
     env_name = f"{stack_info.env_suffix}"
     db_name_normalized = base_name.replace("-", "_")
 
     # Derive common configuration values
-    apisix_ingress_class = jupyterhub_config.get("apisix_ingress_class") or "apisix"
-    rds_password = jupyterhub_config.require("rds_password")
+    apisix_ingress_class = (
+        jupyterhub_deployment_config.get("apisix_ingress_class") or "apisix"
+    )
+
+    # Need to rethink DB config bits.
+    # We have to do some stuff here and some stuff inside the function
+    rds_password = jupyterhub_deployment_config.get("rds_password")
     rds_defaults = defaults(stack_info)["rds"]
     rds_defaults["instance_size"] = (
-        jupyterhub_config.get("db_instance_size") or rds_defaults["instance_size"]
+        jupyterhub_deployment_config.get("db_instance_size")
+        or rds_defaults["instance_size"]
     )
     rds_defaults["use_blue_green"] = False
 
@@ -236,8 +242,8 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
 
     # JupyterHub Helm Release
     extra_images_list = extra_images or {}
-    admin_users_list = jupyterhub_config.get_object("admin_users", default=[])
-    allowed_users_list = jupyterhub_config.get_object("allowed_users", default=[])
+    admin_users_list = jupyterhub_deployment_config.get("admin_users", [])
+    allowed_users_list = jupyterhub_deployment_config.get("allowed_users", [])
     return kubernetes.helm.v3.Release(
         f"{base_name}-{env_name.upper()}-application-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
@@ -286,7 +292,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                     "podPriority": {"enabled": True},
                     "userPlaceholder": {
                         "enabled": True,
-                        "replicas": jupyterhub_config.get_int(
+                        "replicas": jupyterhub_deployment_config.get(
                             "user_placeholder_replicas"
                         )
                         or 4,
