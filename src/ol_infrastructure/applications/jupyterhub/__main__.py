@@ -242,9 +242,11 @@ jupyterhub_authoring_db_config = OLPostgresDBConfig(
     **rds_defaults,
 )
 
-# Need to rethink this. We do stuff w/ rds_password
-# in and out of the function
-# ATM I've duplicated the variable, but that is messy and error-prone.
+# We may want to rethink this. It's a bit cumbersome
+# If we more directly scoped the database to the stack
+# instead of naming it based on the original
+# deployment we could probably clean
+# this abstraction up a bit, but that'd require a teardown.
 deployment_to_db_config = {
     "jupyterhub": jupyterhub_db_config,
     "jupyterhub-authoring": jupyterhub_authoring_db_config,
@@ -258,6 +260,7 @@ for deployment_config in deployment_configs:
     )
     # Need to decide if this is the best way to handle
     # these overrides/revisit values merged into helm charts
+    # Can pull into function and remove params
     menu_override = (
         Path(__file__)
         .parent.joinpath(deployment_config["menu_override_file"])
