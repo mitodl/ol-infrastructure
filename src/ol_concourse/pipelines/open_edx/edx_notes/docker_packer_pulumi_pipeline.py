@@ -143,7 +143,15 @@ def build_notes_pipeline(
                     trigger=True,
                     passed=[ami_fragment.jobs[-1].name],
                 ),
+                GetStep(
+                    get=notes_registry_image.name,
+                    trigger=False,
+                    passed=[image_build_job.name],
+                ),
             ],
+            env_vars_from_files={
+                "EDX_NOTES_DOCKER_DIGEST": f"{notes_registry_image.name}/digest"
+            },
         )
         loop_fragments.append(pulumi_fragment)
 
