@@ -5,12 +5,13 @@ from pathlib import Path
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, ResourceOptions, StackReference
-from pulumi_aws import ec2, get_caller_identity
+from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
@@ -88,6 +89,35 @@ aws_account = get_caller_identity()
 namespace = "jupyter"
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(namespace, ns)
+)
+
+# S3 bucket for storing image assets.
+# We still host actual images in ECR, but we store assets to build those
+# In S3 and Github.
+jupyterhub_course_bucket_name = f"jupyter-courses-{stack_info.env_suffix}"
+jupyter_course_bucket_config = S3BucketConfig(
+    bucket_name=jupyterhub_course_bucket_name,
+    versioning_enabled=True,
+    bucket_policy_document=iam.get_policy_document(
+        statements=[
+            iam.GetPolicyDocumentStatementArgs(
+                effect="Allow",
+                principals=[
+                    iam.GetPolicyDocumentStatementPrincipalArgs(
+                        type="AWS",
+                        identifiers=[f"arn:aws:iam::{aws_account.account_id}:root"],
+                    )
+                ],
+                actions=["s3:*"],
+                resources=[f"arn:aws:s3:::{jupyterhub_course_bucket_name}/*"],
+            )
+        ]
+    ).json,
+    tags=aws_config.tags,
+    region=aws_config.region,
+)
+jupyter_course_bucket = OLBucket(
+    f"jupyter-course-bucket-{env_name}", config=jupyter_course_bucket_config
 )
 
 
