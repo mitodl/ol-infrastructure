@@ -331,7 +331,7 @@ if deploy_to_k8s:
 
     # Pre-deploy commands for migrations and Elasticsearch index
     pre_deploy_commands = [
-        ("migrate", ["python", "manage.py", "lms", "migrate", "--noinput"]),
+        ("migrate", ["python", "manage.py", "migrate", "--noinput"]),
         ("es-index", ["python", "manage.py", "search_index", "--rebuild", "-f"]),
     ]
 
