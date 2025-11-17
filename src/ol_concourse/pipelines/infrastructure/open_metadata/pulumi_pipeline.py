@@ -2,15 +2,11 @@ from ol_concourse.lib.jobs.infrastructure import (
     pulumi_jobs_chain,  # noqa: D100, INP001, RUF100
 )
 from ol_concourse.lib.models.fragment import PipelineFragment
-from ol_concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
-from ol_concourse.lib.resources import git_repo, github_release
+from ol_concourse.lib.models.pipeline import Identifier, Pipeline
+from ol_concourse.lib.resources import git_repo
 from ol_concourse.pipelines.constants import (
     PULUMI_CODE_PATH,
     PULUMI_WATCHED_PATHS,
-)
-
-open_metadata_release = github_release(
-    Identifier("open-metadata-release"), "open-metadata", "OpenMetadata"
 )
 
 open_metadata_pulumi_code = git_repo(
@@ -20,10 +16,9 @@ open_metadata_pulumi_code = git_repo(
         *PULUMI_WATCHED_PATHS,
         "src/ol_infrastructure/applications/open_metadata/",
         "src/bridge/secrets/open_metadata/",
+        "src/bridge/lib/versions.py",
     ],
 )
-
-get_open_metadata_release = GetStep(get=open_metadata_release.name, trigger=True)
 
 open_metadata_pulumi_fragment = pulumi_jobs_chain(
     open_metadata_pulumi_code,
@@ -32,7 +27,6 @@ open_metadata_pulumi_fragment = pulumi_jobs_chain(
     ],
     project_name="ol-infrastructure-open-metadata-server",
     project_source_path=PULUMI_CODE_PATH.joinpath("applications/open_metadata/"),
-    dependencies=[get_open_metadata_release],
 )
 
 combined_fragment = PipelineFragment(
@@ -46,7 +40,6 @@ open_metadata_pipeline = Pipeline(
     resource_types=combined_fragment.resource_types,
     resources=[
         *combined_fragment.resources,
-        open_metadata_release,
         open_metadata_pulumi_code,
     ],
     jobs=combined_fragment.jobs,
