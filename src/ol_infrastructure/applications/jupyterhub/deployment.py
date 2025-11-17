@@ -64,7 +64,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
         cluster_stack: EKS cluster stack reference
         application_labels: Labels to apply to Kubernetes resources
         k8s_global_labels: Global Kubernetes labels
-        extra_images: List of extra images to pre-pull (optional)
+        extra_images: Dictionary mapping image names to image configuration dictionaries (optional)
         menu_override_json: JSON contents for menu override Jupyter config
         disabled_extensions_json: JSON contents for disabled extensions Jupyter config
         extra_config: Extra configuration values to merge into the Helm chart values
