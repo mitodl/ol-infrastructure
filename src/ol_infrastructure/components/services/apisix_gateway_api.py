@@ -110,7 +110,7 @@ class OLApisixHTTPRoute(ComponentResource):
         resource_options = ResourceOptions(parent=self).merge(opts)
 
         # Create PluginConfig resources for unique plugin combinations
-        plugin_configs = self._create_plugin_configs(
+        self._create_plugin_configs(
             route_configs, k8s_namespace, k8s_labels, resource_options
         )
 
@@ -237,8 +237,6 @@ class OLApisixHTTPRoute(ComponentResource):
                 backend_refs = [{"name": route_config.upstream}]
             else:
                 # For service references - these are guaranteed to be non-None by validator
-                assert route_config.backend_service_name is not None
-                assert route_config.backend_service_port is not None
                 backend_ref: dict[str, Any] = {
                     "name": route_config.backend_service_name,
                     "port": route_config.backend_service_port,
