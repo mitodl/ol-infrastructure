@@ -57,7 +57,7 @@ def setup_apisix(
     :param aws_config: The AWS configuration object.
     :param cluster: The EKS cluster object.
     """
-    apisix_domains = eks_config.require_object("apisix_domains")
+    apisix_domains = eks_config.get_object("apisix_domains") or []
 
     session_cookie_name = f"{stack_info.env_suffix}_gateway_session".removeprefix(
         "production"
@@ -270,6 +270,7 @@ def setup_apisix(
                     },
                     "gatewayProxy": {
                         "createDefault": True,
+                        "publishService": "apache-apisix-gateway",
                         "provider": {
                             "type": "ControlPlane",
                             "controlPlane": {
@@ -356,16 +357,28 @@ def setup_apisix(
         metadata={
             "name": "apisix",
             "namespace": "operations",
-            "annotations": {
-                "apisix.apache.org/gateway-proxy": "apache-apisix-config",
-            },
         },
         spec={
             "gatewayClassName": "apisix",
             "listeners": [
-                {"name": "http", "protocol": "HTTP", "port": 80},
-                {"name": "https", "protocol": "HTTPS", "port": 443},
+                {
+                    "name": "http",
+                    "protocol": "HTTP",
+                    "port": 80,
+                },
+                {
+                    "name": "https",
+                    "protocol": "HTTPS",
+                    "port": 443,
+                },
             ],
+            "infrastructure": {
+                "parametersRef": {
+                    "group": "apisix.apache.org",
+                    "kind": "GatewayProxy",
+                    "name": "apache-apisix-config",
+                }
+            },
         },
         opts=ResourceOptions(
             provider=k8s_provider,
