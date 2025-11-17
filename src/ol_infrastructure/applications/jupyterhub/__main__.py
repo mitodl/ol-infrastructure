@@ -233,12 +233,12 @@ jupyterhub_db_config = OLPostgresDBConfig(
 jupyterhub_db = OLAmazonDB(jupyterhub_db_config)
 
 jupyterhub_authoring_db_config = OLPostgresDBConfig(
-    instance_name=f"jupyterhub-authoring-db-{stack_info.env_suffix}",
+    instance_name=f"jupyterhub-db-{stack_info.env_suffix}",  # Use same physical DB instance
     password=rds_password,
     subnet_group_name=target_vpc["rds_subnet"],
     security_groups=[jupyterhub_db_security_group],
     tags=aws_config.tags,
-    db_name="jupyterhub_authoring",
+    db_name="jupyterhub_authoring",  # Logical DB name for authoring
     **rds_defaults,
 )
 
