@@ -44,4 +44,15 @@ config:
   operations_vpc:k8s_service_subnet: 10.110.20.0/23
   residential_staging_vpc:cidr_block: 172.22.0.0/16
   residential_vpc:cidr_block: 172.19.0.0/16
+  residential_vpc:k8s_nat_gateway_config: "single"
+  residential_vpc:k8s_subnet_pair_configs:
+  - public_cidr: 172.19.124.0/24
+    private_cidr: 172.19.128.0/21
+  - public_cidr: 172.19.125.0/24
+    private_cidr: 172.19.136.0/21
+  - public_cidr: 172.19.126.0/24
+    private_cidr: 172.19.144.0/21
+  - public_cidr: 172.19.127.0/24
+    private_cidr: 172.19.152.0/21
+  residential_vpc:k8s_service_subnet: 10.110.26.0/23
   xpro_vpc:cidr_block: 172.20.0.0/16

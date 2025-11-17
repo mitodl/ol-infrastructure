@@ -43,5 +43,16 @@ config:
   operations_vpc:k8s_service_subnet: 10.110.80.0/23
   operations_vpc:name: operations-qa
   residential_staging_vpc:cidr_block: 10.30.0.0/16
+  residential_vpc:k8s_nat_gateway_config: "single"
+  residential_vpc:k8s_subnet_pair_configs:
+  - private_cidr: 10.5.128.0/21
+    public_cidr: 10.5.124.0/24
+  - private_cidr: 10.5.136.0/21
+    public_cidr: 10.5.125.0/24
+  - private_cidr: 10.5.144.0/21
+    public_cidr: 10.5.126.0/24
+  - private_cidr: 10.5.152.0/21
+    public_cidr: 10.5.127.0/24
+  residential_vpc:k8s_service_subnet: 10.110.86.0/23
   residential_vpc:cidr_block: 10.5.0.0/16
   xpro_vpc:cidr_block: 10.6.0.0/16
