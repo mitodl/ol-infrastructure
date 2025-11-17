@@ -332,7 +332,15 @@ def setup_apisix(
         api_version="gateway.networking.k8s.io/v1",
         kind="GatewayClass",
         metadata={"name": "apisix"},
-        spec={"controllerName": "apisix.apache.org/apisix-ingress-controller"},
+        spec={
+            "controllerName": "apisix.apache.org/apisix-ingress-controller",
+            "parametersRef": {
+                "group": "apisix.apache.org",
+                "kind": "GatewayProxy",
+                "name": "apache-apisix-config",
+                "namespace": "operations",
+            },
+        },
         opts=ResourceOptions(
             provider=k8s_provider,
             parent=operations_namespace,
@@ -345,7 +353,13 @@ def setup_apisix(
         f"{cluster_name}-gateway",
         api_version="gateway.networking.k8s.io/v1",
         kind="Gateway",
-        metadata={"name": "apisix", "namespace": "operations"},
+        metadata={
+            "name": "apisix",
+            "namespace": "operations",
+            "annotations": {
+                "apisix.apache.org/gateway-proxy": "apache-apisix-config",
+            },
+        },
         spec={
             "gatewayClassName": "apisix",
             "listeners": [
