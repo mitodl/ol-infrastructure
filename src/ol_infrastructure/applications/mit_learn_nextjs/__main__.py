@@ -143,9 +143,9 @@ raw_env_vars = {
     "NEXT_PUBLIC_SITE_NAME": "MIT Learn",
     "NEXT_PUBLIC_VERSION": MIT_LEARN_NEXTJS_DOCKER_TAG,
     "NEXT_PUBLIC_FEATURE_product_page_courses": False,
-    "NEXT_PUBLIC_FEATURE_enrollment_dashboard": False,
+    "NEXT_PUBLIC_FEATURE_enrollment_dashboard": False,  # pragma: allowlist secret
     "NEXT_PUBLIC_FEATURE_lr_drawer_chatbot": True,
-    "NEXT_PUBLIC_FEATURE_home_page_recommendation_bot": True,
+    "NEXT_PUBLIC_FEATURE_home_page_recommendation_bot": True,  # pragma: allowlist secret  # noqa: E501
 }
 
 env_vars = []
