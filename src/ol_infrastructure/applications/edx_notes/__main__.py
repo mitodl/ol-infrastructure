@@ -10,12 +10,16 @@ import pulumi_consul as consul
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, get_caller_identity, iam, route53
 
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
+from ol_infrastructure.components.applications.eks import (
+    OLEKSAuthBinding,
+    OLEKSAuthBindingConfig,
+)
 from ol_infrastructure.components.aws.acm import ACMCertificate, ACMCertificateConfig
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
@@ -29,6 +33,11 @@ from ol_infrastructure.components.aws.auto_scale_group import (
 from ol_infrastructure.components.services.k8s import (
     OLApplicationK8s,
     OLApplicationK8sConfig,
+)
+from ol_infrastructure.components.services.vault import (
+    OLVaultK8SDynamicSecretConfig,
+    OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -212,39 +221,112 @@ if deploy_to_k8s:
         tags=aws_config.merged_tags({"Name": f"edx-notes-app-{env_name}"}),
     )
 
-    # Get service URLs from stack references
+    # Get service URLs from stack references (as Output objects)
     opensearch_cluster = opensearch_stack.require_output("cluster")
     opensearch_endpoint = opensearch_cluster["endpoint"]
     edxapp_output = edxapp_stack.require_output("edxapp")
     edxapp_db_address = edxapp_output["mariadb"]
 
-    # Application configuration (non-sensitive)
+    # Application configuration (non-sensitive, static values only)
     application_config = {
-        "ELASTICSEARCH_DSL_HOST": opensearch_endpoint,
         "ELASTICSEARCH_DSL_PORT": "443",
         "ELASTICSEARCH_DSL_USE_SSL": "true",
         "ELASTICSEARCH_DSL_VERIFY_CERTS": "false",
-        "DB_HOST": edxapp_db_address,
         "DB_NAME": "edx_notes_api",
         "DB_PORT": "3306",
     }
 
-    # Create configuration from secrets for environment variables
-    secret_env_vars = {
-        "DJANGO_SECRET_KEY": secrets.get("django_secret_key", ""),
-        "OAUTH_CLIENT_ID": secrets.get("oauth_client_id", ""),
-        "OAUTH_CLIENT_SECRET": secrets.get("oauth_client_secret", ""),
-    }
+    # Read Vault policy template and replace DEPLOYMENT placeholder
+    vault_policy_template = (
+        Path(__file__).parent.joinpath("edx_notes_policy.hcl").read_text()
+    )
+    vault_policy_text = vault_policy_template.replace(
+        "DEPLOYMENT", stack_info.env_prefix
+    )
 
-    # Create a K8s secret for sensitive environment variables
-    notes_k8s_secret = kubernetes.core.v1.Secret(
-        f"edx-notes-secrets-{env_name}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="edx-notes-secrets",
+    # Setup Vault Kubernetes auth using OLEKSAuthBinding
+    # EDX Notes doesn't need AWS service access (no S3, SES, etc.)
+    notes_app = OLEKSAuthBinding(
+        OLEKSAuthBindingConfig(
+            application_name="edx-notes",
             namespace=namespace,
+            stack_info=stack_info,
+            aws_config=aws_config,
+            iam_policy_document=None,
+            vault_policy_text=vault_policy_text,
+            cluster_identities=cluster_stack.require_output("cluster_identities"),
+            vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+            irsa_service_account_name="edx-notes",
+            vault_sync_service_account_names="edx-notes-vault",
+            k8s_labels=K8sGlobalLabels(
+                service=Services.edx_notes,
+                ou=BusinessUnit(stack_info.env_prefix),
+                stack=stack_info,
+            ),
+        )
+    )
+
+    vault_k8s_resources = notes_app.vault_k8s_resources
+
+    # Create VaultStaticSecret for application secrets and environment config
+    # Uses Output.all() to handle pulumi.Output objects for hosts
+    static_secret_name = "edx-notes-secrets"  # noqa: S105  # pragma: allowlist secret
+    notes_static_secret = Output.all(
+        db_host=edxapp_db_address,
+        opensearch_host=opensearch_endpoint,
+    ).apply(
+        lambda kwargs: OLVaultK8SSecret(
+            f"edx-notes-{env_name}-static-secret",
+            OLVaultK8SStaticSecretConfig(
+                name="edx-notes-static-secrets",
+                namespace=namespace,
+                dest_secret_labels=k8s_global_labels,
+                dest_secret_name=static_secret_name,
+                labels=k8s_global_labels,
+                mount=f"secret-{stack_info.env_prefix}",
+                mount_type="kv-v2",
+                path=f"edx-notes/{env_name}",
+                templates={
+                    "DJANGO_SECRET_KEY": '{{ get .Secrets "django_secret_key" }}',
+                    "OAUTH_CLIENT_ID": '{{ get .Secrets "oauth_client_id" }}',
+                    "OAUTH_CLIENT_SECRET": '{{ get .Secrets "oauth_client_secret" }}',
+                    "DB_HOST": kwargs["db_host"],
+                    "ELASTICSEARCH_DSL_HOST": kwargs["opensearch_host"],
+                },
+                refresh_after="1h",
+                vaultauth=vault_k8s_resources.auth_name,
+            ),
+            opts=ResourceOptions(
+                delete_before_replace=True,
+                depends_on=vault_k8s_resources,
+            ),
+        )
+    )
+
+    # Create VaultDynamicSecret for database credentials
+    db_creds_secret_name = "edx-notes-db-creds"  # noqa: S105  # pragma: allowlist secret
+    db_creds_secret = OLVaultK8SSecret(
+        f"edx-notes-{env_name}-db-creds-secret",
+        OLVaultK8SDynamicSecretConfig(
+            name="edx-notes-db-creds",
+            namespace=namespace,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=db_creds_secret_name,
             labels=k8s_global_labels,
+            mount=f"mariadb-{stack_info.env_prefix}",
+            path="creds/notes",
+            restart_target_kind="Deployment",
+            restart_target_name="edx-notes-app",
+            templates={
+                "DB_USER": "{{ .Secrets.username }}",
+                "DB_PASSWORD": "{{ .Secrets.password }}",
+            },
+            vaultauth=vault_k8s_resources.auth_name,
         ),
-        string_data=secret_env_vars,
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=vault_k8s_resources,
+        ),
     )
 
     # Pre-deploy commands for migrations and Elasticsearch index
@@ -265,7 +347,7 @@ if deploy_to_k8s:
         application_max_replicas=notes_config.get_int("max_replicas") or 3,
         application_deployment_use_anti_affinity=True,
         k8s_global_labels=k8s_global_labels,
-        env_from_secret_names=["edx-notes-secrets"],
+        env_from_secret_names=["edx-notes-secrets", db_creds_secret_name],
         application_security_group_id=notes_app_security_group.id,
         application_security_group_name=notes_app_security_group.name,
         application_service_account_name=None,
@@ -284,8 +366,8 @@ if deploy_to_k8s:
             "memory": notes_config.get("memory_request") or "512Mi",
         },
         resource_limits={
-            "cpu": notes_config.get("cpu_limit") or "1000m",
-            "memory": notes_config.get("memory_limit") or "2Gi",
+            "cpu": notes_config.get("cpu_limit") or "500m",
+            "memory": notes_config.get("memory_limit") or "1Gi",
         },
         pre_deploy_commands=pre_deploy_commands,
         probe_configs={
