@@ -10,7 +10,7 @@ config:
   eks:apisix_admin_key:
     secure: v1:+4IwDMDzHiVsfnbo:vr+qOCr5SVJhBDoy0N8JL0Mw+1nrcOWNktlN5AKPCCLtAVIJfFWo8m/UJcje8esGgzIql50D/Wj7n8AX3K9zVzh1A6IAws/iZ2GW7B5D0Rw=
   eks:apisix_domains:
-  - "airbyte.ol.mit.edu"
+  - "airbyte.odl.mit.edu"
   - "pipelines.odl.mit.edu"
   eks:apisix_min_replicas: "3"
   eks:apisix_max_replicas: "10"

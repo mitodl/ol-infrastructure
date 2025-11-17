@@ -10,7 +10,7 @@ config:
   eks:apisix_admin_key:
     secure: v1:7MeUlqKSTbqRovyg:d+PtadLdy5md0WQvYWbW3rBF5WHO4mvN69eXpegY72UNos0qGAoWBT/o6eSGxKsjZDllxfFpFEUvKUuOTpjQDl14cDW9khKyaTQFrpJq3WI=
   eks:apisix_domains:
-  - "airbyte-qa.ol.mit.edu"
+  - "airbyte-qa.odl.mit.edu"
   - "pipelines-qa.odl.mit.edu"
   eks:apisix_viewer_key:
     secure: v1:FXn/5LA92VaA0LDu:+M5NNNgprjafZJTssawGZoRrI9ZEoiGKbRa3oVh4YjtZO4B5MLwXgfRvfWyY1zSbT0LJxxMJT90KQtWN3MsWobIseTYXLrdnPcpcYXY9lmg=

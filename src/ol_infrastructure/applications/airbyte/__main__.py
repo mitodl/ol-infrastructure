@@ -790,6 +790,7 @@ airbyte_oidc_resources = OLApisixOIDCResources(
         application_name="airbyte",
         k8s_namespace=airbyte_namespace,
         k8s_labels=k8s_global_labels,
+        oidc_scope="openid profile email",
         vault_mount="secret-operations",
         vault_mount_type="kv-v1",
         vault_path="sso/airbyte",
