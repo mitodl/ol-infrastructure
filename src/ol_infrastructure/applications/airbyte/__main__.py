@@ -678,8 +678,8 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                 "deploymentStrategyType": "RollingUpdate",
                 "podLabels": k8s_global_labels,
                 "resources": {
-                    "requests": {"memory": "10Gi", "cpu": "300m"},
-                    "limits": {"memory": "15Gi", "cpu": "1000m"},
+                    "requests": {"memory": "1Gi", "cpu": "300m"},
+                    "limits": {"memory": "2Gi", "cpu": "500m"},
                 },
                 "httpIdleTimeout": "20m",
                 "extraEnv": [  # How long to attempt new source schema discovery
