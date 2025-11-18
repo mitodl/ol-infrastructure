@@ -1,0 +1,48 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAGCwktIRKBNDvpmkXt/c+k+AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMbXJKd+Kvl9/IKEZAAgEQgDtZ8aTAeFdJd6wMCMf97aYf493JS0SsieKbwXyDWE4wlEmPKoIuNZfqx8v7iBndlFQjxwKxA8dNfALKtw==
+config:
+  eks:allowed_dns_zones:
+  - ".odl.mit.edu"
+  - "odl.mit.edu"
+  - ".ol.mit.edu"
+  - "ol.mit.edu"
+  - ".mitx.mit.edu"
+  - "mitx.mit.edu"
+  eks:apisix_domains: []
+  eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
+  eks:developer_role_kubernetes_groups: ["admin"]
+  eks:developer_role_scope: "cluster"
+  eks:ebs_csi_provisioner: "true"
+  eks:efs_csi_provisioner: "true"
+  eks:gateway_release_channel: "experimental"
+  eks:namespaces:
+  - "botkube"
+  - "kubewatch"
+  - "mitx-openedx"
+  - "mitx-staging-openedx"
+  eks:nodegroups:
+    worker-xlarge:
+      disk_size_gb: 100
+      instance_type: "r7a.large"
+      gpu: false
+      labels:
+        node_size: r7a.large
+        ondemand: true
+        ol.mit.edu/core_node: true
+        ol.mit.edu/gpu_node: false
+      node_group_options: {}
+      scaling:
+        desired: 3
+        max: 5
+        min: 2
+      tags:
+        cluster: applications-ci
+      taints: {}
+      version:
+  environment:business_unit: residential
+  environment:target_vpc: residential_mitx_vpc
+  eks:apisix_admin_key:
+    secure: v1:LeFhvSvx1YJEAjL5:MNspMz6SIBvytekyocDXmCjR4ouvPOgid/MbGC23ZTnAz/bjYyux8oMqtMc0XuZi
+  eks:apisix_viewer_key:
+    secure: v1:MDSIXSPn4RgChQCp:xG6Qd5Bf2amCIOjWQna8aJkmT/jszENVAMhNjwCUKK/KjFqpAw9RcRf+pUtqn+23

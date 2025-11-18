@@ -1,0 +1,6 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAFZr4tUKdkL5a5xOk5vo920AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMS6i9/2Umuk5yamvPAgEQgDsCoUyI6rxQ0Tmv9qu1aXcDJfS9vGd5ihFTJcDEAdGehJSNnCS+A82B6njorTntF2VJdV2BaKAMyi6r3Q==
+config:
+  environment:business_unit: residential
+  environment:target_vpc: residential_mitx_vpc

@@ -146,6 +146,9 @@ residential_mitx_vpc_config = OLVPCConfig(
         "business_unit": "residential",
         "Name": f"MITx {stack_info.name}",
     },
+    k8s_nat_gateway_config=mitx_config.get("k8s_nat_gateway_config") or None,
+    k8s_subnet_pair_configs=mitx_config.get_object("k8s_subnet_pair_configs") or None,
+    k8s_service_subnet=mitx_config.get("k8s_service_subnet") or None,
 )
 residential_mitx_vpc = OLVPC(residential_mitx_vpc_config)
 

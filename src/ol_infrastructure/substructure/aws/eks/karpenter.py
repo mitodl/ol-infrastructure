@@ -185,6 +185,22 @@ def setup_karpenter(  # noqa: PLR0913
         policy_arn=karpenter_controller_policy.arn,
     )
 
+    # Install Karpeter CRD Helm Chart
+    karpenter_crd_release = kubernetes.helm.v3.Release(
+        f"{cluster_name}-karpeter-crd-helm-release",
+        kubernetes.helm.v3.ReleaseArgs(
+            name="karpeter-crds",
+            chart="oci://public.ecr.aws/karpenter/karpenter-crd",
+            version=KARPENTER_CHART_VERSION,
+            disable_crd_hooks=True,
+            namespace="operations",
+            cleanup_on_fail=True,
+            skip_await=False,
+            values={},
+        ),
+        opts=ResourceOptions(provider=k8s_provider),
+    )
+
     crd_info = {
         "ec2nodeclasses.karpenter.k8s.aws": "EC2NodeClass",
         "nodeclaims.karpenter.sh": "NodeClaim",
@@ -209,25 +225,12 @@ def setup_karpenter(  # noqa: PLR0913
                     kind=kind
                 ),
             ),
-            opts=ResourceOptions(provider=k8s_provider),
+            opts=ResourceOptions(
+                provider=k8s_provider, depends_on=[karpenter_crd_release]
+            ),
         )
         crd_patches.append(patch)
 
-    # Install Karpeter CRD Helm Chart
-    karpenter_crd_release = kubernetes.helm.v3.Release(
-        f"{cluster_name}-karpeter-crd-helm-release",
-        kubernetes.helm.v3.ReleaseArgs(
-            name="karpeter-crds",
-            chart="oci://public.ecr.aws/karpenter/karpenter-crd",
-            version=KARPENTER_CHART_VERSION,
-            disable_crd_hooks=True,
-            namespace="operations",
-            cleanup_on_fail=True,
-            skip_await=False,
-            values={},
-        ),
-        opts=ResourceOptions(provider=k8s_provider, depends_on=crd_patches),
-    )
     # Install Karpenter Helm Chart
     karpenter_release = kubernetes.helm.v3.Release(
         f"{cluster_name}-karpenter-helm-release",

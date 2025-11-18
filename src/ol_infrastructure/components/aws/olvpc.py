@@ -301,6 +301,7 @@ class OLVPC(ComponentResource):
 
             nat_gateway_index = -1
             if vpc_config.k8s_nat_gateway_config == "single":
+                # This picks a 'random' AZ based on the VPC name to place the nat gateway in
                 nat_gateway_index = sum(bytearray(vpc_config.vpc_name, "utf-8")) % len(
                     vpc_config.k8s_subnet_pair_configs
                 )

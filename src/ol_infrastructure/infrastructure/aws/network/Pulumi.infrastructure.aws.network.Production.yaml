@@ -41,7 +41,18 @@ config:
     public_cidr: 10.0.127.0/24
   operations_vpc:k8s_service_subnet: 10.110.140.0/23
   operations_vpc:name: operations
-  residential_staging_vpc:cidr_block: 10.31.0.0/16
+  residential_vpc:k8s_nat_gateway_config: "all"
+  residential_vpc:k8s_subnet_pair_configs:
+  - private_cidr: 10.7.128.0/21
+    public_cidr: 10.7.124.0/24
+  - private_cidr: 10.7.136.0/21
+    public_cidr: 10.7.125.0/24
+  - private_cidr: 10.7.144.0/21
+    public_cidr: 10.7.126.0/24
+  - private_cidr: 10.7.152.0/21
+    public_cidr: 10.7.127.0/24
+  residential_vpc:k8s_service_subnet: 10.110.146.0/23
   residential_vpc:cidr_block: 10.7.0.0/16
+  residential_staging_vpc:cidr_block: 10.31.0.0/16
   xpro_vpc:cidr_block: 10.8.0.0/16
   xpro_vpc:name: mitxpro-production
