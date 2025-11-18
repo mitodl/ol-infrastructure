@@ -25,6 +25,7 @@ config:
   - "dagster"
   - "kubewatch"
   - "open-metadata"
+  - "qdrant"
   - "superset"
   eks:nodegroups:
     worker-xlarge:
