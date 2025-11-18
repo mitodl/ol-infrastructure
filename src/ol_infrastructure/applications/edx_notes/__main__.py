@@ -285,7 +285,7 @@ if deploy_to_k8s:
             dest_secret_name=static_secret_name,
             labels=k8s_global_labels,
             mount=f"secret-{stack_info.env_prefix}",
-            mount_type="kv-v2",
+            mount_type="kv-v1",
             path="edx-notes",
             templates={
                 "DJANGO_SECRET_KEY": '{{ get .Secrets "django_secret_key" }}',
