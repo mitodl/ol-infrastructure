@@ -30,6 +30,12 @@ from ol_infrastructure.components.aws.auto_scale_group import (
     OLTargetGroupConfig,
     TagSpecification,
 )
+from ol_infrastructure.components.aws.eks import (
+    OLEKSGateway,
+    OLEKSGatewayConfig,
+    OLEKSGatewayListenerConfig,
+    OLEKSGatewayRouteConfig,
+)
 from ol_infrastructure.components.services.k8s import (
     OLApplicationK8s,
     OLApplicationK8sConfig,
@@ -352,7 +358,7 @@ if deploy_to_k8s:
         application_security_group_name=notes_app_security_group.name,
         application_service_account_name=None,
         application_image_repository="mitodl/openedx-notes",
-        application_docker_digest=docker_image_tag,
+        application_image_digest=docker_image_tag,
         application_cmd_array=None,
         application_arg_array=None,
         vault_k8s_resource_auth_name=f"edx-notes-{stack_info.env_prefix}",
@@ -404,44 +410,43 @@ if deploy_to_k8s:
         ol_app_k8s_config=ol_app_k8s_config,
     )
 
-    # HTTPRoute for Gateway API (if needed - depends on your ingress strategy)
+    # Gateway API routing + TLS certificate with cert-manager
     dns_name = notes_config.get("domain")
-    notes_httproute = kubernetes.apiextensions.CustomResource(
-        f"edx-notes-httproute-{env_name}",
-        api_version="gateway.networking.k8s.io/v1",
-        kind="HTTPRoute",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="edx-notes",
-            namespace=namespace,
-            labels=k8s_global_labels,
-        ),
-        spec={
-            "parentRefs": [
-                {
-                    "name": "default-gateway",
-                    "namespace": "gateway-system",
-                }
-            ],
-            "hostnames": [dns_name],
-            "rules": [
-                {
-                    "matches": [
-                        {
-                            "path": {
-                                "type": "PathPrefix",
-                                "value": "/",
-                            }
-                        }
-                    ],
-                    "backendRefs": [
-                        {
-                            "name": "edx-notes",
-                            "port": 8000,
-                        }
-                    ],
-                }
-            ],
-        },
+
+    gateway_config = OLEKSGatewayConfig(
+        cert_issuer="letsencrypt-production",
+        cert_issuer_class="cluster-issuer",
+        gateway_name="edx-notes",
+        namespace=namespace,
+        labels=k8s_global_labels,
+        listeners=[
+            OLEKSGatewayListenerConfig(
+                name="https-web",
+                hostname=dns_name,
+                port=8443,
+                protocol="HTTPS",
+                tls_mode="Terminate",
+                certificate_secret_name="edx-notes-tls",  # pragma: allowlist secret  # noqa: E501, S106
+                certificate_secret_namespace=namespace,
+            ),
+        ],
+        routes=[
+            OLEKSGatewayRouteConfig(
+                backend_service_name="edx-notes",
+                backend_service_namespace=namespace,
+                backend_service_port=8000,
+                name="edx-notes-https-root",
+                listener_name="https-web",
+                hostnames=[dns_name],
+                port=8443,
+                matches=[{"path": {"type": "PathPrefix", "value": "/"}}],
+            ),
+        ],
+    )
+
+    notes_gateway = OLEKSGateway(
+        "edx-notes-gateway",
+        gateway_config=gateway_config,
     )
 
     # Export Kubernetes resources
