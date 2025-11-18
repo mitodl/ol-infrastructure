@@ -914,7 +914,7 @@ def create_k8s_resources(  # noqa: C901
                             lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
                         ),
                         "username": "default",
-                        "datbaseIndex": "1",
+                        "databaseIndex": "1",
                         "password": edxapp_cache.cache_cluster.auth_token,
                         "listName": "edx.lms.core.default",
                         "listLength": "10",
@@ -1396,7 +1396,7 @@ def create_k8s_resources(  # noqa: C901
                             lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
                         ),
                         "username": "default",
-                        "datbaseIndex": "1",
+                        "databaseIndex": "1",
                         "password": edxapp_cache.cache_cluster.auth_token,
                         "listName": "edx.cms.core.default",
                         "listLength": "10",
