@@ -9,3 +9,17 @@ It is dirty, but it gets the job done. The script is idempotent and you can run 
 It expects to find the passwords in the sops file for environment. So, same place you defined the `master_user_password` in order to build the environment.
 
 If you need an older cluster ( < ES 7.X ), use the `bootstrap_security_config_6.8.py` script instead. Some of the API interfaces are different.
+
+### ML Stuff for Anastasia
+
+On 2025-11-18 Anastasia requested ML capabilities be added to the cluster. This requires some additional configuration. We turned on one setting by hand in the cluster:
+
+```
+PUT _cluster/settings
+{
+  "persistent": {
+    "plugins.ml_commons.only_run_on_ml_node": false
+  }
+}
+```
+She said that this was not needed for production clusters, only in RC. Documented here incase that isn't true.
