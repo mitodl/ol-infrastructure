@@ -227,7 +227,7 @@ def _build_image_job(
                             path="sh",
                             args=[
                                 "-c",
-                                f"grep 'VERSION = ' {git_repo_resource.name}/main/settings.py | cut -d'\"' -f2 > {version_file}",
+                                rf"""grep -E -o '^VERSION = "[0-9]+\.[0-9]+\.[0-9]+"$' {git_repo_resource.name}/main/settings.py | cut -d'\"' -f2 > {version_file}""",
                             ],
                         ),
                     ),
