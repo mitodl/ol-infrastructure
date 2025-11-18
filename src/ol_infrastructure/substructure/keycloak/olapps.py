@@ -988,7 +988,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         )
         onboard_oidc_org(
             OIDCIdpConfig(
-                org_domains=["dynideas.com"],
+                org_domains=["dynideas.com", "veltiston.ai"],
                 org_name="Dynamic Ideas, LLC.",
                 org_alias="DYNIDEAS",
                 learn_domain=mitlearn_domain,
