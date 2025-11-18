@@ -914,7 +914,7 @@ def create_k8s_resources(  # noqa: C901
                             lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
                         ),
                         "username": "default",
-                        "datbaseIndex": "0",
+                        "datbaseIndex": "1",
                         "password": edxapp_cache.cache_cluster.auth_token,
                         "listName": "celery",  # TODO(Mike): is this correct for both lms and cms?
                         "listLength": "10",
@@ -1396,7 +1396,7 @@ def create_k8s_resources(  # noqa: C901
                             lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
                         ),
                         "username": "default",
-                        "datbaseIndex": "0",
+                        "datbaseIndex": "1",
                         "password": edxapp_cache.cache_cluster.auth_token,
                         "listName": "celery",  # TODO(Mike): is this correct for both lms and cms?
                         "listLength": "10",
