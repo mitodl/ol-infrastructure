@@ -833,6 +833,7 @@ cert_manager_certificate_api = OLCertManagerCert(
 )
 
 # Basic auth secret for API access (used by Dagster)
+# APISIX basic-auth requires username/password in separate keys
 basic_auth_secret_name = "airbyte-basic-auth"  # noqa: S105  # pragma: allowlist secret
 basic_auth_secret_config = OLVaultK8SStaticSecretConfig(
     name="airbyte-basic-auth-config",
@@ -843,7 +844,7 @@ basic_auth_secret_config = OLVaultK8SStaticSecretConfig(
     mount="secret-airbyte",
     mount_type="kv-v2",
     path="dagster",
-    templates={"users": 'dagster:{{ get .Secrets "credentials" }}'},
+    templates={"username": "dagster", "password": '{{ get .Secrets "credentials" }}'},
     vaultauth=vault_k8s_resources.auth_name,
 )
 basic_auth_secret = OLVaultK8SSecret(
@@ -851,6 +852,33 @@ basic_auth_secret = OLVaultK8SSecret(
     resource_config=basic_auth_secret_config,
     opts=ResourceOptions(
         depends_on=[airbyte_helm_release],
+        delete_before_replace=True,
+    ),
+)
+
+# ApisixConsumer for basic-auth authentication
+# This links the consumer "dagster" to the credentials in the secret
+airbyte_basic_auth_consumer = kubernetes.apiextensions.CustomResource(
+    "airbyte-dagster-consumer",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixConsumer",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster",
+        namespace=airbyte_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        "ingressClassName": "apache-apisix",
+        "authParameter": {
+            "basicAuth": {
+                "secretRef": {
+                    "name": basic_auth_secret_name,
+                }
+            }
+        },
+    },
+    opts=ResourceOptions(
+        depends_on=[basic_auth_secret],
         delete_before_replace=True,
     ),
 )
@@ -890,7 +918,6 @@ airbyte_apisix_route = OLApisixRoute(
                     config={
                         "hide_credentials": True,
                     },
-                    secretRef=basic_auth_secret_name,
                 ),
             ],
         ),
@@ -901,7 +928,7 @@ airbyte_apisix_route = OLApisixRoute(
         depends_on=[
             airbyte_helm_release,
             airbyte_oidc_resources,
-            basic_auth_secret,
+            airbyte_basic_auth_consumer,
         ]
     ),
 )
