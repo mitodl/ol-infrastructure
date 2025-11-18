@@ -40,8 +40,10 @@ read_only_role = {
 read_write_role = {
     "cluster_permissions": [
         "cluster_composite_ops",
+        "cluster_monitor",
         "indices:data/read/scroll",
         "indices:data/read/scroll/clear",
+        "cluster:admin/opensearch/ml/*",
     ],
     "index_permissions": [
         {
