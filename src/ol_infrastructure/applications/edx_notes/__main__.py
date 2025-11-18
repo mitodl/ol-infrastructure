@@ -189,7 +189,7 @@ consul_datacenter = consul_stack.require_output("datacenter")
 
 k8s_global_labels = K8sGlobalLabels(
     service=Services.edx_notes,
-    ou=BusinessUnit(stack_info.env_prefix),
+    ou=notes_config.require("business_unit"),
     stack=stack_info,
 ).model_dump()
 
