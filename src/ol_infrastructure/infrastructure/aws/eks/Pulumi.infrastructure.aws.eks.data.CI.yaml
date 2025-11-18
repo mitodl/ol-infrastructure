@@ -11,6 +11,7 @@ config:
     secure: v1:alhS5zTWGpzPC3t3:QxvqqeD7zQ0zWxyKnnGWVRsmQwVx35NmdIaza5rI5re8+frp5OzpQZJR++4cfgzd13VBeNdOB1PM9Q3Z8hUaqGbjAhtclG6HSOg7z7tf3Ak=
   eks:apisix_domains:
   - "airbyte-ci.odl.mit.edu"
+  - "api-airbyte-ci.odl.mit.edu"
   - "pipelines-ci.odl.mit.edu"
   eks:apisix_viewer_key:
     secure: v1:ZFN4gG/xa7D+1wDe:qwerlKPydX7u54UjHLBvNUCT2Oha5e4EgXs5Uf+8tMOMUtf4yz/5SYy4rfpfls1HDMgroXWwRUY9U21sgKsGF+YJ5lexA+Fo9VSStrw9zPc=
