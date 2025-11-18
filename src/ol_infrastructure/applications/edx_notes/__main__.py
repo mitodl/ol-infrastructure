@@ -13,7 +13,7 @@ import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, get_caller_identity, iam, route53
 
-from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT, DEFAULT_WSGI_PORT
+from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT, DEFAULT_NGINX_PORT
 from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.components.applications.eks import (
@@ -235,7 +235,7 @@ if deploy_to_k8s:
 
     # Application configuration (non-sensitive, static values only)
     application_config = {
-        "APP_PORT": str(DEFAULT_WSGI_PORT),
+        "APP_PORT": str(DEFAULT_NGINX_PORT),  # Must match Service port
         "ELASTICSEARCH_DSL_PORT": "443",
         "ELASTICSEARCH_DSL_USE_SSL": "true",
         "ELASTICSEARCH_DSL_VERIFY_CERTS": "false",
@@ -381,7 +381,7 @@ if deploy_to_k8s:
             "liveness_probe": kubernetes.core.v1.ProbeArgs(
                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
                     path="/heartbeat",
-                    port=DEFAULT_WSGI_PORT,
+                    port=DEFAULT_NGINX_PORT,  # Must match APP_PORT
                 ),
                 initial_delay_seconds=30,
                 period_seconds=10,
@@ -389,7 +389,7 @@ if deploy_to_k8s:
             "readiness_probe": kubernetes.core.v1.ProbeArgs(
                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
                     path="/heartbeat",
-                    port=DEFAULT_WSGI_PORT,
+                    port=DEFAULT_NGINX_PORT,  # Must match APP_PORT
                 ),
                 initial_delay_seconds=10,
                 period_seconds=5,
@@ -397,7 +397,7 @@ if deploy_to_k8s:
             "startup_probe": kubernetes.core.v1.ProbeArgs(
                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
                     path="/heartbeat",
-                    port=DEFAULT_WSGI_PORT,
+                    port=DEFAULT_NGINX_PORT,  # Must match APP_PORT
                 ),
                 initial_delay_seconds=10,
                 period_seconds=10,
@@ -436,7 +436,7 @@ if deploy_to_k8s:
             OLEKSGatewayRouteConfig(
                 backend_service_name="edx-notes",
                 backend_service_namespace=namespace,
-                backend_service_port=DEFAULT_WSGI_PORT,
+                backend_service_port=DEFAULT_NGINX_PORT,  # Service uses NGINX port
                 name="edx-notes-https-root",
                 listener_name="https-web",
                 hostnames=[dns_name],
