@@ -7,7 +7,7 @@ from pulumi import ComponentResource, Config, Output, ResourceOptions
 from pulumi_aws import get_caller_identity, iam
 from pulumi_vault import Policy
 from pulumi_vault import kubernetes as vault_kubernetes
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.components.services.vault import (
@@ -32,8 +32,9 @@ class OLEKSAuthBindingConfig(BaseModel):
     namespace: str
     stack_info: StackInfo
     aws_config: AWSBase
-    iam_policy_document: dict[str, Any]
-    vault_policy_path: Path
+    iam_policy_document: dict[str, Any] | None = None
+    vault_policy_path: Path | None = None
+    vault_policy_text: str | None = None
     # From cluster stack reference
     cluster_identities: Output[Any]
     vault_auth_endpoint: Output[str]
@@ -48,6 +49,17 @@ class OLEKSAuthBindingConfig(BaseModel):
     # Optional parliament config for IAM policy linting
     parliament_config: dict[str, Any] | None = None
 
+    @model_validator(mode="after")
+    def validate_vault_policy(self):
+        """Ensure exactly one of vault_policy_path or vault_policy_text is provided."""
+        if self.vault_policy_path is None and self.vault_policy_text is None:
+            msg = "Either vault_policy_path or vault_policy_text must be provided"
+            raise ValueError(msg)
+        if self.vault_policy_path is not None and self.vault_policy_text is not None:
+            msg = "Only one of vault_policy_path or vault_policy_text can be provided"
+            raise ValueError(msg)
+        return self
+
     class Config:
         """Pydantic model configuration."""
 
@@ -58,6 +70,7 @@ class OLEKSAuthBinding(ComponentResource):
     """A component for deploying applications to EKS."""
 
     irsa_role: iam.Role
+    iam_policy: iam.Policy | None
     vault_k8s_resources: OLVaultK8SResources
 
     def __init__(
@@ -78,21 +91,26 @@ class OLEKSAuthBinding(ComponentResource):
         )
         stack_info = parse_stack()
         aws_account = get_caller_identity()
-        self.iam_policy = iam.Policy(
-            f"{config.application_name}-policy-{config.stack_info.env_suffix}",
-            name=f"{config.application_name}-policy-{config.stack_info.env_suffix}",
-            path=f"/ol-data/{config.application_name}-policy-{config.stack_info.env_suffix}/",
-            policy=lint_iam_policy(
-                config.iam_policy_document,
-                stringify=True,
-                parliament_config=config.parliament_config,
-            ),
-            description=(
-                f"Policy for granting access for {config.application_name} to AWS"
-                " resources"
-            ),
-            opts=ResourceOptions(parent=self),
-        )
+
+        # Only create IAM policy if iam_policy_document is provided
+        if config.iam_policy_document is not None:
+            self.iam_policy = iam.Policy(
+                f"{config.application_name}-policy-{config.stack_info.env_suffix}",
+                name=f"{config.application_name}-policy-{config.stack_info.env_suffix}",
+                path=f"/ol-data/{config.application_name}-policy-{config.stack_info.env_suffix}/",
+                policy=lint_iam_policy(
+                    config.iam_policy_document,
+                    stringify=True,
+                    parliament_config=config.parliament_config,
+                ),
+                description=(
+                    f"Policy for granting access for {config.application_name} to AWS"
+                    " resources"
+                ),
+                opts=ResourceOptions(parent=self),
+            )
+        else:
+            self.iam_policy = None
 
         self.trust_role = OLEKSTrustRole(
             f"{config.application_name}-irsa-trust-role-{config.stack_info.env_suffix}",
@@ -112,18 +130,27 @@ class OLEKSAuthBinding(ComponentResource):
             opts=ResourceOptions(parent=self),
         )
 
-        iam.RolePolicyAttachment(
-            f"{config.application_name}-irsa-policy-attach-{config.stack_info.env_suffix}",
-            policy_arn=self.iam_policy.arn,
-            role=self.trust_role.role.name,
-            opts=ResourceOptions(parent=self),
-        )
+        # Only attach IAM policy if it was created
+        if self.iam_policy is not None:
+            iam.RolePolicyAttachment(
+                f"{config.application_name}-irsa-policy-attach-{config.stack_info.env_suffix}",
+                policy_arn=self.iam_policy.arn,
+                role=self.trust_role.role.name,
+                opts=ResourceOptions(parent=self),
+            )
         self.irsa_role = self.trust_role.role
+
+        # Read Vault policy from file or use provided text
+        vault_policy_text = (
+            config.vault_policy_path.read_text()
+            if config.vault_policy_path
+            else config.vault_policy_text
+        )
 
         vault_policy = Policy(
             f"{config.application_name}-server-vault-policy",
             name=f"{config.application_name}-server",
-            policy=config.vault_policy_path.read_text(),
+            policy=vault_policy_text,
             opts=ResourceOptions(parent=self),
         )
 

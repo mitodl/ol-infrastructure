@@ -60,6 +60,7 @@ class Services(str, Enum):
     dagster = "dagster"
     digital_credentials = "digital-credentials"
     ecommerce = "unified-ecommerce"
+    edx_notes = "edx-notes"
     edxapp = "edxapp"
     keycloak = "keycloak"
     kubewatch = "kubewatch"
