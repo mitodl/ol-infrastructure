@@ -277,6 +277,7 @@ class OLApplicationK8s(ComponentResource):
         ]
         webapp_volume_mounts = nginx_volume_mounts.copy()
 
+        app_containers = []
         # Import nginx configuration as a configmap
         if ol_app_k8s_config.import_nginx_config:
             application_nginx_configmap = kubernetes.core.v1.ConfigMap(
@@ -314,6 +315,23 @@ class OLApplicationK8s(ComponentResource):
                     sub_path="web.conf",
                     read_only=True,
                 )
+            )
+            app_containers.append(  # nginx container infront of uwsgi
+                kubernetes.core.v1.ContainerArgs(
+                    name="nginx",
+                    image=cached_image_uri(f"nginx:{NGINX_VERSION}"),
+                    ports=[
+                        kubernetes.core.v1.ContainerPortArgs(
+                            container_port=DEFAULT_NGINX_PORT
+                        )
+                    ],
+                    image_pull_policy="IfNotPresent",
+                    resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                        requests={"cpu": "50m", "memory": "50Mi"},
+                        limits={"cpu": "50m", "memory": "50Mi"},
+                    ),
+                    volume_mounts=nginx_volume_mounts,
+                ),
             )
 
         # Import uwsgi configuration as a configmap
@@ -532,6 +550,30 @@ class OLApplicationK8s(ComponentResource):
                     ),
                 )
 
+        app_containers.append(
+            # Actual application run with uwsgi
+            kubernetes.core.v1.ContainerArgs(
+                name=f"{ol_app_k8s_config.application_name}-app",
+                image=app_image,
+                ports=[
+                    kubernetes.core.v1.ContainerPortArgs(
+                        container_port=DEFAULT_WSGI_PORT
+                    )
+                ],
+                image_pull_policy=image_pull_policy,
+                resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                    requests=ol_app_k8s_config.resource_requests,
+                    limits=ol_app_k8s_config.resource_limits,
+                ),
+                command=ol_app_k8s_config.application_cmd_array,
+                args=ol_app_k8s_config.application_arg_array,
+                env=application_deployment_env_vars,
+                env_from=application_deployment_envfrom,
+                volume_mounts=webapp_volume_mounts,
+                **ol_app_k8s_config.probe_configs,
+            ),
+        )
+
         _application_deployment = kubernetes.apps.v1.Deployment(
             f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-deployment",
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -563,45 +605,7 @@ class OLApplicationK8s(ComponentResource):
                         ],
                         dns_policy="ClusterFirst",
                         service_account_name=ol_app_k8s_config.application_service_account_name,
-                        containers=[
-                            # nginx container infront of uwsgi
-                            kubernetes.core.v1.ContainerArgs(
-                                name="nginx",
-                                image=cached_image_uri(f"nginx:{NGINX_VERSION}"),
-                                ports=[
-                                    kubernetes.core.v1.ContainerPortArgs(
-                                        container_port=DEFAULT_NGINX_PORT
-                                    )
-                                ],
-                                image_pull_policy="IfNotPresent",
-                                resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                                    requests={"cpu": "50m", "memory": "50Mi"},
-                                    limits={"cpu": "50m", "memory": "50Mi"},
-                                ),
-                                volume_mounts=nginx_volume_mounts,
-                            ),
-                            # Actual application run with uwsgi
-                            kubernetes.core.v1.ContainerArgs(
-                                name=f"{ol_app_k8s_config.application_name}-app",
-                                image=app_image,
-                                ports=[
-                                    kubernetes.core.v1.ContainerPortArgs(
-                                        container_port=DEFAULT_WSGI_PORT
-                                    )
-                                ],
-                                image_pull_policy=image_pull_policy,
-                                resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                                    requests=ol_app_k8s_config.resource_requests,
-                                    limits=ol_app_k8s_config.resource_limits,
-                                ),
-                                command=ol_app_k8s_config.application_cmd_array,
-                                args=ol_app_k8s_config.application_arg_array,
-                                env=application_deployment_env_vars,
-                                env_from=application_deployment_envfrom,
-                                volume_mounts=webapp_volume_mounts,
-                                **ol_app_k8s_config.probe_configs,
-                            ),
-                        ],
+                        containers=app_containers,
                         **pod_spec_args,
                     ),
                 ),
