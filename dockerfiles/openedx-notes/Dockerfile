@@ -9,7 +9,6 @@ RUN useradd --home-dir /app --create-home --shell /bin/bash --uid ${APP_USER_ID}
 USER ${APP_USER_ID}
 ARG EDX_NOTES_GIT_BRANCH=master
 WORKDIR /app/edx-notes-api
-ENV DJANGO_SETTINGS_MODULE notesserver.settings.env_config
 ENV PATH=/app/.local/bin:$PATH
 
 RUN git clone https://github.com/edx/edx-notes-api --branch ${EDX_NOTES_GIT_BRANCH} --depth 1 /app/edx-notes-api

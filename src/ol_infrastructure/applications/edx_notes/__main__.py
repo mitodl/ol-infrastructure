@@ -240,6 +240,7 @@ if deploy_to_k8s:
         "ELASTICSEARCH_DSL_VERIFY_CERTS": "false",
         "DB_NAME": "edx_notes_api",
         "DB_PORT": "3306",
+        "DJANGO_SETTINGS_MODULE": "notesserver.settings.env_config",
     }
 
     # Read Vault policy template and replace DEPLOYMENT placeholder
