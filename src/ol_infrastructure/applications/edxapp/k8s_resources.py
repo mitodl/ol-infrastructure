@@ -916,7 +916,7 @@ def create_k8s_resources(  # noqa: C901
                         "username": "default",
                         "datbaseIndex": "1",
                         "password": edxapp_cache.cache_cluster.auth_token,
-                        "listName": "celery",  # TODO(Mike): is this correct for both lms and cms?
+                        "listName": "edx.lms.core.default",
                         "listLength": "10",
                         "enableTLS": "true",
                     },
@@ -1398,7 +1398,7 @@ def create_k8s_resources(  # noqa: C901
                         "username": "default",
                         "datbaseIndex": "1",
                         "password": edxapp_cache.cache_cluster.auth_token,
-                        "listName": "celery",  # TODO(Mike): is this correct for both lms and cms?
+                        "listName": "edx.cms.core.default",
                         "listLength": "10",
                         "enableTLS": "true",
                     },
