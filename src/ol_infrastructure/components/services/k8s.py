@@ -78,7 +78,8 @@ class OLApplicationK8sConfig(BaseModel):
     application_service_account_name: str | Output[str] | None = None
     application_image_repository: str
     application_image_repository_suffix: str | None = None
-    application_docker_tag: str
+    application_docker_tag: str | None = None
+    application_image_digest: str | None = None
     application_cmd_array: list[str] | None = None
     application_arg_array: list[str] | None = None
     deployment_notifications: bool = False
@@ -187,6 +188,19 @@ class OLApplicationK8sConfig(BaseModel):
         # Convert all values to strings because that is what k8s expects.
         return {key: str(value) for key, value in application_config.items()}
 
+    @model_validator(mode="after")
+    def validate_image_tag_or_digest(self):
+        """Ensure that exactly one of application_docker_tag or application_image_digest is provided."""
+        if self.application_docker_tag and self.application_image_digest:
+            msg = "Cannot specify both application_docker_tag and application_image_digest"
+            raise ValueError(msg)
+        if not self.application_docker_tag and not self.application_image_digest:
+            msg = (
+                "Must specify either application_docker_tag or application_image_digest"
+            )
+            raise ValueError(msg)
+        return self
+
 
 stack_info = parse_stack()
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
@@ -232,9 +246,17 @@ class OLApplicationK8s(ComponentResource):
         )
 
         # Determine the full name of the container image
-        if ol_app_k8s_config.application_image_repository_suffix:
+        if ol_app_k8s_config.application_image_digest:
+            # Use digest format: repository@sha256:digest
+            if ol_app_k8s_config.application_image_repository_suffix:
+                app_image = f"{ol_app_k8s_config.application_image_repository}{ol_app_k8s_config.application_image_repository_suffix}@{ol_app_k8s_config.application_image_digest}"
+            else:
+                app_image = f"{ol_app_k8s_config.application_image_repository}@{ol_app_k8s_config.application_image_digest}"
+        elif ol_app_k8s_config.application_image_repository_suffix:
+            # Use tag format: repository:tag with suffix
             app_image = f"{ol_app_k8s_config.application_image_repository}{ol_app_k8s_config.application_image_repository_suffix}:{ol_app_k8s_config.application_docker_tag}"
         else:
+            # Use tag format: repository:tag
             app_image = f"{ol_app_k8s_config.application_image_repository}:{ol_app_k8s_config.application_docker_tag}"
         if ol_app_k8s_config.registry == "dockerhub":
             app_image = cached_image_uri(app_image)
@@ -357,7 +379,10 @@ class OLApplicationK8s(ComponentResource):
             )
 
         image_pull_policy = ol_app_k8s_config.image_pull_policy
-        if ol_app_k8s_config.application_docker_tag.lower() == "latest":
+        if (
+            ol_app_k8s_config.application_docker_tag
+            and ol_app_k8s_config.application_docker_tag.lower() == "latest"
+        ):
             image_pull_policy = "Always"
 
         init_containers = []

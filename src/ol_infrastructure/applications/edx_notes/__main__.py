@@ -352,7 +352,7 @@ if deploy_to_k8s:
         application_security_group_name=notes_app_security_group.name,
         application_service_account_name=None,
         application_image_repository="mitodl/openedx-notes",
-        application_docker_tag=docker_image_tag,
+        application_docker_digest=docker_image_tag,
         application_cmd_array=None,
         application_arg_array=None,
         vault_k8s_resource_auth_name=f"edx-notes-{stack_info.env_prefix}",
