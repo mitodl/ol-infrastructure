@@ -231,7 +231,7 @@ athena_permissions: list[dict[str, str | list[str]]] = [
         ],
         "Resource": [
             "arn:aws:glue:*:*:catalog",
-            f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}",
+            f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}*",
             f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}/*",
         ],
     },
