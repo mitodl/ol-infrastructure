@@ -98,10 +98,10 @@ config:
         min: 2
     celery:
       lms:
-        max: 3
+        max: 10
         min: 1
       cms:
-        max: 3
+        max: 5
         min: 1
   edxapp:k8s_resources:
     webapp:
