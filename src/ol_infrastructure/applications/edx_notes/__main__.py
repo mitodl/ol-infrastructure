@@ -10,7 +10,7 @@ import pulumi_consul as consul
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, get_caller_identity, iam, route53
 
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
@@ -275,38 +275,32 @@ if deploy_to_k8s:
     vault_k8s_resources = notes_app.vault_k8s_resources
 
     # Create VaultStaticSecret for application secrets and environment config
-    # Uses Output.all() to handle pulumi.Output objects for hosts
     static_secret_name = "edx-notes-secrets"  # noqa: S105  # pragma: allowlist secret
-    notes_static_secret = Output.all(
-        db_host=edxapp_db_address,
-        opensearch_host=opensearch_endpoint,
-    ).apply(
-        lambda kwargs: OLVaultK8SSecret(
-            f"edx-notes-{env_name}-static-secret",
-            OLVaultK8SStaticSecretConfig(
-                name="edx-notes-static-secrets",
-                namespace=namespace,
-                dest_secret_labels=k8s_global_labels,
-                dest_secret_name=static_secret_name,
-                labels=k8s_global_labels,
-                mount=f"secret-{stack_info.env_prefix}",
-                mount_type="kv-v2",
-                path=f"edx-notes/{env_name}",
-                templates={
-                    "DJANGO_SECRET_KEY": '{{ get .Secrets "django_secret_key" }}',
-                    "OAUTH_CLIENT_ID": '{{ get .Secrets "oauth_client_id" }}',
-                    "OAUTH_CLIENT_SECRET": '{{ get .Secrets "oauth_client_secret" }}',
-                    "DB_HOST": kwargs["db_host"],
-                    "ELASTICSEARCH_DSL_HOST": kwargs["opensearch_host"],
-                },
-                refresh_after="1h",
-                vaultauth=vault_k8s_resources.auth_name,
-            ),
-            opts=ResourceOptions(
-                delete_before_replace=True,
-                depends_on=vault_k8s_resources,
-            ),
-        )
+    notes_static_secret = OLVaultK8SSecret(
+        f"edx-notes-{env_name}-static-secret",
+        OLVaultK8SStaticSecretConfig(
+            name="edx-notes-static-secrets",
+            namespace=namespace,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=static_secret_name,
+            labels=k8s_global_labels,
+            mount=f"secret-{stack_info.env_prefix}",
+            mount_type="kv-v2",
+            path="edx-notes",
+            templates={
+                "DJANGO_SECRET_KEY": '{{ get .Secrets "django_secret_key" }}',
+                "OAUTH_CLIENT_ID": '{{ get .Secrets "oauth_client_id" }}',
+                "OAUTH_CLIENT_SECRET": '{{ get .Secrets "oauth_client_secret" }}',
+                "DB_HOST": edxapp_db_address,
+                "ELASTICSEARCH_DSL_HOST": opensearch_endpoint,
+            },
+            refresh_after="1h",
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=vault_k8s_resources,
+        ),
     )
 
     # Create VaultDynamicSecret for database credentials
@@ -408,6 +402,7 @@ if deploy_to_k8s:
     # Create the OLApplicationK8s component
     edx_notes_k8s_app = OLApplicationK8s(
         ol_app_k8s_config=ol_app_k8s_config,
+        opts=ResourceOptions(depends_on=[notes_static_secret, db_creds_secret]),
     )
 
     # Gateway API routing + TLS certificate with cert-manager
