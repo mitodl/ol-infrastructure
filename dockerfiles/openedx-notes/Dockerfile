@@ -17,5 +17,6 @@ RUN pip install --no-cache-dir -r requirements/base.txt
 # Copy custom settings module that loads from environment variables
 COPY --chown=app:app env_config.py /app/edx-notes-api/notesserver/settings/env_config.py
 
-EXPOSE 8000
-CMD gunicorn --workers=2 --name notes --bind=0.0.0.0:8000 --max-requests=1000 notesserver.wsgi:application
+ENV APP_PORT=8000
+EXPOSE $APP_PORT
+CMD gunicorn --workers=2 --name notes --bind=0.0.0.0:$APP_PORT --max-requests=1000 notesserver.wsgi:application
