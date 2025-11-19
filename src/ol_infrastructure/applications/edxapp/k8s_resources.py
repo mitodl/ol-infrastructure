@@ -867,7 +867,7 @@ def create_k8s_resources(  # noqa: C901
                                 "--hostname=edx.lms.core.default.%%h",
                                 "--max-tasks-per-child",
                                 "100",
-                                "--exclude-queues=edx.lms.core.default",
+                                "--exclude-queues=edx.cms.core.default",
                             ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
