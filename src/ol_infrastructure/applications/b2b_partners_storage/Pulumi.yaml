@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-B2BPartnersStorage-application
+runtime: python
+description: S3/SFTP Storage For B2B Partners
+backend:
+  url: s3://mitol-pulumi-state/

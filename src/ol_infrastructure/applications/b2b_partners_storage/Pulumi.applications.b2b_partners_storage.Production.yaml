@@ -1,0 +1,10 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAFO4avpSa+gDHuddXyA3AhRAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMJAgPyX+AYSyh14RrAgEQgDsQbFM6/DjzuLoPlF1ZILbjaMfAibxP4NtNmcJcCSFJpFBL4cEBLcHXObYHJpY2OVKCyfVeQVqdMmeiEQ==
+config:
+  b2b_partners:partners:
+  - name: "B2B Test Partner 1"
+    username: b2btestpartner1
+    aws_account_id: "713545616749"   # Partner's AWS account ID for cross-account S3 access
+    ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINEE3btBObBRVXPPA0mIDC1R+wlIy+1KSOcxjAU/+3dL\
+      \ feoh@prometheus"

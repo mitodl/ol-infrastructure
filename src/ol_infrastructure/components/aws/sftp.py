@@ -1,10 +1,10 @@
 """Module for creating and managing AWS Transfer Family SFTP servers backed by S3."""
 
 import json
-from typing import Literal
+from typing import Any, Literal
 
 from pulumi import ComponentResource, ResourceOptions
-from pulumi_aws import iam, s3, transfer
+from pulumi_aws import get_caller_identity, iam, s3, transfer
 from pydantic import BaseModel, ConfigDict, Field
 
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -16,6 +16,7 @@ class SFTPUserConfig(BaseModel):
     username: str
     role_arn: str | None = None
     public_keys: list[str] = Field(default_factory=list)
+    aws_account_id: str | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -86,6 +87,89 @@ class SFTPServer(ComponentResource):
             opts=generic_resource_opts,
         )
 
+        # Create bucket policy for cross-account access
+        # Build policy statements for each partner account
+
+        # Get current AWS account for bucket owner access
+        current_account = get_caller_identity()
+
+        def build_policy_statements(account_id: str) -> list[Any]:
+            """Build policy statements including bucket owner and partners."""
+            statements = []
+
+            # Allow bucket owner account full access
+            statements.append(
+                {
+                    "Sid": "AllowBucketOwnerFullAccess",
+                    "Effect": "Allow",
+                    "Principal": {"AWS": f"arn:aws:iam::{account_id}:root"},
+                    "Action": ["s3:*"],
+                    "Resource": [
+                        f"arn:aws:s3:::{sftp_config.bucket_name}",
+                        f"arn:aws:s3:::{sftp_config.bucket_name}/*",
+                    ],
+                }
+            )
+
+            # Add partner access statements
+            for user_config in sftp_config.users:
+                if user_config.aws_account_id:
+                    # Allow partner account to list their prefix
+                    statements.append(
+                        {
+                            "Sid": f"AllowListBucketFor{user_config.username}",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": f"arn:aws:iam::{user_config.aws_account_id}:root"
+                            },
+                            "Action": ["s3:ListBucket"],
+                            "Resource": f"arn:aws:s3:::{sftp_config.bucket_name}",
+                            "Condition": {
+                                "StringLike": {
+                                    "s3:prefix": [
+                                        f"{user_config.username}/*",
+                                        f"{user_config.username}",
+                                    ]
+                                }
+                            },
+                        }
+                    )
+                    # Allow partner account to read objects in their prefix
+                    statements.append(
+                        {
+                            "Sid": f"AllowReadObjectsFor{user_config.username}",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": f"arn:aws:iam::{user_config.aws_account_id}:root"
+                            },
+                            "Action": [
+                                "s3:GetObject",
+                                "s3:GetObjectVersion",
+                                "s3:GetObjectTagging",
+                                "s3:GetObjectVersionTagging",
+                            ],
+                            "Resource": (
+                                f"arn:aws:s3:::{sftp_config.bucket_name}/"
+                                f"{user_config.username}/*"
+                            ),
+                        }
+                    )
+
+            return statements
+
+        # Create bucket policy
+        s3.BucketPolicy(
+            f"{sftp_config.server_name}-sftp-bucket-policy",
+            bucket=self.bucket.id,
+            policy=json.dumps(
+                {
+                    "Version": "2012-10-17",
+                    "Statement": build_policy_statements(current_account.account_id),
+                }
+            ),
+            opts=generic_resource_opts,
+        )
+
         # Create Transfer Family server
         self.transfer_server = transfer.Server(
             f"{sftp_config.server_name}",
@@ -131,25 +215,44 @@ class SFTPServer(ComponentResource):
                                         "s3:GetObjectACL",
                                         "s3:PutObjectACL",
                                     ],
-                                    "Resource": f"arn:aws:s3:::{sftp_config.bucket_name}/{user_config.username}/*",  # noqa: E501
+                                    "Resource": (
+                                        f"arn:aws:s3:::{sftp_config.bucket_name}/"
+                                        f"{user_config.username}/*"
+                                    ),
                                 },
                             ],
                         }
                     ),
                 )
 
+                # Build assume role policy - include partner AWS account if provided
+                assume_role_principals = {"Service": "transfer.amazonaws.com"}
+                assume_role_statements = [
+                    {
+                        "Effect": "Allow",
+                        "Principal": assume_role_principals,
+                        "Action": "sts:AssumeRole",
+                    }
+                ]
+
+                # Add cross-account access if AWS account ID is provided
+                if user_config.aws_account_id:
+                    assume_role_statements.append(
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": f"arn:aws:iam::{user_config.aws_account_id}:root"
+                            },
+                            "Action": "sts:AssumeRole",
+                        }
+                    )
+
                 user_role = iam.Role(
                     f"{sftp_config.server_name}-sftp-{user_config.username}-role",
                     assume_role_policy=json.dumps(
                         {
                             "Version": "2012-10-17",
-                            "Statement": [
-                                {
-                                    "Effect": "Allow",
-                                    "Principal": {"Service": "transfer.amazonaws.com"},
-                                    "Action": "sts:AssumeRole",
-                                }
-                            ],
+                            "Statement": assume_role_statements,
                         }
                     ),
                     tags=sftp_config.merged_tags(
