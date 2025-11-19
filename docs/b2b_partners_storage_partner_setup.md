@@ -1,8 +1,8 @@
-# UAI Partners Storage - Partner Account Setup Guide
+# B2B Partners Storage - Partner Account Setup Guide
 
 ## Overview
 
-This document explains how partner AWS accounts can access their data in the MIT Open Learning UAI Partners Storage S3 bucket.
+This document explains how partner AWS accounts can access their data in the MIT Open Learning B2B Partners Storage S3 bucket.
 
 **Important**: You need access configured in **BOTH** AWS accounts:
 1. ✅ **MIT's account** - Already configured (bucket policy grants your account access)
@@ -28,7 +28,7 @@ MIT has granted your AWS account access to a specific prefix in our S3 bucket. T
 4. **Copy and paste one of the policies below** (replace the placeholders first)
 5. Click **Next: Tags** (optional)
 6. Click **Next: Review**
-7. Name the policy: `MIT-UAI-Storage-Access`
+7. Name the policy: `MIT-B2B-Storage-Access`
 8. Click **Create policy**
 
 **Option B: Using AWS CLI**
@@ -37,7 +37,7 @@ MIT has granted your AWS account access to a specific prefix in our S3 bucket. T
 2. Run:
 ```bash
 aws iam create-policy \
-    --policy-name MIT-UAI-Storage-Access \
+    --policy-name MIT-B2B-Storage-Access \
     --policy-document file://mit-storage-policy.json
 ```
 
@@ -47,7 +47,7 @@ aws iam create-policy \
 1. Go to **IAM** → **Users** (or **Roles**)
 2. Select the user/role that needs access
 3. Click **Add permissions** → **Attach policies directly**
-4. Search for `MIT-UAI-Storage-Access`
+4. Search for `MIT-B2B-Storage-Access`
 5. Check the box and click **Add permissions**
 
 **Using AWS CLI:**
@@ -55,12 +55,12 @@ aws iam create-policy \
 # For a user
 aws iam attach-user-policy \
     --user-name YOUR_USER_NAME \
-    --policy-arn arn:aws:iam::YOUR_ACCOUNT_ID:policy/MIT-UAI-Storage-Access
+    --policy-arn arn:aws:iam::YOUR_ACCOUNT_ID:policy/MIT-B2B-Storage-Access
 
 # For a role
 aws iam attach-role-policy \
     --role-name YOUR_ROLE_NAME \
-    --policy-arn arn:aws:iam::YOUR_ACCOUNT_ID:policy/MIT-UAI-Storage-Access
+    --policy-arn arn:aws:iam::YOUR_ACCOUNT_ID:policy/MIT-B2B-Storage-Access
 ```
 
 ## IAM Policy Examples
@@ -69,8 +69,8 @@ aws iam attach-role-policy \
 
 **Your MIT-provided information:**
 - Environment: `ci`
-- Bucket name: `ol-uai-partners-storage-ci`
-- Your prefix/username: `uaitestpartner1`
+- Bucket name: `ol-b2b-partners-storage-ci`
+- Your prefix/username: `b2btestpartner1`
 - Your AWS account ID: `713545616749`
 
 **IAM Policy (copy this into AWS Console → IAM → Policies → Create Policy → JSON tab):**
@@ -83,12 +83,12 @@ aws iam attach-role-policy \
             "Sid": "ListMITBucket",
             "Effect": "Allow",
             "Action": "s3:ListBucket",
-            "Resource": "arn:aws:s3:::ol-uai-partners-storage-ci",
+            "Resource": "arn:aws:s3:::ol-b2b-partners-storage-ci",
             "Condition": {
                 "StringLike": {
                     "s3:prefix": [
-                        "uaitestpartner1/*",
-                        "uaitestpartner1"
+                        "b2btestpartner1/*",
+                        "b2btestpartner1"
                     ]
                 }
             }
@@ -102,7 +102,7 @@ aws iam attach-role-policy \
                 "s3:GetObjectTagging",
                 "s3:GetObjectVersionTagging"
             ],
-            "Resource": "arn:aws:s3:::ol-uai-partners-storage-ci/uaitestpartner1/*"
+            "Resource": "arn:aws:s3:::ol-b2b-partners-storage-ci/b2btestpartner1/*"
         }
     ]
 }
@@ -112,7 +112,7 @@ aws iam attach-role-policy \
 
 **Your MIT-provided information:**
 - Environment: `production`
-- Bucket name: `ol-uai-partners-storage-production`
+- Bucket name: `ol-b2b-partners-storage-production`
 - Your prefix/username: `partner_org_name`
 - Your AWS account ID: `123456789012`
 
@@ -126,7 +126,7 @@ aws iam attach-role-policy \
             "Sid": "ListMITBucket",
             "Effect": "Allow",
             "Action": "s3:ListBucket",
-            "Resource": "arn:aws:s3:::ol-uai-partners-storage-production",
+            "Resource": "arn:aws:s3:::ol-b2b-partners-storage-production",
             "Condition": {
                 "StringLike": {
                     "s3:prefix": [
@@ -145,7 +145,7 @@ aws iam attach-role-policy \
                 "s3:GetObjectTagging",
                 "s3:GetObjectVersionTagging"
             ],
-            "Resource": "arn:aws:s3:::ol-uai-partners-storage-production/partner_org_name/*"
+            "Resource": "arn:aws:s3:::ol-b2b-partners-storage-production/partner_org_name/*"
         }
     ]
 }
@@ -155,7 +155,7 @@ aws iam attach-role-policy \
 
 **Your MIT-provided information:**
 - Environment: `qa`
-- Bucket name: `ol-uai-partners-storage-qa`
+- Bucket name: `ol-b2b-partners-storage-qa`
 - Your prefix/username: `yourcompany`
 - Your AWS account ID: `987654321098`
 
@@ -169,7 +169,7 @@ aws iam attach-role-policy \
             "Sid": "ListMITBucket",
             "Effect": "Allow",
             "Action": "s3:ListBucket",
-            "Resource": "arn:aws:s3:::ol-uai-partners-storage-qa",
+            "Resource": "arn:aws:s3:::ol-b2b-partners-storage-qa",
             "Condition": {
                 "StringLike": {
                     "s3:prefix": [
@@ -188,7 +188,7 @@ aws iam attach-role-policy \
                 "s3:GetObjectTagging",
                 "s3:GetObjectVersionTagging"
             ],
-            "Resource": "arn:aws:s3:::ol-uai-partners-storage-qa/yourcompany/*"
+            "Resource": "arn:aws:s3:::ol-b2b-partners-storage-qa/yourcompany/*"
         }
     ]
 }
@@ -198,12 +198,12 @@ aws iam attach-role-policy \
 
 **To customize for your specific setup, replace these values:**
 
-1. **Bucket name** (`ol-uai-partners-storage-{ENV}`):
+1. **Bucket name** (`ol-b2b-partners-storage-{ENV}`):
    - Replace `{ENV}` with: `ci`, `qa`, or `production`
-   - Example: `ol-uai-partners-storage-ci`
+   - Example: `ol-b2b-partners-storage-ci`
 
 2. **Your prefix** (appears 4 times in the policy):
-   - Replace `uaitestpartner1` with your assigned username
+   - Replace `b2btestpartner1` with your assigned username
    - Must match what MIT provided to you
    - Example: If MIT said "your prefix is acme_corp", use `acme_corp`
 
@@ -226,17 +226,17 @@ aws sts get-caller-identity
 # Should show your partner AWS account ID
 
 # 2. List files in your prefix
-aws s3 ls s3://ol-uai-partners-storage-ci/uaitestpartner1/
-# Replace 'ci' and 'uaitestpartner1' with your environment and prefix
+aws s3 ls s3://ol-b2b-partners-storage-ci/b2btestpartner1/
+# Replace 'ci' and 'b2btestpartner1' with your environment and prefix
 
 # 3. Download a specific file
-aws s3 cp s3://ol-uai-partners-storage-ci/uaitestpartner1/example.txt ./
+aws s3 cp s3://ol-b2b-partners-storage-ci/b2btestpartner1/example.txt ./
 # Replace with an actual filename MIT has placed in your prefix
 
 # 4. List files using S3 API (more detailed output)
 aws s3api list-objects-v2 \
-    --bucket ol-uai-partners-storage-ci \
-    --prefix uaitestpartner1/
+    --bucket ol-b2b-partners-storage-ci \
+    --prefix b2btestpartner1/
 ```
 
 **Using Python (boto3):**
@@ -248,8 +248,8 @@ import boto3
 s3 = boto3.client('s3')
 
 # Your configuration (provided by MIT)
-bucket_name = 'ol-uai-partners-storage-ci'
-prefix = 'uaitestpartner1/'
+bucket_name = 'ol-b2b-partners-storage-ci'
+prefix = 'b2btestpartner1/'
 
 # List objects in your prefix
 response = s3.list_objects_v2(
@@ -284,8 +284,8 @@ public class MITStorageAccess {
     public static void main(String[] args) {
         S3Client s3 = S3Client.create();
 
-        String bucketName = "ol-uai-partners-storage-ci";
-        String prefix = "uaitestpartner1/";
+        String bucketName = "ol-b2b-partners-storage-ci";
+        String prefix = "b2btestpartner1/";
 
         // List objects
         ListObjectsV2Request listRequest = ListObjectsV2Request.builder()
@@ -328,7 +328,7 @@ Access Denied
 
 1. **IAM policy not created in your account**
    - Solution: Follow Step 1 above to create the IAM policy
-   - Verify: Check IAM → Policies in your AWS account for `MIT-UAI-Storage-Access`
+   - Verify: Check IAM → Policies in your AWS account for `MIT-B2B-Storage-Access`
 
 2. **IAM policy not attached to your user/role**
    - Solution: Follow Step 2 above to attach the policy
@@ -345,7 +345,7 @@ Access Denied
    - Your policy must match the prefix exactly
 
 5. **Typo in bucket name**
-   - Verify bucket name: `ol-uai-partners-storage-{environment}`
+   - Verify bucket name: `ol-b2b-partners-storage-{environment}`
    - Environment is: `ci`, `qa`, or `production`
    - Check your IAM policy JSON for typos
 
@@ -355,7 +355,7 @@ Access Denied
 
 1. **MIT hasn't added your account to the bucket policy yet**
    - Contact MIT to verify your AWS account ID is configured
-   - They will verify: `aws s3api get-bucket-policy --bucket ol-uai-partners-storage-ci`
+   - They will verify: `aws s3api get-bucket-policy --bucket ol-b2b-partners-storage-ci`
 
 2. **Wrong AWS account ID provided to MIT**
    - Run: `aws sts get-caller-identity --query Account --output text`
@@ -377,7 +377,7 @@ The specified bucket does not exist
 **Solution:**
 - Check the bucket name spelling
 - Verify the environment name (ci/qa/production)
-- Bucket names are: `ol-uai-partners-storage-{environment}`
+- Bucket names are: `ol-b2b-partners-storage-{environment}`
 
 ### Error: "NoSuchKey" when downloading a file
 
@@ -401,19 +401,19 @@ Run these commands to diagnose issues:
 aws sts get-caller-identity
 
 # 2. Check if IAM policy exists in your account
-aws iam list-policies --scope Local --query "Policies[?PolicyName=='MIT-UAI-Storage-Access']"
+aws iam list-policies --scope Local --query "Policies[?PolicyName=='MIT-B2B-Storage-Access']"
 
 # 3. Check if policy is attached to your user (replace YOUR_USER)
 aws iam list-attached-user-policies --user-name YOUR_USER
 
 # 4. View the policy document to check for typos
 aws iam get-policy-version \
-    --policy-arn arn:aws:iam::YOUR_ACCOUNT_ID:policy/MIT-UAI-Storage-Access \
+    --policy-arn arn:aws:iam::YOUR_ACCOUNT_ID:policy/MIT-B2B-Storage-Access \
     --version-id v1 \
     --query 'PolicyVersion.Document'
 
 # 5. Test bucket access with detailed error output
-aws s3 ls s3://ol-uai-partners-storage-ci/your-prefix/ --debug
+aws s3 ls s3://ol-b2b-partners-storage-ci/your-prefix/ --debug
 ```
 
 ## Detailed Setup Instructions
@@ -443,8 +443,8 @@ aws s3 ls s3://ol-uai-partners-storage-ci/your-prefix/ --debug
    - Click "Next"
 
 5. **Review and Name**
-   - Policy name: `MIT-UAI-Storage-Access`
-   - Description (optional): "Access to MIT UAI Partners Storage bucket"
+   - Policy name: `MIT-B2B-Storage-Access`
+   - Description (optional): "Access to MIT B2B Partners Storage bucket"
    - Click "Create policy"
 
 6. **Attach to User**
@@ -452,7 +452,7 @@ aws s3 ls s3://ol-uai-partners-storage-ci/your-prefix/ --debug
    - Click on the username that needs access
    - Click "Add permissions" button
    - Select "Attach policies directly"
-   - Search for "MIT-UAI-Storage-Access"
+   - Search for "MIT-B2B-Storage-Access"
    - Check the box next to it
    - Click "Add permissions"
 
@@ -463,7 +463,7 @@ If multiple people in your organization need access:
 1. **Create an IAM Group:**
    - IAM → Groups → Create New Group
    - Group name: `MIT-Storage-Users`
-   - Attach the `MIT-UAI-Storage-Access` policy to the group
+   - Attach the `MIT-B2B-Storage-Access` policy to the group
 
 2. **Add Users to Group:**
    - IAM → Users → Select user
@@ -495,14 +495,14 @@ Your access is strictly limited to your prefix. Examples:
 **Your prefix: `partner1`**
 
 ✅ **Allowed:**
-- `s3://ol-uai-partners-storage-ci/partner1/data.csv`
-- `s3://ol-uai-partners-storage-ci/partner1/2024/report.pdf`
-- `s3://ol-uai-partners-storage-ci/partner1/subfolder/anything.txt`
+- `s3://ol-b2b-partners-storage-ci/partner1/data.csv`
+- `s3://ol-b2b-partners-storage-ci/partner1/2024/report.pdf`
+- `s3://ol-b2b-partners-storage-ci/partner1/subfolder/anything.txt`
 
 ❌ **Blocked:**
-- `s3://ol-uai-partners-storage-ci/` (bucket root)
-- `s3://ol-uai-partners-storage-ci/partner2/data.csv` (other prefix)
-- `s3://ol-uai-partners-storage-ci/shared/file.txt` (outside your prefix)
+- `s3://ol-b2b-partners-storage-ci/` (bucket root)
+- `s3://ol-b2b-partners-storage-ci/partner2/data.csv` (other prefix)
+- `s3://ol-b2b-partners-storage-ci/shared/file.txt` (outside your prefix)
 
 ### Best Practices
 
@@ -547,7 +547,7 @@ Include this information:
 
 ### MIT Contact Information
 - Email: [Contact details from MIT]
-- Include "UAI Partners Storage" in the subject line
+- Include "B2B Partners Storage" in the subject line
 
 ## Appendix
 
@@ -560,9 +560,9 @@ If you manage infrastructure with code, here are examples for common tools:
 ```hcl
 # variables.tf
 variable "mit_bucket_name" {
-  description = "MIT UAI Partners Storage bucket name"
+  description = "MIT B2B Partners Storage bucket name"
   type        = string
-  default     = "ol-uai-partners-storage-production"
+  default     = "ol-b2b-partners-storage-production"
 }
 
 variable "mit_prefix" {
@@ -573,8 +573,8 @@ variable "mit_prefix" {
 
 # iam.tf
 resource "aws_iam_policy" "mit_storage" {
-  name        = "MIT-UAI-Storage-Access"
-  description = "Access to MIT UAI Partners Storage bucket"
+  name        = "MIT-B2B-Storage-Access"
+  description = "Access to MIT B2B Partners Storage bucket"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -625,12 +625,12 @@ resource "aws_iam_role_policy_attachment" "mit_storage_role" {
 
 ```yaml
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'IAM policy for MIT UAI Partners Storage access'
+Description: 'IAM policy for MIT B2B Partners Storage access'
 
 Parameters:
   MITBucketName:
     Type: String
-    Default: ol-uai-partners-storage-production
+    Default: ol-b2b-partners-storage-production
     Description: MIT bucket name
 
   MITPrefix:
@@ -641,8 +641,8 @@ Resources:
   MITStoragePolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
-      ManagedPolicyName: MIT-UAI-Storage-Access
-      Description: Access to MIT UAI Partners Storage bucket
+      ManagedPolicyName: MIT-B2B-Storage-Access
+      Description: Access to MIT B2B Partners Storage bucket
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -690,7 +690,7 @@ class MITStorageAccessStack(Stack):
         bucket_name = CfnParameter(
             self, "BucketName",
             type="String",
-            default="ol-uai-partners-storage-production",
+            default="ol-b2b-partners-storage-production",
             description="MIT bucket name"
         )
 
@@ -703,8 +703,8 @@ class MITStorageAccessStack(Stack):
         # Create IAM policy
         policy = iam.ManagedPolicy(
             self, "MITStoragePolicy",
-            managed_policy_name="MIT-UAI-Storage-Access",
-            description="Access to MIT UAI Partners Storage bucket",
+            managed_policy_name="MIT-B2B-Storage-Access",
+            description="Access to MIT B2B Partners Storage bucket",
             statements=[
                 iam.PolicyStatement(
                     sid="ListMITBucket",
@@ -743,12 +743,12 @@ class MITStorageAccessStack(Stack):
 
 ```bash
 #!/bin/bash
-# Setup script for MIT UAI Storage access
+# Setup script for MIT B2B Storage access
 
 # Configuration
-BUCKET_NAME="ol-uai-partners-storage-production"
+BUCKET_NAME="ol-b2b-partners-storage-production"
 PREFIX="your_prefix"
-POLICY_NAME="MIT-UAI-Storage-Access"
+POLICY_NAME="MIT-B2B-Storage-Access"
 USER_NAME="data-reader"
 
 # Create policy document

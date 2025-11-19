@@ -1,12 +1,12 @@
 """
-Pulumi project for UAI Partners Storage (S3/SFTP).
+Pulumi project for B2B Partners Storage (S3/SFTP).
 
-This project enables Universal AI partners to consume data via S3 or SFTP,
+This project enables B2B partners to consume data via S3 or SFTP,
 with each partner having access to only their designated prefix.
 
 Expected configuration format in Pulumi stack YAML:
     config:
-      uai_partners:partners:
+      b2b_partners:partners:
         - name: "partner1"
           username: "partner1_user"
           aws_account_id: "123456789012"
@@ -28,19 +28,19 @@ from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 stack_info = parse_stack()
-uai_config = Config("uai_partners")
+b2b_config = Config("b2b_partners")
 
 # Base AWS configuration
 aws_config = AWSBase(
     tags={
         "OU": "operations",
         "Environment": stack_info.env_suffix,
-        "Application": "uai-partners-storage",
+        "Application": "b2b-partners-storage",
     }
 )
 
 # Parse partner configurations from Pulumi config
-partners_config = uai_config.require_object("partners")
+partners_config = b2b_config.require_object("partners")
 
 # Create SFTP user configurations for each partner
 sftp_users = [
@@ -53,9 +53,9 @@ sftp_users = [
 ]
 
 # Create SFTP server with S3 backend
-bucket_name = f"ol-uai-partners-storage-{stack_info.env_suffix}"
+bucket_name = f"ol-b2b-partners-storage-{stack_info.env_suffix}"
 sftp_server_config = SFTPServerConfig(
-    server_name=f"uai-partners-sftp-{stack_info.env_suffix}",
+    server_name=f"b2b-partners-sftp-{stack_info.env_suffix}",
     bucket_name=bucket_name,
     users=sftp_users,
     tags=aws_config.tags,

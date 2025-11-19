@@ -1,13 +1,13 @@
-# UAI Partners Storage
+# B2B Partners Storage
 
 ## Overview
 
-This project enables Universal AI partners to consume data via S3 directly or through an SFTP server. Each partner has isolated access to their own S3 prefix.
+This project enables B2B partners to consume data via S3 directly or through an SFTP server. Each partner has isolated access to their own S3 prefix.
 
 ## Architecture
 
 ### Resources Created
-- **S3 Bucket**: Named `ol-uai-partners-storage-{environment}` with versioning enabled
+- **S3 Bucket**: Named `ol-b2b-partners-storage-{environment}` with versioning enabled
 - **SFTP Server**: AWS Transfer Family server with SERVICE_MANAGED identity provider
 - **IAM Roles**: Per-partner IAM roles with scoped S3 permissions
 - **Partner Directories**: Each partner gets an S3 prefix: `/{bucket}/{username}/`
@@ -37,17 +37,17 @@ This project enables Universal AI partners to consume data via S3 directly or th
    Partner IAM User → Partner IAM Policy → MIT Bucket Policy → S3 Objects
    ```
 
-See [Partner Setup Guide](../../../../docs/uai_partners_storage_partner_setup.md) for detailed partner-side configuration.
+See [Partner Setup Guide](../../../../docs/b2b_partners_storage_partner_setup.md) for detailed partner-side configuration.
 
 ## Configuration
 
 ### Adding Partners
 
-Edit the appropriate stack configuration file (`Pulumi.applications.uai_partners_storage.{Environment}.yaml`):
+Edit the appropriate stack configuration file (`Pulumi.applications.b2b_partners_storage.{Environment}.yaml`):
 
 ```yaml
 config:
-  uai_partners:partners:
+  b2b_partners:partners:
     - name: partner1
       username: partner1_user
       aws_account_id: "123456789012"
@@ -77,14 +77,14 @@ Remove the partner entry from the configuration and run `pulumi up`. The SFTP us
 
 ### Initialize Stack (First Time)
 ```bash
-cd src/ol_infrastructure/applications/uai_partners_storage
-pulumi stack init applications.uai_partners_storage.QA
+cd src/ol_infrastructure/applications/b2b_partners_storage
+pulumi stack init applications.b2b_partners_storage.QA
 ```
 
 ### Deploy Changes
 ```bash
-cd src/ol_infrastructure/applications/uai_partners_storage
-pulumi stack select applications.uai_partners_storage.QA
+cd src/ol_infrastructure/applications/b2b_partners_storage
+pulumi stack select applications.b2b_partners_storage.QA
 pulumi up
 ```
 
@@ -125,13 +125,13 @@ The bucket policy grants access to partner AWS account roots:
 #### Partner Side (Required)
 Partners must create an IAM policy in their own AWS account and attach it to users/roles:
 
-**See [Partner Setup Guide](../../../../docs/uai_partners_storage_partner_setup.md)** for complete instructions and IAM policy templates.
+**See [Partner Setup Guide](../../../../docs/b2b_partners_storage_partner_setup.md)** for complete instructions and IAM policy templates.
 
 **Quick Test**:
 ```bash
 # From partner AWS account
-aws s3 ls s3://ol-uai-partners-storage-{environment}/{username}/
-aws s3 cp s3://ol-uai-partners-storage-{environment}/{username}/file.txt ./
+aws s3 ls s3://ol-b2b-partners-storage-{environment}/{username}/
+aws s3 cp s3://ol-b2b-partners-storage-{environment}/{username}/file.txt ./
 ```
 
 **Troubleshooting**:

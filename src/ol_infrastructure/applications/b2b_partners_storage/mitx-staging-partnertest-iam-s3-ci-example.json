@@ -5,12 +5,12 @@
         "Sid": "ListMITBucketWithPrefix",
         "Effect": "Allow",
         "Action": "s3:ListBucket",
-        "Resource": "arn:aws:s3:::ol-uai-partners-storage-ci",
+        "Resource": "arn:aws:s3:::ol-b2b-partners-storage-ci",
         "Condition": {
           "StringLike": {
             "s3:prefix": [
-              "uaitestpartner1/*",
-              "uaitestpartner1"
+              "b2btestpartner1/*",
+              "b2btestpartner1"
             ]
           }
         }
@@ -24,7 +24,7 @@
           "s3:GetObjectTagging",
           "s3:GetObjectVersionTagging"
         ],
-        "Resource": "arn:aws:s3:::ol-uai-partners-storage-ci/uaitestpartner1/*"
+        "Resource": "arn:aws:s3:::ol-b2b-partners-storage-ci/b2btestpartner1/*"
       }
     ]
 }

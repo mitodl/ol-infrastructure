@@ -1,6 +1,0 @@
----
-name: ol-infrastructure-UAIPartnersStorage-application
-runtime: python
-description: S3/SFTP Storage For UAI Partners
-backend:
-  url: s3://mitol-pulumi-state/

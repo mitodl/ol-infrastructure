@@ -2,9 +2,9 @@
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHjZAY5LtmRWGljev0oiDGn0jR5cRwD4IVXCn50TW5i0qQGmJu45HP7YhOTLaofWsVeLAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMbQ49MEzDxkdhTCwwAgEQgDsoVYbYpViDtMot2Ebw2zdD7CY4j8ykJJeMJMEGOpOqc+9GW8r0yOmoVGtkq+Z/mOvwRuOW6Y9xUP7tNQ==
 config:
-  uai_partners:partners:
-  - name: "UAI Test Partner 1"
-    username: uaitestpartner1
+  b2b_partners:partners:
+  - name: "B2B Test Partner 1"
+    username: b2btestpartner1
     aws_account_id: "713545616749"   # Partner's AWS account ID for cross-account S3 access
     ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINEE3btBObBRVXPPA0mIDC1R+wlIy+1KSOcxjAU/+3dL\
       \ feoh@prometheus"
