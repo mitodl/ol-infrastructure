@@ -64,7 +64,7 @@ openedx_release = (
 
 k8s_global_labels = K8sGlobalLabels(
     service=Services.codejail,
-    ou=BusinessUnit(stack_info.env_prefix),
+    ou=BusinessUnit(codejail_config.require("business_unit")),
     stack=stack_info,
 ).model_dump()
 
