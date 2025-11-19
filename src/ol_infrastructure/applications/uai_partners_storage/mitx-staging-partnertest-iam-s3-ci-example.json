@@ -10,7 +10,7 @@
           "StringLike": {
             "s3:prefix": [
               "uaitestpartner1/*",
-	      "uaitestpartner1"
+              "uaitestpartner1"
             ]
           }
         }
