@@ -26,6 +26,7 @@ config:
   - "kubewatch"
   - "open-metadata"
   - "qdrant"
+  - "starrocks"
   - "superset"
   eks:nodegroups:
     worker-xlarge:
