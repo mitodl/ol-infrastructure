@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-UAIPartnersStoraged-application
+name: ol-infrastructure-UAIPartnersStorage-application
 runtime: python
 description: S3/SFTP Storage For UAI Partners
 backend:
