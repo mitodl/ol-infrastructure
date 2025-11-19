@@ -323,6 +323,7 @@ def setup_aws_integrations(
             version=versions["AWS_LOAD_BALANCER_CONTROLLER_CHART"],
             namespace="kube-system",
             cleanup_on_fail=True,
+            timeout=600,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 repo="https://aws.github.io/eks-charts",
             ),
