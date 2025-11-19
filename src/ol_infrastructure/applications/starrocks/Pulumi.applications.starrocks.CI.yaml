@@ -1,0 +1,7 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagE98/AcVuZYFrvssgrUMKxnAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMQL4gwDdQmhst3Db1AgEQgDvJjcAUXmbNIex0rkn7tft19foLBWZYBR6I6PjApIn0WgqpeS366GjOvBvIl4EJHHyM40Pr3OLfWcO6Zw==
+config:
+  aws:region: us-east-1
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
