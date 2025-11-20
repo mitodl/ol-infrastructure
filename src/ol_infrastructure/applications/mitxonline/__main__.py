@@ -81,7 +81,8 @@ setup_vault_provider(skip_child_token=True)
 
 mitxonline_config = Config("mitxonline")
 vault_config = Config("vault")
-
+apisix_ingress_class = mitxonline_config.get("apisix_ingress_class") or "apisix"
+slack_channel = mitxonline_config.get("slack_channel")  # Optional Slack channel
 fastly_provider = get_fastly_provider()
 
 stack_info = parse_stack()
@@ -544,6 +545,7 @@ mitxonline_k8s_app = OLApplicationK8s(
         ],
         resource_requests={"cpu": "250m", "memory": "1500Mi"},
         resource_limits={"memory": "1500Mi"},
+        slack_channel=slack_channel,
         hpa_scaling_metrics=[
             kubernetes.autoscaling.v2.MetricSpecArgs(
                 type="Resource",

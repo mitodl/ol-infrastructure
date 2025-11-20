@@ -63,3 +63,4 @@ config:
     secure: v1:N1ZyKKPiMa/DaKYH:Y8NIcmgFnBBjTIUkT6PeefRnINIjVI/MMmX8IXKfxF5bLfMjRT/6dG8eYwMtHFSRMn+Kb1ZEJod3oqiSeMdeidttL4LPKK0=
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
+  mitxonline:slack_channel: "mit-x-online-releases"

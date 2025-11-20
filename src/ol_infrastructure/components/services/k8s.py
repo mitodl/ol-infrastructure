@@ -83,6 +83,7 @@ class OLApplicationK8sConfig(BaseModel):
     application_cmd_array: list[str] | None = None
     application_arg_array: list[str] | None = None
     deployment_notifications: bool = False
+    slack_channel: str | None = None  # Slack channel for deployment notifications
     vault_k8s_resource_auth_name: str
     registry: Literal["dockerhub", "ecr"] = "ecr"
     image_pull_policy: str = "IfNotPresent"
@@ -443,6 +444,12 @@ class OLApplicationK8s(ComponentResource):
         # Add deployment notification label if enabled
         if ol_app_k8s_config.deployment_notifications:
             application_labels["ol.mit.edu/notify-deployments"] = "true"
+
+        # Add Slack channel label if specified
+        if ol_app_k8s_config.slack_channel:
+            application_labels["ol.mit.edu/slack-channel"] = (
+                ol_app_k8s_config.slack_channel
+            )
 
         pod_spec_args = {}
         if ol_app_k8s_config.application_deployment_use_anti_affinity:
@@ -850,6 +857,12 @@ class OLApplicationK8s(ComponentResource):
                 # Every type of worker needs a unique set of labels or the pod selectors will break.
                 "ol.mit.edu/worker-name": celery_worker_config.queue_name,
             }
+
+            # Add Slack channel label if specified
+            if ol_app_k8s_config.slack_channel:
+                celery_labels["ol.mit.edu/slack-channel"] = (
+                    ol_app_k8s_config.slack_channel
+                )
 
             _celery_deployment_name = truncate_k8s_metanames(
                 f"{ol_app_k8s_config.application_name}-{celery_worker_config.queue_name}-celery-worker".replace(
