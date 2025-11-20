@@ -194,10 +194,9 @@ def setup_traefik(
                 "resources": {
                     "requests": {
                         "cpu": "100m",
-                        "memory": "50Mi",
+                        "memory": "150Mi",
                     },
                     "limits": {
-                        "cpu": "300m",
                         "memory": "150Mi",
                     },
                 },

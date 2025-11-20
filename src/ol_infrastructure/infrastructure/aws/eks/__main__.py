@@ -923,12 +923,11 @@ metrics_server_release = kubernetes.helm.v3.Release(
             "tolerations": operations_tolerations,
             "resources": {
                 "requests": {
-                    "memory": "50Mi",
-                    "cpu": "50m",
+                    "memory": "100Mi",
+                    "cpu": "25m",
                 },
                 "limits": {
                     "memory": "100Mi",
-                    "cpu": "100m",
                 },
             },
         },

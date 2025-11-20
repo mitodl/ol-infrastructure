@@ -114,8 +114,7 @@ def setup_apisix(
                         "memory": "400Mi",
                     },
                     "limits": {
-                        "cpu": "500m",
-                        "memory": "1000Mi",
+                        "memory": "400Mi",
                     },
                 },
                 # --- Service (LoadBalancer) ---
@@ -294,10 +293,9 @@ def setup_apisix(
                         "resources": {
                             "requests": {
                                 "cpu": "50m",
-                                "memory": "50Mi",
+                                "memory": "256Mi",
                             },
                             "limits": {
-                                "cpu": "50m",
                                 "memory": "256Mi",
                             },
                         },

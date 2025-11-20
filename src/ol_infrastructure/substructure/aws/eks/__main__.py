@@ -350,12 +350,11 @@ if cluster_stack.require_output("has_ebs_storage"):
                 },
                 "resources": {
                     "requests": {
-                        "cpu": "100m",
+                        "cpu": "10m",
                         "memory": "100Mi",
                     },
                     "limits": {
-                        "cpu": "200m",
-                        "memory": "256Mi",
+                        "memory": "100Mi",
                     },
                 },
             },
@@ -701,7 +700,27 @@ nvidia_k8s_device_plugin_release = kubernetes.helm.v3.Release(
                 "enabled": True,
             },
             "nfd": {
+                "master": {
+                    "resources": {
+                        "requests": {
+                            "cpu": "10m",
+                            "memory": "100Mi",
+                        },
+                        "limits": {
+                            "memory": "100Mi",
+                        },
+                    },
+                },
                 "worker": {
+                    "resources": {
+                        "requests": {
+                            "cpu": "5m",
+                            "memory": "20Mi",
+                        },
+                        "limits": {
+                            "memory": "20Mi",
+                        },
+                    },
                     "tolerations": [
                         {
                             "key": "ol.mit.edu/gpu_node",
@@ -709,7 +728,7 @@ nvidia_k8s_device_plugin_release = kubernetes.helm.v3.Release(
                             "value": "true",
                             "effect": "NoSchedule",
                         },
-                    ]
+                    ],
                 },
             },
             "config": {
@@ -719,12 +738,11 @@ nvidia_k8s_device_plugin_release = kubernetes.helm.v3.Release(
             },
             "resources": {
                 "requests": {
-                    "cpu": "100m",
+                    "cpu": "10m",
                     "memory": "100Mi",
                 },
                 "limits": {
-                    "cpu": "200m",
-                    "memory": "200Mi",
+                    "memory": "100Mi",
                 },
             },
         },
@@ -757,6 +775,15 @@ nvidia_dcgm_exporter_release = kubernetes.helm.v3.Release(
                     "effect": "NoSchedule",
                 }
             ],
+            "resources": {
+                "requests": {
+                    "cpu": "10m",
+                    "memory": "512Mi",
+                },
+                "limits": {
+                    "memory": "512Mi",
+                },
+            },
             "nodeSelector": {
                 "ol.mit.edu/gpu_node": "true",
             },

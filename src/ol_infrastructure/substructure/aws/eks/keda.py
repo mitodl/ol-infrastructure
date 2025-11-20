@@ -96,32 +96,29 @@ def setup_keda(
                 "resources": {
                     "operator": {
                         "requests": {
-                            "cpu": "100m",
-                            "memory": "200Mi",
+                            "cpu": "10m",
+                            "memory": "400Mi",
                         },
                         "limits": {
-                            "cpu": "200m",
                             "memory": "400Mi",
                         },
                     },
                     "metricServer": {
                         "requests": {
-                            "cpu": "100m",
+                            "cpu": "10m",
                             "memory": "100Mi",
                         },
                         "limits": {
-                            "cpu": "200m",
-                            "memory": "200Mi",
+                            "memory": "100Mi",
                         },
                     },
                     "webhooks": {
                         "requests": {
-                            "cpu": "100m",
-                            "memory": "100Mi",
+                            "cpu": "10m",
+                            "memory": "40Mi",
                         },
                         "limits": {
-                            "cpu": "200m",
-                            "memory": "200Mi",
+                            "memory": "40Mi",
                         },
                     },
                 },
