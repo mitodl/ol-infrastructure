@@ -547,7 +547,8 @@ jupyterhub_application = kubernetes.helm.v3.Release(
                 },
                 "extraEnv": {
                     # This is the modern UI experience
-                    "JUPYTERHUB_SINGLEUSER_APP": "jupyter_server.serverapp.ServerApp"
+                    "JUPYTERHUB_SINGLEUSER_APP": "jupyter_server.serverapp.ServerApp",
+                    "NOTEBOOK_BUCKET": jupyterhub_course_bucket_name,
                 },
                 "cloudMetadata": {
                     "blockWithIptables": False,  # this should really be true but it isn't working right now

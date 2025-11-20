@@ -136,6 +136,12 @@ courses = [
         repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.PM.1-1T2026",
         image_name="uai_source-uai.pm1",
     ),
+    CourseImageInfo(
+        course_name="base_authoring_image",
+        s3_bucket="jupyter-courses-ci",
+        s3_object_path="base_author/base_authoring_image.tar.gz",
+        image_name="base_authoring_image",
+    ),
 ]
 
 # This infers the ECR url from the AWS account,
