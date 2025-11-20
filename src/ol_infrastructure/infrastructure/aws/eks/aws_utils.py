@@ -330,6 +330,7 @@ def setup_aws_integrations(
             values={
                 "clusterName": cluster_name,
                 "enableCertManager": True,
+                "keepTLSSecret": False,
                 "serviceAccount": {
                     "create": False,
                     "name": aws_lb_controller_service_account_name,
