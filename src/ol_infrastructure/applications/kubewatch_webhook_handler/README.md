@@ -8,6 +8,7 @@ This Pulumi project builds and deploys a webhook handler service that:
 - Receives webhook events from kubewatch
 - Queries Kubernetes API for detailed deployment information
 - Formats rich Slack messages with Block Kit
+- Routes notifications to different Slack channels based on deployment labels
 - Posts enhanced notifications to Slack
 
 ## What It Provides
@@ -27,6 +28,35 @@ You get detailed notifications with:
 - **Container Image**: Current image being deployed
 - **Progress Messages**: Details from Kubernetes conditions
 
+### Dynamic Slack Channel Routing
+
+**NEW:** Route notifications to different Slack channels based on deployment labels!
+
+Add the `ol.mit.edu/slack-channel` label to your deployment to send notifications to a specific channel:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: mitlearn
+  labels:
+    ol.mit.edu/application: my-app
+    ol.mit.edu/slack-channel: "team-alpha-alerts"  # Route to this channel
+spec:
+  # ... deployment spec
+```
+
+**Features:**
+- Deployments without the label use the default channel
+- Invalid or missing channels automatically fall back to default
+- No configuration changes required - just add the label
+- Supports both channel names (`#my-channel`) and IDs (`C1234567890`)
+
+**Requirements:**
+- Slack bot must be invited to target channels
+- Channel names should not include the `#` prefix (automatically handled by Slack)
+
 ### Example Slack Message
 
 ```
@@ -40,7 +70,7 @@ Image: .../mitodl/mitlearn-app:latest
 Labels:
   • ol.mit.edu/application: mitlearn-app
   • ol.mit.edu/process: webapp
-  • ol.mit.edu/notify-deployments: true
+  • ol.mit.edu/slack-channel: team-alpha-alerts
 
 ReplicaSet "mitlearn-app-7b9c7875c9" has successfully progressed.
 ```
