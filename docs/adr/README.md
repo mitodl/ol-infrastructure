@@ -160,6 +160,7 @@ graph LR
 |-----|-------|--------|------|
 | [0001](0001-use-adr-for-architecture-decisions.md) | Use ADR for Architecture Decisions | Accepted | 2025-10-29 |
 | [0002](0002-migrate-to-gateway-api-httproute.md) | Migrate to Gateway API HTTPRoute | Proposed | 2025-10-29 |
+| [0003](0003-label-based-slack-channel-routing-for-kubewatch.md) | Label-Based Slack Channel Routing for Kubewatch | Proposed | 2025-11-20 |
 
 ## Creating a New ADR
 
