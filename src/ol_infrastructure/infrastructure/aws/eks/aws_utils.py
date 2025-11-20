@@ -343,12 +343,11 @@ def setup_aws_integrations(
                 "tolerations": operations_tolerations,
                 "resources": {
                     "requests": {
-                        "cpu": "100m",
+                        "cpu": "25m",
                         "memory": "128Mi",
                     },
                     "limits": {
-                        "cpu": "200m",
-                        "memory": "256Mi",
+                        "memory": "128Mi",
                     },
                 },
             },

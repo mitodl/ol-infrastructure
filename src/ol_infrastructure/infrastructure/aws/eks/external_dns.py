@@ -160,8 +160,7 @@ def setup_external_dns(
                         "cpu": "10m",
                     },
                     "limits": {
-                        "memory": "128Mi",
-                        "cpu": "50m",
+                        "memory": "64Mi",
                     },
                 },
             },
