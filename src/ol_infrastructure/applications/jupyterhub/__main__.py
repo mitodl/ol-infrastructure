@@ -109,7 +109,10 @@ jupyter_course_bucket_config = S3BucketConfig(
                     )
                 ],
                 actions=["s3:*"],
-                resources=[f"arn:aws:s3:::{jupyterhub_course_bucket_name}/*"],
+                resources=[
+                    f"arn:aws:s3:::{jupyterhub_course_bucket_name}/*",
+                    f"arn:aws:s3:::{jupyterhub_course_bucket_name}",
+                ],
             )
         ]
     ).json,
