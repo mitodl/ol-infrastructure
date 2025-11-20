@@ -317,6 +317,7 @@ COURSE_NAMES = [
     "deep_learning_foundations_and_applications",
     "supervised_learning_fundamentals",
     "introduction_to_data_analytics_and_machine_learning",
+    "base_authoring_image",
 ]
 COURSE_NAMES.extend(
     [
