@@ -5,3 +5,5 @@ config:
   aws:region: us-east-1
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
+  starrocks:root_password:
+    secure: v1:w7XB0bIL9sTAauXL:Iq4pX5ZCeISL7XkB+aTI5YsyncAt3C4ZVJVbjJHCuTZhhTviyOI7oE9HEu+oVGGTFHh7snFElkqQflrGPCeUfcb8uHaJ5j+z3DLYbGNfCNE=
