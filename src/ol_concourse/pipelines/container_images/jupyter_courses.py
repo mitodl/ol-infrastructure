@@ -139,7 +139,7 @@ courses = [
     CourseImageInfo(
         course_name="base_authoring_image",
         s3_bucket="jupyter-courses-ci",
-        s3_object_path="base_author/base_authoring_image.tar.gz",
+        s3_object_path="ol-jupyter-courses/7f5202889ff1484188d628ef7f041383/base_authoring_image.tar.gz",
         image_name="base_authoring_image",
     ),
 ]
