@@ -139,7 +139,10 @@ kubewatch_application = kubernetes.helm.v3.Release(
                 "runAsUser": "",
                 "runAsNonRoot": "",
             },
-            "resources": {"limits": {}, "requests": {}},
+            "resources": {
+                "requests": {"cpu": "10m", "memory": "768Mi"},
+                "limits": {"memory": "768Mi"},
+            },
             "startupProbe": {
                 "enabled": False,
                 "initialDelaySeconds": 10,
