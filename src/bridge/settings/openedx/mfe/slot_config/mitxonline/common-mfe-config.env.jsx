@@ -471,6 +471,12 @@ const addSecondaryMenuSlotOverride = (config) => {
 }
 
 const addEnvOverrides = (config) => {
+  if (CURRENT_MFE_APP_ID === AUTHORING_APP_ID) {
+    config = {
+      ...config,
+      LOGO_URL: process.env.LOGO_URL.replace(/logo\.svg$/, 'old-logo.svg'),
+    }
+  }
   if (isLearnCourse()) {
     return {
       ...config,
