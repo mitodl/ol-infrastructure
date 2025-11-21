@@ -272,6 +272,7 @@ def create_k8s_configmaps(
                 SOCIAL_AUTH_EDX_OAUTH2_URL_ROOT: https://{edxapp_config.require_object("domains")["lms"]}
                 SOCIAL_AUTH_EDX_OAUTH2_PUBLIC_URL_ROOT: https://{edxapp_config.require_object("domains")["lms"]}
                 SESSION_COOKIE_NAME: {env_name}-edx-studio-sessionid
+                GITHUB_ORG_API_URL: {edxapp_config.require("github_org_api_url")}
             """)
         },
         opts=ResourceOptions(delete_before_replace=True),
