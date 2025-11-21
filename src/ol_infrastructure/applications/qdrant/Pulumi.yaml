@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-qdrant-application
+runtime: python
+description: MIT OL Qdrant Service
+backend:
+  url: s3://mitol-pulumi-state/
