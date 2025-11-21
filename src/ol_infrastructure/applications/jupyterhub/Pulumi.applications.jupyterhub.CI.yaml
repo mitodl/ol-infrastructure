@@ -13,6 +13,7 @@ config:
     menu_override_file: menu_override.json
     disabled_extension_file: disabled_extensions.json
     extra_config_file: dynamicImageConfig.py
+    enable_image_prepuller: true
   - name: jupyterhub-authoring
     domain: authoring.nb.ci.learn.mit.edu
     namespace: jupyterhub-authoring
@@ -23,6 +24,7 @@ config:
     menu_override_file: author_menu_override.json
     disabled_extension_file: author_disabled_extensions.json
     extra_config_file: dynamicImageConfig.py
+    enable_image_prepuller: false
   jupyterhub:target_vpc: "applications_vpc"
   jupyterhub:business_unit: "mit-learn"
   aws:region: us-east-1
