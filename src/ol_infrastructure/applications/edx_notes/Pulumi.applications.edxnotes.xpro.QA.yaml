@@ -12,6 +12,7 @@ config:
   edxnotes:business_unit: mitxpro
   edxnotes:dns_zone: xpro
   edxnotes:domain: xpro-notes-qa.xpro.mit.edu
+  edxnotes:deploy_to_k8s: true
   edxnotes:target_vpc: xpro_vpc
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
