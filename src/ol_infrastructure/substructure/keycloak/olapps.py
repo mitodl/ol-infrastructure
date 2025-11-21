@@ -7,7 +7,6 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
-from bridge.lib.magic_numbers import SECONDS_IN_ONE_DAY
 from ol_infrastructure.substructure.keycloak.org_flows import (
     create_organization_browser_flows,
     create_organization_first_broker_login_flows,
@@ -116,7 +115,6 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         "realmEvents",
         realm_id=ol_apps_realm.realm,
         events_enabled=True,
-        events_expiration=SECONDS_IN_ONE_DAY,
         admin_events_enabled=True,
         admin_events_details_enabled=True,
         events_listeners=["jboss-logging"],
