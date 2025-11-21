@@ -231,12 +231,11 @@ webhook_deployment = kubernetes.apps.v1.Deployment(
                         ],
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(
                             requests={
-                                "cpu": "100m",
-                                "memory": "128Mi",
+                                "cpu": "10m",
+                                "memory": "200Mi",
                             },
                             limits={
-                                "cpu": "500m",
-                                "memory": "512Mi",
+                                "memory": "200Mi",
                             },
                         ),
                         liveness_probe=kubernetes.core.v1.ProbeArgs(
