@@ -978,8 +978,6 @@ env_vars = {
     "CORS_ALLOWED_ORIGIN_REGEXES": "['^.+ocw-next.netlify.app$']",
     "CSAIL_BASE_URL": "https://cap.csail.mit.edu/",
     "CSRF_COOKIE_DOMAIN": f".{mitlearn_config.get('frontend_domain')}",
-    "DEFAULT_SEARCH_MAX_INCOMPLETENESS_PENALTY": 0,
-    "DEFAULT_SEARCH_STALENESS_PENALTY": 0,
     "EDX_API_ACCESS_TOKEN_URL": "https://api.edx.org/oauth2/v1/access_token",
     "EDX_API_URL": "https://api.edx.org/catalog/v1/catalogs/10/courses",
     "EDX_PROGRAMS_API_URL": "https://discovery.edx.org/api/v1/programs/",
