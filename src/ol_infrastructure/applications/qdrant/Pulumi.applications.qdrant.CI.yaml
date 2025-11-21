@@ -9,12 +9,6 @@ config:
   qdrant:persistence_size: 200Gi
   qdrant:snapshot_size: 200Gi
   qdrant:snapshot_enabled: true
-  qdrant:cluster_enabled: true
-  qdrant:service_type: NodePort
   qdrant:enable_topology_spread: true
   qdrant:pod_disruption_budget_enabled: true
   qdrant:pod_disruption_budget_max_unavailable: 1
-  qdrant:cpu_request: 2000m
-  qdrant:cpu_limit: 3000m
-  qdrant:memory_request: 4Gi
-  qdrant:memory_limit: 12Gi
