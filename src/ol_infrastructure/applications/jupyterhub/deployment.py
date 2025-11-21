@@ -10,6 +10,9 @@ from pulumi import Config, ResourceOptions, StackReference
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.lib.versions import JUPYTERHUB_CHART_VERSION
+from ol_infrastructure.applications.jupyterhub.values import (
+    get_prepuller_config_with_images,
+)
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -50,7 +53,6 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     disabled_extensions_json: str | None = None,
     extra_config: str | None = None,
 ) -> kubernetes.helm.v3.Release:
-
     base_name = jupyterhub_deployment_config["name"]
     domain_name = jupyterhub_deployment_config["domain"]
     namespace = jupyterhub_deployment_config["namespace"]
@@ -221,6 +223,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     extra_images_list = extra_images or {}
     admin_users_list = jupyterhub_deployment_config.get("admin_users", [])
     allowed_users_list = jupyterhub_deployment_config.get("allowed_users", [])
+    enable_prepuller = jupyterhub_deployment_config.get("enable_prepuller", True)
     return kubernetes.helm.v3.Release(
         f"{base_name}-{env_name.upper()}-application-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
@@ -330,25 +333,10 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                         },
                     },
                 },
-                "prePuller": {
-                    "continuous": {
-                        "enabled": True,
-                    },
-                    "hook": {
-                        "enabled": False,
-                    },
-                    "extraImages": extra_images_list,
-                    "resources": {
-                        "requests": {
-                            "cpu": "10m",
-                            "memory": "128Mi",
-                        },
-                        "limits": {
-                            "cpu": "100m",
-                            "memory": "512Mi",
-                        },
-                    },
-                },
+                # Consider keying off extra_images, it's only used for this
+                "prePuller": get_prepuller_config_with_images(extra_images_list)
+                if enable_prepuller
+                else {},
                 "singleuser": {
                     "extraFiles": {
                         "menu_override": {
