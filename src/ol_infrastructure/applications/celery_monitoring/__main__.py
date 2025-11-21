@@ -194,6 +194,7 @@ celery_monitoring_auth_binding = OLEKSAuthBinding(
         vault_policy_path=Path(__file__).parent.joinpath(
             "celery_monitoring_server_policy.hcl"
         ),
+        cluster_name=cluster_stack.require_output("cluster_name"),
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
         irsa_service_account_name="celery-monitoring",

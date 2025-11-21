@@ -360,6 +360,7 @@ dagster_auth_binding = OLEKSAuthBinding(
         aws_config=aws_config,
         iam_policy_document=dagster_iam_policy_document,
         vault_policy_path=Path(__file__).parent.joinpath("dagster_server_policy.hcl"),
+        cluster_name=cluster_stack.require_output("cluster_name"),
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
         irsa_service_account_name=["dagster", "dagster-user-code"],

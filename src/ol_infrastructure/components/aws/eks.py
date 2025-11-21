@@ -362,19 +362,21 @@ class OLEKSTrustRole(pulumi.ComponentResource):
                 for sa_name in service_account_names
             ]
 
-        self.role = aws.iam.Role(
-            f"{role_config.cluster_name}-{role_config.role_name}-trust-role",
-            name=f"{role_config.cluster_name}-{role_config.role_name}-trust-role"[:63],
-            path=f"/ol-infrastructure/eks/{role_config.cluster_name}/",
-            assume_role_policy=role_config.cluster_identities.apply(
-                lambda ids: oidc_trust_policy_template(
-                    oidc_identifier=ids[0]["oidcs"][0]["issuer"],
-                    account_id=str(role_config.account_id),
-                    k8s_service_account_identifier=service_account_identifiers,
-                    operator=role_config.policy_operator,
-                )
-            ),
-            description=role_config.description,
-            tags=role_config.tags,
-            opts=pulumi.ResourceOptions(parent=self).merge(opts),
+        self.role = pulumi.Output.from_input(role_config.cluster_name).apply(
+            lambda cluster_name: aws.iam.Role(
+                f"{cluster_name}-{role_config.role_name}-trust-role",
+                name=f"{cluster_name}-{role_config.role_name}-trust-role"[:63],
+                path=f"/ol-infrastructure/eks/{cluster_name}/",
+                assume_role_policy=role_config.cluster_identities.apply(
+                    lambda ids: oidc_trust_policy_template(
+                        oidc_identifier=ids[0]["oidcs"][0]["issuer"],
+                        account_id=str(role_config.account_id),
+                        k8s_service_account_identifier=service_account_identifiers,
+                        operator=role_config.policy_operator,
+                    )
+                ),
+                description=role_config.description,
+                tags=role_config.tags,
+                opts=pulumi.ResourceOptions(parent=self).merge(opts),
+            )
         )

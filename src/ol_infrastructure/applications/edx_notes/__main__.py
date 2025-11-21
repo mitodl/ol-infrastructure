@@ -255,16 +255,17 @@ if deploy_to_k8s:
     # EDX Notes doesn't need AWS service access (no S3, SES, etc.)
     notes_app = OLEKSAuthBinding(
         OLEKSAuthBindingConfig(
-            application_name="edx-notes",
+            application_name=f"edx-notes-{stack_info.env_prefix}",
             namespace=namespace,
             stack_info=stack_info,
             aws_config=aws_config,
             iam_policy_document=None,
             vault_policy_text=vault_policy_text,
+            cluster_name=cluster_stack.require_output("cluster_name"),
             cluster_identities=cluster_stack.require_output("cluster_identities"),
             vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
             irsa_service_account_name="edx-notes",
-            vault_sync_service_account_names="edx-notes-vault",
+            vault_sync_service_account_names=f"edx-notes-{stack_info.env_prefix}-vault",
             k8s_labels=k8s_global_labels,
         )
     )
