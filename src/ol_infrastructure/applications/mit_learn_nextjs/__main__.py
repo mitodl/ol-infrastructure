@@ -232,7 +232,7 @@ mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
                             image_pull_policy="Always",
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={"cpu": "1000m", "memory": "8Gi"},
-                                limits={"cpu": "3000m", "memory": "8Gi"},
+                                limits={"memory": "8Gi"},
                             ),
                         ),
                     ],
@@ -317,8 +317,8 @@ def create_deployment_for_color(color: str) -> kubernetes.apps.v1.Deployment:
                             ],
                             image_pull_policy="Always",
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                                requests={"cpu": "250m", "memory": "500Mi"},
-                                limits={"cpu": "1000m", "memory": "2Gi"},
+                                requests={"cpu": "100m", "memory": "1Gi"},
+                                limits={"memory": "1Gi"},
                             ),
                             env=env_vars,
                             volume_mounts=[volume_mount],

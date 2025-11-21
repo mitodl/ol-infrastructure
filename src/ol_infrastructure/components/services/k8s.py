@@ -46,9 +46,9 @@ class OLApplicationK8sCeleryWorkerConfig(BaseModel):
         "INFO"
     )
     queues: list[str] = ["default"]
-    resource_requests: dict[str, str] = Field(default={"cpu": "500m", "memory": "1Gi"})
+    resource_requests: dict[str, str] = Field(default={"cpu": "250m", "memory": "2Gi"})
     resource_limits: dict[str, str] = Field(
-        default={"cpu": "2000m", "memory": "8Gi"},
+        default={"memory": "2Gi"},
     )
     min_replicas: NonNegativeInt = 1
     max_replicas: NonNegativeInt = 10
@@ -104,7 +104,7 @@ class OLApplicationK8sConfig(BaseModel):
                 name="memory",  # Memory utilization as the scaling metric
                 target=kubernetes.autoscaling.v2.MetricTargetArgs(
                     type="Utilization",
-                    average_utilization=60,  # Target memory utilization (60%)
+                    average_utilization=80,  # Target memory utilization (60%)
                 ),
             ),
         ),
@@ -112,12 +112,8 @@ class OLApplicationK8sConfig(BaseModel):
     import_nginx_config: bool = Field(default=True)
     import_nginx_config_path: str = "files/web.conf"
     import_uwsgi_config: bool = Field(default=False)
-    resource_requests: dict[str, str] = Field(
-        default={"cpu": "250m", "memory": "300Mi"}
-    )
-    resource_limits: dict[str, str] = Field(
-        default={"cpu": "2", "memory": "1500Mi"},
-    )
+    resource_requests: dict[str, str] = Field(default={"cpu": "250m", "memory": "1Gi"})
+    resource_limits: dict[str, str] = Field(default={"memory": "1Gi"})
     init_migrations: bool = Field(default=True)
     init_collectstatic: bool = Field(default=True)
     celery_worker_configs: list[OLApplicationK8sCeleryWorkerConfig] = []

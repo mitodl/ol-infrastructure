@@ -365,12 +365,11 @@ if deploy_to_k8s:
         init_migrations=False,  # We're using pre-deploy jobs instead
         init_collectstatic=False,  # EDX Notes doesn't need collectstatic
         resource_requests={
-            "cpu": notes_config.get("cpu_request") or "250m",
-            "memory": notes_config.get("memory_request") or "512Mi",
+            "cpu": "250m",
+            "memory": "512Mi",
         },
         resource_limits={
-            "cpu": notes_config.get("cpu_limit") or "500m",
-            "memory": notes_config.get("memory_limit") or "1Gi",
+            "memory": "512Mi",
         },
         pre_deploy_commands=pre_deploy_commands,
         probe_configs={
