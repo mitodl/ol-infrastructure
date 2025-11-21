@@ -50,28 +50,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     disabled_extensions_json: str | None = None,
     extra_config: str | None = None,
 ) -> kubernetes.helm.v3.Release:
-    """Provision a JupyterHub deployment with all required AWS and Kubernetes resources.
 
-    Args:
-        base_name: Base name for the deployment (e.g., "jupyterhub" or
-            "jupyterhub-authoring"). This name is used to derive all resource
-            names throughout the deployment.
-        domain_name: Domain name for the deployment (e.g., "jupyter.mitlearn.mit.edu")
-        namespace: Kubernetes namespace for the deployment
-        stack_info: Stack information from parse_stack()
-        jupyterhub_deployment_config: Pulumi config for jupyterhub deployment
-        vault_config: Pulumi config for vault
-        cluster_stack: EKS cluster stack reference
-        application_labels: Labels to apply to Kubernetes resources
-        k8s_global_labels: Global Kubernetes labels
-        extra_images: Dictionary mapping image names to image configuration dictionaries (optional)
-        menu_override_json: JSON contents for menu override Jupyter config
-        disabled_extensions_json: JSON contents for disabled extensions Jupyter config
-        extra_config: Extra configuration values to merge into the Helm chart values
-
-    Returns:
-        The JupyterHub Helm release resource
-    """
     base_name = jupyterhub_deployment_config["name"]
     domain_name = jupyterhub_deployment_config["domain"]
     namespace = jupyterhub_deployment_config["namespace"]
