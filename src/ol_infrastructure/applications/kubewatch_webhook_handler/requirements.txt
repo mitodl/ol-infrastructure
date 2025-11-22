@@ -1,4 +1,4 @@
 flask==3.1.2
 kubernetes==34.1.0
-slack-sdk==3.38.0
+slack-sdk==3.39.0
 requests=2.32.5
