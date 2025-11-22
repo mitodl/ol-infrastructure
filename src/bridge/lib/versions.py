@@ -52,7 +52,7 @@ KUBE_STATE_METRICS_CHART_VERSION = "5.1.0"
 # renovate: datasource=docker depName=kubewatch packageName=kubewatch
 KUBEWATCH_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
-TRAEFIK_CHART_VERSION = "37.3.0"
+TRAEFIK_CHART_VERSION = "37.4.0"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
 VANTAGE_K8S_AGENT_CHART_VERSION = "1.2.2"
 # renovate: datasource=helm depName=vault-secrets-operator packageName=vault-secrets-operator registryUrl=https://helm.releases.hashicorp.com
