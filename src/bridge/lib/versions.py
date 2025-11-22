@@ -16,7 +16,7 @@ REDASH_VERSION = "9d273e4"
 TRAEFIK_VERSION = "3.6.2"
 TUTOR_PERMISSIONS_VERSION = "15.3.4"
 # renovate: datasource=github-releases depName=vault packageName=hashicorp/vault
-VAULT_VERSION = "1.21.0"
+VAULT_VERSION = "1.21.1"
 
 # EKS Specific Versions
 # renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/charts
