@@ -302,6 +302,7 @@ def s3_object(
             "bucket": bucket,
             "regexp": object_regex,
             "versioned_file": object_path,
+            "enable_aws_creds_provider": True,
         },
     )
 
