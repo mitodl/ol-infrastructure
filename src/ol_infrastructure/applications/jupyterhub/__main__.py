@@ -412,7 +412,6 @@ jupyterhub_application = kubernetes.helm.v3.Release(
                             "memory": "64Mi",
                         },
                         "limits": {
-                            "cpu": "100m",
                             "memory": "64Mi",
                         },
                     },
@@ -469,7 +468,6 @@ jupyterhub_application = kubernetes.helm.v3.Release(
                         "memory": "256Mi",
                     },
                     "limits": {
-                        "cpu": "100m",
                         "memory": "256Mi",
                     },
                 },
@@ -485,11 +483,10 @@ jupyterhub_application = kubernetes.helm.v3.Release(
                 "resources": {
                     "requests": {
                         "cpu": "10m",
-                        "memory": "128Mi",
+                        "memory": "64Mi",
                     },
                     "limits": {
-                        "cpu": "100m",
-                        "memory": "512Mi",
+                        "memory": "64Mi",
                     },
                 },
             },
@@ -539,11 +536,10 @@ jupyterhub_application = kubernetes.helm.v3.Release(
                     "enabled": False,
                 },
                 "memory": {
-                    "limit": "4G",
-                    "guarantee": "1G",
+                    "limit": "2G",
+                    "guarantee": "2G",
                 },
                 "cpu": {
-                    "limit": 1,
                     "guarantee": 0.25,
                 },
                 "storage": {
