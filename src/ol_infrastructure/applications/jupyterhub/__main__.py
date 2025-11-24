@@ -109,7 +109,10 @@ jupyter_course_bucket_config = S3BucketConfig(
                     )
                 ],
                 actions=["s3:*"],
-                resources=[f"arn:aws:s3:::{jupyterhub_course_bucket_name}/*"],
+                resources=[
+                    f"arn:aws:s3:::{jupyterhub_course_bucket_name}/*",
+                    f"arn:aws:s3:::{jupyterhub_course_bucket_name}",
+                ],
             )
         ]
     ).json,
@@ -314,6 +317,7 @@ COURSE_NAMES = [
     "deep_learning_foundations_and_applications",
     "supervised_learning_fundamentals",
     "introduction_to_data_analytics_and_machine_learning",
+    "base_authoring_image",
 ]
 COURSE_NAMES.extend(
     [
@@ -547,7 +551,8 @@ jupyterhub_application = kubernetes.helm.v3.Release(
                 },
                 "extraEnv": {
                     # This is the modern UI experience
-                    "JUPYTERHUB_SINGLEUSER_APP": "jupyter_server.serverapp.ServerApp"
+                    "JUPYTERHUB_SINGLEUSER_APP": "jupyter_server.serverapp.ServerApp",
+                    "NOTEBOOK_BUCKET": jupyterhub_course_bucket_name,
                 },
                 "cloudMetadata": {
                     "blockWithIptables": False,  # this should really be true but it isn't working right now

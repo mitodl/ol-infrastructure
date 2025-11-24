@@ -19,6 +19,7 @@ KNOWN_COURSES = [
     "deep_learning_foundations_and_applications",
     "supervised_learning_fundamentals",
     "introduction_to_data_analytics_and_machine_learning",
+    "base_authoring_image",
 ]
 # We have notebooks in UAI courses 6-13, excluding 10
 KNOWN_COURSES.extend(
