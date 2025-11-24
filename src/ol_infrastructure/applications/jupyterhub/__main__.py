@@ -196,14 +196,8 @@ jupyterhub_db_config = OLPostgresDBConfig(
 jupyterhub_db = OLAmazonDB(jupyterhub_db_config)
 
 jupyterhub_authoring_role_statements = postgres_role_statements.copy()
-# I don't know if this will work.
-# gexec is psql specific and vault uses a driver.
-# A workaround with dblink_exec was suggested?
-# I definitely dont think this is correct, I dont know how databases
-# and schemas interact in postgres
 jupyterhub_authoring_role_statements["app"] = {
     "create": [
-        # Create
         # Check if the jupyterhub_authoring role exists and create it if not
         Template(
             """SELECT 'CREATE DATABASE "${app_name}"' WHERE NOT EXISTS
