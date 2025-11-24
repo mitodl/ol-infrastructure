@@ -36,6 +36,7 @@ def build_dagster_docker_pipeline() -> Pipeline:
         {"name": "learning_resources", "module": "learning_resources.definitions"},
         {"name": "legacy_openedx", "module": "legacy_openedx.definitions"},
         {"name": "openedx", "module": "openedx.definitions"},
+        {"name": "b2b_organization", "module": "b2b_organization.definitions"},
     ]
 
     # Create git resources for each code location with specific path filters
