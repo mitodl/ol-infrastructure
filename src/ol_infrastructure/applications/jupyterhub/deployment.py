@@ -237,7 +237,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     extra_images_list = extra_images or {}
     admin_users_list = jupyterhub_deployment_config.get("admin_users", [])
     allowed_users_list = jupyterhub_deployment_config.get("allowed_users", [])
-    enable_prepuller = jupyterhub_deployment_config.get("enable_prepuller", True)
+    enable_prepuller = jupyterhub_deployment_config.get("enable_image_prepuller", True)
     return kubernetes.helm.v3.Release(
         f"{base_name}-{env_name.upper()}-application-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
