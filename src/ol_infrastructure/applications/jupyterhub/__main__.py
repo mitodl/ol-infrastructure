@@ -198,6 +198,7 @@ jupyterhub_db = OLAmazonDB(jupyterhub_db_config)
 jupyterhub_authoring_role_statements = postgres_role_statements.copy()
 jupyterhub_authoring_role_statements["app"] = {
     "create": [
+        # Not sure if we need an authoring schema. Is there a reason we shouldn't use public?
         # Check if the jupyterhub_authoring role exists and create it if not
         Template(
             """SELECT 'CREATE DATABASE "${app_name}"' WHERE NOT EXISTS
@@ -224,7 +225,7 @@ jupyterhub_authoring_role_statements["app"] = {
             $$do$$;
             """
         ),
-        # Create the external schema if it doesn't exist already
+        # Create the authoring schema if it doesn't exist already
         Template("""CREATE SCHEMA IF NOT EXISTS authoring;"""),
         # Do grants on to the mitopen in both schemas
         Template(
@@ -237,10 +238,10 @@ jupyterhub_authoring_role_statements["app"] = {
             """
         ),
         Template(
-            """GRANT USAGE ON SCHEMA external TO jupyterhub_authoring WITH GRANT OPTION;"""
+            """GRANT USAGE ON SCHEMA authoring TO jupyterhub_authoring WITH GRANT OPTION;"""
         ),
         Template(
-            """GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA external TO "jupyterhub_authoring";"""
+            """GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA authoring TO "jupyterhub_authoring";"""
         ),
         Template(
             """GRANT CREATE ON DATABASE \"jupyterhub_authoring\" TO jupyterhub_authoring;"""
@@ -252,11 +253,11 @@ jupyterhub_authoring_role_statements["app"] = {
             """
         ),
         Template(
-            """GRANT CREATE ON SCHEMA external TO jupyterhub_authoring WITH GRANT OPTION;"""
+            """GRANT CREATE ON SCHEMA authoring TO jupyterhub_authoring WITH GRANT OPTION;"""
         ),
         Template(
             """
-            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA external TO "jupyterhub_authoring"
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA authoring TO "jupyterhub_authoring"
             WITH GRANT OPTION;
             """
         ),
