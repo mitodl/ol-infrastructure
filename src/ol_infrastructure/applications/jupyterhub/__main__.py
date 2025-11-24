@@ -198,6 +198,8 @@ jupyterhub_authoring_role_statements = postgres_role_statements.copy()
 # I don't know if this will work.
 # gexec is psql specific and vault uses a driver.
 # A workaround with dblink_exec was suggested?
+# I definitely dont think this is correct, I dont know how databases
+# and schemas interact in postgres
 jupyterhub_authoring_role_statements["app"]["create"].append(
     Template(
         r"""SELECT 'CREATE DATABASE "${app_name}"' WHERE NOT EXISTS
