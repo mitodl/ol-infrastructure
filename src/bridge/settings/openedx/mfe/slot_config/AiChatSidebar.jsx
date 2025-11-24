@@ -19,7 +19,7 @@ import messages from '@src/courseware/course/new-sidebar/messages';
  * AiChatSidebar integrates with the existing Notifications/Discussions sidebar slot.
  * It listens for postMessage events (smoot-design::tutor-drawer-open, smoot-design::tutor-drawer-close) and
  * displays the AI chat panel inside the slot.
- * 
+ *
  * The component dynamically loads aiChat.umd.js from /static/smoot-design/aiChat.umd.js
  * and initializes the AI chat interface when triggered via postMessage events.
  */
@@ -523,4 +523,3 @@ const AiChatSidebar = () => {
 };
 
 export default AiChatSidebar;
-
