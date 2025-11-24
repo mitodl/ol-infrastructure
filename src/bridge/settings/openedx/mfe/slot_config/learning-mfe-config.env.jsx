@@ -1,5 +1,3 @@
-import { getConfig } from '@edx/frontend-platform';
-import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
 import { PLUGIN_OPERATIONS, DIRECT_PLUGIN } from '@openedx/frontend-plugin-framework';
 import CourseBreadcrumbs from './src/courseware/course/breadcrumbs';
 import { SequenceNavigation } from './src/courseware/course/sequence/sequence-navigation';
@@ -7,22 +5,7 @@ import { BookmarkButton } from './src/courseware/course/bookmark';
 import messages from './src/courseware/course/sequence/messages';
 import { useIntl } from '@edx/frontend-platform/i18n';
 import config from './common-mfe-config.env.jsx';
-
-import(
-  /**
-   * remoteTutorDrawer is already bundled to include its own version
-   * of React and ReactDOM.
-   *
-   * Add webpackIgnore to avoid bundling it again.
-   */
-  /* webpackIgnore: true */
- "/learn/static/smoot-design/aiDrawerManager.es.js").then(module => {
-   module.init({
-      messageOrigin: getConfig().LMS_BASE_URL,
-      transformBody: messages => ({ message: messages[messages.length - 1].content }),
-      getTrackingClient: getAuthenticatedHttpClient,
-   })
-})
+import AiChatSidebar from './AiChatSidebar.jsx';
 
 let learningMFEConfig = {
     ...config
@@ -133,7 +116,22 @@ if (process.env.DEPLOYMENT_NAME?.includes("mitxonline")) {
             widgetId: 'default_trigger',
           },
         ]
-      }
+      },
+      // Register AiChatSidebar in the notifications/discussions sidebar slot
+      // The component dynamically loads aiChat.umd.js from /static/smoot-design/aiChat.umd.js
+      'org.openedx.frontend.learning.notifications_discussions_sidebar.v1': {
+        keepDefault: true,
+        plugins: [
+          {
+            op: PLUGIN_OPERATIONS.Insert,
+            widget: {
+              id: 'ai_chat_sidebar',
+              type: DIRECT_PLUGIN,
+              RenderWidget: () => <AiChatSidebar />,
+            },
+          },
+        ],
+      },
   };
 }
 
