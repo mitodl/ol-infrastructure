@@ -1,43 +1,16 @@
 """JupyterHub application deployment for MIT Open Learning."""
 
 from pulumi import Config, StackReference
-from pulumi_aws import ec2
-
-import pulumi_kubernetes as kubernetes
-import pulumi_vault as vault
-from pulumi import Config, InvokeOptions, ResourceOptions, StackReference
 from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
 )
-from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
-from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
-from ol_infrastructure.components.services.cert_manager import (
-    OLCertManagerCert,
-    OLCertManagerCertConfig,
-)
-from ol_infrastructure.components.services.k8s import (
-    OLApisixOIDCConfig,
-    OLApisixOIDCResources,
-    OLApisixRoute,
-    OLApisixRouteConfig,
-    OLApisixSharedPlugins,
-    OLApisixSharedPluginsConfig,
-)
-from ol_infrastructure.components.services.vault import (
-    OLVaultDatabaseBackend,
-    OLVaultK8SDynamicSecretConfig,
-    OLVaultK8SResources,
-    OLVaultK8SResourcesConfig,
-    OLVaultK8SSecret,
-    OLVaultPostgresDatabaseConfig,
-)
-from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from ol_infrastructure.applications.jupyterhub.deployment import (
     provision_jupyterhub_deployment,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
@@ -87,13 +60,7 @@ application_labels = k8s_global_labels | {
 
 # Setup Kubernetes provider
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
-
-# Check namespaces
-namespace = "jupyter"
-authoring_namespace = "jupyter-authoring"
-cluster_stack.require_output("namespaces").apply(
-    lambda ns: check_cluster_namespace(namespace, ns)
-)
+aws_account = get_caller_identity()
 
 # S3 bucket for storing image assets.
 # We still host actual images in ECR, but we store assets to build those
@@ -125,11 +92,6 @@ jupyter_course_bucket_config = S3BucketConfig(
 )
 jupyter_course_bucket = OLBucket(
     f"jupyter-course-bucket-{env_name}", config=jupyter_course_bucket_config
-)
-
-authoring_namespace = "jupyter-authoring"
-cluster_stack.require_output("namespaces").apply(
-    lambda ns: check_cluster_namespace(authoring_namespace, ns)
 )
 
 deployment_configs = jupyterhub_config.require_object("deployments")
