@@ -114,7 +114,10 @@ mitlearn_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
     stack_info.env_suffix
 ]
 mitlearn_app_buckets = [f"ol-mitlearn-app-storage-{mitlearn_env_suffix}"]
-dagster_pipeline_buckets = s3_tracking_logs_buckets + mitlearn_app_buckets
+b2b_export_buckets = [f"ol-b2b-partners-storage-{stack_info.env_suffix}"]
+dagster_pipeline_buckets = (
+    s3_tracking_logs_buckets + mitlearn_app_buckets + b2b_export_buckets
+)
 dagster_s3_permissions: list[dict[str, str | list[str]]] = [
     {
         "Effect": "Allow",
