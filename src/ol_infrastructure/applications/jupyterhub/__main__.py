@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """JupyterHub application deployment for MIT Open Learning."""
 
 from string import Template
@@ -200,12 +201,145 @@ jupyterhub_authoring_role_statements = postgres_role_statements.copy()
 # A workaround with dblink_exec was suggested?
 # I definitely dont think this is correct, I dont know how databases
 # and schemas interact in postgres
-jupyterhub_authoring_role_statements["app"]["create"].append(
-    Template(
-        r"""SELECT 'CREATE DATABASE "${app_name}"' WHERE NOT EXISTS
-        (SELECT FROM pg_database WHERE datname = '${app_name}')\gexec;"""
-    )
-)
+jupyterhub_authoring_role_statements["app"] = {
+    "create": [
+        # Create
+        # Check if the jupyterhub_authoring role exists and create it if not
+        Template(
+            """SELECT 'CREATE DATABASE "${app_name}"' WHERE NOT EXISTS
+            (SELECT FROM pg_database WHERE datname = '${app_name}')\\gexec;"""
+        ),
+        Template(
+            """
+            DO
+            $$do$$
+            BEGIN
+               IF EXISTS (
+                  SELECT FROM pg_catalog.pg_roles
+                  WHERE  rolname = 'jupyterhub_authoring') THEN
+                      RAISE NOTICE 'Role "jupyterhub_authoring" already exists. Skipping.';
+               ELSE
+                  BEGIN   -- nested block
+                     CREATE ROLE jupyterhub_authoring;
+                  EXCEPTION
+                     WHEN duplicate_object THEN
+                        RAISE NOTICE 'Role "jupyterhub_authoring" was just created by a concurrent transaction. Skipping.';
+                  END;
+               END IF;
+            END
+            $$do$$;
+            """
+        ),
+        # Create the external schema if it doesn't exist already
+        Template("""CREATE SCHEMA IF NOT EXISTS authoring;"""),
+        # Do grants on to the mitopen in both schemas
+        Template(
+            """GRANT CREATE ON SCHEMA public TO jupyterhub_authoring WITH GRANT OPTION;"""
+        ),
+        Template(
+            """
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "jupyterhub_authoring"
+            WITH GRANT OPTION;
+            """
+        ),
+        Template(
+            """GRANT USAGE ON SCHEMA external TO jupyterhub_authoring WITH GRANT OPTION;"""
+        ),
+        Template(
+            """GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA external TO "jupyterhub_authoring";"""
+        ),
+        Template(
+            """GRANT CREATE ON DATABASE \"jupyterhub_authoring\" TO jupyterhub_authoring;"""
+        ),
+        Template(
+            """
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "jupyterhub_authoring"
+            WITH GRANT OPTION;
+            """
+        ),
+        Template(
+            """GRANT CREATE ON SCHEMA external TO jupyterhub_authoring WITH GRANT OPTION;"""
+        ),
+        Template(
+            """
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA external TO "jupyterhub_authoring"
+            WITH GRANT OPTION;
+            """
+        ),
+        Template(
+            # Set/refresh default privileges in both schemas
+            """
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA authoring TO "jupyterhub_authoring"
+            WITH GRANT OPTION;
+            """
+        ),
+        # Set/refresh default privileges in both schemas
+        Template("""SET ROLE "jupyterhub_authoring";"""),
+        Template(
+            """
+            ALTER DEFAULT PRIVILEGES FOR ROLE "jupyterhub_authoring" IN SCHEMA public
+            GRANT ALL PRIVILEGES ON TABLES TO "jupyterhub_authoring" WITH GRANT OPTION;
+            """
+        ),
+        Template(
+            """
+            ALTER DEFAULT PRIVILEGES FOR ROLE "jupyterhub_authoring" IN SCHEMA public
+            GRANT ALL PRIVILEGES ON SEQUENCES TO "jupyterhub_authoring" WITH GRANT OPTION;
+            """
+        ),
+        Template(
+            """
+            ALTER DEFAULT PRIVILEGES FOR ROLE "jupyterhub_authoring" IN SCHEMA authoring
+            GRANT ALL PRIVILEGES ON TABLES TO "jupyterhub_authoring" WITH GRANT OPTION;
+            """
+        ),
+        Template(
+            """
+            ALTER DEFAULT PRIVILEGES FOR ROLE "jupyterhub_authoring" IN SCHEMA authoring
+            GRANT ALL PRIVILEGES ON SEQUENCES TO "jupyterhub_authoring" WITH GRANT OPTION;
+            """
+        ),
+        Template("""RESET ROLE;"""),
+        # Actually create the user in the 'jupyterhub_authoring' role
+        Template(
+            """
+            CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
+            VALID UNTIL '{{expiration}}' IN ROLE "jupyterhub_authoring" INHERIT;
+            """
+        ),
+        # Make sure things done by the new user belong to role and not the user
+        Template("""ALTER ROLE "{{name}}" SET ROLE "jupyterhub_authoring";"""),
+    ],
+    "revoke": [
+        # Remove the user from the mitopen role
+        Template("""REVOKE "jupyterhub_authoring" FROM "{{name}}";"""),
+        # Put the user back into the app role but as an administrator
+        Template("""GRANT "{{name}}" TO jupyterhub_authoring WITH ADMIN OPTION;"""),
+        # Change ownership to the app role for anything that might belong to this user
+        Template("""SET ROLE jupyterhub_authoring;"""),
+        Template("""REASSIGN OWNED BY "{{name}}" TO "jupyterhub_authoring";"""),
+        Template("""RESET ROLE;"""),
+        # Take any permissions assigned directly to this user away
+        Template(
+            """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";"""
+        ),
+        Template(
+            """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA authoring FROM "{{name}}";"""
+        ),
+        Template(
+            """REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";"""
+        ),
+        Template(
+            """REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA authoring FROM "{{name}}";"""
+        ),
+        Template("""REVOKE USAGE ON SCHEMA public FROM "{{name}}";"""),
+        Template("""REVOKE USAGE ON SCHEMA authoring FROM "{{name}}";"""),
+        # Finally, drop this user from the database
+        Template("""DROP USER "{{name}}";"""),
+    ],
+    "renew": [],
+    "rollback": [],
+}
 
 # Use same physical DB instance
 jupyterhub_authoring_db_config = OLPostgresDBConfig(
