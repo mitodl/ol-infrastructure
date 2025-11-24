@@ -77,7 +77,7 @@ config:
     gradebook: gradebook
     learning: learn
     ora_grading: ora-grading
-  edxapp:github_org_api_url: https://github.mit.edu/api/v3/orgs/mtixonline-rc
+  edxapp:github_org_api_url: https://github.mit.edu/api/v3/orgs/mitxonline-rc
   edxapp:google_analytics_id: UA-5145472-46
   edxapp:mail_domain: edxapp-mail.rc.learn.mit.edu
   edxapp:proctortrack_url: "https://preproduction.verificient.com"

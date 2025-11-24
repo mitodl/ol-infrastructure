@@ -76,7 +76,7 @@ config:
     gradebook: gradebook
     learning: learn
     ora_grading: ora-grading
-  edxapp:github_org_api_url: https://github.mit.edu/api/v3/orgs/mtixonline-rc
+  edxapp:github_org_api_url: https://github.mit.edu/api/v3/orgs/mitxonline-rc
   edxapp:google_analytics_id: ""
   edxapp:elb_healthcheck_interval: '30'
   edxapp:mail_domain: edxapp-mail.ci.learn.mit.edu
