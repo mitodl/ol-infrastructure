@@ -12,7 +12,7 @@ class OLCertManagerCertConfig(BaseModel):
     resource_suffix: str = "cert"
 
     create_apisixtls_resource: bool = False
-    apisixtls_ingress_class: str = "apisix"
+    apisixtls_ingress_class: str = "apache-apisix"
     dest_secret_name: str
     dns_names: list[str]
     letsencrypt_env: Literal["staging", "production"] = "production"

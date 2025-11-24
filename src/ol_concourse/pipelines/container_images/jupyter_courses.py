@@ -11,14 +11,16 @@ from ol_concourse.lib.models.pipeline import (
     PutStep,
     Resource,
 )
-from ol_concourse.lib.resources import ssh_git_repo
+from ol_concourse.lib.resources import s3_object, ssh_git_repo
 
 
 @dataclasses.dataclass
 class CourseImageInfo:
     course_name: str
-    repo_uri: str
     image_name: str
+    repo_uri: str | None = None
+    s3_bucket: str | None = None
+    s3_object_path: str | None = None
 
 
 # Used to make a parameterized pipeline which builds
@@ -126,20 +128,19 @@ courses = [
     ),
     CourseImageInfo(
         course_name="uai_source-uai.mltl1",
-        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.MLTL.1-1T2026 ",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.MLTL.1-1T2026",
         image_name="uai_source-uai.mltl1",
+    ),
+    CourseImageInfo(
+        course_name="uai_source-uai.pm1",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.PM.1-1T2026",
+        image_name="uai_source-uai.pm1",
     ),
 ]
 
-course_repository = ssh_git_repo(
-    name=Identifier("course_name"),
-    uri="((course_repo))",
-    branch="main",
-    private_key="((github.ol_notebooks_private_ssh_key))",
-)
-
 # This infers the ECR url from the AWS account,
 # the region and the repository name
+# This part is common between both pipelines
 course_image = Resource(
     name=Identifier("course_image"),
     type="registry-image",
@@ -151,36 +152,101 @@ course_image = Resource(
     },
 )
 
-build_task = container_build_task(
-    inputs=[Input(name=course_repository.name)],
-    build_parameters={"CONTEXT": course_repository.name},
-)
 
-docker_pipeline = Pipeline(
-    resources=[course_repository, course_image],
-    jobs=[
-        Job(
-            name=Identifier("build-and-publish-container"),
-            plan=[
-                GetStep(get=course_repository.name, trigger=True),
-                build_task,
-                PutStep(
-                    put=course_image.name,
-                    params={
-                        "image": "image/image.tar",
-                        "additional_tags": f"./{course_repository.name}/.git/describe_ref",  # noqa: E501
-                    },
-                ),
-            ],
-        )
-    ],
-)
+def pipeline_for_github():
+    course_repository = ssh_git_repo(
+        name=Identifier("course_name"),
+        uri="((course_repo))",
+        branch="main",
+        private_key="((github.ol_notebooks_private_ssh_key))",
+    )
+
+    build_task = container_build_task(
+        inputs=[Input(name=course_repository.name)],
+        build_parameters={"CONTEXT": course_repository.name},
+    )
+
+    return Pipeline(
+        resources=[course_repository, course_image],
+        jobs=[
+            Job(
+                name=Identifier("build-and-publish-container"),
+                plan=[
+                    GetStep(get=course_repository.name, trigger=True),
+                    build_task,
+                    PutStep(
+                        put=course_image.name,
+                        params={
+                            "image": "image/image.tar",
+                            "additional_tags": f"./{course_repository.name}"
+                            f"/.git/describe_ref",
+                        },
+                    ),
+                ],
+            )
+        ],
+    )
+
+
+def pipeline_for_s3():
+    s3_archive = s3_object(
+        name=Identifier("course_name"),
+        bucket="((s3_bucket))",
+        object_path="((s3_object_path))",
+    )
+
+    # We may want to remove the cruft that the S3 resource
+    # provides alongside the unzipped archive:
+    # s3_uri, url, version files as detailed at
+    # https://github.com/concourse/s3-resource?tab=readme-ov-file#in-fetch-an-object-from-the-bucket
+
+    build_task = container_build_task(
+        inputs=[Input(name=s3_archive.name)],
+        build_parameters={"CONTEXT": f"{s3_archive.name}"},
+    )
+
+    return Pipeline(
+        resources=[s3_archive, course_image],
+        jobs=[
+            Job(
+                name=Identifier("build-and-publish-container"),
+                plan=[
+                    GetStep(get=s3_archive.name, trigger=True, params={"unpack": True}),
+                    build_task,
+                    PutStep(
+                        put=course_image.name,
+                        params={
+                            "image": "image/image.tar",
+                        },
+                    ),
+                ],
+            )
+        ],
+    )
+
 
 if __name__ == "__main__":
-    with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(docker_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(docker_pipeline.model_dump_json(indent=2))
+    github_pipeline = pipeline_for_github()
+    with open("github_definition.json", "w") as definition:  # noqa: PTH123
+        definition.write(github_pipeline.model_dump_json(indent=2))
+    sys.stdout.write(github_pipeline.model_dump_json(indent=2))
+    s3_pipeline = pipeline_for_s3()
+    with open("s3_definition.json", "w") as definition:  # noqa: PTH123
+        definition.write(s3_pipeline.model_dump_json(indent=2))
+    sys.stdout.write(s3_pipeline.model_dump_json(indent=2))
     for course in courses:
-        sys.stdout.write(
-            f"fly -t <prod_target> set-pipeline -p jupyter_notebook_docker_image_build -c definition.json --var course_repo={course.repo_uri} --instance-var image_name={course.image_name}\n"  # noqa: E501
-        )
+        if course.repo_uri:
+            sys.stdout.write(
+                f"fly -t <prod_target> set-pipeline "
+                f"-p jupyter_notebook_docker_image_build "
+                f"-c github_definition.json --var course_repo={course.repo_uri} "
+                f"--instance-var image_name={course.image_name}\n"
+            )
+        else:
+            sys.stdout.write(
+                f"fly -t <prod_target> set-pipeline "
+                f"-p jupyter_notebook_docker_image_build "
+                f"-c s3_definition.json --var s3_bucket={course.s3_bucket} "
+                f"--var s3_object_path={course.s3_object_path} "
+                f"--instance-var image_name={course.image_name}\n"
+            )

@@ -16,7 +16,7 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase, K8sGlobalLabels
-from ol_infrastructure.lib.pulumi_helper import StackInfo
+from ol_infrastructure.lib.pulumi_helper import StackInfo, parse_stack
 
 
 class OLEKSAuthBindingConfig(BaseModel):
@@ -76,6 +76,7 @@ class OLEKSAuthBinding(ComponentResource):
             {},
             opts,
         )
+        stack_info = parse_stack()
         aws_account = get_caller_identity()
         self.iam_policy = iam.Policy(
             f"{config.application_name}-policy-{config.stack_info.env_suffix}",
@@ -147,7 +148,8 @@ class OLEKSAuthBinding(ComponentResource):
             application_name=config.application_name,
             namespace=config.namespace,
             labels=config.k8s_labels.model_dump(),
-            vault_address=Config("vault").require("address"),
+            vault_address=Config("vault").get("address")
+            or f"https://vault-{stack_info.env_suffix}.odl.mit.edu",
             vault_auth_endpoint=config.vault_auth_endpoint,
             vault_auth_role_name=k8s_auth_backend_role.role_name,
             service_account_name=service_account_names[0],

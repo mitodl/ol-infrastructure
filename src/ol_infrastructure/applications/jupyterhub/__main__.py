@@ -306,6 +306,7 @@ COURSE_NAMES.extend(
             13,
             "st1",
             "mltl1",
+            "pm1",
         ]
     ]
 )
@@ -440,6 +441,9 @@ jupyterhub_application = kubernetes.helm.v3.Release(
                 },
             },
             "prePuller": {
+                "hook": {
+                    "enabled": False,
+                },
                 "continuous": {
                     "enabled": True,
                 },
@@ -447,11 +451,11 @@ jupyterhub_application = kubernetes.helm.v3.Release(
                 "resources": {
                     "requests": {
                         "cpu": "10m",
-                        "memory": "10Mi",
+                        "memory": "128Mi",
                     },
                     "limits": {
-                        "cpu": "10m",
-                        "memory": "10Mi",
+                        "cpu": "100m",
+                        "memory": "512Mi",
                     },
                 },
             },

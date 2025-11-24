@@ -58,7 +58,8 @@ install-deps:
   ENV PATH /root/.local/bin:/openedx/nodeenv/bin:${PATH}
   ENV NPM_REGISTRY "https://registry.npmjs.org/"
   RUN nodeenv /openedx/nodeenv --node=$NODE_VERSION --prebuilt \
-    && npm clean-install -s --registry=$NPM_REGISTRY
+    && npm clean-install -s --registry=$NPM_REGISTRY \
+    && npm install git+https://git@github.com/verificient/edx-proctoring-proctortrack.git#f0fa9edbd16aa5af5a41ac309d2609e529ea8732
   SAVE ARTIFACT /openedx/edx-platform
   SAVE ARTIFACT /openedx/nodeenv
   SAVE ARTIFACT /root/.local

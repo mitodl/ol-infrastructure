@@ -4,10 +4,16 @@ from pathlib import Path
 
 import httpx
 import pulumi_fastly as fastly
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi import (
+    Config,
+    InvokeOptions,
+    Output,
+    ResourceOptions,
+    StackReference,
+    export,
+)
 from pulumi_aws import iam, route53, s3
 
-from bridge.lib.constants import FASTLY_A_TLS_1_2, FASTLY_CNAME_TLS_1_3
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     FIVE_MINUTES,
@@ -18,6 +24,9 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.aws.route53_helper import (
+    fastly_certificate_validation_records,
+)
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
@@ -946,6 +955,34 @@ for purpose in ("draft", "live", "test"):
         opts=ResourceOptions(protect=True).merge(fastly_provider),
     )
 
+    tls_configuration = fastly.get_tls_configuration(
+        default=False,
+        name="TLS v1.3",
+        tls_protocols=["1.2", "1.3"],
+        opts=InvokeOptions(provider=fastly_provider.provider),
+    )
+
+    fastly_tls = fastly.TlsSubscription(
+        f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-{purpose}-tls-subscription",
+        # valid values are certainly, lets-encrypt, or globalsign
+        certificate_authority="certainly",
+        domains=servicevcl_backend.domains.apply(
+            lambda domains: [domain.name for domain in domains]
+        ),
+        # Retrieved from https://manage.fastly.com/network/tls-configurations
+        configuration_id=tls_configuration.id,
+        force_update=True,
+        opts=fastly_provider,
+    )
+
+    fastly_tls.managed_dns_challenges.apply(fastly_certificate_validation_records)
+
+    validated_tls_subscription = fastly.TlsSubscriptionValidation(
+        f"{purpose}-tls-subscription-validation",
+        subscription_id=fastly_tls.id,
+        opts=fastly_provider,
+    )
+
     fastly_distributions[purpose] = servicevcl_backend
 
     for domain in site_domains[purpose]:
@@ -954,17 +991,16 @@ for purpose in ("draft", "live", "test"):
         # record. If it's deeper than 3 levels then it's a subdomain of ocw.mit.edu and
         # we can use a CNAME.
         record_type = "A" if len(domain.split(".")) == 3 else "CNAME"  # noqa: PLR2004
-        record_value = (
-            [str(addr) for addr in FASTLY_A_TLS_1_2]
-            if record_type == "A"
-            else [FASTLY_CNAME_TLS_1_3]
-        )
         route53.Record(
             f"ocw-site-dns-record-{domain}",
             name=domain,
             type=record_type,
             ttl=FIVE_MINUTES,
-            records=record_value,
+            records=[
+                record.record_value
+                for record in tls_configuration.dns_records
+                if record.record_type == record_type
+            ],
             zone_id=ocw_zone["id"],
         )
 

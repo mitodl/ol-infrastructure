@@ -1,0 +1,7 @@
+---
+config:
+  vault:address: https://vault-qa.odl.mit.edu
+  kubewatch_webhook:watched_namespaces: "ecommerce,learn-ai,mitlearn,mitxonline"
+  kubewatch_webhook:ignored_label_patterns: "celery" # Comma-separated patterns to ignore in ol.mit.edu/* labels
+  slack:channel_name: kubewatch-applications-qa
+encryptionsalt: v1:G+tPvc9dh1Y=:v1:HW5VtN3Ql4I9tQ7z:Yol6KPxCo4EWJsec8y7bVAIbvFl4Tg==

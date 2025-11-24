@@ -388,15 +388,11 @@ s3.BucketPolicy(
 )
 s3.BucketCorsConfiguration(
     "edxapp-storage-bucket-cors-rules",
-    bucket=edxapp_mfe_bucket.id,
+    bucket=edxapp_storage_bucket.id,
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_headers=["*"],
-            allowed_methods=[
-                "GET",
-                "PUT",
-                "POST",
-            ],
+            allowed_methods=["GET", "PUT", "POST", "HEAD"],
             allowed_origins=[f"https://{domain}" for domain in edxapp_domains.values()],
             expose_headers=["ETag"],
             max_age_seconds=3000,
@@ -974,11 +970,17 @@ redis_cluster_security_group = ec2.SecurityGroup(
             protocol="tcp",
             security_groups=[
                 edxapp_security_group.id,
-                operations_vpc["security_groups"]["celery_monitoring"],
             ],
             cidr_blocks=k8s_pod_subnet_cidrs.apply(lambda pod_cidrs: pod_cidrs),
             description="Allow access from edX to Redis for caching and queueing",
-        )
+        ),
+        ec2.SecurityGroupIngressArgs(
+            from_port=DEFAULT_REDIS_PORT,
+            to_port=DEFAULT_REDIS_PORT,
+            protocol="tcp",
+            cidr_blocks=operations_vpc["k8s_pod_subnet_cidrs"],
+            description="Allow access from Operations VPC celery monitoring pods to Redis",
+        ),
     ],
     tags=aws_config.merged_tags({"Name": f"edxapp-redis-{env_name}"}),
     vpc_id=edxapp_vpc_id,
@@ -1167,6 +1169,7 @@ consul_kv_data = {
     "google-analytics-id": edxapp_config.require("google_analytics_id"),
     "lms-domain": edxapp_domains["lms"],
     "marketing-domain": edxapp_config.get("marketing_domain") or "",
+    "mitxonline-domain": edxapp_config.get("mitxonline_domain") or "",
     "preview-domain": edxapp_domains["preview"],
     "rds-host": edxapp_db.db_instance.address,
     "proctortrack-base-url": edxapp_config.get("proctortrack_url") or "",

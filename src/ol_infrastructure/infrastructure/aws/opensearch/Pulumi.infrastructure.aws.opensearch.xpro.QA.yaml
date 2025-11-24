@@ -7,3 +7,5 @@ config:
   consul:scheme: https
   environment:business_unit: mitxpro
   environment:target_vpc: xpro_vpc
+  opensearch:additional_trusted_cidrs:
+  - '10.12.0.0/16'

@@ -401,6 +401,10 @@ class OLApplicationK8s(ComponentResource):
             ),
         }
 
+        # Add deployment notification label if enabled
+        if ol_app_k8s_config.deployment_notifications:
+            application_labels["ol.mit.edu/notify-deployments"] = "true"
+
         pod_spec_args = {}
         if ol_app_k8s_config.application_deployment_use_anti_affinity:
             pod_spec_args["affinity"] = kubernetes.core.v1.AffinityArgs(
@@ -1037,7 +1041,7 @@ class OLApisixRoute(ComponentResource):
         route_configs: list[OLApisixRouteConfig],
         k8s_namespace: str,
         k8s_labels: dict[str, str],
-        ingress_class_name: str = "apisix",
+        ingress_class_name: str = "apache-apisix",
         opts: ResourceOptions | None = None,
     ):
         """Initialize the OLApisixRoute component resource."""

@@ -3,7 +3,7 @@ name = "ol-infrastructure"
 version = "0.1.0"
 description = "Infrastructure management, configuration management logic, and Packer templates for building and deploying images to run services in a production environment."
 authors = [{ name = "MIT Open Learning Engineering", email = "oldevops@mit.edu" }]
-requires-python = "~=3.12"
+requires-python = ">=3.13,<3.15"
 readme = "README.md"
 license = "BSD-3-Clause"
 classifiers = [
@@ -14,9 +14,9 @@ dependencies = [
     "boto3~=1.24",
     "httpx>=0.28.0,<0.29",
     "hvac[parser]>=2.0.0,<3",
-    "parliament!=1.6.4",
     "pulumi>=3.39.1,<4",
     "pulumi-aws>=7.1,<8",
+    "pulumi-docker>=4.0.0,<5",
     "pulumi-fastly>=11,<12",
     "pulumi-github>=6.0.0,<7",
     "pulumi-mailgun>=3.0.0,<4",
@@ -35,6 +35,7 @@ dependencies = [
     "packaging>=24.2",
     "pulumiverse-time>=0.1.1",
     "kubernetes>=34.1.0",
+    "parliament@git+https://github.com/mitodl/parliament",
 ]
 
 [project.urls]
@@ -73,6 +74,10 @@ include = [
 "src/bridge" = "bridge"
 "src/bilder" = "bilder"
 "src/ol_concourse" = "ol_concourse"
+
+# Allow for installing dependencies from git
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [build-system]
 requires = ["hatchling"]

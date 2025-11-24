@@ -2,12 +2,13 @@ import { useContext } from "react";
 import { AppContext } from '@edx/frontend-platform/react';
 import { PLUGIN_OPERATIONS, DIRECT_PLUGIN } from '@openedx/frontend-plugin-framework';
 import { getConfig } from '@edx/frontend-platform';
-import { Icon } from "@openedx/paragon";
-import { Home } from '@openedx/paragon/icons';
+
 import Footer, { Logo, MenuLinks, CopyrightNotice } from './Footer.jsx';
+import './mitxonline-styles.scss';
 
 const configData = getConfig();
 const UAI_COURSE_KEYS = ['course-v1:uai_'];
+const MOBILE_BREAKPOINT = 991; // px
 const AUTHORING_APP_ID = 'authoring';
 const LEARNING_APPS = ['learning', 'discussions', 'ora-grading', 'communications'];
 const DASHBOARD_APPS = ['gradebook', 'learner-dashboard'];
@@ -23,6 +24,7 @@ const SLOT_IDS = {
     logo: 'org.openedx.frontend.layout.header_logo.v1',
     learning_help: 'org.openedx.frontend.layout.header_learning_help.v1',
     desktop_secondary_user_menu: 'org.openedx.frontend.layout.header_desktop_secondary_menu.v1',
+    desktop_main_menu_slot: 'org.openedx.frontend.layout.header_desktop_main_menu.v1',
   },
   footer: {
     slot: 'footer_slot',
@@ -40,6 +42,7 @@ const addFooterSubSlotsOverride = (config) => {
   const accessibilityURL = process.env.ACCESSIBILITY_URL || 'https://accessibility.mit.edu/';
   const contactUsURL = process.env.CONTACT_URL || 'mailto:mitlearn-support@mit.edu';
   const copyRightText = 'Massachusetts Institute of Technology';
+  const supportURL = process.env.SUPPORT_URL || 'https://mitxonline.zendesk.com/hc/en-us';
   const footerLogo = <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={process.env.MIT_BASE_URL} />;
 
   const footerLegalLinks = [
@@ -59,7 +62,16 @@ const addFooterSubSlotsOverride = (config) => {
       url: contactUsURL,
       title: 'Contact Us',
     },
-  ];
+  ]
+
+  if (!isLearnCourse()) {
+    footerLegalLinks.push(
+      {
+        url: supportURL,
+        title: 'Help',
+      }
+    );
+  }
 
   const footerSubSlotsConfig = {
     [SLOT_IDS.footer.desktop_left_links]: {
@@ -163,22 +175,39 @@ const isLearnCourse = () => {
   });
 }
 
-const getUserMenu = () => {
+const isMobile = () => {
+  // Guard for SSR / tests
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  return window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches;
+};
+
+const getUserMenu = ({ includeDashboard = false } = {}) => {
   const userMenuLinkTitles = {
     profile: 'Profile',
     account: 'Settings',
     logout: 'Sign Out',
+    dashboard: 'Dashboard',
   };
 
+  // Build dashboard URL consistently with SecondaryMenu logic
+  let dashboardURL = process.env.MIT_LEARN_BASE_URL ? `${process.env.MIT_LEARN_BASE_URL}/dashboard` : 'https://learn.mit.edu/dashboard';
+  if (!isLearnCourse()) {
+    dashboardURL = configData.MARKETING_SITE_BASE_URL ? `${configData.MARKETING_SITE_BASE_URL}/dashboard/` : 'https://mitxonline.mit.edu/dashboard/';
+  }
+
   if (isLearnCourse()) {
-    return [
+    const baseMenu = [
       {
         url: `${configData.LMS_BASE_URL}/logout`,
         title: userMenuLinkTitles.logout,
       },
     ];
+    return includeDashboard ? [{ url: dashboardURL, title: userMenuLinkTitles.dashboard }, ...baseMenu] : baseMenu;
   }
-  return [
+
+  const baseMenu = [
     {
       url: `${configData.MARKETING_SITE_BASE_URL}/profile/`,
       title: userMenuLinkTitles.profile,
@@ -192,10 +221,11 @@ const getUserMenu = () => {
       title: userMenuLinkTitles.logout,
     },
   ];
-}
+  return includeDashboard ? [{ url: dashboardURL, title: userMenuLinkTitles.dashboard }, ...baseMenu] : baseMenu;
+};
 
 const DesktopHeaderUserMenu = (widget) => {
-  const userMenu = getUserMenu();
+  const userMenu = getUserMenu({ includeDashboard: isMobile() });
   widget.content.menu = [
     {
       items: userMenu.map((item) => ({
@@ -209,7 +239,7 @@ const DesktopHeaderUserMenu = (widget) => {
 };
 
 const LearningHeaderUserMenu = (widget) => {
-  const userMenu = getUserMenu();
+  const userMenu = getUserMenu({ includeDashboard: isMobile() });
   widget.content.items = userMenu.map((item) => ({
     href: item.url,
     message: item.title,
@@ -217,12 +247,19 @@ const LearningHeaderUserMenu = (widget) => {
   return widget;
 };
 
-const displayFullNameInMenu = (widget) => {
+const UserMenuOverride = () => {
   const { authenticatedUser } = useContext(AppContext);
-  if (authenticatedUser) {
-    widget.content.label = authenticatedUser.name || authenticatedUser.username;
+  if (!authenticatedUser) {
+    return null;
   }
-  return widget;
+  return (
+    <>
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M15.9998 2.66797C23.3598 2.66797 29.3332 8.6413 29.3332 16.0013C29.3332 23.3613 23.3598 29.3346 15.9998 29.3346C8.63984 29.3346 2.6665 23.3613 2.6665 16.0013C2.6665 8.6413 8.63984 2.66797 15.9998 2.66797ZM8.03093 20.5564C9.98761 23.4772 12.9267 25.3346 16.2128 25.3346C19.4989 25.3346 22.438 23.4772 24.3946 20.5564C22.2512 18.5576 19.3748 17.3346 16.2128 17.3346C13.0508 17.3346 10.1744 18.5576 8.03093 20.5564ZM15.9998 14.668C18.209 14.668 19.9998 12.8771 19.9998 10.668C19.9998 8.45884 18.209 6.66797 15.9998 6.66797C13.7906 6.66797 11.9998 8.45884 11.9998 10.668C11.9998 12.8771 13.7906 14.668 15.9998 14.668Z" fill="white"></path></svg>
+      {/* Username hidden on mobile via CSS; remains for larger screens */}
+      <span className="user-menu-name">{authenticatedUser.name || authenticatedUser.username}</span>
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="remixicon "><path d="M11.9999 13.1714L16.9497 8.22168L18.3639 9.63589L11.9999 15.9999L5.63599 9.63589L7.0502 8.22168L11.9999 13.1714Z"></path></svg>
+    </>
+  );
 };
 
 const addUserMenuSlotOverride = (config) => {
@@ -232,20 +269,34 @@ const addUserMenuSlotOverride = (config) => {
         keepDefault: true,
         plugins: [
           {
-            op: PLUGIN_OPERATIONS.Modify,
-            widgetId: 'default_contents',
-              fn: displayFullNameInMenu,
+            op: PLUGIN_OPERATIONS.Hide,
+            widgetId: 'default_contents'
           },
+          {
+          op: PLUGIN_OPERATIONS.Insert,
+          widget: {
+            id: 'custom_learning_user_menu_toggle',
+            type: DIRECT_PLUGIN,
+            RenderWidget: () => <UserMenuOverride />
+          },
+        },
         ]
       },
       [SLOT_IDS.header.desktop_user_menu_toggle]: {
         keepDefault: true,
         plugins: [
           {
-            op: PLUGIN_OPERATIONS.Modify,
-            widgetId: 'default_contents',
-              fn: displayFullNameInMenu,
+          op: PLUGIN_OPERATIONS.Hide,
+          widgetId: 'default_contents'
           },
+          {
+          op: PLUGIN_OPERATIONS.Insert,
+          widget: {
+            id: 'custom_learning_user_menu_toggle',
+            type: DIRECT_PLUGIN,
+            RenderWidget: () => <UserMenuOverride />
+          },
+        },
         ]
       }
   };
@@ -305,7 +356,7 @@ const addLearningCourseInfoSlotOverride = (config) => {
               id: 'custom_header_learning_course_info',
               type: DIRECT_PLUGIN,
               RenderWidget: ({ courseTitle }) => (
-                <div style={{ paddingTop: '14px', minWidth: 0 }}>
+                <div style={{ paddingTop: '7px', minWidth: 0 }}>
                   <span className='d-block m-0 font-weight-bold course-title'>{courseTitle}</span>
                 </div>
               ),
@@ -347,10 +398,8 @@ const addLogoSlotOverride = (config) => {
 }
 
 const SecondaryMenu = () => {
-  let helpURL = (process.env.CONTACT_URL || 'mailto:mitlearn-support@mit.edu')
   let dashboardURL = process.env.MIT_LEARN_BASE_URL ? `${process.env.MIT_LEARN_BASE_URL}/dashboard` : 'https://learn.mit.edu/dashboard';
   if (!isLearnCourse()) {
-    helpURL = (process.env.SUPPORT_URL || 'https://mitxonline.zendesk.com/hc/')
     dashboardURL = configData.MARKETING_SITE_BASE_URL ? `${configData.MARKETING_SITE_BASE_URL}/dashboard/` : 'https://mitxonline.mit.edu/dashboard/';
   }
 
@@ -360,47 +409,11 @@ const SecondaryMenu = () => {
       alignItems: 'center',
     }}>
       <a
-        className="nav-link custom-help-link"
-        href={helpURL}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        Help
-      </a>
-
-      <a
         href={dashboardURL}
-        style={{
-        height: '3rem',
-        width: '160px',
-        backgroundColor: '#40464C',
-        color: 'white',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textDecoration: 'none',
-        borderRadius: '0.375rem',
-        gap: '8px'
-      }}
+        className="dashboard-btn"
       >
-        <Icon src={Home} className="dashboard-icon" />
         <p style={{ margin: 0 }}>Dashboard</p>
       </a>
-      <style>
-      {`
-        .dashboard-icon svg path {
-          fill: transparent;
-          stroke: #fff;
-          stroke-width: 2;
-        }
-        .custom-help-link {
-          &:hover, &:focus {
-            background-color: transparent !important;
-            color: #454545FF !important;
-          }
-        }
-      `}
-      </style>
     </div>
   );
 }
@@ -467,6 +480,29 @@ const addEnvOverrides = (config) => {
   return config;
 }
 
+const addDesktopMainMenuSlotOverride = (config) => {
+  if (!DASHBOARD_APPS.includes(CURRENT_MFE_APP_ID)) {
+    return config;
+  }
+
+  return {
+    ...config,
+    pluginSlots: {
+      ...config.pluginSlots,
+      [SLOT_IDS.header.desktop_main_menu_slot]: {
+        keepDefault: true,
+        plugins: [
+          {
+            op: PLUGIN_OPERATIONS.Hide,
+            widgetId: 'default_contents',
+          },
+        ]
+      }
+    },
+  }
+}
+
+
 let config = {
   ...process.env,
   // Override the proctoring info panel 'Review instructions and system requirements' link
@@ -482,6 +518,7 @@ config = addUserMenuSlotOverride(config);
 config = addLogoSlotOverride(config);
 config = addLearningHelpSlotOverride(config);
 config = addSecondaryMenuSlotOverride(config);
+config = addDesktopMainMenuSlotOverride(config);
 config = addEnvOverrides(config);
 
 export default config;

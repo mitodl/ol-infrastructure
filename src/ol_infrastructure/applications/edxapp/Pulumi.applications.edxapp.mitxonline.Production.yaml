@@ -15,31 +15,33 @@ config:
   - ["course_experience.relative_dates_disable_reset", "--create", "--everyone"]
   - ["discussions.enable_forum_v2", "--create", "--everyone"]
   - ["discussions.pages_and_resources_mfe", "--create", "--everyone"]
+  - ["discussions.enable_new_structure_discussions", "--create", "--everyone"]
+  - ["discussions.enable_discussions_mfe", "--create", "--everyone"]
   - ["grades.bulk_management", "--create", "--superusers", "--everyone", "--staff",
     "--authenticated"]
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
   - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
   - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
-  - ["legacy_studio.advanced_settings", "--create", "--everyone"]
+  - ["legacy_studio.advanced_settings", "--deactivate"]
   - ["legacy_studio.certificates", "--create", "--everyone"]
-  - ["legacy_studio.configurations", "--create", "--everyone"]
+  - ["legacy_studio.configurations", "--deactivate"]
   - ["legacy_studio.course_outline", "--deactivate"]
-  - ["legacy_studio.course_team", "--create", "--everyone"]
+  - ["legacy_studio.course_team", "--deactivate"]
   - ["legacy_studio.custom_pages", "--deactivate"]
-  - ["legacy_studio.exam_settings", "--create", "--everyone"]
-  - ["legacy_studio.export", "--create", "--everyone"]
-  - ["legacy_studio.files_uploads", "--create", "--everyone"]
-  - ["legacy_studio.grading", "--create", "--everyone"]
-  - ["legacy_studio.home", "--create", "--everyone"]
-  - ["legacy_studio.import", "--create", "--everyone"]
-  - ["legacy_studio.logged_out_home", "--create", "--everyone"]
-  - ["legacy_studio.problem_editor", "--create", "--everyone"]
-  - ["legacy_studio.schedule_details", "--create", "--everyone"]
+  - ["legacy_studio.exam_settings", "--deactivate"]
+  - ["legacy_studio.export", "--deactivate"]
+  - ["legacy_studio.files_uploads", "--deactivate"]
+  - ["legacy_studio.grading", "--deactivate"]
+  - ["legacy_studio.home", "--deactivate"]
+  - ["legacy_studio.import", "--deactivate"]
+  - ["legacy_studio.logged_out_home", "--deactivate"]
+  - ["legacy_studio.problem_editor", "--deactivate"]
+  - ["legacy_studio.schedule_details", "--deactivate"]
   - ["legacy_studio.text_editor", "--deactivate"]
-  - ["legacy_studio.textbooks", "--create", "--everyone"]
-  - ["legacy_studio.unit_editor", "--create", "--everyone"]
-  - ["legacy_studio.updates", "--create", "--everyone"]
-  - ["legacy_studio.video_editor", "--create", "--everyone"]
+  - ["legacy_studio.textbooks", "--deactivate"]
+  - ["legacy_studio.unit_editor", "--deactivate"]
+  - ["legacy_studio.updates", "--deactivate"]
+  - ["legacy_studio.video_editor", "--deactivate"]
   - ["notifications.enable_notifications", "--create", "--everyone"]
   - ["notifications.enable_email_notifications", "--create", "--everyone"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone",
@@ -63,6 +65,7 @@ config:
   edxapp:mit_learn_api_domain: api.learn.mit.edu
   edxapp:learn_ai_frontend_domain: "learn-ai.ol.mit.edu"
   edxapp:marketing_domain: learn.mit.edu
+  edxapp:mitxonline_domain: mitxonline.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:qzfe99Jb8n0TnEQS:Y6fSOS8lksj7WvED+V7kCtV7arDtwx7184Fw330Mwh9JDHW72rVd8y7Nm0fF8ANCcFCwDV5EwSU2Fcc+X47NHDOLCOQv16lyB6jWOF2mTr/veRax6MbXY9NlLmsfp9EBQesDCitULbkz9hyHcHT3GPI=
   edxapp:enable_notes: "True"
@@ -80,6 +83,7 @@ config:
   edxapp:sender_email_address: mitlearn-support@mit.edu
   edxapp:email_use_course_id_from_for_bulk: "True"
   edxapp:bulk_email_default_from_email: no-reply@edxapp-mail.learn.mit.edu
+  edxapp:enable_xqueue: true
   edxapp:framework: "earthly"
   edxapp:web_instance_type: m7a.2xlarge
   edxapp:web_node_capacity: "9"

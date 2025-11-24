@@ -436,19 +436,24 @@ operations_vpc_exports = vpc_exports(
         "xpro_vpc",
     ],
 )
+celery_monitoring_security_group = ec2.SecurityGroup(
+    "operations-celery-monitoring",
+    description="Security group for Leek service for Celery Monitoring",
+    vpc_id=operations_vpc.olvpc.id,
+    ingress=[],
+    egress=default_egress_args,
+    tags=operations_vpc_config.merged_tags(
+        {"Name": f"operations-{stack_info.env_suffix}-celery-monitoring"}
+    ),
+)
+
 operations_vpc_exports.update(
     {
         "security_groups": {
-            "celery_monitoring": ec2.SecurityGroup(
-                "operations-celery-monitoring",
-                description="Security group for Leek service for Celery Monitoring",
-                vpc_id=operations_vpc.olvpc.id,
-                ingress=[],
-                egress=[],
-                tags=operations_vpc_config.merged_tags(
-                    {"Name": f"operations-{stack_info.env_suffix}-celery-monitoring"}
-                ),
-            ).id,
+            "celery_monitoring": {
+                "id": celery_monitoring_security_group.id,
+                "name": celery_monitoring_security_group.name,
+            },
             "default": operations_vpc.olvpc.id.apply(default_group).id,
             "web": public_web(operations_vpc_config.vpc_name, operations_vpc.olvpc)(
                 tags=operations_vpc_config.merged_tags(
@@ -532,8 +537,13 @@ operations_to_xpro_peer = OLVPCPeeringConnection(
     operations_vpc,
     xpro_vpc,
 )
-applications_to_mitx_conline_peer = OLVPCPeeringConnection(
+applications_to_mitx_online_peer = OLVPCPeeringConnection(
     f"ol-applications-{stack_info.env_suffix}-to-mitx-online-{stack_info.env_suffix}-vpc-peer",
     applications_vpc,
     mitx_online_vpc,
+)
+applications_to_xpro_online_peer = OLVPCPeeringConnection(
+    f"ol-applications-{stack_info.env_suffix}-to-xpro-{stack_info.env_suffix}-vpc-peer",
+    applications_vpc,
+    xpro_vpc,
 )

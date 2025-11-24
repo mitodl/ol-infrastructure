@@ -14,13 +14,15 @@ config:
   - ["course_experience.relative_dates_disable_reset", "--create", "--everyone"]
   - ["discussions.enable_forum_v2", "--create", "--everyone"]
   - ["discussions.pages_and_resources_mfe", "--create", "--everyone"]
+  - ["discussions.enable_new_structure_discussions", "--create", "--everyone"]
+  - ["discussions.enable_discussions_mfe", "--create", "--everyone"]
   - ["grades.bulk_management", "--create", "--superusers", "--everyone", "--staff",
     "--authenticated"]
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
   - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
   - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
   - ["legacy_studio.advanced_settings", "--deactivate"]
-  - ["legacy_studio.certificates", "--deactivate"]
+  - ["legacy_studio.certificates", "--create", "--everyone"]
   - ["legacy_studio.configurations", "--deactivate"]
   - ["legacy_studio.course_outline", "--deactivate"]
   - ["legacy_studio.course_team", "--deactivate"]
@@ -63,6 +65,7 @@ config:
   edxapp:backend_studio_domain: studio-backend.ci.learn.mit.edu
   edxapp:backend_preview_domain: preview-backend.ci.learn.mit.edu
   edxapp:marketing_domain: ci.mitxonline.mit.edu
+  edxapp:mitxonline_domain: ci.mitxonline.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:+8kgTH+x98kC+Lxc:bW03E5mk8wRB+FxZYtj06FPx/MEJuEiKO5ekaDTZKmqmfklisVhidp0fhX+So2Eygf/Aiyqp5L03RCzA8k7I4ZmlNss19//pdGgBDwa3HAbw
   edxapp:enable_notes: "True"
@@ -84,6 +87,7 @@ config:
     secure: v1:lC3eiftPkXDB9eI/:PxRgffKu9kJjB78ijeLeJgS3fSC0kT80n5GurGDVELGh80RHA31t/VW/4EgwSK00ZlAkCYVKyNSgsDNMwkMzbOP20YcRKvp46olDgdo0Yk2Krou4BzBax5/9
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
+  edxapp:enable_xqueue: true
   edxapp:framework: "earthly"
   edxapp:min_web_nodes: "1"
   edxapp:min_worker_nodes: "1"

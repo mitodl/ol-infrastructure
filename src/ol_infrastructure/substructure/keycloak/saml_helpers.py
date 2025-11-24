@@ -1,9 +1,12 @@
 """Helper functions for managing Keycloak SAML integrations."""
 
+import logging
 import xml.etree.ElementTree as ET
 from collections.abc import Collection
 from urllib.parse import urlparse
 from urllib.request import urlopen
+
+logger = logging.getLogger(__name__)
 
 SAML_FRIENDLY_NAMES = {
     "firstName": [
@@ -62,6 +65,9 @@ def _fetch_and_parse_saml_metadata(metadata_url: str) -> ET.Element | None:
     """
     parsed_url = urlparse(metadata_url)
     if parsed_url.scheme != "https":
+        logger.warning(
+            "SAML metadata URL must use HTTPS, got %s. Skipping.", metadata_url
+        )
         return None
     try:
         # Set timeout and limit response size
@@ -69,9 +75,18 @@ def _fetch_and_parse_saml_metadata(metadata_url: str) -> ET.Element | None:
         with urlopen(metadata_url, timeout=10) as metadata_file:  # noqa: S310
             metadata_bytes = metadata_file.read(MAX_METADATA_SIZE + 1)
             if len(metadata_bytes) > MAX_METADATA_SIZE:
+                logger.warning(
+                    "SAML metadata from %s exceeds maximum size. Skipping.",
+                    metadata_url,
+                )
                 return None
             return ET.fromstring(metadata_bytes)  # noqa: S314
-    except (OSError, ET.ParseError):
+    except (OSError, ET.ParseError) as e:
+        logger.warning(
+            "Unable to fetch or parse SAML metadata from %s: %s. Skipping.",
+            metadata_url,
+            e,
+        )
         return None
 
 
@@ -156,28 +171,32 @@ def extract_saml_metadata(metadata_source: str) -> dict[str, str | None]:
     }
 
 
-def generate_pulumi_args_dict(metadata: dict[str, str]) -> dict[str, str]:
+def generate_pulumi_args_dict(metadata: dict[str, str | None]) -> dict[str, str]:
     """Generate a dictionary of arguments for the Pulumi IdentityProvider resource.
 
     Args:
         metadata (dict): Dictionary containing extracted IdP metadata.
 
-    Returns: dict: A dictionary of arguments suitable for Pulumi, or None if metadata is
-        missing.
+    Returns: dict: A dictionary of arguments suitable for Pulumi, or empty dict if
+        metadata is missing required fields.
 
     """
     if not metadata:
         return {}
 
-    args_dict = {
-        "single_sign_on_service_url": metadata["single_sign_on_service_url"],
-    }
+    args_dict: dict[str, str] = {}
 
-    if metadata["single_logout_service_url"]:
-        args_dict["single_logout_service_url"] = metadata["single_logout_service_url"]
+    sso_url = metadata.get("single_sign_on_service_url")
+    if sso_url:
+        args_dict["single_sign_on_service_url"] = sso_url
 
-    if metadata["x509_certificate"]:
-        args_dict["signing_certificate"] = metadata["x509_certificate"]
+    slo_url = metadata.get("single_logout_service_url")
+    if slo_url:
+        args_dict["single_logout_service_url"] = slo_url
+
+    cert = metadata.get("x509_certificate")
+    if cert:
+        args_dict["signing_certificate"] = cert
 
     return args_dict
 

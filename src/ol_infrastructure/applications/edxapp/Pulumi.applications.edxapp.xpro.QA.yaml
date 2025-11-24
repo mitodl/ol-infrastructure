@@ -56,6 +56,7 @@ config:
   edxapp:sender_email_address: support@edxapp-mail-qa.xpro.mit.edu
   edxapp:web_node_capacity: "1"
   edxapp:worker_node_capacity: "1"
+  edxapp:enable_xqueue: false
   edxapp:framework: "earthly"
   redis:instance_type: cache.r7g.large
   mongodb:atlas_project_id: 61a8f5e33456732be1fbb699

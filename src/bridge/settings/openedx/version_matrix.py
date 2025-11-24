@@ -318,11 +318,6 @@ ReleaseMap: dict[
                 origin_override="https://github.com/mitodl/mitx-theme",
             ),
             OpenEdxApplicationVersion(
-                application="forum",
-                application_type="IDA",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
                 application="gradebook",
                 application_type="MFE",
                 release="ulmo",
@@ -397,11 +392,6 @@ ReleaseMap: dict[
                 origin_override="https://github.com/mitodl/mitx-theme",
             ),
             OpenEdxApplicationVersion(
-                application="forum",
-                application_type="IDA",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
                 application="gradebook",
                 application_type="MFE",
                 release="ulmo",
@@ -468,11 +458,6 @@ ReleaseMap: dict[
                 origin_override="https://github.com/mitodl/mitxpro-theme",
             ),
             OpenEdxApplicationVersion(
-                application="forum",
-                application_type="IDA",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
                 application="gradebook",
                 application_type="MFE",
                 release="ulmo",
@@ -527,11 +512,6 @@ ReleaseMap: dict[
                 release="master",
                 branch_override="main",
                 origin_override="https://github.com/mitodl/mitxonline-theme",
-            ),
-            OpenEdxApplicationVersion(
-                application="forum",
-                application_type="IDA",
-                release="master",
             ),
             OpenEdxApplicationVersion(
                 application="gradebook",
@@ -595,11 +575,6 @@ ReleaseMap: dict[
                 release="master",
                 branch_override="master",
                 origin_override="https://github.com/mitodl/mitx-theme",
-            ),
-            OpenEdxApplicationVersion(
-                application="forum",
-                application_type="IDA",
-                release="master",
             ),
             OpenEdxApplicationVersion(
                 application="gradebook",
@@ -669,11 +644,6 @@ ReleaseMap: dict[
                 release="master",
                 branch_override="master",
                 origin_override="https://github.com/mitodl/mitx-theme",
-            ),
-            OpenEdxApplicationVersion(
-                application="forum",
-                application_type="IDA",
-                release="master",
             ),
             OpenEdxApplicationVersion(
                 application="gradebook",

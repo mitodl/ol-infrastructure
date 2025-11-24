@@ -1,10 +1,7 @@
 # ruff: noqa: E501, PLR0913
-"""Configure and install the official Apache APISIX Helm chart.
+"""Configure and install the Apache APISIX Helm chart.
 
-This module deploys the official APISIX chart from
-https://apache.github.io/apisix-helm-chart as part of a blue-green migration from the
-Bitnami chart.
-
+This module deploys the Apache APISIX chart from https://apache.github.io/apisix-helm-chart.
 """
 
 import textwrap
@@ -21,7 +18,7 @@ from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
-def setup_apisix_official(
+def setup_apisix(
     cluster_name: str,
     k8s_provider: kubernetes.Provider,
     operations_namespace: kubernetes.core.v1.Namespace,
@@ -37,9 +34,9 @@ def setup_apisix_official(
     cluster,
 ):
     """
-    Configure and install the official Apache APISIX ingress controller.
+    Configure and install the Apache APISIX ingress controller.
 
-    This deploys APISIX using the official Apache chart from https://apache.github.io/apisix-helm-chart
+    This deploys APISIX using the Apache chart from https://apache.github.io/apisix-helm-chart
     in standalone mode with YAML-based configuration provider and apisix-standalone ingress controller.
 
     Note: The "worker has not received configuration" message in /status/ready is expected during initial
@@ -59,25 +56,15 @@ def setup_apisix_official(
     :param aws_config: The AWS configuration object.
     :param cluster: The EKS cluster object.
     """
-    # Support separate domains for blue-green migration
-    # Use apisix_official_domains if provided, otherwise fall back to apisix_domains
-    if not eks_config.get_bool("apisix_ingress_enabled"):
-        apisix_domains = [
-            *(eks_config.get_object("apisix_official_domains") or []),
-            *eks_config.require_object("apisix_domains"),
-        ]
-    else:
-        apisix_domains = eks_config.get_object(
-            "apisix_official_domains"
-        ) or eks_config.require_object("apisix_domains")
+    apisix_domains = eks_config.require_object("apisix_domains")
 
     session_cookie_name = f"{stack_info.env_suffix}_gateway_session".removeprefix(
         "production"
     ).strip("_")
 
-    # Official APISIX chart uses a different chart version scheme
+    # APISIX chart uses a different chart version scheme
     # Chart version 2.12.x contains APISIX 3.14.x
-    apisix_chart_version = versions["APISIX_OFFICIAL_CHART"]
+    apisix_chart_version = versions["APISIX_CHART"]
 
     # Create apache-apisix specific labels that include both global labels
     # and app-specific labels for proper service selector matching

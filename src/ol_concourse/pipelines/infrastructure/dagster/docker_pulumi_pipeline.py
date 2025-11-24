@@ -76,7 +76,11 @@ def build_dagster_docker_pipeline() -> Pipeline:
     pulumi_code = git_repo(
         name=Identifier("ol-infrastructure-pulumi"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        paths=[*PULUMI_WATCHED_PATHS, "src/ol_infrastructure/applications/dagster/"],
+        paths=[
+            *PULUMI_WATCHED_PATHS,
+            "src/ol_infrastructure/applications/dagster/",
+            "src/bridge/lib/versions.py",
+        ],
         branch=pulumi_code_branch,
     )
 

@@ -406,7 +406,6 @@ redis_cluster_security_group = ec2.SecurityGroup(
         ec2.SecurityGroupIngressArgs(
             security_groups=[
                 mitxonline_app_security_group.id,
-                operations_vpc["security_groups"]["celery_monitoring"],
                 cluster_substructure_stack.require_output(
                     "cluster_keda_security_group_id"
                 ),
@@ -415,6 +414,13 @@ redis_cluster_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,
             description="Allow application pods to talk to Redis",
+        ),
+        ec2.SecurityGroupIngressArgs(
+            cidr_blocks=operations_vpc["k8s_pod_subnet_cidrs"],
+            protocol="tcp",
+            from_port=DEFAULT_REDIS_PORT,
+            to_port=DEFAULT_REDIS_PORT,
+            description="Allow Operations VPC celery monitoring pods to talk to Redis",
         ),
     ],
     vpc_id=apps_vpc["id"],
@@ -686,7 +692,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
             route_name="reqauth",
             priority=10,
             hosts=[api_domain, frontend_domain],
-            paths=["/login/", "/admin/login/*", "/login", "/login/oidc*"],
+            paths=["/login/*", "/admin/login/*", "/login*", "/login/oidc*"],
             plugins=[
                 mitxonline_direct_oidc.get_full_oidc_plugin_config(
                     unauth_action="auth"

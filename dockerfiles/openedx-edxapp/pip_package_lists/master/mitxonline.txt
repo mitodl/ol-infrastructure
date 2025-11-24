@@ -1,5 +1,5 @@
 celery-redbeat==2.3.3  # Support for using Redis as the lock for Celery schedules
-granian==2.5.6
+granian==2.6.0
 django-redis==6.0.0
 ol-openedx-git-auto-export==0.7.0
 edx-sysadmin==0.4.0
@@ -13,7 +13,7 @@ ol-openedx-logging
 ol-openedx-sentry
 openedx-scorm-xblock
 ol-social-auth==0.2.0
-pydantic-settings==2.11.0
+pydantic-settings==2.12.0
 uwsgi==2.0.31
 wheel==0.45.1
 
@@ -25,11 +25,14 @@ ol-openedx-chat-xblock
 ol-openedx-course-sync
 
 # Open Telemetry support
-opentelemetry-api==1.38.0
-opentelemetry-distro==0.59b0
-opentelemetry-instrumentation==0.59b0
-opentelemetry-instrumentation-django==0.59b0
-opentelemetry-instrumentation-wsgi==0.59b0
-opentelemetry-sdk==1.38.0
-opentelemetry-semantic-conventions==0.59b0
-opentelemetry-util-http==0.59b0
+# opentelemetry-api
+# opentelemetry-distro
+# opentelemetry-instrumentation
+# opentelemetry-instrumentation-django
+# opentelemetry-instrumentation-wsgi
+# opentelemetry-sdk
+# opentelemetry-semantic-conventions
+# opentelemetry-util-http
+
+# Utilities to help with schema debugging and other common tasks
+django-extensions

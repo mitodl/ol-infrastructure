@@ -220,7 +220,7 @@ LEARNER_PORTAL_URL_ROOT: https://learner-portal-localhost:18000
 LEARNER_HOME_MICROFRONTEND_URL: '/dashboard/'
 LOCAL_LOGLEVEL: INFO
 LOGGING_ENV: sandbox
-LOG_DIR: /openedx/data/var/log/ed/openedx/data/var/log/edx
+LOG_DIR: /openedx/data/var/log/edx
 MAINTENANCE_BANNER_TEXT: Sample banner message
 MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within the bucket. No leading / allowed
 MEDIA_URL: /media/

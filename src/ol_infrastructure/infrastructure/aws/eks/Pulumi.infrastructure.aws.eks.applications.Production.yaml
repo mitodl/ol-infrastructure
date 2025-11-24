@@ -13,18 +13,18 @@ config:
   - ".mitxonline.mit.edu"
   eks:apisix_admin_key:
     secure: v1:PafPE9cAPNoOSOrU:8V16zZH9OGc1jgfZffXRDLvb6ROksZLULaYJvdjHgPCG/zmB/8nA8EMZb8X2/O74
-  eks:apisix_ingress_enabled: "true"
-  eks:apisix_official_enabled: "true"
   eks:apisix_viewer_key:
     secure: v1:Iozn2qrhdgmfpCXw:1H82fWngqaTZzOrgGp+jykq0+p/YOKTs5KE7rIPxhGZ1PbjCQ8Clz9+JzXqLQfCu
   eks:apisix_domains:
-  - "api-pay.ol.mit.edu"
   - "api-learn-ai.ol.mit.edu"
+  - "api-pay.ol.mit.edu"
   - "api.learn.mit.edu"
-  - "nb.learn.mit.edu"
   - "api.mitxonline.mit.edu"
-  eks:apisix_official_domains:
   - "binder.learn.mit.edu"
+  - "courses-backend.learn.mit.edu"
+  - "dcc.learn.mit.edu"
+  - "nb.learn.mit.edu"
+  - "studio-backend.learn.mit.edu"
   eks:apisix_min_replicas: "5"
   eks:apisix_max_replicas: "10"
   eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
@@ -35,6 +35,7 @@ config:
   eks:gateway_release_channel: "experimental"
   eks:namespaces:
   - "botkube"
+  - "digital-credentials"
   - "ecommerce"
   - "jupyter"
   - "kubewatch"

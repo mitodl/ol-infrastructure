@@ -322,13 +322,15 @@ redis_cluster_security_group = ec2.SecurityGroup(
                 "Allow access from EKS pods to Redis for caching and queueing"
             ),
         ),
-        # Allow from celery monitoring SG
+        # Allow from celery monitoring pods in Operations VPC
         ec2.SecurityGroupIngressArgs(
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,
             protocol="tcp",
-            security_groups=[operations_vpc["security_groups"]["celery_monitoring"]],
-            description="Allow access from celery monitoring",
+            cidr_blocks=operations_vpc["k8s_pod_subnet_cidrs"],
+            description=(
+                "Allow access from Operations VPC celery monitoring pods to Redis"
+            ),
         ),
     ],
     tags=aws_config.merged_tags({"Name": f"superset-redis-{superset_env}"}),

@@ -852,6 +852,9 @@ dagster_helm_values = {
         "type": "K8sRunLauncher",
         "config": {
             "k8sRunLauncher": {
+                "imagePullPolicy": "IfNotPresent",
+                "loadInclusterConfig": True,
+                "envConfigMaps": [],
                 "envVars": dagster_db.db_instance.address.apply(
                     lambda db_host: [
                         f"DAGSTER_PG_HOST={db_host}",
@@ -866,6 +869,8 @@ dagster_helm_values = {
                     {"name": "dagster-dbt-secrets"},
                     {"name": "dagster-postgresql-secret"},
                 ],
+                "volumeMounts": [],
+                "volumes": [],
                 "jobNamespace": dagster_namespace,
             },
         },
@@ -873,16 +878,21 @@ dagster_helm_values = {
 }
 
 # Deploy Dagster using Helm
+# Note: Using local vendored chart with JSON schema files removed.
+# This works around a Pulumi/Helm SDK bug where schema validation fails
+# on external $ref URLs (https://kubernetesjsonschema.dev).
+# To update charts, run: ./vendor_charts.sh
+dagster_chart_path = str(
+    Path(__file__).parent
+    / "helm-charts"
+    / f"dagster-{DAGSTER_CHART_VERSION}-noschema.tgz"
+)
 dagster_helm_release = kubernetes.helm.v3.Release(
     f"dagster-helm-release-{stack_info.env_suffix}",
     kubernetes.helm.v3.ReleaseArgs(
         name="dagster",
-        version=DAGSTER_CHART_VERSION,
         namespace=dagster_namespace,
-        chart="dagster",
-        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-            repo="https://dagster-io.github.io/helm",
-        ),
+        chart=dagster_chart_path,
         cleanup_on_fail=True,
         values=dagster_helm_values,
     ),
@@ -938,17 +948,19 @@ dagster_user_code_values = {
     },
 }
 
+dagster_user_code_chart_path = str(
+    Path(__file__).parent
+    / "helm-charts"
+    / f"dagster-user-deployments-{DAGSTER_CHART_VERSION}-noschema.tgz"
+)
 dagster_user_code_release = kubernetes.helm.v3.Release(
     f"dagster-user-code-release-{stack_info.env_suffix}",
     kubernetes.helm.v3.ReleaseArgs(
         name="dagster-user-code",
-        version=DAGSTER_CHART_VERSION,
         namespace=dagster_namespace,
-        chart="dagster-user-deployments",
-        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-            repo="https://dagster-io.github.io/helm",
-        ),
+        chart=dagster_user_code_chart_path,
         cleanup_on_fail=True,
+        disable_openapi_validation=True,
         values=dagster_user_code_values,
     ),
     opts=ResourceOptions(
