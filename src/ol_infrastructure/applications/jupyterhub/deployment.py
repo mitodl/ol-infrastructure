@@ -36,7 +36,6 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib.ol_types import StackInfo
 from ol_infrastructure.lib.stack_defaults import defaults
-from ol_infrastructure.lib.vault import postgres_role_statements
 
 
 def provision_jupyterhub_deployment(  # noqa: PLR0913
@@ -46,6 +45,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     db_config: OLPostgresDBConfig,
     cluster_stack: StackReference,
     app_db: OLAmazonDB,
+    postgres_role_statements: list[dict[str, str]],
     application_labels: dict[str, str],
     k8s_global_labels: dict[str, str],
     extra_images: dict[str, dict[str, str]] | None = None,

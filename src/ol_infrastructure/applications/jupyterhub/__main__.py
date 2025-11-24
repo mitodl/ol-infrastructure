@@ -1,5 +1,7 @@
 """JupyterHub application deployment for MIT Open Learning."""
 
+from string import Template
+
 from pulumi import Config, StackReference
 from pulumi_aws import ec2, get_caller_identity, iam
 
@@ -23,7 +25,7 @@ from ol_infrastructure.lib.ol_types import (
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
-from ol_infrastructure.lib.vault import setup_vault_provider
+from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 
 # Parse stack and setup providers
 stack_info = parse_stack()
@@ -192,6 +194,17 @@ jupyterhub_db_config = OLPostgresDBConfig(
 )
 jupyterhub_db = OLAmazonDB(jupyterhub_db_config)
 
+jupyterhub_authoring_role_statements = postgres_role_statements.copy()
+# I don't know if this will work.
+# gexec is psql specific and vault uses a driver.
+# A workaround with dblink_exec was suggested?
+jupyterhub_authoring_role_statements["app"]["create"].append(
+    Template(
+        r"""SELECT 'CREATE DATABASE "${app_name}"' WHERE NOT EXISTS
+        (SELECT FROM pg_database WHERE datname = '${app_name}')\gexec;"""
+    )
+)
+
 # Use same physical DB instance
 jupyterhub_authoring_db_config = OLPostgresDBConfig(
     instance_name=f"jupyterhub-db-{stack_info.env_suffix}",
@@ -208,9 +221,12 @@ jupyterhub_authoring_db_config = OLPostgresDBConfig(
 # instead of naming it based on the original
 # deployment we could probably clean
 # this abstraction up a bit, but that'd require a teardown.
-deployment_to_db_config = {
-    "jupyterhub": jupyterhub_db_config,
-    "jupyterhub-authoring": jupyterhub_authoring_db_config,
+deployment_to_db_config_and_role_statements = {
+    "jupyterhub": (jupyterhub_db_config, postgres_role_statements),
+    "jupyterhub-authoring": (
+        jupyterhub_authoring_db_config,
+        jupyterhub_authoring_role_statements,
+    ),
 }
 
 # Provision JupyterHub deployments
@@ -223,10 +239,15 @@ for deployment_config in deployment_configs:
         stack_info=stack_info,
         jupyterhub_deployment_config=deployment_config,
         vault_config=vault_config,
-        db_config=deployment_to_db_config[deployment_config["name"]],
+        db_config=deployment_to_db_config_and_role_statements[
+            deployment_config["name"]
+        ][0],
         app_db=jupyterhub_db,
         cluster_stack=cluster_stack,
         application_labels=application_labels,
         k8s_global_labels=k8s_global_labels,
         extra_images=EXTRA_IMAGES,
+        postgres_role_statements=deployment_to_db_config_and_role_statements[
+            deployment_config["name"]
+        ][1],
     )
