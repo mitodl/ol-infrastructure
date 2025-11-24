@@ -402,7 +402,8 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                     "extraEnv": {
                         "JUPYTERHUB_SINGLEUSER_APP": (
                             "jupyter_server.serverapp.ServerApp"
-                        )
+                        ),
+                        "NOTEBOOK_BUCKET": "jupyter-courses-ci",
                     },
                     "cloudMetadata": {
                         "blockWithIptables": False,
