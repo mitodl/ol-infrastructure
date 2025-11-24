@@ -1137,7 +1137,7 @@ class OLApisixOIDCConfig(BaseModel):
     oidc_logout_path: str = "/logout/oidc"
     oidc_post_logout_redirect_uri: str = "/"
     oidc_renew_access_token_on_expiry: bool = True
-    oidc_scope: str = "openid profile email organization"
+    oidc_scope: str = "openid profile email organization:*"
     oidc_session_contents: dict[str, bool] = {
         "access_token": True,
         "enc_id_token": True,
