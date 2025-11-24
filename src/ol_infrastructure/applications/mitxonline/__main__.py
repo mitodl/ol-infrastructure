@@ -542,8 +542,8 @@ mitxonline_k8s_app = OLApplicationK8s(
                 resource_limits={"memory": "1500Mi"},
             ),
         ],
-        resource_requests={"cpu": "250m", "memory": "1Gi"},
-        resource_limits={"memory": "1Gi"},
+        resource_requests={"cpu": "250m", "memory": "1500Mi"},
+        resource_limits={"memory": "1500Mi"},
         hpa_scaling_metrics=[
             kubernetes.autoscaling.v2.MetricSpecArgs(
                 type="Resource",
