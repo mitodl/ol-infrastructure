@@ -49,15 +49,29 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     application_labels: dict[str, str],
     k8s_global_labels: dict[str, str],
     extra_images: dict[str, dict[str, str]] | None = None,
-    menu_override_json: str | None = None,
-    disabled_extensions_json: str | None = None,
-    extra_config: str | None = None,
 ) -> kubernetes.helm.v3.Release:
     base_name = jupyterhub_deployment_config["name"]
     domain_name = jupyterhub_deployment_config["domain"]
     namespace = jupyterhub_deployment_config["namespace"]
     env_name = f"{stack_info.env_suffix}"
     db_name_normalized = base_name.replace("-", "_")
+
+    # Read configuration files from paths in deployment config
+    menu_override_json = (
+        Path(__file__)
+        .parent.joinpath(jupyterhub_deployment_config["menu_override_file"])
+        .read_text()
+    )
+    disabled_extensions_json = (
+        Path(__file__)
+        .parent.joinpath(jupyterhub_deployment_config["disabled_extension_file"])
+        .read_text()
+    )
+    extra_config = (
+        Path(__file__)
+        .parent.joinpath(jupyterhub_deployment_config["extra_config_file"])
+        .read_text()
+    )
 
     # Derive common configuration values
     apisix_ingress_class = (

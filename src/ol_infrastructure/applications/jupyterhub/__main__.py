@@ -1,7 +1,5 @@
 """JupyterHub application deployment for MIT Open Learning."""
 
-from pathlib import Path
-
 from pulumi import Config, StackReference
 from pulumi_aws import ec2
 
@@ -232,8 +230,9 @@ jupyterhub_db_config = OLPostgresDBConfig(
 )
 jupyterhub_db = OLAmazonDB(jupyterhub_db_config)
 
+# Use same physical DB instance
 jupyterhub_authoring_db_config = OLPostgresDBConfig(
-    instance_name=f"jupyterhub-db-{stack_info.env_suffix}",  # Use same physical DB instance
+    instance_name=f"jupyterhub-db-{stack_info.env_suffix}",
     password=rds_password,
     subnet_group_name=target_vpc["rds_subnet"],
     security_groups=[jupyterhub_db_security_group],
@@ -258,24 +257,6 @@ for deployment_config in deployment_configs:
     cluster_stack.require_output("namespaces").apply(
         lambda ns, namespace=namespace: check_cluster_namespace(namespace, ns)
     )
-    # Need to decide if this is the best way to handle
-    # these overrides/revisit values merged into helm charts
-    # Can pull into function and remove params
-    menu_override = (
-        Path(__file__)
-        .parent.joinpath(deployment_config["menu_override_file"])
-        .read_text()
-    )
-    disabled_extensions = (
-        Path(__file__)
-        .parent.joinpath(deployment_config["disabled_extension_file"])
-        .read_text()
-    )
-    dynamic_image_config = (
-        Path(__file__)
-        .parent.joinpath(deployment_config["extra_config_file"])
-        .read_text()
-    )
     jupyterhub_deployment = provision_jupyterhub_deployment(
         stack_info=stack_info,
         jupyterhub_deployment_config=deployment_config,
@@ -286,7 +267,4 @@ for deployment_config in deployment_configs:
         application_labels=application_labels,
         k8s_global_labels=k8s_global_labels,
         extra_images=EXTRA_IMAGES,
-        menu_override_json=menu_override,
-        disabled_extensions_json=disabled_extensions,
-        extra_config=dynamic_image_config,
     )
