@@ -111,10 +111,10 @@ def setup_apisix(
                 "resources": {
                     "requests": {
                         "cpu": "100m",
-                        "memory": "400Mi",
+                        "memory": eks_config.get("apisix_memory") or "400Mi",
                     },
                     "limits": {
-                        "memory": "400Mi",
+                        "memory": eks_config.get("apisix_memory") or "400Mi",
                     },
                 },
                 # --- Service (LoadBalancer) ---
