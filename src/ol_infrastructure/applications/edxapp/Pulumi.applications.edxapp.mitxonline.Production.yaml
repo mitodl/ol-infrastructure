@@ -111,25 +111,21 @@ config:
     webapp:
       lms:
         cpu_request: "250m"
-        cpu_limit: "500m"
-        memory_request: "1Gi"
+        memory_request: "2Gi"
         memory_limit: "2Gi"
       cms:
         cpu_request: "250m"
-        cpu_limit: "500m"
-        memory_request: "1Gi"
+        memory_request: "2Gi"
         memory_limit: "2Gi"
     celery:
       lms:
         cpu_request: "250m"
-        cpu_limit: "500m"
-        memory_request: "1Gi"
-        memory_limit: "2Gi"
+        memory_request: "5Gi"
+        memory_limit: "8Gi"
       cms:
         cpu_request: "250m"
-        cpu_limit: "500m"
-        memory_request: "1Gi"
-        memory_limit: "2Gi"
+        memory_request: "5Gi"
+        memory_limit: "8Gi"
   edxapp:k8s_deployment: true
   edxapp:k8s_cutover: false
   edxapp:disable_ec2_deployment: false
