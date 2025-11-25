@@ -26,7 +26,6 @@ Arguments:
     --auth-realm (str): The realm to authenticate against. Default: master
 """
 
-# ruff: noqa: INP001, C901, PLR0912, PLR0915
 
 import argparse
 import sys
@@ -294,9 +293,9 @@ def main() -> None:
         )
 
         if args.dry_run:
-            print("*** DRY-RUN MODE: No changes will be made ***")  # noqa: T201
+            print("*** DRY-RUN MODE: No changes will be made ***")
 
-        print(  # noqa: T201
+        print(
             f"Searching for users with email domain: {args.email_domain}"
             + (" (including subdomains)" if args.include_subdomains else "")
         )
@@ -304,38 +303,38 @@ def main() -> None:
             args.realm, args.email_domain, include_subdomains=args.include_subdomains
         )
         if not users:
-            print(  # noqa: T201
+            print(
                 "No users found with the specified email domain."
             )
             return
 
-        print(f"Found {len(users)} users.")  # noqa: T201
+        print(f"Found {len(users)} users.")
 
-        print(  # noqa: T201
+        print(
             f"Searching for organization: {args.organization_alias}"
         )
         organization = client.get_organization_by_alias(
             args.realm, args.organization_alias
         )
         if not organization:
-            print(  # noqa: T201
+            print(
                 f"Error: Organization '{args.organization_alias}' not found."
             )
             sys.exit(1)
 
         org_id = organization["id"]
-        print(  # noqa: T201
+        print(
             f"Found organization '{organization['alias']}' with ID: {org_id}"
         )
 
-        print("Getting existing organization members...")  # noqa: T201
+        print("Getting existing organization members...")
         members = client.get_organization_members(args.realm, org_id)
         member_ids = {member["id"] for member in members}
-        print(f"Found {len(member_ids)} existing members.")  # noqa: T201
+        print(f"Found {len(member_ids)} existing members.")
 
         exclude_domains = args.exclude_domain or []
         if exclude_domains:
-            print(  # noqa: T201
+            print(
                 f"Excluding users from domains: {', '.join(exclude_domains)}"
             )
 
@@ -351,41 +350,41 @@ def main() -> None:
                         excluded = True
                         break
                 if excluded:
-                    print(  # noqa: T201
+                    print(
                         f"Skipping user {user['username']} ({user_email}) - "
                         "excluded domain."
                     )
                     continue
 
             if user_id in member_ids:
-                print(  # noqa: T201
+                print(
                     f"User {user['username']} ({user_id}) is already a member "
                     f"of {organization['alias']}."
                 )
                 continue
 
-            print(  # noqa: T201
+            print(
                 f"Adding user {user['username']} ({user_id}) to organization "
                 f"{organization['alias']}..."
             )
             if args.dry_run:
-                print("  [DRY-RUN] Skipping actual API call.")  # noqa: T201
+                print("  [DRY-RUN] Skipping actual API call.")
                 continue
 
             try:
                 client.add_user_to_organization(args.realm, user_id, org_id)
-                print("Done.")  # noqa: T201
+                print("Done.")
             except httpx.HTTPStatusError as e:
-                print(  # noqa: T201
+                print(
                     "Received an error: ", e.response.status_code, e.response.text
                 )
                 if e.response.status_code == HTTP_CONFLICT:
-                    print(  # noqa: T201
+                    print(
                         f"User {user['username']} ({user_id}) is already a "
                         f"member of {organization['alias']}."
                     )
                 elif "User does not exist" in e.response.text:
-                    print(  # noqa: T201
+                    print(
                         f"Warning: User {user['username']} ({user_id}) not "
                         "found in Keycloak. Skipping."
                     )
@@ -393,12 +392,12 @@ def main() -> None:
                     raise
 
     except httpx.HTTPStatusError as e:
-        print(  # noqa: T201
+        print(
             f"An HTTP error occurred: {e.response.status_code} - {e.response.text}"
         )
         sys.exit(1)
     except KeyError as e:
-        print(f"An unexpected key error occurred: {e}")  # noqa: T201
+        print(f"An unexpected key error occurred: {e}")
         sys.exit(1)
 
 
