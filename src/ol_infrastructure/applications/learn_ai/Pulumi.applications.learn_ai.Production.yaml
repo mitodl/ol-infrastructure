@@ -35,7 +35,7 @@ config:
     MITOL_FEATURES_DEFAULT: "true"
     NODE_ENV: "development"
     OPENTELEMETRY_ENABLED: "true"
-    OPENTELEMETRY_ENDPOINT: "grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4317"
+    OPENTELEMETRY_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces"
     OPENTELEMETRY_SERVICE_NAME: "learn-ai-webapp"
     OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=production,service.namespace=learn-ai,service.version=${GIT_SHA:-unknown},service.instance.id=${HOSTNAME}"
     OTEL_TRACES_SAMPLER: "parentbased_traceidratio"
