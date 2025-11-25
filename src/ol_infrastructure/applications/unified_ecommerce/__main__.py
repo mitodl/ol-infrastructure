@@ -94,6 +94,7 @@ aws_config = AWSBase(
     tags={"OU": "operations", "Environment": ecommerce_environment},
 )
 vault_config = Config("vault")
+slack_channel = ecommerce_config.get("slack_channel")  # Optional Slack channel
 
 consul_provider = get_consul_provider(stack_info)
 setup_vault_provider(stack_info)
@@ -693,6 +694,7 @@ ecommerce_k8s_config: OLApplicationK8sConfig = OLApplicationK8sConfig(
 
 ol_k8s_application = OLApplicationK8s(
     ol_app_k8s_config=ecommerce_k8s_config,
+    slack_channel=slack_channel,
     opts=ResourceOptions(depends_on=ecommerce_db),
 )
 
