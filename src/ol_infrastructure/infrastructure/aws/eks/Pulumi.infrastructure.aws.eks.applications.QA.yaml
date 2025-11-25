@@ -43,6 +43,7 @@ config:
   - "mitxonline-openedx"
   - "odl-video-service"
   - "xpro-openedx"
+  - "jupyter-authoring"
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 1000
