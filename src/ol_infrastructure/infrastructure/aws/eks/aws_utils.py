@@ -330,6 +330,7 @@ def setup_aws_integrations(
             values={
                 "clusterName": cluster_name,
                 "enableCertManager": True,
+                "keepTLSSecret": False,
                 "serviceAccount": {
                     "create": False,
                     "name": aws_lb_controller_service_account_name,
@@ -343,12 +344,11 @@ def setup_aws_integrations(
                 "tolerations": operations_tolerations,
                 "resources": {
                     "requests": {
-                        "cpu": "100m",
+                        "cpu": "25m",
                         "memory": "128Mi",
                     },
                     "limits": {
-                        "cpu": "200m",
-                        "memory": "256Mi",
+                        "memory": "128Mi",
                     },
                 },
             },

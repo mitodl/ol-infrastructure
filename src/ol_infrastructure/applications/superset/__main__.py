@@ -136,6 +136,7 @@ superset_app = OLEKSAuthBinding(
         aws_config=aws_config,
         iam_policy_document=superset_policy_document,
         vault_policy_path=Path(__file__).parent.joinpath("superset_server_policy.hcl"),
+        cluster_name=cluster_stack.require_output("cluster_name"),
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
         irsa_service_account_name="superset",

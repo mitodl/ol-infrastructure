@@ -1167,6 +1167,7 @@ consul_kv_data = {
     "default-module-class": edxapp_config.get("default_module_class")
     or "xmodule.hidden_block.HiddenBlock",
     "google-analytics-id": edxapp_config.require("google_analytics_id"),
+    "github-auto-export-org-api-url": edxapp_config.get("github_org_api_url") or "",
     "lms-domain": edxapp_domains["lms"],
     "marketing-domain": edxapp_config.get("marketing_domain") or "",
     "mitxonline-domain": edxapp_config.get("mitxonline_domain") or "",

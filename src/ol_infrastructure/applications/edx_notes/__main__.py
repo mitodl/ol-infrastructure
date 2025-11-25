@@ -54,7 +54,6 @@ from ol_infrastructure.lib.aws.eks_helper import (
 from ol_infrastructure.lib.consul import consul_key_helper, get_consul_provider
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
-    BusinessUnit,
     K8sGlobalLabels,
     Services,
 )
@@ -197,7 +196,7 @@ k8s_global_labels = K8sGlobalLabels(
     service=Services.edx_notes,
     ou=notes_config.require("business_unit"),
     stack=stack_info,
-).model_dump()
+)
 
 # Deploy to Kubernetes using OLApplicationK8s component
 if deploy_to_k8s:
@@ -256,21 +255,18 @@ if deploy_to_k8s:
     # EDX Notes doesn't need AWS service access (no S3, SES, etc.)
     notes_app = OLEKSAuthBinding(
         OLEKSAuthBindingConfig(
-            application_name="edx-notes",
+            application_name=f"edx-notes-{stack_info.env_prefix}",
             namespace=namespace,
             stack_info=stack_info,
             aws_config=aws_config,
             iam_policy_document=None,
             vault_policy_text=vault_policy_text,
+            cluster_name=cluster_stack.require_output("cluster_name"),
             cluster_identities=cluster_stack.require_output("cluster_identities"),
             vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
             irsa_service_account_name="edx-notes",
-            vault_sync_service_account_names="edx-notes-vault",
-            k8s_labels=K8sGlobalLabels(
-                service=Services.edx_notes,
-                ou=BusinessUnit(stack_info.env_prefix),
-                stack=stack_info,
-            ),
+            vault_sync_service_account_names=f"edx-notes-{stack_info.env_prefix}-vault",
+            k8s_labels=k8s_global_labels,
         )
     )
 
@@ -287,9 +283,9 @@ if deploy_to_k8s:
             OLVaultK8SStaticSecretConfig(
                 name="edx-notes-static-secrets",
                 namespace=namespace,
-                dest_secret_labels=k8s_global_labels,
+                dest_secret_labels=k8s_global_labels.model_dump(),
                 dest_secret_name=static_secret_name,
-                labels=k8s_global_labels,
+                labels=k8s_global_labels.model_dump(),
                 mount=f"secret-{stack_info.env_prefix}",
                 mount_type="kv-v1",
                 path="edx-notes",
@@ -317,9 +313,9 @@ if deploy_to_k8s:
         OLVaultK8SDynamicSecretConfig(
             name="edx-notes-db-creds",
             namespace=namespace,
-            dest_secret_labels=k8s_global_labels,
+            dest_secret_labels=k8s_global_labels.model_dump(),
             dest_secret_name=db_creds_secret_name,
-            labels=k8s_global_labels,
+            labels=k8s_global_labels.model_dump(),
             mount=f"mariadb-{stack_info.env_prefix}",
             path="creds/notes",
             restart_target_kind="Deployment",
@@ -353,7 +349,7 @@ if deploy_to_k8s:
         application_min_replicas=notes_config.get_int("min_replicas") or 1,
         application_max_replicas=notes_config.get_int("max_replicas") or 3,
         application_deployment_use_anti_affinity=True,
-        k8s_global_labels=k8s_global_labels,
+        k8s_global_labels=k8s_global_labels.model_dump(),
         env_from_secret_names=["edx-notes-secrets", db_creds_secret_name],
         application_security_group_id=notes_app_security_group.id,
         application_security_group_name=notes_app_security_group.name,
@@ -369,12 +365,11 @@ if deploy_to_k8s:
         init_migrations=False,  # We're using pre-deploy jobs instead
         init_collectstatic=False,  # EDX Notes doesn't need collectstatic
         resource_requests={
-            "cpu": notes_config.get("cpu_request") or "250m",
-            "memory": notes_config.get("memory_request") or "512Mi",
+            "cpu": "250m",
+            "memory": "512Mi",
         },
         resource_limits={
-            "cpu": notes_config.get("cpu_limit") or "500m",
-            "memory": notes_config.get("memory_limit") or "1Gi",
+            "memory": "512Mi",
         },
         pre_deploy_commands=pre_deploy_commands,
         probe_configs={
@@ -420,7 +415,7 @@ if deploy_to_k8s:
         cert_issuer_class="cluster-issuer",
         gateway_name="edx-notes",
         namespace=namespace,
-        labels=k8s_global_labels,
+        labels=k8s_global_labels.model_dump(),
         listeners=[
             OLEKSGatewayListenerConfig(
                 name="https-web",

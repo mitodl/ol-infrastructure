@@ -35,6 +35,7 @@ class OLEKSAuthBindingConfig(BaseModel):
     iam_policy_document: dict[str, Any] | None = None
     vault_policy_path: Path | None = None
     vault_policy_text: str | None = None
+    cluster_name: str | Output[str]
     # From cluster stack reference
     cluster_identities: Output[Any]
     vault_auth_endpoint: Output[str]
@@ -116,7 +117,7 @@ class OLEKSAuthBinding(ComponentResource):
             f"{config.application_name}-irsa-trust-role-{config.stack_info.env_suffix}",
             role_config=OLEKSTrustRoleConfig(
                 account_id=aws_account.account_id,
-                cluster_name=f"data-{config.stack_info.name}",
+                cluster_name=config.cluster_name,
                 cluster_identities=config.cluster_identities,
                 description=(
                     f"Trust role for {config.application_name} k8s service account"

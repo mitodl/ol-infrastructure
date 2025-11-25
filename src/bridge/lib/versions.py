@@ -16,7 +16,7 @@ REDASH_VERSION = "9d273e4"
 TRAEFIK_VERSION = "3.6.2"
 TUTOR_PERMISSIONS_VERSION = "15.3.4"
 # renovate: datasource=github-releases depName=vault packageName=hashicorp/vault
-VAULT_VERSION = "1.21.0"
+VAULT_VERSION = "1.21.1"
 
 # EKS Specific Versions
 # renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/charts
@@ -24,9 +24,9 @@ AIRBYTE_CHART_VERSION = "2.0.19"
 # renovate: datasource=helm depName=superset packageName=superset registryUrl=https://apache.github.io/superset
 SUPERSET_CHART_VERSION = "0.15.0"
 # renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://apache.github.io/apisix-helm-chart
-APISIX_CHART_VERSION = "2.12.2"
+APISIX_CHART_VERSION = "2.12.3"
 # renovate: datasource=helm depName=aws-load-balancer-controller packageName=aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts
-AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION = "1.15.0"
+AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION = "1.16.0"
 # renovate: datasource=helm depName=aws-node-termination-handler packageName=aws-node-termination-handler registryUrl=https://aws.github.io/eks-charts
 AWS_NODE_TERMINATION_HANDLER_CHART_VERSION = "0.27.2"
 # renovate: datasource=helm depName=botkube packageName=botkube
@@ -34,7 +34,7 @@ BOTKUBE_CHART_VERSION = "v1.14.0"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager
 CERT_MANAGER_CHART_VERSION = "v1.16.1"
 # renovate: datasource=helm depName=dagster packageName=dagster registryUrl=https://dagster-io.github.io/helm
-DAGSTER_CHART_VERSION = "1.12.2"
+DAGSTER_CHART_VERSION = "1.12.3"
 # renovate: datasource=aws-eks-addon depName=ebs-csi-driver
 EBS_CSI_DRIVER_VERSION = "v1.40.1-eksbuild.1"
 # renovate: datasource=aws-eks-addon depName=efs-csi-driver
@@ -52,7 +52,7 @@ KUBE_STATE_METRICS_CHART_VERSION = "5.1.0"
 # renovate: datasource=docker depName=kubewatch packageName=kubewatch
 KUBEWATCH_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
-TRAEFIK_CHART_VERSION = "37.3.0"
+TRAEFIK_CHART_VERSION = "37.4.0"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
 VANTAGE_K8S_AGENT_CHART_VERSION = "1.2.2"
 # renovate: datasource=helm depName=vault-secrets-operator packageName=vault-secrets-operator registryUrl=https://helm.releases.hashicorp.com
@@ -60,13 +60,13 @@ VAULT_SECRETS_OPERATOR_CHART_VERSION = "1.0.1"
 # renovate: datasource=docker depName=nginx
 NGINX_VERSION = "1.29.3"
 # renovate: datasource=github-releases depName=prometheus-operator packageName=prometheus-operator/prometheus-operator
-PROMETHEUS_OPERATOR_CRD_VERSION = "v0.86.2"
+PROMETHEUS_OPERATOR_CRD_VERSION = "v0.87.0"
 # renovate: datasource=github-releases depName=keycloak-k8s-resources packageName=keycloak/keycloak-k8s-resources
 KEYCLOAK_OPERATOR_CRD_VERSION = "26.2.4"
 # renovate: datasource=helm depName=jupyterhub packageName=jupyterhub registryUrl=https://hub.jupyter.org/helm-chart
 JUPYTERHUB_CHART_VERSION = "4.3.1"
 # renovate: datasource=helm depName=k8s-monitoring packageName=k8s-monitoring registryUrl=https://grafana.github.io/helm-charts
-GRAFANA_K8S_MONITORING_CHART_VERSION = "3.5.7"
+GRAFANA_K8S_MONITORING_CHART_VERSION = "3.6.0"
 # renovate: datasource=helm depName=dcgm-exporter packageName=dcgm-exporter registryUrl=https://nvidia.github.io/dcgm-exporter/helm-charts
 NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.6.0"
 # renovate: datasource=helm depName=nvidia-device-plugin packageName=nvidia-device-plugin registryUrl=https://nvidia.github.io/k8s-device-plugin

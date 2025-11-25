@@ -99,7 +99,7 @@ def setup_vault_secrets_operator(
             ),
             values={
                 "image": {
-                    "pullPolicy": "Always",
+                    "pullPolicy": "IfNotPresent",
                 },
                 "extraLabels": k8s_global_labels,
                 "defaultVaultConnection": {
@@ -113,12 +113,11 @@ def setup_vault_secrets_operator(
                     "manager": {
                         "resources": {
                             "requests": {
-                                "memory": "64Mi",
-                                "cpu": "10m",
+                                "memory": "128Mi",
+                                "cpu": "30m",
                             },
                             "limits": {
                                 "memory": "128Mi",
-                                "cpu": "50m",
                             },
                         },
                         "clientCache": {

@@ -115,14 +115,11 @@ if codejail_config.get_bool("deploy_to_k8s"):
                             image=codejail_image,
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={
-                                    "cpu": codejail_config.get("cpu_request") or "100m",
-                                    "memory": codejail_config.get("memory_request")
-                                    or "256Mi",
+                                    "cpu": "100m",
+                                    "memory": "256Mi",
                                 },
                                 limits={
-                                    "cpu": codejail_config.get("cpu_limit") or "500m",
-                                    "memory": codejail_config.get("memory_limit")
-                                    or "512Mi",
+                                    "memory": "265Mi",
                                 },
                             ),
                             env=[

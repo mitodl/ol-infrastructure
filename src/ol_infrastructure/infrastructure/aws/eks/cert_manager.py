@@ -113,8 +113,7 @@ def setup_cert_manager(
             "cpu": "10m",
         },
         "limits": {
-            "memory": "128Mi",
-            "cpu": "50m",
+            "memory": "64Mi",
         },
     }
 

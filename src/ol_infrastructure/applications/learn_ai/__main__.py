@@ -789,8 +789,8 @@ learn_ai_app_k8s = OLApplicationK8s(
         import_nginx_config=True,
         # Nginx resources (defaults from component are fine)
         # App container resources
-        resource_requests={"cpu": "250m", "memory": "1000Mi"},
-        resource_limits={"cpu": "500m", "memory": "1600Mi"},
+        resource_requests={"cpu": "250m", "memory": "1600Mi"},
+        resource_limits={"memory": "1600Mi"},
         init_migrations=True,
         init_collectstatic=True,  # Assuming createcachetable is not needed or handled elsewhere
         celery_worker_configs=[
@@ -799,12 +799,16 @@ learn_ai_app_k8s = OLApplicationK8s(
                 redis_host=redis_cache.address,
                 redis_database_index="1",
                 redis_password=redis_config.require("password"),
+                resource_requests={"cpu": "100m", "memory": "2500Mi"},
+                resource_limits={"memory": "2500Mi"},
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="edx_content",
                 redis_host=redis_cache.address,
                 redis_database_index="1",
                 redis_password=redis_config.require("password"),
+                resource_requests={"cpu": "100m", "memory": "2500Mi"},
+                resource_limits={"memory": "2500Mi"},
             ),
         ],
         hpa_scaling_metrics=[

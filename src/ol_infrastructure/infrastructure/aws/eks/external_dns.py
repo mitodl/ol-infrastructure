@@ -156,12 +156,11 @@ def setup_external_dns(
                 "domainFilters": eks_config.require_object("allowed_dns_zones"),
                 "resources": {
                     "requests": {
-                        "memory": "64Mi",
+                        "memory": "128Mi",
                         "cpu": "10m",
                     },
                     "limits": {
                         "memory": "128Mi",
-                        "cpu": "50m",
                     },
                 },
             },
