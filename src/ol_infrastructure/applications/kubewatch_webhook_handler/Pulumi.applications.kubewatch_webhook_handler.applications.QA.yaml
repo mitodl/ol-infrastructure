@@ -1,3 +1,4 @@
+---
 config:
   vault:address: https://vault-qa.odl.mit.edu
   kubewatch_webhook:watched_namespaces: "ecommerce,learn-ai,mitlearn,mitxonline"
