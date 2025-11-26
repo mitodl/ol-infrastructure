@@ -6,6 +6,13 @@
   font-size: 14px !important;
   line-height: 18px !important;
 
+  .user-dropdown .btn {
+    height: 40px !important;
+  }
+  .container-xl{
+    padding: 16px 8px !important;
+  }
+  
   .dropdown-toggle::after{
     display: none !important;
   }
@@ -54,24 +61,28 @@
     }
   }
   .dashboard-btn{
-    display: inline-flex !important;
-    height: 40px !important;
-    padding: 18px 12px !important;
-    flex-direction: column !important;
-    justify-content: center !important;
-    align-items: center !important;
-    gap: 10px !important;
-    flex-shrink: 0 !important;
-    border-radius: 4px !important;
-    border: 1px solid var(--Light-Gray-2, #DDE1E6) !important;
-    background: var(--Light-Gray-2, #DDE1E6) !important;
-    p {
-      color: #212326 !important;
-      &:hover {
-        text-decoration: none !important;
-        color: #212326 !important;
-      }
-    }
+    text-decoration: none;
+    text-align: center;
+    display: inline-flex;
+    -webkit-box-pack: center;
+    justify-content: center;
+    -webkit-box-align: center;
+    align-items: center;
+    transition: background 250ms;
+    cursor: pointer;
+    min-width: 100px;
+    box-sizing: border-box;
+    font-family: neue-haas-grotesk-text, sans-serif;
+    font-weight: 500;
+    font-style: normal;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: rgb(33, 35, 38);
+    border: none;
+    background-color: rgb(221, 225, 230);
+    border-radius: 4px;
+    height: 40px;
+    padding: 18px 12px;
   &:hover{
     background: var(--white-mit-brand, #FFF) !important;
     text-decoration: none !important;
