@@ -27,7 +27,6 @@ Arguments:
 """
 
 # ruff: noqa: INP001, C901, PLR0912, PLR0915
-
 import argparse
 import sys
 from typing import Any
@@ -305,6 +304,7 @@ def main() -> None:
         )
         if not users:
 <<<<<<< HEAD
+<<<<<<< HEAD
             print("No users found with the specified email domain.")
 ||||||| parent of fab7ef18 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
             print(  # noqa: T201
@@ -315,10 +315,18 @@ def main() -> None:
                 "No users found with the specified email domain."
             )
 >>>>>>> fab7ef18 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
+||||||| parent of 4990ec94 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
+            print(
+                "No users found with the specified email domain."
+            )
+=======
+            print("No users found with the specified email domain.")
+>>>>>>> 4990ec94 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
             return
 
         print(f"Found {len(users)} users.")
 
+<<<<<<< HEAD
 <<<<<<< HEAD
         print(f"Searching for organization: {args.organization_alias}")
 ||||||| parent of fab7ef18 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
@@ -330,10 +338,18 @@ def main() -> None:
             f"Searching for organization: {args.organization_alias}"
         )
 >>>>>>> fab7ef18 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
+||||||| parent of 4990ec94 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
+        print(
+            f"Searching for organization: {args.organization_alias}"
+        )
+=======
+        print(f"Searching for organization: {args.organization_alias}")
+>>>>>>> 4990ec94 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
         organization = client.get_organization_by_alias(
             args.realm, args.organization_alias
         )
         if not organization:
+<<<<<<< HEAD
 <<<<<<< HEAD
             print(f"Error: Organization '{args.organization_alias}' not found.")
 ||||||| parent of fab7ef18 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
@@ -345,9 +361,17 @@ def main() -> None:
                 f"Error: Organization '{args.organization_alias}' not found."
             )
 >>>>>>> fab7ef18 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
+||||||| parent of 4990ec94 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
+            print(
+                f"Error: Organization '{args.organization_alias}' not found."
+            )
+=======
+            print(f"Error: Organization '{args.organization_alias}' not found.")
+>>>>>>> 4990ec94 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
             sys.exit(1)
 
         org_id = organization["id"]
+<<<<<<< HEAD
 <<<<<<< HEAD
         print(f"Found organization '{organization['alias']}' with ID: {org_id}")
 ||||||| parent of fab7ef18 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
@@ -359,6 +383,13 @@ def main() -> None:
             f"Found organization '{organization['alias']}' with ID: {org_id}"
         )
 >>>>>>> fab7ef18 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
+||||||| parent of 4990ec94 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
+        print(
+            f"Found organization '{organization['alias']}' with ID: {org_id}"
+        )
+=======
+        print(f"Found organization '{organization['alias']}' with ID: {org_id}")
+>>>>>>> 4990ec94 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
 
         print("Getting existing organization members...")
         members = client.get_organization_members(args.realm, org_id)
@@ -367,6 +398,7 @@ def main() -> None:
 
         exclude_domains = args.exclude_domain or []
         if exclude_domains:
+<<<<<<< HEAD
 <<<<<<< HEAD
             print(f"Excluding users from domains: {', '.join(exclude_domains)}")
 ||||||| parent of fab7ef18 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
@@ -378,6 +410,13 @@ def main() -> None:
                 f"Excluding users from domains: {', '.join(exclude_domains)}"
             )
 >>>>>>> fab7ef18 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
+||||||| parent of 4990ec94 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
+            print(
+                f"Excluding users from domains: {', '.join(exclude_domains)}"
+            )
+=======
+            print(f"Excluding users from domains: {', '.join(exclude_domains)}")
+>>>>>>> 4990ec94 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
 
         for user in users:
             user_id = user["id"]
@@ -417,6 +456,7 @@ def main() -> None:
                 print("Done.")
             except httpx.HTTPStatusError as e:
 <<<<<<< HEAD
+<<<<<<< HEAD
                 print("Received an error: ", e.response.status_code, e.response.text)
 ||||||| parent of fab7ef18 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
                 print(  # noqa: T201
@@ -427,6 +467,13 @@ def main() -> None:
                     "Received an error: ", e.response.status_code, e.response.text
                 )
 >>>>>>> fab7ef18 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
+||||||| parent of 4990ec94 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
+                print(
+                    "Received an error: ", e.response.status_code, e.response.text
+                )
+=======
+                print("Received an error: ", e.response.status_code, e.response.text)
+>>>>>>> 4990ec94 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
                 if e.response.status_code == HTTP_CONFLICT:
                     print(
                         f"User {user['username']} ({user_id}) is already a "
@@ -442,6 +489,7 @@ def main() -> None:
 
     except httpx.HTTPStatusError as e:
 <<<<<<< HEAD
+<<<<<<< HEAD
         print(f"An HTTP error occurred: {e.response.status_code} - {e.response.text}")
 ||||||| parent of fab7ef18 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
         print(  # noqa: T201
@@ -452,6 +500,13 @@ def main() -> None:
             f"An HTTP error occurred: {e.response.status_code} - {e.response.text}"
         )
 >>>>>>> fab7ef18 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
+||||||| parent of 4990ec94 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
+        print(
+            f"An HTTP error occurred: {e.response.status_code} - {e.response.text}"
+        )
+=======
+        print(f"An HTTP error occurred: {e.response.status_code} - {e.response.text}")
+>>>>>>> 4990ec94 ([pre-commit.ci] auto fixes from pre-commit.com hooks)
         sys.exit(1)
     except KeyError as e:
         print(f"An unexpected key error occurred: {e}")
