@@ -30,6 +30,7 @@ plugins = [
     "ol_openedx_course_export",
     "ol_openedx_course_structure_api",
     "ol_openedx_course_sync",
+    "ol_openedx_course_translations",
     "ol_openedx_git_auto_export",
     "ol_openedx_logging",
     "ol_openedx_otel_monitoring",
