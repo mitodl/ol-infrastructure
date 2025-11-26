@@ -980,7 +980,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 keycloak_url=keycloak_url,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
-                org_oidc_metadata_url="https://stage-idp.upgrad.dev/realms/upgrad-stage/.well-known/openid-configuration",
+                org_oidc_metadata_url="https://idp.upgrad.com/realms/upgrad/.well-known/openid-configuration",
                 client_id="ira-frontend",
             )
         )
