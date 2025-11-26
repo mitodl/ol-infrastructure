@@ -37,3 +37,4 @@ config:
     secure: v1:gSGSH3Lc+dcCjMGC:DWAY3/dEqzdQvZYPpv8p17Nle6Ew/5M5+aImd1rxPJxy4Xkh2eKcJsmxo2kgRgrQBKyDibEBrvQev1w/HL+L64+4g3CM075KkbvIMqPoP/c=
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
+  ecommerce:slack_channel: "ecommerce-releases"
