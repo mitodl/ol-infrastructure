@@ -16,7 +16,7 @@ config:
     enable_image_prepuller: true
   - name: jupyterhub-authoring
     domain: authoring.nb.ci.learn.mit.edu
-    namespace: jupyterhub-authoring
+    namespace: jupyter-authoring
     db_name: jupyterhub_authoring
     apisix_ingress_class: apache-apisix
     admin_users:
