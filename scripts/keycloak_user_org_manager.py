@@ -26,7 +26,6 @@ Arguments:
     --auth-realm (str): The realm to authenticate against. Default: master
 """
 
-
 import argparse
 import sys
 from typing import Any
@@ -303,29 +302,21 @@ def main() -> None:
             args.realm, args.email_domain, include_subdomains=args.include_subdomains
         )
         if not users:
-            print(
-                "No users found with the specified email domain."
-            )
+            print("No users found with the specified email domain.")
             return
 
         print(f"Found {len(users)} users.")
 
-        print(
-            f"Searching for organization: {args.organization_alias}"
-        )
+        print(f"Searching for organization: {args.organization_alias}")
         organization = client.get_organization_by_alias(
             args.realm, args.organization_alias
         )
         if not organization:
-            print(
-                f"Error: Organization '{args.organization_alias}' not found."
-            )
+            print(f"Error: Organization '{args.organization_alias}' not found.")
             sys.exit(1)
 
         org_id = organization["id"]
-        print(
-            f"Found organization '{organization['alias']}' with ID: {org_id}"
-        )
+        print(f"Found organization '{organization['alias']}' with ID: {org_id}")
 
         print("Getting existing organization members...")
         members = client.get_organization_members(args.realm, org_id)
@@ -334,9 +325,7 @@ def main() -> None:
 
         exclude_domains = args.exclude_domain or []
         if exclude_domains:
-            print(
-                f"Excluding users from domains: {', '.join(exclude_domains)}"
-            )
+            print(f"Excluding users from domains: {', '.join(exclude_domains)}")
 
         for user in users:
             user_id = user["id"]
@@ -375,9 +364,7 @@ def main() -> None:
                 client.add_user_to_organization(args.realm, user_id, org_id)
                 print("Done.")
             except httpx.HTTPStatusError as e:
-                print(
-                    "Received an error: ", e.response.status_code, e.response.text
-                )
+                print("Received an error: ", e.response.status_code, e.response.text)
                 if e.response.status_code == HTTP_CONFLICT:
                     print(
                         f"User {user['username']} ({user_id}) is already a "
@@ -392,9 +379,7 @@ def main() -> None:
                     raise
 
     except httpx.HTTPStatusError as e:
-        print(
-            f"An HTTP error occurred: {e.response.status_code} - {e.response.text}"
-        )
+        print(f"An HTTP error occurred: {e.response.status_code} - {e.response.text}")
         sys.exit(1)
     except KeyError as e:
         print(f"An unexpected key error occurred: {e}")
