@@ -44,6 +44,7 @@ KNOWN_COURSES.extend(
             "st1",
             "mltl1",
             "pm1",
+            "se1",
         ]
     ]
 )
@@ -62,6 +63,7 @@ GPU_ENABLED_COURSES = {
     "uai_source-uai.13",
     "uai_source-uai.st1",
     "uai_source-uai.mltl1",
+    "uai_source-uai.se1",
 }
 
 

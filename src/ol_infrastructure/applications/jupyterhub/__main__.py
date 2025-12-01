@@ -339,6 +339,7 @@ COURSE_NAMES.extend(
             "st1",
             "mltl1",
             "pm1",
+            "se1",
         ]
     ]
 )
