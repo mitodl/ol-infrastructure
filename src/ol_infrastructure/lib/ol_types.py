@@ -62,9 +62,9 @@ class Services(str, Enum):
     ecommerce = "unified-ecommerce"
     edx_notes = "edx-notes"
     edxapp = "edxapp"
+    jupyterhub = "jupyterhub"
     keycloak = "keycloak"
     kubewatch = "kubewatch"
-    jupyterhub = "jupyterhub"
     micromasters = "micromasters"
     mit_learn = "mit-learn"
     mit_open = "open"
@@ -76,6 +76,7 @@ class Services(str, Enum):
     odl_video_service = "ovs"
     open_metadata = "open-metadata"
     redash = "redash"
+    tika = "tika"
     xpro = "xpro"
 
 
