@@ -68,13 +68,13 @@ repos:
     - charts/
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.14.6'
+  rev: 'v0.14.7'
   hooks:
   - id: ruff-format
   - id: ruff-check
     args: [--extend-ignore=D1, --fix]
 - repo: https://github.com/pre-commit/mirrors-mypy
-  rev: v1.18.2
+  rev: v1.19.0
   hooks:
   - id: mypy
     args:
