@@ -22,6 +22,7 @@ mysql_creds: &mysql_creds
 
 {{ with secret "secret-mitxonline/edxapp" }}
 CELERY_BROKER_PASSWORD: {{ .Data.redis_auth_token }}
+DEEPL_API_KEY: {{ .Data.deepl_api_key }} # ADDED for ol_openedx_course_translations
 FERNET_KEYS: {{ .Data.fernet_keys }}
 redis_cache_config: &redis_cache_config
   BACKEND: django_redis.cache.RedisCache
@@ -520,7 +521,6 @@ OAUTH2_PROVIDER:
     - "https"
     - "edu.mit.learn.app"
 OL_OPENEDX_COURSE_SYNC_SERVICE_WORKER_USERNAME: studio_worker # ADDED for ol_openedx_course_sync
-DEEPL_API_KEY: {{ key "edxapp/deepl-api-key" }} # ADDED for ol_openedx_course_translations
 ORA2_FILE_PREFIX: mitxonline/ora2  # MODIFIED
 PARTNER_SUPPORT_EMAIL: ''
 PASSWORD_POLICY_COMPLIANCE_ROLLOUT_CONFIG:
