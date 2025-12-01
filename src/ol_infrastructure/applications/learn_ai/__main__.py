@@ -102,7 +102,7 @@ aws_config = AWSBase(
 )
 learn_ai_config = Config("learn_ai")
 vault_config = Config("vault")
-apisix_ingress_class = learn_ai_config.get("apisix_ingress_class") or "apisix"
+
 
 setup_vault_provider(stack_info)
 fastly_provider = get_fastly_provider()
@@ -948,7 +948,6 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
     f"mit-learn-learn-ai-{stack_info.env_suffix}-https-olapisixroute",
     k8s_namespace=learn_ai_namespace,
     k8s_labels=k8s_global_labels,
-    ingress_class_name=apisix_ingress_class,
     route_configs=[
         # Protected route for canvas syllabus agent - requires canvas_token header
         OLApisixRouteConfig(
@@ -1061,7 +1060,6 @@ learn_ai_https_apisix_route = OLApisixRoute(
     f"learn-ai-{stack_info.env_suffix}-https-olapisixroute",
     k8s_namespace=learn_ai_namespace,
     k8s_labels=k8s_global_labels,
-    ingress_class_name=apisix_ingress_class,
     route_configs=[
         # Protected route for canvas syllabus agent - requires canvas_token header
         OLApisixRouteConfig(
@@ -1171,7 +1169,7 @@ learn_ai_https_apisix_tls = kubernetes.apiextensions.CustomResource(
     ),
     spec={
         "hosts": [learn_ai_api_domain],
-        "ingressClassName": apisix_ingress_class,
+        "ingressClassName": "apache-apisix",
         # Use the shared ol-wildcard cert loaded into every cluster
         "secret": {
             "name": "ol-wildcard-cert",
@@ -1189,7 +1187,7 @@ learn_ai_https_apisix_consumer = kubernetes.apiextensions.CustomResource(
         labels=k8s_global_labels,
     ),
     spec={
-        "ingressClassName": apisix_ingress_class,
+        "ingressClassName": "apache-apisix",
         "authParameter": {
             "keyAuth": {
                 "value": {

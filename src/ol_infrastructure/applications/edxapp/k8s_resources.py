@@ -1405,7 +1405,7 @@ def create_k8s_resources(  # noqa: C901
     )
 
     # APISIX ingress configuration and s4etup
-    apisix_ingress_class = edxapp_config.get("apisix_ingress_class") or "apisix"
+
     tls_secret_name = (
         "shared-backend-tls-pair"  # pragma: allowlist secret  # noqa: S105
     )
@@ -1416,7 +1416,6 @@ def create_k8s_resources(  # noqa: C901
             k8s_namespace=namespace,
             k8s_labels=k8s_global_labels,
             create_apisixtls_resource=True,
-            apisixtls_ingress_class=apisix_ingress_class,
             dest_secret_name=tls_secret_name,
             dns_names=[
                 edxapp_config.require("backend_lms_domain"),
@@ -1441,7 +1440,6 @@ def create_k8s_resources(  # noqa: C901
         name=f"ol-{stack_info.env_prefix}-edxapp-lms-apisix-route-{stack_info.env_suffix}",
         k8s_namespace=namespace,
         k8s_labels=k8s_global_labels,
-        ingress_class_name=apisix_ingress_class,
         route_configs=[
             OLApisixRouteConfig(
                 route_name="lms-default",
