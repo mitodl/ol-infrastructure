@@ -25,7 +25,6 @@ config:
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["studio.library_authoring_mfe", "--deactivate"]
   - ["legacy_studio.certificates", "--create", "--everyone"]
-  edxapp:apisix_ingress_class: apache-apisix
   edxapp:business_unit: mitxpro
   edxapp:db_password:
     secure: v1:gkXc0/WssuL5whQt:/28AEA/UN9lAkRHEl1B6D6OjWjysfgzUTG0KGFd6aYvrAU5bbBxUsZUe6RMI9wyKFA5f0l9z3hQ=
