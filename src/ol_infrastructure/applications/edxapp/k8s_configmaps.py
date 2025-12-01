@@ -183,7 +183,7 @@ def create_k8s_configmaps(
                     LOGO_URL_PNG_FOR_EMAIL: https://{edxapp_config.require_object("domains")["lms"]}/static/{stack_info.env_prefix}/images/logo.png
                     LOGO_TRADEMARK_URL: https://{edxapp_config.require_object("domains")["lms"]}/static/{stack_info.env_prefix}/images/{"mit-ol-logo" if stack_info.env_prefix == "xpro" else "mit-logo"}.svg
                     MARKETING_SITE_BASE_URL: https://{edxapp_config.require("marketing_domain")}/ # ADDED - to support mitxonline-theme
-                    MARKETING_SITE_CHECKOUT_URL: https://{edxapp_config.require("marketing_domain")}/cart/add/ # ADDED - to support mitxonline checkout
+                    MARKETING_SITE_CHECKOUT_URL: https://{edxapp_config.get("mitxonline_domain") or edxapp_config.get("marketing_domain")}/cart/add/ # ADDED - to support mitxonline checkout
                     MKTG_URLS:
                       ROOT: https://{edxapp_config.require("marketing_domain")}/
                     MKTG_URL_OVERRIDES:
@@ -259,6 +259,17 @@ def create_k8s_configmaps(
 
     # Interpolated configuration items for the CMS application.
     cms_interpolated_config_name = "72-cms-interpolated-config-yaml"
+    cms_interpolated_config_content = textwrap.dedent(f"""
+        SITE_NAME: {edxapp_config.require_object("domains")["studio"]}
+        SOCIAL_AUTH_EDX_OAUTH2_URL_ROOT: https://{edxapp_config.require_object("domains")["lms"]}
+        SOCIAL_AUTH_EDX_OAUTH2_PUBLIC_URL_ROOT: https://{edxapp_config.require_object("domains")["lms"]}
+        SESSION_COOKIE_NAME: {env_name}-edx-studio-sessionid
+    """)
+    if stack_info.env_suffix == "mitxonline":
+        cms_interpolated_config_content += (
+            f"    GITHUB_ORG_API_URL: {edxapp_config.require('github_org_api_url')}\n"
+        )
+
     cms_interpolated_config_map = kubernetes.core.v1.ConfigMap(
         f"ol-{stack_info.env_prefix}-edxapp-cms-interpolated-config-{stack_info.env_suffix}",
         metadata={
@@ -266,14 +277,7 @@ def create_k8s_configmaps(
             "namespace": namespace,
             "labels": k8s_global_labels,
         },
-        data={
-            "72-cms-interpolated-config.yaml": textwrap.dedent(f"""
-                SITE_NAME: {edxapp_config.require_object("domains")["studio"]}
-                SOCIAL_AUTH_EDX_OAUTH2_URL_ROOT: https://{edxapp_config.require_object("domains")["lms"]}
-                SOCIAL_AUTH_EDX_OAUTH2_PUBLIC_URL_ROOT: https://{edxapp_config.require_object("domains")["lms"]}
-                SESSION_COOKIE_NAME: {env_name}-edx-studio-sessionid
-            """)
-        },
+        data={"72-cms-interpolated-config.yaml": cms_interpolated_config_content},
         opts=ResourceOptions(delete_before_replace=True),
     )
 

@@ -149,12 +149,18 @@ issuer_coordinator_secrets = read_yaml_secrets(
     Path(f"digital_credentials/issuer_coordinator.{stack_info.env_suffix}.yaml")
 )
 
+signing_service_tenants = {}
+for tenant, keydoc in signing_service_secrets["tenants"].items():
+    signing_service_tenants[f"TENANT_SEED_{tenant}"] = json.loads(keydoc)[
+        "secretKeySeed"
+    ]
+
 # Write signing service secrets to Vault KV
 vault.kv.SecretV2(
     f"signing-service-vault-secret-{stack_info.env_suffix}",
     mount=digital_credentials_vault_kv_path,
     name="signing-service",
-    data_json=json.dumps(signing_service_secrets),
+    data_json=json.dumps({"tenants": signing_service_tenants}),
 )
 
 # Write issuer coordinator secrets to Vault KV
@@ -192,7 +198,7 @@ signing_service_vault_secret = OLVaultK8SSecret(
         mount_type="kv-v2",
         path="signing-service",
         templates={
-            key: f'{{{{ get .Secrets.tenants "{key}" }}}}'
+            f"TENANT_SEED_{key}": f'{{{{ get .Secrets.tenants "TENANT_SEED_{key}" }}}}'
             for key in signing_service_secrets.get("tenants", {})
         },
         refresh_after="1h",

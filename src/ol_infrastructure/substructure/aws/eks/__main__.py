@@ -351,10 +351,10 @@ if cluster_stack.require_output("has_ebs_storage"):
                 "resources": {
                     "requests": {
                         "cpu": "10m",
-                        "memory": "100Mi",
+                        "memory": "200Mi",
                     },
                     "limits": {
-                        "memory": "100Mi",
+                        "memory": "200Mi",
                     },
                 },
             },

@@ -11,7 +11,6 @@ config:
   - ["course_experience.relative_dates_disable_reset", "--create", "--everyone"]
   - ["course_home.course_home_mfe_progress_tab", "--create", "--everyone"]
   - ["courseware.courseware_mfe", "--create", "--superusers", "--everyone"]
-  - ["discussions.enable_forum_v2", "--deactivate"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
   - ["effort_estimation.disabled", "--create", "--superusers", "--everyone"]
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
@@ -47,9 +46,6 @@ config:
     learning: learn
     ora_grading: ora-grading
   edxapp:google_analytics_id: ""
-  edxapp:k8s_deployment: false
-  edxapp:k8s_cutover: false
-  edxapp:disable_ec2_deployment: false
   edxapp:mail_domain: edxapp-mail-qa.xpro.mit.edu
   edxapp:min_web_nodes: "1"
   edxapp:min_worker_nodes: "1"
@@ -62,3 +58,47 @@ config:
   mongodb:atlas_project_id: 61a8f5e33456732be1fbb699
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
+  edxapp:apisix_ingres_class: apache-apisix
+  edxapp:mit_learn_api_domain: api.rc.learn.mit.edu
+  edxapp:mit_learn_domain: rc.learn.mit.edu
+  edxapp:learn_ai_frontend_domain: "learn-ai-ci.ol.mit.edu"
+  edxapp:backend_lms_domain: courses-backend.rc.xpro.mit.edu
+  edxapp:backend_studio_domain: studio-backend.rc.xpro.mit.edu
+  edxapp:backend_preview_domain: preview-backend.rc.xpro.mit.edu
+  edxapp:k8s_replicas:
+    webapp:
+      cms:
+        min: 1
+        max: 2
+      lms:
+        min: 1
+        max: 2
+    celery:
+      lms:
+        min: 1
+        max: 4
+      cms:
+        min: 1
+        max: 4
+  edxapp:k8s_resources:
+    webapp:
+      lms:
+        cpu_request: "250m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+      cms:
+        cpu_request: "250m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+    celery:
+      lms:
+        cpu_request: "250m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+      cms:
+        cpu_request: "250m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+  edxapp:k8s_deployment: true
+  edxapp:k8s_cutover: true
+  edxapp:disable_ec2_deployment: false

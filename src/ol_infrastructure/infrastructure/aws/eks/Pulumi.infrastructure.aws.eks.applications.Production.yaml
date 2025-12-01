@@ -11,6 +11,8 @@ config:
   - ".learn.mit.edu"
   - "mitxonline.mit.edu"
   - ".mitxonline.mit.edu"
+  - "xpro.mit.edu"
+  - ".xpro.mit.edu"
   eks:apisix_admin_key:
     secure: v1:PafPE9cAPNoOSOrU:8V16zZH9OGc1jgfZffXRDLvb6ROksZLULaYJvdjHgPCG/zmB/8nA8EMZb8X2/O74
   eks:apisix_viewer_key:
@@ -25,8 +27,12 @@ config:
   - "dcc.learn.mit.edu"
   - "nb.learn.mit.edu"
   - "studio-backend.learn.mit.edu"
+  - "studio-backend.xpro.mit.edu"
+  - "courses-backend.xpro.mit.edu"
+  - "preview.xpro.mit.edu"
   eks:apisix_min_replicas: "5"
   eks:apisix_max_replicas: "10"
+  eks:apisix_memory: "1000Mi"
   eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
   eks:developer_role_kubernetes_groups: ["admin"]
   eks:developer_role_scope: "cluster"
@@ -45,6 +51,7 @@ config:
   - "mitxonline"
   - "mitxonline-openedx"
   - "odl-video-service"
+  - "tika"
   - "xpro-openedx"
   eks:nodegroups:
     worker-xlarge:

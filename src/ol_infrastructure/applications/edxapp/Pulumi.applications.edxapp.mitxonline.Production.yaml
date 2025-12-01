@@ -13,7 +13,6 @@ config:
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone",
     "--staff", "--authenticated"]
   - ["course_experience.relative_dates_disable_reset", "--create", "--everyone"]
-  - ["discussions.enable_forum_v2", "--create", "--everyone"]
   - ["discussions.pages_and_resources_mfe", "--create", "--everyone"]
   - ["discussions.enable_new_structure_discussions", "--create", "--everyone"]
   - ["discussions.enable_discussions_mfe", "--create", "--everyone"]
@@ -55,7 +54,7 @@ config:
   edxapp:db_password:
     secure: v1:Za4LI6RKfAW7jLJh:hlthF86wmGH6VSiBHgehE8mY11hDfOUK/uYZADbodhCVuS8RSXoCoHtrRrBDNMXunQmHLABw4SM=
   edxapp:db_use_blue_green: true
-  edxapp:db_instance_size: db.m7g.xlarge
+  edxapp:db_instance_size: db.r8g.xlarge
   edxapp:dns_zone: learn
   edxapp:domains:
     lms: courses.learn.mit.edu
@@ -111,25 +110,21 @@ config:
     webapp:
       lms:
         cpu_request: "250m"
-        cpu_limit: "500m"
-        memory_request: "1Gi"
+        memory_request: "2Gi"
         memory_limit: "2Gi"
       cms:
         cpu_request: "250m"
-        cpu_limit: "500m"
-        memory_request: "1Gi"
+        memory_request: "2Gi"
         memory_limit: "2Gi"
     celery:
       lms:
         cpu_request: "250m"
-        cpu_limit: "500m"
-        memory_request: "1Gi"
-        memory_limit: "2Gi"
+        memory_request: "5Gi"
+        memory_limit: "8Gi"
       cms:
         cpu_request: "250m"
-        cpu_limit: "500m"
-        memory_request: "1Gi"
-        memory_limit: "2Gi"
+        memory_request: "5Gi"
+        memory_limit: "8Gi"
   edxapp:k8s_deployment: true
   edxapp:k8s_cutover: false
   edxapp:disable_ec2_deployment: false

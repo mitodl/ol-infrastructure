@@ -84,7 +84,6 @@ def create_k8s_resources(  # noqa: C901
                 "memory": resources_dict[class_name][component]["memory_request"],
             },
             limits={
-                "cpu": resources_dict[class_name][component]["cpu_limit"],
                 "memory": resources_dict[class_name][component]["memory_limit"],
             },
         )
@@ -753,7 +752,6 @@ def create_k8s_resources(  # noqa: C901
                                     "memory": "128Mi",
                                 },
                                 limits={
-                                    "cpu": "200m",
                                     "memory": "256Mi",
                                 },
                             ),
@@ -1237,7 +1235,6 @@ def create_k8s_resources(  # noqa: C901
                                     "memory": "128Mi",
                                 },
                                 limits={
-                                    "cpu": "200m",
                                     "memory": "256Mi",
                                 },
                             ),

@@ -445,8 +445,8 @@ def setup_karpenter(  # noqa: PLR0913
                 "consolidateAfter": "1h",
             },
             "limits": {
-                "cpu": "64",
-                "memory": "256Gi",
+                "cpu": "128",
+                "memory": "500Gi",
             },
         },
         opts=ResourceOptions(

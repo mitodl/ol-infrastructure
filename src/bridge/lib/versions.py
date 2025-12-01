@@ -3,13 +3,13 @@ CONCOURSE_VERSION = "7.14.3"
 # renovate: datasource=github-releases depName=consul-template packageName=hashicorp/consul-template
 CONSUL_TEMPLATE_VERSION = "0.41.3"
 # renovate: datasource=github-releases depName=consul packageName=hashicorp/consul
-CONSUL_VERSION = "1.22.0"
+CONSUL_VERSION = "1.22.1"
 # renovate: datasource=pypi depName=jupyterhub packageName=jupyterhub
 JUPYTERHUB_VERSION = "5.4.2"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
 KEYCLOAK_VERSION = "26.4.5"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
-OPEN_METADATA_VERSION = "1.10.7"
+OPEN_METADATA_VERSION = "1.10.10"
 OVS_VERSION = "v0.65.1-3-g2630021"
 REDASH_VERSION = "9d273e4"
 # renovate: datasource=github-releases depName=traefik packageName=traefik/traefik
@@ -24,7 +24,7 @@ AIRBYTE_CHART_VERSION = "2.0.19"
 # renovate: datasource=helm depName=superset packageName=superset registryUrl=https://apache.github.io/superset
 SUPERSET_CHART_VERSION = "0.15.0"
 # renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://apache.github.io/apisix-helm-chart
-APISIX_CHART_VERSION = "2.12.3"
+APISIX_CHART_VERSION = "2.12.4"
 # renovate: datasource=helm depName=aws-load-balancer-controller packageName=aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts
 AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION = "1.16.0"
 # renovate: datasource=helm depName=aws-node-termination-handler packageName=aws-node-termination-handler registryUrl=https://aws.github.io/eks-charts
@@ -66,7 +66,7 @@ KEYCLOAK_OPERATOR_CRD_VERSION = "26.2.4"
 # renovate: datasource=helm depName=jupyterhub packageName=jupyterhub registryUrl=https://hub.jupyter.org/helm-chart
 JUPYTERHUB_CHART_VERSION = "4.3.1"
 # renovate: datasource=helm depName=k8s-monitoring packageName=k8s-monitoring registryUrl=https://grafana.github.io/helm-charts
-GRAFANA_K8S_MONITORING_CHART_VERSION = "3.6.0"
+GRAFANA_K8S_MONITORING_CHART_VERSION = "3.6.1"
 # renovate: datasource=helm depName=dcgm-exporter packageName=dcgm-exporter registryUrl=https://nvidia.github.io/dcgm-exporter/helm-charts
 NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.6.0"
 # renovate: datasource=helm depName=nvidia-device-plugin packageName=nvidia-device-plugin registryUrl=https://nvidia.github.io/k8s-device-plugin

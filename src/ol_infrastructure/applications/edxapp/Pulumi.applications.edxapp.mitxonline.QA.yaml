@@ -12,7 +12,6 @@ config:
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone",
     "--staff", "--authenticated"]
   - ["course_experience.relative_dates_disable_reset", "--create", "--everyone"]
-  - ["discussions.enable_forum_v2", "--create", "--everyone"]
   - ["discussions.pages_and_resources_mfe", "--create", "--everyone"]
   - ["discussions.enable_new_structure_discussions", "--create", "--everyone"]
   - ["discussions.enable_discussions_mfe", "--create", "--everyone"]
@@ -77,6 +76,7 @@ config:
     gradebook: gradebook
     learning: learn
     ora_grading: ora-grading
+  edxapp:github_org_api_url: https://github.mit.edu/api/v3/orgs/mitxonline-rc
   edxapp:google_analytics_id: UA-5145472-46
   edxapp:mail_domain: edxapp-mail.rc.learn.mit.edu
   edxapp:proctortrack_url: "https://preproduction.verificient.com"

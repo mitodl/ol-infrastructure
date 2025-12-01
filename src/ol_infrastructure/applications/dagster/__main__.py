@@ -114,7 +114,10 @@ mitlearn_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
     stack_info.env_suffix
 ]
 mitlearn_app_buckets = [f"ol-mitlearn-app-storage-{mitlearn_env_suffix}"]
-dagster_pipeline_buckets = s3_tracking_logs_buckets + mitlearn_app_buckets
+b2b_export_buckets = [f"ol-b2b-partners-storage-{stack_info.env_suffix}"]
+dagster_pipeline_buckets = (
+    s3_tracking_logs_buckets + mitlearn_app_buckets + b2b_export_buckets
+)
 dagster_s3_permissions: list[dict[str, str | list[str]]] = [
     {
         "Effect": "Allow",
@@ -553,6 +556,11 @@ code_locations: list[dict[str, str | int]] = [
     },
     {"name": "legacy_openedx", "module": "legacy_openedx.definitions", "port": 4005},
     {"name": "openedx", "module": "openedx.definitions", "port": 4006},
+    {
+        "name": "b2b_organization",
+        "module": "b2b_organization.definitions",
+        "port": 4007,
+    },
 ]
 
 # Build deployments list for user code

@@ -1,7 +1,11 @@
 # -*- mode: yaml -*-
 # ALTERNATE_WORKER_QUEUES: lms  # Already has a sane default in the code
+
+
 COURSE_AUTHORING_MICROFRONTEND_URL: /authoring
 DISCUSSIONS_INCONTEXT_LEARNMORE_URL: https://openedx.atlassian.net/wiki/spaces/COMM/pages/3470655498/Discussions+upgrade+Sidebar+and+new+topic+structure
+
+GITHUB_ORG_API_URL: {{ key "edxapp/github-auto-export-org-api-url" }}
 GIT_REPO_EXPORT_DIR: /openedx/data/export_course_repos
 GIT_EXPORT_DEFAULT_IDENT:
   name: MITx Online
@@ -10,10 +14,13 @@ GIT_EXPORT_DEFAULT_IDENT:
 PARSE_KEYS: {}
 REDBEAT_KEY_PREFIX: redbeat_cms  # ADDED - RedBeat key prefix to separate LMS and CMS schedules
 SITE_NAME: {{ key "edxapp/studio-domain" }}  # MODIFIED
+
 {{ with secret "secret-mitxonline/edxapp" }}
+GITHUB_ACCESS_TOKEN: {{ .Data.github_access_token }}
 SOCIAL_AUTH_EDX_OAUTH2_KEY: {{ .Data.studio_oauth_client.id }}
 SOCIAL_AUTH_EDX_OAUTH2_SECRET: {{ .Data.studio_oauth_client.secret }}
 {{ end }}
+
 SOCIAL_AUTH_EDX_OAUTH2_URL_ROOT: https://{{ key "edxapp/lms-domain" }}  # possibly same as public LMS root URL
 SOCIAL_AUTH_EDX_OAUTH2_PUBLIC_URL_ROOT: https://{{ key "edxapp/lms-domain" }}
 SESSION_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edx-studio-sessionid  # MODIFIED

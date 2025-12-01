@@ -1,7 +1,7 @@
 celery-redbeat==2.3.3  # Support for using Redis as the lock for Celery schedules
 granian==2.6.0
 django-redis==6.0.0
-ol-openedx-git-auto-export==0.6.0
+ol-openedx-git-auto-export==0.7.0
 edx-sysadmin==0.4.0
 edx-username-changer==0.5.0
 openedx-companion-auth==1.2.0
@@ -20,6 +20,9 @@ wheel==0.45.1
 # Experimental Plugins for AI features
 ol-openedx-chat
 ol-openedx-chat-xblock
+
+# Experimental Plugins for Translations feature
+ol-openedx-course-translations
 
 # Allow for copying courses to children to support UAI
 ol-openedx-course-sync

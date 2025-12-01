@@ -48,6 +48,7 @@ config:
   - "mitxonline"
   - "mitxonline-openedx"
   - "odl-video-service"
+  - "tika"
   - "xpro-openedx"
   eks:nodegroups:
     worker-xlarge:

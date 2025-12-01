@@ -22,6 +22,7 @@ mysql_creds: &mysql_creds
 
 {{ with secret "secret-mitxonline/edxapp" }}
 CELERY_BROKER_PASSWORD: {{ .Data.redis_auth_token }}
+DEEPL_API_KEY: {{ .Data.deepl_api_key }} # ADDED for ol_openedx_course_translations
 FERNET_KEYS: {{ .Data.fernet_keys }}
 redis_cache_config: &redis_cache_config
   BACKEND: django_redis.cache.RedisCache
@@ -330,6 +331,7 @@ FEATURES:
     ENABLE_ENROLLMENT_RESET: false
     ENABLE_EXAM_SETTINGS_HTML_VIEW: true # ADDED KEY
     ENABLE_EXPORT_GIT: true  # MODIFIED
+    ENABLE_AUTO_GITHUB_REPO_CREATION: true
     ENABLE_FORUM_DAILY_DIGEST: true
     ENABLE_GIT_AUTO_EXPORT: true  # ADDED KEY
     ENABLE_GRADE_DOWNLOADS: true
@@ -440,7 +442,7 @@ LOGO_URL_PNG_FOR_EMAIL: https://{{ key "edxapp/lms-domain" }}/static/mitxonline/
 LOGO_TRADEMARK_URL: https://{{ key "edxapp/lms-domain" }}/static/mitxonline/images/mit-logo.svg
 MAINTENANCE_BANNER_TEXT: Sample banner message
 MARKETING_SITE_BASE_URL: https://{{ key "edxapp/marketing-domain" }}/ # ADDED - to support mitxonline-theme
-MARKETING_SITE_CHECKOUT_URL: https://{{ key "edxapp/marketing-domain" }}/cart/add/ # ADDED - to support mitxonline checkout
+MARKETING_SITE_CHECKOUT_URL: https://{{ key "edxapp/mitxonline-domain" }}/cart/add/ # ADDED - to support mitxonline checkout
 MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within the bucket. No leading / allowed
 MEDIA_URL: /media/
 MICROSITE_CONFIGURATION: {}

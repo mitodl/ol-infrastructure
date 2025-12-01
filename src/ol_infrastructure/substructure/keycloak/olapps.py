@@ -980,7 +980,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 keycloak_url=keycloak_url,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
-                org_oidc_metadata_url="https://stage-idp.upgrad.dev/realms/upgrad-stage/.well-known/openid-configuration",
+                org_oidc_metadata_url="https://idp.upgrad.com/realms/upgrad/.well-known/openid-configuration",
                 client_id="ira-frontend",
             )
         )
@@ -997,6 +997,20 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 org_oidc_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
                 client_id="393621505200-fb5rhjqvvmdodn5jdjdv1h1fbpk6rgq7.apps.googleusercontent.com",
                 client_secret=keycloak_realm_config.require("dynideas_client_secret"),
+            )
+        )
+        onboard_oidc_org(
+            OIDCIdpConfig(
+                org_domains=["ucr.ac.cr"],
+                org_name="Universidad de Costa Rica",
+                org_alias="UCR",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                keycloak_url=keycloak_url,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                org_oidc_metadata_url="https://sso.ucr.ac.cr/realms/UCR/.well-known/openid-configuration",
+                client_id="MIT-Learn-sso",
             )
         )
 
