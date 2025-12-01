@@ -1,6 +1,7 @@
 # ruff: noqa: E501
 """JupyterHub application deployment for MIT Open Learning."""
 
+from dataclasses import dataclass
 from string import Template
 
 from pulumi import Config, StackReference
@@ -352,12 +353,33 @@ jupyterhub_authoring_db_config = OLPostgresDBConfig(
 # instead of naming it based on the original
 # deployment we could probably clean
 # this abstraction up a bit, but that'd require a teardown.
-deployment_to_db_config_and_role_statements = {
-    "jupyterhub": (jupyterhub_db_config, postgres_role_statements),
-    "jupyterhub-authoring": (
-        jupyterhub_authoring_db_config,
-        jupyterhub_authoring_role_statements,
-    ),
+
+
+@dataclass
+class JupyterhubDeploymentInfo:
+    name: str
+    db_config: OLPostgresDBConfig
+    postgres_role_statements: dict[str, dict[str, list[Template]]]
+    extra_images: dict[str, dict[str, str]]
+
+
+JupyterhubInfo = JupyterhubDeploymentInfo(
+    name="jupyterhub",
+    db_config=jupyterhub_db_config,
+    postgres_role_statements=postgres_role_statements,
+    extra_images=EXTRA_IMAGES,
+)
+JupyterhubAuthoringInfo = JupyterhubDeploymentInfo(
+    name="jupyterhub-authoring",
+    db_config=jupyterhub_authoring_db_config,
+    postgres_role_statements=jupyterhub_authoring_role_statements,
+    extra_images={},
+)
+
+
+deployment_to_jupyterhub_info = {
+    "jupyterhub": JupyterhubInfo,
+    "jupyterhub-authoring": JupyterhubAuthoringInfo,
 }
 
 # Provision JupyterHub deployments
@@ -370,15 +392,15 @@ for deployment_config in deployment_configs:
         stack_info=stack_info,
         jupyterhub_deployment_config=deployment_config,
         vault_config=vault_config,
-        db_config=deployment_to_db_config_and_role_statements[
-            deployment_config["name"]
-        ][0],
+        db_config=deployment_to_jupyterhub_info[deployment_config["name"]].db_config,
         app_db=jupyterhub_db,
         cluster_stack=cluster_stack,
         application_labels=application_labels,
         k8s_global_labels=k8s_global_labels,
-        extra_images=EXTRA_IMAGES,
-        postgres_role_statements=deployment_to_db_config_and_role_statements[
+        extra_images=deployment_to_jupyterhub_info[
             deployment_config["name"]
-        ][1],
+        ].extra_images,
+        postgres_role_statements=deployment_to_jupyterhub_info[
+            deployment_config["name"]
+        ].postgres_role_statements,
     )

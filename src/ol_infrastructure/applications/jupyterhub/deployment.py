@@ -3,6 +3,7 @@ with values consistently derived from its name.
 """
 
 from pathlib import Path
+from string import Template
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
@@ -45,7 +46,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     db_config: OLPostgresDBConfig,
     cluster_stack: StackReference,
     app_db: OLAmazonDB,
-    postgres_role_statements: list[dict[str, str]],
+    postgres_role_statements: dict[str, dict[str, list[Template]]],
     application_labels: dict[str, str],
     k8s_global_labels: dict[str, str],
     extra_images: dict[str, dict[str, str]] | None = None,
@@ -237,7 +238,6 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     extra_images_list = extra_images or {}
     admin_users_list = jupyterhub_deployment_config.get("admin_users", [])
     allowed_users_list = jupyterhub_deployment_config.get("allowed_users", [])
-    enable_prepuller = jupyterhub_deployment_config.get("enable_image_prepuller", True)
     return kubernetes.helm.v3.Release(
         f"{base_name}-{env_name.upper()}-application-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
@@ -347,9 +347,8 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                         },
                     },
                 },
-                # Consider keying off extra_images, it's only used for this
                 "prePuller": get_prepuller_config_with_images(extra_images_list)
-                if enable_prepuller
+                if extra_images_list
                 else {},
                 "singleuser": {
                     "extraFiles": {
