@@ -66,16 +66,16 @@ def _build_general_secrets_template(
     if stack_info.env_prefix == "mitxonline":
         template_parts.append(
             """
-        GITHUB_ACCESS_TOKEN: {{{{ get .Secrets "github_access_token" }}}}
-        DEEPL_API_KEY: {{{{ get .Secrets "deepl_api_key" }}}}"""
+        GITHUB_ACCESS_TOKEN: {{ get .Secrets "github_access_token" }}
+        DEEPL_API_KEY: {{ get .Secrets "deepl_api_key" }}"""
         )
 
     # Conditional: xpro-specific email configuration
     if stack_info.env_prefix == "xpro":
         template_parts.append(
             """
-        EMAIL_HOST_USER: {{{{ get .Secrets "email_username" }}}}
-        EMAIL_HOST_PASSWORD: {{{{ get .Secrets "email_password" }}}}"""
+        EMAIL_HOST_USER: {{ get .Secrets "email_username" }}
+        EMAIL_HOST_PASSWORD: {{ get .Secrets "email_password" }}"""
         )
 
     # Proctoring backend configuration
