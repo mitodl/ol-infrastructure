@@ -30,6 +30,7 @@ config:
   - "studio-backend.rc.xpro.mit.edu"
   - "courses-backend.rc.xpro.mit.edu"
   - "preview-rc.xpro.mit.edu"
+  - "tika-qa.ol.mit.edu"
   eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
   eks:developer_role_kubernetes_groups: ["admin"]
   eks:developer_role_scope: "cluster"
