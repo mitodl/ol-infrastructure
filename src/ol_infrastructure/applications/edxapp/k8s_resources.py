@@ -1404,8 +1404,8 @@ def create_k8s_resources(  # noqa: C901
         },
     )
 
-    # APISIX ingress configuration and s4etup
-
+    # APISIX ingress configuration and setup
+    apisix_ingress_class = edxapp_config.get("apisix_ingress_class") or "apisix"
     tls_secret_name = (
         "shared-backend-tls-pair"  # pragma: allowlist secret  # noqa: S105
     )
