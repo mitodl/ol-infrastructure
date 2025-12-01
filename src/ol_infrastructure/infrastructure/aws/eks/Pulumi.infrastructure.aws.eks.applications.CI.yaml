@@ -41,14 +41,15 @@ config:
   - "digital-credentials"
   - "ecommerce"
   - "jupyter"
+  - "jupyter-authoring"
   - "kubewatch"
   - "learn-ai"
   - "mitlearn"
   - "mitxonline"
   - "mitxonline-openedx"
   - "odl-video-service"
+  - "tika"
   - "xpro-openedx"
-  - "jupyter-authoring"
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 1000
