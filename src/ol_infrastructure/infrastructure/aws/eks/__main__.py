@@ -211,7 +211,9 @@ access_entries = {
             ),
         },
         kubernetes_groups=["admin"],
-    )
+    ),
+    # Note: Node role access entry is automatically created by EKS for self-managed
+    # node groups when authentication_mode="API". No explicit creation needed.
 }
 
 # Couple ways developers may be given access to the cluster via different scopes.
@@ -445,17 +447,6 @@ node_instance_profile = aws.iam.InstanceProfile(
     f"{cluster_name}-eks-node-instance-profile",
     role=node_role.name,
     path=f"/ol-infrastructure/eks/{cluster_name}/",
-)
-# Create access entry for the nodegroup's IAM role
-# This allows EC2 instances in the nodegroup to authenticate to the cluster
-aws.eks.AccessEntry(
-    f"{cluster_name}-eks-nodegroup-access-entry",
-    cluster_name=cluster.eks_cluster.name,
-    principal_arn=node_role.arn,
-    type="EC2_LINUX",
-    opts=ResourceOptions(
-        depends_on=[cluster],
-    ),
 )
 
 export("node_instance_profile", node_instance_profile.id)
