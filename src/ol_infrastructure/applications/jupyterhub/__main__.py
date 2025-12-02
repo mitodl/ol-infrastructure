@@ -205,11 +205,6 @@ jupyterhub_authoring_db_config = OLPostgresDBConfig(
 jupyterhub_db = OLAmazonDB(jupyterhub_db_config)
 
 
-# We may want to rethink this. It's a bit cumbersome
-# If we more directly scoped the database to the stack
-# instead of naming it based on the original
-# deployment we could probably clean
-# this abstraction up a bit, but that'd require a teardown.
 @dataclass
 class JupyterhubDeploymentInfo:
     name: str
