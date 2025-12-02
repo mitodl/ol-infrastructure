@@ -156,6 +156,11 @@ EXTRA_IMAGES = {
 # The physical database for Jupyterhub is shared across both the main and authoring
 # deployments, but we create separate Vault backends for each to manage credentials
 # and roles separately.
+
+
+# NOTE that for subsequent deployments which use different logical databases
+# that the operator will need to create the database manually as it will NOT be
+# automatically provisioned.
 jupyterhub_db_security_group = ec2.SecurityGroup(
     f"jupyterhub-db-security-group-{env_name}",
     name=f"jupyterhub-db-{target_vpc_name}-{env_name}",
