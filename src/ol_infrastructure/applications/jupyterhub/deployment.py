@@ -47,6 +47,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     application_labels: dict[str, str],
     k8s_global_labels: dict[str, str],
     extra_images: dict[str, dict[str, str]] | None = None,
+    proxy_port: int = 0,
 ) -> kubernetes.helm.v3.Release:
     base_name = jupyterhub_deployment_config["name"]
     domain_name = jupyterhub_deployment_config["domain"]
@@ -126,9 +127,9 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
         labels=k8s_global_labels,
         mount=app_vault_backend.db_mount.path,
         namespace=namespace,
-        path="creds/app"
-        if base_name == "jupyterhub"
-        else "creds/authoring",  # Conditionalize based on deployment name
+        path="creds/app",
+        # if base_name == "jupyterhub"
+        # else "creds/authoring",  # Conditionalize based on deployment name
         templates={
             "DATABASE_URL": f'postgresql://{{{{ get .Secrets "username" }}}}'
             f':{{{{ get .Secrets "password" }}}}'
@@ -207,7 +208,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                 hosts=[domain_name],
                 paths=["/*"],
                 backend_service_name="proxy-public",
-                backend_service_port="http",
+                backend_service_port=proxy_port if proxy_port else "http",
                 websocket=True,
             ),
         ],
@@ -247,7 +248,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                     "service": {
                         "type": "NodePort",
                         "nodePorts": {
-                            "http": 30000,
+                            "http": proxy_port if proxy_port else 30000,
                             "https": 30443,
                         },
                     },
@@ -281,7 +282,6 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                                 "memory": "64Mi",
                             },
                             "limits": {
-                                "cpu": "100m",
                                 "memory": "64Mi",
                             },
                         },
@@ -324,7 +324,6 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                             "memory": "256Mi",
                         },
                         "limits": {
-                            "cpu": "100m",
                             "memory": "256Mi",
                         },
                     },
@@ -370,11 +369,10 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                         "enabled": False,
                     },
                     "memory": {
-                        "limit": "4G",
-                        "guarantee": "1G",
+                        "limit": "2G",
+                        "guarantee": "2G",
                     },
                     "cpu": {
-                        "limit": 1,
                         "guarantee": 0.25,
                     },
                     "storage": {

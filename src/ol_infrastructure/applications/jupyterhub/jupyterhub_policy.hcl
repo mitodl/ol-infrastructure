@@ -9,7 +9,7 @@ path "postgres-jupyterhub/creds/app" {
   capabilities = ["read"]
 }
 
-path "postgres-jupyterhub/creds/authoring" {
+path "postgres-jupyterhub_authoring/creds/app" {
   capabilities = ["read"]
 }
 
@@ -33,12 +33,12 @@ path "sys/leases/revoke" {
 path "sys/leases/renew" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-jupyterhub/creds/authoring/*"]
+    lease_id = ["postgres-jupyterhub_authoring/creds/app/*"]
   }
 }
 path "sys/leases/revoke" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-jupyterhub/creds/authoring/*"]
+    lease_id = ["postgres-jupyterhub_authoring/creds/app/*"]
   }
 }

@@ -9,11 +9,10 @@ PREPULLER_CONFIG = {
     "resources": {
         "requests": {
             "cpu": "10m",
-            "memory": "128Mi",
+            "memory": "64Mi",
         },
         "limits": {
-            "cpu": "100m",
-            "memory": "512Mi",
+            "memory": "64Mi",
         },
     },
 }
