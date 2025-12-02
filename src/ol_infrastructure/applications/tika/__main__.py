@@ -392,6 +392,15 @@ tika_helm_release = kubernetes.helm.v3.Release(
                 "type": "ClusterIP",
                 "port": 9998,
             },
+            "resources": {
+                "requests": {
+                    "cpu": "10m",  # does nothing most of the time
+                    "memory": "2Gi",  # java never gives it back
+                },
+                "limits": {
+                    "memory": "2Gi",
+                },
+            },
         },
         skip_await=False,
     ),
