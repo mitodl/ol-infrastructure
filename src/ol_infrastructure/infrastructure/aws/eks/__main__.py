@@ -341,8 +341,6 @@ access_entries["node-role"] = eks.AccessEntryArgs(
             policy_arn="arn:aws:eks::aws:cluster-access-policy/AmazonEKSWorkerPolicy",
         ),
     },
-    kubernetes_groups=["system:nodes"],
-    type="EC2_LINUX",
 )
 
 ############################################################
