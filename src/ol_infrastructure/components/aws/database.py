@@ -208,7 +208,9 @@ class OLAmazonDB(pulumi.ComponentResource):
             opts,
         )
 
-        resource_options = pulumi.ResourceOptions(parent=self)
+        replica_options = resource_options = (opts or pulumi.ResourceOptions()).merge(
+            pulumi.ResourceOptions(parent=self)
+        )
 
         # In order to update the minor versions of an RDS instance with a read replica,
         # the replica has to be upgraded prior to the primary. This block of logic
@@ -266,6 +268,12 @@ class OLAmazonDB(pulumi.ComponentResource):
             resource_options = pulumi.ResourceOptions.merge(
                 resource_options,
                 pulumi.ResourceOptions(custom_timeouts=custom_timeouts),
+            )
+            replica_options = pulumi.ResourceOptions.merge(
+                resource_options,
+                pulumi.ResourceOptions(
+                    ignore_changes=["engineVersion", "parameterGroupName"]
+                ),
             )
 
         if db_config.read_replica:
@@ -329,7 +337,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             instance_class=db_config.instance_size,
             max_allocated_storage=db_config.max_storage,
             multi_az=db_config.multi_az,
-            opts=resource_options,
+            opts=replica_options,
             parameter_group_name=primary_parameter_group.name,
             password=db_config.password.get_secret_value(),
             port=db_config.port,
