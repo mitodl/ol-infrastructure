@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from string import Template
 
-from pulumi import Config, StackReference
+from pulumi import Config, ResourceOptions, StackReference
 from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import (
@@ -15,6 +15,10 @@ from ol_infrastructure.applications.jupyterhub.deployment import (
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.components.services.vault import (
+    OLVaultDatabaseBackend,
+    OLVaultPostgresDatabaseConfig,
+)
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
@@ -196,15 +200,11 @@ jupyterhub_db_config = OLPostgresDBConfig(
 )
 jupyterhub_db = OLAmazonDB(jupyterhub_db_config)
 
-jupyterhub_authoring_role_statements = postgres_role_statements.copy()
-jupyterhub_authoring_role_statements["app"] = {
-    "create": [
-        # Not sure if we need an authoring schema. Is there a reason we shouldn't use public?
-        # Check if the jupyterhub_authoring role exists and create it if not
-        Template(
-            """SELECT 'CREATE DATABASE "${app_name}"' WHERE NOT EXISTS
-            (SELECT FROM pg_database WHERE datname = '${app_name}')\\gexec;"""
-        ),
+jupyterhub_role_statements = postgres_role_statements.copy()
+
+
+def get_authoring_role_statements() -> dict[str, list[Template]]:
+    creation_statements = [
         Template(
             """
             DO
@@ -226,50 +226,20 @@ jupyterhub_authoring_role_statements["app"] = {
             $$do$$;
             """
         ),
-        # Create the authoring schema if it doesn't exist already
-        Template("""CREATE SCHEMA IF NOT EXISTS authoring;"""),
-        # Do grants on to the mitopen in both schemas
+        # Set/refresh the default privileges for the new role
         Template(
             """GRANT CREATE ON SCHEMA public TO jupyterhub_authoring WITH GRANT OPTION;"""
         ),
-        Template(
-            """
-            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "jupyterhub_authoring"
-            WITH GRANT OPTION;
-            """
-        ),
-        Template(
-            """GRANT USAGE ON SCHEMA authoring TO jupyterhub_authoring WITH GRANT OPTION;"""
-        ),
-        Template(
-            """GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA authoring TO "jupyterhub_authoring";"""
-        ),
-        Template(
-            """GRANT CREATE ON DATABASE \"jupyterhub_authoring\" TO jupyterhub_authoring;"""
-        ),
+        Template("""
+                    GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "jupyterhub_authoring"
+                    WITH GRANT OPTION;
+                    """),
         Template(
             """
             GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "jupyterhub_authoring"
             WITH GRANT OPTION;
             """
         ),
-        Template(
-            """GRANT CREATE ON SCHEMA authoring TO jupyterhub_authoring WITH GRANT OPTION;"""
-        ),
-        Template(
-            """
-            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA authoring TO "jupyterhub_authoring"
-            WITH GRANT OPTION;
-            """
-        ),
-        Template(
-            # Set/refresh default privileges in both schemas
-            """
-            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA authoring TO "jupyterhub_authoring"
-            WITH GRANT OPTION;
-            """
-        ),
-        # Set/refresh default privileges in both schemas
         Template("""SET ROLE "jupyterhub_authoring";"""),
         Template(
             """
@@ -283,20 +253,8 @@ jupyterhub_authoring_role_statements["app"] = {
             GRANT ALL PRIVILEGES ON SEQUENCES TO "jupyterhub_authoring" WITH GRANT OPTION;
             """
         ),
-        Template(
-            """
-            ALTER DEFAULT PRIVILEGES FOR ROLE "jupyterhub_authoring" IN SCHEMA authoring
-            GRANT ALL PRIVILEGES ON TABLES TO "jupyterhub_authoring" WITH GRANT OPTION;
-            """
-        ),
-        Template(
-            """
-            ALTER DEFAULT PRIVILEGES FOR ROLE "jupyterhub_authoring" IN SCHEMA authoring
-            GRANT ALL PRIVILEGES ON SEQUENCES TO "jupyterhub_authoring" WITH GRANT OPTION;
-            """
-        ),
         Template("""RESET ROLE;"""),
-        # Actually create the user in the 'jupyterhub_authoring' role
+        # Create the user in jupyterhub_authoring
         Template(
             """
             CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
@@ -305,9 +263,9 @@ jupyterhub_authoring_role_statements["app"] = {
         ),
         # Make sure things done by the new user belong to role and not the user
         Template("""ALTER ROLE "{{name}}" SET ROLE "jupyterhub_authoring";"""),
-    ],
-    "revoke": [
-        # Remove the user from the mitopen role
+    ]
+    revocation_statements = [
+        # Remove the user from the app role
         Template("""REVOKE "jupyterhub_authoring" FROM "{{name}}";"""),
         # Put the user back into the app role but as an administrator
         Template("""GRANT "{{name}}" TO jupyterhub_authoring WITH ADMIN OPTION;"""),
@@ -320,59 +278,58 @@ jupyterhub_authoring_role_statements["app"] = {
             """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";"""
         ),
         Template(
-            """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA authoring FROM "{{name}}";"""
-        ),
-        Template(
             """REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";"""
         ),
-        Template(
-            """REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA authoring FROM "{{name}}";"""
-        ),
         Template("""REVOKE USAGE ON SCHEMA public FROM "{{name}}";"""),
-        Template("""REVOKE USAGE ON SCHEMA authoring FROM "{{name}}";"""),
         # Finally, drop this user from the database
         Template("""DROP USER "{{name}}";"""),
-    ],
-    "renew": [],
-    "rollback": [],
-}
+    ]
+    renew_statements: list[Template] = []
+    rollback_statements: list[Template] = []
+    return {
+        "create": creation_statements,
+        "revoke": revocation_statements,
+        "renew": renew_statements,
+        "rollback": rollback_statements,
+    }
 
-# Use same physical DB instance
-jupyterhub_authoring_db_config = OLPostgresDBConfig(
-    instance_name=f"jupyterhub-db-{stack_info.env_suffix}",
-    password=rds_password,
-    subnet_group_name=target_vpc["rds_subnet"],
-    security_groups=[jupyterhub_db_security_group],
-    tags=aws_config.tags,
-    db_name="jupyterhub_authoring",  # Logical DB name for authoring
-    **rds_defaults,
+
+jupyterhub_role_statements["authoring"] = get_authoring_role_statements()
+
+app_vault_backend_config = OLVaultPostgresDatabaseConfig(
+    db_name=jupyterhub_db_config.db_name,
+    mount_point=f"{jupyterhub_db_config.engine}-{jupyterhub_db_config.db_name}",
+    db_admin_username=jupyterhub_db_config.username,
+    # Not sure if this is allowed or not
+    db_admin_password=jupyterhub_db_config.password.get_secret_value(),
+    db_host=jupyterhub_db.db_instance.address,
+    role_statements=jupyterhub_role_statements,
 )
+
+# Vault Database Backend
+app_vault_backend = OLVaultDatabaseBackend(
+    app_vault_backend_config,
+    opts=ResourceOptions(depends_on=[jupyterhub_db]),
+)
+
 
 # We may want to rethink this. It's a bit cumbersome
 # If we more directly scoped the database to the stack
 # instead of naming it based on the original
 # deployment we could probably clean
 # this abstraction up a bit, but that'd require a teardown.
-
-
 @dataclass
 class JupyterhubDeploymentInfo:
     name: str
-    db_config: OLPostgresDBConfig
-    postgres_role_statements: dict[str, dict[str, list[Template]]]
     extra_images: dict[str, dict[str, str]]
 
 
 JupyterhubInfo = JupyterhubDeploymentInfo(
     name="jupyterhub",
-    db_config=jupyterhub_db_config,
-    postgres_role_statements=postgres_role_statements,
     extra_images=EXTRA_IMAGES,
 )
 JupyterhubAuthoringInfo = JupyterhubDeploymentInfo(
     name="jupyterhub-authoring",
-    db_config=jupyterhub_authoring_db_config,
-    postgres_role_statements=jupyterhub_authoring_role_statements,
     extra_images={},
 )
 
@@ -392,15 +349,12 @@ for deployment_config in deployment_configs:
         stack_info=stack_info,
         jupyterhub_deployment_config=deployment_config,
         vault_config=vault_config,
-        db_config=deployment_to_jupyterhub_info[deployment_config["name"]].db_config,
-        app_db=jupyterhub_db,
+        db_config=jupyterhub_db_config,
+        app_vault_backend=app_vault_backend,
         cluster_stack=cluster_stack,
         application_labels=application_labels,
         k8s_global_labels=k8s_global_labels,
         extra_images=deployment_to_jupyterhub_info[
             deployment_config["name"]
         ].extra_images,
-        postgres_role_statements=deployment_to_jupyterhub_info[
-            deployment_config["name"]
-        ].postgres_role_statements,
     )

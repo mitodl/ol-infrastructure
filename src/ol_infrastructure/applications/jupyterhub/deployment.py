@@ -3,7 +3,6 @@ with values consistently derived from its name.
 """
 
 from pathlib import Path
-from string import Template
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
@@ -14,7 +13,7 @@ from bridge.lib.versions import JUPYTERHUB_CHART_VERSION
 from ol_infrastructure.applications.jupyterhub.values import (
     get_prepuller_config_with_images,
 )
-from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.database import OLPostgresDBConfig
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
@@ -33,7 +32,6 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
     OLVaultK8SSecret,
-    OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.ol_types import StackInfo
 from ol_infrastructure.lib.stack_defaults import defaults
@@ -45,8 +43,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     vault_config: Config,
     db_config: OLPostgresDBConfig,
     cluster_stack: StackReference,
-    app_db: OLAmazonDB,
-    postgres_role_statements: dict[str, dict[str, list[Template]]],
+    app_vault_backend: OLVaultDatabaseBackend,
     application_labels: dict[str, str],
     k8s_global_labels: dict[str, str],
     extra_images: dict[str, dict[str, str]] | None = None,
@@ -85,23 +82,6 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
         or rds_defaults["instance_size"]
     )
     rds_defaults["use_blue_green"] = False
-
-    # Vault Database Backend Config
-    app_vault_backend_config = OLVaultPostgresDatabaseConfig(
-        db_name=db_config.db_name,
-        mount_point=f"{db_config.engine}-{base_name}",
-        db_admin_username=db_config.username,
-        # Not sure if this is allowed or not
-        db_admin_password=db_config.password.get_secret_value(),
-        db_host=app_db.db_instance.address,
-        role_statements=postgres_role_statements,
-    )
-
-    # Vault Database Backend
-    app_vault_backend = OLVaultDatabaseBackend(
-        app_vault_backend_config,
-        opts=ResourceOptions(depends_on=[app_db]),
-    )
 
     # Vault Policy
     vault_policy = vault.Policy(
@@ -144,9 +124,11 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
         dest_secret_name=creds_secret_name,
         exclude_raw=True,
         labels=k8s_global_labels,
-        mount=app_vault_backend_config.mount_point,
+        mount=app_vault_backend.db_mount.path,
         namespace=namespace,
-        path="creds/app",
+        path="creds/app"
+        if base_name == "jupyterhub"
+        else "creds/authoring",  # Conditionalize based on deployment name
         templates={
             "DATABASE_URL": f'postgresql://{{{{ get .Secrets "username" }}}}'
             f':{{{{ get .Secrets "password" }}}}'
