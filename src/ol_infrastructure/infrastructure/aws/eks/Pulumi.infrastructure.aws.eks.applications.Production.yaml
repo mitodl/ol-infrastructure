@@ -30,6 +30,7 @@ config:
   - "studio-backend.xpro.mit.edu"
   - "courses-backend.xpro.mit.edu"
   - "preview.xpro.mit.edu"
+  - "tika-production.ol.mit.edu"
   eks:apisix_min_replicas: "5"
   eks:apisix_max_replicas: "10"
   eks:apisix_memory: "1000Mi"

@@ -9,6 +9,7 @@ config:
     max: 2
     min: 1
   tika:business_unit: operations
+  tika:k8s_domain: tika-ci.ol.mit.edu
   tika:target_vpc: applications_vpc
   tika:web_host_domain: tika-ci.odl.mit.edu
   vault:address: https://vault-ci.odl.mit.edu
