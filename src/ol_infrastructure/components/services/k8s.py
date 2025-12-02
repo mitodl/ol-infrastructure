@@ -936,6 +936,18 @@ class OLApplicationK8s(ComponentResource):
                         "minReplicaCount": deployment_info[
                             "celery_config"
                         ].min_replicas,
+                        "advanced": {
+                            "horizontalPodAutoscalerConfig": {
+                                "behavior": {
+                                    "scaleUp": {
+                                        "stabilizationWindowSeconds": 300,
+                                    },
+                                    "scaleDown": {
+                                        "stabilizationWindowSeconds": 300,
+                                    },
+                                }
+                            }
+                        },
                         "triggers": [
                             {
                                 "type": "redis",
