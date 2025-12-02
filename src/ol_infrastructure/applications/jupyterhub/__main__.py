@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from pulumi import Config, ResourceOptions, StackReference
+from pulumi import Config, StackReference
 from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import (
@@ -13,10 +13,6 @@ from ol_infrastructure.applications.jupyterhub.deployment import (
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
-from ol_infrastructure.components.services.vault import (
-    OLVaultDatabaseBackend,
-    OLVaultPostgresDatabaseConfig,
-)
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
@@ -29,7 +25,7 @@ from ol_infrastructure.lib.ol_types import (
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
-from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
+from ol_infrastructure.lib.vault import setup_vault_provider
 
 # Parse stack and setup providers
 stack_info = parse_stack()
@@ -208,36 +204,6 @@ jupyterhub_authoring_db_config = OLPostgresDBConfig(
 )
 jupyterhub_db = OLAmazonDB(jupyterhub_db_config)
 
-app_vault_backend_config = OLVaultPostgresDatabaseConfig(
-    db_name=jupyterhub_db_config.db_name,
-    mount_point=f"{jupyterhub_db_config.engine}-{jupyterhub_db_config.db_name}",
-    db_admin_username=jupyterhub_db_config.username,
-    db_admin_password=jupyterhub_db_config.password.get_secret_value(),
-    db_host=jupyterhub_db.db_instance.address,
-    role_statements=postgres_role_statements,
-)
-
-authoring_vault_db_config = OLVaultPostgresDatabaseConfig(
-    db_name=jupyterhub_authoring_db_config.db_name,
-    mount_point=f"{jupyterhub_authoring_db_config.engine}-{jupyterhub_authoring_db_config.db_name}",
-    db_admin_username=jupyterhub_authoring_db_config.username,
-    db_admin_password=jupyterhub_authoring_db_config.password.get_secret_value(),
-    db_host=jupyterhub_db.db_instance.address,
-    role_statements=postgres_role_statements,
-)
-
-# Vault Database Backend
-app_vault_backend = OLVaultDatabaseBackend(
-    app_vault_backend_config,
-    opts=ResourceOptions(depends_on=[jupyterhub_db]),
-)
-
-# Vault Database Backend
-authoring_vault_backend = OLVaultDatabaseBackend(
-    authoring_vault_db_config,
-    opts=ResourceOptions(depends_on=[jupyterhub_db]),
-)
-
 
 # We may want to rethink this. It's a bit cumbersome
 # If we more directly scoped the database to the stack
@@ -248,20 +214,17 @@ authoring_vault_backend = OLVaultDatabaseBackend(
 class JupyterhubDeploymentInfo:
     name: str
     extra_images: dict[str, dict[str, str]]
-    vault_backend: OLVaultDatabaseBackend
     db_config: OLPostgresDBConfig
 
 
 JupyterhubInfo = JupyterhubDeploymentInfo(
     name="jupyterhub",
     extra_images=EXTRA_IMAGES,
-    vault_backend=app_vault_backend,
     db_config=jupyterhub_db_config,
 )
 JupyterhubAuthoringInfo = JupyterhubDeploymentInfo(
     name="jupyterhub-authoring",
     extra_images={},
-    vault_backend=authoring_vault_backend,
     db_config=jupyterhub_authoring_db_config,
 )
 
@@ -281,10 +244,8 @@ for deployment_config in deployment_configs:
         stack_info=stack_info,
         jupyterhub_deployment_config=deployment_config,
         vault_config=vault_config,
-        db_config=jupyterhub_db_config,
-        app_vault_backend=deployment_to_jupyterhub_info[
-            deployment_config["name"]
-        ].vault_backend,
+        jupyterhub_db=jupyterhub_db,
+        db_config=deployment_to_jupyterhub_info[deployment_config["name"]].db_config,
         cluster_stack=cluster_stack,
         application_labels=application_labels,
         k8s_global_labels=k8s_global_labels,

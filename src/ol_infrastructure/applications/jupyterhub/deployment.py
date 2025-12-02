@@ -13,7 +13,7 @@ from bridge.lib.versions import JUPYTERHUB_CHART_VERSION
 from ol_infrastructure.applications.jupyterhub.values import (
     get_prepuller_config_with_images,
 )
-from ol_infrastructure.components.aws.database import OLPostgresDBConfig
+from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
@@ -32,9 +32,11 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
     OLVaultK8SSecret,
+    OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.ol_types import StackInfo
 from ol_infrastructure.lib.stack_defaults import defaults
+from ol_infrastructure.lib.vault import postgres_role_statements
 
 
 def provision_jupyterhub_deployment(  # noqa: PLR0913
@@ -42,8 +44,8 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     jupyterhub_deployment_config: Config,
     vault_config: Config,
     db_config: OLPostgresDBConfig,
+    jupyterhub_db: OLAmazonDB,
     cluster_stack: StackReference,
-    app_vault_backend: OLVaultDatabaseBackend,
     application_labels: dict[str, str],
     k8s_global_labels: dict[str, str],
     extra_images: dict[str, dict[str, str]] | None = None,
@@ -114,6 +116,20 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
             delete_before_replace=True,
             depends_on=[vault_k8s_auth_backend_role],
         ),
+    )
+    vault_backend_config = OLVaultPostgresDatabaseConfig(
+        db_name=db_config.db_name,
+        mount_point=f"{db_config.engine}-{db_config.db_name}",
+        db_admin_username=db_config.username,
+        db_admin_password=db_config.password.get_secret_value(),
+        db_host=jupyterhub_db.db_instance.address,
+        role_statements=postgres_role_statements,
+    )
+
+    # Vault Database Backend
+    app_vault_backend = OLVaultDatabaseBackend(
+        vault_backend_config,
+        opts=ResourceOptions(depends_on=[jupyterhub_db]),
     )
 
     # Dynamic Secret for Database Credentials
