@@ -240,16 +240,15 @@ for deployment_config in deployment_configs:
     cluster_stack.require_output("namespaces").apply(
         lambda ns, namespace=namespace: check_cluster_namespace(namespace, ns)
     )
+    jupyterhub_info = deployment_to_jupyterhub_info[deployment_config["name"]]
     jupyterhub_deployment = provision_jupyterhub_deployment(
         stack_info=stack_info,
         jupyterhub_deployment_config=deployment_config,
         vault_config=vault_config,
         jupyterhub_db=jupyterhub_db,
-        db_config=deployment_to_jupyterhub_info[deployment_config["name"]].db_config,
+        db_config=jupyterhub_info.db_config,
         cluster_stack=cluster_stack,
         application_labels=application_labels,
         k8s_global_labels=k8s_global_labels,
-        extra_images=deployment_to_jupyterhub_info[
-            deployment_config["name"]
-        ].extra_images,
+        extra_images=jupyterhub_info.extra_images,
     )
