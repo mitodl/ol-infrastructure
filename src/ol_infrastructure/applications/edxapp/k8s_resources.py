@@ -904,6 +904,13 @@ def create_k8s_resources(  # noqa: C901
             "cooldownPeriod": 10,
             "minReplicaCount": replicas_dict["celery"]["lms"]["min"],
             "maxReplicaCount": replicas_dict["celery"]["lms"]["max"],
+            "advanced": {
+                "horizontalPodAutoscalerConfig": {
+                    "behavior": {
+                        "scaleUp": {"stabilizationWindowSeconds": 300},
+                    }
+                }
+            },
             "triggers": [
                 {
                     "type": "redis",
