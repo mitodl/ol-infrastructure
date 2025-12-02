@@ -47,7 +47,6 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     application_labels: dict[str, str],
     k8s_global_labels: dict[str, str],
     extra_images: dict[str, dict[str, str]] | None = None,
-    proxy_port: int = 0,
 ) -> kubernetes.helm.v3.Release:
     base_name = jupyterhub_deployment_config["name"]
     domain_name = jupyterhub_deployment_config["domain"]
@@ -208,7 +207,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                 hosts=[domain_name],
                 paths=["/*"],
                 backend_service_name="proxy-public",
-                backend_service_port=proxy_port if proxy_port else "http",
+                backend_service_port="http",
                 websocket=True,
             ),
         ],
@@ -248,7 +247,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                     "service": {
                         "type": "NodePort",
                         "nodePorts": {
-                            "http": proxy_port if proxy_port else 30000,
+                            "http": 30000,
                             "https": 30443,
                         },
                     },
