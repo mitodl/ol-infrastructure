@@ -205,12 +205,18 @@ def create_k8s_secrets(
                         CONN_MAX_AGE: 0
                         NAME: edxapp
                         OPTIONS:
+                          ssl_mode: REQUIRED
+                          ssl:
+                            cipher: TLSv1.2
                           charset: utf8mb4
                         <<: *mysql_creds
                       read_replica:
                         CONN_MAX_AGE: 0
                         NAME: edxapp
                         OPTIONS:
+                          ssl_mode: REQUIRED
+                          ssl:
+                            cipher: TLSv1.2
                           charset: utf8mb4
                         <<: *mysql_creds
                       student_module_history:
@@ -220,6 +226,9 @@ def create_k8s_secrets(
                         PORT: {db["port"]}
                         NAME: edxapp_csmh
                         OPTIONS:
+                          ssl_mode: REQUIRED
+                          ssl:
+                            cipher: TLSv1.2
                           charset: utf8mb4
                         USER: {{{{ get .Secrets "username" }}}}
                         PASSWORD: {{{{ get .Secrets "password" }}}}

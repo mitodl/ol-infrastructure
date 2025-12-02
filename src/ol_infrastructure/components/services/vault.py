@@ -14,6 +14,7 @@ from enum import Enum
 from string import Template
 from typing import Any, Literal
 
+import httpx
 import pulumi_kubernetes as kubernetes
 from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_aws.acmpca import Certificate, CertificateValidityArgs
@@ -136,6 +137,11 @@ class OLVaultDatabaseBackend(ComponentResource):
         )
 
         db_option_dict = {}
+        ssl_dict = {
+            "tls_ca": httpx.get(
+                "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem"
+            ).text
+        }
         credentials_dict = {
             "username": db_config.db_admin_username,
             "password": db_config.db_admin_password,
@@ -146,6 +152,7 @@ class OLVaultDatabaseBackend(ComponentResource):
                 {
                     "connection_url": self.format_connection_string(db_config),
                     **credentials_dict,
+                    **ssl_dict,
                 }
             )
 
