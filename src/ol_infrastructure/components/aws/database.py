@@ -89,6 +89,7 @@ class OLDBConfig(AWSBase):
     use_blue_green: bool = False
     blue_green_timeout_minutes: PositiveInt = PositiveInt(60 * 12)
     username: str = "oldevops"  # The name of the admin user for the instance
+    enable_iam_auth: bool = True
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("engine")
@@ -153,7 +154,7 @@ class OLPostgresDBConfig(OLDBConfig):
     """Configuration container to specify settings specific to Postgres."""
 
     engine: str = "postgres"
-    engine_major_version: str | int = "17"
+    engine_major_version: str | int = "18"
     port: PositiveInt = PositiveInt(5432)
     parameter_overrides: list[dict[str, str | bool | int | float]] = [  # noqa: RUF012
         {"name": "autovacuum", "value": 1},
@@ -170,7 +171,7 @@ class OLMariaDBConfig(OLDBConfig):
     """Configuration container to specify settings specific to MariaDB."""
 
     engine: str = "mariadb"
-    engine_major_version: str | int = "11.4"
+    engine_major_version: str | int = "11.8"
     port: PositiveInt = PositiveInt(3306)
     parameter_overrides: list[dict[str, str | bool | int | float]] = [  # noqa: RUF012
         {"name": "character_set_client", "value": "utf8mb4"},
@@ -320,6 +321,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             deletion_protection=deletion_protection_for_primary,
             engine=db_config.engine,
             engine_version=primary_engine_version,
+            iam_database_authentication_enabled=db_config.enable_iam_auth,
             final_snapshot_identifier=(
                 f"{db_config.instance_name}-{db_config.engine}-final-snapshot"
             ),

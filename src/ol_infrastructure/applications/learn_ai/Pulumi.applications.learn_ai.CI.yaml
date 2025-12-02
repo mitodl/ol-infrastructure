@@ -3,7 +3,7 @@ secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAGzwYvKdv8btlpNoWfQrhopAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMA4aPdRQRnWQHfbAYAgEQgDvk5wiD1oK6gGUeZPT7mw/zGXqFmUNovUnubtRP/Vp/YcVaewPWpeOq6nFf8jBRI34GpG+6pc5PxmSARw==
 config:
   aws:region: us-east-1
-  learn_ai:apisix_ingress_class: apache-apisix
+
   learn_ai:backend_domain: "api-learn-ai-ci.ol.mit.edu"
   learn_ai:db_password:
     secure: v1:LPQWUf68siLqkk30:JHBZ8gREGp0fRcAWH4ER7ExID5d3LVbn8BoFZ8o7tOBj43Jf+Jqh2c9acA/im/p9+W4c15appQNpC1hMHo4+hrIks3UIhC8a8+SV6GzO908=

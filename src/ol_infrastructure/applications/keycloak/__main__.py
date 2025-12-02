@@ -270,9 +270,9 @@ keycloak_db_config = OLPostgresDBConfig(
     or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
     subnet_group_name=target_vpc["rds_subnet"],
     security_groups=[keycloak_database_security_group],
-    engine_major_version="16",
     db_name="keycloak",
     tags=aws_config.tags,
+    use_blue_green=keycloak_config.get_bool("db_use_blue_green") or False,
     **rds_defaults,
 )
 keycloak_db = OLAmazonDB(keycloak_db_config)

@@ -23,6 +23,8 @@ VAULT_VERSION = "1.21.1"
 AIRBYTE_CHART_VERSION = "2.0.19"
 # renovate: datasource=helm depName=superset packageName=superset registryUrl=https://apache.github.io/superset
 SUPERSET_CHART_VERSION = "0.15.0"
+# renovate: datasource=helm depName=tika packageName=tika registryUrl=https://apache.github.io/tika-helm
+TIKA_CHART_VERSION = "3.2.2"
 # renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://apache.github.io/apisix-helm-chart
 APISIX_CHART_VERSION = "2.12.4"
 # renovate: datasource=helm depName=aws-load-balancer-controller packageName=aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts

@@ -7,7 +7,7 @@ config:
   # actually use Consul for anything else in this project so this is okay (so far) (TMM
   # 2025-02-21)
   consul:address: https://consul-mitxonline-ci.odl.mit.edu
-  mitlearn:apisix_ingress_class: apache-apisix
+
   mitlearn:api_domain: "api.ci.learn.mit.edu"
   mitlearn:db_instance_size: db.t4g.medium # Leave small for now
   mitlearn:db_password:

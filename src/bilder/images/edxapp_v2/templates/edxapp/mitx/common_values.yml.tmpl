@@ -77,12 +77,18 @@ DATABASES:
     CONN_MAX_AGE: 0
     NAME: edxapp
     OPTIONS:
+      ssl_mode: REQUIRED
+      ssl:
+        cipher: TLSv1.2
       charset: utf8mb4
     <<: *mysql_creds
   read_replica:
     CONN_MAX_AGE: 0
     NAME: edxapp
     OPTIONS:
+      ssl_mode: REQUIRED
+      ssl:
+        cipher: TLSv1.2
       charset: utf8mb4
     <<: *mysql_creds
   student_module_history:
@@ -92,6 +98,9 @@ DATABASES:
     HOST: {{ keyOrDefault "edxapp/rds-host" "edxapp-db.service.consul" }}
     NAME: edxapp_csmh
     OPTIONS:
+      ssl_mode: REQUIRED
+      ssl:
+        cipher: TLSv1.2
       charset: utf8mb4
     {{ with secret "mariadb-mitx/creds/edxapp-csmh"}}
     PASSWORD: {{ .Data.password }}

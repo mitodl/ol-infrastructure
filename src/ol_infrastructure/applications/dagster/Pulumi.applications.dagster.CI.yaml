@@ -4,7 +4,7 @@ encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAGE+ekHl2+Q0Cfqge
 config:
   aws:region: us-east-1
   consul:address: https://consul-data-ci.odl.mit.edu
-  dagster:apisix_ingress_class: apache-apisix
+
   dagster:db_password:
     secure: v1:IPKfNisITCCH9aqx:fpyUnCHGQCke2c1FXLVGHwX2+N44gd+/NuE8fQ2uwnj1pahjQv80dg4ZuFl1pGbJqoX+uwU2IpP3/xU=
   dagster:domain: pipelines-ci.odl.mit.edu

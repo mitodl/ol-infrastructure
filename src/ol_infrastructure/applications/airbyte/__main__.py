@@ -481,7 +481,6 @@ airbyte_db_config = OLPostgresDBConfig(
     subnet_group_name=target_vpc["rds_subnet"],
     security_groups=[airbyte_db_security_group],
     parameter_overrides=[{"name": "rds.force_ssl", "value": 0}],
-    engine_major_version="16",
     tags=aws_config.tags,
     db_name="airbyte",
     **rds_defaults,

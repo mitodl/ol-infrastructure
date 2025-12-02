@@ -81,7 +81,7 @@ setup_vault_provider(skip_child_token=True)
 
 mitxonline_config = Config("mitxonline")
 vault_config = Config("vault")
-apisix_ingress_class = mitxonline_config.get("apisix_ingress_class") or "apisix"
+
 fastly_provider = get_fastly_provider()
 
 stack_info = parse_stack()
@@ -584,7 +584,6 @@ cert_manager_certificate = OLCertManagerCert(
         k8s_namespace=mitxonline_namespace,
         k8s_labels=k8s_global_labels,
         create_apisixtls_resource=True,
-        apisixtls_ingress_class=apisix_ingress_class,
         dest_secret_name=frontend_tls_secret_name,
         dns_names=[api_domain, frontend_domain],
     ),
@@ -661,7 +660,6 @@ mitxonline_apisix_route_direct = OLApisixRoute(
     name=f"mitxonline-apisix-route-direct-{stack_info.env_suffix}",
     k8s_namespace=mitxonline_namespace,
     k8s_labels=k8s_global_labels,
-    ingress_class_name=apisix_ingress_class,
     route_configs=[
         OLApisixRouteConfig(
             route_name="passauth",
@@ -718,7 +716,6 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
     name=f"mitxonline-apisix-route-prefixed-{stack_info.env_suffix}",
     k8s_namespace=mitxonline_namespace,
     k8s_labels=k8s_global_labels,
-    ingress_class_name=apisix_ingress_class,
     route_configs=[
         OLApisixRouteConfig(
             route_name="passauth",

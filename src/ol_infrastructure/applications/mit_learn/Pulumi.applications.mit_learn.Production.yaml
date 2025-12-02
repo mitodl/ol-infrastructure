@@ -2,7 +2,7 @@
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHiiGjYUolrtj8PCnScLM7oLAdMl8nJrLjQjnqyl1LykYgGq710cJf4taf7FUfw+iIGNAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM2JcEQu/tozu3tO8TAgEQgDvnl65jF/6aC66eb97jIrt3/CIL6a5XcVwv9E8EWgWlrX3cJadv9f2X0bcVLKiGPImjG4qTL6m5sDN7Ig==
 config:
-  mitlearn:apisix_ingress_class: apache-apisix
+
   mitlearn:api_domain: "api.learn.mit.edu"
   mitlearn:db_instance_size: db.m7g.2xlarge
   mitlearn:db_password:
