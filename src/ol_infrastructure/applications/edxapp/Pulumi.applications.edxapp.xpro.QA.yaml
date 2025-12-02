@@ -58,10 +58,9 @@ config:
   mongodb:atlas_project_id: 61a8f5e33456732be1fbb699
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
-  edxapp:apisix_ingres_class: apache-apisix
   edxapp:mit_learn_api_domain: api.rc.learn.mit.edu
   edxapp:mit_learn_domain: rc.learn.mit.edu
-  edxapp:learn_ai_frontend_domain: "learn-ai-ci.ol.mit.edu"
+  edxapp:learn_ai_frontend_domain: "learn-ai-qa.ol.mit.edu"
   edxapp:backend_lms_domain: courses-backend.rc.xpro.mit.edu
   edxapp:backend_studio_domain: studio-backend.rc.xpro.mit.edu
   edxapp:backend_preview_domain: preview-backend.rc.xpro.mit.edu
@@ -101,4 +100,4 @@ config:
         memory_limit: "2Gi"
   edxapp:k8s_deployment: true
   edxapp:k8s_cutover: true
-  edxapp:disable_ec2_deployment: false
+  edxapp:disable_ec2_deployment: true

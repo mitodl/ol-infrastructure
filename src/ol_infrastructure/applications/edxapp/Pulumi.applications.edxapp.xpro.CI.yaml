@@ -60,7 +60,6 @@ config:
   edxapp:worker_node_capacity: "1"
   edxapp:enable_xqueue: false
   edxapp:framework: "earthly"
-  edxapp:apisix_ingres_class: apache-apisix
   edxapp:k8s_replicas:
     webapp:
       cms:
