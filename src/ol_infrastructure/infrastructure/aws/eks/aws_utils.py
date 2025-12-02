@@ -22,6 +22,7 @@ def setup_aws_integrations(
     target_vpc,
     node_groups,
     versions,
+    cert_manager,
 ):
     """
     Set up AWS integrations for EKS.
@@ -315,7 +316,7 @@ def setup_aws_integrations(
         opts=ResourceOptions(parent=aws_load_balancer_controller_role),
     )
 
-    kubernetes.helm.v3.Release(
+    lb_controller = kubernetes.helm.v3.Release(
         f"{cluster_name}-aws-load-balancer-controller-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
             name="aws-load-balancer-controller",
@@ -359,7 +360,8 @@ def setup_aws_integrations(
             parent=cluster,
             depends_on=[
                 cluster,
-                node_groups[0],
+                *node_groups,
+                cert_manager,
                 aws_load_balancer_controller_role,
                 aws_load_balancer_controller_policy,
             ],
@@ -411,5 +413,8 @@ def setup_aws_integrations(
             provider=k8s_provider,
             parent=cluster,
             delete_before_replace=True,
+            depends_on=[*node_groups],
         ),
     )
+
+    return lb_controller

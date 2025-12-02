@@ -118,7 +118,7 @@ def setup_cert_manager(
     }
 
     # Ref: https://cert-manager.io/docs/installation/
-    kubernetes.helm.v3.Release(
+    return kubernetes.helm.v3.Release(
         f"{cluster_name}-cert-manager-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
             name="cert-manager",
@@ -173,7 +173,7 @@ def setup_cert_manager(
         opts=ResourceOptions(
             provider=k8s_provider,
             parent=operations_namespace,
-            depends_on=[cluster, node_groups[0]],
+            depends_on=[cluster, *node_groups],
             delete_before_replace=True,
         ),
     )

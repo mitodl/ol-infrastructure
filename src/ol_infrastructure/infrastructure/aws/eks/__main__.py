@@ -285,6 +285,66 @@ for index, policy in enumerate(cluster_policy_arns):
         role=cluster_role.id,
         opts=ResourceOptions(parent=cluster_role),
     )
+
+############################################################
+# Create node role before cluster so it can be added to access_entries
+############################################################
+
+# create a node role / instance profile used by all nodes in the cluster
+# regardless of what node group they are in
+#
+# Attached policies depend on configuration flags
+node_role = aws.iam.Role(
+    f"{cluster_name}-eks-node-role",
+    assume_role_policy=json.dumps(default_assume_role_policy),
+    name_prefix=f"{cluster_name}-eks-node-role-"[:IAM_ROLE_NAME_PREFIX_MAX_LENGTH],
+    path=f"/ol-infrastructure/eks/{cluster_name}/",
+    tags=aws_config.tags,
+)
+managed_node_policy_arns = [
+    "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
+    "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
+    "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
+    policy_stack.require_output("iam_policies")["describe_instances"],
+]
+if eks_config.get_bool("ebs_csi_provisioner"):
+    managed_node_policy_arns.append(
+        "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+    )
+if eks_config.get_bool("efs_csi_provisioner"):
+    managed_node_policy_arns.append(
+        "arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"
+    )
+for i, policy in enumerate(managed_node_policy_arns):
+    aws.iam.RolePolicyAttachment(
+        f"{cluster_name}-eks-node-role-policy-attachment-{i}",
+        policy_arn=policy,
+        role=node_role.id,
+        opts=ResourceOptions(parent=node_role),
+    )
+node_instance_profile = aws.iam.InstanceProfile(
+    f"{cluster_name}-eks-node-instance-profile",
+    role=node_role.name,
+    path=f"/ol-infrastructure/eks/{cluster_name}/",
+)
+export("node_instance_profile", node_instance_profile.id)
+export("node_role_arn", value=node_role.arn)
+
+# Add node role to access entries so nodes can authenticate to the cluster
+access_entries["node-role"] = eks.AccessEntryArgs(
+    principal_arn=node_role.arn,
+    access_policies={
+        "worker": eks.AccessPolicyAssociationArgs(
+            access_scope=aws.eks.AccessPolicyAssociationAccessScopeArgs(
+                type="cluster",
+            ),
+            policy_arn="arn:aws:eks::aws:cluster-access-policy/AmazonEKSWorkerPolicy",
+        ),
+    },
+    kubernetes_groups=["system:nodes"],
+    type="EC2_LINUX",
+)
+
 ############################################################
 # Provision the cluster
 ############################################################
@@ -408,46 +468,7 @@ Output.all(ca=cluster_certificate_authority, address=cluster_address).apply(
 # Configure node groups
 ############################################################
 # At least one node group must be defined.
-
-# create a node role / instance profile used by all nodes in the cluster
-# regardless of what node group they are in
-#
-# Attached policies depend on configuration flags
-node_role = aws.iam.Role(
-    f"{cluster_name}-eks-node-role",
-    assume_role_policy=json.dumps(default_assume_role_policy),
-    name_prefix=f"{cluster_name}-eks-node-role-"[:IAM_ROLE_NAME_PREFIX_MAX_LENGTH],
-    path=f"/ol-infrastructure/eks/{cluster_name}/",
-    tags=aws_config.tags,
-)
-managed_node_policy_arns = [
-    "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
-    "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
-    "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
-    policy_stack.require_output("iam_policies")["describe_instances"],
-]
-if eks_config.get_bool("ebs_csi_provisioner"):
-    managed_node_policy_arns.append(
-        "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
-    )
-if eks_config.get_bool("efs_csi_provisioner"):
-    managed_node_policy_arns.append(
-        "arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"
-    )
-for i, policy in enumerate(managed_node_policy_arns):
-    aws.iam.RolePolicyAttachment(
-        f"{cluster_name}-eks-node-role-policy-attachment-{i}",
-        policy_arn=policy,
-        role=node_role.id,
-        opts=ResourceOptions(parent=node_role),
-    )
-node_instance_profile = aws.iam.InstanceProfile(
-    f"{cluster_name}-eks-node-instance-profile",
-    role=node_role.name,
-    path=f"/ol-infrastructure/eks/{cluster_name}/",
-)
-export("node_instance_profile", node_instance_profile.id)
-export("node_role_arn", value=node_role.arn)
+# Node role is already created earlier and added to access_entries.
 
 # Initalize the k8s pulumi provider
 k8s_global_labels = {
@@ -558,8 +579,7 @@ for namespace in namespaces:
             labels=k8s_global_labels,
         ),
         opts=ResourceOptions(
-            provider=k8s_provider,
-            protect=False,
+            provider=k8s_provider, protect=False, depends_on=[*node_groups]
         ),
     )
 export("namespaces", [*namespaces, "operations"])
@@ -583,8 +603,7 @@ prometheus_operator_crds = kubernetes.yaml.v2.ConfigGroup(
         f"{PROMETHEUS_OPERATOR_CRD_BASE_URL}/monitoring.coreos.com_probes.yaml",
     ],
     opts=ResourceOptions(
-        provider=k8s_provider,
-        delete_before_replace=True,
+        provider=k8s_provider, delete_before_replace=True, depends_on=[*node_groups]
     ),
 )
 
@@ -693,7 +712,7 @@ if eks_config.get_bool("ebs_csi_provisioner"):
         },
         opts=ResourceOptions(
             provider=k8s_provider,
-            depends_on=[ebs_csi_driver_role],
+            depends_on=[ebs_csi_driver_role, *node_groups],
         ),
     )
     aws_ebs_cni_driver_addon = eks.Addon(
@@ -705,7 +724,7 @@ if eks_config.get_bool("ebs_csi_provisioner"):
         opts=ResourceOptions(
             parent=cluster,
             # Addons won't install properly if there are not nodes to schedule them on
-            depends_on=[cluster, node_groups[0]],
+            depends_on=[cluster, *node_groups],
         ),
     )
     export("ebs_storageclass", "ebs-gp3-sc")
@@ -792,7 +811,7 @@ if eks_config.get_bool("efs_csi_provisioner"):
         },
         opts=ResourceOptions(
             provider=k8s_provider,
-            depends_on=[efs_csi_driver_role],
+            depends_on=[efs_csi_driver_role, *node_groups],
         ),
     )
     aws_efs_cni_driver_addon = eks.Addon(
@@ -804,7 +823,7 @@ if eks_config.get_bool("efs_csi_provisioner"):
         opts=ResourceOptions(
             parent=cluster,
             # Addons won't install properly if there are not nodes to schedule them on
-            depends_on=[cluster, node_groups[0]],
+            depends_on=[cluster, *node_groups],
         ),
     )
     export("efs_storageclass", "efs-sc")
@@ -822,37 +841,6 @@ setup_vault_secrets_operator(
     versions=VERSIONS,
 )
 
-gateway_api_crds = setup_traefik(
-    cluster_name=cluster_name,
-    k8s_provider=k8s_provider,
-    operations_namespace=operations_namespace,
-    node_groups=node_groups,
-    prometheus_operator_crds=prometheus_operator_crds,
-    k8s_global_labels=k8s_global_labels,
-    operations_tolerations=operations_tolerations,
-    versions=VERSIONS,
-    eks_config=eks_config,
-    target_vpc=target_vpc,
-    aws_config=aws_config,
-    cluster=cluster,
-)
-
-setup_apisix(
-    cluster_name=cluster_name,
-    k8s_provider=k8s_provider,
-    operations_namespace=operations_namespace,
-    node_groups=node_groups,
-    gateway_api_crds=gateway_api_crds,
-    stack_info=stack_info,
-    k8s_global_labels=k8s_global_labels,
-    operations_tolerations=operations_tolerations,
-    versions=VERSIONS,
-    eks_config=eks_config,
-    target_vpc=target_vpc,
-    aws_config=aws_config,
-    cluster=cluster,
-)
-
 setup_external_dns(
     cluster_name=cluster_name,
     cluster=cluster,
@@ -867,7 +855,7 @@ setup_external_dns(
     eks_config=eks_config,
 )
 
-setup_cert_manager(
+cert_manager_release = setup_cert_manager(
     cluster_name=cluster_name,
     cluster=cluster,
     aws_account=aws_account,
@@ -885,13 +873,14 @@ create_core_dns_resources(
     k8s_global_labels=k8s_global_labels,
     k8s_provider=k8s_provider,
     cluster=cluster,
+    node_groups=node_groups,
 )
 
 ############################################################
 # Setup AWS integrations
 # AWS Load Balancer Controller, AWS Node Termination Handler
 ############################################################
-setup_aws_integrations(
+lb_controller = setup_aws_integrations(
     aws_account=aws_account,
     cluster_name=cluster_name,
     cluster=cluster,
@@ -902,7 +891,42 @@ setup_aws_integrations(
     target_vpc=target_vpc,
     node_groups=node_groups,
     versions=VERSIONS,
+    cert_manager=cert_manager_release,
 )
+
+gateway_api_crds = setup_traefik(
+    cluster_name=cluster_name,
+    k8s_provider=k8s_provider,
+    operations_namespace=operations_namespace,
+    node_groups=node_groups,
+    prometheus_operator_crds=prometheus_operator_crds,
+    k8s_global_labels=k8s_global_labels,
+    operations_tolerations=operations_tolerations,
+    versions=VERSIONS,
+    eks_config=eks_config,
+    target_vpc=target_vpc,
+    aws_config=aws_config,
+    cluster=cluster,
+    lb_controller=lb_controller,
+)
+
+setup_apisix(
+    cluster_name=cluster_name,
+    k8s_provider=k8s_provider,
+    operations_namespace=operations_namespace,
+    node_groups=node_groups,
+    gateway_api_crds=gateway_api_crds,
+    stack_info=stack_info,
+    k8s_global_labels=k8s_global_labels,
+    operations_tolerations=operations_tolerations,
+    versions=VERSIONS,
+    eks_config=eks_config,
+    target_vpc=target_vpc,
+    aws_config=aws_config,
+    cluster=cluster,
+    lb_controller=lb_controller,
+)
+
 
 ############################################################
 # Install and configure metrics-server

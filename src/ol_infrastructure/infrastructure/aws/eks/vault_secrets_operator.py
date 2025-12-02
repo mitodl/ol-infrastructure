@@ -142,7 +142,7 @@ def setup_vault_secrets_operator(
         opts=ResourceOptions(
             provider=k8s_provider,
             parent=operations_namespace,
-            depends_on=[cluster, node_groups[0], vault_secret_operator_transit_role],
+            depends_on=[cluster, *node_groups, vault_secret_operator_transit_role],
             delete_before_replace=True,
         ),
     )
