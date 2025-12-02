@@ -89,6 +89,7 @@ class OLDBConfig(AWSBase):
     use_blue_green: bool = False
     blue_green_timeout_minutes: PositiveInt = PositiveInt(60 * 12)
     username: str = "oldevops"  # The name of the admin user for the instance
+    enable_iam_auth: bool = True
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("engine")
@@ -320,6 +321,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             deletion_protection=deletion_protection_for_primary,
             engine=db_config.engine,
             engine_version=primary_engine_version,
+            iam_database_authentication_enabled=db_config.enable_iam_auth,
             final_snapshot_identifier=(
                 f"{db_config.instance_name}-{db_config.engine}-final-snapshot"
             ),
