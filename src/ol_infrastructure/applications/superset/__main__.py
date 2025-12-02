@@ -289,7 +289,6 @@ superset_db_config = OLPostgresDBConfig(
     password=superset_config.require("db_password"),
     subnet_group_name=data_vpc["rds_subnet"],
     security_groups=[superset_db_security_group],
-    engine_major_version="16",
     tags=aws_config.tags,
     db_name="superset",
     **rds_defaults,

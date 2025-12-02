@@ -149,7 +149,7 @@ micromasters_db_config = OLPostgresDBConfig(
     security_groups=[micromasters_db_security_group],
     tags=aws_config.tags,
     db_name="micromasters",
-    engine_major_version="13",
+    engine_major_version="15",
     public_access=True,
     **rds_defaults,
 )
