@@ -942,9 +942,6 @@ class OLApplicationK8s(ComponentResource):
                                     "scaleUp": {
                                         "stabilizationWindowSeconds": 300,
                                     },
-                                    "scaleDown": {
-                                        "stabilizationWindowSeconds": 300,
-                                    },
                                 }
                             }
                         },
