@@ -1,5 +1,3 @@
-# ruff: noqa: E501
-
 import os
 from pathlib import Path
 
@@ -14,7 +12,6 @@ from bridge.lib.versions import (
     NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION,
     VANTAGE_K8S_AGENT_CHART_VERSION,
 )
-from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
@@ -24,8 +21,10 @@ from ol_infrastructure.components.services.vault import (
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
+from ol_infrastructure.substructure.aws.eks.grafana import setup_grafana
 from ol_infrastructure.substructure.aws.eks.karpenter import setup_karpenter
 from ol_infrastructure.substructure.aws.eks.keda import setup_keda
+from ol_infrastructure.substructure.aws.eks.nvidia import setup_nvidia
 
 env_config = Config("environment")
 
@@ -366,264 +365,13 @@ if cluster_stack.require_output("has_ebs_storage"):
         ),
     )
 
-# Grafana k8s-monitoring
-grafana_vault_secrets = read_yaml_secrets(
-    Path(f"alloy/grafana.{stack_info.env_suffix}.yaml")
+# Setup Grafana k8s-monitoring
+setup_grafana(
+    cluster_name=cluster_name,
+    stack_info=stack_info,
+    k8s_provider=k8s_provider,
+    grafana_k8s_monitoring_version=VERSIONS["GRAFANA_K8S_MONITORING_VERSION"],
 )
-
-alloy_extra_env_vars = [
-    {
-        "name": "GCLOUD_RW_API_KEY",
-        "valueFrom": {
-            "secretKeyRef": {
-                "name": "alloy-metrics-remote-cfg-grafana-k8s-monitoring",
-                "key": "password",
-            }
-        },
-    },
-    {
-        "name": "CLUSTER_NAME",
-        "value": cluster_name,
-    },
-    {
-        "name": "NAMESPACE",
-        "valueFrom": {
-            "fieldRef": {"fieldPath": "metadata.namespace"},
-        },
-    },
-    {
-        "name": "POD_NAME",
-        "valueFrom": {
-            "fieldRef": {"fieldPath": "metadata.name"},
-        },
-    },
-    {
-        "name": "GCLOUD_FM_COLLECTOR_ID",
-        "value": "grafana-k8s-monitoring-$(CLUSTER_NAME)-$(NAMESPACE)-$(POD_NAME)",
-    },
-]
-grafana_k8s_monitoring_helm_release = kubernetes.helm.v3.Release(
-    f"{cluster_name}-grafana-k8s-monitoring-helm-release",
-    kubernetes.helm.v3.ReleaseArgs(
-        name="grafana-k8s-monitoring",
-        chart="k8s-monitoring",
-        version=VERSIONS["GRAFANA_K8S_MONITORING_VERSION"],
-        namespace="grafana",
-        create_namespace=True,  # Important
-        cleanup_on_fail=True,
-        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-            repo="https://grafana.github.io/helm-charts",
-        ),
-        values={
-            "cluster": {
-                "name": cluster_name,
-            },
-            "destinations": [
-                {
-                    "name": "grafana-cloud-metrics",
-                    "type": "prometheus",
-                    "url": "https://prometheus-prod-10-prod-us-central-0.grafana.net./api/prom/push",
-                    "auth": {
-                        "type": "basic",
-                        "username": grafana_vault_secrets[
-                            "k8s_monitoring_metrics_username"
-                        ],
-                        "password": grafana_vault_secrets["k8s_monitoring_api_key"],
-                    },
-                },
-                {
-                    "name": "grafana-cloud-logs",
-                    "type": "loki",
-                    "url": "https://logs-prod-us-central1.grafana.net./loki/api/v1/push",
-                    "auth": {
-                        "type": "basic",
-                        "username": grafana_vault_secrets[
-                            "k8s_monitoring_logs_username"
-                        ],
-                        "password": grafana_vault_secrets["k8s_monitoring_api_key"],
-                    },
-                },
-                {
-                    "name": "gc-otlp-endpoint",
-                    "type": "otlp",
-                    "url": "https://otlp-gateway-prod-us-central-0.grafana.net./otlp",
-                    "protocol": "http",
-                    "auth": {
-                        "type": "basic",
-                        "username": grafana_vault_secrets[
-                            "k8s_monitoring_tracing_username"
-                        ],
-                        "password": grafana_vault_secrets["k8s_monitoring_api_key"],
-                    },
-                    "metrics": {
-                        "enabled": True,
-                    },
-                    "logs": {
-                        "enabled": True,
-                    },
-                    "traces": {
-                        "enabled": True,
-                    },
-                },
-            ],
-            "clusterMetrics": {
-                "enabled": True,
-                "opencost": {
-                    "enabled": True,
-                    "metricsSource": "grafana-cloud-metrics",
-                    "opencost": {
-                        "exporter": {
-                            "defaultClusterId": cluster_name,
-                        },
-                        "prometheus": {
-                            "existingSecretName": "grafana-cloud-metrics-grafana-k8s-monitoring",  # pragma: allowlist secret
-                            "external": {
-                                "url": "https://prometheus-prod-10-prod-us-central-0.grafana.net./api/prom"
-                            },
-                        },
-                    },
-                },
-                "kube-state-metrics": {"deploy": True},
-                "kepler": {
-                    "enabled": True,
-                },
-            },
-            "annotationAutodiscover": {
-                "enabled": True,
-            },
-            "prometheusOperatorObjects": {
-                "enabled": True,
-            },
-            "clusterEvents": {
-                "enabled": True,
-            },
-            "podLogs": {
-                "enabled": True,
-            },
-            "applicationObservability": {
-                "enabled": True,
-                "receivers": {
-                    "otlp": {
-                        "grpc": {
-                            "enabled": True,
-                            "port": 4317,
-                        },
-                        "http": {
-                            "enabled": True,
-                            "port": 4318,
-                        },
-                    },
-                    "zipkin": {
-                        "enabled": True,
-                        "port": 9411,
-                    },
-                },
-            },
-            "alloy-metrics": {
-                "enabled": True,
-                "alloy": {
-                    "extraEnv": alloy_extra_env_vars,
-                },
-                "remoteConfig": {
-                    "enabled": True,
-                    "url": "https://fleet-management-prod-001.grafana.net",
-                    "auth": {
-                        "type": "basic",
-                        "username": grafana_vault_secrets[
-                            "k8s_monitoring_tracing_username"
-                        ],
-                        "password": grafana_vault_secrets["k8s_monitoring_api_key"],
-                    },
-                },
-            },
-            "alloy-singleton": {
-                "enabled": True,
-                "alloy": {
-                    "extraEnv": alloy_extra_env_vars,
-                },
-                "remoteConfig": {
-                    "enabled": True,
-                    "url": "https://fleet-management-prod-001.grafana.net",
-                    "auth": {
-                        "type": "basic",
-                        "username": grafana_vault_secrets[
-                            "k8s_monitoring_tracing_username"
-                        ],
-                        "password": grafana_vault_secrets["k8s_monitoring_api_key"],
-                    },
-                },
-            },
-            "alloy-logs": {
-                "enabled": True,
-                "alloy": {
-                    "extraEnv": alloy_extra_env_vars,
-                },
-                "remoteConfig": {
-                    "enabled": True,
-                    "url": "https://fleet-management-prod-001.grafana.net",
-                    "auth": {
-                        "type": "basic",
-                        "username": grafana_vault_secrets[
-                            "k8s_monitoring_tracing_username"
-                        ],
-                        "password": grafana_vault_secrets["k8s_monitoring_api_key"],
-                    },
-                },
-            },
-            "alloy-receiver": {
-                "enabled": True,
-                "alloy": {
-                    "extraEnv": alloy_extra_env_vars,
-                    "extraPorts": [
-                        {
-                            "name": "otlp-grpc",
-                            "port": 4317,
-                            "targetPort": 4317,
-                            "protocol": "TCP",
-                        },
-                        {
-                            "name": "otlp-http",
-                            "port": 4318,
-                            "targetPort": 4318,
-                            "protocol": "TCP",
-                        },
-                        {
-                            "name": "zipkin",
-                            "port": 9411,
-                            "targetPort": 9411,
-                            "protocol": "TCP",
-                        },
-                    ],
-                },
-                "remoteConfig": {
-                    "enabled": True,
-                    "url": "https://fleet-management-prod-001.grafana.net",
-                    "auth": {
-                        "type": "basic",
-                        "username": grafana_vault_secrets[
-                            "k8s_monitoring_tracing_username"
-                        ],
-                        "password": grafana_vault_secrets["k8s_monitoring_api_key"],
-                    },
-                },
-            },
-            "integrations": {
-                "dcgm-exporter": {
-                    "instances": [
-                        {
-                            "name": "dcgm-exporter",
-                            "labelSelectors": {
-                                "app.kubernetes.io/name": "dcgm-exporter",
-                            },
-                        }
-                    ],
-                },
-            },
-        },
-    ),
-    opts=ResourceOptions(provider=k8s_provider, delete_before_replace=True),
-)
-
 
 # Setup Karpenter
 setup_karpenter(
@@ -648,154 +396,10 @@ setup_keda(
     k8s_global_labels=k8s_global_labels,
 )
 
-node_feature_discovery_crds = kubernetes.yaml.v2.ConfigGroup(
-    f"{cluster_name}-nfd-crds",
-    files=[
-        "https://raw.githubusercontent.com/kubernetes-sigs/node-feature-discovery/master/deployment/base/nfd-crds/nfd-api-crds.yaml",
-    ],
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        delete_before_replace=True,
-    ),
-)
-nvidia_k8s_device_plugin_release = kubernetes.helm.v3.Release(
-    f"{cluster_name}-nvidia-k8s-device-plugin-helm-release",
-    kubernetes.helm.v3.ReleaseArgs(
-        name="nvidia-device-plugin",
-        chart="nvidia-device-plugin",
-        version=VERSIONS["NVIDIA_K8S_DEVICE_PLUGIN_VERSION"],
-        namespace="operations",
-        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-            repo="https://nvidia.github.io/k8s-device-plugin"
-        ),
-        cleanup_on_fail=True,
-        skip_await=True,
-        values={
-            "affinity": {
-                "nodeAffinity": {
-                    "requiredDuringSchedulingIgnoredDuringExecution": {
-                        "nodeSelectorTerms": [
-                            {
-                                "matchExpressions": [
-                                    {
-                                        "key": "ol.mit.edu/gpu_node",
-                                        "operator": "In",
-                                        "values": ["true"],
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                }
-            },
-            "tolerations": [
-                {
-                    "key": "ol.mit.edu/gpu_node",
-                    "operator": "Equal",
-                    "value": "true",
-                    "effect": "NoSchedule",
-                }
-            ],
-            "gfd": {
-                "enabled": True,
-            },
-            "nfd": {
-                "master": {
-                    "resources": {
-                        "requests": {
-                            "cpu": "10m",
-                            "memory": "100Mi",
-                        },
-                        "limits": {
-                            "memory": "100Mi",
-                        },
-                    },
-                },
-                "worker": {
-                    "resources": {
-                        "requests": {
-                            "cpu": "5m",
-                            "memory": "20Mi",
-                        },
-                        "limits": {
-                            "memory": "20Mi",
-                        },
-                    },
-                    "tolerations": [
-                        {
-                            "key": "ol.mit.edu/gpu_node",
-                            "operator": "Equal",
-                            "value": "true",
-                            "effect": "NoSchedule",
-                        },
-                    ],
-                },
-            },
-            "config": {
-                "map": {
-                    "default": "version: v1\nsharing:\n  mps:\n    resources:\n    - name: nvidia.com/gpu\n      replicas: 10\n    failRequestsGreaterThanOne: false\n",
-                }
-            },
-            "resources": {
-                "requests": {
-                    "cpu": "10m",
-                    "memory": "100Mi",
-                },
-                "limits": {
-                    "memory": "100Mi",
-                },
-            },
-        },
-    ),
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        parent=k8s_provider,
-        delete_before_replace=True,
-    ),
-)
-
-nvidia_dcgm_exporter_release = kubernetes.helm.v3.Release(
-    f"{cluster_name}-nvidia-dcgm-exporter-helm-release",
-    kubernetes.helm.v3.ReleaseArgs(
-        name="nvidia-dcgm-exporter",
-        chart="dcgm-exporter",
-        version=VERSIONS["NVIDIA_DCGM_EXPORTER_VERSION"],
-        namespace="operations",
-        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-            repo="https://nvidia.github.io/dcgm-exporter/helm-charts"
-        ),
-        cleanup_on_fail=True,
-        skip_await=True,
-        values={
-            "tolerations": [
-                {
-                    "key": "ol.mit.edu/gpu_node",
-                    "operator": "Equal",
-                    "value": "true",
-                    "effect": "NoSchedule",
-                }
-            ],
-            "resources": {
-                "requests": {
-                    "cpu": "10m",
-                    "memory": "512Mi",
-                },
-                "limits": {
-                    "memory": "512Mi",
-                },
-            },
-            "nodeSelector": {
-                "ol.mit.edu/gpu_node": "true",
-            },
-            "serviceMonitor": {
-                "enabled": False,
-            },
-        },
-    ),
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        parent=k8s_provider,
-        depends_on=[node_feature_discovery_crds],
-        delete_before_replace=True,
-    ),
+# Setup NVIDIA GPU resources
+setup_nvidia(
+    cluster_name=cluster_name,
+    k8s_provider=k8s_provider,
+    nvidia_dcgm_exporter_version=VERSIONS["NVIDIA_DCGM_EXPORTER_VERSION"],
+    nvidia_k8s_device_plugin_version=VERSIONS["NVIDIA_K8S_DEVICE_PLUGIN_VERSION"],
 )
