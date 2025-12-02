@@ -379,7 +379,9 @@ for deployment_config in deployment_configs:
         jupyterhub_deployment_config=deployment_config,
         vault_config=vault_config,
         db_config=jupyterhub_db_config,
-        app_vault_backend=app_vault_backend,
+        app_vault_backend=app_vault_backend
+        if namespace == "jupyter"
+        else authoring_vault_backend,
         cluster_stack=cluster_stack,
         application_labels=application_labels,
         k8s_global_labels=k8s_global_labels,
