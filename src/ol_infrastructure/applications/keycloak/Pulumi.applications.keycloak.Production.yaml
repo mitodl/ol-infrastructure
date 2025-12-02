@@ -10,6 +10,7 @@ config:
   keycloak:cpu_request: 1000m
   keycloak:cpu_limit: 2000m
   keycloak:db_capacity: "100"
+  keycloak:db_use_blue_green: true
   keycloak:domain: sso.ol.mit.edu
   keycloak:instance_type: general_purpose_large
   keycloak:rds_password:
