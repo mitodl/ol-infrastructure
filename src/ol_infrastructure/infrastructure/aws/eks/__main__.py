@@ -285,64 +285,6 @@ for index, policy in enumerate(cluster_policy_arns):
         role=cluster_role.id,
         opts=ResourceOptions(parent=cluster_role),
     )
-
-############################################################
-# Create node role before cluster so it can be added to access_entries
-############################################################
-
-# create a node role / instance profile used by all nodes in the cluster
-# regardless of what node group they are in
-#
-# Attached policies depend on configuration flags
-node_role = aws.iam.Role(
-    f"{cluster_name}-eks-node-role",
-    assume_role_policy=json.dumps(default_assume_role_policy),
-    name_prefix=f"{cluster_name}-eks-node-role-"[:IAM_ROLE_NAME_PREFIX_MAX_LENGTH],
-    path=f"/ol-infrastructure/eks/{cluster_name}/",
-    tags=aws_config.tags,
-)
-managed_node_policy_arns = [
-    "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
-    "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
-    "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
-    policy_stack.require_output("iam_policies")["describe_instances"],
-]
-if eks_config.get_bool("ebs_csi_provisioner"):
-    managed_node_policy_arns.append(
-        "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
-    )
-if eks_config.get_bool("efs_csi_provisioner"):
-    managed_node_policy_arns.append(
-        "arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"
-    )
-for i, policy in enumerate(managed_node_policy_arns):
-    aws.iam.RolePolicyAttachment(
-        f"{cluster_name}-eks-node-role-policy-attachment-{i}",
-        policy_arn=policy,
-        role=node_role.id,
-        opts=ResourceOptions(parent=node_role),
-    )
-node_instance_profile = aws.iam.InstanceProfile(
-    f"{cluster_name}-eks-node-instance-profile",
-    role=node_role.name,
-    path=f"/ol-infrastructure/eks/{cluster_name}/",
-)
-export("node_instance_profile", node_instance_profile.id)
-export("node_role_arn", value=node_role.arn)
-
-# Add node role to access entries so nodes can authenticate to the cluster
-access_entries["node-role"] = eks.AccessEntryArgs(
-    principal_arn=node_role.arn,
-    access_policies={
-        "worker": eks.AccessPolicyAssociationArgs(
-            access_scope=aws.eks.AccessPolicyAssociationAccessScopeArgs(
-                type="cluster",
-            ),
-            policy_arn="arn:aws:eks::aws:cluster-access-policy/AmazonEKSWorkerPolicy",
-        ),
-    },
-)
-
 ############################################################
 # Provision the cluster
 ############################################################
@@ -466,7 +408,58 @@ Output.all(ca=cluster_certificate_authority, address=cluster_address).apply(
 # Configure node groups
 ############################################################
 # At least one node group must be defined.
-# Node role is already created earlier and added to access_entries.
+
+# create a node role / instance profile used by all nodes in the cluster
+# regardless of what node group they are in
+#
+# Attached policies depend on configuration flags
+node_role = aws.iam.Role(
+    f"{cluster_name}-eks-node-role",
+    assume_role_policy=json.dumps(default_assume_role_policy),
+    name_prefix=f"{cluster_name}-eks-node-role-"[:IAM_ROLE_NAME_PREFIX_MAX_LENGTH],
+    path=f"/ol-infrastructure/eks/{cluster_name}/",
+    tags=aws_config.tags,
+)
+managed_node_policy_arns = [
+    "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
+    "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
+    "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
+    policy_stack.require_output("iam_policies")["describe_instances"],
+]
+if eks_config.get_bool("ebs_csi_provisioner"):
+    managed_node_policy_arns.append(
+        "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+    )
+if eks_config.get_bool("efs_csi_provisioner"):
+    managed_node_policy_arns.append(
+        "arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"
+    )
+for i, policy in enumerate(managed_node_policy_arns):
+    aws.iam.RolePolicyAttachment(
+        f"{cluster_name}-eks-node-role-policy-attachment-{i}",
+        policy_arn=policy,
+        role=node_role.id,
+        opts=ResourceOptions(parent=node_role),
+    )
+node_instance_profile = aws.iam.InstanceProfile(
+    f"{cluster_name}-eks-node-instance-profile",
+    role=node_role.name,
+    path=f"/ol-infrastructure/eks/{cluster_name}/",
+)
+# Create access entry for the nodegroup's IAM role
+# This allows EC2 instances in the nodegroup to authenticate to the cluster
+aws.eks.AccessEntry(
+    f"{cluster_name}-eks-nodegroup-access-entry",
+    cluster_name=cluster.eks_cluster.name,
+    principal_arn=node_role.arn,
+    type="EC2_LINUX",
+    opts=ResourceOptions(
+        depends_on=[cluster],
+    ),
+)
+
+export("node_instance_profile", node_instance_profile.id)
+export("node_role_arn", value=node_role.arn)
 
 # Initalize the k8s pulumi provider
 k8s_global_labels = {
