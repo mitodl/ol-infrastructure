@@ -101,7 +101,7 @@ config:
     SENTRY_TRACES_SAMPLE_RATE: "0.25"
     SESSION_COOKIE_NAME: "session_mitlearn"
     SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT: "https://sso.ol.mit.edu/realms/olapps"
-    TIKA_SERVER_ENDPOINT: "https://tika-production.odl.mit.edu"
+    TIKA_SERVER_ENDPOINT: "https://tika-production.ol.mit.edu"
     UWSGI_THREADS: 15
     UWSGI_WORKERS: 3
   redis:password:
