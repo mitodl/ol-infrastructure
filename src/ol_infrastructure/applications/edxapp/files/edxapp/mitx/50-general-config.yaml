@@ -121,7 +121,7 @@ DEFAULT_COURSE_VISIBILITY_IN_CATALOG: both
 # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
 DEFAULT_FILE_STORAGE: storages.backends.s3boto3.S3Boto3Storage  # MODIFIED
 DEFAULT_MOBILE_AVAILABLE: false
-DEFAULT_SITE_THEME: mitx  # MODIFIED
+DEFAULT_SITE_THEME: xpro  # MODIFIED
 DEPRECATED_ADVANCED_COMPONENT_TYPES: []
 
 EDXNOTES_INTERNAL_API: http://localhost:18120/api/v1
@@ -249,6 +249,9 @@ MITX_REDIRECT_ALLOW_RE_LIST:  # ADDED VALUE
   - "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"
   - "^/courses/.*/courseware-navigation-sidebar/toggles/?$"
   - "^/courses/.*/courseware-search/enabled/?$"
+MITXPRO_CORE_REDIRECT_ALLOW_RE_LIST:
+  - "^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/)"
+  - "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"
 MKTG_URL_LINK_MAP:
   TOS: tos
   ABOUT: about
@@ -309,12 +312,12 @@ PARTNER_SUPPORT_EMAIL: ''
 PASSWORD_POLICY_COMPLIANCE_ROLLOUT_CONFIG:
   ENFORCE_COMPLIANCE_ON_LOGIN: false
 PASSWORD_RESET_SUPPORT_LINK: ''
-PLATFORM_DESCRIPTION: MITx Residential # MODIFIED
+PLATFORM_DESCRIPTION: MIT xPRO # MODIFIED
 PLATFORM_FACEBOOK_ACCOUNT: http://www.facebook.com/YourPlatformFacebookAccount
-PLATFORM_NAME: MITx Residential  # MODIFIED
+PLATFORM_NAME: MIT xPRO  # MODIFIED
 PLATFORM_TWITTER_ACCOUNT: '@YourPlatformTwitterAccount'
 POLICY_CHANGE_GRADES_ROUTING_KEY: edx.lms.core.default
-PRESS_EMAIL: support@mitx.mit.edu # MODIFIED
+PRESS_EMAIL: support@xpro.mit.edu # MODIFIED
 
 PROCTORING_SETTINGS: {}
 REDBEAT_KEY_PREFIX: redbeat_lms
@@ -377,6 +380,7 @@ STATIC_ROOT_BASE: /openedx/staticfiles/
 # Django 4.2+ storage configuration
 STUDIO_NAME: Studio
 STUDIO_SHORT_NAME: Studio
+SUPPORT_SITE_LINK: https://xpro.zendesk.com/hc/
 SYSADMIN_DEFAULT_BRANCH: None
 SYSTEM_WIDE_ROLE_CLASSES: []
 TECH_SUPPORT_EMAIL: odl-devops@mit.edu  # MODIFIED
