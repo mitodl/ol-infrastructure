@@ -37,7 +37,7 @@ config:
         max: 5
         min: 2
       tags:
-        cluster: applications-ci
+        cluster: residential-ci
       taints: {}
       version:
   environment:business_unit: residential
