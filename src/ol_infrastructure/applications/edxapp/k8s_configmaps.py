@@ -265,7 +265,7 @@ def create_k8s_configmaps(
         SOCIAL_AUTH_EDX_OAUTH2_PUBLIC_URL_ROOT: https://{edxapp_config.require_object("domains")["lms"]}
         SESSION_COOKIE_NAME: {env_name}-edx-studio-sessionid
     """)
-    if stack_info.env_suffix == "mitxonline":
+    if stack_info.env_prefix == "mitxonline":
         cms_interpolated_config_content += (
             f"    GITHUB_ORG_API_URL: {edxapp_config.require('github_org_api_url')}\n"
         )
