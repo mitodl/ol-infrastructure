@@ -59,6 +59,7 @@ config:
   edxapp:k8s_deployment: false
   edxapp:k8s_cutover: false
   edxapp:disable_ec2_deployment: false
+  edxapp:k8s_vpc: residential_mitx_vpc
   edxapp:mail_domain: edxapp-mail-staging-qa.mitx.mit.edu
   edxapp:min_web_nodes: "1"
   edxapp:min_worker_nodes: "1"
