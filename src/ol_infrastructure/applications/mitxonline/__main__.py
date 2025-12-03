@@ -546,7 +546,6 @@ mitxonline_k8s_app = OLApplicationK8s(
         ],
         resource_requests={"cpu": "250m", "memory": "1500Mi"},
         resource_limits={"memory": "1500Mi"},
-        slack_channel=slack_channel,
         hpa_scaling_metrics=[
             kubernetes.autoscaling.v2.MetricSpecArgs(
                 type="Resource",
