@@ -143,8 +143,6 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
         mount=app_vault_backend.db_mount.path,
         namespace=namespace,
         path="creds/app",
-        # if base_name == "jupyterhub"
-        # else "creds/authoring",  # Conditionalize based on deployment name
         templates={
             "DATABASE_URL": f'postgresql://{{{{ get .Secrets "username" }}}}'
             f':{{{{ get .Secrets "password" }}}}'
