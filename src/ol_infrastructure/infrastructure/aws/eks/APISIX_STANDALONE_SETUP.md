@@ -493,6 +493,7 @@ external-dns.alpha.kubernetes.io/hostname: "domain1.com,domain2.com,..."
 - `api-learn-ai-ci.ol.mit.edu`
 - `api.ci.learn.mit.edu`
 - `nb.ci.learn.mit.edu`
+- `authoring.nb.ci.learn.mit.edu`
 - `ci.mitxonline.mit.edu`
 - `api.ci.mitxonline.mit.edu`
 - `studio-backend.ci.learn.mit.edu`

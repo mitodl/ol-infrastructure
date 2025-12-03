@@ -48,6 +48,7 @@ config:
   - "https://mitxonline.mit.edu/*"
   - "https://api.mitxonline.mit.edu/*"
   - "https://nb.learn.mit.edu/*"
+  - "https://authoring.nb.learn.mit.edu/*"
   - "https://binder.learn.mit.edu/*"
   keycloak_realm:olapps-mitlearn-client-roles:
   - "https://learn.mit.edu/*"
@@ -55,6 +56,7 @@ config:
   - "https://pay.ol.mit.edu/*"
   - "https://mitxonline.mit.edu/*"
   - "https://nb.learn.mit.edu/*"
+  - "https://authoring.nb.learn.mit.edu/*"
   - "https://binder.learn.mit.edu/*"
   keycloak_realm:olapps-mitxonline-client-redirect-uris:
   - "https://mitxonline.mit.edu/account/action/complete*"
