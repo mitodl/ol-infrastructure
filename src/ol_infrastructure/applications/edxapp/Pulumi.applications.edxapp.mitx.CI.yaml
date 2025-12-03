@@ -81,6 +81,7 @@ config:
   edxapp:cluster_stack: infrastructure.aws.eks.residential.CI
   edxapp:mit_learn_api_domain: api.ci.learn.mit.edu
   edxapp:mit_learn_domain: ci.learn.mit.edu
+  edxapp:marketing_domain: lms-ci.mitx.mit.edu
   edxapp:backend_lms_domain: courses-backend.ci.mitx.mit.edu
   edxapp:backend_studio_domain: studio-backend.ci.mitx.mit.edu
   edxapp:backend_preview_domain: preview-backend.ci.mitx.mit.edu
