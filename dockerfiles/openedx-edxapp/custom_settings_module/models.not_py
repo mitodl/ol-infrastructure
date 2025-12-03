@@ -168,7 +168,9 @@ class ThemingSettings(BaseSettings):
 class ApplicationSettings(BaseSettings):
     """Django application configuration."""
 
-    INSTALLED_APPS: list[str] = []
+    INSTALLED_APPS: list[str] = [
+        "lms.djangoapps.lti_provider",
+    ]
     MIDDLEWARE: list[str] = []
     AUTHENTICATION_BACKENDS: list[str] = [
         "django.contrib.auth.backends.ModelBackend",
