@@ -263,6 +263,10 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                     "service": {
                         "type": "NodePort",
                         "nodePorts": {
+                            # This definitely needs to be changed per deployment
+                            # Gets the following error atm
+                            # Service "proxy-public" is invalid: spec.ports[0].nodePort:
+                            # Invalid value: 30000: provided port is already allocated
                             "http": 30000,
                             "https": 30443,
                         },
