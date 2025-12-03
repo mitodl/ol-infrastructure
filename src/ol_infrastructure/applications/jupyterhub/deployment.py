@@ -73,6 +73,11 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
         .parent.joinpath(jupyterhub_deployment_config["extra_config_file"])
         .read_text()
     )
+    vault_policy_hcl = (
+        Path(__file__)
+        .parent.joinpath(jupyterhub_deployment_config["vault_policy_file"])
+        .read_text()
+    )
 
     # Derive common configuration values
     apisix_ingress_class = (
@@ -90,7 +95,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     vault_policy = vault.Policy(
         f"ol-{base_name}-vault-policy-{stack_info.env_suffix}",
         name=base_name,
-        policy=Path(__file__).parent.joinpath("jupyterhub_policy.hcl").read_text(),
+        policy=vault_policy_hcl,
     )
 
     # Vault K8S Auth Backend Role
@@ -187,7 +192,6 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
 
     # OIDC Configuration
     # ol-k8s-apisix-olapisixoidcresources-ci
-    # It wants to tear this down since the name is changing. Is that okay?
     oidc = OLApisixOIDCResources(
         f"ol-k8s-apisix-{base_name}-olapisixoidcresources-{stack_info.env_suffix}",
         oidc_config=OLApisixOIDCConfig(
@@ -333,7 +337,9 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                             "allowed_users": allowed_users_list,
                         },
                         "JupyterHub": {
-                            "authenticator_class": "tmp",
+                            "authenticator_class": jupyterhub_deployment_config.get(
+                                "authenticator_class", "tmp"
+                            )
                         },
                     },
                     "resources": {

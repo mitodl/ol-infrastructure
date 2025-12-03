@@ -13,6 +13,7 @@ config:
     menu_override_file: menu_override.json
     disabled_extension_file: disabled_extensions.json
     extra_config_file: dynamicImageConfig.py
+    vault_policy_file: jupyterhub_policy.hcl
     proxy_port: 30000
   - name: jupyterhub-authoring
     domain: authoring.nb.ci.learn.mit.edu
@@ -24,7 +25,9 @@ config:
     menu_override_file: author_menu_override.json
     disabled_extension_file: author_disabled_extensions.json
     extra_config_file: dynamicImageConfig.py
+    vault_policy_file: jupyterhub_policy.hcl
     proxy_port: 30001
+    user_placeholder_replicas: 1
   jupyterhub:target_vpc: "applications_vpc"
   jupyterhub:business_unit: "mit-learn"
   aws:region: us-east-1
