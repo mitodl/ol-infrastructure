@@ -6,11 +6,20 @@
 import json
 import os
 
+import boto3
 import pulumi_aws as aws
 import pulumi_eks as eks
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Alias, Config, Output, ResourceOptions, StackReference, export
+from botocore.exceptions import ClientError
+from pulumi import (
+    Alias,
+    Config,
+    Output,
+    ResourceOptions,
+    StackReference,
+    export,
+)
 
 from bridge.lib.magic_numbers import (
     DEFAULT_EFS_PORT,
@@ -42,6 +51,7 @@ from ol_infrastructure.infrastructure.aws.eks.vault_secrets_operator import (
     setup_vault_secrets_operator,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
+    access_entry_opts,
     get_cluster_version,
     get_eks_addon_version,
 )
@@ -451,6 +461,64 @@ node_instance_profile = aws.iam.InstanceProfile(
 
 export("node_instance_profile", node_instance_profile.id)
 export("node_role_arn", value=node_role.arn)
+
+############################################################
+# Create access entry for self-managed node groups
+############################################################
+# When authentication_mode="API", self-managed node groups require an explicit
+# access entry with type="EC2_LINUX" to join the cluster.
+# This uses conditional import to handle existing access entries gracefully.
+#
+# We need to predict the node role ARN since it hasn't been created yet.
+# The pattern is: arn:aws:iam::{account_id}:role{path}{role_name}
+# Since role uses name_prefix, we look for any role matching the path pattern.
+
+
+def get_node_role_arn_pattern(cluster_name: str):
+    """Get the ARN pattern for node role to check for existing access entry."""
+    # Node roles are in the path /ol-infrastructure/eks/{cluster_name}/
+    # We'll try to find existing role with this path and name pattern
+    path = f"/ol-infrastructure/eks/{cluster_name}/"
+    iam_client = boto3.client("iam")
+    try:
+        roles = iam_client.list_roles(PathPrefix=path)["Roles"]
+        for role in roles:
+            if role["RoleName"].startswith(
+                f"{cluster_name}-eks-node-role-"[:IAM_ROLE_NAME_PREFIX_MAX_LENGTH]
+            ):
+                role_detail = iam_client.get_role(RoleName=role["RoleName"])
+                if {"Key": "cluster", "Value": cluster_name} not in role_detail["Role"][
+                    "Tags"
+                ]:
+                    return role["Arn"]
+    except ClientError:
+        # Role doesn't exist yet, will create new entry
+        return None
+    return None
+
+
+node_role_arn_pattern = get_node_role_arn_pattern(cluster_name)
+
+if node_role_arn_pattern:
+    node_access_entry_opts, _ = access_entry_opts(
+        cluster_name=cluster_name,
+        principal_arn=node_role_arn_pattern,
+    )
+else:
+    node_access_entry_opts = ResourceOptions()
+
+node_access_entry = aws.eks.AccessEntry(
+    f"{cluster_name}-eks-node-access-entry",
+    cluster_name=cluster.eks_cluster.name,
+    principal_arn=node_role.arn,
+    type="EC2_LINUX",
+    tags=aws_config.merged_tags({"cluster": cluster_name}),
+    opts=node_access_entry_opts.merge(
+        ResourceOptions(
+            depends_on=[cluster, node_role],
+        )
+    ),
+)
 
 # Initalize the k8s pulumi provider
 k8s_global_labels = {
