@@ -1,4 +1,4 @@
-# ruff: noqa: F841, E501, PLR0913, FIX002, PLR0915
+# ruff: noqa: F841, E501, PLR0913, PLR0915
 import os
 from pathlib import Path
 
@@ -89,9 +89,6 @@ def create_k8s_resources(  # noqa: C901
         )
 
     # Get various VPC / network configuration information
-    apps_vpc = network_stack.require_output("applications_vpc")
-    k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
-
     data_vpc = network_stack.require_output("data_vpc")
     operations_vpc = network_stack.require_output("operations_vpc")
     edxapp_target_vpc = (
@@ -99,8 +96,23 @@ def create_k8s_resources(  # noqa: C901
     )
     edxapp_vpc = network_stack.require_output(edxapp_target_vpc)
 
-    # TODO(Mike): Will require special handling for residential clusters
-    k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
+    # For K8s deployments, the cluster and pod subnets are in the cluster VPC
+    # This is typically the applications_vpc for standard deployments, but may be
+    # a residential VPC or other target VPC for specialized deployments.
+    # We need to get the K8s pod subnets from the cluster's VPC, not from a hardcoded applications_vpc.
+    # The cluster is deployed in the same VPC where the pods will run.
+    # When using residential clusters, this will be the residential_mitx_vpc, etc.
+    # For now, we use the edxapp_vpc which is the target VPC. For k8s deployments,
+    # this should be the cluster VPC. We get the applications_vpc as fallback for compatibility.
+    # Try to get pod subnets from the target VPC first (handles residential, xpro, etc.)
+    cluster_vpc = edxapp_vpc
+    if "k8s_pod_subnet_cidrs" in cluster_vpc:
+        k8s_pod_subnet_cidrs = cluster_vpc["k8s_pod_subnet_cidrs"]
+    else:
+        # Fallback to applications_vpc for standard deployments
+        apps_vpc = network_stack.require_output("applications_vpc")
+        k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
+        cluster_vpc = apps_vpc
 
     # Verify that the namespace exists in the EKS cluster
     namespace = f"{stack_info.env_prefix}-openedx"
@@ -207,7 +219,7 @@ def create_k8s_resources(  # noqa: C901
         egress=default_psg_egress_args,
         ingress=get_default_psg_ingress_args(k8s_pod_subnet_cidrs=k8s_pod_subnet_cidrs),
         tags=aws_config.tags,
-        vpc_id=apps_vpc["id"],
+        vpc_id=cluster_vpc["id"],
     )
     export("edxapp_k8s_app_security_group_id", edxapp_k8s_app_security_group.id)
 
