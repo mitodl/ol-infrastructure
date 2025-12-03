@@ -96,23 +96,11 @@ def create_k8s_resources(  # noqa: C901
     )
     edxapp_vpc = network_stack.require_output(edxapp_target_vpc)
 
-    # For K8s deployments, the cluster and pod subnets are in the cluster VPC
-    # This is typically the applications_vpc for standard deployments, but may be
-    # a residential VPC or other target VPC for specialized deployments.
-    # We need to get the K8s pod subnets from the cluster's VPC, not from a hardcoded applications_vpc.
-    # The cluster is deployed in the same VPC where the pods will run.
-    # When using residential clusters, this will be the residential_mitx_vpc, etc.
-    # For now, we use the edxapp_vpc which is the target VPC. For k8s deployments,
-    # this should be the cluster VPC. We get the applications_vpc as fallback for compatibility.
-    # Try to get pod subnets from the target VPC first (handles residential, xpro, etc.)
-    cluster_vpc = edxapp_vpc
-    if "k8s_pod_subnet_cidrs" in cluster_vpc:
-        k8s_pod_subnet_cidrs = cluster_vpc["k8s_pod_subnet_cidrs"]
-    else:
-        # Fallback to applications_vpc for standard deployments
-        apps_vpc = network_stack.require_output("applications_vpc")
-        k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
-        cluster_vpc = apps_vpc
+    # For K8s deployments, edxapp uses the applications_vpc cluster
+    # (not the target_vpc which is for EC2 deployments)
+    apps_vpc = network_stack.require_output("applications_vpc")
+    k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
+    cluster_vpc = apps_vpc
 
     # Verify that the namespace exists in the EKS cluster
     namespace = f"{stack_info.env_prefix}-openedx"
