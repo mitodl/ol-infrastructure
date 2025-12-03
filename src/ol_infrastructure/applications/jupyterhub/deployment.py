@@ -55,6 +55,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     namespace = jupyterhub_deployment_config["namespace"]
     env_name = f"{stack_info.env_suffix}"
     db_name_normalized = base_name.replace("-", "_")
+    proxy_port = jupyterhub_deployment_config["proxy_port"]
 
     # Read configuration files from paths in deployment config
     menu_override_json = (
@@ -265,7 +266,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                             # Gets the following error atm
                             # Service "proxy-public" is invalid: spec.ports[0].nodePort:
                             # Invalid value: 30000: provided port is already allocated
-                            "http": 30000,
+                            "http": proxy_port,
                             "https": 30443,
                         },
                     },
