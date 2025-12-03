@@ -5,7 +5,7 @@ import { BookmarkButton } from './src/courseware/course/bookmark';
 import messages from './src/courseware/course/sequence/messages';
 import { useIntl } from '@edx/frontend-platform/i18n';
 import config from './common-mfe-config.env.jsx';
-import AiDrawerManagerSidebar from './AiDrawerManagerSidebar.jsx';
+import SidebarAIDrawerCoordinator from './SidebarAIDrawerCoordinator.jsx';
 
 let learningMFEConfig = {
     ...config
@@ -117,16 +117,15 @@ if (process.env.DEPLOYMENT_NAME?.includes("mitxonline")) {
           },
         ]
       },
-      // Register AiChatSidebar in the notifications/discussions sidebar slot
       'org.openedx.frontend.learning.notifications_discussions_sidebar.v1': {
-          keepDefault: true,
+          keepDefault: false,
           plugins: [
               {
                   op: PLUGIN_OPERATIONS.Insert,
                   widget: {
-                      id: 'ai_chat_sidebar',
+                      id: 'coordinated_sidebar_with_ai_drawer',
                       type: DIRECT_PLUGIN,
-                      RenderWidget: () => <AiDrawerManagerSidebar />,
+                      RenderWidget: ({ courseId }) => <SidebarAIDrawerCoordinator courseId={courseId} />,
                   },
               },
           ],
