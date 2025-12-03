@@ -186,7 +186,7 @@ webhook_deployment = kubernetes.apps.v1.Deployment(
         },
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
-        replicas=2,
+        replicas=1,  # Single replica required for in-memory state tracking
         selector=kubernetes.meta.v1.LabelSelectorArgs(
             match_labels={"app": webhook_resource_name},
         ),
