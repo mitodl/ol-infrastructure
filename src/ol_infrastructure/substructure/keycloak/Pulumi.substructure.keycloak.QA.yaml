@@ -51,6 +51,7 @@ config:
   - "https://rc.mitxonline.mit.edu/*"
   - "https://api.rc.mitxonline.mit.edu/*"
   - "https://nb.rc.learn.mit.edu/*"
+  - "https://authoring.nb.rc.learn.mit.edu/*"
   - "https://binder.rc.learn.mit.edu/*"
   keycloak_realm:olapps-mitlearn-client-roles:
   - "https://rc.learn.mit.edu/*"
@@ -58,6 +59,7 @@ config:
   - "https://pay-qa.ol.mit.edu/*"
   - "https://rc.mitxonline.mit.edu/*"
   - "https://nb.rc.learn.mit.edu/*"
+  - "https://authoring.nb.rc.learn.mit.edu/*"
   - "https://binder.rc.learn.mit.edu/*"
   keycloak_realm:olapps-mitxonline-client-redirect-uris:
   - "https://rc.mitxonline.mit.edu/account/action/complete*"

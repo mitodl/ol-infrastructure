@@ -70,6 +70,7 @@ config:
   - "https://pay-ci.ol.mit.edu/*"
   - "https://ci.mitxonline.mit.edu/*"
   - "https://nb.ci.learn.mit.edu/*"
+  - "https://authoring.nb.ci.learn.mit.edu/*"
   - "https://binder.ci.learn.mit.edu/*"
   keycloak_realm:olapps-mitlearn-client-redirect-uris:
   - "https://api.ci.learn.mit.edu/*"
@@ -80,6 +81,7 @@ config:
   - "https://pay-ci.ol.mit.edu/*"
   - "https://ci.mitxonline.mit.edu/*"
   - "https://api.ci.mitxonline.mit.edu/*"
+  - "https://authoring.nb.ci.learn.mit.edu/*"
   - "https://nb.ci.learn.mit.edu/*"
   - "https://binder.ci.learn.mit.edu/*"
   keycloak_realm:olapps-mitlearn-client-secret:
