@@ -13,5 +13,7 @@ config:
   edxnotes:dns_zone: mitx
   edxnotes:domain: notes-qa.mitx.mit.edu
   edxnotes:target_vpc: residential_mitx_vpc
+  edxnotes:deploy_to_k8s: true
+  edxnotes:cluster: residential
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
