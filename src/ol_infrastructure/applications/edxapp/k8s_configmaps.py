@@ -267,7 +267,7 @@ def create_k8s_configmaps(
     """)
     if stack_info.env_prefix == "mitxonline":
         cms_interpolated_config_content += (
-            f"    GITHUB_ORG_API_URL: {edxapp_config.require('github_org_api_url')}\n"
+            f"GITHUB_ORG_API_URL: {edxapp_config.require('github_org_api_url')}\n"
         )
 
     cms_interpolated_config_map = kubernetes.core.v1.ConfigMap(
