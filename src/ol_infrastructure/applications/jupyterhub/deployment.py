@@ -11,7 +11,7 @@ from pulumi import Config, ResourceOptions, StackReference
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.lib.versions import JUPYTERHUB_CHART_VERSION
 from ol_infrastructure.applications.jupyterhub.values import (
-    get_prepuller_config_with_images,
+    get_prepuller_config_for_images,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.cert_manager import (
@@ -343,9 +343,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                         },
                     },
                 },
-                "prePuller": get_prepuller_config_with_images(extra_images_list)
-                if extra_images_list
-                else {},
+                "prePuller": get_prepuller_config_for_images(extra_images_list),
                 "singleuser": {
                     "extraFiles": {
                         "menu_override": {
