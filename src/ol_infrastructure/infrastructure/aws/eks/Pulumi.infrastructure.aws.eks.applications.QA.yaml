@@ -25,6 +25,7 @@ config:
   - "courses-backend.rc.learn.mit.edu"
   - "dcc.rc.learn.mit.edu"
   - "nb.rc.learn.mit.edu"
+  - "authoring.nb.rc.learn.mit.edu"
   - "preview.courses.rc.learn.mit.edu"
   - "studio-backend.rc.learn.mit.edu"
   - "studio-backend.rc.xpro.mit.edu"
