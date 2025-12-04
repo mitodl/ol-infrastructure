@@ -245,15 +245,7 @@ MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within
 MEDIA_URL: /media/
 MICROSITE_CONFIGURATION: {}
 MIT_BASE_URL: https://web.mit.edu # Keeping it hardcoded till we change MARKETING_SITE_BASE_URL
-MITX_REDIRECT_ENABLED: True
-MITX_REDIRECT_ALLOW_RE_LIST:  # ADDED VALUE
-  - "^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/)"
-  - "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"
-  - "^/courses/.*/courseware-navigation-sidebar/toggles/?$"
-  - "^/courses/.*/courseware-search/enabled/?$"
-MITXPRO_CORE_REDIRECT_ALLOW_RE_LIST:
-  - "^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/)"
-  - "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"
+MITX_REDIRECT_ENABLED: False
 MKTG_URL_LINK_MAP:
   TOS: tos
   ABOUT: about
