@@ -167,7 +167,7 @@ def get_deployment_details(namespace: str, name: str) -> dict[str, Any] | None:
         return None
 
 
-def format_slack_message(
+def format_slack_message(  # noqa: C901
     event_data: dict[str, Any], deployment_details: dict[str, Any] | None
 ) -> dict[str, Any]:
     """Format a rich Slack message with deployment details."""
@@ -244,16 +244,27 @@ def format_slack_message(
         )
         fields.append({"type": "mrkdwn", "text": f"*Last Update:*\n{updated}"})
 
-    # Image
-    image = deployment_details["image"]
-    if len(image) > MAX_IMAGE_LENGTH:
-        # Shorten long image names
-        image_parts = image.split("/")
-        image = f".../{'/'.join(image_parts[-2:])}"
-
-    # Only add image if we haven't hit the field limit
-    if len(fields) < MAX_SLACK_FIELDS:
-        fields.append({"type": "mrkdwn", "text": f"*Image:*\n`{image}`"})
+    # Images - enumerate all containers
+    all_images = deployment_details.get("all_images", [])
+    if all_images and len(fields) < MAX_SLACK_FIELDS:
+        if len(all_images) == 1:
+            # Single container - show as before
+            image = all_images[0]
+            if len(image) > MAX_IMAGE_LENGTH:
+                image_parts = image.split("/")
+                image = f".../{'/'.join(image_parts[-2:])}"
+            fields.append({"type": "mrkdwn", "text": f"*Image:*\n`{image}`"})
+        else:
+            # Multiple containers - enumerate them
+            image_list = []
+            for idx, img in enumerate(all_images, 1):
+                display_img = img
+                if len(img) > MAX_IMAGE_LENGTH:
+                    img_parts = img.split("/")
+                    display_img = f".../{'/'.join(img_parts[-2:])}"
+                image_list.append(f"{idx}. `{display_img}`")
+            images_text = "\n".join(image_list)
+            fields.append({"type": "mrkdwn", "text": f"*Images:*\n{images_text}"})
 
     # Important labels - limit to avoid exceeding fields total
     labels = deployment_details["labels"]
