@@ -1037,8 +1037,8 @@ class OLApisixRouteConfig(BaseModel):
     @classmethod
     def validate_timeout(cls, v: str) -> str:
         """Ensure that the timeout value is a non-negative integer followed by 's'."""
-        if not v.endswith("s") or not v[:-1].isdigit():
-            msg = "Timeout must be a non-negative integer followed by 's' (e.g. '60s')"
+        if not v.endswith("s") or not v[:-1].isdigit() or int(v[:-1]) <= 0:
+            msg = "Timeout must be a positive integer greater than 0 followed by 's' (e.g. '60s')"
             raise ValueError(msg)
         return v
 
