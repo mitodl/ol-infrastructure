@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, D100
 import base64
 import json
 import mimetypes
@@ -102,7 +102,6 @@ aws_config = AWSBase(
 )
 learn_ai_config = Config("learn_ai")
 vault_config = Config("vault")
-<<<<<<< HEAD
 
 slack_channel = learn_ai_config.get("slack_channel")  # Optional Slack channel
 apisix_ingress_class = learn_ai_config.get("apisix_ingress_class") or "apisix"
