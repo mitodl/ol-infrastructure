@@ -117,10 +117,7 @@ def create_k8s_resources(  # noqa: C901
     opensearch_hostname = opensearch_stack.require_output("cluster")["endpoint"]
 
     # Configure reusable global labels
-    if stack_info.env_prefix == "xpro":
-        ou = BusinessUnit.xpro
-    else:
-        ou = BusinessUnit(stack_info.env_prefix)
+    ou = BusinessUnit(edxapp_config.require("business_unit"))
     k8s_global_labels = K8sGlobalLabels(
         service=Services.edxapp,
         ou=ou,
