@@ -141,6 +141,7 @@ COURSE_NAMES.extend(
             "mltl1",
             "pm1",
             "se1",
+            "haim1",
         ]
     ]
 )
