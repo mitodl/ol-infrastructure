@@ -73,7 +73,7 @@ config:
   edxapp:marketing_domain: lms-ci.mitx.mit.edu
   edxapp:backend_lms_domain: courses-backend-staging.ci.mitx.mit.edu
   edxapp:backend_studio_domain: studio-backend-staging.ci.mitx.mit.edu
-  edxapp:backend_preview_domain: preview-staging-ci.mitx.mit.edu
+  edxapp:backend_preview_domain: preview-staging.ci.mitx.mit.edu
   edxapp:k8s_replicas:
     webapp:
       cms:
