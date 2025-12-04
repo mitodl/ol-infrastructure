@@ -80,7 +80,6 @@ REGISTRATION_RATELIMIT: 1000000/minute  # ADDED KEY
 RATELIMIT_RATE: '600/m'  # ADDED KEY
 RECALCULATE_GRADES_ROUTING_KEY: edx.lms.core.default
 THIRD_PARTY_AUTH_BACKENDS:
-- ol_social_auth.backends.OLOAuth2
 - social_core.backends.google.GoogleOAuth2
 - social_core.backends.linkedin.LinkedinOAuth2
 - social_core.backends.facebook.FacebookOAuth2
