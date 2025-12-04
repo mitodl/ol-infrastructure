@@ -9,7 +9,13 @@ config:
   - "ol.mit.edu"
   - ".mitx.mit.edu"
   - "mitx.mit.edu"
-  eks:apisix_domains: []
+  eks:apisix_domains:
+  - courses-backend.mitx.mit.edu
+  - studio-backend.mitx.mit.edu
+  - preview.mitx.mit.edu
+  - courses-backend-staging.mitx.mit.edu
+  - studio-backend-staging.mitx.mit.edu
+  - preview-staging.mitx.mit.edu
   eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
   eks:developer_role_kubernetes_groups: ["admin"]
   eks:developer_role_scope: "cluster"
