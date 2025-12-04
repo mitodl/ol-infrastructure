@@ -53,7 +53,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     base_name = jupyterhub_deployment_config["name"]
     domain_name = jupyterhub_deployment_config["domain"]
     namespace = jupyterhub_deployment_config["namespace"]
-    env_name = f"{stack_info.env_suffix}"
+    env_name = f"{stack_info.name}"
     db_name_normalized = base_name.replace("-", "_")
     proxy_port = jupyterhub_deployment_config["proxy_port"]
 
@@ -240,7 +240,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     admin_users_list = jupyterhub_deployment_config.get("admin_users", [])
     allowed_users_list = jupyterhub_deployment_config.get("allowed_users", [])
     return kubernetes.helm.v3.Release(
-        f"{base_name}-{env_name.upper()}-application-helm-release",
+        f"{base_name}-{env_name}-application-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
             chart="jupyterhub",
             cleanup_on_fail=True,
