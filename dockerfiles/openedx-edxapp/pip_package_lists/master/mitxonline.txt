@@ -21,6 +21,9 @@ wheel==0.45.1
 ol-openedx-chat
 ol-openedx-chat-xblock
 
+# Plugin for LTI related utilities
+ol-openedx-lti-utilities
+
 # Experimental Plugins for Translations feature
 ol-openedx-course-translations
 

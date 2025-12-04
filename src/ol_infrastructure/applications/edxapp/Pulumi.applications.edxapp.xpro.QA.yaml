@@ -63,11 +63,11 @@ config:
   edxapp:k8s_replicas:
     webapp:
       cms:
-        min: 1
-        max: 2
+        min: 2
+        max: 4
       lms:
-        min: 1
-        max: 2
+        min: 2
+        max: 5
     celery:
       lms:
         min: 1
@@ -97,3 +97,4 @@ config:
   edxapp:k8s_deployment: true
   edxapp:k8s_cutover: true
   edxapp:disable_ec2_deployment: true
+  edxapp:k8s_vpc: applications_vpc

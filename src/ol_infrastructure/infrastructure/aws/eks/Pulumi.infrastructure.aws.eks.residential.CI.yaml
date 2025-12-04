@@ -9,12 +9,18 @@ config:
   - "ol.mit.edu"
   - ".mitx.mit.edu"
   - "mitx.mit.edu"
-  eks:apisix_domains: []
+  eks:apisix_domains:
+  - courses-backend.ci.mitx.mit.edu
+  - studio-backend.ci.mitx.mit.edu
+  - preview-ci.mitx.mit.edu
+  - courses-backend-staging.ci.mitx.mit.edu
+  - studio-backend-staging.ci.mitx.mit.edu
+  - preview-staging-ci.mitx.mit.edu
   eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
   eks:developer_role_kubernetes_groups: ["admin"]
   eks:developer_role_scope: "cluster"
-  eks:ebs_csi_provisioner: "true"
-  eks:efs_csi_provisioner: "true"
+  eks:ebs_csi_provisioner: true
+  eks:efs_csi_provisioner: true
   eks:gateway_release_channel: "experimental"
   eks:namespaces:
   - "botkube"
@@ -37,7 +43,7 @@ config:
         max: 5
         min: 2
       tags:
-        cluster: applications-ci
+        cluster: residential-ci
       taints: {}
       version:
   environment:business_unit: residential

@@ -1,4 +1,4 @@
-# ruff: noqa: F841, E501, PLR0913, FIX002, PLR0915
+# ruff: noqa: F841, E501, PLR0913, PLR0915
 import os
 from pathlib import Path
 
@@ -89,9 +89,6 @@ def create_k8s_resources(  # noqa: C901
         )
 
     # Get various VPC / network configuration information
-    apps_vpc = network_stack.require_output("applications_vpc")
-    k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
-
     data_vpc = network_stack.require_output("data_vpc")
     operations_vpc = network_stack.require_output("operations_vpc")
     edxapp_target_vpc = (
@@ -99,8 +96,10 @@ def create_k8s_resources(  # noqa: C901
     )
     edxapp_vpc = network_stack.require_output(edxapp_target_vpc)
 
-    # TODO(Mike): Will require special handling for residential clusters
-    k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
+    # For K8s deployments, edxapp uses the applications_vpc cluster
+    # (not the target_vpc which is for EC2 deployments)
+    cluster_vpc = network_stack.require_output(edxapp_config.require("k8s_vpc"))
+    k8s_pod_subnet_cidrs = cluster_vpc["k8s_pod_subnet_cidrs"]
 
     # Verify that the namespace exists in the EKS cluster
     namespace = f"{stack_info.env_prefix}-openedx"
@@ -117,10 +116,7 @@ def create_k8s_resources(  # noqa: C901
     opensearch_hostname = opensearch_stack.require_output("cluster")["endpoint"]
 
     # Configure reusable global labels
-    if stack_info.env_prefix == "xpro":
-        ou = BusinessUnit.xpro
-    else:
-        ou = BusinessUnit(stack_info.env_prefix)
+    ou = BusinessUnit(edxapp_config.require("business_unit"))
     k8s_global_labels = K8sGlobalLabels(
         service=Services.edxapp,
         ou=ou,
@@ -207,7 +203,7 @@ def create_k8s_resources(  # noqa: C901
         egress=default_psg_egress_args,
         ingress=get_default_psg_ingress_args(k8s_pod_subnet_cidrs=k8s_pod_subnet_cidrs),
         tags=aws_config.tags,
-        vpc_id=apps_vpc["id"],
+        vpc_id=cluster_vpc["id"],
     )
     export("edxapp_k8s_app_security_group_id", edxapp_k8s_app_security_group.id)
 
@@ -904,6 +900,13 @@ def create_k8s_resources(  # noqa: C901
             "cooldownPeriod": 10,
             "minReplicaCount": replicas_dict["celery"]["lms"]["min"],
             "maxReplicaCount": replicas_dict["celery"]["lms"]["max"],
+            "advanced": {
+                "horizontalPodAutoscalerConfig": {
+                    "behavior": {
+                        "scaleUp": {"stabilizationWindowSeconds": 300},
+                    }
+                }
+            },
             "triggers": [
                 {
                     "type": "redis",

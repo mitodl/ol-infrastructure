@@ -2,6 +2,7 @@ from functools import lru_cache, partial
 
 import boto3
 import pulumi
+from botocore.exceptions import ClientError
 from packaging.version import Version
 from pulumi_aws import ec2
 from pulumi_kubernetes import Provider
@@ -133,3 +134,44 @@ def cached_image_uri(
 
 def ecr_image_uri(image_repo: str, aws_account_id: str | int = "610119931565") -> str:
     return f"{aws_account_id}.dkr.ecr.us-east-1.amazonaws.com/{image_repo}"
+
+
+def access_entry_opts(
+    cluster_name: str,
+    principal_arn: str,
+) -> tuple[pulumi.ResourceOptions, str]:
+    """Look up and conditionally import an existing EKS access entry.
+
+    This function checks if an access entry already exists for the given principal
+    in the cluster. If it exists, it will be imported into Pulumi state.
+
+    :param cluster_name: The name of the EKS cluster
+    :type cluster_name: str
+
+    :param principal_arn: The ARN of the IAM principal (role/user)
+    :type principal_arn: str
+
+    :returns: A Pulumi ResourceOptions object for importing the access entry
+              and the composite import ID or empty string if not found
+    :rtype: Tuple[pulumi.ResourceOptions, str]
+    """
+    resource_id = ""
+
+    try:
+        eks_client.describe_access_entry(
+            clusterName=cluster_name,
+            principalArn=principal_arn,
+        )
+        # Access entry exists, set up for import
+        # Import ID format: cluster_name:principal_arn
+        resource_id = f"{cluster_name}:{principal_arn}"
+        opts = pulumi.ResourceOptions(
+            import_=resource_id,
+        )
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "ResourceNotFoundException":
+            raise
+        # Access entry doesn't exist, create new one
+        opts = pulumi.ResourceOptions()
+
+    return opts, resource_id

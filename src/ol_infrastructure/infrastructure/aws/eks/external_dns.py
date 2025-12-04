@@ -169,6 +169,6 @@ def setup_external_dns(
             provider=k8s_provider,
             parent=operations_namespace,
             delete_before_replace=True,
-            depends_on=[cluster, node_groups[0], operations_namespace],
+            depends_on=[cluster, *node_groups, operations_namespace],
         ),
     )

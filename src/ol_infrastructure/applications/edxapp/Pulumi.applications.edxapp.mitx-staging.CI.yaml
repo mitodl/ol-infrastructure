@@ -56,9 +56,6 @@ config:
     ora_grading: ora-grading
   edxapp:framework: "earthly"
   edxapp:google_analytics_id: ""
-  edxapp:k8s_deployment: false
-  edxapp:k8s_cutover: false
-  edxapp:disable_ec2_deployment: false
   edxapp:mail_domain: edxapp-mail-staging-ci.mitx.mit.edu
   edxapp:min_web_nodes: "1"
   edxapp:min_worker_nodes: "1"
@@ -69,3 +66,49 @@ config:
   mongodb:atlas_project_id: 6193f02d576a70760e8bcb02
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
+  edxapp:cluster_stack: infrastructure.aws.eks.residential.CI
+  edxapp:learn_ai_frontend_domain: "learn-ai-ci.ol.mit.edu"
+  edxapp:mit_learn_api_domain: api.ci.learn.mit.edu
+  edxapp:mit_learn_domain: ci.learn.mit.edu
+  edxapp:marketing_domain: lms-ci.mitx.mit.edu
+  edxapp:backend_lms_domain: courses-backend-staging.ci.mitx.mit.edu
+  edxapp:backend_studio_domain: studio-backend-staging.ci.mitx.mit.edu
+  edxapp:backend_preview_domain: preview-staging.ci.mitx.mit.edu
+  edxapp:k8s_replicas:
+    webapp:
+      cms:
+        min: 1
+        max: 2
+      lms:
+        min: 1
+        max: 2
+    celery:
+      lms:
+        min: 1
+        max: 4
+      cms:
+        min: 1
+        max: 4
+  edxapp:k8s_resources:
+    webapp:
+      lms:
+        cpu_request: "250m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+      cms:
+        cpu_request: "250m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+    celery:
+      lms:
+        cpu_request: "250m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+      cms:
+        cpu_request: "250m"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+  edxapp:k8s_deployment: true
+  edxapp:k8s_cutover: true
+  edxapp:disable_ec2_deployment: false
+  edxapp:k8s_vpc: residential_mitx_vpc

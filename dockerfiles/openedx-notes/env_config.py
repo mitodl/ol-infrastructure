@@ -52,7 +52,7 @@ DATABASES = {
         "PASSWORD": os.environ["DB_PASSWORD"],
         "PORT": int(os.environ.get("DB_PORT", "3306")),
         "OPTIONS": {
-            "ssl_mode": "REQUIRE",
+            "ssl_mode": "REQUIRED",
             "ssl": {"cipher": "TLSv1.2"},
             "connect_timeout": int(os.environ.get("DB_CONNECT_TIMEOUT", "10")),
         },

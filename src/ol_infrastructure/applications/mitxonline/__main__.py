@@ -290,7 +290,7 @@ mitxonline_db_config = OLPostgresDBConfig(
     tags=aws_config.tags,
     db_name="mitxonline",
     public_access=False,
-    blue_green_timeout_minutes=60 * 6,  # 6 hours
+    use_blue_green=mitxonline_config.get_bool("db_use_blue_green") or False,
     **db_defaults,
 )
 mitxonline_db_config.parameter_overrides.append(

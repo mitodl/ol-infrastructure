@@ -31,7 +31,8 @@ def setup_apisix(
     eks_config: Config,
     target_vpc,
     aws_config: AWSBase,
-    cluster,
+    cluster: eks.Cluster,
+    lb_controller,
 ):
     """
     Configure and install the Apache APISIX ingress controller.
@@ -317,9 +318,10 @@ def setup_apisix(
             delete_before_replace=True,
             depends_on=[
                 cluster,
-                node_groups[0],
+                *node_groups,
                 operations_namespace,
                 gateway_api_crds,
+                lb_controller,
             ],
         ),
     )

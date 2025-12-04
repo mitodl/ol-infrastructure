@@ -57,7 +57,7 @@ config:
     SOCIAL_AUTH_MICROMASTERS_LOGIN_URL: "https://micromasters-rc.odl.mit.edu/login/edxorg/?next=/discussions/"
     SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT: "https://sso-qa.ol.mit.edu/realms/olapps"
     SOCIAL_AUTH_SAML_SP_ENTITY_ID: "https://discussions-rc.odl.mit.edu/saml/metadata"
-    TIKA_SERVER_ENDPOINT: "https://tika-qa.odl.mit.edu"
+    TIKA_SERVER_ENDPOINT: "https://tika-qa.ol.mit.edu"
     USERINFO_URL: "https://sso-qa.ol.mit.edu/realms/olapps/protocol/openid-connect/userinfo"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa

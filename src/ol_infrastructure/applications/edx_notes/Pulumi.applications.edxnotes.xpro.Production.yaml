@@ -12,6 +12,7 @@ config:
   edxnotes:business_unit: mitxpro
   edxnotes:dns_zone: xpro
   edxnotes:domain: xpro-notes.xpro.mit.edu
-  edxnotes:target_vpc: xpro_vpc
+  edxnotes:target_vpc: applications_vpc
+  edxnotes:deploy_to_k8s: true
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

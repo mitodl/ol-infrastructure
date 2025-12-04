@@ -936,6 +936,15 @@ class OLApplicationK8s(ComponentResource):
                         "minReplicaCount": deployment_info[
                             "celery_config"
                         ].min_replicas,
+                        "advanced": {
+                            "horizontalPodAutoscalerConfig": {
+                                "behavior": {
+                                    "scaleUp": {
+                                        "stabilizationWindowSeconds": 300,
+                                    },
+                                }
+                            }
+                        },
                         "triggers": [
                             {
                                 "type": "redis",
@@ -1020,6 +1029,18 @@ class OLApisixRouteConfig(BaseModel):
     backend_resolve_granularity: Literal["endpoint", "service"] = "service"
     upstream: str | None = None
     websocket: bool = False
+    timeout_connect: str = "60s"
+    timeout_read: str = "60s"
+    timeout_send: str = "60s"
+
+    @field_validator("timeout_connect", "timeout_read", "timeout_send")
+    @classmethod
+    def validate_timeout(cls, v: str) -> str:
+        """Ensure that the timeout value is a non-negative integer followed by 's'."""
+        if not v.endswith("s") or not v[:-1].isdigit() or int(v[:-1]) <= 0:
+            msg = "Timeout must be a positive integer greater than 0 followed by 's' (e.g. '60s')"
+            raise ValueError(msg)
+        return v
 
     @field_validator("plugins")
     @classmethod
@@ -1108,6 +1129,11 @@ class OLApisixRoute(ComponentResource):
                     "paths": route_config.paths,
                 },
                 "websocket": route_config.websocket,
+                "timeout": {
+                    "connect": route_config.timeout_connect,
+                    "send": route_config.timeout_send,
+                    "read": route_config.timeout_read,
+                },
             }
             if route_config.upstream:
                 route["upstreams"] = [{"name": route_config.upstream}]

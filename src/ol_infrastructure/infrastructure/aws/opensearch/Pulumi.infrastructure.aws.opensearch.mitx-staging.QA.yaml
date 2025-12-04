@@ -5,6 +5,7 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-mitx-staging-qa.odl.mit.edu
   consul:scheme: https
-
   environment:business_unit: residential-staging
   environment:target_vpc: residential_mitx_staging_vpc
+  opensearch:additional_trusted_cidrs:
+  - '10.5.0.0/16'

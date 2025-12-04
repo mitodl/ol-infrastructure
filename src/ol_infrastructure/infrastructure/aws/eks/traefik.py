@@ -23,6 +23,7 @@ def setup_traefik(
     target_vpc,
     aws_config: AWSBase,
     cluster,
+    lb_controller,
 ):
     """
     Configure and install the Traefik ingress controller.
@@ -235,10 +236,11 @@ def setup_traefik(
             delete_before_replace=True,
             depends_on=[
                 cluster,
-                node_groups[0],
+                *node_groups,
                 operations_namespace,
                 gateway_api_crds,
                 prometheus_operator_crds,
+                lb_controller,
             ],
         ),
     )

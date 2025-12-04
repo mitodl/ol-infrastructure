@@ -6,11 +6,20 @@
 import json
 import os
 
+import boto3
 import pulumi_aws as aws
 import pulumi_eks as eks
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Alias, Config, Output, ResourceOptions, StackReference, export
+from botocore.exceptions import ClientError
+from pulumi import (
+    Alias,
+    Config,
+    Output,
+    ResourceOptions,
+    StackReference,
+    export,
+)
 
 from bridge.lib.magic_numbers import (
     DEFAULT_EFS_PORT,
@@ -42,6 +51,7 @@ from ol_infrastructure.infrastructure.aws.eks.vault_secrets_operator import (
     setup_vault_secrets_operator,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
+    access_entry_opts,
     get_cluster_version,
     get_eks_addon_version,
 )
@@ -211,7 +221,9 @@ access_entries = {
             ),
         },
         kubernetes_groups=["admin"],
-    )
+    ),
+    # Note: Node role access entry is automatically created by EKS for self-managed
+    # node groups when authentication_mode="API". No explicit creation needed.
 }
 
 # Couple ways developers may be given access to the cluster via different scopes.
@@ -446,8 +458,67 @@ node_instance_profile = aws.iam.InstanceProfile(
     role=node_role.name,
     path=f"/ol-infrastructure/eks/{cluster_name}/",
 )
+
 export("node_instance_profile", node_instance_profile.id)
 export("node_role_arn", value=node_role.arn)
+
+############################################################
+# Create access entry for self-managed node groups
+############################################################
+# When authentication_mode="API", self-managed node groups require an explicit
+# access entry with type="EC2_LINUX" to join the cluster.
+# This uses conditional import to handle existing access entries gracefully.
+#
+# We need to predict the node role ARN since it hasn't been created yet.
+# The pattern is: arn:aws:iam::{account_id}:role{path}{role_name}
+# Since role uses name_prefix, we look for any role matching the path pattern.
+
+
+def get_node_role_arn_pattern(cluster_name: str):
+    """Get the ARN pattern for node role to check for existing access entry."""
+    # Node roles are in the path /ol-infrastructure/eks/{cluster_name}/
+    # We'll try to find existing role with this path and name pattern
+    path = f"/ol-infrastructure/eks/{cluster_name}/"
+    iam_client = boto3.client("iam")
+    try:
+        roles = iam_client.list_roles(PathPrefix=path)["Roles"]
+        for role in roles:
+            if role["RoleName"].startswith(
+                f"{cluster_name}-eks-node-role-"[:IAM_ROLE_NAME_PREFIX_MAX_LENGTH]
+            ):
+                role_detail = iam_client.get_role(RoleName=role["RoleName"])
+                if {"Key": "cluster", "Value": cluster_name} not in role_detail["Role"][
+                    "Tags"
+                ]:
+                    return role["Arn"]
+    except ClientError:
+        # Role doesn't exist yet, will create new entry
+        return None
+    return None
+
+
+node_role_arn_pattern = get_node_role_arn_pattern(cluster_name)
+
+if node_role_arn_pattern:
+    node_access_entry_opts, _ = access_entry_opts(
+        cluster_name=cluster_name,
+        principal_arn=node_role_arn_pattern,
+    )
+else:
+    node_access_entry_opts = ResourceOptions()
+
+node_access_entry = aws.eks.AccessEntry(
+    f"{cluster_name}-eks-node-access-entry",
+    cluster_name=cluster.eks_cluster.name,
+    principal_arn=node_role.arn,
+    type="EC2_LINUX",
+    tags=aws_config.merged_tags({"cluster": cluster_name}),
+    opts=node_access_entry_opts.merge(
+        ResourceOptions(
+            depends_on=[cluster, node_role],
+        )
+    ),
+)
 
 # Initalize the k8s pulumi provider
 k8s_global_labels = {
@@ -558,8 +629,7 @@ for namespace in namespaces:
             labels=k8s_global_labels,
         ),
         opts=ResourceOptions(
-            provider=k8s_provider,
-            protect=False,
+            provider=k8s_provider, protect=False, depends_on=[*node_groups]
         ),
     )
 export("namespaces", [*namespaces, "operations"])
@@ -583,8 +653,7 @@ prometheus_operator_crds = kubernetes.yaml.v2.ConfigGroup(
         f"{PROMETHEUS_OPERATOR_CRD_BASE_URL}/monitoring.coreos.com_probes.yaml",
     ],
     opts=ResourceOptions(
-        provider=k8s_provider,
-        delete_before_replace=True,
+        provider=k8s_provider, delete_before_replace=True, depends_on=[*node_groups]
     ),
 )
 
@@ -693,7 +762,7 @@ if eks_config.get_bool("ebs_csi_provisioner"):
         },
         opts=ResourceOptions(
             provider=k8s_provider,
-            depends_on=[ebs_csi_driver_role],
+            depends_on=[ebs_csi_driver_role, *node_groups],
         ),
     )
     aws_ebs_cni_driver_addon = eks.Addon(
@@ -705,7 +774,7 @@ if eks_config.get_bool("ebs_csi_provisioner"):
         opts=ResourceOptions(
             parent=cluster,
             # Addons won't install properly if there are not nodes to schedule them on
-            depends_on=[cluster, node_groups[0]],
+            depends_on=[cluster, *node_groups],
         ),
     )
     export("ebs_storageclass", "ebs-gp3-sc")
@@ -792,7 +861,7 @@ if eks_config.get_bool("efs_csi_provisioner"):
         },
         opts=ResourceOptions(
             provider=k8s_provider,
-            depends_on=[efs_csi_driver_role],
+            depends_on=[efs_csi_driver_role, *node_groups],
         ),
     )
     aws_efs_cni_driver_addon = eks.Addon(
@@ -804,7 +873,7 @@ if eks_config.get_bool("efs_csi_provisioner"):
         opts=ResourceOptions(
             parent=cluster,
             # Addons won't install properly if there are not nodes to schedule them on
-            depends_on=[cluster, node_groups[0]],
+            depends_on=[cluster, *node_groups],
         ),
     )
     export("efs_storageclass", "efs-sc")
@@ -822,37 +891,6 @@ setup_vault_secrets_operator(
     versions=VERSIONS,
 )
 
-gateway_api_crds = setup_traefik(
-    cluster_name=cluster_name,
-    k8s_provider=k8s_provider,
-    operations_namespace=operations_namespace,
-    node_groups=node_groups,
-    prometheus_operator_crds=prometheus_operator_crds,
-    k8s_global_labels=k8s_global_labels,
-    operations_tolerations=operations_tolerations,
-    versions=VERSIONS,
-    eks_config=eks_config,
-    target_vpc=target_vpc,
-    aws_config=aws_config,
-    cluster=cluster,
-)
-
-setup_apisix(
-    cluster_name=cluster_name,
-    k8s_provider=k8s_provider,
-    operations_namespace=operations_namespace,
-    node_groups=node_groups,
-    gateway_api_crds=gateway_api_crds,
-    stack_info=stack_info,
-    k8s_global_labels=k8s_global_labels,
-    operations_tolerations=operations_tolerations,
-    versions=VERSIONS,
-    eks_config=eks_config,
-    target_vpc=target_vpc,
-    aws_config=aws_config,
-    cluster=cluster,
-)
-
 setup_external_dns(
     cluster_name=cluster_name,
     cluster=cluster,
@@ -867,7 +905,7 @@ setup_external_dns(
     eks_config=eks_config,
 )
 
-setup_cert_manager(
+cert_manager_release = setup_cert_manager(
     cluster_name=cluster_name,
     cluster=cluster,
     aws_account=aws_account,
@@ -885,13 +923,14 @@ create_core_dns_resources(
     k8s_global_labels=k8s_global_labels,
     k8s_provider=k8s_provider,
     cluster=cluster,
+    node_groups=node_groups,
 )
 
 ############################################################
 # Setup AWS integrations
 # AWS Load Balancer Controller, AWS Node Termination Handler
 ############################################################
-setup_aws_integrations(
+lb_controller = setup_aws_integrations(
     aws_account=aws_account,
     cluster_name=cluster_name,
     cluster=cluster,
@@ -902,7 +941,42 @@ setup_aws_integrations(
     target_vpc=target_vpc,
     node_groups=node_groups,
     versions=VERSIONS,
+    cert_manager=cert_manager_release,
 )
+
+gateway_api_crds = setup_traefik(
+    cluster_name=cluster_name,
+    k8s_provider=k8s_provider,
+    operations_namespace=operations_namespace,
+    node_groups=node_groups,
+    prometheus_operator_crds=prometheus_operator_crds,
+    k8s_global_labels=k8s_global_labels,
+    operations_tolerations=operations_tolerations,
+    versions=VERSIONS,
+    eks_config=eks_config,
+    target_vpc=target_vpc,
+    aws_config=aws_config,
+    cluster=cluster,
+    lb_controller=lb_controller,
+)
+
+setup_apisix(
+    cluster_name=cluster_name,
+    k8s_provider=k8s_provider,
+    operations_namespace=operations_namespace,
+    node_groups=node_groups,
+    gateway_api_crds=gateway_api_crds,
+    stack_info=stack_info,
+    k8s_global_labels=k8s_global_labels,
+    operations_tolerations=operations_tolerations,
+    versions=VERSIONS,
+    eks_config=eks_config,
+    target_vpc=target_vpc,
+    aws_config=aws_config,
+    cluster=cluster,
+    lb_controller=lb_controller,
+)
+
 
 ############################################################
 # Install and configure metrics-server

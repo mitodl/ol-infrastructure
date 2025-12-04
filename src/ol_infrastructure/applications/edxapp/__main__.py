@@ -97,7 +97,11 @@ FIVE_MINUTES = 60 * 5
 #####################
 # Stack Information #
 #####################
-cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+cluster_stack_name = (
+    edxapp_config.get("cluster_stack")
+    or f"infrastructure.aws.eks.applications.{stack_info.name}"
+)
+cluster_stack = StackReference(cluster_stack_name)
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
@@ -124,7 +128,7 @@ notes_stack = StackReference(
 #############
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 target_vpc = edxapp_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
-k8s_vpc = edxapp_config.get("k8s_vpc") or "applications_vpc"
+k8s_vpc = edxapp_config.require("k8s_vpc")
 aws_account = get_caller_identity()
 aws_config = AWSBase(
     tags={

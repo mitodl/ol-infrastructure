@@ -523,6 +523,7 @@ mitlearn_db_config = OLPostgresDBConfig(
     tags=aws_config.tags,
     db_name="mitopen",
     public_access=True,
+    use_blue_green=mitlearn_config.get_bool("db_use_blue_green") or False,
     **rds_defaults,
 )
 mitlearn_db_config.parameter_overrides.append(
@@ -1023,6 +1024,7 @@ env_vars = {
     "QDRANT_DENSE_MODEL": "text-embedding-3-large",
     "QDRANT_ENABLE_INDEXING_PLUGIN_HOOKS": True,
     "QDRANT_ENCODER": "vector_search.encoders.litellm.LiteLLMEncoder",
+    "OCR_MODEL": "gpt-5-nano-2025-08-07",
     "SECURE_CROSS_ORIGIN_OPENER_POLICY": "None",
     "SEE_API_ACCESS_TOKEN_URL": "https://mit-unified-portal-prod-78eeds.43d8q2.usa-e2.cloudhub.io/oauth/token",
     "SEE_API_URL": "https://mit-unified-portal-prod-78eeds.43d8q2.usa-e2.cloudhub.io/api/",

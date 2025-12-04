@@ -12,6 +12,7 @@ def create_core_dns_resources(
     k8s_global_labels: dict[str, str],
     k8s_provider: kubernetes.Provider,
     cluster: eks.Cluster,
+    node_groups: list[eks.NodeGroupV2],
 ):
     """
     Create resources for ensuring CoreDNS resiliency.
@@ -61,5 +62,7 @@ def create_core_dns_resources(
                 },
             },
         },
-        opts=ResourceOptions(provider=k8s_provider, parent=cluster),
+        opts=ResourceOptions(
+            provider=k8s_provider, parent=cluster, depends_on=[*node_groups]
+        ),
     )

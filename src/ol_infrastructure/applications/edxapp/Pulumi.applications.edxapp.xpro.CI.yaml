@@ -100,3 +100,4 @@ config:
   mongodb:atlas_project_id: 619395b5ab3fc40d5942a23c
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
+  edxapp:k8s_vpc: applications_vpc

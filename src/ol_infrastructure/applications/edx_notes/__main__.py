@@ -210,8 +210,9 @@ if deploy_to_k8s:
     docker_image_tag = os.environ.get("EDX_NOTES_DOCKER_DIGEST", openedx_release)
 
     # Get the VPC that the EKS cluster uses (which has k8s subnets configured)
-    # The cluster is typically deployed in the applications VPC
-    cluster_vpc = network_stack.require_output("applications_vpc")
+    # When deploying to K8s, use the target VPC (which may be residential, xpro, etc.)
+    # not the default applications VPC
+    cluster_vpc = network_stack.require_output(target_vpc_name)
     cluster_vpc_id = cluster_vpc["id"]
     k8s_pod_subnet_cidrs = cluster_vpc["k8s_pod_subnet_cidrs"]
 

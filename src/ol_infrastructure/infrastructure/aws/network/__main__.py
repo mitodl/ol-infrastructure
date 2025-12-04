@@ -550,3 +550,8 @@ applications_to_xpro_online_peer = OLVPCPeeringConnection(
     applications_vpc,
     xpro_vpc,
 )
+mitx_staging_to_mitx_peer = OLVPCPeeringConnection(
+    f"ol-mitx-staging-{stack_info.env_suffix}-to-mitx-{stack_info.env_suffix}-vpc-peer",
+    residential_mitx_staging_vpc,
+    residential_mitx_vpc,
+)
