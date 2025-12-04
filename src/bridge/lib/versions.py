@@ -31,7 +31,7 @@ APISIX_CHART_VERSION = "2.12.4"
 AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION = "1.16.0"
 # renovate: datasource=helm depName=aws-node-termination-handler packageName=aws-node-termination-handler registryUrl=https://aws.github.io/eks-charts
 AWS_NODE_TERMINATION_HANDLER_CHART_VERSION = "0.27.2"
-# renovate: datasource=helm depName=botkube packageName=botkube
+# renovate: datasource=helm depName=botkube packageName=botkube registryUrl=https://charts.botkube.io
 BOTKUBE_CHART_VERSION = "v1.14.0"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager
 CERT_MANAGER_CHART_VERSION = "v1.16.1"
@@ -51,7 +51,7 @@ KARPENTER_CHART_VERSION = "1.8.2"
 KEDA_CHART_VERSION = "2.17.1"
 # renovate: datasource=docker depName=kube-state-metrics packageName=registry-1.docker.io/bitnamicharts/kube-state-metrics
 KUBE_STATE_METRICS_CHART_VERSION = "5.1.0"
-# renovate: datasource=docker depName=kubewatch packageName=kubewatch
+# renovate: datasource=helm depName=kubewatch packageName=kubewatch registryUrl=https://robusta-charts.storage.googleapis.com
 KUBEWATCH_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
 TRAEFIK_CHART_VERSION = "37.4.0"
