@@ -340,6 +340,7 @@ COURSE_NAMES.extend(
             "mltl1",
             "pm1",
             "se1",
+            "haim1",
         ]
     ]
 )
@@ -347,7 +348,6 @@ EXTRA_IMAGES = {
     course_name.replace(".", "-").replace("_", "-"): {
         "name": "610119931565.dkr.ecr.us-east-1.amazonaws.com/ol-course-notebooks",
         "tag": course_name,
-        # "pullPolicy": "Always",
     }
     for course_name in COURSE_NAMES
 }
