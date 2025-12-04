@@ -7,3 +7,5 @@ config:
   consul:scheme: https
   environment:business_unit: residential-staging
   environment:target_vpc: residential_mitx_staging_vpc
+  opensearch:additional_trusted_cidrs:
+  - '10.7.0.0/16'
