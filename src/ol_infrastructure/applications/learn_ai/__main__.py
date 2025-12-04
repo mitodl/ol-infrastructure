@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D100
+# ruff: noqa: E501
 import base64
 import json
 import mimetypes
