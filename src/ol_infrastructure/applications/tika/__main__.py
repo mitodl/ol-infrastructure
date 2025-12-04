@@ -1,8 +1,10 @@
 """Create the resources needed to run a tika server.  # noqa: D200"""
 
+import json
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
+import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference
 
 from bridge.lib.versions import TIKA_CHART_VERSION
@@ -28,6 +30,7 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.vault import setup_vault_provider
 
 ##################################
 ##    Setup + Config Retrival   ##
@@ -44,6 +47,16 @@ setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 x_access_token = read_yaml_secrets(Path(f"tika/tika.{stack_info.env_suffix}.yaml"))[
     "x_access_token"
 ]
+
+if Config("vault_server").get("env_namespace"):
+    setup_vault_provider()
+
+# Store the access token in vault
+vault.generic.Secret(
+    "tika-server-x-access-token-vault-secret",
+    path="secret-operations/tika/access-token",
+    data_json=json.dumps({"value": x_access_token}),
+)
 
 ###################################
 #   Kubernetes Deployment (K8S)   #
