@@ -96,6 +96,39 @@ def should_ignore_deployment(
     return False, ""
 
 
+def get_deployment_from_replicaset(
+    namespace: str, replicaset_name: str
+) -> tuple[str | None, str | None]:
+    """
+    Get the parent deployment name from a ReplicaSet.
+
+    Args:
+        namespace: Kubernetes namespace
+        replicaset_name: Name of the ReplicaSet
+
+    Returns:
+        Tuple of (deployment_name, deployment_namespace) or (None, None) if not found
+    """
+    try:
+        replicaset = apps_v1.read_namespaced_replica_set(replicaset_name, namespace)
+
+        # Check owner references to find parent deployment
+        if replicaset.metadata.owner_references:
+            for owner in replicaset.metadata.owner_references:
+                if owner.kind == "Deployment":
+                    return owner.name, namespace
+
+        logger.warning(
+            "No Deployment owner found for ReplicaSet %s/%s",
+            namespace,
+            replicaset_name,
+        )
+    except client.exceptions.ApiException:
+        logger.exception("Error fetching ReplicaSet %s/%s", namespace, replicaset_name)
+
+    return None, None
+
+
 def get_deployment_details(namespace: str, name: str) -> dict[str, Any] | None:
     """Fetch detailed deployment information from Kubernetes API."""
     try:
@@ -349,18 +382,54 @@ def webhook_handler():
                 {"status": "ignored", "reason": "namespace not watched"}
             ), HTTPStatus.OK
 
-        # Only process deployment events
-        if kind.lower() != "deployment":
-            logger.info("Ignoring non-deployment event: %s", kind)
+        # Only process deployment and replicaset events
+        if kind.lower() not in ["deployment", "replicaset"]:
+            logger.info("Ignoring non-deployment/replicaset event: %s", kind)
             return (
-                jsonify({"status": "ignored", "reason": "not a deployment"}),
+                jsonify(
+                    {
+                        "status": "ignored",
+                        "reason": "not a deployment or replicaset",
+                    }
+                ),
                 HTTPStatus.OK,
+            )
+
+        # Determine deployment name and namespace
+        deployment_name = name
+        deployment_namespace = namespace
+
+        # If this is a ReplicaSet event, find the parent Deployment
+        if kind.lower() == "replicaset":
+            deployment_name, deployment_namespace = get_deployment_from_replicaset(
+                namespace, name
+            )
+            if not deployment_name:
+                logger.warning(
+                    "Could not find parent Deployment for ReplicaSet %s/%s",
+                    namespace,
+                    name,
+                )
+                return (
+                    jsonify(
+                        {"status": "ignored", "reason": "no parent deployment found"}
+                    ),
+                    HTTPStatus.OK,
+                )
+            logger.info(
+                "ReplicaSet %s/%s belongs to Deployment %s/%s",
+                namespace,
+                name,
+                deployment_namespace,
+                deployment_name,
             )
 
         # Get detailed deployment information
         deployment_details = None
         if event_type.lower() != "deleted":
-            deployment_details = get_deployment_details(namespace, name)
+            deployment_details = get_deployment_details(
+                deployment_namespace, deployment_name
+            )
 
         # Check if deployment should be ignored based on filters
         should_ignore, ignore_reason = should_ignore_deployment(deployment_details)
@@ -372,10 +441,11 @@ def webhook_handler():
             )
 
         # Create event data in expected format for format_slack_message
+        # Use the deployment name for display (not the ReplicaSet name)
         formatted_event_data = {
-            "namespace": namespace,
-            "name": name,
-            "kind": kind,
+            "namespace": deployment_namespace,
+            "name": deployment_name,
+            "kind": "Deployment",  # Always show as Deployment in message
             "eventType": event_type,
         }
 
