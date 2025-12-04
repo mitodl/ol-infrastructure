@@ -433,6 +433,7 @@ tika_apisix_route = OLApisixRoute(
             route_name="tika-all",
             priority=10,
             shared_plugin_config_name=tika_shared_plugins.resource_name,
+            timeout_send="300s",  # Tika can take a while to process large files
             plugins=[
                 # Use serverless-pre-function to validate X-Access-Token header
                 # This is simpler than request-validation and more flexible
