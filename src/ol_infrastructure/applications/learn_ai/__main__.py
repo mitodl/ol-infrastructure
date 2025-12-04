@@ -102,7 +102,10 @@ aws_config = AWSBase(
 )
 learn_ai_config = Config("learn_ai")
 vault_config = Config("vault")
+<<<<<<< HEAD
 
+slack_channel = learn_ai_config.get("slack_channel")  # Optional Slack channel
+apisix_ingress_class = learn_ai_config.get("apisix_ingress_class") or "apisix"
 
 setup_vault_provider(stack_info)
 fastly_provider = get_fastly_provider()
@@ -785,6 +788,7 @@ learn_ai_app_k8s = OLApplicationK8s(
         application_min_replicas=learn_ai_config.get("min_replicas") or 2,
         application_cmd_array=cmd_array,
         application_arg_array=arg_array,
+        slack_channel=slack_channel,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,
         # Nginx resources (defaults from component are fine)

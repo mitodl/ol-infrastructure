@@ -7,6 +7,7 @@ config:
   learn_ai:backend_domain: "api-learn-ai.ol.mit.edu"
   learn_ai:db_password:
     secure: v1:DIaoiP0dVXpI2w72:zcSTWgD6DInTMOdD1oH1FTdlUJCney7MLeAfL5Q5hcL9lDfW7AjVGynLDeDtpL3DQIZvFBUvcbjIHVaBYQf8Ikf8tdjWamNBv+4Ymwe2
+  learn_ai:slack_channel: "product-learn-ai"
   learn_ai:env_vars:
     AI_CHATBOTS_SESSION_EXPIRY_DAYS: 36500
     AI_CITED_PROMPTS: '["syllabus_canvas"]'
