@@ -98,9 +98,8 @@ def create_k8s_resources(  # noqa: C901
 
     # For K8s deployments, edxapp uses the applications_vpc cluster
     # (not the target_vpc which is for EC2 deployments)
-    apps_vpc = network_stack.require_output("applications_vpc")
-    k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
-    cluster_vpc = apps_vpc
+    cluster_vpc = network_stack.require_output(edxapp_config.require("k8s_vpc"))
+    k8s_pod_subnet_cidrs = cluster_vpc["k8s_pod_subnet_cidrs"]
 
     # Verify that the namespace exists in the EKS cluster
     namespace = f"{stack_info.env_prefix}-openedx"

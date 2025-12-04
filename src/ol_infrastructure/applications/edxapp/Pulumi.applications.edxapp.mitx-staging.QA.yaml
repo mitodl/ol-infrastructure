@@ -56,10 +56,6 @@ config:
     learning: learn
     ora_grading: ora-grading
   edxapp:google_analytics_id: ""
-  edxapp:k8s_deployment: false
-  edxapp:k8s_cutover: false
-  edxapp:disable_ec2_deployment: false
-  edxapp:k8s_vpc: residential_mitx_vpc
   edxapp:mail_domain: edxapp-mail-staging-qa.mitx.mit.edu
   edxapp:min_web_nodes: "1"
   edxapp:min_worker_nodes: "1"
@@ -71,3 +67,7 @@ config:
   mongodb:atlas_project_id: 61a8fc35438c21331e5773f6
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
+  edxapp:k8s_deployment: false
+  edxapp:k8s_cutover: false
+  edxapp:disable_ec2_deployment: false
+  edxapp:k8s_vpc: residential_mitx_vpc

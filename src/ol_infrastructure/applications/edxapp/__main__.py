@@ -128,7 +128,7 @@ notes_stack = StackReference(
 #############
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 target_vpc = edxapp_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
-k8s_vpc = edxapp_config.get("k8s_vpc") or "applications_vpc"
+k8s_vpc = edxapp_config.require("k8s_vpc")
 aws_account = get_caller_identity()
 aws_config = AWSBase(
     tags={

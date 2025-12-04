@@ -97,3 +97,4 @@ config:
   edxapp:k8s_deployment: true
   edxapp:k8s_cutover: true
   edxapp:disable_ec2_deployment: true
+  edxapp:k8s_vpc: applications_vpc

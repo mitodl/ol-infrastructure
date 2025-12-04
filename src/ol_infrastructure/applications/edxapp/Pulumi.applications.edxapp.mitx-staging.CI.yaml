@@ -66,7 +66,6 @@ config:
   mongodb:atlas_project_id: 6193f02d576a70760e8bcb02
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
-  edxapp:k8s_vpc: residential_mitx_vpc
   edxapp:cluster_stack: infrastructure.aws.eks.residential.CI
   edxapp:learn_ai_frontend_domain: "learn-ai-ci.ol.mit.edu"
   edxapp:mit_learn_api_domain: api.ci.learn.mit.edu
@@ -110,5 +109,6 @@ config:
         memory_request: "1Gi"
         memory_limit: "2Gi"
   edxapp:k8s_deployment: true
-  edxapp:k8s_cutover: false
+  edxapp:k8s_cutover: true
   edxapp:disable_ec2_deployment: false
+  edxapp:k8s_vpc: residential_mitx_vpc
