@@ -1619,9 +1619,9 @@ encoded_fastly_proxy_credentials = base64.b64encode(
     f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
 ).decode("utf8")
 
-vector_log_proxy_fqdn = vector_log_proxy_stack.require_output("vector_log_proxy")[
-    "fqdn"
-]
+vector_log_proxy_domain = vector_log_proxy_stack.require_output(
+    "vector_log_proxy_domain"
+)
 
 fastly_access_logging_bucket = monitoring_stack.require_output(
     "fastly_access_logging_bucket"
@@ -1801,8 +1801,8 @@ edxapp_fastly_service = fastly.ServiceVcl(
     ],
     logging_https=[
         fastly.ServiceVclLoggingHttpArgs(
-            url=Output.all(fqdn=vector_log_proxy_fqdn).apply(
-                lambda fqdn: "https://{fqdn}".format(**fqdn)
+            url=Output.all(domain=vector_log_proxy_domain).apply(
+                lambda kwargs: f"https://{kwargs['domain']}/fastly"
             ),
             name=f"fastly-{env_name}-https-logging-args",
             content_type="application/json",
