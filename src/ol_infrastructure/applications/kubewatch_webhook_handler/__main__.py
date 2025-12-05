@@ -43,12 +43,17 @@ setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 # Configuration
 webhook_config = Config("kubewatch_webhook")
 vault_config = Config("vault")
+slack_config = Config("slack")
 
 # Namespace filtering (kubewatch watches all, webhook handler filters)
 watched_namespaces = webhook_config.get("watched_namespaces") or ""
 
 # Get filtering patterns from config
 ignored_label_patterns = webhook_config.get("ignored_label_patterns") or "celery"
+
+# Get default Slack channel (optional - empty means no notifications for
+# unlabeled deployments)
+default_slack_channel = slack_config.get("channel_name") or ""
 
 # Read secrets
 webhook_secrets = read_yaml_secrets(
@@ -215,6 +220,10 @@ webhook_deployment = kubernetes.apps.v1.Deployment(
                                         key="slack-token",
                                     ),
                                 ),
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="SLACK_CHANNEL",
+                                value=default_slack_channel,
                             ),
                             kubernetes.core.v1.EnvVarArgs(
                                 name="WATCHED_NAMESPACES",
