@@ -60,7 +60,7 @@ def get_authenticator_config(jupyterhub_deployment_config):
     }
     if authenticator_type == "shared-password":
         auth_conf["SharedPasswordAuthenticator"] = {
-            "user_password": jupyterhub_deployment_config.get("shared_password")
+            "admin_password": jupyterhub_deployment_config.get("shared_password")
         }
         auth_conf["JupyterHub"] = {
             "authenticator_class": "shared-password",
