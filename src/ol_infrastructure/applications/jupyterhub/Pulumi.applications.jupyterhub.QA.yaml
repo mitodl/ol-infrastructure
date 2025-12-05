@@ -20,6 +20,7 @@ config:
     namespace: jupyter-authoring
     db_name: jupyterhub_authoring
     apisix_ingress_class: apache-apisix
+    authenticator_class: shared-password
     admin_users:
     - "admin"
     menu_override_file: author_menu_override.json
@@ -29,12 +30,12 @@ config:
     proxy_port: 30001
     user_placeholder_replicas: 1
     notebook_bucket: jupyter-courses-qa
+    shared_password:
+      secure: v1:6jn5qRWKDbtbGB9M:VA+J7wwlJM6aw+nrn6gSU3+ndpxXRYDIWwi7x9NuNMxY8CfCesxQuoczRu04L0PhPC8f5qbDnWkF/PB9huub1feGkETJkr8EAr0b3CpGeDo=
   jupyterhub:target_vpc: "applications_vpc"
   jupyterhub:business_unit: "mit-learn"
   aws:region: us-east-1
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
-  jupyterhub:shared_password:
-    secure: v1:6jn5qRWKDbtbGB9M:VA+J7wwlJM6aw+nrn6gSU3+ndpxXRYDIWwi7x9NuNMxY8CfCesxQuoczRu04L0PhPC8f5qbDnWkF/PB9huub1feGkETJkr8EAr0b3CpGeDo=
   jupyterhub:rds_password:
     secure: v1:azvoUOJDNjEzqmDX:CVO6sIlnFR6uTjq/5mK2kHhIh7DAAR3D6FXX4HkcTAdhyZwBhAhU9c4RikJvIhyPLUqJDZELr7dZzp0=
