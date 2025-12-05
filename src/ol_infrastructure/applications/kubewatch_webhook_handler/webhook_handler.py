@@ -96,6 +96,7 @@ def should_ignore_deployment(
 
     return False, ""
 
+
 def get_target_slack_channel(deployment_details: dict[str, Any] | None) -> str:
     """
     Determine target Slack channel from deployment labels.
@@ -391,7 +392,7 @@ def health():
 
 
 @app.route("/webhook/kubewatch", methods=["POST"])
-def webhook_handler():
+def webhook_handler():  # noqa: C901, PLR0912, PLR0915
     """Handle webhook events from kubewatch."""
     try:
         # Parse the incoming event
