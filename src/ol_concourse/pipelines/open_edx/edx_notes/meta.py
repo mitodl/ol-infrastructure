@@ -36,9 +36,11 @@ def build_meta_job(release_name):
         pipeline_team = "main"
         pipeline_id = "self"
     else:
-        pipeline_definition_path = "src/ol_concourse/pipelines/open_edx/edx_notes/docker_packer_pulumi_pipeline.py"  # noqa: E501
+        pipeline_definition_path = (
+            "src/ol_concourse/pipelines/open_edx/edx_notes/docker_pulumi_pipeline.py"
+        )
         pipeline_team = "infrastructure"
-        pipeline_id = f"docker-packer-pulumi-edx-notes-{release_name}"
+        pipeline_id = f"docker-pulumi-edx-notes-{release_name}"
     return Job(
         name=Identifier(f"create-edx-notes-{release_name}-pipeline"),
         plan=[
@@ -87,5 +89,5 @@ if __name__ == "__main__":
         definition.write(meta_pipeline.model_dump_json(indent=2))
     sys.stdout.write(meta_pipeline.model_dump_json(indent=2))
     sys.stdout.write(
-        "\nfly -t <target> set-pipeline -p docker-packer-pulumi-edx-notes-meta -c definition.json"  # noqa: E501
+        "\nfly -t <target> set-pipeline -p docker-pulumi-edx-notes-meta -c definition.json"  # noqa: E501
     )
