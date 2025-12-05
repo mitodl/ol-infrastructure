@@ -6,6 +6,17 @@ This is a **large-scale infrastructure-as-code monorepo** (467 Python files, ~91
 
 **Trust these instructions.** They are comprehensive and validated. Only search for additional information if these instructions are incomplete or incorrect.
 
+## Pre-Approved Tools for Agents
+
+The following tools are **pre-approved** for use without asking for permission:
+- `uv` — Package manager and Python environment management
+- `cat` — View file contents
+- `jq` — JSON parsing and manipulation
+- `find` — Search for files and directories
+- `xargs` -- Use one command to generate args for another
+
+These tools can be used freely during any task in this repository.
+
 ## Essential Build & Validation Commands
 
 ### Environment Setup (One-Time)

@@ -108,7 +108,8 @@ def get_target_slack_channel(deployment_details: dict[str, Any] | None) -> str:
         deployment_details: Deployment details from Kubernetes API
 
     Returns:
-        Target channel name (falls back to DEFAULT_SLACK_CHANNEL if not specified)
+        Target channel name. Returns empty string if no channel is configured,
+        which signals that no notification should be sent.
     """
     if not deployment_details:
         return DEFAULT_SLACK_CHANNEL
@@ -118,15 +119,24 @@ def get_target_slack_channel(deployment_details: dict[str, Any] | None) -> str:
 
     # Validate channel name is not empty
     if not target_channel or not target_channel.strip():
-        logger.warning(
-            "Empty slack-channel label found for %s/%s, using default",
-            deployment_details.get("namespace"),
-            deployment_details.get("name"),
-        )
-        return DEFAULT_SLACK_CHANNEL
+        if DEFAULT_SLACK_CHANNEL:
+            logger.info(
+                "No slack-channel label for %s/%s, using default: %s",
+                deployment_details.get("namespace"),
+                deployment_details.get("name"),
+                DEFAULT_SLACK_CHANNEL,
+            )
+            return DEFAULT_SLACK_CHANNEL
+        else:
+            logger.debug(
+                "No slack-channel label for %s/%s and no default configured",
+                deployment_details.get("namespace"),
+                deployment_details.get("name"),
+            )
+            return ""
 
     # Log routing decision if different from default
-    if target_channel != DEFAULT_SLACK_CHANNEL:
+    if DEFAULT_SLACK_CHANNEL and target_channel != DEFAULT_SLACK_CHANNEL:
         logger.info(
             "Routing notification for %s/%s to channel: %s (from label)",
             deployment_details.get("namespace"),
@@ -392,7 +402,7 @@ def health():
 
 
 @app.route("/webhook/kubewatch", methods=["POST"])
-def webhook_handler():  # noqa: C901, PLR0912, PLR0915
+def webhook_handler():  # noqa: C901, PLR0911, PLR0912, PLR0915
     """Handle webhook events from kubewatch."""
     try:
         # Parse the incoming event
@@ -498,9 +508,20 @@ def webhook_handler():  # noqa: C901, PLR0912, PLR0915
         logger.info("Sending Slack message: %s", message_preview)
 
         # Send to Slack with dynamic channel routing
-        if slack_client and DEFAULT_SLACK_CHANNEL:
+        if slack_client:
             # Determine target channel from deployment labels
             target_channel = get_target_slack_channel(deployment_details)
+
+            # Skip notification if no channel is specified
+            if not target_channel:
+                logger.info(
+                    "No Slack channel configured for %s/%s, skipping notification",
+                    namespace,
+                    name,
+                )
+                return jsonify(
+                    {"status": "success", "reason": "no channel configured"}
+                ), HTTPStatus.OK
 
             try:
                 slack_client.chat_postMessage(
@@ -518,31 +539,48 @@ def webhook_handler():  # noqa: C901, PLR0912, PLR0915
                 # Handle channel_not_found error gracefully
                 if e.response.get("error") == "channel_not_found":
                     logger.warning(
-                        "Channel '%s' not found for %s/%s, falling back to default: %s",
+                        "Channel '%s' not found for %s/%s",
                         target_channel,
                         namespace,
                         name,
-                        DEFAULT_SLACK_CHANNEL,
                     )
-                    # Retry with default channel
-                    try:
-                        slack_client.chat_postMessage(
-                            channel=DEFAULT_SLACK_CHANNEL,
-                            text=slack_message.get("text", "Deployment notification"),
-                            blocks=slack_message.get("blocks", []),
-                        )
+                    # If there's a default channel and it's different, try that
+                    if (
+                        DEFAULT_SLACK_CHANNEL
+                        and target_channel != DEFAULT_SLACK_CHANNEL
+                    ):
                         logger.info(
-                            "Successfully sent notification to default channel "
-                            "for %s/%s",
+                            "Falling back to default channel: %s",
+                            DEFAULT_SLACK_CHANNEL,
+                        )
+                        try:
+                            slack_client.chat_postMessage(
+                                channel=DEFAULT_SLACK_CHANNEL,
+                                text=slack_message.get(
+                                    "text", "Deployment notification"
+                                ),
+                                blocks=slack_message.get("blocks", []),
+                            )
+                            logger.info(
+                                "Successfully sent notification to default channel "
+                                "for %s/%s",
+                                namespace,
+                                name,
+                            )
+                        except SlackApiError as retry_error:
+                            logger.exception(
+                                "Failed to send to default channel: %s",
+                                retry_error.response.get("error"),
+                            )
+                            raise
+                    else:
+                        # No fallback available, log and continue
+                        logger.warning(
+                            "No fallback channel available, notification "
+                            "dropped for %s/%s",
                             namespace,
                             name,
                         )
-                    except SlackApiError as retry_error:
-                        logger.exception(
-                            "Failed to send to default channel: %s",
-                            retry_error.response.get("error"),
-                        )
-                        raise
                 else:
                     logger.exception(
                         "Slack API error: %s - %s",
@@ -551,10 +589,7 @@ def webhook_handler():  # noqa: C901, PLR0912, PLR0915
                     )
                     raise
         else:
-            logger.warning(
-                "SLACK_TOKEN or SLACK_CHANNEL not configured, "
-                "skipping Slack notification"
-            )
+            logger.warning("SLACK_TOKEN not configured, skipping Slack notification")
 
         return jsonify({"status": "success"}), HTTPStatus.OK
 
