@@ -421,21 +421,18 @@ sensitive_heroku_vars = {
     "GITHUB_WEBHOOK_KEY": vault_secrets["github"]["shared_secret"],
 }
 
-if stack_info.env_suffix.lower() != "ci":
-    auth_postgres_ocw_studio_applications_env_creds_app = (
-        vault.generic.get_secret_output(
-            path=f"postgres-ocw-studio-applications-{stack_info.env_suffix}/creds/app",
-            with_lease_start_time=False,
-            opts=InvokeOptions(parent=ocw_studio_secrets),
+auth_postgres_ocw_studio_applications_env_creds_app = vault.generic.get_secret_output(
+    path=f"postgres-ocw-studio-applications-{stack_info.env_suffix}/creds/app",
+    with_lease_start_time=False,
+    opts=InvokeOptions(parent=ocw_studio_secrets),
+)
+sensitive_heroku_vars["DATABASE_URL"] = (
+    auth_postgres_ocw_studio_applications_env_creds_app.data.apply(
+        lambda data: "postgres://{}:{}@ocw-studio-db-applications-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/ocw_studio".format(
+            data["username"], data["password"], stack_info.env_suffix
         )
     )
-    sensitive_heroku_vars["DATABASE_URL"] = (
-        auth_postgres_ocw_studio_applications_env_creds_app.data.apply(
-            lambda data: "postgres://{}:{}@ocw-studio-db-applications-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/ocw_studio".format(
-                data["username"], data["password"], stack_info.env_suffix
-            )
-        )
-    )
+)
 
 heroku_app_id = heroku_config.require("app_id")
 ocw_studio_heroku_configassociation = heroku.app.ConfigAssociation(
