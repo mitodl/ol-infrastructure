@@ -1448,7 +1448,7 @@ def create_k8s_resources(  # noqa: C901
                 route_name="lms-default",
                 priority=0,
                 plugins=[],
-                shared_plugins=edxapp_shared_plugins.resource_name,
+                shared_plugin_config_name=edxapp_shared_plugins.resource_name,
                 hosts=[
                     edxapp_config.require("backend_lms_domain"),
                     edxapp_config.require_object("domains")["lms"],
@@ -1457,11 +1457,19 @@ def create_k8s_resources(  # noqa: C901
                 backend_service_name=lms_webapp_deployment_name,
                 backend_service_port="http",
             ),
+        ],
+    )
+
+    cms_apisixroute = OLApisixRoute(
+        name=f"ol-{stack_info.env_prefix}-edxapp-cms-apisix-route-{stack_info.env_suffix}",
+        k8s_namespace=namespace,
+        k8s_labels=k8s_global_labels,
+        route_configs=[
             OLApisixRouteConfig(
                 route_name="cms-default",
                 priority=0,
                 plugins=[],
-                shared_plugins=edxapp_shared_plugins.resource_name,
+                shared_plugin_config_name=edxapp_shared_plugins.resource_name,
                 hosts=[
                     edxapp_config.require("backend_studio_domain"),
                     edxapp_config.require_object("domains")["studio"],
