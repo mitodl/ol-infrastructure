@@ -165,6 +165,20 @@ class OLApisixHTTPRoute(ComponentResource):
         # Build HTTPRoute rules
         http_rules = self._build_http_route_rules(route_configs)
 
+        # Build HTTPRoute spec - omit hostnames field if empty per Gateway API spec
+        hostnames = self._extract_unique_hostnames(route_configs)
+        spec: dict[str, Any] = {
+            "parentRefs": [
+                {
+                    "name": gateway_name,
+                    "namespace": gateway_namespace,
+                }
+            ],
+            "rules": http_rules,
+        }
+        if hostnames:  # Only include hostnames if we have any
+            spec["hostnames"] = hostnames
+
         # Create the HTTPRoute resource
         self.http_route_resource = kubernetes.apiextensions.CustomResource(
             f"OLApisixHTTPRoute-{name}",
@@ -175,16 +189,7 @@ class OLApisixHTTPRoute(ComponentResource):
                 labels=k8s_labels,
                 namespace=k8s_namespace,
             ),
-            spec={
-                "parentRefs": [
-                    {
-                        "name": gateway_name,
-                        "namespace": gateway_namespace,
-                    }
-                ],
-                "hostnames": self._extract_unique_hostnames(route_configs),
-                "rules": http_rules,
-            },
+            spec=spec,
             opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
         )
 
@@ -261,9 +266,10 @@ class OLApisixHTTPRoute(ComponentResource):
         rules = []
 
         for route_config in route_configs:
-            # Build matches for paths
+            # Build matches for paths - default to "/" if no paths specified
             matches = []
-            for path in route_config.paths:
+            paths = route_config.paths if route_config.paths else ["/"]
+            for path in paths:
                 # Convert APISIX path pattern to Gateway API path match
                 # APISIX uses /path/* format, Gateway API uses prefix matching
                 path_value = path.rstrip("*").rstrip("/")

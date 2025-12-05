@@ -370,6 +370,8 @@ def setup_apisix(
                     "name": "https",
                     "protocol": "HTTPS",
                     "port": 443,
+                    # TLS configuration is intentionally omitted here because it is handled
+                    # separately by per-application ApisixTls CRDs (see ADR-0003).
                 },
             ],
             "infrastructure": {
