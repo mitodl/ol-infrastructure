@@ -77,6 +77,7 @@ class Services(str, Enum):
     open_metadata = "open-metadata"
     redash = "redash"
     tika = "tika"
+    vector_log_proxy = "vector-log-proxy"
     xpro = "xpro"
 
 
