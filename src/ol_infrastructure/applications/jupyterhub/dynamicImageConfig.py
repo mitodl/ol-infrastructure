@@ -85,6 +85,10 @@ class QueryStringKubeSpawner(KubeSpawner):
             # notebook=Assignment_2_Prediction_with_LogReg_%26_CART_%26_XGBoost.ipynb
             notebook = self.handler.get_query_argument("notebook", "")
             tag = self.handler.get_query_argument("tag", "").lower()
+
+            # needs_gpu indicates whether the user wants a GPU-enabled environment
+            # Its only intended use is to request a GPU when authoring courses
+            needs_gpu = self.handler.get_query_argument("needs_gpu", default=False)
             if course in KNOWN_COURSES or tag:
                 # Specifying tag will let you effectively
                 # reference anything in the ECR registry
@@ -93,7 +97,7 @@ class QueryStringKubeSpawner(KubeSpawner):
                     image_base.format(tag) if tag else image_base.format(course)
                 )
 
-                if course in GPU_ENABLED_COURSES:
+                if needs_gpu or course in GPU_ENABLED_COURSES:
                     # This course requires a GPU, so we are adding a node affinity
                     # rule to schedule the pod on a node with a GPU.
                     self.node_affinity_required = GPU_NODE_AFFINITY_LIST

@@ -11,6 +11,7 @@ from pulumi import Config, ResourceOptions, StackReference
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.lib.versions import JUPYTERHUB_CHART_VERSION
 from ol_infrastructure.applications.jupyterhub.values import (
+    get_authenticator_config,
     get_prepuller_config_for_images,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
@@ -237,8 +238,6 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
 
     # JupyterHub Helm Release
     extra_images_list = extra_images or {}
-    admin_users_list = jupyterhub_deployment_config.get("admin_users", [])
-    allowed_users_list = jupyterhub_deployment_config.get("allowed_users", [])
     return kubernetes.helm.v3.Release(
         f"{base_name}-{env_name}-application-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
@@ -327,17 +326,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                         }
                     },
                     "extraConfig": {"dynamicImageConfig.py": extra_config},
-                    "config": {
-                        "Authenticator": {
-                            "admin_users": admin_users_list,
-                            "allowed_users": allowed_users_list,
-                        },
-                        "JupyterHub": {
-                            "authenticator_class": jupyterhub_deployment_config.get(
-                                "authenticator_class", "tmp"
-                            )
-                        },
-                    },
+                    "config": get_authenticator_config(jupyterhub_deployment_config),
                     "resources": {
                         "requests": {
                             "cpu": "100m",
@@ -400,7 +389,9 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                         "JUPYTERHUB_SINGLEUSER_APP": (
                             "jupyter_server.serverapp.ServerApp"
                         ),
-                        "NOTEBOOK_BUCKET": "jupyter-courses-ci",
+                        "NOTEBOOK_BUCKET": jupyterhub_deployment_config.get(
+                            "notebook_bucket", ""
+                        ),
                     },
                     "cloudMetadata": {
                         "blockWithIptables": False,

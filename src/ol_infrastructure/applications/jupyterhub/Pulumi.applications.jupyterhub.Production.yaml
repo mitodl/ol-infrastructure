@@ -28,6 +28,7 @@ config:
     vault_policy_file: jupyterhub_policy.hcl
     proxy_port: 30001
     user_placeholder_replicas: 1
+    notebook_bucket: jupyter-courses-production
   jupyterhub:target_vpc: "applications_vpc"
   jupyterhub:business_unit: "mit-learn"
   aws:region: us-east-1

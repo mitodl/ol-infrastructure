@@ -4,6 +4,7 @@
          "nbdime-jupyterlab": true,
          "@jupyter-notebook/application-extension:logo": true,
          "@jupyter-notebook/notebook-extension:trusted": true,
-         "@jupyter-notebook/application-extension:dirty": true
+         "@jupyter-notebook/application-extension:dirty": true,
+         "ol-jupyter-authoring": true
    }
 }
