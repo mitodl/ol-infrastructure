@@ -260,6 +260,7 @@ def _build_interpolated_config_dict(
         config.update(
             {
                 "MITXONLINE_BASE_URL": f"https://{marketing_domain}/",
+                "ENABLE_AUTO_LANGUAGE_SELECTION": env_name == "mitxonline-production",
                 "IDA_LOGOUT_URI_LIST": [
                     f"https://{marketing_domain}/logout",
                     f"https://{domains['studio']}/logout",

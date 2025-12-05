@@ -130,6 +130,7 @@ mitxonline = [
         enable_video_upload_page_link_in_content_dropdown="true",
         enable_jumpnav="true",
         enable_ai_drawer_slot="true",
+        enable_auto_language_selection="false",
     ),
     OpenEdxVars(
         about_us_url="https://rc.mitxonline.mit.edu/about-us/",
@@ -159,6 +160,7 @@ mitxonline = [
         enable_video_upload_page_link_in_content_dropdown="true",
         enable_jumpnav="true",
         enable_ai_drawer_slot="true",
+        enable_auto_language_selection="true",
     ),
     OpenEdxVars(
         about_us_url="https://mitxonline.mit.edu/about-us/",
@@ -188,6 +190,7 @@ mitxonline = [
         enable_video_upload_page_link_in_content_dropdown="true",
         enable_jumpnav="true",
         appzi_url="https://w.appzi.io/w.js?token=Q2pSI",
+        enable_auto_language_selection="false",
     ),
 ]
 

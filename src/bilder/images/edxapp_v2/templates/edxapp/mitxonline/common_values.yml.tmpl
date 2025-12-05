@@ -532,6 +532,11 @@ OAUTH2_PROVIDER:
     - "https"
     - "edu.mit.learn.app"
 OL_OPENEDX_COURSE_SYNC_SERVICE_WORKER_USERNAME: studio_worker # ADDED for ol_openedx_course_sync
+{{ if eq (env "ENVIRONMENT") "mitxonline-production" }}
+ENABLE_AUTO_LANGUAGE_SELECTION: false # ADDED for ol_openedx_course_translations
+{{ else }}
+ENABLE_AUTO_LANGUAGE_SELECTION: true # ADDED for ol_openedx_course_translations
+{{ end }}
 ORA2_FILE_PREFIX: mitxonline/ora2  # MODIFIED
 PARTNER_SUPPORT_EMAIL: ''
 PASSWORD_POLICY_COMPLIANCE_ROLLOUT_CONFIG:
