@@ -160,6 +160,42 @@ const Footer = () => {
     centerLinks = [],
   } = config;
 
+  const location = useLocation();
+
+  useEffect(() => {
+    function getCookie(name) {
+      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      return match ? decodeURIComponent(match[2]) : null;
+    }
+
+    if (process.env.APP_ID === 'authoring') {
+      const cookieLang = getCookie('openedx-language-preference');
+      if (cookieLang && cookieLang !== 'en') {
+        fetch('/api/ol-openedx-course-translations/user/reset-language/', { method: 'POST', credentials: 'include' })
+          .finally(() => window.location.reload());
+      }
+      return;
+    }
+
+    const courseKeyRegex = /course-v1:[^/]+/;
+    const match = location.pathname.match(courseKeyRegex);
+    const baseURL = getConfig().LMS_BASE_URL || process.env.LMS_BASE_URL;
+
+    if (match) {
+      const courseKey = match[0];
+      fetch(`${baseURL}/api/ol-openedx-course-translations/course-language/${courseKey}`)
+        .then(res => res.json())
+        .then(data => {
+          const courseLang = data.language;
+          const cookieLang = getCookie('openedx-language-preference');
+          if (courseLang && cookieLang && courseLang !== cookieLang) {
+            window.location.href = `${baseURL}/courses/${courseKey}/course`;
+          }
+        })
+        .catch(() => {});
+    }
+  }, [location]);
+
   return (
     <footer className="d-flex flex-column align-items-stretch">
       <ForceLoginRedirect />
