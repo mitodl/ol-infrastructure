@@ -81,7 +81,8 @@ setup_vault_provider(skip_child_token=True)
 
 mitxonline_config = Config("mitxonline")
 vault_config = Config("vault")
-
+slack_channel = mitxonline_config.get("slack_channel")  # Optional Slack channel
+apisix_ingress_class = mitxonline_config.get("apisix_ingress_class") or "apisix"
 fastly_provider = get_fastly_provider()
 
 stack_info = parse_stack()
@@ -517,6 +518,7 @@ mitxonline_k8s_app = OLApplicationK8s(
         application_docker_tag=MITXONLINE_DOCKER_TAG,
         application_cmd_array=cmd_array,
         application_arg_array=arg_array,
+        slack_channel=slack_channel,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,
         import_nginx_config_path=nginx_config_path,
