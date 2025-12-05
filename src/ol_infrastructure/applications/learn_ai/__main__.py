@@ -75,6 +75,7 @@ from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
     K8sGlobalLabels,
+    KubernetesServiceAppProtocol,
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -778,6 +779,7 @@ learn_ai_app_k8s = OLApplicationK8s(
         application_namespace=learn_ai_namespace,
         application_lb_service_name="learn-ai-webapp",
         application_lb_service_port_name="http",
+        application_lb_service_app_protocol=KubernetesServiceAppProtocol.WSS,
         k8s_global_labels=k8s_global_labels,
         env_from_secret_names=[
             db_creds_secret_name,
@@ -1033,11 +1035,14 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
             backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",
         ),
-        # Special handling for websocket URLs.
+        # WebSocket route for /ai/ws/* paths (using legacy ApisixRoute CRD).
+        # Note: This uses ApisixRoute where 'websocket' field IS used to enable
+        # WebSocket support. This is different from Gateway API HTTPRoute where
+        # websocket support is controlled by Service appProtocol field.
         OLApisixRouteConfig(
             route_name="websocket",
             priority=1,
-            websocket=True,
+            websocket=True,  # Required for ApisixRoute to enable WebSocket
             shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
                 proxy_rewrite_plugin,
@@ -1142,11 +1147,14 @@ learn_ai_https_apisix_route = OLApisixRoute(
             backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",
         ),
-        # Special handling for websocket URLs.
+        # WebSocket route for /ws/* paths (using legacy ApisixRoute CRD).
+        # Note: This uses ApisixRoute where 'websocket' field IS used to enable
+        # WebSocket support. This is different from Gateway API HTTPRoute where
+        # websocket support is controlled by Service appProtocol field.
         OLApisixRouteConfig(
             route_name="websocket",
             priority=1,
-            websocket=True,
+            websocket=True,  # Required for ApisixRoute to enable WebSocket
             shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
                 OLApisixPluginConfig(
@@ -1243,11 +1251,19 @@ mit_learn_learn_ai_https_http_route = OLApisixHTTPRoute(
             backend_service_name=learn_ai_app_k8s.application_lb_service_name,
             backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
         ),
-        # Special handling for websocket URLs
+        # WebSocket route for /ai/ws/* paths.
+        # Note: Gateway API HTTPRoute handles WebSocket via HTTP Upgrade protocol.
+        # Service appProtocol (kubernetes.io/ws or wss) is OPTIONAL - it's a hint
+        # to the gateway that may optimize behavior (timeouts, health checks) but
+        # does NOT restrict traffic. Regular HTTP requests work normally even with
+        # appProtocol set. Most gateways auto-detect WebSocket upgrades without it.
+        # The 'websocket' and 'priority' fields below are for ApisixRoute compatibility
+        # only and have NO effect on HTTPRoute. Route precedence is by path specificity.
+        # See: https://gateway-api.sigs.k8s.io/geps/gep-1911/
         OLApisixHTTPRouteConfig(
             route_name="websocket",
-            priority=1,
-            websocket=True,
+            priority=1,  # NOT used in HTTPRoute - precedence by path specificity
+            websocket=True,  # NOT used in HTTPRoute - set Service appProtocol instead
             shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
                 proxy_rewrite_plugin,
@@ -1344,11 +1360,17 @@ learn_ai_https_http_route = OLApisixHTTPRoute(
             backend_service_name=learn_ai_app_k8s.application_lb_service_name,
             backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
         ),
-        # Special handling for websocket URLs
+        # WebSocket route for /ws/* paths.
+        # Note: Gateway API HTTPRoute handles WebSocket via HTTP Upgrade protocol.
+        # Service appProtocol (kubernetes.io/ws or wss) is OPTIONAL - it's a hint
+        # to the gateway that may optimize behavior but does NOT restrict traffic.
+        # Regular HTTP requests work normally even with appProtocol set. The
+        # 'websocket' and 'priority' fields are for ApisixRoute compatibility only.
+        # See: https://gateway-api.sigs.k8s.io/geps/gep-1911/
         OLApisixHTTPRouteConfig(
             route_name="websocket",
-            priority=1,
-            websocket=True,
+            priority=1,  # NOT used in HTTPRoute - precedence by path specificity
+            websocket=True,  # NOT used in HTTPRoute - set Service appProtocol instead
             shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
                 OLApisixPluginConfig(

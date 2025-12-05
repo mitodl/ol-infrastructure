@@ -22,19 +22,67 @@ from ol_infrastructure.components.services.k8s import OLApisixPluginConfig
 
 
 class OLApisixHTTPRouteConfig(BaseModel):
-    """Configuration for a single HTTPRoute rule (Gateway API)."""
+    """Configuration for a single HTTPRoute rule (Gateway API).
+
+    Note on WebSocket support:
+        WebSocket uses HTTP Upgrade protocol (RFC 6455) - clients send HTTP requests
+        with Upgrade headers, and servers respond with 101 Switching Protocols.
+        Gateway controllers handle WebSocket upgrades automatically in most cases.
+
+        Gateway API v1.2 added Service appProtocol field as an OPTIONAL hint:
+
+        1. appProtocol is OPTIONAL - gateways should support WebSocket upgrades even
+           without it (per GEP-1911: "Absence of appProtocol does not imply the
+           implementation should disable any features (eg. websocket upgrades)")
+
+        2. If set, appProtocol signals gateway about protocol support:
+           - kubernetes.io/ws: WebSocket over cleartext (RFC 6455)
+           - kubernetes.io/wss: WebSocket over TLS (RFC 6455)
+
+        3. Setting appProtocol does NOT force all requests to use that protocol.
+           It's an informational hint that may optimize gateway behavior (e.g.,
+           timeouts, health checks). Regular HTTP requests still work normally.
+
+        4. APISix ingress controller 2.0.0-rc5+ supports appProtocol resolution,
+           but WebSocket likely works without it via auto-detection.
+
+        The 'websocket' field in this config model is retained for compatibility
+        with ApisixRoute but has NO effect on HTTPRoute generation.
+
+        Reference: https://kubernetes.io/blog/2024/11/21/gateway-api-v1-2/
+        GEP-1911: https://gateway-api.sigs.k8s.io/geps/gep-1911/
+        APISix support: https://github.com/apache/apisix-ingress-controller/pull/2601
+
+    Note on priority:
+        The Gateway API HTTPRoute does not have a native 'priority' field.
+        Route precedence is determined by match specificity:
+        - Exact path matches take precedence over prefix matches
+        - Longer prefix matches take precedence over shorter prefix matches
+        - Multiple routes with identical matches have undefined precedence
+
+        The 'priority' field is retained for compatibility with ApisixRoute but
+        has NO effect on HTTPRoute generation. To control route precedence, use
+        more specific path matches (e.g., /api/ws/ before /api/).
+
+    Note on backend_resolve_granularity:
+        This is an APISix-specific field from ApisixRoute CRD. The Gateway API
+        HTTPRoute uses standard Kubernetes Service discovery (endpoints). This
+        field is retained for compatibility but has NO effect on HTTPRoute generation.
+    """
 
     route_name: str
-    priority: int = 0
+    priority: int = 0  # NOT used in Gateway API HTTPRoute - see class docstring
     shared_plugin_config_name: str | None = None
     plugins: list[OLApisixPluginConfig] = []
     hosts: list[str] = []
     paths: list[str] = []
     backend_service_name: str | None = None
     backend_service_port: str | NonNegativeInt | None = None
-    backend_resolve_granularity: Literal["endpoint", "service"] = "service"
+    backend_resolve_granularity: Literal["endpoint", "service"] = (
+        "service"  # NOT used in Gateway API HTTPRoute
+    )
     upstream: str | None = None
-    websocket: bool = False
+    websocket: bool = False  # NOT used in Gateway API HTTPRoute - see class docstring for proper WebSocket setup
 
     @field_validator("plugins")
     @classmethod
