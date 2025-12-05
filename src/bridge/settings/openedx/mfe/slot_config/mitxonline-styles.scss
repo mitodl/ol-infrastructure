@@ -200,3 +200,93 @@
     }
   }
 }
+/**
+ * AI Drawer Manager Sidebar Styles
+ *
+ * Styles for the AskTIM chat sidebar that integrates with the notifications_discussions_sidebar slot.
+ */
+.ai-drawer-wrapper {
+  width: 30rem;
+  margin: 0;
+  flex-shrink: 0;
+  height: fit-content;
+  align-self: flex-start;
+  overflow: visible;
+
+  // Sticky positioning - stays at top when scrolling
+  position: sticky;
+  top: 0;
+  z-index: 5;
+
+  &.ai-drawer-wrapper-fullscreen {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100% !important;
+    max-width: 100%;
+    z-index: 1050;
+    border: none;
+    border-radius: 0;
+    align-self: stretch;
+    background: transparent;
+
+    &:has([data-smoot-version]) {
+      background: white;
+      pointer-events: auto;
+    }
+
+    &:not(:has([data-smoot-version])) {
+      display: none;
+      pointer-events: none !important;
+    }
+  }
+
+  // Slot variant returns null when closed, so [data-smoot-version] element doesn't exist
+  &:not(:has([data-smoot-version])) {
+    width: 0;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+  }
+}
+
+// Inner Container
+
+.ai-drawer-manager-sidebar-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  max-height: 100vh;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+
+  // Scrolling
+  overflow-y: auto;
+
+  transform: translateZ(0);
+
+  background: transparent;
+  border: none;
+  border-radius: 0;
+
+  &:has([data-smoot-version]) {
+    background: white;
+    border: 1px solid var(--pgn-color-light-400, #d7d3d1);
+    border-radius: 4px;
+  }
+
+  .ai-drawer-wrapper-fullscreen & {
+    height: 100%;
+    max-height: 100%;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+
+    &:has([data-smoot-version]) {
+      background: white;
+    }
+  }
+}
