@@ -1332,6 +1332,11 @@ class OLApisixSharedPlugins(ComponentResource):
                     },
                 },
             },
+            {
+                "name": "prometheus",
+                "enable": True,
+                "config": {"prefer_name": True},
+            },
         ]
 
         resource_options = ResourceOptions(parent=self).merge(opts)
