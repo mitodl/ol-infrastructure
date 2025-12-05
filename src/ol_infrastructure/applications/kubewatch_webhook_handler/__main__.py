@@ -217,10 +217,6 @@ webhook_deployment = kubernetes.apps.v1.Deployment(
                                 ),
                             ),
                             kubernetes.core.v1.EnvVarArgs(
-                                name="SLACK_CHANNEL",
-                                value=Config("slack").require("channel_name"),
-                            ),
-                            kubernetes.core.v1.EnvVarArgs(
                                 name="WATCHED_NAMESPACES",
                                 value=watched_namespaces,
                             ),
