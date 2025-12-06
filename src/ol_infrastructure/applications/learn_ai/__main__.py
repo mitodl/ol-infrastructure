@@ -1,4 +1,6 @@
 # ruff: noqa: E501
+"""Learn AI application infrastructure deployment (Pulumi)."""
+
 import base64
 import json
 import mimetypes
@@ -34,6 +36,10 @@ from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.components.services import appdb
+from ol_infrastructure.components.services.apisix_gateway_api import (
+    OLApisixHTTPRoute,
+    OLApisixHTTPRouteConfig,
+)
 from ol_infrastructure.components.services.k8s import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
@@ -69,6 +75,7 @@ from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
     K8sGlobalLabels,
+    KubernetesServiceAppProtocol,
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -772,6 +779,7 @@ learn_ai_app_k8s = OLApplicationK8s(
         application_namespace=learn_ai_namespace,
         application_lb_service_name="learn-ai-webapp",
         application_lb_service_port_name="http",
+        application_lb_service_app_protocol=KubernetesServiceAppProtocol.WSS,
         k8s_global_labels=k8s_global_labels,
         env_from_secret_names=[
             db_creds_secret_name,
@@ -1027,11 +1035,14 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
             backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",
         ),
-        # Special handling for websocket URLs.
+        # WebSocket route for /ai/ws/* paths (using legacy ApisixRoute CRD).
+        # Note: This uses ApisixRoute where 'websocket' field IS used to enable
+        # WebSocket support. This is different from Gateway API HTTPRoute where
+        # websocket support is controlled by Service appProtocol field.
         OLApisixRouteConfig(
             route_name="websocket",
             priority=1,
-            websocket=True,
+            websocket=True,  # Required for ApisixRoute to enable WebSocket
             shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
                 proxy_rewrite_plugin,
@@ -1136,11 +1147,14 @@ learn_ai_https_apisix_route = OLApisixRoute(
             backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",
         ),
-        # Special handling for websocket URLs.
+        # WebSocket route for /ws/* paths (using legacy ApisixRoute CRD).
+        # Note: This uses ApisixRoute where 'websocket' field IS used to enable
+        # WebSocket support. This is different from Gateway API HTTPRoute where
+        # websocket support is controlled by Service appProtocol field.
         OLApisixRouteConfig(
             route_name="websocket",
             priority=1,
-            websocket=True,
+            websocket=True,  # Required for ApisixRoute to enable WebSocket
             shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
                 OLApisixPluginConfig(
@@ -1161,6 +1175,224 @@ learn_ai_https_apisix_route = OLApisixRoute(
         depends_on=[learn_ai_app_k8s, learn_ai_oidc_resources],
     ),
 )
+# Gateway API HTTPRoute for learn.mit.edu domain (Phase 3 Migration)
+# This runs in parallel with ApisixRoute during migration
+mit_learn_learn_ai_https_http_route = OLApisixHTTPRoute(
+    f"mit-learn-learn-ai-{stack_info.env_suffix}-https-httproute",
+    route_configs=[
+        # Protected route for canvas syllabus agent - requires canvas_token header
+        OLApisixHTTPRouteConfig(
+            route_name="canvas_syllabus_agent",
+            priority=20,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="key-auth",
+                    config={
+                        "header": "canvas_token",
+                    },
+                ),
+            ],
+            hosts=[learn_api_domain],
+            paths=["/ai/http/canvas_*"],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+        ),
+        # Wildcard route that can use auth but doesn't require it
+        OLApisixHTTPRouteConfig(
+            route_name="passauth",
+            priority=2,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin,
+                # Use helper from OIDC component instance
+                OLApisixPluginConfig(
+                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("pass")
+                ),
+            ],
+            hosts=[learn_api_domain],
+            paths=["/ai/*"],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+        ),
+        # Strip trailing slash from logout redirect
+        OLApisixHTTPRouteConfig(
+            route_name="logout-redirect",
+            priority=10,
+            plugins=[
+                proxy_rewrite_plugin,
+                OLApisixPluginConfig(
+                    name="redirect",
+                    config={
+                        "uri": "/logout",
+                    },
+                ),
+            ],
+            hosts=[learn_api_domain],
+            paths=["/ai/logout/*"],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+        ),
+        # Routes that require authentication
+        OLApisixHTTPRouteConfig(
+            route_name="reqauth",
+            priority=10,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin,
+                OLApisixPluginConfig(
+                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("auth")
+                ),
+            ],
+            hosts=[learn_api_domain],
+            paths=[
+                "/ai/admin/login/*",
+                "/ai/http/login/*",
+            ],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+        ),
+        # WebSocket route for /ai/ws/* paths.
+        # Note: Gateway API HTTPRoute handles WebSocket via HTTP Upgrade protocol.
+        # Service appProtocol (kubernetes.io/ws or wss) is OPTIONAL - it's a hint
+        # to the gateway that may optimize behavior (timeouts, health checks) but
+        # does NOT restrict traffic. Regular HTTP requests work normally even with
+        # appProtocol set. Most gateways auto-detect WebSocket upgrades without it.
+        # The 'websocket' and 'priority' fields below are for ApisixRoute compatibility
+        # only and have NO effect on HTTPRoute. Route precedence is by path specificity.
+        # See: https://gateway-api.sigs.k8s.io/geps/gep-1911/
+        OLApisixHTTPRouteConfig(
+            route_name="websocket",
+            priority=1,  # NOT used in HTTPRoute - precedence by path specificity
+            websocket=True,  # NOT used in HTTPRoute - set Service appProtocol instead
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin,
+                OLApisixPluginConfig(
+                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("pass")
+                ),
+            ],
+            hosts=[learn_api_domain],
+            paths=[
+                "/ai/ws/*",
+            ],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+        ),
+    ],
+    k8s_namespace=learn_ai_namespace,
+    k8s_labels=k8s_global_labels,
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[learn_ai_app_k8s, learn_ai_oidc_resources],
+    ),
+)
+
+# Gateway API HTTPRoute for legacy backend_domain (Phase 3 Migration)
+# This runs in parallel with ApisixRoute during migration
+learn_ai_https_http_route = OLApisixHTTPRoute(
+    f"learn-ai-{stack_info.env_suffix}-https-httproute",
+    route_configs=[
+        # Protected route for canvas syllabus agent - requires canvas_token header
+        OLApisixHTTPRouteConfig(
+            route_name="canvas_syllabus_agent",
+            priority=20,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="key-auth",
+                    config={
+                        "header": "canvas_token",
+                    },
+                ),
+            ],
+            hosts=[learn_ai_api_domain],
+            paths=["/http/canvas_*"],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+        ),
+        # Wildcard route that can use auth but doesn't require it
+        OLApisixHTTPRouteConfig(
+            route_name="passauth",
+            priority=2,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
+            plugins=[
+                # Use helper from OIDC component instance
+                OLApisixPluginConfig(
+                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("pass")
+                ),
+            ],
+            hosts=[learn_ai_api_domain],
+            paths=["/*"],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+        ),
+        # Strip trailing slash from logout redirect
+        OLApisixHTTPRouteConfig(
+            route_name="logout-redirect",
+            priority=10,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="redirect",
+                    config={
+                        "uri": "/logout",
+                    },
+                ),
+            ],
+            hosts=[learn_ai_api_domain],
+            paths=["/logout/*"],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+        ),
+        # Routes that require authentication
+        OLApisixHTTPRouteConfig(
+            route_name="reqauth",
+            priority=10,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("auth")
+                ),
+            ],
+            hosts=[learn_ai_api_domain],
+            paths=[
+                "/admin/login/*",
+                "/http/login/*",
+            ],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+        ),
+        # WebSocket route for /ws/* paths.
+        # Note: Gateway API HTTPRoute handles WebSocket via HTTP Upgrade protocol.
+        # Service appProtocol (kubernetes.io/ws or wss) is OPTIONAL - it's a hint
+        # to the gateway that may optimize behavior but does NOT restrict traffic.
+        # Regular HTTP requests work normally even with appProtocol set. The
+        # 'websocket' and 'priority' fields are for ApisixRoute compatibility only.
+        # See: https://gateway-api.sigs.k8s.io/geps/gep-1911/
+        OLApisixHTTPRouteConfig(
+            route_name="websocket",
+            priority=1,  # NOT used in HTTPRoute - precedence by path specificity
+            websocket=True,  # NOT used in HTTPRoute - set Service appProtocol instead
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("pass")
+                ),
+            ],
+            hosts=[learn_ai_api_domain],
+            paths=[
+                "/ws/*",
+            ],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+        ),
+    ],
+    k8s_namespace=learn_ai_namespace,
+    k8s_labels=k8s_global_labels,
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[learn_ai_app_k8s, learn_ai_oidc_resources],
+    ),
+)
+
 learn_ai_https_apisix_tls = kubernetes.apiextensions.CustomResource(
     f"learn-ai-{stack_info.env_suffix}-https-apisix-tls",
     api_version="apisix.apache.org/v2",

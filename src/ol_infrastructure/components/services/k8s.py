@@ -32,6 +32,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SStaticSecretConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import cached_image_uri, ecr_image_uri
+from ol_infrastructure.lib.ol_types import KubernetesServiceAppProtocol
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
@@ -68,6 +69,9 @@ class OLApplicationK8sConfig(BaseModel):
     application_namespace: str
     application_lb_service_name: str
     application_lb_service_port_name: str
+    application_lb_service_app_protocol: KubernetesServiceAppProtocol | None = (
+        None  # Optional hint for gateway controllers (e.g., WSS for WebSocket over TLS)
+    )
     application_min_replicas: NonNegativeInt = 2
     application_max_replicas: NonNegativeInt = 10
     application_deployment_use_anti_affinity: bool = True
@@ -839,6 +843,7 @@ class OLApplicationK8s(ComponentResource):
                         port=DEFAULT_NGINX_PORT,
                         target_port=DEFAULT_NGINX_PORT,
                         protocol="TCP",
+                        app_protocol=ol_app_k8s_config.application_lb_service_app_protocol,
                     ),
                 ],
                 type="ClusterIP",

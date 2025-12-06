@@ -9,8 +9,6 @@ config:
   - "odl.mit.edu"
   - ".ol.mit.edu"
   - "ol.mit.edu"
-  eks:apisix_domains:
-  - "celery-monitoring.odl.mit.edu"
   eks:apisix_min_replicas: "3"
   eks:apisix_max_replicas: "10"
   eks:ebs_csi_provisioner: true
