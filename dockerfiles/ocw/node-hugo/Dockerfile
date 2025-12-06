@@ -5,7 +5,7 @@ LABEL version="0.8"
 WORKDIR /tmp
 
 # renovate: datasource=github-releases depName=hugo packageName=gohugoio/hugo
-ENV HUGO_VERSION="0.142.0"
+ENV HUGO_VERSION="0.152.2"
 ENV HUGO_NAME="hugo_extended_${HUGO_VERSION}_linux-amd64"
 
 # renovate: datasource=github-tags depName=go packageName=golang/go versioning=go
