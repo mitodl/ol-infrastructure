@@ -142,7 +142,6 @@ jupyterhub_trust_role_config = OLEKSTrustRoleConfig(
     policy_operator="StringEquals",
     role_name="jupyterhub",
     service_account_identifier=[
-        f"system:serviceaccount:jupyter:{jupyterhub_service_account_name}",
         f"system:serviceaccount:jupyter-authoring:{jupyterhub_service_account_name}",
     ],
     tags=aws_config.tags,
@@ -278,6 +277,7 @@ class JupyterhubDeploymentInfo:
     name: str
     extra_images: dict[str, dict[str, str]]
     db_config: OLPostgresDBConfig
+    service_account_name: str | None = None
 
 
 JupyterhubInfo = JupyterhubDeploymentInfo(
@@ -289,6 +289,7 @@ JupyterhubAuthoringInfo = JupyterhubDeploymentInfo(
     name="jupyterhub-authoring",
     extra_images={},
     db_config=jupyterhub_authoring_db_config,
+    service_account_name=jupyterhub_service_account_name,
 )
 
 
@@ -314,6 +315,6 @@ for deployment_config in deployment_configs:
         application_labels=application_labels,
         k8s_global_labels=k8s_global_labels,
         extra_images=jupyterhub_info.extra_images,
-        service_account_name=jupyterhub_service_account_name,
+        service_account_name=jupyterhub_info.service_account_name,
         service_trust_role=jupyterhub_trust_role,
     )
