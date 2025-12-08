@@ -142,7 +142,10 @@ jupyterhub_trust_role_config = OLEKSTrustRoleConfig(
     "access the aws API",
     policy_operator="StringEquals",
     role_name="jupyterhub",
-    service_account_identifier=f"system:serviceaccount:jupyter:{jupyterhub_service_account_name}",
+    service_account_identifier=[
+        f"system:serviceaccount:jupyter:{jupyterhub_service_account_name}",
+        f"system:serviceaccount:jupyter-authoring:{jupyterhub_service_account_name}",
+    ],
     tags=aws_config.tags,
 )
 
@@ -302,6 +305,7 @@ for deployment_config in deployment_configs:
         lambda ns, namespace=namespace: check_cluster_namespace(namespace, ns)
     )
     # Move this into the deployment function?
+    # Might make more sense to just pass in
     jupyterhub_service_account = kubernetes.core.v1.ServiceAccount(
         f"jupyterhub-service-account-{namespace}-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
