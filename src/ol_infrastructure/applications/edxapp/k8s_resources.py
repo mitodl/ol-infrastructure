@@ -1,4 +1,4 @@
-# ruff: noqa: F841, E501, PLR0913, PLR0915, ERA001
+# ruff: noqa: F841, E501, PLR0913, PLR0915
 import os
 from pathlib import Path
 
@@ -9,9 +9,11 @@ import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import iam
 
-from bridge.lib.magic_numbers import DEFAULT_REDIS_PORT
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
+from ol_infrastructure.applications.edxapp.k8s_autoscaling import (
+    create_autoscaling_resources,
+)
 from ol_infrastructure.applications.edxapp.k8s_configmaps import create_k8s_configmaps
 from ol_infrastructure.applications.edxapp.k8s_secrets import create_k8s_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache
@@ -227,53 +229,6 @@ def create_k8s_resources(  # noqa: C901
             "securityGroups": {"groupIds": [edxapp_k8s_app_security_group.id]},
         },
         opts=pulumi.ResourceOptions(depends_on=[edxapp_k8s_app_security_group]),
-    )
-
-    webapp_hpa_scaling_metrics = [
-        kubernetes.autoscaling.v2.MetricSpecArgs(
-            type="Resource",
-            resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
-                name="cpu",
-                target=kubernetes.autoscaling.v2.MetricTargetArgs(
-                    type="Utilization",
-                    average_utilization=80,
-                ),
-            ),
-        ),
-        kubernetes.autoscaling.v2.MetricSpecArgs(
-            type="Resource",
-            resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
-                name="memory",
-                target=kubernetes.autoscaling.v2.MetricTargetArgs(
-                    type="Utilization",
-                    average_utilization=80,
-                ),
-            ),
-        ),
-    ]
-    webapp_hpa_behavior = kubernetes.autoscaling.v2.HorizontalPodAutoscalerBehaviorArgs(
-        scale_up=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
-            stabilization_window_seconds=60,  # wait 1 minute before scaling uzp again
-            select_policy="Max",  # Choose the max value when multiple metrics
-            policies=[
-                kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
-                    type="Percent",
-                    value=100,  # at most, double the pods
-                    period_seconds=60,  # within a minute
-                )
-            ],
-        ),
-        scale_down=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
-            stabilization_window_seconds=300,  # wait 5 minutes before scaling down again
-            select_policy="Min",  # Choose the max value when multiple metrics
-            policies=[
-                kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
-                    type="Percent",
-                    value=25,  # at most, remove 1/4 of the pods at once
-                    period_seconds=60,  # within 1 minute
-                )
-            ],
-        ),
     )
 
     # Call out to other modules to create the k8s secrets and configmaps
@@ -780,100 +735,6 @@ def create_k8s_resources(  # noqa: C901
         ),
     )
 
-    # Create secret for Prometheus authentication
-    # Using credentials from SOPS-encrypted alloy secrets
-    webapp_prometheus_auth_secret = kubernetes.core.v1.Secret(
-        f"ol-{stack_info.env_prefix}-edxapp-webapp-prometheus-auth-{stack_info.env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=f"{env_name}-edxapp-webapp-prometheus-auth",
-            namespace=namespace,
-            labels=k8s_global_labels,
-        ),
-        string_data={
-            "username": alloy_secrets["k8s_monitoring_metrics_username"],
-            "password": alloy_secrets["k8s_monitoring_api_key"],
-        },
-    )
-
-    # Create KEDA ScaledObject for LMS deployment
-    # This will scale the LMS deployment based on Prometheus metrics
-    lms_prom_route_name = f"{stack_info.env_prefix}-openedx_ol-{stack_info.env_prefix}-edxapp-lms-apisix-route-{stack_info.env_suffix}_lms-default"
-    lms_prom_query = f'histogram_quantile(0.95,sum(rate(apisix_http_latency_bucket{{route="{lms_prom_route_name}"}}[5m])) by (le, route))'
-    lms_prom_threshold = "500"
-
-    # Alternate query based on the total number of requests arriving per minute
-    # lms_prom_matched_host = edxapp_config.require("domains")["lms"]
-    # lms_prom_query = f'sum(rate(apisix_http_status{{matched_host="{lms_prom_matched_host}"}}[1m]))'
-    # lms_prom_threshold = "30"
-
-    # we could also use both
-
-    lms_webapp_scaledobject = kubernetes.apiextensions.CustomResource(
-        f"ol-{stack_info.env_prefix}-edxapp-lms-scaledobject-{stack_info.env_suffix}",
-        api_version="keda.sh/v1alpha1",
-        kind="ScaledObject",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=f"{lms_webapp_deployment_name}-scaledobject",
-            namespace=namespace,
-            labels=lms_webapp_labels,
-        ),
-        spec={
-            "scaleTargetRef": {
-                "apiVersion": "apps/v1",
-                "kind": "Deployment",
-                "name": lms_webapp_deployment_name,
-            },
-            "minReplicaCount": replicas_dict["webapp"]["lms"]["min"],
-            "maxReplicaCount": replicas_dict["webapp"]["lms"]["max"],
-            "pollingInterval": 60,
-            "cooldownPeriod": 300,
-            "triggers": [
-                {
-                    "type": "prometheus",
-                    "metadata": {
-                        "serverAddress": "https://prometheus-prod-10-prod-us-central-0.grafana.net/api/prom",
-                        "query": lms_prom_query,
-                        "threshold": lms_prom_threshold,
-                        "authModes": "basic",
-                    },
-                    "authenticationRef": {
-                        "name": f"{env_name}-edxapp-webapp-prometheus-auth-trigger",
-                    },
-                }
-            ],
-        },
-        opts=pulumi.ResourceOptions(
-            depends_on=[lms_webapp_deployment, webapp_prometheus_auth_secret]
-        ),
-    )
-
-    # Create TriggerAuthentication for Prometheus (shared between LMS and CMS)
-    webapp_prometheus_trigger_auth = kubernetes.apiextensions.CustomResource(
-        f"ol-{stack_info.env_prefix}-edxapp-webapp-prometheus-trigger-auth-{stack_info.env_suffix}",
-        api_version="keda.sh/v1alpha1",
-        kind="TriggerAuthentication",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=f"{env_name}-edxapp-webapp-prometheus-auth-trigger",
-            namespace=namespace,
-            labels=k8s_global_labels,
-        ),
-        spec={
-            "secretTargetRef": [
-                {
-                    "parameter": "username",
-                    "name": f"{env_name}-edxapp-webapp-prometheus-auth",
-                    "key": "username",
-                },
-                {
-                    "parameter": "password",
-                    "name": f"{env_name}-edxapp-webapp-prometheus-auth",
-                    "key": "password",
-                },
-            ]
-        },
-        opts=pulumi.ResourceOptions(depends_on=[webapp_prometheus_auth_secret]),
-    )
-
     lms_webapp_service = kubernetes.core.v1.Service(
         f"ol-{stack_info.env_prefix}-edxapp-lms-service-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -957,50 +818,6 @@ def create_k8s_resources(  # noqa: C901
             ),
         ),
         opts=pulumi.ResourceOptions(depends_on=[*lms_edxapp_config_sources.values()]),
-    )
-
-    lms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
-        f"ol-{stack_info.env_prefix}-edxapp-lms-celery-scaledobject-{stack_info.env_suffix}",
-        api_version="keda.sh/v1alpha1",
-        kind="ScaledObject",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=f"{lms_celery_deployment_name}-scaledobject",
-            namespace=namespace,
-            labels=lms_celery_labels,
-        ),
-        spec={
-            "scaleTargetRef": {
-                "kind": "Deployment",
-                "name": lms_celery_deployment_name,
-            },
-            "pollingInterval": 60,
-            "cooldownPeriod": 300,
-            "minReplicaCount": replicas_dict["celery"]["lms"]["min"],
-            "maxReplicaCount": replicas_dict["celery"]["lms"]["max"],
-            "advanced": {
-                "horizontalPodAutoscalerConfig": {
-                    "behavior": {
-                        "scaleUp": {"stabilizationWindowSeconds": 300},
-                    }
-                }
-            },
-            "triggers": [
-                {
-                    "type": "redis",
-                    "metadata": {
-                        "address": edxapp_cache.address.apply(
-                            lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
-                        ),
-                        "username": "default",
-                        "databaseIndex": "1",
-                        "password": edxapp_cache.cache_cluster.auth_token,
-                        "listName": "edx.lms.core.default",
-                        "listLength": "10",
-                        "enableTLS": "true",
-                    },
-                }
-            ],
-        },
     )
 
     # Celery deployment do not require service definitions
@@ -1345,58 +1162,6 @@ def create_k8s_resources(  # noqa: C901
         ),
     )
 
-    # Create KEDA ScaledObject for CMS deployment
-    # This will scale the CMS deployment based on Prometheus metrics
-    cms_prom_route_name = f"{stack_info.env_prefix}-openedx_ol-{stack_info.env_prefix}-edxapp-cms-apisix-route-{stack_info.env_suffix}_cms-default"
-    cms_prom_query = f'histogram_quantile(0.95,sum(rate(apisix_http_latency_bucket{{route="{cms_prom_route_name}"}}[5m])) by (le, route))'
-    cms_prom_threshold = "500"
-
-    # Alternate query based on the total number of requests arriving per minute
-    # cms_prom_matched_host = edxapp_config.require("domains")["cms"]
-    # cms_prom_query = f'sum(rate(apisix_http_status{{matched_host="{cms_prom_matched_host}"}}[1m]))'
-    # cms_prom_threshold = "30"
-
-    # we could also use both
-
-    cms_webapp_scaledobject = kubernetes.apiextensions.CustomResource(
-        f"ol-{stack_info.env_prefix}-edxapp-cms-scaledobject-{stack_info.env_suffix}",
-        api_version="keda.sh/v1alpha1",
-        kind="ScaledObject",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=f"{cms_webapp_deployment_name}-scaledobject",
-            namespace=namespace,
-            labels=cms_webapp_labels,
-        ),
-        spec={
-            "scaleTargetRef": {
-                "apiVersion": "apps/v1",
-                "kind": "Deployment",
-                "name": cms_webapp_deployment_name,
-            },
-            "minReplicaCount": replicas_dict["webapp"]["cms"]["min"],
-            "maxReplicaCount": replicas_dict["webapp"]["cms"]["max"],
-            "pollingInterval": 60,
-            "cooldownPeriod": 300,
-            "triggers": [
-                {
-                    "type": "prometheus",
-                    "metadata": {
-                        "serverAddress": "https://prometheus-prod-10-prod-us-central-0.grafana.net/api/prom",
-                        "query": cms_prom_query,
-                        "threshold": cms_prom_threshold,
-                        "authModes": "basic",
-                    },
-                    "authenticationRef": {
-                        "name": f"{env_name}-edxapp-webapp-prometheus-auth-trigger",
-                    },
-                }
-            ],
-        },
-        opts=pulumi.ResourceOptions(
-            depends_on=[cms_webapp_deployment, webapp_prometheus_auth_secret]
-        ),
-    )
-
     cms_webapp_service = kubernetes.core.v1.Service(
         f"ol-{stack_info.env_prefix}-edxapp-cms-service-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -1481,41 +1246,27 @@ def create_k8s_resources(  # noqa: C901
         ),
         opts=pulumi.ResourceOptions(depends_on=[*cms_edxapp_config_sources.values()]),
     )
-    cms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
-        f"ol-{stack_info.env_prefix}-edxapp-cms-celery-scaledobject-{stack_info.env_suffix}",
-        api_version="keda.sh/v1alpha1",
-        kind="ScaledObject",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=f"{cms_celery_deployment_name}-scaledobject",
-            namespace=namespace,
-            labels=cms_celery_labels,
-        ),
-        spec={
-            "scaleTargetRef": {
-                "kind": "Deployment",
-                "name": cms_celery_deployment_name,
-            },
-            "pollingInterval": 60,
-            "cooldownPeriod": 300,
-            "minReplicaCount": replicas_dict["celery"]["cms"]["min"],
-            "maxReplicaCount": replicas_dict["celery"]["cms"]["max"],
-            "triggers": [
-                {
-                    "type": "redis",
-                    "metadata": {
-                        "address": edxapp_cache.address.apply(
-                            lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
-                        ),
-                        "username": "default",
-                        "databaseIndex": "1",
-                        "password": edxapp_cache.cache_cluster.auth_token,
-                        "listName": "edx.cms.core.default",
-                        "listLength": "10",
-                        "enableTLS": "true",
-                    },
-                }
-            ],
-        },
+
+    # Create autoscaling resources (ScaledObjects, TriggerAuthentications, etc.)
+    autoscaling_resources = create_autoscaling_resources(
+        alloy_secrets=alloy_secrets,
+        edxapp_cache=edxapp_cache,
+        replicas_dict=replicas_dict,
+        namespace=namespace,
+        k8s_global_labels=k8s_global_labels,
+        lms_webapp_labels=lms_webapp_labels,
+        lms_celery_labels=lms_celery_labels,
+        cms_webapp_labels=cms_webapp_labels,
+        cms_celery_labels=cms_celery_labels,
+        lms_webapp_deployment_name=lms_webapp_deployment_name,
+        lms_celery_deployment_name=lms_celery_deployment_name,
+        cms_webapp_deployment_name=cms_webapp_deployment_name,
+        cms_celery_deployment_name=cms_celery_deployment_name,
+        stack_info=stack_info,
+        lms_webapp_deployment=lms_webapp_deployment,
+        lms_celery_deployment=lms_celery_deployment,
+        cms_webapp_deployment=cms_webapp_deployment,
+        cms_celery_deployment=cms_celery_deployment,
     )
 
     # APISIX ingress configuration and setup
