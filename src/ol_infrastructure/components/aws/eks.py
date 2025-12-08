@@ -194,6 +194,24 @@ class OLEKSGateway(pulumi.ComponentResource):
             )
 
         for route_config in gateway_config.routes:
+            # Build the rule configuration
+            rule = {
+                "filters": route_config.filters,
+                "matches": route_config.matches,
+            }
+
+            # Only add backendRefs if backend service is specified
+            # (RequestRedirect filters don't need a backend)
+            if route_config.backend_service_name is not None:
+                rule["backendRefs"] = [
+                    {
+                        "name": route_config.backend_service_name,
+                        "namespace": route_config.backend_service_namespace,
+                        "kind": "Service",
+                        "port": route_config.backend_service_port,
+                    }
+                ]
+
             https_route_spec = {
                 "parentRefs": [
                     {
@@ -205,20 +223,7 @@ class OLEKSGateway(pulumi.ComponentResource):
                     },
                 ],
                 "hostnames": route_config.hostnames,
-                "rules": [
-                    {
-                        "backendRefs": [
-                            {
-                                "name": route_config.backend_service_name,
-                                "namespace": route_config.backend_service_namespace,
-                                "kind": "Service",
-                                "port": route_config.backend_service_port,
-                            }
-                        ],
-                        "filters": route_config.filters,
-                        "matches": route_config.matches,
-                    }
-                ],
+                "rules": [rule],
             }
 
             route_resource = kubernetes.apiextensions.CustomResource(
