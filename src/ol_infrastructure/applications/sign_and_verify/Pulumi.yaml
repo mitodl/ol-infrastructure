@@ -1,7 +1,0 @@
----
-name: ol-infrastructure-sign-and-verify-application
-runtime: python
-description: Pulumi project for deploying the digital credentials Sign and Verify
-  service on AWS Fargate
-backend:
-  url: s3://mitol-pulumi-state/
