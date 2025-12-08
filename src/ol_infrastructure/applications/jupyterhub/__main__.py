@@ -108,8 +108,8 @@ jupyterhub_policy_document = {
                 "s3:*",
             ],
             "Resource": [
-                f"arn:aws:s3:::{jupyterhub_course_bucket_name}"
-                f"arn:aws:s3:::{jupyterhub_course_bucket_name}/*"
+                f"arn:aws:s3:::{jupyterhub_course_bucket_name}",
+                f"arn:aws:s3:::{jupyterhub_course_bucket_name}/*",
             ],
         },
     ],
@@ -325,4 +325,5 @@ for deployment_config in deployment_configs:
         application_labels=application_labels,
         k8s_global_labels=k8s_global_labels,
         extra_images=jupyterhub_info.extra_images,
+        service_account_name=jupyterhub_service_account_name,
     )

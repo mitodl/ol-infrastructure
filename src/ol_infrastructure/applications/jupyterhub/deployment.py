@@ -50,6 +50,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     application_labels: dict[str, str],
     k8s_global_labels: dict[str, str],
     extra_images: dict[str, dict[str, str]] | None = None,
+    service_account_name: str | None = None,
 ) -> kubernetes.helm.v3.Release:
     base_name = jupyterhub_deployment_config["name"]
     domain_name = jupyterhub_deployment_config["domain"]
@@ -339,6 +340,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                 },
                 "prePuller": get_prepuller_config_for_images(extra_images_list),
                 "singleuser": {
+                    "serviceAccountName": service_account_name,
                     "extraFiles": {
                         "menu_override": {
                             "mountPath": (
