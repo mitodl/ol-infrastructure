@@ -20,6 +20,10 @@ from ol_infrastructure.components.aws.eks import (
     OLEKSGatewayListenerConfig,
     OLEKSGatewayRouteConfig,
 )
+from ol_infrastructure.components.services.vault import (
+    OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
+)
 from ol_infrastructure.lib.aws.eks_helper import cached_image_uri
 from ol_infrastructure.lib.ol_types import AWSBase, K8sGlobalLabels, Services
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -152,12 +156,6 @@ vector_auth_binding = OLEKSAuthBinding(
         vault_sync_service_account_names="vector-log-proxy-vault",
         k8s_labels=k8s_labels,
     )
-)
-
-# Import VaultStaticSecret component now that we need it
-from ol_infrastructure.components.services.vault import (  # noqa: E402
-    OLVaultK8SSecret,
-    OLVaultK8SStaticSecretConfig,
 )
 
 # Sync credentials from Vault to Kubernetes secret
@@ -364,9 +362,6 @@ vector_service_account = kubernetes.core.v1.ServiceAccount(
 ##################################
 #  Kubernetes Deployment         #
 ##################################
-
-# pragma: allowlist secret
-wildcard_cert_secret_name = "odl-wildcard-cert"  # noqa: S105  # pragma: allowlist secret
 
 vector_deployment = kubernetes.apps.v1.Deployment(
     "vector-log-proxy-deployment",
@@ -619,6 +614,34 @@ vector_gateway = OLEKSGateway(
             ),
         ],
         routes=[
+            # Fastly service hash challenge route (must come first for specificity)
+            OLEKSGatewayRouteConfig(
+                backend_service_name=None,
+                backend_service_namespace=None,
+                backend_service_port=None,
+                hostnames=[vector_domain],
+                name="vector-log-proxy-fastly-challenge",
+                listener_name="https",
+                port=8443,
+                matches=[
+                    {
+                        "path": {
+                            "type": "PathPrefix",
+                            "value": "/.well-known/fastly/logging/challenge",
+                        }
+                    }
+                ],
+                filters=[
+                    {
+                        "type": "RequestRedirect",
+                        "requestRedirect": {
+                            "scheme": "https",
+                            "hostname": service_hash_bucket_fqdn,
+                            "statusCode": 301,
+                        },
+                    }
+                ],
+            ),
             OLEKSGatewayRouteConfig(
                 backend_service_name=application_name,
                 backend_service_namespace=namespace,
@@ -628,6 +651,17 @@ vector_gateway = OLEKSGateway(
                 listener_name="https",
                 port=8443,
                 matches=[{"path": {"type": "PathPrefix", "value": "/heroku"}}],
+                filters=[
+                    {
+                        "type": "URLRewrite",
+                        "urlRewrite": {
+                            "path": {
+                                "type": "ReplacePrefixMatch",
+                                "replacePrefixMatch": "/",
+                            }
+                        },
+                    }
+                ],
             ),
             OLEKSGatewayRouteConfig(
                 backend_service_name=application_name,
@@ -638,6 +672,17 @@ vector_gateway = OLEKSGateway(
                 listener_name="https",
                 port=8443,
                 matches=[{"path": {"type": "PathPrefix", "value": "/fastly"}}],
+                filters=[
+                    {
+                        "type": "URLRewrite",
+                        "urlRewrite": {
+                            "path": {
+                                "type": "ReplacePrefixMatch",
+                                "replacePrefixMatch": "/",
+                            }
+                        },
+                    }
+                ],
             ),
         ],
     ),
