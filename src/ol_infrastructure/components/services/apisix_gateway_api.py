@@ -211,7 +211,9 @@ class OLApisixHTTPRoute(ComponentResource):
         # Create a hash of the plugin configuration for uniqueness
         plugin_data = str([p.model_dump() for p in plugins])
         plugin_hash = hashlib.sha256(plugin_data.encode()).hexdigest()[:8]
-        return f"{route_name}-plugins-{plugin_hash}"
+        # Sanitize route_name to comply with RFC 1123 subdomain rules (lowercase alphanumeric + hyphens)
+        sanitized_route_name = route_name.replace("_", "-").lower()
+        return f"{sanitized_route_name}-plugins-{plugin_hash}"
 
     def _create_plugin_configs(
         self,
@@ -291,9 +293,20 @@ class OLApisixHTTPRoute(ComponentResource):
                 backend_refs = [{"name": route_config.upstream}]
             else:
                 # For service references - these are guaranteed to be non-None by validator
+                # Gateway API requires port to be numeric, not a string port name
+                port = route_config.backend_service_port
+                if isinstance(port, str):
+                    # Convert common port names to numbers
+                    port_mapping = {
+                        "http": 8071,  # DEFAULT_NGINX_PORT
+                        "https": 443,
+                        "http-alt": 8080,
+                    }
+                    port = port_mapping.get(port, 8071)  # Default to DEFAULT_NGINX_PORT
+
                 backend_ref: dict[str, Any] = {
                     "name": route_config.backend_service_name,
-                    "port": route_config.backend_service_port,
+                    "port": port,
                 }
                 backend_refs = [backend_ref]
 
