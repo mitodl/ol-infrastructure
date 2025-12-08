@@ -26,6 +26,10 @@ from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBindingConfig,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.services.apisix_gateway_api import (
+    OLApisixHTTPRoute,
+    OLApisixHTTPRouteConfig,
+)
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
@@ -34,8 +38,6 @@ from ol_infrastructure.components.services.k8s import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixPluginConfig,
-    OLApisixRoute,
-    OLApisixRouteConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -1020,12 +1022,11 @@ cert_manager_certificate = OLCertManagerCert(
     ),
 )
 
-dagster_apisix_route = OLApisixRoute(
-    f"dagster-apisix-route-{stack_info.env_suffix}",
+dagster_apisix_httproute = OLApisixHTTPRoute(
+    f"dagster-apisix-httproute-{stack_info.env_suffix}",
     route_configs=[
-        OLApisixRouteConfig(
+        OLApisixHTTPRouteConfig(
             route_name="dagster",
-            priority=10,
             hosts=[dagster_config.require("domain")],
             paths=["/*"],
             backend_service_name="dagster-dagster-webserver",

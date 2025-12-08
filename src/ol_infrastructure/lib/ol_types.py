@@ -81,6 +81,25 @@ class Services(str, Enum):
     xpro = "xpro"
 
 
+@unique
+class KubernetesServiceAppProtocol(str, Enum):
+    """Kubernetes Standard Application Protocols for Service appProtocol field.
+
+    These constants are defined in KEP-3726 and supported by Gateway API v1.2+.
+    The appProtocol field is an optional hint to ingress controllers/gateways
+    about the L7 protocol supported by a Service port. Setting this does NOT
+    restrict traffic - regular HTTP requests work alongside WebSocket on the
+    same port.
+
+    Reference: https://github.com/kubernetes/enhancements/tree/master/keps/sig-network/3726-standard-application-protocols
+    Gateway API: https://gateway-api.sigs.k8s.io/geps/gep-1911/
+    """
+
+    H2C = "kubernetes.io/h2c"  # HTTP/2 over cleartext (RFC 7540)
+    WS = "kubernetes.io/ws"  # WebSocket over cleartext (RFC 6455)
+    WSS = "kubernetes.io/wss"  # WebSocket over TLS (RFC 6455)
+
+
 class K8sGlobalLabels(BaseModel):
     """Base class for Kubernetes resource labels."""
 

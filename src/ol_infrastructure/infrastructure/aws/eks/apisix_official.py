@@ -57,7 +57,7 @@ def setup_apisix(
     :param aws_config: The AWS configuration object.
     :param cluster: The EKS cluster object.
     """
-    apisix_domains = eks_config.require_object("apisix_domains")
+    apisix_domains = eks_config.get_object("apisix_domains") or []
 
     session_cookie_name = f"{stack_info.env_suffix}_gateway_session".removeprefix(
         "production"
@@ -270,6 +270,7 @@ def setup_apisix(
                     },
                     "gatewayProxy": {
                         "createDefault": True,
+                        "publishService": "apache-apisix-gateway",
                         "provider": {
                             "type": "ControlPlane",
                             "controlPlane": {
@@ -323,5 +324,67 @@ def setup_apisix(
                 gateway_api_crds,
                 lb_controller,
             ],
+        ),
+    )
+
+    # Create GatewayClass resource for Gateway API
+    gateway_class = kubernetes.apiextensions.CustomResource(
+        f"{cluster_name}-gateway-class",
+        api_version="gateway.networking.k8s.io/v1",
+        kind="GatewayClass",
+        metadata={"name": "apisix"},
+        spec={
+            "controllerName": "apisix.apache.org/apisix-ingress-controller",
+            "parametersRef": {
+                "group": "apisix.apache.org",
+                "kind": "GatewayProxy",
+                "name": "apache-apisix-config",
+                "namespace": "operations",
+            },
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=operations_namespace,
+            depends_on=[gateway_api_crds],
+        ),
+    )
+
+    # Create Gateway resource for Gateway API
+    kubernetes.apiextensions.CustomResource(
+        f"{cluster_name}-gateway",
+        api_version="gateway.networking.k8s.io/v1",
+        kind="Gateway",
+        metadata={
+            "name": "apisix",
+            "namespace": "operations",
+        },
+        spec={
+            "gatewayClassName": "apisix",
+            "listeners": [
+                {
+                    "name": "http",
+                    "protocol": "HTTP",
+                    "port": 80,
+                },
+                {
+                    "name": "https",
+                    "protocol": "HTTPS",
+                    "port": 443,
+                    # TLS configuration is intentionally omitted here because it is handled
+                    # separately by per-application ApisixTls CRDs (see ADR-0003).
+                },
+            ],
+            "infrastructure": {
+                "parametersRef": {
+                    "group": "apisix.apache.org",
+                    "kind": "GatewayProxy",
+                    "name": "apache-apisix-config",
+                }
+            },
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=operations_namespace,
+            depends_on=[gateway_api_crds, gateway_class],
         ),
     )
