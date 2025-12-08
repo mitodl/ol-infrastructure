@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 
-import pulumi_kubernetes as kubernetes
 from pulumi import Config, StackReference
 from pulumi_aws import ec2, get_caller_identity, iam
 
@@ -304,20 +303,6 @@ for deployment_config in deployment_configs:
     cluster_stack.require_output("namespaces").apply(
         lambda ns, namespace=namespace: check_cluster_namespace(namespace, ns)
     )
-    # Move this into the deployment function?
-    # Might make more sense to just pass in
-    jupyterhub_service_account = kubernetes.core.v1.ServiceAccount(
-        f"jupyterhub-service-account-{namespace}-{stack_info.env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=jupyterhub_service_account_name,
-            namespace=namespace,
-            labels=k8s_global_labels,
-            annotations={
-                "eks.amazonaws.com/role-arn": jupyterhub_trust_role.role.arn,
-            },
-        ),
-        automount_service_account_token=False,
-    )
     jupyterhub_info = deployment_to_jupyterhub_info[deployment_config["name"]]
     jupyterhub_deployment = provision_jupyterhub_deployment(
         stack_info=stack_info,
@@ -330,4 +315,5 @@ for deployment_config in deployment_configs:
         k8s_global_labels=k8s_global_labels,
         extra_images=jupyterhub_info.extra_images,
         service_account_name=jupyterhub_service_account_name,
+        service_trust_role=jupyterhub_trust_role,
     )
