@@ -118,6 +118,7 @@ rds_defaults["instance_size"] = (
     open_metadata_config.get("db_instance_size") or DBInstanceTypes.small.value
 )
 rds_defaults["use_blue_green"] = False
+rds_defaults["read_replica"] = None
 open_metadata_db_config = OLPostgresDBConfig(
     instance_name=f"open-metadata-db-{stack_info.env_suffix}",
     password=open_metadata_config.get("db_password"),

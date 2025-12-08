@@ -104,6 +104,7 @@ rds_defaults["instance_size"] = (
     jupyterhub_config.get("db_instance_size") or rds_defaults["instance_size"]
 )
 rds_defaults["use_blue_green"] = False
+rds_defaults["read_replica"] = None
 rds_password = jupyterhub_config.require("rds_password")
 
 target_vpc_name = jupyterhub_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"

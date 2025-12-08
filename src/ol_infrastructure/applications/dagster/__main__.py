@@ -327,6 +327,7 @@ dagster_db_security_group = ec2.SecurityGroup(
 rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["monitoring_profile_name"] = "disabled"
 rds_defaults["use_blue_green"] = False
+rds_defaults["read_replica"] = None
 dagster_db_config = OLPostgresDBConfig(
     db_name="dagster",
     instance_name=f"ol-etl-db-{stack_info.env_suffix}",

@@ -284,6 +284,7 @@ superset_db_security_group = ec2.SecurityGroup(
 )
 rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["use_blue_green"] = False
+rds_defaults["read_replica"] = None
 superset_db_config = OLPostgresDBConfig(
     instance_name=f"ol-superset-db-{stack_info.env_suffix}",
     password=superset_config.require("db_password"),
