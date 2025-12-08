@@ -159,11 +159,11 @@ class OLApisixHTTPRoute(ComponentResource):
 
         # Create PluginConfig resources for unique plugin combinations
         self._create_plugin_configs(
-            route_configs, k8s_namespace, k8s_labels, resource_options
+            name, route_configs, k8s_namespace, k8s_labels, resource_options
         )
 
         # Build HTTPRoute rules
-        http_rules = self._build_http_route_rules(route_configs)
+        http_rules = self._build_http_route_rules(name, route_configs)
 
         # Build HTTPRoute spec - omit hostnames field if empty per Gateway API spec
         hostnames = self._extract_unique_hostnames(route_configs)
@@ -205,18 +205,26 @@ class OLApisixHTTPRoute(ComponentResource):
         return sorted(hostnames)  # Sort for deterministic output
 
     def _generate_plugin_config_name(
-        self, route_name: str, plugins: list[OLApisixPluginConfig]
+        self, httproute_name: str, route_name: str, plugins: list[OLApisixPluginConfig]
     ) -> str:
-        """Generate a unique name for a plugin configuration."""
+        """Generate a unique name for a plugin configuration.
+
+        Args:
+            httproute_name: Name of the parent HTTPRoute (ensures uniqueness across routes)
+            route_name: Name of the specific route config
+            plugins: List of plugins to hash
+        """
         # Create a hash of the plugin configuration for uniqueness
         plugin_data = str([p.model_dump() for p in plugins])
         plugin_hash = hashlib.sha256(plugin_data.encode()).hexdigest()[:8]
-        # Sanitize route_name to comply with RFC 1123 subdomain rules (lowercase alphanumeric + hyphens)
+        # Sanitize names to comply with RFC 1123 subdomain rules (lowercase alphanumeric + hyphens)
+        sanitized_httproute_name = httproute_name.replace("_", "-").lower()
         sanitized_route_name = route_name.replace("_", "-").lower()
-        return f"{sanitized_route_name}-plugins-{plugin_hash}"
+        return f"{sanitized_httproute_name}-{sanitized_route_name}-{plugin_hash}"
 
     def _create_plugin_configs(
         self,
+        httproute_name: str,
         route_configs: list[OLApisixHTTPRouteConfig],
         k8s_namespace: str,
         k8s_labels: dict[str, str],
@@ -236,7 +244,7 @@ class OLApisixHTTPRoute(ComponentResource):
 
             # Generate unique name for this plugin combination
             config_name = self._generate_plugin_config_name(
-                route_config.route_name, route_config.plugins
+                httproute_name, route_config.route_name, route_config.plugins
             )
 
             # Only create if we haven't seen this exact plugin combo before
@@ -262,6 +270,7 @@ class OLApisixHTTPRoute(ComponentResource):
 
     def _build_http_route_rules(
         self,
+        httproute_name: str,
         route_configs: list[OLApisixHTTPRouteConfig],
     ) -> list[dict[str, Any]]:
         """Build HTTPRoute rules from route configurations."""
@@ -330,7 +339,7 @@ class OLApisixHTTPRoute(ComponentResource):
                 ]
             elif route_config.plugins:
                 config_name = self._generate_plugin_config_name(
-                    route_config.route_name, route_config.plugins
+                    httproute_name, route_config.route_name, route_config.plugins
                 )
                 rule["filters"] = [
                     {
