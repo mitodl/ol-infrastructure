@@ -1891,11 +1891,7 @@ for domain_key, domain_value in edxapp_domains.items():
 
 # Actions to take when the the stack is configured to deploy into k8s
 if edxapp_config.get_bool("k8s_deployment"):
-    alloy_secrets = read_yaml_secrets(
-        Path(f"alloy/grafana.{stack_info.env_suffix}.yaml")
-    )
     k8s_resources = create_k8s_resources(
-        alloy_secrets=alloy_secrets,
         aws_config=aws_config,
         cluster_stack=cluster_stack,
         edxapp_cache=edxapp_redis_cache,

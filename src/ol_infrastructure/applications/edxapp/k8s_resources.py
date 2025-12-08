@@ -52,7 +52,6 @@ from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
 def create_k8s_resources(  # noqa: C901
-    alloy_secrets: dict[str, str],
     aws_config: AWSBase,
     cluster_stack: StackReference,
     edxapp_cache: OLAmazonCache,
@@ -1249,7 +1248,6 @@ def create_k8s_resources(  # noqa: C901
 
     # Create autoscaling resources (ScaledObjects, TriggerAuthentications, etc.)
     autoscaling_resources = create_autoscaling_resources(
-        alloy_secrets=alloy_secrets,
         edxapp_cache=edxapp_cache,
         replicas_dict=replicas_dict,
         namespace=namespace,
@@ -1263,6 +1261,7 @@ def create_k8s_resources(  # noqa: C901
         cms_webapp_deployment_name=cms_webapp_deployment_name,
         cms_celery_deployment_name=cms_celery_deployment_name,
         stack_info=stack_info,
+        vault_k8s_resources=vault_k8s_resources,
         lms_webapp_deployment=lms_webapp_deployment,
         lms_celery_deployment=lms_celery_deployment,
         cms_webapp_deployment=cms_webapp_deployment,

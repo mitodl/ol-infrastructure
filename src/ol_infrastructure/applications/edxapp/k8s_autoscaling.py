@@ -3,14 +3,19 @@ from typing import Any
 
 import pulumi
 import pulumi_kubernetes as kubernetes
+from pulumi import ResourceOptions
 
 from bridge.lib.magic_numbers import DEFAULT_REDIS_PORT
 from ol_infrastructure.components.aws.cache import OLAmazonCache
+from ol_infrastructure.components.services.vault import (
+    OLVaultK8SResources,
+    OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
+)
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
 def create_autoscaling_resources(
-    alloy_secrets: dict[str, str],
     edxapp_cache: OLAmazonCache,
     replicas_dict: dict[str, Any],
     namespace: str,
@@ -24,6 +29,7 @@ def create_autoscaling_resources(
     cms_webapp_deployment_name: str,
     cms_celery_deployment_name: str,
     stack_info: StackInfo,
+    vault_k8s_resources: OLVaultK8SResources,
     lms_webapp_deployment: kubernetes.apps.v1.Deployment,
     lms_celery_deployment: kubernetes.apps.v1.Deployment,
     cms_webapp_deployment: kubernetes.apps.v1.Deployment,
@@ -32,7 +38,6 @@ def create_autoscaling_resources(
     """Create Kubernetes autoscaling resources (HPA, KEDA ScaledObjects).
 
     Args:
-        alloy_secrets: Alloy secrets containing Prometheus credentials
         edxapp_cache: OLAmazonCache instance for Redis connection
         replicas_dict: Dictionary containing replica count configurations
         namespace: Kubernetes namespace
@@ -46,6 +51,7 @@ def create_autoscaling_resources(
         cms_webapp_deployment_name: Name of CMS webapp deployment
         cms_celery_deployment_name: Name of CMS celery deployment
         stack_info: Stack information
+        vault_k8s_resources: Vault Kubernetes resources for authentication
         lms_webapp_deployment: LMS webapp deployment resource
         lms_celery_deployment: LMS celery deployment resource
         cms_webapp_deployment: CMS webapp deployment resource
@@ -56,19 +62,28 @@ def create_autoscaling_resources(
     """
     env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
-    # Create secret for Prometheus authentication
-    # Using credentials from SOPS-encrypted alloy secrets
-    webapp_prometheus_auth_secret = kubernetes.core.v1.Secret(
+    # Create secret for Prometheus authentication from Vault
+    webapp_prometheus_auth_secret_name = f"{env_name}-edxapp-webapp-prometheus-auth"
+    webapp_prometheus_auth_secret = OLVaultK8SSecret(
         f"ol-{stack_info.env_prefix}-edxapp-webapp-prometheus-auth-{stack_info.env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=f"{env_name}-edxapp-webapp-prometheus-auth",
+        OLVaultK8SStaticSecretConfig(
+            name=webapp_prometheus_auth_secret_name,
             namespace=namespace,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=webapp_prometheus_auth_secret_name,
             labels=k8s_global_labels,
+            mount="secret-global",
+            mount_type="kv-v2",
+            path="grafana",
+            templates={
+                "username": '{{ get .Secrets "k8s_monitoring_metrics_username" }}',
+                "password": '{{ get .Secrets "k8s_monitoring_api_key" }}',
+            },
+            vaultauth=vault_k8s_resources.auth_name,
         ),
-        string_data={
-            "username": alloy_secrets["k8s_monitoring_metrics_username"],
-            "password": alloy_secrets["k8s_monitoring_api_key"],
-        },
+        opts=ResourceOptions(
+            delete_before_replace=True, depends_on=[vault_k8s_resources]
+        ),
     )
 
     # Create TriggerAuthentication for Prometheus (shared between LMS and CMS)
@@ -85,12 +100,12 @@ def create_autoscaling_resources(
             "secretTargetRef": [
                 {
                     "parameter": "username",
-                    "name": f"{env_name}-edxapp-webapp-prometheus-auth",
+                    "name": webapp_prometheus_auth_secret_name,
                     "key": "username",
                 },
                 {
                     "parameter": "password",
-                    "name": f"{env_name}-edxapp-webapp-prometheus-auth",
+                    "name": webapp_prometheus_auth_secret_name,
                     "key": "password",
                 },
             ]
