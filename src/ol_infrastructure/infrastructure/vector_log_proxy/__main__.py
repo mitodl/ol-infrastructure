@@ -24,7 +24,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
-from ol_infrastructure.lib.aws.eks_helper import cached_image_uri
+from ol_infrastructure.lib.aws.eks_helper import cached_image_uri, setup_k8s_provider
 from ol_infrastructure.lib.ol_types import AWSBase, K8sGlobalLabels, Services
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -82,10 +82,8 @@ vpc_id = target_vpc["id"]
 ##################################
 #   Kubernetes Provider Setup    #
 ##################################
-
-k8s_provider = kubernetes.Provider(
-    "k8s-provider",
-    kubeconfig=cluster_stack.require_output("kube_config"),
+k8s_provider = setup_k8s_provider(
+    kubeconfig=cluster_stack.require_output("kube_config")
 )
 
 ##################################
@@ -186,7 +184,6 @@ vector_log_proxy_credentials_secret = OLVaultK8SSecret(
         vaultauth=vector_auth_binding.vault_k8s_resources.auth_name,
     ),
     opts=ResourceOptions(
-        provider=k8s_provider,
         delete_before_replace=True,
         depends_on=[vector_auth_binding.vault_k8s_resources.vso_resources],
     ),
@@ -334,7 +331,6 @@ vector_config_map = kubernetes.core.v1.ConfigMap(
     data={
         "vector.yaml": vector_config_template,
     },
-    opts=ResourceOptions(provider=k8s_provider),
 )
 
 ##################################
@@ -354,7 +350,6 @@ vector_service_account = kubernetes.core.v1.ServiceAccount(
         },
     ),
     opts=ResourceOptions(
-        provider=k8s_provider,
         depends_on=[vector_auth_binding],
     ),
 )
@@ -552,7 +547,6 @@ vector_deployment = kubernetes.apps.v1.Deployment(
             ),
         ),
     ),
-    opts=ResourceOptions(provider=k8s_provider),
 )
 
 ##################################
@@ -584,7 +578,6 @@ vector_service = kubernetes.core.v1.Service(
             ),
         ],
     ),
-    opts=ResourceOptions(provider=k8s_provider),
 )
 
 ##################################
@@ -687,7 +680,6 @@ vector_gateway = OLEKSGateway(
         ],
     ),
     opts=ResourceOptions(
-        provider=k8s_provider,
         delete_before_replace=True,
     ),
 )
