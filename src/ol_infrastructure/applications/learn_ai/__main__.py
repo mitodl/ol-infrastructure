@@ -779,7 +779,7 @@ learn_ai_app_k8s = OLApplicationK8s(
         application_namespace=learn_ai_namespace,
         application_lb_service_name="learn-ai-webapp",
         application_lb_service_port_name="http",
-        application_lb_service_app_protocol=KubernetesServiceAppProtocol.WSS,
+        application_lb_service_app_protocol=KubernetesServiceAppProtocol.WS,
         k8s_global_labels=k8s_global_labels,
         env_from_secret_names=[
             db_creds_secret_name,
