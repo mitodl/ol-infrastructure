@@ -1,89 +1,33 @@
-"""Create the resources needed to run a vector-log-proxy server.  # noqa: D200"""
+"""Create the resources needed to run a vector-log-proxy server in Kubernetes."""
 
-import base64
 import json
-import textwrap
-from os import linesep
 from pathlib import Path
 
+import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-import yaml
-from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53, s3
+from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi_aws import get_caller_identity, s3
 
-from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
+from bridge.lib.versions import VECTOR_VERSION
 from bridge.secrets.sops import read_yaml_secrets
-from ol_infrastructure.lib.aws.ec2_helper import (
-    DiskTypes,
-    InstanceTypes,
-    default_egress_args,
+from ol_infrastructure.components.applications.eks import (
+    OLEKSAuthBinding,
+    OLEKSAuthBindingConfig,
 )
-from ol_infrastructure.lib.consul import get_consul_provider
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.components.aws.eks import (
+    OLEKSGateway,
+    OLEKSGatewayConfig,
+    OLEKSGatewayListenerConfig,
+    OLEKSGatewayRouteConfig,
+)
+from ol_infrastructure.components.services.vault import (
+    OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
+)
+from ol_infrastructure.lib.aws.eks_helper import cached_image_uri, setup_k8s_provider
+from ol_infrastructure.lib.ol_types import AWSBase, K8sGlobalLabels, Services
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
-
-
-def build_user_data(consul_dc, challenge_url, service_hash_bucket_fqdn):
-    cloud_config_contents = {
-        "write_files": [
-            {
-                "path": "/etc/consul.d/02-autojoin.json",
-                "content": json.dumps(
-                    {
-                        "retry_join": [
-                            f"provider=aws tag_key=consul_env tag_value={consul_dc}"  # noqa: ISC001, RUF100
-                        ],
-                        "datacenter": consul_dc,
-                    }
-                ),
-                "owner": "consul:consul",
-            },
-            {
-                "path": "/etc/default/traefik",
-                "content": textwrap.dedent(
-                    f"""\
-            DOMAIN={vector_log_proxy_config.require("web_host_domain")}
-            FASTLY_SERVICE_HASH_BUCKET_FQDN={service_hash_bucket_fqdn}
-            FASTLY_SERVICE_HASH_BUCKET_CHALLENGE_URL="{challenge_url}"
-            """
-                ),
-                "owner": "root:root",
-            },
-            {
-                "path": "/etc/default/vector",
-                "content": textwrap.dedent(
-                    f"""\
-            ENVIRONMENT={consul_dc}
-            APPLICATION=vector-log-proxy
-            SERVICE=vector-log-proxy
-            VECTOR_CONFIG_DIR=/etc/vector/
-            VECTOR_STRICT_ENV_VARS=false
-            AWS_REGION={aws_config.region}
-            GRAFANA_CLOUD_API_KEY={grafana_credentials["api_key"]}
-            GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials["prometheus_user_id"]}
-            GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials["loki_user_id"]}
-            HEROKU_PROXY_PASSWORD={heroku_proxy_credentials["password"]}
-            HEROKU_PROXY_USERNAME={heroku_proxy_credentials["username"]}
-            FASTLY_PROXY_PASSWORD={fastly_proxy_credentials["password"]}
-            FASTLY_PROXY_USERNAME={fastly_proxy_credentials["username"]}
-            FASTLY_CHALLENGE_REDIRECT_URL={challenge_url}
-            """
-                ),
-                "owner": "root:root",
-            },
-        ]
-    }
-
-    return base64.b64encode(
-        "#cloud-config\n{}".format(
-            yaml.dump(
-                cloud_config_contents,
-                sort_keys=True,
-            )
-        ).encode("utf8")
-    ).decode("utf8")
-
 
 ##################################
 ##    Setup + Config Retrival   ##
@@ -91,98 +35,81 @@ def build_user_data(consul_dc, challenge_url, service_hash_bucket_fqdn):
 
 if Config("vault_server").get("env_namespace"):
     setup_vault_provider()
+
 stack_info = parse_stack()
 vector_log_proxy_config = Config("vector_log_proxy")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-policy_stack = StackReference("infrastructure.aws.policies")
-dns_stack = StackReference("infrastructure.aws.dns")
-consul_stack = StackReference(f"infrastructure.consul.operations.{stack_info.name}")
-mitodl_zone_id = dns_stack.require_output("odl_zone_id")
+cluster_stack = StackReference(
+    f"infrastructure.aws.eks.{stack_info.env_prefix}.{stack_info.name}"
+)
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+cluster_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+namespace = "operations"
+application_name = "vector-log-proxy"
 
-target_vpc_name = (
-    vector_log_proxy_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
-)
-target_vpc = network_stack.require_output(target_vpc_name)
+# Ports for the proxy services (internal)
+HEROKU_LOG_PROXY_PORT = 9000
+FASTLY_LOG_PROXY_PORT = 9443
 
-HEROKU_LOG_PROXY_PORT = vector_log_proxy_config.get("heroku_listener_port") or 9000
-FASTLY_LOG_PROXY_PORT = (
-    vector_log_proxy_config.get("fastly_listener_port") or DEFAULT_HTTPS_PORT
-)
-
-consul_security_groups = consul_stack.require_output("security_groups")
 aws_config = AWSBase(
     tags={
         "OU": vector_log_proxy_config.get("business_unit") or "operations",
         "Environment": f"{env_name}",
     }
 )
+
 aws_account = get_caller_identity()
+
+k8s_global_labels = {
+    "pulumi_managed": "true",
+    "pulumi_stack": stack_info.full_name,
+    "ol.mit.edu/stack": stack_info.full_name,
+}
+
+k8s_labels = K8sGlobalLabels(
+    service=Services.vector_log_proxy,
+    ou="operations",
+    stack=stack_info,
+)
+
+target_vpc_name = (
+    vector_log_proxy_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
+)
+target_vpc = network_stack.require_output(target_vpc_name)
 vpc_id = target_vpc["id"]
-vector_log_proxy_ami = ec2.get_ami(
-    filters=[
-        ec2.GetAmiFilterArgs(name="name", values=["vector_log_proxy-*"]),
-        ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
-        ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
-    ],
-    most_recent=True,
-    owners=[aws_account.account_id],
+
+##################################
+#   Kubernetes Provider Setup    #
+##################################
+k8s_provider = setup_k8s_provider(
+    kubeconfig=cluster_stack.require_output("kube_config")
 )
 
-vector_log_proxy_tag = f"vector-{env_name}"
-consul_provider = get_consul_provider(stack_info)
+##################################
+#     Vault + Secrets Setup      #
+##################################
 
-###############################
-##     General Resources     ##
-###############################
-
-# IAM and instance profile
-vector_log_proxy_instance_role = iam.Role(
-    f"vector-log-proxy-instance-role-{env_name}",
-    assume_role_policy=json.dumps(
-        {
-            "Version": "2012-10-17",
-            "Statement": {
-                "Effect": "Allow",
-                "Action": "sts:AssumeRole",
-                "Principal": {"Service": "ec2.amazonaws.com"},
-            },
-        }
-    ),
-    path="/ol-infrastructure/vector-web-proxy/role/",
-    tags=aws_config.tags,
-)
-iam.RolePolicyAttachment(
-    f"vector-log-proxy-describe-instance-role-policy-{env_name}",
-    policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
-    role=vector_log_proxy_instance_role.name,
-)
-iam.RolePolicyAttachment(
-    f"vector-log-proxy-route53-role-policy-{env_name}",
-    policy_arn=policy_stack.require_output("iam_policies")["route53_odl_zone_records"],
-    role=vector_log_proxy_instance_role.name,
-)
-vector_log_proxy_instance_profile = iam.InstanceProfile(
-    f"vector-log-proxy-instance-profile-{env_name}",
-    role=vector_log_proxy_instance_role.name,
-    path="/ol-infrastructure/vector-log-proxy/profile/",
-)
-
-# Mount Vault secrets backend and populate secrets
+# Create Vault secrets backend for vector-log-proxy
 vector_log_proxy_secrets_mount = vault.Mount(
     "vector-log-proxy-app-secrets",
     description="Generic secrets storage for vector-log-proxy deployment",
     path="secret-vector-log-proxy",
     type="kv-v2",
 )
+
+# Read secrets from SOPS-encrypted files
 proxy_credentials = read_yaml_secrets(
     Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
 )
+grafana_credentials = read_yaml_secrets(
+    Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
+)
+
 heroku_proxy_credentials = proxy_credentials["heroku"]
 fastly_proxy_credentials = proxy_credentials["fastly"]
 
-# This secret is never actually referenced by anything but it is good to have.
+# Store proxy and Grafana credentials in Vault
 vault.generic.Secret(
     "vector-log-proxy-http-auth-creds",
     path=vector_log_proxy_secrets_mount.path.apply(
@@ -198,71 +125,73 @@ vault.generic.Secret(
                 "username": heroku_proxy_credentials["username"],
                 "password": heroku_proxy_credentials["password"],
             },
+            "grafana_api_key": grafana_credentials["api_key"],
+            "grafana_prometheus_user_id": grafana_credentials["prometheus_user_id"],
+            "grafana_loki_user_id": grafana_credentials["loki_user_id"],
         }
     ),
 )
 
-# Vault policy definition
-vector_log_proxy_vault_policy = vault.Policy(
-    "vector-log-proxy-vault-policy",
-    name="vector-log-proxy",
-    policy=Path(__file__).parent.joinpath("vector_log_proxy_policy.hcl").read_text(),
+##################################
+#  IAM + Vault Auth Binding      #
+##################################
+
+# Set up IAM role (IRSA) and Vault auth for Vector pods
+# Vector doesn't need S3 access (only writes to Grafana Cloud)
+# But we set up the binding for Vault secret access
+vector_auth_binding = OLEKSAuthBinding(
+    OLEKSAuthBindingConfig(
+        application_name="vector-log-proxy",
+        namespace=namespace,
+        stack_info=stack_info,
+        aws_config=aws_config,
+        iam_policy_document=None,  # No AWS permissions needed
+        vault_policy_path=Path(__file__).parent.joinpath("vector_log_proxy_policy.hcl"),
+        cluster_name=cluster_stack.require_output("cluster_name"),
+        cluster_identities=cluster_stack.require_output("cluster_identities"),
+        vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+        irsa_service_account_name="vector-log-proxy",
+        vault_sync_service_account_names="vector-log-proxy-vault",
+        k8s_labels=k8s_labels,
+    )
 )
-# Register vector-log-proxy AMI for Vault AWS auth
-vault.aws.AuthBackendRole(
-    "vector-log-proxy-ami-ec2-vault-auth",
-    backend="aws",
-    auth_type="iam",
-    role="vector-log-proxy",
-    inferred_entity_type="ec2_instance",
-    inferred_aws_region=aws_config.region,
-    bound_iam_instance_profile_arns=[vector_log_proxy_instance_profile.arn],
-    bound_ami_ids=[vector_log_proxy_ami.id],
-    bound_account_ids=[aws_account.account_id],
-    bound_vpc_ids=[vpc_id],
-    token_policies=[vector_log_proxy_vault_policy.name],
+
+# Sync credentials from Vault to Kubernetes secret
+vector_log_proxy_credentials_secret = OLVaultK8SSecret(
+    f"vector-log-proxy-credentials-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name="vector-log-proxy-vault-secret-sync",
+        namespace=namespace,
+        labels=k8s_global_labels,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name="vector-log-proxy-credentials",  # noqa: S106  # pragma: allowlist secret
+        dest_secret_type="Opaque",  # noqa: S106  # pragma: allowlist secret
+        mount="secret-vector-log-proxy",
+        mount_type="kv-v2",
+        path="basic_auth_credentials",
+        templates={
+            "fastly_username": "{{ .Secrets.fastly.username }}",
+            # pragma: allowlist secret
+            "fastly_password": "{{ .Secrets.fastly.password }}",
+            "heroku_username": "{{ .Secrets.heroku.username }}",
+            # pragma: allowlist secret
+            "heroku_password": "{{ .Secrets.heroku.password }}",
+            "grafana_api_key": "{{ .Secrets.grafana_api_key }}",
+            "grafana_prometheus_user_id": ("{{ .Secrets.grafana_prometheus_user_id }}"),
+            "grafana_loki_user_id": "{{ .Secrets.grafana_loki_user_id }}",
+        },
+        refresh_after="1h",
+        vaultauth=vector_auth_binding.vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[vector_auth_binding.vault_k8s_resources.vso_resources],
+    ),
 )
 
 ##################################
-#     Network Access Control     #
+#     S3 Fastly Challenge Bucket #
 ##################################
-# Create security group
-vector_log_proxy_security_group = ec2.SecurityGroup(
-    f"vector-log-proxy-security-group-{env_name}",
-    name=f"vector-log-proxy-operations-{env_name}",
-    description="Access control for vector-log-proxy servers",
-    ingress=[
-        ec2.SecurityGroupIngressArgs(
-            protocol="tcp",
-            from_port=HEROKU_LOG_PROXY_PORT,
-            to_port=HEROKU_LOG_PROXY_PORT,
-            cidr_blocks=["0.0.0.0/0"],
-            description=(
-                "Allow traffic to the vector-log-proxy server on port"
-                f" {HEROKU_LOG_PROXY_PORT}"
-            ),
-        ),
-        ec2.SecurityGroupIngressArgs(
-            protocol="tcp",
-            from_port=FASTLY_LOG_PROXY_PORT,
-            to_port=FASTLY_LOG_PROXY_PORT,
-            cidr_blocks=["0.0.0.0/0"],
-            description=(
-                "Allow traffic to the vector-log-proxy server on port"
-                f" {FASTLY_LOG_PROXY_PORT}"
-            ),
-        ),
-    ],
-    egress=default_egress_args,
-    vpc_id=vpc_id,
-)
-
-########################################
-#     Fastly Service Hash Challenge    #
-########################################
-# Need to give fastly a proof-of-ownership for sending logs to a https endpoint
-# see:
-# https://docs.fastly.com/en/guides/log-streaming-https#prerequisites
 
 fastly_service_hash_bucket_name = f"mitodl-vector-log-proxy-static-{env_name}"
 fastly_service_hash_bucket = s3.Bucket(
@@ -276,7 +205,7 @@ service_hash_content = ""
 for service_hash in vector_log_proxy_config.get_object(
     "fastly_service_id_sha256sums"
 ).values():
-    service_hash_content = service_hash_content + service_hash + linesep
+    service_hash_content = service_hash_content + service_hash + "\n"
 
 fastly_service_hash_bucket_name_with_prefix = ".well-known/fastly/logging/challenge"
 fastly_service_hash_object = s3.BucketObjectv2(
@@ -299,194 +228,467 @@ export(
     {"challenge_url": challenge_url, "bucket_fqdn": service_hash_bucket_fqdn},
 )
 
-###################################
-#     Web Node EC2 Deployment     #
-###################################
+##################################
+#     Vector Configuration       #
+##################################
 
-# Create load balancer for Concourse web nodes
-LOAD_BALANCER_NAME_MAX_LENGTH = 32
-vector_log_proxy_lb = lb.LoadBalancer(
-    "vector-log-proxy-load-balancer",
-    name=f"vector-log-proxy-alb-{stack_info.env_prefix[:3]}-{stack_info.env_suffix[:2]}"[
-        :LOAD_BALANCER_NAME_MAX_LENGTH
-    ],
-    ip_address_type="dualstack",
-    load_balancer_type="application",
-    enable_http2=True,
-    subnets=target_vpc["subnet_ids"],
-    security_groups=[
-        vector_log_proxy_security_group.id,
-    ],
-    tags=aws_config.merged_tags({"Name": vector_log_proxy_tag}),
-)
+# Build Vector configuration
+vector_config_template = """
+api:
+  enabled: false
 
-TARGET_GROUP_NAME_MAX_LENGTH = 32
+sources:
+  fastly_log_proxy:
+    type: http_server
+    address: 0.0.0.0:9443
+    auth:
+      password: ${FASTLY_PROXY_PASSWORD}
+      username: ${FASTLY_PROXY_USERNAME}
+    decoding:
+      codec: bytes
 
-heroku_log_proxy_lb_target_group = lb.TargetGroup(
-    "heroku-vector-log-proxy-alb-target-group",
-    vpc_id=vpc_id,
-    target_type="instance",
-    port=HEROKU_LOG_PROXY_PORT,
-    protocol="HTTPS",
-    health_check=lb.TargetGroupHealthCheckArgs(
-        healthy_threshold=2,
-        interval=120,
-        path="/",
-        port=str(HEROKU_LOG_PROXY_PORT),
-        protocol="HTTPS",
-        matcher="405",
+  heroku_log_proxy:
+    type: heroku_logs
+    acknowledgements: false
+    address: 0.0.0.0:9000
+    decoding:
+      codec: bytes
+    auth:
+      password: "${HEROKU_PROXY_PASSWORD}"
+      username: "${HEROKU_PROXY_USERNAME}"
+    query_parameters:
+    - "app_name"
+    - "environment"
+    - "service"
+
+transforms:
+  fastly_drop_unwanted_logs:
+    type: remap
+    inputs:
+    - "fastly_log_proxy"
+    source: |
+      event, err = parse_json(.message)
+      if event != null {
+        .,err = merge(., event)
+        del(.message)
+      }
+
+  heroku_drop_unwanted_logs:
+    type: remap
+    inputs:
+    - "heroku_log_proxy"
+    source: |
+      # Drop all messages from uninteresting heroku apps
+      abort_match_boring_apps, err = (match_any(.app_name,
+        [r'ol-eng-library', r'.*wiki.*']))
+      if abort_match_boring_apps {
+        abort
+      }
+
+sinks:
+  ship_fastly_logs_to_grafana_cloud:
+    inputs:
+    - 'fastly_drop_unwanted_logs'
+    type: loki
+    auth:
+      strategy: basic
+      password: ${GRAFANA_CLOUD_API_KEY}
+      user: "${GRAFANA_CLOUD_LOKI_API_USER-loki}"
+    endpoint: https://logs-prod-us-central1.grafana.net
+    encoding:
+      codec: json
+    labels:
+      environment: "{{ environment }}"
+      application: "{{ application }}"
+      service: "fastly"
+    out_of_order_action: rewrite_timestamp
+
+  ship_heroku_logs_to_grafana_cloud:
+    inputs:
+    - 'heroku_drop_unwanted_logs'
+    type: loki
+    auth:
+      strategy: basic
+      password: ${GRAFANA_CLOUD_API_KEY}
+      user: "${GRAFANA_CLOUD_LOKI_API_USER-loki}"
+    endpoint: https://logs-prod-us-central1.grafana.net
+    encoding:
+      codec: json
+    labels:
+      environment: "{{ environment }}"
+      application: "{{ app_name }}"
+      service: "{{ service }}"
+    out_of_order_action: rewrite_timestamp
+"""
+
+vector_config_map = kubernetes.core.v1.ConfigMap(
+    "vector-log-proxy-config",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        namespace=namespace,
+        name="vector-log-proxy-config",
+        labels=k8s_global_labels,
     ),
-    name=("heroku-" + vector_log_proxy_tag)[:TARGET_GROUP_NAME_MAX_LENGTH].rstrip("-"),
-    tags=aws_config.tags,
+    data={
+        "vector.yaml": vector_config_template,
+    },
 )
-fastly_log_proxy_lb_target_group = lb.TargetGroup(
-    "fastly-vector-log-proxy-alb-target-group",
-    vpc_id=vpc_id,
-    target_type="instance",
-    port=FASTLY_LOG_PROXY_PORT,
-    protocol="HTTPS",
-    health_check=lb.TargetGroupHealthCheckArgs(
-        healthy_threshold=2,
-        interval=120,
-        path="/",
-        port=str(FASTLY_LOG_PROXY_PORT),
-        protocol="HTTPS",
-        matcher="405",
+
+##################################
+#  Service Account + RBAC        #
+##################################
+
+# Service account for Vector pods with IRSA annotation
+vector_service_account = kubernetes.core.v1.ServiceAccount(
+    "vector-log-proxy-service-account",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        namespace=namespace,
+        name="vector-log-proxy",
+        labels=k8s_global_labels,
+        annotations={
+            # pragma: allowlist secret
+            "eks.amazonaws.com/role-arn": vector_auth_binding.irsa_role.arn,
+        },
     ),
-    name=("fastly-" + vector_log_proxy_tag)[:TARGET_GROUP_NAME_MAX_LENGTH].rstrip("-"),
-    tags=aws_config.tags,
-)
-
-vector_log_proxy_acm_cert = acm.get_certificate(
-    domain="*.odl.mit.edu", most_recent=True, statuses=["ISSUED"]
-)
-heroku_log_proxy_alb_listener = lb.Listener(
-    "heroku-vector-log-proxy-alb-listener",
-    certificate_arn=vector_log_proxy_acm_cert.arn,
-    load_balancer_arn=vector_log_proxy_lb.arn,
-    port=HEROKU_LOG_PROXY_PORT,
-    protocol="HTTPS",
-    default_actions=[
-        lb.ListenerDefaultActionArgs(
-            type="forward",
-            target_group_arn=heroku_log_proxy_lb_target_group.arn,
-        )
-    ],
-)
-heroku_log_proxy_alb_listener = lb.Listener(
-    "fastly-vector-log-proxy-alb-listener",
-    certificate_arn=vector_log_proxy_acm_cert.arn,
-    load_balancer_arn=vector_log_proxy_lb.arn,
-    port=FASTLY_LOG_PROXY_PORT,
-    protocol="HTTPS",
-    default_actions=[
-        lb.ListenerDefaultActionArgs(
-            type="forward",
-            target_group_arn=fastly_log_proxy_lb_target_group.arn,
-        )
-    ],
-)
-
-## Create auto scale group and launch configs for vector-log-proxy
-instance_type = (
-    vector_log_proxy_config.get("instance_type") or InstanceTypes.burstable_small.name
-)
-consul_datacenter = consul_stack.require_output("datacenter")
-
-grafana_credentials = read_yaml_secrets(
-    Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
-)
-
-vector_log_proxy_launch_config = ec2.LaunchTemplate(
-    "vector-log-proxy-launch-template",
-    name_prefix=f"vector-server-{env_name}-",
-    description="Launch template for deploying vector-log-proxy nodes",
-    iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
-        arn=vector_log_proxy_instance_profile.arn,
+    opts=ResourceOptions(
+        depends_on=[vector_auth_binding],
     ),
-    image_id=vector_log_proxy_ami.id,
-    block_device_mappings=[
-        ec2.LaunchTemplateBlockDeviceMappingArgs(
-            device_name="/dev/xvda",
-            ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=vector_log_proxy_config.get_int("disk_size") or 25,
-                volume_type=DiskTypes.ssd,
-                delete_on_termination=True,
+)
+
+##################################
+#  Kubernetes Deployment         #
+##################################
+
+vector_deployment = kubernetes.apps.v1.Deployment(
+    "vector-log-proxy-deployment",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        namespace=namespace,
+        name=application_name,
+        labels=k8s_global_labels,
+    ),
+    spec=kubernetes.apps.v1.DeploymentSpecArgs(
+        replicas=2,
+        strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
+            type="RollingUpdate",
+            rolling_update=kubernetes.apps.v1.RollingUpdateDeploymentArgs(
+                max_surge="25%",
+                max_unavailable="25%",
             ),
-        )
-    ],
-    vpc_security_group_ids=[
-        vector_log_proxy_security_group.id,
-        consul_security_groups["consul_agent"],
-    ],
-    instance_type=InstanceTypes[instance_type].value,
-    key_name="oldevops",
-    tag_specifications=[
-        ec2.LaunchTemplateTagSpecificationArgs(
-            resource_type="instance",
-            tags=aws_config.merged_tags({"Name": vector_log_proxy_tag}),
         ),
-        ec2.LaunchTemplateTagSpecificationArgs(
-            resource_type="volume",
-            tags=aws_config.merged_tags({"Name": vector_log_proxy_tag}),
+        selector=kubernetes.meta.v1.LabelSelectorArgs(
+            match_labels=k8s_global_labels,
         ),
-    ],
-    tags=aws_config.tags,
-    user_data=Output.all(
-        consul_dc=consul_datacenter,
-        challenge_url=challenge_url,
-        service_hash_bucket_fqdn=service_hash_bucket_fqdn,
-    ).apply(
-        lambda init_dict: build_user_data(
-            init_dict["consul_dc"],
-            init_dict["challenge_url"],
-            init_dict["service_hash_bucket_fqdn"],
-        )
+        template=kubernetes.core.v1.PodTemplateSpecArgs(
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                labels=k8s_global_labels,
+            ),
+            spec=kubernetes.core.v1.PodSpecArgs(
+                service_account_name="vector-log-proxy",
+                containers=[
+                    # Vector log processing
+                    kubernetes.core.v1.ContainerArgs(
+                        name="vector",
+                        image=cached_image_uri(
+                            f"timberio/vector:{VECTOR_VERSION}-alpine"
+                        ),
+                        ports=[
+                            kubernetes.core.v1.ContainerPortArgs(
+                                name="heroku", container_port=HEROKU_LOG_PROXY_PORT
+                            ),
+                            kubernetes.core.v1.ContainerPortArgs(
+                                name="fastly", container_port=FASTLY_LOG_PROXY_PORT
+                            ),
+                        ],
+                        env=[
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="ENVIRONMENT",
+                                value=stack_info.env_suffix,
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="APPLICATION",
+                                value="vector-log-proxy",
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="SERVICE",
+                                value="vector-log-proxy",
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="VECTOR_CONFIG_DIR",
+                                value="/etc/vector/",
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="VECTOR_STRICT_ENV_VARS",
+                                value="false",
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="AWS_REGION",
+                                value="us-east-1",
+                            ),
+                            # Grafana credentials from Vault secrets
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="GRAFANA_CLOUD_API_KEY",
+                                value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                    secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                        name="vector-log-proxy-credentials",
+                                        key="grafana_api_key",
+                                    ),
+                                ),
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="GRAFANA_CLOUD_PROMETHEUS_API_USER",
+                                value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                    secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                        name="vector-log-proxy-credentials",
+                                        key="grafana_prometheus_user_id",
+                                    ),
+                                ),
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="GRAFANA_CLOUD_LOKI_API_USER",
+                                value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                    secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                        name="vector-log-proxy-credentials",
+                                        key="grafana_loki_user_id",
+                                    ),
+                                ),
+                            ),
+                            # Proxy credentials from Vault secrets
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="HEROKU_PROXY_PASSWORD",
+                                value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                    secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                        name="vector-log-proxy-credentials",
+                                        key="heroku_password",
+                                    ),
+                                ),
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="HEROKU_PROXY_USERNAME",
+                                value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                    secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                        name="vector-log-proxy-credentials",
+                                        key="heroku_username",
+                                    ),
+                                ),
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="FASTLY_PROXY_PASSWORD",
+                                value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                    secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                        name="vector-log-proxy-credentials",
+                                        key="fastly_password",
+                                    ),
+                                ),
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="FASTLY_PROXY_USERNAME",
+                                value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                    secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                        name="vector-log-proxy-credentials",
+                                        key="fastly_username",
+                                    ),
+                                ),
+                            ),
+                        ],
+                        volume_mounts=[
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="vector-config",
+                                mount_path="/etc/vector",
+                            ),
+                        ],
+                        liveness_probe=kubernetes.core.v1.ProbeArgs(
+                            tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
+                                port=HEROKU_LOG_PROXY_PORT,
+                            ),
+                            initial_delay_seconds=15,
+                            period_seconds=30,
+                        ),
+                        readiness_probe=kubernetes.core.v1.ProbeArgs(
+                            tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
+                                port=HEROKU_LOG_PROXY_PORT,
+                            ),
+                            initial_delay_seconds=10,
+                            period_seconds=10,
+                        ),
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            requests={
+                                "cpu": "500m",
+                                "memory": "512Mi",
+                            },
+                            limits={
+                                "cpu": "1000m",
+                                "memory": "1Gi",
+                            },
+                        ),
+                    ),
+                ],
+                volumes=[
+                    kubernetes.core.v1.VolumeArgs(
+                        name="vector-config",
+                        config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                            name="vector-log-proxy-config",
+                        ),
+                    ),
+                ],
+                affinity=kubernetes.core.v1.AffinityArgs(
+                    pod_anti_affinity=kubernetes.core.v1.PodAntiAffinityArgs(
+                        preferred_during_scheduling_ignored_during_execution=[
+                            kubernetes.core.v1.WeightedPodAffinityTermArgs(
+                                weight=100,
+                                pod_affinity_term=kubernetes.core.v1.PodAffinityTermArgs(
+                                    label_selector=kubernetes.meta.v1.LabelSelectorArgs(
+                                        match_labels=k8s_global_labels,
+                                    ),
+                                    topology_key="kubernetes.io/hostname",
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+        ),
     ),
 )
 
-autoscaling.Group(
-    "vector-log-proxy-autoscaling-group",
-    desired_capacity=2,
-    min_size=2,
-    max_size=3,
-    health_check_type="ELB",
-    vpc_zone_identifiers=target_vpc["subnet_ids"],
-    launch_template=autoscaling.GroupLaunchTemplateArgs(
-        id=vector_log_proxy_launch_config.id, version="$Latest"
+##################################
+#     Service Exposure           #
+##################################
+
+vector_service = kubernetes.core.v1.Service(
+    "vector-log-proxy-service",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        namespace=namespace,
+        name=application_name,
+        labels=k8s_global_labels,
     ),
-    instance_refresh=autoscaling.GroupInstanceRefreshArgs(
-        strategy="Rolling",
-        preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=50
-        ),
-        triggers=["tag"],
+    spec=kubernetes.core.v1.ServiceSpecArgs(
+        type="ClusterIP",
+        selector=k8s_global_labels,
+        ports=[
+            kubernetes.core.v1.ServicePortArgs(
+                name="heroku",
+                port=HEROKU_LOG_PROXY_PORT,
+                target_port="heroku",
+                protocol="TCP",
+            ),
+            kubernetes.core.v1.ServicePortArgs(
+                name="fastly",
+                port=FASTLY_LOG_PROXY_PORT,
+                target_port="fastly",
+                protocol="TCP",
+            ),
+        ],
     ),
-    target_group_arns=[
-        heroku_log_proxy_lb_target_group.arn,
-        fastly_log_proxy_lb_target_group.arn,
-    ],
-    tags=[
-        autoscaling.GroupTagArgs(
-            key=key_name,
-            value=key_value,
-            propagate_at_launch=True,
-        )
-        for key_name, key_value in aws_config.merged_tags(
-            {"ami_id": vector_log_proxy_ami.id}
-        ).items()
-    ],
 )
 
-## Create Route53 DNS records for vector-log-proxy nodes
-five_minutes = 60 * 5
-dns_entry = route53.Record(
-    "vector-log-proxy-dns-record",
-    name=vector_log_proxy_config.require("web_host_domain"),
-    type="CNAME",
-    ttl=five_minutes,
-    records=[vector_log_proxy_lb.dns_name],
-    zone_id=mitodl_zone_id,
+##################################
+#     Gateway Configuration      #
+##################################
+
+vector_domain = vector_log_proxy_config.require("web_host_domain")
+
+vector_gateway = OLEKSGateway(
+    f"vector-log-proxy-{stack_info.name}-gateway",
+    gateway_config=OLEKSGatewayConfig(
+        cert_issuer="letsencrypt-production",
+        cert_issuer_class="cluster-issuer",
+        gateway_name="vector-log-proxy-gateway",
+        labels=k8s_global_labels,
+        namespace=namespace,
+        http_redirect=True,
+        listeners=[
+            OLEKSGatewayListenerConfig(
+                name="https",
+                hostname=vector_domain,
+                port=8443,
+                protocol="HTTPS",
+                tls_mode="Terminate",
+                certificate_secret_name="vector-log-proxy-tls",  # noqa: S106  # pragma: allowlist secret
+                certificate_secret_namespace=namespace,
+            ),
+        ],
+        routes=[
+            # Fastly service hash challenge route (must come first for specificity)
+            OLEKSGatewayRouteConfig(
+                backend_service_name=None,
+                backend_service_namespace=None,
+                backend_service_port=None,
+                hostnames=[vector_domain],
+                name="vector-log-proxy-fastly-challenge",
+                listener_name="https",
+                port=8443,
+                matches=[
+                    {
+                        "path": {
+                            "type": "PathPrefix",
+                            "value": "/.well-known/fastly/logging/challenge",
+                        }
+                    }
+                ],
+                filters=[
+                    {
+                        "type": "RequestRedirect",
+                        "requestRedirect": {
+                            "scheme": "https",
+                            "hostname": service_hash_bucket_fqdn,
+                            "statusCode": 301,
+                        },
+                    }
+                ],
+            ),
+            OLEKSGatewayRouteConfig(
+                backend_service_name=application_name,
+                backend_service_namespace=namespace,
+                backend_service_port=HEROKU_LOG_PROXY_PORT,
+                hostnames=[vector_domain],
+                name="vector-log-proxy-heroku",
+                listener_name="https",
+                port=8443,
+                matches=[{"path": {"type": "PathPrefix", "value": "/heroku"}}],
+                filters=[
+                    {
+                        "type": "URLRewrite",
+                        "urlRewrite": {
+                            "path": {
+                                "type": "ReplacePrefixMatch",
+                                "replacePrefixMatch": "/",
+                            }
+                        },
+                    }
+                ],
+            ),
+            OLEKSGatewayRouteConfig(
+                backend_service_name=application_name,
+                backend_service_namespace=namespace,
+                backend_service_port=FASTLY_LOG_PROXY_PORT,
+                hostnames=[vector_domain],
+                name="vector-log-proxy-fastly",
+                listener_name="https",
+                port=8443,
+                matches=[{"path": {"type": "PathPrefix", "value": "/fastly"}}],
+                filters=[
+                    {
+                        "type": "URLRewrite",
+                        "urlRewrite": {
+                            "path": {
+                                "type": "ReplacePrefixMatch",
+                                "replacePrefixMatch": "/",
+                            }
+                        },
+                    }
+                ],
+            ),
+        ],
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+    ),
 )
 
-export("vector_log_proxy", {"fqdn": dns_entry.fqdn})
+##################################
+#     Exports                    #
+##################################
+
+export("vector_log_proxy", {"fqdn": vector_domain})
+export("vector_log_proxy_service", vector_service.metadata["name"])
+export("vector_log_proxy_namespace", namespace)
+export("vector_log_proxy_domain", vector_domain)
