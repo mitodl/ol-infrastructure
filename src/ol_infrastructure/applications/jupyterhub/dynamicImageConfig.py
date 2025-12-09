@@ -113,6 +113,8 @@ class QueryStringKubeSpawner(KubeSpawner):
                     self.default_url = f"/notebooks/{notebook}"
         return super().start()
 
+    # It's safe to put this in as TmpAuthenticator doesn't render a login form
+    # As a result, this only affects login on authoring subdomains
     def _options_form_default(self):
         return """
         <div class="form-group">
