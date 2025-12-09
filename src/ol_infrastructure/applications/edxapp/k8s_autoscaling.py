@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PLR0913, ERA001
+# ruff: noqa: E501, PLR0913
 from typing import Any
 
 import pulumi
@@ -116,15 +116,21 @@ def create_autoscaling_resources(
     # Create KEDA ScaledObject for LMS deployment
     # This will scale the LMS deployment based on Prometheus metrics
     lms_prom_route_name = f"{stack_info.env_prefix}-openedx_ol-{stack_info.env_prefix}-edxapp-lms-apisix-route-{stack_info.env_suffix}_lms-default"
-    lms_prom_query = f'histogram_quantile(0.95,sum(rate(apisix_http_latency_bucket{{route="{lms_prom_route_name}"}}[5m])) by (le, route))'
-    lms_prom_threshold = "500"
 
-    # Alternate query based on the total number of requests arriving per minute
-    # lms_prom_matched_host = edxapp_config.require("domains")["lms"]
-    # lms_prom_query = f'sum(rate(apisix_http_status{{matched_host="{lms_prom_matched_host}"}}[1m]))'
-    # lms_prom_threshold = "30"
+    # Requests / pod / second
+    primary_lms_prom_query = f"""
+        sum(rate(apisix_http_status{{route="{lms_prom_route_name}"}}[5m]))
+            /
+        count(kube_pod_info{{job="integrations/kubernetes/kube-state-metrics", namespace="mitxonline-openedx", pod=~".*lms-webapp.*"}})
+        """
+    primary_lms_prom_threshold = "20"  # 20 requests per pod per second
 
-    # we could also use both
+    # 95th percentile latency in milliseconds
+    secondary_lms_prom_query = f'histogram_quantile(0.95,sum(rate(apisix_http_latency_bucket{{route="{lms_prom_route_name}"}}[5m])) by (le, route))'
+    secondary_lms_prom_threshold = "2000"  # 2 seconds
+
+    # CPU usage percentage
+    tertiary_cpu_threshold = "70"
 
     lms_webapp_scaledobject = kubernetes.apiextensions.CustomResource(
         f"ol-{stack_info.env_prefix}-edxapp-lms-scaledobject-{stack_info.env_suffix}",
@@ -143,21 +149,44 @@ def create_autoscaling_resources(
             },
             "minReplicaCount": replicas_dict["webapp"]["lms"]["min"],
             "maxReplicaCount": replicas_dict["webapp"]["lms"]["max"],
-            "pollingInterval": 60,
-            "cooldownPeriod": 300,
+            "pollingInterval": 60,  # check triggers every minute
+            "cooldownPeriod": 300,  # wait 5 minutes before scaling down again
             "triggers": [
+                # The primary trigger is based on requests per pod
                 {
                     "type": "prometheus",
                     "metadata": {
                         "serverAddress": "https://prometheus-prod-10-prod-us-central-0.grafana.net/api/prom",
-                        "query": lms_prom_query,
-                        "threshold": lms_prom_threshold,
+                        "query": primary_lms_prom_query,
+                        "threshold": primary_lms_prom_threshold,
                         "authModes": "basic",
                     },
                     "authenticationRef": {
                         "name": f"{env_name}-edxapp-webapp-prometheus-auth-trigger",
                     },
-                }
+                },
+                # The secondary trigger is based on 95th percentile latency
+                {
+                    "type": "prometheus",
+                    "metadata": {
+                        "serverAddress": "https://prometheus-prod-10-prod-us-central-0.grafana.net/api/prom",
+                        "query": secondary_lms_prom_query,
+                        "threshold": secondary_lms_prom_threshold,
+                        "authModes": "basic",
+                    },
+                    "authenticationRef": {
+                        "name": f"{env_name}-edxapp-webapp-prometheus-auth-trigger",
+                    },
+                },
+                # The tertiary trigger is based on CPU usage
+                {
+                    "type": "cpu",
+                    "metricType": "AverageValue",
+                    "metadata": {
+                        "value": tertiary_cpu_threshold,
+                        "containerName": "lms-edxapp",
+                    },
+                },
             ],
         },
         opts=pulumi.ResourceOptions(
@@ -213,15 +242,14 @@ def create_autoscaling_resources(
     # Create KEDA ScaledObject for CMS deployment
     # This will scale the CMS deployment based on Prometheus metrics
     cms_prom_route_name = f"{stack_info.env_prefix}-openedx_ol-{stack_info.env_prefix}-edxapp-cms-apisix-route-{stack_info.env_suffix}_cms-default"
-    cms_prom_query = f'histogram_quantile(0.95,sum(rate(apisix_http_latency_bucket{{route="{cms_prom_route_name}"}}[5m])) by (le, route))'
-    cms_prom_threshold = "500"
 
-    # Alternate query based on the total number of requests arriving per minute
-    # cms_prom_matched_host = edxapp_config.require("domains")["cms"]
-    # cms_prom_query = f'sum(rate(apisix_http_status{{matched_host="{cms_prom_matched_host}"}}[1m]))'
-    # cms_prom_threshold = "30"
-
-    # we could also use both
+    # Requests / pod / second
+    primary_cms_prom_query = f"""
+        sum(rate(apisix_http_status{{route="{cms_prom_route_name}"}}[5m]))
+            /
+        count(kube_pod_info{{job="integrations/kubernetes/kube-state-metrics", namespace="mitxonline-openedx", pod=~".*cms-webapp.*"}})
+        """
+    primary_cms_prom_threshold = "20"  # 20 requests per pod per second
 
     cms_webapp_scaledobject = kubernetes.apiextensions.CustomResource(
         f"ol-{stack_info.env_prefix}-edxapp-cms-scaledobject-{stack_info.env_suffix}",
@@ -243,18 +271,28 @@ def create_autoscaling_resources(
             "pollingInterval": 60,
             "cooldownPeriod": 300,
             "triggers": [
+                # The primary trigger is based on requests per pod
                 {
                     "type": "prometheus",
                     "metadata": {
                         "serverAddress": "https://prometheus-prod-10-prod-us-central-0.grafana.net/api/prom",
-                        "query": cms_prom_query,
-                        "threshold": cms_prom_threshold,
+                        "query": primary_cms_prom_query,
+                        "threshold": primary_cms_prom_threshold,
                         "authModes": "basic",
                     },
                     "authenticationRef": {
                         "name": f"{env_name}-edxapp-webapp-prometheus-auth-trigger",
                     },
-                }
+                },
+                # The secondary trigger is based on CPU usage
+                {
+                    "type": "cpu",
+                    "metricType": "AverageValue",
+                    "metadata": {
+                        "value": tertiary_cpu_threshold,
+                        "containerName": "cms-edxapp",
+                    },
+                },
             ],
         },
         opts=pulumi.ResourceOptions(
