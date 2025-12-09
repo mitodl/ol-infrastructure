@@ -79,7 +79,10 @@ class QueryStringKubeSpawner(KubeSpawner):
             "ol-course-notebooks:base_authoring_image"
         )
         if self.handler:
-            course = self.handler.get_query_argument("course", "").lower()
+            course = (
+                self.handler.get_query_argument("course", "").lower()
+                or self.user_options.get("course", "").lower()
+            )
             # Notebook is case sensitive, and special characters
             # with query string meaning must be URL encoded i.e.
             # notebook=Assignment_2_Prediction_with_LogReg_%26_CART_%26_XGBoost.ipynb
@@ -109,6 +112,21 @@ class QueryStringKubeSpawner(KubeSpawner):
                 if notebook and notebook.endswith(".ipynb"):
                     self.default_url = f"/notebooks/{notebook}"
         return super().start()
+
+    def _options_form_default(self):
+        return """
+        <div class="form-group">
+            <label for="course">Course Image Label</label>
+            <input name="course" class="form-control"
+                placeholder="e.g. uai_source-uai.st1"></input>
+        </div>
+        """
+
+    def options_from_form(self, formdata):
+        options = {}
+        course = formdata.get("course", [""])[0].strip()
+        options["course"] = course
+        return options
 
 
 c.JupyterHub.spawner_class = QueryStringKubeSpawner  # type: ignore[name-defined] # noqa: F821
