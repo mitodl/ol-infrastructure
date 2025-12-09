@@ -131,7 +131,7 @@ rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["instance_size"] = (
     semantic_config.get("db_instance_size") or DBInstanceTypes.small.value
 )
-
+rds_defaults["read_replica"] = None
 semantic_db_config = OLPostgresDBConfig(
     instance_name=f"semantic-db-{stack_info.env_suffix}",
     password=semantic_config.get("db_password"),
