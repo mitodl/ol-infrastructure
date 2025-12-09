@@ -76,7 +76,7 @@ class QueryStringKubeSpawner(KubeSpawner):
         )
         self.image = (
             "610119931565.dkr.ecr.us-east-1.amazonaws.com/"
-            "ol-course-notebooks:clustering_and_descriptive_ai"
+            "ol-course-notebooks:base_authoring_image"
         )
         if self.handler:
             course = self.handler.get_query_argument("course", "").lower()

@@ -15,6 +15,7 @@ from ol_infrastructure.applications.jupyterhub.values import (
     get_prepuller_config_for_images,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.eks import OLEKSTrustRole
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
@@ -47,9 +48,11 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     db_config: OLPostgresDBConfig,
     jupyterhub_db: OLAmazonDB,
     cluster_stack: StackReference,
+    service_trust_role: OLEKSTrustRole,
     application_labels: dict[str, str],
     k8s_global_labels: dict[str, str],
     extra_images: dict[str, dict[str, str]] | None = None,
+    service_account_name: str | None = None,
 ) -> kubernetes.helm.v3.Release:
     base_name = jupyterhub_deployment_config["name"]
     domain_name = jupyterhub_deployment_config["domain"]
@@ -236,6 +239,19 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
         ),
     )
 
+    kubernetes.core.v1.ServiceAccount(
+        f"jupyterhub-service-account-{namespace}-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=service_account_name,
+            namespace=namespace,
+            labels=k8s_global_labels,
+            annotations={
+                "eks.amazonaws.com/role-arn": service_trust_role.role.arn,
+            },
+        ),
+        automount_service_account_token=False,
+    )
+
     # JupyterHub Helm Release
     extra_images_list = extra_images or {}
     return kubernetes.helm.v3.Release(
@@ -339,6 +355,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                 },
                 "prePuller": get_prepuller_config_for_images(extra_images_list),
                 "singleuser": {
+                    "serviceAccountName": service_account_name,
                     "extraFiles": {
                         "menu_override": {
                             "mountPath": (

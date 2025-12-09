@@ -12,11 +12,13 @@ from ol_infrastructure.applications.jupyterhub.deployment import (
     provision_jupyterhub_deployment,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
 )
+from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
@@ -94,6 +96,65 @@ jupyter_course_bucket_config = S3BucketConfig(
 )
 jupyter_course_bucket = OLBucket(
     f"jupyter-course-bucket-{env_name}", config=jupyter_course_bucket_config
+)
+
+jupyterhub_policy_document = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:*",
+            ],
+            "Resource": [
+                f"arn:aws:s3:::{jupyterhub_course_bucket_name}",
+                f"arn:aws:s3:::{jupyterhub_course_bucket_name}/*",
+            ],
+        },
+    ],
+}
+parliament_config = {
+    "PERMISSIONS_MANAGEMENT_ACTIONS": {
+        "ignore_locations": [{"actions": ["s3:putobjectacl"]}]
+    },
+    "UNKNOWN_ACTION": {"ignore_locations": []},
+    "RESOURCE_MISMATCH": {"ignore_locations": []},
+    "UNKNOWN_CONDITION_FOR_ACTION": {"ignore_locations": []},
+    "RESOURCE_STAR": {"ignore_locations": []},
+}
+jupyterhub_policy = iam.Policy(
+    "jupyterhub-instance-iam-policy",
+    path=f"/ol-applications/jupyterhub/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+    description=("Grant access to AWS resources for saving/editing Jupyter notebooks."),
+    policy=lint_iam_policy(
+        jupyterhub_policy_document, stringify=True, parliament_config=parliament_config
+    ),
+    tags=aws_config.tags,
+)
+
+jupyterhub_service_account_name = "jupyterhub-service-account"
+jupyterhub_trust_role_config = OLEKSTrustRoleConfig(
+    account_id=aws_account.account_id,
+    cluster_name=f"jupyterhub-{stack_info.name}",
+    cluster_identities=cluster_stack.require_output("cluster_identities"),
+    description="Trust role for allowing the jupyterhub service account to "
+    "access the aws API",
+    policy_operator="StringEquals",
+    role_name="jupyterhub",
+    service_account_identifier=[
+        f"system:serviceaccount:jupyter-authoring:{jupyterhub_service_account_name}",
+    ],
+    tags=aws_config.tags,
+)
+
+jupyterhub_trust_role = OLEKSTrustRole(
+    f"jupyterhub-ol-trust-role-{stack_info.env_suffix}",
+    role_config=jupyterhub_trust_role_config,
+)
+iam.RolePolicyAttachment(
+    f"jupyterhub-policy-attachement-{stack_info.env_suffix}",
+    policy_arn=jupyterhub_policy.arn,
+    role=jupyterhub_trust_role.role.name,
 )
 
 deployment_configs = jupyterhub_config.require_object("deployments")
@@ -217,6 +278,7 @@ class JupyterhubDeploymentInfo:
     name: str
     extra_images: dict[str, dict[str, str]]
     db_config: OLPostgresDBConfig
+    service_account_name: str | None = None
 
 
 JupyterhubInfo = JupyterhubDeploymentInfo(
@@ -228,6 +290,7 @@ JupyterhubAuthoringInfo = JupyterhubDeploymentInfo(
     name="jupyterhub-authoring",
     extra_images={},
     db_config=jupyterhub_authoring_db_config,
+    service_account_name=jupyterhub_service_account_name,
 )
 
 
@@ -253,4 +316,6 @@ for deployment_config in deployment_configs:
         application_labels=application_labels,
         k8s_global_labels=k8s_global_labels,
         extra_images=jupyterhub_info.extra_images,
+        service_account_name=jupyterhub_info.service_account_name,
+        service_trust_role=jupyterhub_trust_role,
     )
