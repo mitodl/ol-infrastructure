@@ -63,6 +63,13 @@ def _build_general_secrets_template(
         SYSADMIN_GITHUB_WEBHOOK_KEY: {{{{ get .Secrets "sysadmin_git_webhook_secret" }}}}"""
     ]
 
+    if stack_info.env_prefix == "mitx":
+        template_parts.append(
+            """
+        CANVAS_ACCESS_TOKEN: {{ get .Secrets "canvas_access_token" }}
+        DEEPL_API_KEY: {{ get .Secrets "deepl_api_key" }}"""
+        )
+
     if stack_info.env_prefix == "mitxonline":
         template_parts.append(
             """
@@ -70,8 +77,8 @@ def _build_general_secrets_template(
         DEEPL_API_KEY: {{ get .Secrets "deepl_api_key" }}"""
         )
 
-    # Conditional: xpro-specific email configuration
-    if stack_info.env_prefix == "xpro":
+    # Conditional: xpro and mitx specific email configuration
+    if stack_info.env_prefix in ("xpro", "mitx"):
         template_parts.append(
             """
         EMAIL_HOST_USER: {{ get .Secrets "email_username" }}

@@ -9,6 +9,9 @@ ACE_ROUTING_KEY: edx.lms.core.default
 # ALTERNATE_WORKER_QUEUES: cms  # The code already has this default
 # ANALYTICS_API_KEY: ''
 # ANALYTICS_API_URL: http://localhost:18100
+ADMIN: # ADDED KEY
+- 'MITx Stacktrace Recipients'
+- 'cuddle-bunnies@mit.edu'
 API_ACCESS_FROM_EMAIL: api-requests@example.com
 API_ACCESS_MANAGER_EMAIL: api-access@example.com
 API_DOCUMENTATION_URL: http://course-catalog-api-guide.readthedocs.io/en/latest/
@@ -20,11 +23,13 @@ CONTACT_MAILING_ADDRESS: SET-ME-PLEASE
 CREDIT_HELP_LINK_URL: ''
 DCS_SESSION_COOKIE_SAMESITE: Lax
 DCS_SESSION_COOKIE_SAMESITE_FORCE_ALL: true
+ENABLE_INSTRUCTOR_LEGACY_DASHBOARD: true # ADDED
 GIT_REPO_DIR: /openedx/data/export_course_repos
 GOOGLE_ANALYTICS_LINKEDIN: ''
 GOOGLE_ANALYTICS_TRACKING_ID: ''
 GOOGLE_SITE_VERIFICATION_ID: ''
 HTTPS: 'on'
+LEARNER_HOME_MFE_REDIRECT_PERCENTAGE: 100 # ADDED
 LEARNER_HOME_MICROFRONTEND_URL: /dashboard/
 LTI_AGGREGATE_SCORE_PASSBACK_DELAY: 900
 LTI_USER_EMAIL_DOMAIN: lti.example.com
@@ -79,13 +84,10 @@ REGISTRATION_VALIDATION_RATELIMIT: 1000000/minute  # ADDED KEY
 REGISTRATION_RATELIMIT: 1000000/minute  # ADDED KEY
 RATELIMIT_RATE: '600/m'  # ADDED KEY
 RECALCULATE_GRADES_ROUTING_KEY: edx.lms.core.default
+RESTRICT_ENROLL_SOCIAL_PROVIDERS:
+- mit-kerberos
+STUDENT_FILEUPLOAD_MAX_SIZE: 52428800
 THIRD_PARTY_AUTH_BACKENDS:
-- social_core.backends.google.GoogleOAuth2
-- social_core.backends.linkedin.LinkedinOAuth2
-- social_core.backends.facebook.FacebookOAuth2
-- social_core.backends.azuread.AzureADOAuth2
-- common.djangoapps.third_party_auth.appleid.AppleIdAuth
-- common.djangoapps.third_party_auth.identityserver3.IdentityServer3
 - common.djangoapps.third_party_auth.saml.SAMLAuthBackend
 - common.djangoapps.third_party_auth.lti.LTIAuthBackend
 TRACKING_SEGMENTIO_WEBHOOK_SECRET: ''

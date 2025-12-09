@@ -45,6 +45,7 @@ config:
   - ["studio.library_authoring_mfe", "--deactivate"]
   - ["legacy_studio.certificates", "--create", "--everyone"]
   edxapp:business_unit: residential
+  exapp:canvas_base_url: https://mit.test.instructre.com
   edxapp:db_password:
     secure: v1:xglzNDR1j+CDTk3s:4TyRALK3e/ncPRhuFTUQQqRBSTwyrCWWcTn/Y6G9XjG+ms/biXjoKbleFdMo0omPC83nGiI5mBc=
   edxapp:db_storage_gb: "200"

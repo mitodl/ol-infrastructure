@@ -107,6 +107,7 @@ def create_k8s_configmaps(
                         default_acl: public-read
                     EMAIL_USE_COURSE_ID_FROM_FOR_BULK: {edxapp_config.get_bool("email_use_course_id_from_for_bulk", False)}
                     BULK_EMAIL_DEFAULT_FROM_EMAIL: {edxapp_config.get("bulk_email_default_from_email") or edxapp_config.require("sender_email_address")}
+                    CANVAS_BASE_URL: {edxapp_config.require("canvas_base_url") if stack_info.env_prefix == "mitx" else ""}
                     CELERY_BROKER_HOSTNAME: {runtime_config["redis_hostname"]}
                     CMS_BASE: {edxapp_config.require_object("domains")["studio"]}
                     CONTACT_EMAIL: {edxapp_config.require("sender_email_address")}
