@@ -217,10 +217,10 @@ fastly_service_hash_object = s3.BucketObjectv2(
     opts=ResourceOptions(parent=fastly_service_hash_bucket),
 )
 
-service_hash_bucket_fqdn = fastly_service_hash_bucket.bucket_domain_name.apply(
+service_hash_bucket_fqdn = fastly_service_hash_bucket.bucket_regional_domain_name.apply(
     lambda domain: f"{domain}"
 )
-challenge_url = fastly_service_hash_bucket.bucket_domain_name.apply(
+challenge_url = fastly_service_hash_bucket.bucket_regional_domain_name.apply(
     lambda domain: f"https://{domain}/{fastly_service_hash_bucket_name_with_prefix}"
 )
 export(
