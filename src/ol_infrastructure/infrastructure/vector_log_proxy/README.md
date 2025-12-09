@@ -52,12 +52,29 @@ If you mess one up, you can remove it easily enough with the same command but `d
 
 Fastly logging is configured automatically via Pulumi in each application's infrastructure code. The logs are sent to `https://<domain>/fastly` with basic authentication.
 
-#### sha256sum
+#### Fastly HTTPS Log Streaming Requirements
 
-To add a new service to the fastly -> vector -> grafana pipeline, you will need to get the service ID hash and add it to the appropriate environments.
+This service implements Fastly's HTTPS log streaming specification (RFC 8615):
 
-```bash
-echo -n "<service id from fastly>" | sha256sum
-```
+1. **HTTPS Endpoint**: TLS-secured endpoint with valid certificate (via Gateway API + Let's Encrypt)
+2. **Basic Authentication**: Username/password authentication configured in Vector
+3. **POST Method**: Accepts HTTP POST requests from Fastly's log streaming service
+4. **Content-Type**: Accepts `application/json` payloads
+5. **Domain Verification**: RFC 8615 challenge endpoint at `/.well-known/fastly/logging/challenge`
 
-The `-n` is important, otherwise it will add a newline to your echo'd string and the hash will not be correct. You can get `sha256sum` on macOS from the `brew` package `coreutils`.
+Reference: https://www.fastly.com/documentation/guides/integrations/logging-endpoints/log-streaming-https/
+
+#### Domain Ownership Verification
+
+Fastly requires proof of domain ownership via RFC 8615 challenge-response:
+- Challenge path: `/.well-known/fastly/logging/challenge`
+- Response: SHA-256 hex digest of each Fastly Service ID (one per line)
+- Implementation: Python sidecar container queries Fastly API dynamically
+
+The challenge server automatically:
+1. Queries the Fastly API using the admin API key from Vault
+2. Retrieves all service IDs from the Fastly account
+3. Computes SHA-256 hashes for each service ID
+4. Returns hashes as newline-delimited text (plus `*` wildcard)
+
+No manual configuration needed - new Fastly services are automatically discovered.

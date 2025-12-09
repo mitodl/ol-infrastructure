@@ -6,7 +6,7 @@ from pathlib import Path
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
-from pulumi_aws import get_caller_identity, s3
+from pulumi_aws import get_caller_identity
 
 from bridge.lib.versions import VECTOR_VERSION
 from bridge.secrets.sops import read_yaml_secrets
@@ -189,43 +189,45 @@ vector_log_proxy_credentials_secret = OLVaultK8SSecret(
     ),
 )
 
+# Sync Fastly API key separately for challenge server
+fastly_api_key_secret = OLVaultK8SSecret(
+    f"vector-log-proxy-fastly-api-key-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name="fastly-api-key-vault-secret-sync",
+        namespace=namespace,
+        labels=k8s_global_labels,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name="fastly-api-key",  # noqa: S106  # pragma: allowlist secret
+        dest_secret_type="Opaque",  # noqa: S106  # pragma: allowlist secret
+        mount="secret-vector-log-proxy",
+        mount_type="kv-v2",
+        path="fastly_api_key",
+        templates={
+            "api_key": "{{ .Secrets.api_key }}",
+        },
+        refresh_after="1h",
+        vaultauth=vector_auth_binding.vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[vector_auth_binding.vault_k8s_resources.vso_resources],
+    ),
+)
+
 ##################################
-#     S3 Fastly Challenge Bucket #
+# Fastly Challenge Server Config #
 ##################################
 
-fastly_service_hash_bucket_name = f"mitodl-vector-log-proxy-static-{env_name}"
-fastly_service_hash_bucket = s3.Bucket(
-    f"vector-log-proxy-fastly-service-hash-bucket-{env_name}",
-    bucket=fastly_service_hash_bucket_name,
-    acl="public-read",
-    tags=aws_config.tags,
-)
+# Read Fastly API credentials
+fastly_api_credentials = read_yaml_secrets(Path("fastly.yaml"))
 
-service_hash_content = ""
-for service_hash in vector_log_proxy_config.get_object(
-    "fastly_service_id_sha256sums"
-).values():
-    service_hash_content = service_hash_content + service_hash + "\n"
-
-fastly_service_hash_bucket_name_with_prefix = ".well-known/fastly/logging/challenge"
-fastly_service_hash_object = s3.BucketObjectv2(
-    fastly_service_hash_bucket_name_with_prefix,
-    bucket=fastly_service_hash_bucket_name,
-    acl="public-read",
-    content=service_hash_content,
-    content_type="text/plain",
-    opts=ResourceOptions(parent=fastly_service_hash_bucket),
-)
-
-service_hash_bucket_fqdn = fastly_service_hash_bucket.bucket_regional_domain_name.apply(
-    lambda domain: f"{domain}"
-)
-challenge_url = fastly_service_hash_bucket.bucket_regional_domain_name.apply(
-    lambda domain: f"https://{domain}/{fastly_service_hash_bucket_name_with_prefix}"
-)
-export(
-    "fastly_service_hash_bucket",
-    {"challenge_url": challenge_url, "bucket_fqdn": service_hash_bucket_fqdn},
+# Store Fastly API key in Vault
+vault.generic.Secret(
+    "vector-log-proxy-fastly-api-key",
+    path=vector_log_proxy_secrets_mount.path.apply(
+        lambda mount_path: f"{mount_path}/fastly_api_key"
+    ),
+    data_json=json.dumps({"api_key": fastly_api_credentials["admin_api_key"]}),
 )
 
 ##################################
@@ -233,6 +235,15 @@ export(
 ##################################
 
 # Build Vector configuration
+# Fastly HTTPS Log Streaming Requirements (RFC 8615):
+# 1. HTTPS endpoint with valid TLS certificate (handled by Gateway API)
+# 2. Basic authentication (configured in http_server source)
+# 3. POST method support for log delivery (configured below)
+# 4. Domain ownership verification via /.well-known/fastly/logging/challenge
+#    (handled by Gateway redirect to S3 bucket with service ID hashes)
+# 5. Accept application/json content-type (handled by json codec)
+# Reference: https://www.fastly.com/documentation/guides/integrations/logging-endpoints/log-streaming-https/
+
 vector_config_template = """
 api:
   enabled: false
@@ -245,7 +256,11 @@ sources:
       password: ${FASTLY_PROXY_PASSWORD}
       username: ${FASTLY_PROXY_USERNAME}
     decoding:
-      codec: bytes
+      codec: json
+    method:
+      - POST
+      - PUT
+    strict_path: false
 
   heroku_log_proxy:
     type: heroku_logs
@@ -267,11 +282,9 @@ transforms:
     inputs:
     - "fastly_log_proxy"
     source: |
-      event, err = parse_json(.message)
-      if event != null {
-        .,err = merge(., event)
-        del(.message)
-      }
+      # Fastly sends logs as JSON objects
+      # The http_server source with json codec already parses the payload
+      # No additional parsing needed - data is already structured
 
   heroku_drop_unwanted_logs:
     type: remap
@@ -330,6 +343,23 @@ vector_config_map = kubernetes.core.v1.ConfigMap(
     ),
     data={
         "vector.yaml": vector_config_template,
+    },
+)
+
+# ConfigMap for Fastly challenge server Python script
+fastly_challenge_server_script = (
+    Path(__file__).parent.joinpath("fastly_challenge_server.py").read_text()
+)
+
+fastly_challenge_config_map = kubernetes.core.v1.ConfigMap(
+    "fastly-challenge-server-config",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        namespace=namespace,
+        name="fastly-challenge-server-config",
+        labels=k8s_global_labels,
+    ),
+    data={
+        "fastly_challenge_server.py": fastly_challenge_server_script,
     },
 )
 
@@ -520,12 +550,67 @@ vector_deployment = kubernetes.apps.v1.Deployment(
                             },
                         ),
                     ),
+                    # Fastly challenge server sidecar
+                    kubernetes.core.v1.ContainerArgs(
+                        name="fastly-challenge",
+                        image=cached_image_uri("python:3.12-slim"),
+                        command=[
+                            "sh",
+                            "-c",
+                            (
+                                "pip install --no-cache-dir requests && "
+                                "python /app/fastly_challenge_server.py"
+                            ),
+                        ],
+                        ports=[
+                            kubernetes.core.v1.ContainerPortArgs(
+                                name="challenge", container_port=8080
+                            ),
+                        ],
+                        env=[
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="PORT",
+                                value="8080",
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="FASTLY_API_KEY",
+                                value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                    secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                        name="fastly-api-key",
+                                        key="api_key",
+                                    ),
+                                ),
+                            ),
+                        ],
+                        volume_mounts=[
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="challenge-script",
+                                mount_path="/app",
+                            ),
+                        ],
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            requests={
+                                "cpu": "100m",
+                                "memory": "128Mi",
+                            },
+                            limits={
+                                "cpu": "200m",
+                                "memory": "256Mi",
+                            },
+                        ),
+                    ),
                 ],
                 volumes=[
                     kubernetes.core.v1.VolumeArgs(
                         name="vector-config",
                         config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
                             name="vector-log-proxy-config",
+                        ),
+                    ),
+                    kubernetes.core.v1.VolumeArgs(
+                        name="challenge-script",
+                        config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                            name="fastly-challenge-server-config",
                         ),
                     ),
                 ],
@@ -576,6 +661,12 @@ vector_service = kubernetes.core.v1.Service(
                 target_port="fastly",
                 protocol="TCP",
             ),
+            kubernetes.core.v1.ServicePortArgs(
+                name="challenge",
+                port=8080,
+                target_port="challenge",
+                protocol="TCP",
+            ),
         ],
     ),
 )
@@ -609,9 +700,9 @@ vector_gateway = OLEKSGateway(
         routes=[
             # Fastly service hash challenge route (must come first for specificity)
             OLEKSGatewayRouteConfig(
-                backend_service_name=None,
-                backend_service_namespace=None,
-                backend_service_port=None,
+                backend_service_name=application_name,
+                backend_service_namespace=namespace,
+                backend_service_port=8080,
                 hostnames=[vector_domain],
                 name="vector-log-proxy-fastly-challenge",
                 listener_name="https",
@@ -622,16 +713,6 @@ vector_gateway = OLEKSGateway(
                             "type": "PathPrefix",
                             "value": "/.well-known/fastly/logging/challenge",
                         }
-                    }
-                ],
-                filters=[
-                    {
-                        "type": "RequestRedirect",
-                        "requestRedirect": {
-                            "scheme": "https",
-                            "hostname": service_hash_bucket_fqdn,
-                            "statusCode": 301,
-                        },
                     }
                 ],
             ),
