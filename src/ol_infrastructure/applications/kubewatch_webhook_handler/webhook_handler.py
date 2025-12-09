@@ -3,7 +3,7 @@ Custom webhook handler for kubewatch that enriches deployment notifications.
 
 This service receives webhook events from kubewatch and:
 1. Extracts deployment information including labels, start time, and status
-2. Formats rich Slack messages with all deployment details
+2. Tracks deployment state to only post start and finish messages
 3. Filters to only namespaces with OLApplicationK8s deployments
 4. Posts to Slack with enhanced formatting
 """
@@ -61,6 +61,10 @@ IGNORED_LABEL_PATTERNS = os.environ.get("IGNORED_LABEL_PATTERNS", "celery").spli
 IGNORED_LABEL_PATTERNS = [
     pattern.strip() for pattern in IGNORED_LABEL_PATTERNS if pattern.strip()
 ]
+
+# In-memory state tracking for deployments
+# Tracks deployment states: "rolling_out", "completed", "failed"
+deployment_states: dict[str, str] = {}
 
 logger.info("Watching namespaces: %s", WATCHED_NAMESPACES or "ALL")
 logger.info("Ignoring label patterns: %s", IGNORED_LABEL_PATTERNS)
@@ -135,6 +139,85 @@ def get_target_slack_channel(deployment_details: dict[str, Any] | None) -> str:
         )
 
     return target_channel
+
+
+def should_post_notification(  # noqa: PLR0911
+    deployment_key: str,
+    progressing_reason: str | None,
+) -> tuple[bool, str]:
+    """
+    Determine if we should post a notification based on deployment state.
+
+    Only posts notifications for:
+    - Start: When rollout begins (ReplicaSetUpdated)
+    - Finish: When rollout completes (NewReplicaSetAvailable) or fails
+      (ProgressDeadlineExceeded)
+
+    Args:
+        deployment_key: Unique key for deployment (namespace/name)
+        progressing_reason: The reason from the Progressing condition
+
+    Returns:
+        Tuple of (should_post: bool, notification_type: str)
+        notification_type can be "start", "finish", or ""
+    """
+    if not progressing_reason:
+        logger.debug("No progressing reason for %s, skipping", deployment_key)
+        return False, ""
+
+    current_state = deployment_states.get(deployment_key)
+
+    # Check if deployment is starting (beginning rollout)
+    if progressing_reason == "ReplicaSetUpdated":
+        if current_state != "rolling_out":
+            # Deployment is starting - post start message
+            deployment_states[deployment_key] = "rolling_out"
+            logger.info("Deployment %s starting rollout", deployment_key)
+            return True, "start"
+        else:
+            # Already notified about start
+            logger.debug(
+                "Deployment %s already in rolling_out state, skipping", deployment_key
+            )
+            return False, ""
+
+    # Check if deployment completed successfully
+    elif progressing_reason == "NewReplicaSetAvailable":
+        if current_state == "rolling_out":
+            # Deployment completed - post finish message
+            deployment_states[deployment_key] = "completed"
+            logger.info("Deployment %s completed successfully", deployment_key)
+            return True, "finish"
+        else:
+            # Either already completed or no start notification was sent
+            logger.debug(
+                "Deployment %s already completed or never started tracking, skipping",
+                deployment_key,
+            )
+            return False, ""
+
+    # Check if deployment failed
+    elif progressing_reason == "ProgressDeadlineExceeded":
+        if current_state == "rolling_out":
+            # Deployment failed - post finish message
+            deployment_states[deployment_key] = "failed"
+            logger.info("Deployment %s failed", deployment_key)
+            return True, "finish"
+        else:
+            # Already notified or wasn't tracked
+            logger.debug(
+                "Deployment %s already failed or never started tracking, skipping",
+                deployment_key,
+            )
+            return False, ""
+
+    # Other progressing reasons - don't notify
+    logger.debug(
+        "Deployment %s has progressing reason '%s', not a start/finish event",
+        deployment_key,
+        progressing_reason,
+    )
+    return False, ""
 
 
 def get_deployment_from_replicaset(
@@ -220,6 +303,9 @@ def get_deployment_details(namespace: str, name: str) -> dict[str, Any] | None:
             "creation_time": creation_time,
             "last_update_time": last_update_time,
             "rollout_status": rollout_status,
+            "progressing_reason": progressing_condition.reason
+            if progressing_condition
+            else None,
             "desired_replicas": desired_replicas,
             "ready_replicas": ready_replicas,
             "updated_replicas": updated_replicas,
@@ -392,7 +478,7 @@ def health():
 
 
 @app.route("/webhook/kubewatch", methods=["POST"])
-def webhook_handler():  # noqa: C901, PLR0912, PLR0915
+def webhook_handler():  # noqa: C901, PLR0912, PLR0915, PLR0911
     """Handle webhook events from kubewatch."""
     try:
         # Parse the incoming event
@@ -480,6 +566,34 @@ def webhook_handler():  # noqa: C901, PLR0912, PLR0915
                 jsonify({"status": "ignored", "reason": ignore_reason}),
                 HTTPStatus.OK,
             )
+
+        # Check if we should post a notification based on deployment state
+        deployment_key = f"{deployment_namespace}/{deployment_name}"
+        progressing_reason = (
+            deployment_details.get("progressing_reason") if deployment_details else None
+        )
+        should_post, notification_type = should_post_notification(
+            deployment_key, progressing_reason
+        )
+
+        if not should_post:
+            logger.info(
+                "Skipping notification for %s (reason: %s, state: %s)",
+                deployment_key,
+                progressing_reason,
+                deployment_states.get(deployment_key, "unknown"),
+            )
+            return (
+                jsonify({"status": "ignored", "reason": "not a start or finish event"}),
+                HTTPStatus.OK,
+            )
+
+        logger.info(
+            "Posting %s notification for %s (reason: %s)",
+            notification_type,
+            deployment_key,
+            progressing_reason,
+        )
 
         # Create event data in expected format for format_slack_message
         # Use the deployment name for display (not the ReplicaSet name)

@@ -6,12 +6,23 @@ Custom webhook handler for kubewatch that enriches deployment notifications with
 
 This Pulumi project builds and deploys a webhook handler service that:
 - Receives webhook events from kubewatch
+- Tracks deployment state to send only start and finish notifications
 - Queries Kubernetes API for detailed deployment information
 - Formats rich Slack messages with Block Kit
 - Routes notifications to different Slack channels based on deployment labels
 - Posts enhanced notifications to Slack
 
 ## What It Provides
+
+### Limited Notifications Per Deployment
+
+**NEW:** Only 2 notifications per deployment to reduce noise!
+
+The webhook handler tracks deployment state and only sends:
+1. **Start message**: When a rollout begins (Kubernetes condition: `ReplicaSetUpdated`)
+2. **Finish message**: When a rollout completes successfully (`NewReplicaSetAvailable`) or fails (`ProgressDeadlineExceeded`)
+
+This eliminates duplicate and intermediate notifications for the same deployment.
 
 ### Rich Deployment Notifications
 
