@@ -21,16 +21,6 @@ config:
     CANVAS_SYLLABUS_DEMO_READABLE_IDS: ["14566-kaleba:20211202", "34642-15.095_FA25"]
     CANVAS_TUTOR_DEMO_RUN_READABLE_IDS: ["14566-kaleba:20211202+canvas", "34642-15.095_FA25+canvas"]
     CELERY_TASK_ALWAYS_EAGER: "false"
-    CORS_ALLOW_ORIGINS:
-    - learn.mit.edu
-    - learn-ai.ol.mit.edu
-    - courses.learn.mit.edu
-    - studio.courses.learn.mit.edu
-    CORS_ALLOWED_ORIGINS:
-    - learn.mit.edu
-    - learn-ai.ol.mit.edu
-    - courses.learn.mit.edu
-    - studio.courses.learn.mit.edu
     CSRF_ALLOWED_ORIGINS: '["https://learn-ai.ol.mit.edu", "https://api-learn-ai.ol.mit.edu",
       "https://learn.mit.edu", "https://api.learn.mit.edu"]'
     CSRF_TRUSTED_ORIGINS: '["https://learn-ai.ol.mit.edu", "https://api-learn-ai.ol.mit.edu",

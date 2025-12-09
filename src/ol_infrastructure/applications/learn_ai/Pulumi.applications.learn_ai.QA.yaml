@@ -28,16 +28,6 @@ config:
       "https://rc.learn.mit.edu", "https://api.rc.learn.mit.edu"]'
     CSRF_TRUSTED_ORIGINS: '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qa.ol.mit.edu",
       "https://rc.learn.mit.edu", "https://api.rc.learn.mit.edu"]'
-    CORS_ALLOW_ORIGINS:
-    - rc.learn.mit.edu
-    - learn-ai-qa.ol.mit.edu
-    - courses.rc.learn.mit.edu
-    - studio.courses.rc.learn.mit.edu
-    CORS_ALLOWED_ORIGINS:
-    - rc.learn.mit.edu
-    - learn-ai-qa.ol.mit.edu
-    - courses.rc.learn.mit.edu
-    - studio.courses.rc.learn.mit.edu
     DEBUG: "false"
     DEV_ENV: "false"
     LANGSMITH_PROJECT: "learn-ai-rc"
