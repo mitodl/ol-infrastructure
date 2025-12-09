@@ -350,7 +350,7 @@ def setup_apisix(
     )
 
     # Create Gateway resource for Gateway API
-    kubernetes.apiextensions.CustomResource(
+    apisix_gateway = kubernetes.apiextensions.CustomResource(
         f"{cluster_name}-gateway",
         api_version="gateway.networking.k8s.io/v1",
         kind="Gateway",
@@ -396,5 +396,54 @@ def setup_apisix(
             provider=k8s_provider,
             parent=operations_namespace,
             depends_on=[gateway_api_crds, gateway_class],
+        ),
+    )
+
+    # Workaround: APISIX ingress controller 2.0.0-rc5 doesn't populate Gateway status.addresses
+    # from publishService in GatewayProxy spec. Manually patch the status so external-dns
+    # can create DNS records for HTTPRoutes attached to this Gateway.
+    #
+    # Without status.addresses, external-dns cannot discover the LoadBalancer hostname and
+    # fails to create DNS records for HTTPRoutes attached to this Gateway.
+    #
+    # Upstream issue: https://github.com/apache/apisix-ingress-controller/issues/2643
+    # "feat: As a user, I want to reference a Kubernetes Service in the GatewayProxy,
+    #  so that the Service's external IP is automatically used to populate the Gateway's
+    #  addresses field"
+    #
+    # Note: CustomResourcePatch in Python doesn't expose 'status' as a parameter, but we can
+    # pass it through spec which Pulumi maps to the full resource body for patches.
+    apisix_gateway_svc = kubernetes.core.v1.Service.get(
+        f"{cluster_name}-apisix-gateway-svc",
+        id="operations/apache-apisix-gateway",
+        opts=ResourceOptions(provider=k8s_provider),
+    )
+
+    # Patch Gateway status with LoadBalancer address when service is ready
+    kubernetes.apiextensions.CustomResourcePatch(
+        f"{cluster_name}-gateway-status-patch",
+        api_version="gateway.networking.k8s.io/v1",
+        kind="Gateway",
+        metadata={
+            "name": "apisix",
+            "namespace": "operations",
+            "annotations": {"pulumi.com/patchForce": "true"},
+        },
+        spec=apisix_gateway_svc.status.load_balancer.ingress[0].hostname.apply(
+            lambda hostname: {
+                "status": {
+                    "addresses": [
+                        {
+                            "type": "Hostname",
+                            "value": hostname,
+                        }
+                    ]
+                }
+            }
+        ),
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=apisix_gateway,
+            depends_on=[apisix_gateway, apisix_gateway_svc],
         ),
     )
