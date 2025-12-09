@@ -257,10 +257,6 @@ sources:
       username: ${FASTLY_PROXY_USERNAME}
     decoding:
       codec: bytes
-    method:
-      - POST
-      - PUT
-    strict_path: false
 
   heroku_log_proxy:
     type: heroku_logs
