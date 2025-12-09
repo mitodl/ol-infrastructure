@@ -256,7 +256,7 @@ sources:
       password: ${FASTLY_PROXY_PASSWORD}
       username: ${FASTLY_PROXY_USERNAME}
     decoding:
-      codec: json
+      codec: bytes
     method:
       - POST
       - PUT
@@ -282,9 +282,11 @@ transforms:
     inputs:
     - "fastly_log_proxy"
     source: |
-      # Fastly sends logs as JSON objects
-      # The http_server source with json codec already parses the payload
-      # No additional parsing needed - data is already structured
+      event, err = parse_json(.message)
+      if event != null {
+        .,err = merge(., event)
+        del(.message)
+      }
 
   heroku_drop_unwanted_logs:
     type: remap
