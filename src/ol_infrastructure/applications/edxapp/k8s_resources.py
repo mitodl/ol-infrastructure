@@ -1249,6 +1249,7 @@ def create_k8s_resources(  # noqa: C901
     # Create autoscaling resources (ScaledObjects, TriggerAuthentications, etc.)
     autoscaling_resources = create_autoscaling_resources(
         edxapp_cache=edxapp_cache,
+        edxapp_config=edxapp_config,
         replicas_dict=replicas_dict,
         namespace=namespace,
         k8s_global_labels=k8s_global_labels,

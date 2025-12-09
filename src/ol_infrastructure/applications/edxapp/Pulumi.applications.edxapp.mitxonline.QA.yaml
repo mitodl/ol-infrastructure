@@ -88,6 +88,11 @@ config:
   edxapp:framework: "earthly"
   edxapp:web_node_capacity: "3"
   edxapp:worker_node_capacity: "5"
+  edxapp:autoscaling_lms_requests_threshold: "20"
+  edxapp:autoscaling_lms_latency_threshold: "2000"
+  edxapp:autoscaling_lms_cpu_threshold: "70"
+  edxapp:autoscaling_cms_requests_threshold: "20"
+  edxapp:autoscaling_cms_cpu_threshold: "70"
   edxapp:k8s_replicas:
     webapp:
       lms:

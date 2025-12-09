@@ -17,6 +17,7 @@ from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 def create_autoscaling_resources(
     edxapp_cache: OLAmazonCache,
+    edxapp_config: pulumi.Config,
     replicas_dict: dict[str, Any],
     namespace: str,
     k8s_global_labels: dict[str, str],
@@ -118,19 +119,23 @@ def create_autoscaling_resources(
     lms_prom_route_name = f"{stack_info.env_prefix}-openedx_ol-{stack_info.env_prefix}-edxapp-lms-apisix-route-{stack_info.env_suffix}_lms-default"
 
     # Requests / pod / second
-    primary_lms_prom_query = f"""
+    lms_requests_query = f"""
         sum(rate(apisix_http_status{{route="{lms_prom_route_name}"}}[5m]))
             /
         count(kube_pod_info{{job="integrations/kubernetes/kube-state-metrics", namespace="mitxonline-openedx", pod=~".*lms-webapp.*"}})
         """
-    primary_lms_prom_threshold = "20"  # 20 requests per pod per second
+    lms_requests_threshold = (
+        edxapp_config.get("autoscaling_lms_requests_threshold") or "20"
+    )  # 20 requests per pod per second
 
     # 95th percentile latency in milliseconds
-    secondary_lms_prom_query = f'histogram_quantile(0.95,sum(rate(apisix_http_latency_bucket{{route="{lms_prom_route_name}"}}[5m])) by (le, route))'
-    secondary_lms_prom_threshold = "2000"  # 2 seconds
+    lms_latency_query = f'histogram_quantile(0.95,sum(rate(apisix_http_latency_bucket{{route="{lms_prom_route_name}"}}[5m])) by (le, route))'
+    lms_latency_threshold = (
+        edxapp_config.get("autoscaling_lms_latency_threshold") or "2000"
+    )  # 2 seconds
 
     # CPU usage percentage
-    tertiary_cpu_threshold = "70"
+    lms_cpu_threshold = edxapp_config.get("autoscaling_lms_cpu_threshold") or "70"
 
     lms_webapp_scaledobject = kubernetes.apiextensions.CustomResource(
         f"ol-{stack_info.env_prefix}-edxapp-lms-scaledobject-{stack_info.env_suffix}",
@@ -157,8 +162,8 @@ def create_autoscaling_resources(
                     "type": "prometheus",
                     "metadata": {
                         "serverAddress": "https://prometheus-prod-10-prod-us-central-0.grafana.net/api/prom",
-                        "query": primary_lms_prom_query,
-                        "threshold": primary_lms_prom_threshold,
+                        "query": lms_requests_query,
+                        "threshold": lms_requests_threshold,
                         "authModes": "basic",
                     },
                     "authenticationRef": {
@@ -170,8 +175,8 @@ def create_autoscaling_resources(
                     "type": "prometheus",
                     "metadata": {
                         "serverAddress": "https://prometheus-prod-10-prod-us-central-0.grafana.net/api/prom",
-                        "query": secondary_lms_prom_query,
-                        "threshold": secondary_lms_prom_threshold,
+                        "query": lms_latency_query,
+                        "threshold": lms_latency_threshold,
                         "authModes": "basic",
                     },
                     "authenticationRef": {
@@ -183,7 +188,7 @@ def create_autoscaling_resources(
                     "type": "cpu",
                     "metricType": "AverageValue",
                     "metadata": {
-                        "value": tertiary_cpu_threshold,
+                        "value": lms_cpu_threshold,
                         "containerName": "lms-edxapp",
                     },
                 },
@@ -244,12 +249,16 @@ def create_autoscaling_resources(
     cms_prom_route_name = f"{stack_info.env_prefix}-openedx_ol-{stack_info.env_prefix}-edxapp-cms-apisix-route-{stack_info.env_suffix}_cms-default"
 
     # Requests / pod / second
-    primary_cms_prom_query = f"""
+    cms_requests_query = f"""
         sum(rate(apisix_http_status{{route="{cms_prom_route_name}"}}[5m]))
             /
         count(kube_pod_info{{job="integrations/kubernetes/kube-state-metrics", namespace="mitxonline-openedx", pod=~".*cms-webapp.*"}})
         """
-    primary_cms_prom_threshold = "20"  # 20 requests per pod per second
+    cms_requests_threshold = (
+        edxapp_config.get("autoscaling_cms_requests_threshold") or "20"
+    )  # 20 requests per pod per second
+
+    cms_cpu_threshold = edxapp_config.get("autoscaling_cms_cpu_threshold") or "70"
 
     cms_webapp_scaledobject = kubernetes.apiextensions.CustomResource(
         f"ol-{stack_info.env_prefix}-edxapp-cms-scaledobject-{stack_info.env_suffix}",
@@ -276,8 +285,8 @@ def create_autoscaling_resources(
                     "type": "prometheus",
                     "metadata": {
                         "serverAddress": "https://prometheus-prod-10-prod-us-central-0.grafana.net/api/prom",
-                        "query": primary_cms_prom_query,
-                        "threshold": primary_cms_prom_threshold,
+                        "query": cms_requests_query,
+                        "threshold": cms_requests_threshold,
                         "authModes": "basic",
                     },
                     "authenticationRef": {
@@ -289,7 +298,7 @@ def create_autoscaling_resources(
                     "type": "cpu",
                     "metricType": "AverageValue",
                     "metadata": {
-                        "value": tertiary_cpu_threshold,
+                        "value": cms_cpu_threshold,
                         "containerName": "cms-edxapp",
                     },
                 },
