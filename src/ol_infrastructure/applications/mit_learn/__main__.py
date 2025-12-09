@@ -1446,8 +1446,8 @@ mitlearn_k8s_app = OLApplicationK8s(
                 max_replicas=20,
                 redis_host=redis_cache.address,
                 redis_password=redis_config.require("password"),
-                resource_requests={"cpu": "200m", "memory": "1200Mi"},
-                resource_limits={"memory": "1200Mi"},
+                resource_requests={"cpu": "200m", "memory": "2400Mi"},
+                resource_limits={"memory": "2400Mi"},
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="edx_content",
