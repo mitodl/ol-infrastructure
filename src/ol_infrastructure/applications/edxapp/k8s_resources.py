@@ -9,9 +9,11 @@ import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import iam
 
-from bridge.lib.magic_numbers import DEFAULT_REDIS_PORT
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
+from ol_infrastructure.applications.edxapp.k8s_autoscaling import (
+    create_autoscaling_resources,
+)
 from ol_infrastructure.applications.edxapp.k8s_configmaps import create_k8s_configmaps
 from ol_infrastructure.applications.edxapp.k8s_secrets import create_k8s_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache
@@ -226,53 +228,6 @@ def create_k8s_resources(  # noqa: C901
             "securityGroups": {"groupIds": [edxapp_k8s_app_security_group.id]},
         },
         opts=pulumi.ResourceOptions(depends_on=[edxapp_k8s_app_security_group]),
-    )
-
-    webapp_hpa_scaling_metrics = [
-        kubernetes.autoscaling.v2.MetricSpecArgs(
-            type="Resource",
-            resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
-                name="cpu",
-                target=kubernetes.autoscaling.v2.MetricTargetArgs(
-                    type="Utilization",
-                    average_utilization=80,
-                ),
-            ),
-        ),
-        kubernetes.autoscaling.v2.MetricSpecArgs(
-            type="Resource",
-            resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
-                name="memory",
-                target=kubernetes.autoscaling.v2.MetricTargetArgs(
-                    type="Utilization",
-                    average_utilization=80,
-                ),
-            ),
-        ),
-    ]
-    webapp_hpa_behavior = kubernetes.autoscaling.v2.HorizontalPodAutoscalerBehaviorArgs(
-        scale_up=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
-            stabilization_window_seconds=60,  # wait 1 minute before scaling uzp again
-            select_policy="Max",  # Choose the max value when multiple metrics
-            policies=[
-                kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
-                    type="Percent",
-                    value=100,  # at most, double the pods
-                    period_seconds=60,  # within a minute
-                )
-            ],
-        ),
-        scale_down=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
-            stabilization_window_seconds=300,  # wait 5 minutes before scaling down again
-            select_policy="Min",  # Choose the max value when multiple metrics
-            policies=[
-                kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
-                    type="Percent",
-                    value=25,  # at most, remove 1/4 of the pods at once
-                    period_seconds=60,  # within 1 minute
-                )
-            ],
-        ),
     )
 
     # Call out to other modules to create the k8s secrets and configmaps
@@ -778,25 +733,7 @@ def create_k8s_resources(  # noqa: C901
             ]
         ),
     )
-    lms_webapp_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
-        f"ol-{stack_info.env_prefix}-edxapp-lms-hpa-{stack_info.env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=f"{lms_webapp_deployment_name}-hpa",
-            namespace=namespace,
-            labels=lms_webapp_labels,
-        ),
-        spec=kubernetes.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
-            scale_target_ref=kubernetes.autoscaling.v2.CrossVersionObjectReferenceArgs(
-                api_version="apps/v1",
-                kind="Deployment",
-                name=lms_webapp_deployment_name,
-            ),
-            min_replicas=replicas_dict["webapp"]["lms"]["min"],
-            max_replicas=replicas_dict["webapp"]["lms"]["max"],
-            metrics=webapp_hpa_scaling_metrics,
-            behavior=webapp_hpa_behavior,
-        ),
-    )
+
     lms_webapp_service = kubernetes.core.v1.Service(
         f"ol-{stack_info.env_prefix}-edxapp-lms-service-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -880,50 +817,6 @@ def create_k8s_resources(  # noqa: C901
             ),
         ),
         opts=pulumi.ResourceOptions(depends_on=[*lms_edxapp_config_sources.values()]),
-    )
-
-    lms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
-        f"ol-{stack_info.env_prefix}-edxapp-lms-celery-scaledobject-{stack_info.env_suffix}",
-        api_version="keda.sh/v1alpha1",
-        kind="ScaledObject",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=f"{lms_celery_deployment_name}-scaledobject",
-            namespace=namespace,
-            labels=lms_celery_labels,
-        ),
-        spec={
-            "scaleTargetRef": {
-                "kind": "Deployment",
-                "name": lms_celery_deployment_name,
-            },
-            "pollingInterval": 3,
-            "cooldownPeriod": 10,
-            "minReplicaCount": replicas_dict["celery"]["lms"]["min"],
-            "maxReplicaCount": replicas_dict["celery"]["lms"]["max"],
-            "advanced": {
-                "horizontalPodAutoscalerConfig": {
-                    "behavior": {
-                        "scaleUp": {"stabilizationWindowSeconds": 300},
-                    }
-                }
-            },
-            "triggers": [
-                {
-                    "type": "redis",
-                    "metadata": {
-                        "address": edxapp_cache.address.apply(
-                            lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
-                        ),
-                        "username": "default",
-                        "databaseIndex": "1",
-                        "password": edxapp_cache.cache_cluster.auth_token,
-                        "listName": "edx.lms.core.default",
-                        "listLength": "10",
-                        "enableTLS": "true",
-                    },
-                }
-            ],
-        },
     )
 
     # Celery deployment do not require service definitions
@@ -1267,25 +1160,7 @@ def create_k8s_resources(  # noqa: C901
             ]
         ),
     )
-    cms_webapp_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
-        f"ol-{stack_info.env_prefix}-edxapp-cms-hpa-{stack_info.env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=f"{cms_webapp_deployment_name}-hpa",
-            namespace=namespace,
-            labels=cms_webapp_labels,
-        ),
-        spec=kubernetes.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
-            scale_target_ref=kubernetes.autoscaling.v2.CrossVersionObjectReferenceArgs(
-                api_version="apps/v1",
-                kind="Deployment",
-                name=cms_webapp_deployment_name,
-            ),
-            min_replicas=replicas_dict["webapp"]["cms"]["min"],
-            max_replicas=replicas_dict["webapp"]["cms"]["max"],
-            metrics=webapp_hpa_scaling_metrics,
-            behavior=webapp_hpa_behavior,
-        ),
-    )
+
     cms_webapp_service = kubernetes.core.v1.Service(
         f"ol-{stack_info.env_prefix}-edxapp-cms-service-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -1370,41 +1245,28 @@ def create_k8s_resources(  # noqa: C901
         ),
         opts=pulumi.ResourceOptions(depends_on=[*cms_edxapp_config_sources.values()]),
     )
-    cms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
-        f"ol-{stack_info.env_prefix}-edxapp-cms-celery-scaledobject-{stack_info.env_suffix}",
-        api_version="keda.sh/v1alpha1",
-        kind="ScaledObject",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=f"{cms_celery_deployment_name}-scaledobject",
-            namespace=namespace,
-            labels=cms_celery_labels,
-        ),
-        spec={
-            "scaleTargetRef": {
-                "kind": "Deployment",
-                "name": cms_celery_deployment_name,
-            },
-            "pollingInterval": 3,
-            "cooldownPeriod": 10,
-            "minReplicaCount": replicas_dict["celery"]["cms"]["min"],
-            "maxReplicaCount": replicas_dict["celery"]["cms"]["max"],
-            "triggers": [
-                {
-                    "type": "redis",
-                    "metadata": {
-                        "address": edxapp_cache.address.apply(
-                            lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
-                        ),
-                        "username": "default",
-                        "databaseIndex": "1",
-                        "password": edxapp_cache.cache_cluster.auth_token,
-                        "listName": "edx.cms.core.default",
-                        "listLength": "10",
-                        "enableTLS": "true",
-                    },
-                }
-            ],
-        },
+
+    # Create autoscaling resources (ScaledObjects, TriggerAuthentications, etc.)
+    autoscaling_resources = create_autoscaling_resources(
+        edxapp_cache=edxapp_cache,
+        edxapp_config=edxapp_config,
+        replicas_dict=replicas_dict,
+        namespace=namespace,
+        k8s_global_labels=k8s_global_labels,
+        lms_webapp_labels=lms_webapp_labels,
+        lms_celery_labels=lms_celery_labels,
+        cms_webapp_labels=cms_webapp_labels,
+        cms_celery_labels=cms_celery_labels,
+        lms_webapp_deployment_name=lms_webapp_deployment_name,
+        lms_celery_deployment_name=lms_celery_deployment_name,
+        cms_webapp_deployment_name=cms_webapp_deployment_name,
+        cms_celery_deployment_name=cms_celery_deployment_name,
+        stack_info=stack_info,
+        vault_k8s_resources=vault_k8s_resources,
+        lms_webapp_deployment=lms_webapp_deployment,
+        lms_celery_deployment=lms_celery_deployment,
+        cms_webapp_deployment=cms_webapp_deployment,
+        cms_celery_deployment=cms_celery_deployment,
     )
 
     # APISIX ingress configuration and setup

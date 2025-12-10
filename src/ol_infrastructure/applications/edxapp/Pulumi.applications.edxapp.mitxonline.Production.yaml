@@ -91,6 +91,11 @@ config:
   edxapp:backend_lms_domain: courses-backend.learn.mit.edu
   edxapp:backend_studio_domain: studio-backend.learn.mit.edu
   edxapp:backend_preview_domain: preview-backend.learn.mit.edu
+  edxapp:autoscaling_lms_requests_threshold: "20"
+  edxapp:autoscaling_lms_latency_threshold: "2000"
+  edxapp:autoscaling_lms_cpu_threshold: "70"
+  edxapp:autoscaling_cms_requests_threshold: "20"
+  edxapp:autoscaling_cms_cpu_threshold: "70"
   edxapp:k8s_replicas:
     webapp:
       lms:

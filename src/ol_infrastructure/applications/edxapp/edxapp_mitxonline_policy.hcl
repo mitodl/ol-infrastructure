@@ -53,3 +53,7 @@ path "secret-global/learn_ai" {
 path "secret-global/data/learn_ai" {
   capabilities = ["read"]
 }
+
+path "secret-global/data/grafana" {
+  capabilities = ["read"]
+}
