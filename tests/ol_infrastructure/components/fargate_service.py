@@ -131,8 +131,8 @@ class TestClassBaseFargateArguments:
             assert deployment_controller["type"] == "ECS", (
                 "Deployment controller must be ECS"
             )
-            assert deployment_maximum_percent == 100  # noqa: PLR2004
-            assert deployment_minimum_healthy_percent == 50  # noqa: PLR2004
+            assert deployment_maximum_percent == 100
+            assert deployment_minimum_healthy_percent == 50
             assert desired_count == 1
 
         return pulumi.Output.all(
@@ -209,8 +209,8 @@ class TestClassBaseFargateArguments:
         def check_cpu_mem(args):
             cpu, memory = args
 
-            assert cpu == 256  # noqa: PLR2004
-            assert memory == 512  # noqa: PLR2004
+            assert cpu == 256
+            assert memory == 512
 
         return pulumi.Output.all(self.task_def.cpu, self.task_def.memory).apply(
             check_cpu_mem
@@ -261,11 +261,11 @@ class TestClassBaseFargateArguments:
 
             assert container["name"] == "nginx"
             assert container["image"] == "nginx"
-            assert container["portMappings"][0]["containerPort"] == 80  # noqa: PLR2004
+            assert container["portMappings"][0]["containerPort"] == 80
             assert container["portMappings"][0]["containerName"] == "nginx"
             assert container["portMappings"][0]["protocol"] == "tcp"
 
-            assert container["memory"] == 512  # noqa: PLR2004
+            assert container["memory"] == 512
             assert container["command"] is None
             assert container["cpu"] is None
             assert container["environment"] == []
@@ -412,8 +412,8 @@ class TestClassAllFargateArguments:
             cpu, memory, container_definitions = args
             containers = json.loads(container_definitions)
 
-            assert cpu == 512  # noqa: PLR2004
-            assert memory == 1024  # noqa: PLR2004
+            assert cpu == 512
+            assert memory == 1024
 
             total_cpu = 0
             total_mem = 0
@@ -428,8 +428,8 @@ class TestClassAllFargateArguments:
 
                 assert container["logConfiguration"]["logDriver"] == "awslogs"
 
-                assert container["cpu"] == 256  # noqa: PLR2004
-                assert container["memory"] == 512  # noqa: PLR2004
+                assert container["cpu"] == 256
+                assert container["memory"] == 512
 
                 total_cpu += container["cpu"]
                 total_mem += container["memory"]
@@ -443,7 +443,7 @@ class TestClassAllFargateArguments:
                     assert container["essential"]
                     assert container["environment"][0]["name"] == "var"
                     assert container["environment"][0]["value"] == "nginx"
-                    assert port_mapping["containerPort"] == 80  # noqa: PLR2004
+                    assert port_mapping["containerPort"] == 80
                     assert port_mapping["containerName"] == "nginx"
                     assert port_mapping["protocol"] == "tcp"
                 elif image == "otel":
@@ -454,7 +454,7 @@ class TestClassAllFargateArguments:
                     assert not container["essential"]
                     assert container["environment"][0]["name"] == "var"
                     assert container["environment"][0]["value"] == "otel"
-                    assert port_mapping["containerPort"] == 4317  # noqa: PLR2004
+                    assert port_mapping["containerPort"] == 4317
                     assert port_mapping["containerName"] == "otel"
                     assert port_mapping["protocol"] == "tcp"
 

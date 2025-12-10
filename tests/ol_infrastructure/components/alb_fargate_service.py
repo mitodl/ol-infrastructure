@@ -154,7 +154,7 @@ class TestClassBaseAlbFargateArguments:
             assert not enable_cross_zone_load_balancing
             assert not enable_deletion_protection
             assert enable_http2 is None or enable_http2
-            assert idle_timeout is None or idle_timeout == 60  # noqa: PLR2004
+            assert idle_timeout is None or idle_timeout == 60
 
         return pulumi.Output.all(
             self.load_balancer.drop_invalid_header_fields,
@@ -177,8 +177,8 @@ class TestClassBaseAlbFargateArguments:
             assert deployment_controller["type"] == "ECS", (
                 "Deployment controller must be ECS"
             )
-            assert deployment_maximum_percent == 100  # noqa: PLR2004
-            assert deployment_minimum_healthy_percent == 50  # noqa: PLR2004
+            assert deployment_maximum_percent == 100
+            assert deployment_minimum_healthy_percent == 50
             assert desired_count == 1
 
         return pulumi.Output.all(
@@ -204,7 +204,7 @@ class TestClassBaseAlbFargateArguments:
         def check_load_balancer(args):
             health_check_grace_period_seconds, load_balancers = args
 
-            assert health_check_grace_period_seconds == 60  # noqa: PLR2004
+            assert health_check_grace_period_seconds == 60
             assert load_balancers is not None
 
         return pulumi.Output.all(
@@ -255,8 +255,8 @@ class TestClassBaseAlbFargateArguments:
         def check_cpu_mem(args):
             cpu, memory = args
 
-            assert cpu == 256  # noqa: PLR2004
-            assert memory == 512  # noqa: PLR2004
+            assert cpu == 256
+            assert memory == 512
 
         return pulumi.Output.all(self.task_def.cpu, self.task_def.memory).apply(
             check_cpu_mem
@@ -307,11 +307,11 @@ class TestClassBaseAlbFargateArguments:
 
             assert container["name"] == "nginx"
             assert container["image"] == "nginx"
-            assert container["portMappings"][0]["containerPort"] == 80  # noqa: PLR2004
+            assert container["portMappings"][0]["containerPort"] == 80
             assert container["portMappings"][0]["containerName"] == "nginx"
             assert container["portMappings"][0]["protocol"] == "tcp"
 
-            assert container["memory"] == 512  # noqa: PLR2004
+            assert container["memory"] == 512
             assert container["command"] is None
             assert container["cpu"] is None
             assert container["environment"] == []
