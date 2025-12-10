@@ -13,6 +13,7 @@ config:
   - ["courseware.courseware_mfe", "--create", "--superusers", "--everyone"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
   - ["effort_estimation.disabled", "--create", "--superusers", "--everyone"]
+  - ["forum_v2.enable_mysql_backend", "--create", "--everyone"]
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
   - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
   - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
