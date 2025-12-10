@@ -111,7 +111,7 @@ def mfe_params(
         "FAVICON_URL": open_edx.favicon_url,
         "HONOR_CODE_URL": open_edx.honor_code_url,
         "LANGUAGE_PREFERENCE_COOKIE_NAME": (
-            f"{open_edx.environment}-open-edx-language-preference"
+            f"{open_edx.environment}-openedx-language-preference"
         ),
         "LMS_BASE_URL": f"https://{open_edx.lms_domain}",
         "LEARNING_BASE_URL": f"https://{open_edx.lms_domain}/{learning_mfe_path}",

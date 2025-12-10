@@ -165,24 +165,42 @@ const AutoSelectLanguage = () => {
       );
     }
 
-    if (process.env.APP_ID === 'authoring') {
-      const cookieLang = getCookie('openedx-language-preference');
-      if (cookieLang && cookieLang !== 'en' && authenticatedUser?.username) {
-        setLanguage('en', authenticatedUser.username).finally(() => window.location.reload());
+    const AUTHORING_APP_ID = 'authoring';
+    const ENGLISH_LANG_CODE = 'en';
+    const LANGUAGE_PREFERENCE_COOKIE_NAME = config.LANGUAGE_PREFERENCE_COOKIE_NAME || process.env.LANGUAGE_PREFERENCE_COOKIE_NAME || 'openedx-language-preference';
+
+    if (process.env.APP_ID === AUTHORING_APP_ID) {
+
+      let LMS_LANGUAGE_COOKIE_DOMAIN = config.LMS_BASE_URL || process.env.LMS_BASE_URL;
+      let STUDIO_LANGUAGE_COOKIE_DOMAIN = config.STUDIO_BASE_URL || process.env.STUDIO_BASE_URL;
+      if (process.env.NODE_ENV === 'development') {
+        LMS_LANGUAGE_COOKIE_DOMAIN = `.${new URL(LMS_LANGUAGE_COOKIE_DOMAIN).hostname}`;
+        STUDIO_LANGUAGE_COOKIE_DOMAIN = `.${new URL(STUDIO_LANGUAGE_COOKIE_DOMAIN).hostname}`;
+      } else {
+        LMS_LANGUAGE_COOKIE_DOMAIN = new URL(LMS_LANGUAGE_COOKIE_DOMAIN).hostname.replace('courses', '');
+        STUDIO_LANGUAGE_COOKIE_DOMAIN = new URL(STUDIO_LANGUAGE_COOKIE_DOMAIN).hostname.replace('studio.courses', '');
+      }
+
+      const cookieLang = getCookie(LANGUAGE_PREFERENCE_COOKIE_NAME);
+      if (cookieLang && cookieLang !== ENGLISH_LANG_CODE && authenticatedUser?.username) {
+        // Clear language preference cookies set for LMS and Studio
+        document.cookie = `${LANGUAGE_PREFERENCE_COOKIE_NAME}=; domain=${LMS_LANGUAGE_COOKIE_DOMAIN}; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC`;
+        document.cookie = `${LANGUAGE_PREFERENCE_COOKIE_NAME}=; domain=${STUDIO_LANGUAGE_COOKIE_DOMAIN}; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC`;
+
+        setLanguage(ENGLISH_LANG_CODE, authenticatedUser.username).finally(() => window.location.reload());
       }
       return;
     }
 
     const courseKeyRegex = /course-v1:[^/]+/;
     const match = location.pathname.match(courseKeyRegex);
-    console.log(match)
     if (match) {
       const courseKey = match[0];
       fetch(`${baseURL}/api/ol-openedx-course-translations/course-language/${courseKey}`)
         .then(res => res.json())
         .then(async data => {
           const courseLang = data.language;
-          const cookieLang = getCookie('openedx-language-preference');
+          const cookieLang = getCookie(LANGUAGE_PREFERENCE_COOKIE_NAME);
           if (courseLang && cookieLang && courseLang !== cookieLang && authenticatedUser?.username) {
             await setLanguage(courseLang, authenticatedUser.username);
             window.location.reload();
