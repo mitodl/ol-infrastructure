@@ -45,6 +45,7 @@ config:
   - ["studio.library_authoring_mfe", "--deactivate"]
   - ["legacy_studio.certificates", "--create", "--everyone"]
   edxapp:business_unit: residential
+  exapp:canvas_base_url: https://mit.test.instructure.com
   edxapp:db_password:
     secure: v1:Q1uI9EWaIrq2z2sY:pTBVK/vatuCQXgO3Z2ItArDb4P1QLpN/lP/jT9690boozaKjjJudoQZOyWjkbCFwGLieh+L9auw=
   edxapp:dns_zone: mitx

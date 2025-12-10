@@ -2,6 +2,11 @@
 COURSE_AUTHORING_MICROFRONTEND_URL: /authoring
 DISCUSSIONS_INCONTEXT_LEARNMORE_URL: https://openedx.atlassian.net/wiki/spaces/COMM/pages/3470655498/Discussions+upgrade+Sidebar+and+new+topic+structure
 GIT_REPO_EXPORT_DIR: /openedx/data/export_course_repos
+FEATURES:
+  ENABLE_INSTRUCTOR_BACKGROUND_TASKS: true # ADDED
+  ENABLE_NEW_BULK_EMAIL_EXPERIENCE: true # ADDED
+  MAX_PROBLEM_RESPONSES_COUNT: 10000 # ADDED
+  PREVIEW_LMS_BASE: preview-ci.mitx.mit.edu # ADDED
 GIT_EXPORT_DEFAULT_IDENT:
   name: MITx Online
   email: mitx-devops@mit.edu
@@ -14,6 +19,7 @@ CALCULATOR_HELP_URL: ''
 DISCUSSIONS_HELP_URL: ''
 EDXNOTES_HELP_URL: ''
 PROGRESS_HELP_URL: ''
+SEGMENT_IO: false # ADDED
 TEAMS_HELP_URL: ''
 TEXTBOOKS_HELP_URL: ''
 WIKI_HELP_URL: ''
