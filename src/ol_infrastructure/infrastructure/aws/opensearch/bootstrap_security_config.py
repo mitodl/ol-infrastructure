@@ -45,6 +45,8 @@ read_write_role = {
         "indices:data/read/scroll/clear",
         "cluster:admin/opensearch/ml/*",
         "cluster:admin/ingest/pipeline/*",
+        "cluster:admin/search/pipeline/get",
+        "cluster:admin/search/pipeline/put",
     ],
     "index_permissions": [
         {
