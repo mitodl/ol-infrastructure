@@ -49,6 +49,9 @@ dev = [
     "mypy",
     "pre-commit>=4.0.0,<5",
     "pytest>=9.0.1,<10",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "pytest-mock>=3.14.0",
     "pytest-testinfra>=10.0.0,<11",
     "ruff>=0.12,<1",
 ]
@@ -201,8 +204,23 @@ inline-quotes = "double"
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/**" = ["T201", "ERA001", "B", "BLE001", "PLR", "E501", "G004", "FBT", "C90", "INP001"]
-"tests/**" = ["S101"]
+"tests/**" = ["S101", "PLR2004", "RUF059"]
 "test_*.py" = ["S101"]
 "src/ol_infrastructure/substructure/vault/pki/__main__.py" = ["E501"]
 "src/ol_infrastructure/lib/fastly.py" = ["E501"]
 "src/bridge/lib/versions.py" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "unit: Unit tests (fast, no external dependencies)",
+    "integration: Integration tests (slow, deploys infrastructure)",
+    "policy: Policy pack tests",
+]
+# Skip slow integration tests by default
+addopts = "-v -m 'not integration'"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

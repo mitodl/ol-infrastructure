@@ -49,8 +49,17 @@ uv run pre-commit run --all-files
 
 ### Testing
 ```bash
-# Run tests (minimal test coverage exists)
+# Run all tests (currently minimal test coverage)
 uv run pytest tests/
+
+# Run tests with verbose output
+uv run pytest tests/ -v
+
+# Run specific test file
+uv run pytest tests/ol_infrastructure/components/aws/test_kubernetes_app_auth.py
+
+# Run tests with coverage report
+uv run pytest tests/ --cov=src/ol_infrastructure --cov-report=term-missing
 ```
 
 ## Critical Build Constraints
@@ -240,11 +249,14 @@ packer validate .
 |------|----------------|------------|
 | Add AWS resource | `src/ol_infrastructure/infrastructure/aws/<service>/__main__.py` | `pulumi preview` |
 | Create new app infra | Create `src/ol_infrastructure/applications/<app>/` with `Pulumi.yaml` + `__main__.py` | `pulumi stack init` then `preview` |
-| Add reusable component | `src/ol_infrastructure/components/<category>/` | Used in other projects |
+| Add reusable component | `src/ol_infrastructure/components/<category>/` | Used in other projects + unit tests |
 | Modify AMI build | `src/bilder/images/<image>/deploy.py` or `.pkr.hcl` | Packer build (CI only) |
 | Add CI/CD pipeline | `src/ol_concourse/pipelines/<category>/` | Generate YAML, deploy to Concourse |
 | Add secret | Encrypt with `sops`, place in `src/bridge/secrets/<context>/`, decrypt in Pulumi | `sops` CLI |
 | Document architecture decision | Create `docs/adr/NNNN-title.md` using template | ADR format validation |
+| Add component unit test | Create `tests/unit/components/test_<name>.py` with PulumiMocks | `uv run pytest tests/unit/` |
+| Add integration test | Create `tests/integration/test_<name>.py` using Automation API | `uv run pytest tests/integration/ -v` |
+| Add policy pack | Create `policy-packs/<name>/` with `__main__.py` | `pulumi preview --policy-pack` |
 
 ## Environment Requirements
 
@@ -284,6 +296,772 @@ Before submitting changes:
 
 **Optional but recommended:**
 - `uv run pre-commit run --all-files` — Run all hooks (may take 2+ minutes)
+
+---
+
+## Testing Pulumi Infrastructure Code
+
+### Testing Philosophy
+
+Testing Pulumi infrastructure code is critical for ensuring reliability and preventing configuration drift. This repository supports three types of testing:
+
+1. **Unit Testing** — Test individual components and resources in isolation using mocked dependencies
+2. **Property/Policy Testing** — Validate resource compliance against organizational standards
+3. **Integration Testing** — Deploy to ephemeral environments and validate end-to-end behavior
+
+**Current state:** Repository has minimal test coverage (~1 unit test example). Expand test coverage as you develop.
+
+### When to Write Tests (for AI Agents)
+
+**ALWAYS write tests when you:**
+
+1. **Create new reusable components** (`src/ol_infrastructure/components/`)
+   - ✅ Test component initialization with various configurations
+   - ✅ Validate resource properties match inputs
+   - ✅ Verify dependent resources are created correctly
+
+2. **Add complex resource logic** (conditional creation, computed properties)
+   - ✅ Test all code paths and edge cases
+   - ✅ Validate property transformations
+   - ✅ Test error handling
+
+3. **Modify existing components with tests**
+   - ✅ Update existing tests to reflect new behavior
+   - ✅ Add tests for new functionality
+
+4. **Create helper functions** (`src/ol_infrastructure/lib/`)
+   - ✅ Test pure functions with various inputs
+   - ✅ Validate edge cases and error conditions
+
+**CONSIDER writing tests when you:**
+
+- Create new Pulumi projects (applications or infrastructure)
+- Implement complex IAM policies or security group rules
+- Build multi-resource orchestration logic
+
+**SKIP tests for:**
+
+- Simple stack configurations (mostly passing values)
+- One-off infrastructure changes
+- Prototypes or experiments
+- Changes solely to documentation
+
+### Unit Testing with Pulumi Mocks
+
+**What are unit tests?** Tests that validate resource properties and relationships without deploying infrastructure. Use Pulumi's mocking system to intercept resource creation.
+
+**Example location:** `tests/ol_infrastructure/components/aws/test_kubernetes_app_auth.py`
+
+#### Unit Test Structure
+
+**Python 3.14+ Compatibility Note:** Pulumi's `set_mocks()` requires an event loop. Add this at the top of test files:
+
+```python
+import asyncio
+
+# Ensure event loop exists for Python 3.14+
+try:
+    asyncio.get_event_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
+```
+
+```python
+"""Tests for MyComponent."""
+import asyncio
+import pulumi
+
+# Python 3.14+ compatibility
+try:
+    asyncio.get_event_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
+
+class MyMocks(pulumi.runtime.Mocks):
+    """Mock implementation for Pulumi resources."""
+
+    def new_resource(self, args: pulumi.runtime.MockResourceArgs):
+        """Mock resource creation - return resource ID and outputs."""
+        outputs = args.inputs
+        # Add mock outputs for specific resource types
+        if args.typ == "aws:ec2/instance:Instance":
+            outputs = {
+                **args.inputs,
+                "publicIp": "203.0.113.12",
+                "publicDns": "ec2-203-0-113-12.compute-1.amazonaws.com",
+            }
+        return [args.name + "_id", outputs]
+
+    def call(self, args: pulumi.runtime.MockCallArgs):
+        """Mock data source calls."""
+        if args.token == "aws:ec2/getAmi:getAmi":  # noqa: S105
+            return {
+                "architecture": "x86_64",
+                "id": "ami-0eb1f3cdeeb8eed2a",
+            }
+        return {}
+
+
+# Set mocks BEFORE importing code under test
+pulumi.runtime.set_mocks(MyMocks())
+
+# Now import the component/infrastructure code
+from ol_infrastructure.components.aws.my_component import MyComponent
+
+
+# Create the component at module level or in a fixture
+test_component = MyComponent(
+    "test-component",
+    vpc_id="vpc-12345",
+    subnet_ids=["subnet-1", "subnet-2"],
+)
+
+
+# Tests use @pulumi.runtime.test decorator and RETURN Output.apply()
+@pulumi.runtime.test
+def test_security_group_created():
+    """Verify security group is created with correct VPC."""
+    def check_vpc_id(args):
+        urn, vpc_id = args
+        assert vpc_id == "vpc-12345", f"Expected vpc-12345, got {vpc_id}"
+
+    return pulumi.Output.all(
+        test_component.security_group.urn,
+        test_component.security_group.vpc_id
+    ).apply(check_vpc_id)
+
+
+@pulumi.runtime.test
+def test_instance_type():
+    """Verify instance uses correct instance type."""
+    def check_instance_type(args):
+        urn, instance_type = args
+        assert instance_type == "t3.micro", f"Expected t3.micro, got {instance_type}"
+
+    return pulumi.Output.all(
+        test_component.instance.urn,
+        test_component.instance.instance_type
+    ).apply(check_instance_type)
+
+
+@pulumi.runtime.test
+def test_tags_applied():
+    """Verify required tags are present."""
+    def check_tags(args):
+        urn, tags = args
+        assert tags, f"Resource {urn} must have tags"
+        assert "Environment" in tags, f"Resource {urn} must have Environment tag"
+
+    return pulumi.Output.all(
+        test_component.instance.urn,
+        test_component.instance.tags
+    ).apply(check_tags)
+```
+
+**See working example:** `tests/test_example_correct_pattern.py`
+
+#### Key Unit Testing Patterns
+
+**1. Module-level setup (CRITICAL):**
+```python
+import pulumi
+
+# Define mocks at module level
+class MyMocks(pulumi.runtime.Mocks):
+    def new_resource(self, args):
+        return [args.name + "_id", args.inputs]
+
+    def call(self, args):
+        return {}
+
+# Set mocks BEFORE importing code under test
+pulumi.runtime.set_mocks(MyMocks())
+
+# NOW import your infrastructure code
+from ol_infrastructure.components.aws.my_component import MyComponent
+```
+
+**2. Use @pulumi.runtime.test decorator:**
+```python
+@pulumi.runtime.test
+def test_resource_property():
+    """Test description."""
+    def check_value(args):
+        urn, actual_value = args
+        assert actual_value == "expected", f"Resource {urn} has wrong value"
+
+    # RETURN the Output.apply() call (don't just call it)
+    return pulumi.Output.all(
+        component.resource.urn,
+        component.resource.property
+    ).apply(check_value)
+```
+
+**3. Testing multiple outputs:**
+```python
+@pulumi.runtime.test
+def test_multiple_properties():
+    def check_values(args):
+        urn, vpc_id, instance_type, tags = args
+        assert vpc_id == "vpc-12345"
+        assert instance_type == "t3.micro"
+        assert "Name" in tags
+
+    return pulumi.Output.all(
+        component.instance.urn,
+        component.instance.vpc_id,
+        component.instance.instance_type,
+        component.instance.tags,
+    ).apply(check_values)
+```
+
+**4. Testing resource existence:**
+```python
+@pulumi.runtime.test
+def test_resource_created():
+    """Verify resource was created."""
+    def check_exists(urn):
+        # If we got a URN, resource exists
+        assert urn, "Resource was not created"
+        assert "my-component" in urn
+
+    return component.my_resource.urn.apply(check_exists)
+```
+
+**5. Testing security group rules:**
+```python
+@pulumi.runtime.test
+def test_no_ssh_from_internet():
+    """Ensure SSH is not open to the internet."""
+    def check_ingress_rules(args):
+        urn, ingress = args
+        ssh_open = any(
+            rule["from_port"] == 22
+            and any(block == "0.0.0.0/0" for block in rule["cidr_blocks"])
+            for rule in ingress
+        )
+        assert not ssh_open, f"Security group {urn} exposes SSH to internet"
+
+    return pulumi.Output.all(
+        security_group.urn,
+        security_group.ingress
+    ).apply(check_ingress_rules)
+```
+
+**6. Mocking AWS data sources:**
+```python
+class MyMocks(pulumi.runtime.Mocks):
+    def call(self, args):
+        # Mock AWS AMI lookup
+        if args.token == "aws:ec2/getAmi:getAmi":  # noqa: S105
+            return {
+                "architecture": "x86_64",
+                "id": "ami-0eb1f3cdeeb8eed2a",
+            }
+        # Mock VPC lookup
+        if args.token == "aws:ec2/getVpc:getVpc":  # noqa: S105
+            return {
+                "id": "vpc-12345678",
+                "cidrBlock": "10.0.0.0/16",
+            }
+        return {}
+```
+
+#### Running Unit Tests
+
+```bash
+# Run all unit tests
+uv run pytest tests/
+
+# Run specific test file
+uv run pytest tests/ol_infrastructure/components/test_my_component.py
+
+# Run with verbose output
+uv run pytest tests/ -v
+
+# Run specific test function
+uv run pytest tests/test_my_component.py::test_security_group_created
+
+# Disable pytest warnings (Pulumi generates many deprecation warnings)
+uv run pytest tests/ --disable-pytest-warnings
+```
+
+**Important:** When using `@pulumi.runtime.test`, you don't need pytest classes or fixtures. Tests are simple functions at module level.
+
+### Property/Policy Testing
+
+**What is policy testing?** Validates that infrastructure resources comply with organizational standards and security requirements. Unlike unit tests that check correctness, policy tests enforce governance.
+
+**Policy testing in this repository:**
+- Policies are written as Pulumi Policy Packs (TypeScript or Python)
+- Policies validate resource properties during `pulumi preview` and `pulumi up`
+- Can enforce mandatory, advisory, or warning-level rules
+
+**When to write policies:**
+- Enforce security standards (encryption, network isolation)
+- Ensure cost controls (instance types, resource limits)
+- Validate compliance requirements (tagging, naming conventions)
+- Prevent misconfigurations (public S3 buckets, open security groups)
+
+**Policy Pack Structure:**
+```
+policy-packs/
+├── aws-security/              # Example policy pack
+│   ├── PulumiPolicy.yaml      # Policy pack metadata (Python)
+│   ├── __main__.py            # Policy definitions (Python)
+│   └── requirements.txt       # Dependencies
+```
+
+**Example Policy (Python):**
+```python
+from pulumi_policy import (
+    EnforcementLevel,
+    PolicyPack,
+    ResourceValidationPolicy,
+)
+
+def s3_bucket_encryption_validator(args, report_violation):
+    """Ensure S3 buckets have encryption enabled."""
+    if args.resource_type == "aws:s3/bucket:Bucket":
+        encryption = args.props.get("serverSideEncryptionConfiguration")
+        if not encryption:
+            report_violation("S3 bucket must have server-side encryption enabled.")
+
+s3_encryption_policy = ResourceValidationPolicy(
+    name="s3-bucket-encryption",
+    description="Validates that S3 buckets have encryption enabled.",
+    validate=s3_bucket_encryption_validator,
+    enforcement_level=EnforcementLevel.MANDATORY,
+)
+
+PolicyPack(
+    name="aws-security",
+    enforcement_level=EnforcementLevel.MANDATORY,
+    policies=[s3_encryption_policy],
+)
+```
+
+**Testing Policies Locally:**
+```bash
+# Navigate to Pulumi project
+cd src/ol_infrastructure/applications/my_app/
+
+# Run policy pack locally (does not enforce, just validates)
+pulumi preview --policy-pack ../../../policy-packs/aws-security/
+```
+
+**Publishing Policies (requires Pulumi Cloud):**
+```bash
+cd policy-packs/aws-security/
+pulumi policy publish <org-name>
+```
+
+**Reference:** See [Pulumi Policy Authoring Guide](https://www.pulumi.com/docs/insights/policy/policy-packs/authoring/) for details.
+
+### Integration Testing
+
+**What is integration testing?** Deploys actual infrastructure to ephemeral environments, validates behavior, then tears down. Tests the complete deployment lifecycle.
+
+**Integration testing options:**
+
+1. **Pulumi Integration Testing Framework (Go)** — Purpose-built framework for testing Pulumi programs
+2. **Pulumi Automation API (Python/Node/Go/.NET/Java)** — Programmatic control over Pulumi lifecycle
+3. **CLI-based testing (Shell scripts)** — Direct use of `pulumi` commands
+
+**When to use integration tests:**
+- Validate multi-resource orchestration
+- Test deployment/update/destroy lifecycle
+- Verify runtime behavior (HTTP endpoints, database connections)
+- Test upgrade paths between versions
+
+#### Option 1: Integration Testing Framework (Go)
+
+**Not currently set up in this repository.** Requires Go test harness.
+
+**Setup required:**
+1. Create `tests/integration/` directory
+2. Add Go module: `go mod init github.com/mitodl/ol-infrastructure/tests/integration`
+3. Add dependency: `go get github.com/pulumi/pulumi/sdk/v3/go/auto`
+4. Write tests using `integration.ProgramTest`
+
+**Example structure:**
+```go
+// tests/integration/network_test.go
+package test
+
+import (
+    "testing"
+    "github.com/pulumi/pulumi/sdk/v3/go/common/resource"
+    "github.com/pulumi/pulumi/pkg/v3/testing/integration"
+)
+
+func TestNetworkInfrastructure(t *testing.T) {
+    integration.ProgramTest(t, &integration.ProgramTestOptions{
+        Dir: "../../src/ol_infrastructure/infrastructure/aws/network",
+        Quick: true,
+        ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+            // Validate outputs
+            vpcId := stack.Outputs["vpc_id"].(string)
+            assert.NotEmpty(t, vpcId)
+        },
+    })
+}
+```
+
+**Reference:** [Pulumi Integration Testing Framework](https://www.pulumi.com/docs/iac/guides/testing/integration/framework/)
+
+#### Option 2: Automation API (Python)
+
+**Current recommendation for this repository** — Write integration tests in Python using Automation API.
+
+**Setup required:**
+1. Add test dependencies to `pyproject.toml`:
+   ```toml
+   [dependency-groups]
+   dev = [
+       # ... existing deps
+       "pytest-asyncio>=0.24.0",  # For async test support
+   ]
+   ```
+
+2. Create integration test directory: `tests/integration/`
+
+3. Create test using Automation API:
+
+```python
+"""Integration tests for network infrastructure."""
+import pytest
+import pulumi
+from pulumi import automation as auto
+import httpx
+
+
+@pytest.mark.integration  # Mark as integration test (slow, optional)
+def test_network_stack_lifecycle():
+    """Test deploying and destroying network stack."""
+    project_name = "network-test"
+    stack_name = "test"
+    work_dir = "src/ol_infrastructure/infrastructure/aws/network"
+
+    # Create or select stack
+    stack = auto.create_or_select_stack(
+        stack_name=stack_name,
+        project_name=project_name,
+        work_dir=work_dir,
+    )
+
+    # Set configuration
+    stack.set_config("aws:region", auto.ConfigValue(value="us-east-1"))
+
+    try:
+        # Deploy stack
+        up_result = stack.up(on_output=print)
+
+        # Validate outputs
+        outputs = up_result.outputs
+        assert "vpc_id" in outputs
+        vpc_id = outputs["vpc_id"].value
+        assert vpc_id.startswith("vpc-")
+
+        # Optionally validate runtime behavior
+        # Example: Check if resource exists via AWS SDK
+
+    finally:
+        # Always clean up
+        stack.destroy(on_output=print)
+        stack.workspace.remove_stack(stack_name)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_web_endpoint_available():
+    """Test that deployed web application responds to HTTP requests."""
+    # Deploy stack (abbreviated)
+    stack = auto.create_or_select_stack(...)
+    up_result = stack.up(on_output=print)
+
+    try:
+        # Get endpoint URL from outputs
+        endpoint_url = up_result.outputs["endpoint_url"].value
+
+        # Validate HTTP endpoint
+        async with httpx.AsyncClient() as client:
+            response = await client.get(endpoint_url)
+            assert response.status_code == 200
+            assert "Welcome" in response.text
+    finally:
+        stack.destroy(on_output=print)
+        stack.workspace.remove_stack(stack_name)
+```
+
+**Running Integration Tests:**
+```bash
+# Run all integration tests (slow - deploys infrastructure)
+uv run pytest tests/integration/ -v
+
+# Run specific integration test
+uv run pytest tests/integration/test_network.py::test_network_stack_lifecycle
+
+# Skip integration tests (run only unit tests)
+uv run pytest tests/ -m "not integration"
+```
+
+**Reference:** [Automation API Testing](https://www.pulumi.com/docs/iac/guides/testing/integration/automation-api/)
+
+#### Option 3: CLI-Based Integration Testing
+
+**Simplest approach** — Use shell scripts or Python subprocess calls to run `pulumi` commands.
+
+```python
+"""CLI-based integration test."""
+import subprocess
+import json
+
+
+def test_stack_deploys_successfully():
+    """Test stack deployment via CLI."""
+    project_dir = "src/ol_infrastructure/infrastructure/aws/network"
+    stack_name = "test"
+
+    # Initialize stack
+    subprocess.run(
+        ["pulumi", "stack", "init", stack_name],
+        cwd=project_dir,
+        check=True,
+    )
+
+    try:
+        # Deploy
+        result = subprocess.run(
+            ["pulumi", "up", "--yes", "--skip-preview"],
+            cwd=project_dir,
+            capture_output=True,
+            check=True,
+        )
+        assert b"error" not in result.stderr.lower()
+
+        # Export outputs
+        outputs_result = subprocess.run(
+            ["pulumi", "stack", "output", "--json"],
+            cwd=project_dir,
+            capture_output=True,
+            check=True,
+        )
+        outputs = json.loads(outputs_result.stdout)
+        assert "vpc_id" in outputs
+
+    finally:
+        # Destroy
+        subprocess.run(
+            ["pulumi", "destroy", "--yes"],
+            cwd=project_dir,
+        )
+        subprocess.run(
+            ["pulumi", "stack", "rm", stack_name, "--yes"],
+            cwd=project_dir,
+        )
+```
+
+### Test Organization
+
+**Recommended directory structure:**
+
+```
+tests/
+├── __init__.py
+├── conftest.py                    # Shared pytest fixtures
+├── unit/                          # Fast unit tests (no deployment)
+│   ├── __init__.py
+│   ├── components/
+│   │   ├── test_fargate_service.py
+│   │   └── test_kubernetes_auth.py
+│   └── lib/
+│       ├── test_aws_helpers.py
+│       └── test_pulumi_helpers.py
+├── integration/                   # Slow integration tests (deploy infra)
+│   ├── __init__.py
+│   ├── test_network_stack.py
+│   └── test_application_deployment.py
+└── policies/                      # Policy pack tests
+    └── test_aws_security_policies.py
+```
+
+**Shared fixtures (`conftest.py`):**
+```python
+"""Shared pytest fixtures for Pulumi tests."""
+import pytest
+import pulumi
+
+
+@pytest.fixture(scope="session", autouse=True)
+def pulumi_mocks():
+    """Set up Pulumi mocks for all unit tests."""
+    class PulumiMocks(pulumi.runtime.Mocks):
+        def new_resource(self, args: pulumi.runtime.MockResourceArgs):
+            return [args.name + "_id", args.inputs]
+
+        def call(self, args: pulumi.runtime.MockCallArgs):
+            return {}
+
+    pulumi.runtime.set_mocks(PulumiMocks())
+
+
+@pytest.fixture
+def aws_region():
+    """Default AWS region for tests."""
+    return "us-east-1"
+
+
+@pytest.fixture
+def mock_vpc_id():
+    """Mock VPC ID for tests."""
+    return "vpc-12345678"
+```
+
+### Test Harness Setup Tasks
+
+**To enable full testing capabilities in this repository:**
+
+1. **Add test dependencies:**
+   ```bash
+   # Edit pyproject.toml to add:
+   # [dependency-groups]
+   # dev = [
+   #     "pytest-asyncio>=0.24.0",
+   #     "pytest-cov>=6.0.0",
+   #     "pytest-mock>=3.14.0",
+   # ]
+   uv sync
+   ```
+
+2. **Create test directory structure:**
+   ```bash
+   mkdir -p tests/unit/components tests/unit/lib tests/integration tests/policies
+   touch tests/conftest.py
+   ```
+
+3. **Add pytest configuration to `pyproject.toml`:**
+   ```toml
+   [tool.pytest.ini_options]
+   testpaths = ["tests"]
+   python_files = ["test_*.py"]
+   python_classes = ["Test*"]
+   python_functions = ["test_*"]
+   markers = [
+       "unit: Unit tests (fast, no external dependencies)",
+       "integration: Integration tests (slow, deploys infrastructure)",
+       "policy: Policy pack tests",
+   ]
+   # Ignore slow integration tests by default
+   addopts = "-v -m 'not integration'"
+   ```
+
+4. **Create shared mocks (`tests/conftest.py`):** See example above
+
+5. **Add coverage reporting:**
+   ```bash
+   uv run pytest tests/ --cov=src/ol_infrastructure --cov-report=html
+   open htmlcov/index.html  # View coverage report
+   ```
+
+6. **For Go integration tests (optional):**
+   ```bash
+   mkdir -p tests/integration_go
+   cd tests/integration_go
+   go mod init github.com/mitodl/ol-infrastructure/tests/integration_go
+   go get github.com/pulumi/pulumi/sdk/v3/go/auto
+   go get github.com/stretchr/testify/assert
+   ```
+
+### Testing Best Practices
+
+**DO:**
+- ✅ Write unit tests for all reusable components
+- ✅ Use descriptive test names: `test_security_group_blocks_public_ssh`
+- ✅ Test both success and failure cases
+- ✅ Use `pytest.mark.integration` for slow tests
+- ✅ Mock external dependencies (AWS API calls)
+- ✅ Clean up resources in integration tests (`try/finally` blocks)
+- ✅ Test outputs and resource properties, not implementation details
+- ✅ Use fixtures for repeated setup code
+
+**DON'T:**
+- ❌ Test implementation details (how resources are created)
+- ❌ Skip cleanup in integration tests (avoid resource leaks)
+- ❌ Hard-code resource IDs or ARNs in tests
+- ❌ Run integration tests on every commit (too slow)
+- ❌ Mix unit and integration tests in same file
+- ❌ Forget to add new test files to git
+
+### Testing Checklist for AI Agents
+
+When creating or modifying Pulumi code:
+
+1. **Unit tests:**
+   - [ ] Created `tests/unit/components/test_<component_name>.py`
+   - [ ] Added `PulumiMocks` fixture
+   - [ ] Tested resource creation with valid inputs
+   - [ ] Tested edge cases and error conditions
+   - [ ] Validated resource properties using `.apply()`
+   - [ ] Tests pass: `uv run pytest tests/unit/`
+
+2. **Integration tests (if applicable):**
+   - [ ] Created `tests/integration/test_<stack_name>.py`
+   - [ ] Test deploys stack successfully
+   - [ ] Test validates outputs
+   - [ ] Test destroys stack in `finally` block
+   - [ ] Marked with `@pytest.mark.integration`
+
+3. **Policy tests (if creating policies):**
+   - [ ] Created policy pack in `policy-packs/<pack_name>/`
+   - [ ] Tested policy with `pulumi preview --policy-pack`
+   - [ ] Documented policy in `policy-packs/README.md`
+
+4. **Documentation:**
+   - [ ] Added docstrings to test functions
+   - [ ] Updated test README if needed
+   - [ ] Documented any special test setup requirements
+
+### Example Test Workflow
+
+**When creating a new component:**
+
+1. Create component file: `src/ol_infrastructure/components/aws/my_component.py`
+2. Create test file: `tests/unit/components/test_my_component.py`
+3. Write component code and tests in parallel (TDD approach)
+4. Run tests: `uv run pytest tests/unit/components/test_my_component.py -v`
+5. Fix failures, iterate
+6. Add integration test if component requires runtime validation
+7. Update documentation
+
+**Before submitting PR:**
+
+```bash
+# Run all unit tests
+uv run pytest tests/unit/ -v
+
+# Run linting
+uv run ruff format src/ tests/
+uv run ruff check src/ tests/
+
+# Run type checking
+uv run mypy src/
+
+# Optionally run integration tests (slow)
+uv run pytest tests/integration/ -v
+```
+
+### Testing Resources
+
+- **Pulumi Unit Testing:** https://www.pulumi.com/docs/iac/guides/testing/unit/
+- **Pulumi Policy Testing:** https://www.pulumi.com/docs/insights/policy/policy-packs/authoring/
+- **Pulumi Integration Testing:** https://www.pulumi.com/docs/iac/guides/testing/integration/
+- **Automation API:** https://www.pulumi.com/docs/iac/packages-and-automation/automation-api/
+- **Pytest Documentation:** https://docs.pytest.org/
+- **Example Repository:** `tests/ol_infrastructure/components/aws/test_kubernetes_app_auth.py`
+
+---
 
 ## When to Search vs. Trust Instructions
 
