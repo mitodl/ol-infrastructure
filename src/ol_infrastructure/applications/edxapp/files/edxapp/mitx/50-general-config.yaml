@@ -26,10 +26,6 @@ ASSUME_ZERO_GRADE_IF_ABSENT_FOR_ALL_TESTS: true # ADDED KEY
 AUTHENTICATION_BACKENDS:
   - common.djangoapps.third_party_auth.saml.SAMLAuthBackend
   - common.djangoapps.third_party_auth.lti.LTIAuthBackend
-  - rules.permissions.ObjectPermissionBackend
-  - django.contrib.auth.backends.AllowAllUsersModelBackend
-  - bridgekeeper.backends.RulePermissionBackend
-  - lms.djangoapps.lti_provider.users.LtiBackend
 AUTH_PASSWORD_VALIDATORS:
 - NAME: django.contrib.auth.password_validation.UserAttributeSimilarityValidator
 - NAME: common.djangoapps.util.password_policy_validators.MinimumLengthValidator
