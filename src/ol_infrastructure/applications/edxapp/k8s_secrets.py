@@ -66,8 +66,7 @@ def _build_general_secrets_template(
     if stack_info.env_prefix == "mitx":
         template_parts.append(
             """
-        CANVAS_ACCESS_TOKEN: {{ get .Secrets "canvas_access_token" }}
-        DEEPL_API_KEY: {{ get .Secrets "deepl_api_key" }}"""
+        CANVAS_ACCESS_TOKEN: {{ get .Secrets "canvas_access_token" }}"""
         )
 
     if stack_info.env_prefix == "mitxonline":
