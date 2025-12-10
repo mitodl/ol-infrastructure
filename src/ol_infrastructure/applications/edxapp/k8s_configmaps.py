@@ -161,7 +161,7 @@ def _build_interpolated_config_template(
     ]
 
     # Special handling of CSRF_TRUSTED_ORIGINS for residential
-    if stack_info.env_prefix in ["mitx", "mitxonline"]:
+    if stack_info.env_prefix in ["mitx", "mitx-staging"]:
         template_parts.append(
             f"""
         CSRF_TRUSTED_ORIGINS:  # MODIFIED
@@ -176,9 +176,10 @@ def _build_interpolated_config_template(
         )
 
     # Special configuration unique to residential
-    if stack_info.env_prefix in ["mitx", "mitxonline"]:
+    if stack_info.env_prefix in ["mitx", "mitx-staging"]:
         template_parts.append(
-            """
+            f"""
+        CANVAS_BASE_URL: {edxapp_config.require("canvas_base_url")}
         """
         )
 
