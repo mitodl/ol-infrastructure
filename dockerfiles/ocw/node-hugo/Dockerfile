@@ -1,4 +1,4 @@
-FROM node:22-trixie-slim
+FROM node:24-trixie-slim
 LABEL maintainer="MIT Open Learning (odl-devops@mit.edu)"
 LABEL description="Node and Hugo, used for building OCW website"
 LABEL version="0.8"
