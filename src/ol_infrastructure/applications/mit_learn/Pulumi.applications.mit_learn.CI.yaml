@@ -69,17 +69,6 @@ config:
     MITX_ONLINE_COURSES_API_URL: "https://mitxonline.mit.edu/api/v2/courses/"
     MITX_ONLINE_PROGRAMS_API_URL: "https://mitxonline.mit.edu/api/v2/programs/"
     OPENTELEMETRY_ENABLED: "true"
-    OPENTELEMETRY_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces"
-    OPENTELEMETRY_SERVICE_NAME: "learn-webapp"
-    OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=ci,service.namespace=learn,service.version=${GIT_SHA:-unknown},service.instance.id=${HOSTNAME}"
-    OTEL_TRACES_SAMPLER: "parentbased_traceidratio"
-    OTEL_TRACES_SAMPLER_ARG: "1.0"
-    OTEL_PROPAGATORS: "tracecontext,baggage"
-    OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
-    OTEL_LOGS_EXPORTER: "otlp"
-    OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/logs"
-    OTEL_METRIC_EXPORT_INTERVAL: "60000"
-    OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT: "128"
     MITOL_SUPPORT_EMAIL: "odl-learn-ci-support@mit.edu" # Need to verify
     MITPE_API_ENABLED: "true"
     OCW_ITERATOR_CHUNK_SIZE: 300
