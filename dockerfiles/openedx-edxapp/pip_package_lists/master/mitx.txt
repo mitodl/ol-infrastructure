@@ -25,7 +25,7 @@ ol-openedx-chat
 ol-openedx-chat-xblock
 
 # Open Telemetry support
-# opentelemetry-api
+opentelemetry-api
 # opentelemetry-distro
 # opentelemetry-instrumentation
 # opentelemetry-instrumentation-django

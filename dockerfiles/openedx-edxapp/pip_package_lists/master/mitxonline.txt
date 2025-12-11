@@ -31,7 +31,7 @@ ol-openedx-course-translations
 ol-openedx-course-sync
 
 # Open Telemetry support
-# opentelemetry-api
+opentelemetry-api
 # opentelemetry-distro
 # opentelemetry-instrumentation
 # opentelemetry-instrumentation-django
