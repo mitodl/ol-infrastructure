@@ -156,6 +156,32 @@ def create_autoscaling_resources(
             "maxReplicaCount": replicas_dict["webapp"]["lms"]["max"],
             "pollingInterval": 60,  # check triggers every minute
             "cooldownPeriod": 300,  # wait 5 minutes before scaling down again
+            "advanced": {
+                "horizontalPodAutoscalerConfig": {
+                    "behavior": {
+                        "scaleUp": {
+                            "stabilizationWindowSeconds": 60,
+                            "policies": [
+                                {
+                                    "type": "Percent",
+                                    "value": 50,  # Aggressive: 50% capacity increase
+                                    "periodSeconds": 15,
+                                }
+                            ],
+                        },
+                        "scaleDown": {
+                            "stabilizationWindowSeconds": 300,
+                            "policies": [
+                                {
+                                    "type": "Percent",
+                                    "value": 10,  # Conservative: 10% decrease
+                                    "periodSeconds": 60,
+                                }
+                            ],
+                        },
+                    }
+                }
+            },
             "triggers": [
                 # The primary trigger is based on requests per pod
                 {
