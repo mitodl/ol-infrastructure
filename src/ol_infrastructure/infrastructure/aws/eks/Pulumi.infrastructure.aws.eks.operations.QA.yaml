@@ -9,6 +9,7 @@ config:
   - "odl.mit.edu"
   - ".ol.mit.edu"
   - "ol.mit.edu"
+  eks:backup: false
   eks:developer_role_policy_name: "AmazonEKSAdminPolicy"
   eks:developer_role_kubernetes_groups: ["admin"]
   eks:ebs_csi_provisioner: true

@@ -9,6 +9,7 @@ config:
   - "ol.mit.edu"
   - ".mitx.mit.edu"
   - "mitx.mit.edu"
+  eks:backup: true
   eks:apisix_domains:
   - courses-backend.mitx.mit.edu
   - studio-backend.mitx.mit.edu

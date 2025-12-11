@@ -13,6 +13,7 @@ config:
   - ".mitxonline.mit.edu"
   - "xpro.mit.edu"
   - ".xpro.mit.edu"
+  eks:backup: false
   eks:apisix_admin_key:
     secure: v1:AndQEZrEKm/Q3QyP:60BdyhdeUbx2ds+YdP3vN5+Q0nIA0AyqLjtUo0XSj0f4vQQc6f5PsLJOKwZj1/4T
   eks:apisix_viewer_key:
