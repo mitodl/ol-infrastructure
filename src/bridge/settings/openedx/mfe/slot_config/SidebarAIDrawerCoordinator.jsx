@@ -26,7 +26,7 @@ const SidebarAIDrawerCoordinator = ({ courseId }) => {
     const toggleSidebar = contextValue?.toggleSidebar ?? (() => {});
     const shouldDisplayFullScreen = contextValue?.shouldDisplayFullScreen ?? false;
 
-    const [showAiDrawer, setShowAiDrawer] = useState(false);
+    const [showAIDrawer, setShowAIDrawer] = useState(false);
 
     const messageOrigin = useMemo(() => {
         const lmsBaseUrl = getConfig().LMS_BASE_URL;
@@ -40,13 +40,13 @@ const SidebarAIDrawerCoordinator = ({ courseId }) => {
         return window.location.origin;
     }, []);
 
-    const handleAiDrawerMessage = useCallback((event) => {
+    const handleAIDrawerMessage = useCallback((event) => {
         if (event.origin !== messageOrigin) {
             return;
         }
 
         if (event.data?.type && AI_DRAWER_MESSAGE_TYPES.includes(event.data.type)) {
-            setShowAiDrawer(true);
+            setShowAIDrawer(true);
             if (currentSidebar !== null) {
                 toggleSidebar(null);
             }
@@ -54,15 +54,15 @@ const SidebarAIDrawerCoordinator = ({ courseId }) => {
     }, [messageOrigin, currentSidebar, toggleSidebar]);
 
     useEffect(() => {
-        window.addEventListener('message', handleAiDrawerMessage);
+        window.addEventListener('message', handleAIDrawerMessage);
         return () => {
-            window.removeEventListener('message', handleAiDrawerMessage);
+            window.removeEventListener('message', handleAIDrawerMessage);
         };
-    }, [handleAiDrawerMessage]);
+    }, [handleAIDrawerMessage]);
 
     useEffect(() => {
         if (currentSidebar !== null) {
-            setShowAiDrawer(false);
+            setShowAIDrawer(false);
         }
     }, [currentSidebar]);
 
@@ -72,8 +72,8 @@ const SidebarAIDrawerCoordinator = ({ courseId }) => {
             <div
                 className={`ai-drawer-wrapper ml-0 ml-lg-4 h-auto align-top zindex-0 ${
                     shouldDisplayFullScreen ? 'ai-drawer-wrapper-fullscreen' : ''
-                } ${showAiDrawer ? '' : 'd-none'}`}
-                aria-hidden={!showAiDrawer}
+                } ${showAIDrawer ? '' : 'd-none'}`}
+                aria-hidden={!showAIDrawer}
             >
                 <AIDrawerManagerSidebar />
             </div>

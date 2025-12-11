@@ -6,7 +6,7 @@ const BUNDLE_PATH = process.env.AI_DRAWER_BUNDLE_PATH || '/learn/static/smoot-de
 
 let loadPromise = null;
 
-const loadAiDrawerManagerBundle = () => {
+const loadAIDrawerManagerBundle = () => {
     if (loadPromise) {
         return loadPromise;
     }
@@ -66,7 +66,7 @@ const AIDrawerManagerSidebar = () => {
 
         let isMounted = true;
 
-        loadAiDrawerManagerBundle()
+        loadAIDrawerManagerBundle()
             .then((aiDrawerManager) => {
                 if (!isMounted || !containerRef.current) {
                     return;
@@ -94,14 +94,14 @@ const AIDrawerManagerSidebar = () => {
                     }
                 } catch (error) {
                     if (isMounted) {
-                        setInitError(getErrorMessage(error, 'Failed to initialize AiDrawerManager'));
+                        setInitError(getErrorMessage(error, 'Failed to initialize AIDrawerManager'));
                         setIsLoading(false);
                     }
                 }
             })
             .catch((error) => {
                 if (isMounted) {
-                    setInitError(getErrorMessage(error, 'Failed to load aiDrawerManager bundle'));
+                    setInitError(getErrorMessage(error, 'Failed to load AIDrawerManager bundle'));
                     setIsLoading(false);
                 }
             })
