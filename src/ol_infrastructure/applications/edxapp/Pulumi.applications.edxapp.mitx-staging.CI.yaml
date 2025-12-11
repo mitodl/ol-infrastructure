@@ -35,6 +35,7 @@ config:
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["legacy_studio.certificates", "--create", "--everyone"]
   edxapp:business_unit: residential-staging
+  edxapp:canvas_base_url: https://mit.test.instructure.com
   edxapp:db_password:
     secure: "v1:ZB90id7gJ0z4NB/r:S3dGQ6OhdFOl1VdJ8cMOyLTc1L/T36F3ULUBvwMi5XOpyCbRDSyPhxb1DXZQ75DMS8R54Qa8pYE="
   edxapp:dns_zone: mitx
