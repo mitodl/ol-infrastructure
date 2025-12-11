@@ -42,6 +42,7 @@ from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleC
 from ol_infrastructure.infrastructure.aws.eks.apisix_official import (
     setup_apisix,
 )
+from ol_infrastructure.infrastructure.aws.eks.aws_backup import setup_eks_backup
 from ol_infrastructure.infrastructure.aws.eks.aws_utils import setup_aws_integrations
 from ol_infrastructure.infrastructure.aws.eks.cert_manager import setup_cert_manager
 from ol_infrastructure.infrastructure.aws.eks.core_dns import create_core_dns_resources
@@ -1013,3 +1014,13 @@ metrics_server_release = kubernetes.helm.v3.Release(
         delete_before_replace=True,
     ),
 )
+
+############################################################
+# Configure AWS Backup for EKS cluster (if enabled)
+############################################################
+if eks_config.get_bool("backup"):
+    backup_resources = setup_eks_backup(
+        cluster_name=cluster_name,
+        cluster=cluster,
+        aws_config=aws_config,
+    )
