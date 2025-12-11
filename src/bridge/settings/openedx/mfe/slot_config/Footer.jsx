@@ -141,77 +141,84 @@ const AutoSelectLanguage = () => {
   const location = useLocation();
   const { authenticatedUser } = useContext(AppContext);
 
-  useEffect(() => {
-    const baseURL = config.LMS_BASE_URL || process.env.LMS_BASE_URL;
-    function getCookie(name) {
-      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-      return match ? decodeURIComponent(match[2]) : null;
+  const lmsBaseURL = config.LMS_BASE_URL || process.env.LMS_BASE_URL;
+  const studioBaseURL = config.STUDIO_BASE_URL || process.env.STUDIO_BASE_URL;
+  const username = authenticatedUser?.username;
+  const ENVIRONMENT = process.env.NODE_ENV;
+  const DEVELOPMENT_ENVIRONMENT = 'development';
+  const AUTHORING_APP_ID = 'authoring';
+  const ENGLISH_LANG_CODE = 'en';
+  const LANGUAGE_PREFERENCE_COOKIE_NAME =
+    config.LANGUAGE_PREFERENCE_COOKIE_NAME ||
+    process.env.LANGUAGE_PREFERENCE_COOKIE_NAME ||
+    'openedx-language-preference';
+
+  const getCookie = (name) => {
+    const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
+    return match ? decodeURIComponent(match[2]) : null;
+  };
+
+  async function setLanguage(baseURL, language) {
+    if (!baseURL) {
+        return;
     }
 
-    async function setLanguage(language, username) {
+    try {
       await getAuthenticatedHttpClient().patch(
         `${baseURL}/api/user/v1/preferences/${username}`,
         { 'pref-lang': language },
-        {
-            headers: {
-                'Content-Type': 'application/merge-patch+json',
-            }
-        }
+        { headers: { 'Content-Type': 'application/merge-patch+json' } }
       );
 
       await getAuthenticatedHttpClient().post(
         `${baseURL}/i18n/setlang/`,
-        { language: language },
+        { language }
       );
+    } catch (error) {
+      if (ENVIRONMENT === DEVELOPMENT_ENVIRONMENT) {
+        console.error("Language update failed:", error);
+      }
     }
+  }
 
-    const AUTHORING_APP_ID = 'authoring';
-    const ENGLISH_LANG_CODE = 'en';
-    const LANGUAGE_PREFERENCE_COOKIE_NAME = config.LANGUAGE_PREFERENCE_COOKIE_NAME || process.env.LANGUAGE_PREFERENCE_COOKIE_NAME || 'openedx-language-preference';
+  useEffect(() => {
+    if (!username) return;
 
+    const cookieLang = getCookie(LANGUAGE_PREFERENCE_COOKIE_NAME);
+    // Studio (Authoring App) logic
     if (process.env.APP_ID === AUTHORING_APP_ID) {
-
-      let LMS_LANGUAGE_COOKIE_DOMAIN = config.LMS_BASE_URL || process.env.LMS_BASE_URL;
-      let STUDIO_LANGUAGE_COOKIE_DOMAIN = config.STUDIO_BASE_URL || process.env.STUDIO_BASE_URL;
-      if (process.env.NODE_ENV === 'development') {
-        LMS_LANGUAGE_COOKIE_DOMAIN = `.${new URL(LMS_LANGUAGE_COOKIE_DOMAIN).hostname}`;
-        STUDIO_LANGUAGE_COOKIE_DOMAIN = `.${new URL(STUDIO_LANGUAGE_COOKIE_DOMAIN).hostname}`;
-      } else {
-        LMS_LANGUAGE_COOKIE_DOMAIN = new URL(LMS_LANGUAGE_COOKIE_DOMAIN).hostname.replace('courses', '');
-        STUDIO_LANGUAGE_COOKIE_DOMAIN = new URL(STUDIO_LANGUAGE_COOKIE_DOMAIN).hostname.replace('studio.courses', '');
-      }
-
-      const cookieLang = getCookie(LANGUAGE_PREFERENCE_COOKIE_NAME);
-      if (cookieLang && cookieLang !== ENGLISH_LANG_CODE && authenticatedUser?.username) {
-        // Clear language preference cookies set for LMS and Studio
-        document.cookie = `${LANGUAGE_PREFERENCE_COOKIE_NAME}=; domain=${LMS_LANGUAGE_COOKIE_DOMAIN}; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC`;
-        document.cookie = `${LANGUAGE_PREFERENCE_COOKIE_NAME}=; domain=${STUDIO_LANGUAGE_COOKIE_DOMAIN}; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC`;
-
-        setLanguage(ENGLISH_LANG_CODE, authenticatedUser.username).finally(() => window.location.reload());
-      }
+      if (cookieLang === ENGLISH_LANG_CODE) return;
+      setLanguage(studioBaseURL, ENGLISH_LANG_CODE).finally(() => window.location.reload());
       return;
     }
 
     const courseKeyRegex = /course-v1:[^/]+/;
     const match = location.pathname.match(courseKeyRegex);
-    if (match) {
-      const courseKey = match[0];
-      fetch(`${baseURL}/api/ol-openedx-course-translations/course-language/${courseKey}`)
-        .then(res => res.json())
-        .then(async data => {
-          const courseLang = data.language;
-          const cookieLang = getCookie(LANGUAGE_PREFERENCE_COOKIE_NAME);
-          if (courseLang && cookieLang && courseLang !== cookieLang && authenticatedUser?.username) {
-            await setLanguage(courseLang, authenticatedUser.username);
-            window.location.reload();
-          }
-        })
-        .catch(() => {});
-    }
-  }, [config, location, authenticatedUser]);
+    if (!match) return;
+
+    const courseKey = match[0];
+    fetch(`${lmsBaseURL}/api/ol-openedx-course-translations/course-language/${courseKey}`)
+      .then((res) => res.json())
+      .then(async ({ language: courseLang }) => {
+        if (
+          courseLang &&
+          cookieLang &&
+          courseLang !== cookieLang
+        ) {
+          await setLanguage(lmsBaseURL, courseLang);
+          window.location.reload();
+        }
+      })
+      .catch(() => {
+        if (ENVIRONMENT === DEVELOPMENT_ENVIRONMENT) {
+          console.warn("Course language fetch failed");
+        }
+      });
+
+  }, [location.pathname, username]);
 
   return null;
-}
+};
 
 const AppziScript = () => {
   const appziUrl = process.env.APPZI_URL;
