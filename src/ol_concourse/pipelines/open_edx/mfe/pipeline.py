@@ -145,7 +145,7 @@ def mfe_params(
             open_edx.enable_video_upload_page_link_in_content_dropdown
         ),
         "OL_OPENEDX_COURSE_TRANSLATIONS_ENABLE_AUTO_LANGUAGE_SELECTION": (
-                open_edx.ol_openedx_course_translations_enable_auto_language_selection
+            open_edx.ol_openedx_course_translations_enable_auto_language_selection
         ),
         "PARAGON_THEME_URLS": "{}",
         "ENABLE_JUMPNAV": open_edx.enable_jumpnav,
