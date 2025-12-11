@@ -249,7 +249,9 @@ const Footer = () => {
     <footer className="d-flex flex-column align-items-stretch">
       <ForceLoginRedirect />
       <AppziScript />
-      <AutoSelectLanguage />
+      {
+          (process.env.OL_OPENEDX_COURSE_TRANSLATIONS_ENABLE_AUTO_LANGUAGE_SELECTION  || false) ? <AutoSelectLanguage /> : null
+      }
         <PluginSlot id="frontend.shell.footer.desktop.top.ui">
             <RevealLinks label={"Reveal Button"} />
         </PluginSlot>
