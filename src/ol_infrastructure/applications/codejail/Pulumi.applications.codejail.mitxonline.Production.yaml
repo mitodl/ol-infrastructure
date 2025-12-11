@@ -13,3 +13,4 @@ config:
   codejail:business_unit: mitxonline
   codejail:target_vpc: mitxonline_vpc
   consul:address: https://consul-mitxonline-production.odl.mit.edu
+  codejail:target_cluster: applications

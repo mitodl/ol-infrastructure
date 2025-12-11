@@ -44,7 +44,10 @@ dns_stack = StackReference("infrastructure.aws.dns")
 consul_stack = StackReference(
     f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
 )
-cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+target_cluster = codejail_config.require("target_cluster")
+cluster_stack = StackReference(
+    f"infrastructure.aws.eks.{target_cluster}.{stack_info.name}"
+)
 
 edxapp_stack = StackReference(
     f"applications.edxapp.{stack_info.env_prefix}.{stack_info.name}"

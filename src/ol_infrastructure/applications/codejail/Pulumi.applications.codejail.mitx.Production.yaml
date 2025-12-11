@@ -12,3 +12,4 @@ config:
   consul:address: https://consul-mitx-production.odl.mit.edu
   codejail:deploy_to_k8s: true
   codejail:replicas: 5
+  codejail:target_cluster: residential
