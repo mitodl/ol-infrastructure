@@ -87,9 +87,8 @@ def _build_general_secrets_template(
     if stack_info.env_prefix in ["mitx", "mitx-staging"]:
         template_parts.append(
             """
-        SOCIAL_AUTH_SAML_SP_PRIVATE_KEY: '{{ .Data.saml_private_key }}'
-        SOCIAL_AUTH_SAML_SP_PUBLIC_CERT: '{{ .Data.saml_public_cert }}'
-         """
+        SOCIAL_AUTH_SAML_SP_PRIVATE_KEY: '{{ get .Secrets "saml_private_key" }}'
+        SOCIAL_AUTH_SAML_SP_PUBLIC_CERT: '{{ get .Secrets "saml_public_cert" }}'"""
         )
 
     # Proctoring backend configuration
