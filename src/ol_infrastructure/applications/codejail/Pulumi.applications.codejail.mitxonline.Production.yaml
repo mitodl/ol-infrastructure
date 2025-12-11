@@ -9,7 +9,7 @@ config:
     min: 2
   codejail:deploy_to_k8s: true
   codejail:deploy_to_ec2: true
-  codejail:replicas: 3
+  codejail:replicas: 5
   codejail:business_unit: mitxonline
   codejail:target_vpc: mitxonline_vpc
   consul:address: https://consul-mitxonline-production.odl.mit.edu

@@ -10,3 +10,5 @@ config:
   codejail:business_unit: residential-staging
   codejail:target_vpc: residential_mitx_staging_vpc
   consul:address: https://consul-mitx-ci.odl.mit.edu
+  codejail:deploy_to_k8s: true
+  codejail:replicas: 1

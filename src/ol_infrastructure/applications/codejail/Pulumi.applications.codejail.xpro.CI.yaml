@@ -10,3 +10,5 @@ config:
   codejail:business_unit: mitxpro
   codejail:target_vpc: xpro_vpc
   consul:address: https://consul-mitxonline-ci.odl.mit.edu
+  codejail:deploy_to_k8s: true
+  codejail:replicas: 1
