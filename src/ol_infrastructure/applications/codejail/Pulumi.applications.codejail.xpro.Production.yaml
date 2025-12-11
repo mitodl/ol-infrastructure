@@ -11,5 +11,6 @@ config:
   codejail:target_vpc: xpro_vpc
   consul:address: https://consul-mitxonline-production.odl.mit.edu
   codejail:deploy_to_k8s: true
+  codejail:deploy_to_ec2: false
   codejail:replicas: 4
   codejail:target_cluster: applications

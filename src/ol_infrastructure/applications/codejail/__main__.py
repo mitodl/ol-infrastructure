@@ -168,7 +168,7 @@ if codejail_config.get_bool("deploy_to_k8s"):
         ),
     )
 # Deploy to ec2
-if codejail_config.get_bool("deploy_to_ec2") or True:
+if codejail_config.require_bool("deploy_to_ec2"):
     codejail_server_ami = ec2.get_ami(
         filters=[
             ec2.GetAmiFilterArgs(name="name", values=["open-edx-codejail-*"]),

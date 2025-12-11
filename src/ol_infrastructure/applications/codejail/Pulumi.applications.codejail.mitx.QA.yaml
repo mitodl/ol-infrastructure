@@ -11,5 +11,6 @@ config:
   codejail:target_vpc: residential_mitx_vpc
   consul:address: https://consul-mitx-qa.odl.mit.edu
   codejail:deploy_to_k8s: true
+  codejail:deploy_to_ec2: false
   codejail:replicas: 2
   codejail:target_cluster: residential

@@ -10,6 +10,7 @@ config:
   codejail:business_unit: mitxonline
   codejail:target_vpc: mitxonline_vpc
   codejail:deploy_to_k8s: true
+  codejail:deploy_to_ec2: false
   codejail:replicas: 1
   consul:address: https://consul-mitxonline-ci.odl.mit.edu
   codejail:target_cluster: applications
