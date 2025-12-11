@@ -84,6 +84,14 @@ def _build_general_secrets_template(
         EMAIL_HOST_PASSWORD: {{ get .Secrets "email_password" }}"""
         )
 
+    if stack_info.env_prefix in ["mitx", "mitx-staging"]:
+        template_parts.append(
+            """
+        SOCIAL_AUTH_SAML_SP_PRIVATE_KEY: '{{ .Data.saml_private_key }}'
+        SOCIAL_AUTH_SAML_SP_PUBLIC_CERT: '{{ .Data.saml_public_cert }}'
+         """
+        )
+
     # Proctoring backend configuration
     default_backend = "null" if stack_info.env_prefix == "xpro" else "proctortrack"
     template_parts.append(
