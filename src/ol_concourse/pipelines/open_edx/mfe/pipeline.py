@@ -75,6 +75,9 @@ class OpenEdxVars(BaseModel):
     ) = None
     enable_jumpnav: Literal["true", "false"] | None = None
     appzi_url: str | None = None
+    ol_openedx_course_translations_enable_auto_language_selection: (
+        Literal["true", "false"] | None
+    ) = None
 
     @property
     def release_name(self) -> OpenEdxSupportedRelease:
@@ -140,6 +143,9 @@ def mfe_params(
         "USER_INFO_COOKIE_NAME": f"{open_edx.environment}-edx-user-info",
         "ENABLE_VIDEO_UPLOAD_PAGE_LINK_IN_CONTENT_DROPDOWN": (
             open_edx.enable_video_upload_page_link_in_content_dropdown
+        ),
+        "OL_OPENEDX_COURSE_TRANSLATIONS_ENABLE_AUTO_LANGUAGE_SELECTION": (
+                open_edx.ol_openedx_course_translations_enable_auto_language_selection
         ),
         "PARAGON_THEME_URLS": "{}",
         "ENABLE_JUMPNAV": open_edx.enable_jumpnav,
