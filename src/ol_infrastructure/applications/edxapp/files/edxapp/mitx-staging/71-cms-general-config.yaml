@@ -1,10 +1,6 @@
 # ALTERNATE_WORKER_QUEUES: lms  # Already has a sane default in the code
 COURSE_AUTHORING_MICROFRONTEND_URL: /authoring
 DISCUSSIONS_INCONTEXT_LEARNMORE_URL: https://openedx.atlassian.net/wiki/spaces/COMM/pages/3470655498/Discussions+upgrade+Sidebar+and+new+topic+structure
-FEATURES:
-  ENABLE_INSTRUCTOR_BACKGROUND_TASKS: true # ADDED
-  ENABLE_NEW_BULK_EMAIL_EXPERIENCE: true # ADDED
-  PREVIEW_LMS_BASE: preview-staging-ci.mitx.mit.edu # ADDED
 GIT_REPO_EXPORT_DIR: /openedx/data/export_course_repos
 GIT_EXPORT_DEFAULT_IDENT:
   name: MITx Online
