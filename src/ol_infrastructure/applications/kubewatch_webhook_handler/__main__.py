@@ -1,17 +1,18 @@
 """
-Pulumi stack to build and deploy kubewatch webhook handler.
+Pulumi stack to deploy kubewatch webhook handler.
 
 This stack:
-1. Builds a Docker image for the webhook handler
-2. Pushes it to ECR
-3. Deploys the webhook handler to Kubernetes
-4. Creates necessary secrets and services
+1. Creates ECR repository for the Docker image
+2. Deploys the webhook handler to Kubernetes (image built separately)
+3. Creates necessary secrets and services
+
+Note: The Docker image is built separately in the Concourse pipeline
+      before this Pulumi stack runs.
 """
 
 from pathlib import Path
 
 import pulumi_aws as aws
-import pulumi_docker as docker
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, Output, StackReference, export, log
 
@@ -93,21 +94,9 @@ ecr_auth_token = aws.ecr.get_authorization_token_output(
     registry_id=ecr_repository.registry_id
 )
 
-# Build and push Docker image
-webhook_image = docker.Image(
-    "kubewatch-webhook-handler-image",
-    build=docker.DockerBuildArgs(
-        context=str(Path(__file__).parent),
-        dockerfile=str(Path(__file__).parent / "Dockerfile"),
-        platform="linux/amd64",
-    ),
-    image_name=ecr_repository.repository_url.apply(lambda url: f"{url}:latest"),
-    registry=docker.RegistryArgs(
-        server=ecr_repository.repository_url,
-        username=ecr_auth_token.user_name,
-        password=ecr_auth_token.password,
-    ),
-)
+# Reference the Docker image (built separately in Concourse pipeline)
+# The image is built by the Concourse pipeline before this Pulumi stack runs
+webhook_image_name = ecr_repository.repository_url.apply(lambda url: f"{url}:latest")
 
 # Kubernetes namespace
 kubewatch_namespace = "kubewatch"
@@ -199,7 +188,7 @@ webhook_deployment = kubernetes.apps.v1.Deployment(
                 containers=[
                     kubernetes.core.v1.ContainerArgs(
                         name="webhook-handler",
-                        image=webhook_image.image_name,
+                        image=webhook_image_name,
                         ports=[
                             kubernetes.core.v1.ContainerPortArgs(
                                 container_port=8080,
@@ -287,7 +276,7 @@ webhook_service = kubernetes.core.v1.Service(
 
 # Export outputs
 export("ecr_repository_url", ecr_repository.repository_url)
-export("webhook_image", webhook_image.image_name)
+export("webhook_image", webhook_image_name)
 export(
     "webhook_service_url",
     Output.concat(

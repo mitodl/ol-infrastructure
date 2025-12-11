@@ -2,9 +2,17 @@
 
 import sys
 
+from ol_concourse.lib.containers import container_build_task
 from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
-from ol_concourse.lib.models.pipeline import GetStep, Identifier
+from ol_concourse.lib.models.pipeline import (
+    GetStep,
+    Identifier,
+    Input,
+    Job,
+    PutStep,
+    Resource,
+)
 from ol_concourse.lib.resources import git_repo
 from ol_concourse.pipelines.constants import (
     PULUMI_CODE_PATH,
@@ -15,7 +23,7 @@ from ol_concourse.pipelines.constants import (
 def build_kubewatch_webhook_handler_pipeline() -> PipelineFragment:
     """Build pipeline for kubewatch webhook handler.
 
-    Includes Docker build in Pulumi.
+    Builds Docker image first, then deploys with Pulumi.
     """
     webhook_handler_pulumi_code = git_repo(
         name=Identifier("ol-infrastructure-pulumi-kubewatch-webhook"),
@@ -27,6 +35,60 @@ def build_kubewatch_webhook_handler_pipeline() -> PipelineFragment:
         ],
     )
 
+    # ECR image resource for webhook handler
+    ecr_repo_url = (
+        "610119931565.dkr.ecr.us-east-1.amazonaws.com/kubewatch-webhook-handler-ci"
+    )
+    ecr_image_resource = Resource(
+        name=Identifier("kubewatch-webhook-handler-image"),
+        type=Identifier("registry-image"),
+        icon=Identifier("docker"),
+        source={
+            "repository": ecr_repo_url,
+            "aws_region": "us-east-1",
+            "aws_access_key_id": "((aws.access_key_id))",
+            "aws_secret_access_key": "((aws.secret_access_key))",
+        },
+    )
+
+    # Docker build job for CI environment
+    code_name = webhook_handler_pulumi_code.name
+    app_path = "src/ol_infrastructure/applications/kubewatch_webhook_handler"
+    docker_build_job = Job(
+        name=Identifier("build-kubewatch-webhook-handler-image-ci"),
+        plan=[
+            GetStep(
+                get=code_name,
+                trigger=True,
+            ),
+            container_build_task(
+                inputs=[Input(name=code_name)],
+                build_parameters={
+                    "CONTEXT": f"{code_name}/{app_path}",
+                    "DOCKERFILE": f"{code_name}/{app_path}/Dockerfile",
+                },
+            ),
+            PutStep(
+                put=ecr_image_resource.name,
+                params={
+                    "image": "image/image.tar",
+                    "additional_tags": f"{code_name}/.git/short_ref",
+                },
+            ),
+        ],
+    )
+
+    # Create Pulumi deployment jobs with Docker build dependency
+    custom_dependencies = {
+        0: [  # CI environment
+            GetStep(
+                get=webhook_handler_pulumi_code.name,
+                trigger=True,
+                passed=[docker_build_job.name],
+            ),
+        ],
+    }
+
     webhook_handler_fragment = pulumi_jobs_chain(
         pulumi_code=webhook_handler_pulumi_code,
         stack_names=[
@@ -37,8 +99,12 @@ def build_kubewatch_webhook_handler_pipeline() -> PipelineFragment:
         project_source_path=PULUMI_CODE_PATH.joinpath(
             "applications/kubewatch_webhook_handler/"
         ),
+        custom_dependencies=custom_dependencies,
     )
 
+    # Add Docker build job and ECR resource to fragment
+    webhook_handler_fragment.jobs.insert(0, docker_build_job)
+    webhook_handler_fragment.resources.append(ecr_image_resource)
     webhook_handler_fragment.resources.append(webhook_handler_pulumi_code)
     return webhook_handler_fragment
 
