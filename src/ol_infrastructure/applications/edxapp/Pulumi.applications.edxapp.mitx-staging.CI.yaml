@@ -112,5 +112,5 @@ config:
         memory_limit: "2Gi"
   edxapp:k8s_deployment: true
   edxapp:k8s_cutover: true
-  edxapp:disable_ec2_deployment: false
+  edxapp:disable_ec2_deployment: true
   edxapp:k8s_vpc: residential_mitx_vpc
