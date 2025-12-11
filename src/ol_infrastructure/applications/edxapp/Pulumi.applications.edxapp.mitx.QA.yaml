@@ -80,7 +80,49 @@ config:
   mongodb:atlas_project_id: 61a8f2d2c263e144f50f13b4
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
-  edxapp:k8s_vpc: residential_mitx_vpc
-  edxapp:k8s_deployment: false
-  edxapp:k8s_cutover: false
+  edxapp:cluster_stack: infrastructure.aws.eks.residential.QA
+  edxapp:learn_ai_frontend_domain: "learn-ai-qa.ol.mit.edu"
+  edxapp:mit_learn_api_domain: api.rc.learn.mit.edu
+  edxapp:mit_learn_domain: rc.learn.mit.edu
+  edxapp:marketing_domain: mitx-qa.mitx.mit.edu
+  edxapp:backend_lms_domain: courses-backend.qa.mitx.mit.edu
+  edxapp:backend_studio_domain: studio-backend.qa.mitx.mit.edu
+  edxapp:backend_preview_domain: preview.qa.mitx.mit.edu
+  edxapp:k8s_replicas:
+    webapp:
+      cms:
+        min: 1
+        max: 3
+      lms:
+        min: 2
+        max: 5
+    celery:
+      lms:
+        min: 1
+        max: 4
+      cms:
+        min: 1
+        max: 4
+  edxapp:k8s_resources:
+    webapp:
+      lms:
+        cpu_request: "250m"
+        memory_request: "2Gi"
+        memory_limit: "2Gi"
+      cms:
+        cpu_request: "250m"
+        memory_request: "2Gi"
+        memory_limit: "2Gi"
+    celery:
+      lms:
+        cpu_request: "250m"
+        memory_request: "2Gi"
+        memory_limit: "2Gi"
+      cms:
+        cpu_request: "250m"
+        memory_request: "2Gi"
+        memory_limit: "2Gi"
+  edxapp:k8s_deployment: true
+  edxapp:k8s_cutover: true
   edxapp:disable_ec2_deployment: false
+  edxapp:k8s_vpc: residential_mitx_vpc
