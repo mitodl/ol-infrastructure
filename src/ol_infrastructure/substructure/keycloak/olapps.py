@@ -843,12 +843,14 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
-                attribute_map={
-                    "email": "mail",
-                    "firstName": "givenName",
-                    "lastName": "sn",
-                    "fullName": "cn",
+                attribute_name_map={
+                    "email": "urn:oid:0.9.2342.19200300.100.1.3",
+                    "firstName": "urn:oid:2.5.4.42",
+                    "lastName": "urn:oid:2.5.4.4",
+                    "fullName": "urn:oid:2.5.4.3",
                 },
+                # Override the SSO URL from metadata
+                single_sign_on_service_url="https://login.ntua.gr/idp/profile/SAML2/Redirect/SSO",
                 want_assertions_encrypted=True,
                 want_assertions_signed=True,
             )

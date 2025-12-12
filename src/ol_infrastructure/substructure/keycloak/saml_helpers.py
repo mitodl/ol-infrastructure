@@ -2,7 +2,7 @@
 
 import logging
 import xml.etree.ElementTree as ET
-from collections.abc import Collection
+from typing import Any
 from urllib.parse import urlparse
 from urllib.request import urlopen
 
@@ -201,9 +201,13 @@ def generate_pulumi_args_dict(metadata: dict[str, str | None]) -> dict[str, str]
     return args_dict
 
 
-def get_saml_attribute_mappers(
-    metadata_source: str, idp_alias: str, attribute_map: dict[str, str] | None = None
-) -> dict[str, dict[str, Collection[str]]]:
+def get_saml_attribute_mappers(  # noqa: C901, PLR0912
+    metadata_source: str,
+    idp_alias: str,
+    attribute_map: dict[str, str] | None = None,
+    attribute_name_map: dict[str, str] | None = None,
+    mapper_extra_config: dict[str, dict[str, str]] | None = None,
+) -> dict[str, dict[str, Any]]:
     """Parse SAML metadata to find attributes that can be used for attribute mappers.
 
     It first attempts to find attributes by their "FriendlyName" and falls back to a
@@ -213,7 +217,11 @@ def get_saml_attribute_mappers(
         metadata_source: Either the URL to the SAML IdP metadata XML or the
             XML string itself.
         idp_alias: The alias for the Keycloak identity provider.
-        attribute_map: Optional mapping of attributes to friendly names.
+        attribute_map: Optional mapping of Keycloak user attributes to SAML
+            friendly names.
+        attribute_name_map: Optional mapping of Keycloak user attributes to SAML
+            attribute names (not friendly names).
+        mapper_extra_config: Optional per-attribute extra configuration overrides.
 
     Returns:
         A dictionary of attribute mapper configurations suitable for Pulumi.
@@ -238,16 +246,41 @@ def get_saml_attribute_mappers(
     common_friendly_names = SAML_FRIENDLY_NAMES
     mappers = {}
 
+    # Handle attribute_name_map (takes precedence over attribute_map)
+    if attribute_name_map:
+        for mapped_attribute, attribute_name in attribute_name_map.items():
+            extra_config = {
+                "syncMode": "INHERIT",
+                "attribute.name.format": "ATTRIBUTE_FORMAT_URI",
+            }
+            # Apply per-attribute extra config overrides if provided
+            if mapper_extra_config and mapped_attribute in mapper_extra_config:
+                extra_config.update(mapper_extra_config[mapped_attribute])
+
+            mappers[mapped_attribute] = {
+                "name": f"{idp_alias}-{mapped_attribute}-mapper",
+                "attribute_name": attribute_name,
+                "user_attribute": mapped_attribute,
+                "extra_config": extra_config,
+            }
+        return mappers
+
+    # Handle attribute_map (friendly names)
     if attribute_map:
         for mapped_attribute, friendly_name in attribute_map.items():
+            extra_config = {
+                "syncMode": "INHERIT",
+                "attribute.name.format": "ATTRIBUTE_FORMAT_URI",
+            }
+            # Apply per-attribute extra config overrides if provided
+            if mapper_extra_config and mapped_attribute in mapper_extra_config:
+                extra_config.update(mapper_extra_config[mapped_attribute])
+
             mappers[mapped_attribute] = {
                 "name": f"{idp_alias}-{mapped_attribute}-mapper",
                 "attribute_friendly_name": friendly_name,
                 "user_attribute": mapped_attribute,
-                "extra_config": {
-                    "syncMode": "INHERIT",
-                    "attribute.name.format": "ATTRIBUTE_FORMAT_URI",
-                },
+                "extra_config": extra_config,
             }
         return mappers
 
