@@ -130,7 +130,7 @@ def _build_interpolated_config_template(
         LOGO_URL_PNG_FOR_EMAIL: https://{edxapp_config.require_object("domains")["lms"]}/static/{stack_info.env_prefix}/images/logo.png
         LOGO_TRADEMARK_URL: https://{edxapp_config.require_object("domains")["lms"]}/static/{stack_info.env_prefix}/images/{"mit-ol-logo" if stack_info.env_prefix == "xpro" else "mit-logo"}.svg
         MARKETING_SITE_BASE_URL: https://{edxapp_config.require("marketing_domain")}/ # ADDED - to support mitxonline-theme
-        MARKETING_SITE_CHECKOUT_URL: https://{edxapp_config.get("mitxonline_domain") or edxapp_config.get("marketing_domain")}/cart/add/ # ADDED - to support mitxonline checkout
+        MARKETING_SITE_CHECKOUT_URL: https://{edxapp_config.get("marketing_domain") or edxapp_config.get("marketing_domain")}/cart/add/ # ADDED - to support mitxonline checkout
         MKTG_URLS:
           ROOT: https://{edxapp_config.require("marketing_domain")}/
         MKTG_URL_OVERRIDES:
