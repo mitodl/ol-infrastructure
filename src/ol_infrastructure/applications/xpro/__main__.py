@@ -10,17 +10,26 @@ from pathlib import Path
 
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
-from pulumi import Config, InvokeOptions, StackReference, export
-from pulumi_aws import ec2, iam, s3
+from pulumi import (
+    ROOT_STACK_RESOURCE,
+    Alias,
+    Config,
+    InvokeOptions,
+    ResourceOptions,
+    StackReference,
+    export,
+)
+from pulumi_aws import ec2, iam
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
 )
-from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
+from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.heroku import setup_heroku_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -52,49 +61,56 @@ aws_config = AWSBase(
 
 # Bucket used to store file uploads from xpro app.
 xpro_storage_bucket_name = f"ol-xpro-app-{stack_info.env_suffix}"
-xpro_storage_bucket = s3.Bucket(
-    f"ol-xpro-app-{stack_info.env_suffix}",
-    bucket=xpro_storage_bucket_name,
-    tags=aws_config.tags,
-)
-xpro_storage_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "ol-xpro-app-bucket-ownership-controls",
-    bucket=xpro_storage_bucket.id,
-    rule=s3.BucketOwnershipControlsRuleArgs(
-        object_ownership="BucketOwnerPreferred",
-    ),
-)
-s3.BucketVersioning(
-    "ol-xpro-app-bucket-versioning",
-    bucket=xpro_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Enabled"
-    ),
-)
-ocw_storage_bucket_public_access = s3.BucketPublicAccessBlock(
-    "ol-xpro-app-bucket-public-access",
-    bucket=xpro_storage_bucket.id,
+xpro_storage_bucket_config = S3BucketConfig(
+    bucket_name=xpro_storage_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerPreferred",
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
+    restrict_public_buckets=False,
+    tags=aws_config.tags,
+    bucket_policy_document=json.dumps(
+        {
+            "Version": IAM_POLICY_VERSION,
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": "*"},
+                    "Action": "s3:GetObject",
+                    "Resource": f"arn:aws:s3:::{xpro_storage_bucket_name}/*",
+                }
+            ],
+        }
+    ),
 )
-s3.BucketPolicy(
-    "ol-xpro-app-bucket-policy",
-    bucket=xpro_storage_bucket.id,
-    policy=iam.get_policy_document(
-        statements=[
-            iam.GetPolicyDocumentStatementArgs(
-                effect="Allow",
-                principals=[
-                    iam.GetPolicyDocumentStatementPrincipalArgs(
-                        type="AWS", identifiers=["*"]
-                    )
-                ],
-                actions=["s3:GetObject"],
-                resources=[xpro_storage_bucket.arn.apply("{}/*".format)],
-            )
+xpro_storage_bucket = OLBucket(
+    "ol-xpro-app",
+    config=xpro_storage_bucket_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"ol-xpro-app-{stack_info.env_suffix}",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="ol-xpro-app-bucket-ownership-controls",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="ol-xpro-app-bucket-versioning",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="ol-xpro-app-bucket-public-access",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="ol-xpro-app-bucket-policy",
+                parent=ROOT_STACK_RESOURCE,
+            ),
         ]
-    ).json,
+    ),
 )
 
 
