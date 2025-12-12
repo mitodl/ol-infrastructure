@@ -13,6 +13,7 @@ app_list = [
     "open",
     "mitlearn",
     "celery_monitoring",
+    "open_metadata",
 ]
 
 shared_pulumi_code_resource = git_repo(
