@@ -8,6 +8,8 @@ CONSUL_VERSION = "1.22.1"
 JUPYTERHUB_VERSION = "5.4.2"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
 KEYCLOAK_VERSION = "26.4.7"
+# renovate: datasource=docker depName=leek packageName=kodhive/leek
+LEEK_VERSION = "0.7.5"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
 OPEN_METADATA_VERSION = "1.10.14"
 OVS_VERSION = "v0.65.1-3-g2630021"
@@ -25,7 +27,7 @@ VECTOR_VERSION = "0.40.1"
 AIRBYTE_CHART_VERSION = "2.0.19"
 # renovate: datasource=helm depName=superset packageName=superset registryUrl=https://apache.github.io/superset
 SUPERSET_CHART_VERSION = "0.15.0"
-# renovate: datasource=helm depName=tika packageName=tika registryUrl=https://apache.github.io/tika-helm
+# renovate: datasource=helm depName=tika packageName=tika registryUrl=https://apache.jfrog.io/artifactory/tika
 TIKA_CHART_VERSION = "3.2.2"
 # renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://apache.github.io/apisix-helm-chart
 APISIX_CHART_VERSION = "2.12.4"
