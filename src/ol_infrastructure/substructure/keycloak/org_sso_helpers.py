@@ -49,6 +49,16 @@ class SamlIdpConfig(OrgConfig):
     principal_attribute: str | None = None
     mapper_attribute_format: AttributeFormat = AttributeFormat.uri
     attribute_map: dict[str, str] | None = None
+    attribute_name_map: dict[str, str] | None = (
+        None  # Map using attribute_name instead of attribute_friendly_name
+    )
+    mapper_extra_config: dict[str, dict[str, str]] | None = (
+        None  # Per-attribute extra config overrides
+    )
+    # Override metadata-extracted values
+    single_sign_on_service_url: str | None = None  # Override SSO URL from metadata
+    single_logout_service_url: str | None = None  # Override SLO URL from metadata
+    signing_certificate: str | None = None  # Override signing certificate from metadata
     want_assertions_encrypted: bool = False
     want_assertions_signed: bool | None = None  # Optional, no default
 
@@ -92,7 +102,7 @@ def create_org_for_learn(org_config: OrgConfig) -> keycloak.Organization:
     )
 
 
-def onboard_saml_org(
+def onboard_saml_org(  # noqa: C901
     saml_config: SamlIdpConfig,
 ) -> None:
     org = create_org_for_learn(saml_config)
@@ -111,10 +121,21 @@ def onboard_saml_org(
         )
         return
     saml_args = generate_pulumi_args_dict(saml_metadata)
+
+    # Apply overrides if provided
+    if saml_config.single_sign_on_service_url is not None:
+        saml_args["single_sign_on_service_url"] = saml_config.single_sign_on_service_url
+    if saml_config.single_logout_service_url is not None:
+        saml_args["single_logout_service_url"] = saml_config.single_logout_service_url
+    if saml_config.signing_certificate is not None:
+        saml_args["signing_certificate"] = saml_config.signing_certificate
+
     mappers = get_saml_attribute_mappers(
         metadata_source,
         saml_config.org_alias.lower(),
         saml_config.attribute_map,
+        saml_config.attribute_name_map,
+        saml_config.mapper_extra_config,
     )
 
     # Build extra_config based on whether URL or XML is provided
