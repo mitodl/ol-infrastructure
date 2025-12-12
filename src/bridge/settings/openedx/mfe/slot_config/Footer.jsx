@@ -6,6 +6,7 @@ import { PluginSlot } from '@openedx/frontend-plugin-framework';
 import { getLoginRedirectUrl } from '@edx/frontend-platform/auth';
 import { AppContext } from '@edx/frontend-platform/react';
 import { useLocation } from 'react-router-dom';
+import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
 
 function RevealLinks({ label, children }) {
 
@@ -135,6 +136,90 @@ const ForceLoginRedirect = () => {
   return null;
 };
 
+const AutoSelectLanguage = () => {
+  const config = getConfig();
+  const location = useLocation();
+  const { authenticatedUser } = useContext(AppContext);
+
+  const lmsBaseURL = config.LMS_BASE_URL || process.env.LMS_BASE_URL;
+  const studioBaseURL = config.STUDIO_BASE_URL || process.env.STUDIO_BASE_URL;
+  const username = authenticatedUser?.username;
+  const ENVIRONMENT = process.env.NODE_ENV;
+  const DEVELOPMENT_ENVIRONMENT = 'development';
+  const AUTHORING_APP_ID = 'authoring';
+  const ENGLISH_LANG_CODE = 'en';
+  const LANGUAGE_PREFERENCE_COOKIE_NAME =
+    config.LANGUAGE_PREFERENCE_COOKIE_NAME ||
+    process.env.LANGUAGE_PREFERENCE_COOKIE_NAME ||
+    'openedx-language-preference';
+
+  const getCookie = (name) => {
+    const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
+    return match ? decodeURIComponent(match[2]) : null;
+  };
+
+  async function setLanguage(baseURL, language) {
+    if (!baseURL) {
+        return;
+    }
+
+    try {
+      await getAuthenticatedHttpClient().patch(
+        `${baseURL}/api/user/v1/preferences/${username}`,
+        { 'pref-lang': language },
+        { headers: { 'Content-Type': 'application/merge-patch+json' } }
+      );
+
+      await getAuthenticatedHttpClient().post(
+        `${baseURL}/i18n/setlang/`,
+        { language }
+      );
+    } catch (error) {
+      if (ENVIRONMENT === DEVELOPMENT_ENVIRONMENT) {
+        console.error("Language update failed:", error);
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!username) return;
+
+    const cookieLang = getCookie(LANGUAGE_PREFERENCE_COOKIE_NAME);
+    // Studio (Authoring App) logic
+    if (process.env.APP_ID === AUTHORING_APP_ID) {
+      if (cookieLang === ENGLISH_LANG_CODE) return;
+      setLanguage(studioBaseURL, ENGLISH_LANG_CODE).finally(() => window.location.reload());
+      return;
+    }
+
+    const courseKeyRegex = /course-v1:[^/]+/;
+    const match = location.pathname.match(courseKeyRegex);
+    if (!match) return;
+
+    const courseKey = match[0];
+    fetch(`${lmsBaseURL}/api/ol-openedx-course-translations/course-language/${courseKey}`)
+      .then((res) => res.json())
+      .then(async ({ language: courseLang }) => {
+        if (
+          courseLang &&
+          cookieLang &&
+          courseLang !== cookieLang
+        ) {
+          await setLanguage(lmsBaseURL, courseLang);
+          window.location.reload();
+        }
+      })
+      .catch(() => {
+        if (ENVIRONMENT === DEVELOPMENT_ENVIRONMENT) {
+          console.warn("Course language fetch failed");
+        }
+      });
+
+  }, [location.pathname, username]);
+
+  return null;
+};
+
 const AppziScript = () => {
   const appziUrl = process.env.APPZI_URL;
 
@@ -164,6 +249,9 @@ const Footer = () => {
     <footer className="d-flex flex-column align-items-stretch">
       <ForceLoginRedirect />
       <AppziScript />
+      {
+          (process.env.OL_OPENEDX_COURSE_TRANSLATIONS_ENABLE_AUTO_LANGUAGE_SELECTION  || false) ? <AutoSelectLanguage /> : null
+      }
         <PluginSlot id="frontend.shell.footer.desktop.top.ui">
             <RevealLinks label={"Reveal Button"} />
         </PluginSlot>

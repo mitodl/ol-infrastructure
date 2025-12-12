@@ -75,6 +75,9 @@ class OpenEdxVars(BaseModel):
     ) = None
     enable_jumpnav: Literal["true", "false"] | None = None
     appzi_url: str | None = None
+    ol_openedx_course_translations_enable_auto_language_selection: (
+        Literal["true", "false"] | None
+    ) = None
 
     @property
     def release_name(self) -> OpenEdxSupportedRelease:
@@ -111,7 +114,7 @@ def mfe_params(
         "FAVICON_URL": open_edx.favicon_url,
         "HONOR_CODE_URL": open_edx.honor_code_url,
         "LANGUAGE_PREFERENCE_COOKIE_NAME": (
-            f"{open_edx.environment}-open-edx-language-preference"
+            f"{open_edx.environment}-openedx-language-preference"
         ),
         "LMS_BASE_URL": f"https://{open_edx.lms_domain}",
         "LEARNING_BASE_URL": f"https://{open_edx.lms_domain}/{learning_mfe_path}",
@@ -140,6 +143,9 @@ def mfe_params(
         "USER_INFO_COOKIE_NAME": f"{open_edx.environment}-edx-user-info",
         "ENABLE_VIDEO_UPLOAD_PAGE_LINK_IN_CONTENT_DROPDOWN": (
             open_edx.enable_video_upload_page_link_in_content_dropdown
+        ),
+        "OL_OPENEDX_COURSE_TRANSLATIONS_ENABLE_AUTO_LANGUAGE_SELECTION": (
+            open_edx.ol_openedx_course_translations_enable_auto_language_selection
         ),
         "PARAGON_THEME_URLS": "{}",
         "ENABLE_JUMPNAV": open_edx.enable_jumpnav,
