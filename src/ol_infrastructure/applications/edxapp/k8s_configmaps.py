@@ -117,6 +117,7 @@ def _build_interpolated_config_template(
         MIT_LEARN_AI_XBLOCK_PROBLEM_SET_LIST_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai/api/v0/problem_set_list  # Added for ol_openedx_chat_xblock
         MIT_LEARN_AI_XBLOCK_CHAT_RATING_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai/api/v0/chat_sessions/  # Added for ol_openedx_chat_xblock
         MIT_LEARN_LOGO: https://{edxapp_config.require_object("domains")["lms"]}/static/mitxonline/images/mit-learn-logo.svg
+        MITXONLINE_BASE_URL: https://{edxapp_config.require("marketing_domain")}/ # ADDED - to support mitxonline-theme
         LEARNING_MICROFRONTEND_URL: https://{edxapp_config.require_object("domains")["lms"]}/learn
         LMS_BASE: {edxapp_config.require_object("domains")["lms"]}
         LMS_INTERNAL_ROOT_URL: https://{edxapp_config.require_object("domains")["lms"]}
@@ -130,7 +131,7 @@ def _build_interpolated_config_template(
         LOGO_URL_PNG_FOR_EMAIL: https://{edxapp_config.require_object("domains")["lms"]}/static/{stack_info.env_prefix}/images/logo.png
         LOGO_TRADEMARK_URL: https://{edxapp_config.require_object("domains")["lms"]}/static/{stack_info.env_prefix}/images/{"mit-ol-logo" if stack_info.env_prefix == "xpro" else "mit-logo"}.svg
         MARKETING_SITE_BASE_URL: https://{edxapp_config.require("marketing_domain")}/ # ADDED - to support mitxonline-theme
-        MARKETING_SITE_CHECKOUT_URL: https://{edxapp_config.get("mitxonline_domain") or edxapp_config.get("marketing_domain")}/cart/add/ # ADDED - to support mitxonline checkout
+        MARKETING_SITE_CHECKOUT_URL: https://{edxapp_config.get("marketing_domain") or edxapp_config.get("marketing_domain")}/cart/add/ # ADDED - to support mitxonline checkout
         MKTG_URLS:
           ROOT: https://{edxapp_config.require("marketing_domain")}/
         MKTG_URL_OVERRIDES:
