@@ -1,4 +1,4 @@
-# ruff: noqa: ERA001, FIX002, E501
+# ruff: noqa: ERA001, FIX002, E501, D100
 
 import base64
 import json
@@ -1453,7 +1453,7 @@ mitlearn_k8s_app = OLApplicationK8s(
                 queue_name="edx_content",
                 redis_host=redis_cache.address,
                 redis_password=redis_config.require("password"),
-                resource_requests={"cpu": "200m", "memory": "1200Mi"},
+                resource_requests={"cpu": "200m", "memory": "2400Mi"},
                 resource_limits={"memory": "1200Mi"},
             ),
             OLApplicationK8sCeleryWorkerConfig(
@@ -1461,12 +1461,12 @@ mitlearn_k8s_app = OLApplicationK8s(
                 max_replicas=30,
                 redis_host=redis_cache.address,
                 redis_password=redis_config.require("password"),
-                resource_requests={"cpu": "200m", "memory": "1200Mi"},
+                resource_requests={"cpu": "200m", "memory": "2400Mi"},
                 resource_limits={"memory": "1200Mi"},
             ),
         ],
-        resource_requests={"cpu": "250m", "memory": "2000Mi"},
-        resource_limits={"memory": "2000Mi"},
+        resource_requests={"cpu": "250m", "memory": "2400Mi"},
+        resource_limits={"memory": "2400Mi"},
         hpa_scaling_metrics=[
             kubernetes.autoscaling.v2.MetricSpecArgs(
                 type="Resource",
