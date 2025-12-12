@@ -1,4 +1,4 @@
-# ruff: noqa: ERA001, FIX002, E501, D100
+# ruff: noqa: ERA001, FIX002, E501
 
 import base64
 import json
