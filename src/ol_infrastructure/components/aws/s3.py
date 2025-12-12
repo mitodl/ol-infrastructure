@@ -213,7 +213,9 @@ class OLBucket(pulumi.ComponentResource):
         """
         super().__init__("ol:aws:s3:OLBucket", name, {}, opts)
 
-        child_opts = pulumi.ResourceOptions(parent=self)
+        child_opts = (opts or pulumi.ResourceOptions()).merge(
+            pulumi.ResourceOptions(parent=self)
+        )
 
         # Apply merged tags from config and component name
         # Use config.bucket_name if provided, otherwise default to the Pulumi
@@ -229,8 +231,6 @@ class OLBucket(pulumi.ComponentResource):
             tags=merged_tags,
             opts=child_opts,
         )
-        # Ensure subsequent resources depend on the main bucket
-        child_opts = pulumi.ResourceOptions(parent=self, depends_on=[self.bucket_v2])
 
         # Conditionally create BucketVersioning
         if config.versioning_enabled:

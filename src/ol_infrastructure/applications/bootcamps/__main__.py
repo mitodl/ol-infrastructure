@@ -10,12 +10,21 @@ from pathlib import Path
 
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
-from pulumi import Config, InvokeOptions, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, iam, s3
+from pulumi import (
+    ROOT_STACK_RESOURCE,
+    Alias,
+    Config,
+    InvokeOptions,
+    ResourceOptions,
+    StackReference,
+    export,
+)
+from pulumi_aws import ec2, iam
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
@@ -51,36 +60,16 @@ aws_config = AWSBase(
 
 # Bucket used to store file uploads from bootcamps app.
 bootcamps_storage_bucket_name = f"ol-bootcamps-app-{stack_info.env_suffix}"
-bootcamps_storage_bucket = s3.Bucket(
-    f"ol-bootcamps-app-{stack_info.env_suffix}",
-    bucket=bootcamps_storage_bucket_name,
-    tags=aws_config.tags,
-)
-bootcamps_storage_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "ol-bootcamps-app-bucket-ownership-controls",
-    bucket=bootcamps_storage_bucket.id,
-    rule=s3.BucketOwnershipControlsRuleArgs(
-        object_ownership="BucketOwnerPreferred",
-    ),
-)
-s3.BucketVersioning(
-    "ol-bootcamps-app-bucket-versioning",
-    bucket=bootcamps_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Enabled"
-    ),
-)
-bootcamps_storage_bucket_public_access = s3.BucketPublicAccessBlock(
-    "ol-bootcamps-app-bucket-public-access",
-    bucket=bootcamps_storage_bucket.id,
+bootcamps_storage_bucket_config = S3BucketConfig(
+    bucket_name=bootcamps_storage_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerPreferred",
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
-)
-s3.BucketPolicy(
-    "ol-bootcamps-app-bucket-policy",
-    bucket=bootcamps_storage_bucket.id,
-    policy=json.dumps(
+    restrict_public_buckets=False,
+    tags=aws_config.tags,
+    bucket_policy_document=json.dumps(
         {
             "Version": IAM_POLICY_VERSION,
             "Statement": [
@@ -97,13 +86,36 @@ s3.BucketPolicy(
             ],
         }
     ),
+)
+bootcamps_storage_bucket = OLBucket(
+    "ol-bootcamps-app",
+    config=bootcamps_storage_bucket_config,
     opts=ResourceOptions(
-        depends_on=[
-            bootcamps_storage_bucket_public_access,
-            bootcamps_storage_bucket_ownership_controls,
+        aliases=[
+            Alias(
+                name=f"ol-bootcamps-app-{stack_info.env_suffix}",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="ol-bootcamps-app-bucket-ownership-controls",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="ol-bootcamps-app-bucket-versioning",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="ol-bootcamps-app-bucket-public-access",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="ol-bootcamps-app-bucket-policy",
+                parent=ROOT_STACK_RESOURCE,
+            ),
         ]
     ),
 )
+
 
 bootcamps_iam_policy = iam.Policy(
     f"bootcamps-{stack_info.env_suffix}-policy",
