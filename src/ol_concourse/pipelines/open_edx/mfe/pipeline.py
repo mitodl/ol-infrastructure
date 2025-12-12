@@ -74,6 +74,7 @@ class OpenEdxVars(BaseModel):
         Literal["true", "false"] | None
     ) = None
     enable_jumpnav: Literal["true", "false"] | None = None
+    enable_ai_drawer_slot: Literal["true", "false"] | None = None
     appzi_url: str | None = None
 
     @property
@@ -143,6 +144,7 @@ def mfe_params(
         ),
         "PARAGON_THEME_URLS": "{}",
         "ENABLE_JUMPNAV": open_edx.enable_jumpnav,
+        "ENABLE_AI_DRAWER_SLOT": open_edx.enable_ai_drawer_slot,
         "APPZI_URL": open_edx.appzi_url,
     }
 
@@ -197,6 +199,7 @@ def mfe_job(
     slot_config_file = f"{open_edx_deployment.deployment_name}/common-mfe-config"
     copy_common_config = ""
     mfe_smoot_design_overrides = ""
+    copy_ai_drawer_components = []
 
     if OpenEdxMicroFrontend[mfe_name].value == OpenEdxMicroFrontend.learn.value:
         mfe_smoot_design_overrides = """
@@ -211,6 +214,18 @@ def mfe_job(
             f"{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx "
             f"{mfe_build_dir.name}/common-mfe-config.env.jsx"
         )
+        copy_ai_drawer_components = [
+            (
+                f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+                f"AIDrawerManagerSidebar.jsx "
+                f"{mfe_build_dir.name}/AIDrawerManagerSidebar.jsx"
+            ),
+            (
+                f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+                f"SidebarAIDrawerCoordinator.jsx "
+                f"{mfe_build_dir.name}/SidebarAIDrawerCoordinator.jsx"
+            ),
+        ]
 
     mfe_setup_steps = [
         f"cp -r {mfe_repo.name}/* {mfe_build_dir.name}",
@@ -226,6 +241,7 @@ def mfe_job(
     ]
     if copy_common_config:
         mfe_setup_steps.append(copy_common_config)
+    mfe_setup_steps.extend(copy_ai_drawer_components)
 
     # Add styles.scss copy for Residential deployments
     if open_edx_deployment.deployment_name in ["mitx", "mitx-staging"]:

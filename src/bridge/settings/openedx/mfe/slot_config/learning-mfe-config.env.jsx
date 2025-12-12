@@ -1,28 +1,35 @@
+import { PLUGIN_OPERATIONS, DIRECT_PLUGIN } from '@openedx/frontend-plugin-framework';
 import { getConfig } from '@edx/frontend-platform';
 import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
-import { PLUGIN_OPERATIONS, DIRECT_PLUGIN } from '@openedx/frontend-plugin-framework';
 import CourseBreadcrumbs from './src/courseware/course/breadcrumbs';
 import { SequenceNavigation } from './src/courseware/course/sequence/sequence-navigation';
 import { BookmarkButton } from './src/courseware/course/bookmark';
 import messages from './src/courseware/course/sequence/messages';
 import { useIntl } from '@edx/frontend-platform/i18n';
 import config from './common-mfe-config.env.jsx';
+import SidebarAIDrawerCoordinator from './SidebarAIDrawerCoordinator.jsx';
 
-import(
-  /**
-   * remoteTutorDrawer is already bundled to include its own version
-   * of React and ReactDOM.
-   *
-   * Add webpackIgnore to avoid bundling it again.
-   */
-  /* webpackIgnore: true */
- "/learn/static/smoot-design/aiDrawerManager.es.js").then(module => {
-   module.init({
+// When ENABLE_AI_DRAWER_SLOT is disabled or unset
+const ENABLE_AI_DRAWER_SLOT = process.env.ENABLE_AI_DRAWER_SLOT === "true";
+
+if (!ENABLE_AI_DRAWER_SLOT) {
+  import(
+    /**
+     * remoteTutorDrawer is already bundled to include its own version
+     * of React and ReactDOM.
+     *
+     * Add webpackIgnore to avoid bundling it again.
+     */
+    /* webpackIgnore: true */
+    "/learn/static/smoot-design/aiDrawerManager.es.js"
+  ).then(module => {
+    module.init({
       messageOrigin: getConfig().LMS_BASE_URL,
       transformBody: messages => ({ message: messages[messages.length - 1].content }),
       getTrackingClient: getAuthenticatedHttpClient,
-   })
-})
+    });
+  });
+}
 
 let learningMFEConfig = {
     ...config
@@ -99,17 +106,17 @@ if (process.env.DEPLOYMENT_NAME?.includes("mitxonline")) {
               const isProcessing = unit.bookmarkedUpdateState === 'loading';
               const {formatMessage} = useIntl();
               return <>
-              <div className="d-flex justify-content-between">
-                  <div className="mb-0">
-                    <h3 className="h3">{unit.title}</h3>
+                  <div className="d-flex justify-content-between">
+                      <div className="mb-0">
+                          <h3 className="h3">{unit.title}</h3>
+                      </div>
                   </div>
-                </div>
-                <p className="sr-only">{formatMessage(messages.headerPlaceholder)}</p>
-                <BookmarkButton
-                  unitId={unit.id}
-                  isBookmarked={unit.bookmarked}
-                  isProcessing={isProcessing}
-                />
+                  <p className="sr-only">{formatMessage(messages.headerPlaceholder)}</p>
+                  <BookmarkButton
+                      unitId={unit.id}
+                      isBookmarked={unit.bookmarked}
+                      isProcessing={isProcessing}
+                  />
               </>
               },
             },
@@ -133,7 +140,23 @@ if (process.env.DEPLOYMENT_NAME?.includes("mitxonline")) {
             widgetId: 'default_trigger',
           },
         ]
-      }
+      },
+      // Slot-based AskTim Chatbot - only if feature flag is enabled
+      ...(ENABLE_AI_DRAWER_SLOT ? {
+        'org.openedx.frontend.learning.notifications_discussions_sidebar.v1': {
+            keepDefault: false,
+            plugins: [
+                {
+                    op: PLUGIN_OPERATIONS.Insert,
+                    widget: {
+                        id: 'coordinated_sidebar_with_ai_drawer',
+                        type: DIRECT_PLUGIN,
+                        RenderWidget: ({ courseId }) => <SidebarAIDrawerCoordinator courseId={courseId} />,
+                    },
+                },
+            ],
+        },
+      } : {}),
   };
 }
 

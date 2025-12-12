@@ -129,6 +129,7 @@ mitxonline = [
         logo_trademark_url="https://courses.ci.learn.mit.edu/static/mitxonline/images/mit-logo.svg",
         enable_video_upload_page_link_in_content_dropdown="true",
         enable_jumpnav="true",
+        enable_ai_drawer_slot="true",
     ),
     OpenEdxVars(
         about_us_url="https://rc.mitxonline.mit.edu/about-us/",
@@ -157,6 +158,7 @@ mitxonline = [
         logo_trademark_url="https://courses.rc.learn.mit.edu/static/mitxonline/images/mit-logo.svg",
         enable_video_upload_page_link_in_content_dropdown="true",
         enable_jumpnav="true",
+        enable_ai_drawer_slot="true",
     ),
     OpenEdxVars(
         about_us_url="https://mitxonline.mit.edu/about-us/",
