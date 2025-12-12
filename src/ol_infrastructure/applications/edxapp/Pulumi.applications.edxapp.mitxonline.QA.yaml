@@ -65,7 +65,6 @@ config:
   edxapp:backend_studio_domain: studio-backend.rc.learn.mit.edu
   edxapp:backend_preview_domain: preview-backend.rc.learn.mit.edu
   edxapp:marketing_domain: rc.mitxonline.mit.edu
-  edxapp:mitlearn_domain: rc.learn.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:IqXRArQveCV+9lkE:cRaraFuN2dDmI29PD4QifOU7MrRFdszOoaUb7o3pDJordt4TSjw8fIxldWfMzNhZRLC+NS291DorO1IuN6ASdCbt5d53aMvHVt+3hA6wyuI11OFjk7U=
   edxapp:elb_healthcheck_interval: "30"

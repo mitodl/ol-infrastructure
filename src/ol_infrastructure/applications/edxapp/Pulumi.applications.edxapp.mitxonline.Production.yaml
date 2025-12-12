@@ -64,7 +64,6 @@ config:
   edxapp:mit_learn_api_domain: api.learn.mit.edu
   edxapp:learn_ai_frontend_domain: "learn-ai.ol.mit.edu"
   edxapp:marketing_domain: mitxonline.mit.edu
-  edxapp:mitlearn_domain: learn.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:qzfe99Jb8n0TnEQS:Y6fSOS8lksj7WvED+V7kCtV7arDtwx7184Fw330Mwh9JDHW72rVd8y7Nm0fF8ANCcFCwDV5EwSU2Fcc+X47NHDOLCOQv16lyB6jWOF2mTr/veRax6MbXY9NlLmsfp9EBQesDCitULbkz9hyHcHT3GPI=
   edxapp:enable_notes: "True"
