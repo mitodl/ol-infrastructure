@@ -7,6 +7,7 @@ import pulumi_vault as vault
 import pulumiverse_heroku as heroku
 from pulumi import Config, InvokeOptions, Output, StackReference
 
+from bridge.lib.versions import LEEK_VERSION
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
@@ -260,7 +261,7 @@ celery_monitoring_oidc_resources = OLApisixOIDCResources(
 )
 
 # Leek container image from ECR mirror
-leek_image = cached_image_uri("kodhive/leek")
+leek_image = cached_image_uri(f"kodhive/leek:{LEEK_VERSION}")
 
 # Kubernetes Deployment for Leek
 leek_deployment = kubernetes.apps.v1.Deployment(
