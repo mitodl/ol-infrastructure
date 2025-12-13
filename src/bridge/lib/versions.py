@@ -70,7 +70,7 @@ PROMETHEUS_OPERATOR_CRD_VERSION = "v0.87.1"
 # renovate: datasource=github-releases depName=keycloak-k8s-resources packageName=keycloak/keycloak-k8s-resources
 KEYCLOAK_OPERATOR_CRD_VERSION = "26.2.4"
 # renovate: datasource=helm depName=jupyterhub packageName=jupyterhub registryUrl=https://hub.jupyter.org/helm-chart
-JUPYTERHUB_CHART_VERSION = "4.3.1"
+JUPYTERHUB_CHART_VERSION = "4.3.2"
 # renovate: datasource=helm depName=k8s-monitoring packageName=k8s-monitoring registryUrl=https://grafana.github.io/helm-charts
 GRAFANA_K8S_MONITORING_CHART_VERSION = "3.6.2"
 # renovate: datasource=helm depName=dcgm-exporter packageName=dcgm-exporter registryUrl=https://nvidia.github.io/dcgm-exporter/helm-charts
