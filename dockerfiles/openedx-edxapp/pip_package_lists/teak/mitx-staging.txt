@@ -25,11 +25,11 @@ ol-openedx-chat
 ol-openedx-chat-xblock
 
 # Open Telemetry support
-opentelemetry-api==1.39.0
+opentelemetry-api==1.39.1
 opentelemetry-distro==0.59b0
 opentelemetry-instrumentation==0.59b0
 opentelemetry-instrumentation-django==0.59b0
 opentelemetry-instrumentation-wsgi==0.59b0
-opentelemetry-sdk==1.39.0
+opentelemetry-sdk==1.39.1
 opentelemetry-semantic-conventions==0.59b0
 opentelemetry-util-http==0.59b0
