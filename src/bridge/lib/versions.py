@@ -5,7 +5,7 @@ CONSUL_TEMPLATE_VERSION = "0.41.3"
 # renovate: datasource=github-releases depName=consul packageName=hashicorp/consul
 CONSUL_VERSION = "1.22.1"
 # renovate: datasource=pypi depName=jupyterhub packageName=jupyterhub
-JUPYTERHUB_VERSION = "5.4.2"
+JUPYTERHUB_VERSION = "5.4.3"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
 KEYCLOAK_VERSION = "26.4.7"
 # renovate: datasource=docker depName=leek packageName=kodhive/leek
