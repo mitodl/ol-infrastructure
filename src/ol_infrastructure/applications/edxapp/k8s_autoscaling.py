@@ -119,11 +119,8 @@ def create_autoscaling_resources(
     lms_prom_route_name = f"{stack_info.env_prefix}-openedx_ol-{stack_info.env_prefix}-edxapp-lms-apisix-route-{stack_info.env_suffix}_lms-default"
 
     # Requests / pod / second
-    lms_requests_query = f"""
-        sum(rate(apisix_http_status{{route="{lms_prom_route_name}"}}[5m]))
-            /
-        count(kube_pod_info{{job="integrations/kubernetes/kube-state-metrics", namespace="mitxonline-openedx", pod=~".*lms-webapp.*"}})
-        """
+    lms_requests_query = f'sum(rate(apisix_http_status{{route="{lms_prom_route_name}"}}[5m]))/count(kube_pod_info{{job="integrations/kubernetes/kube-state-metrics",namespace="mitxonline-openedx",pod=~".*lms-webapp.*"}})'
+
     lms_requests_threshold = (
         edxapp_config.get("autoscaling_lms_requests_threshold") or "20"
     )  # 20 requests per pod per second
