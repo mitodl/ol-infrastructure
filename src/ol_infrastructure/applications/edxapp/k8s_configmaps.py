@@ -126,7 +126,6 @@ def _build_interpolated_config_template(
         - {edxapp_config.require_object("domains")["lms"]}
         - {edxapp_config.require_object("domains")["preview"]}
         - {edxapp_config.get("mitxonline_domain") or edxapp_config.get("marketing_domain")}
-        - {edxapp_config.require("mit_learn_domain")}
         LOGO_URL: https://{edxapp_config.require_object("domains")["lms"]}/static/{stack_info.env_prefix}/images/logo.svg
         LOGO_URL_PNG_FOR_EMAIL: https://{edxapp_config.require_object("domains")["lms"]}/static/{stack_info.env_prefix}/images/logo.png
         LOGO_TRADEMARK_URL: https://{edxapp_config.require_object("domains")["lms"]}/static/{stack_info.env_prefix}/images/{"mit-ol-logo" if stack_info.env_prefix == "xpro" else "mit-logo"}.svg
@@ -135,11 +134,11 @@ def _build_interpolated_config_template(
         MKTG_URLS:
           ROOT: https://{edxapp_config.get("mitxonline_domain") or edxapp_config.get("marketing_domain")}/
         MKTG_URL_OVERRIDES:
-          COURSES: https://{edxapp_config.require("marketing_domain") if stack_info.env_prefix != "mitxonline" else ""}/{"catalog/" if stack_info.env_prefix == "xpro" else ""}
-          PRIVACY: https://{edxapp_config.require("marketing_domain") if stack_info.env_prefix != "mitxonline" else ""}/privacy{"-policy/" if stack_info.env_prefix == "xpro" else ""}
-          TOS: https://{edxapp_config.require("marketing_domain") if stack_info.env_prefix != "mitxonline" else edxapp_config.require("mitxonline_domain")}/terms{"-of-service/" if stack_info.env_prefix == "xpro" else ""}
-          ABOUT: https://{edxapp_config.require("marketing_domain") if stack_info.env_prefix != "mitxonline" else edxapp_config.require("mitxonline_domain")}/about{"-us" if stack_info.env_prefix == "xpro" else ""}
-          HONOR: https://{edxapp_config.require("marketing_domain") if stack_info.env_prefix != "mitxonline" else ""}/honor-code/
+          COURSES: https://{edxapp_config.require("marketing_domain") if stack_info.env_prefix != "mitxonline" else edxapp_config.require("mit_learn_domain")}/{"catalog/" if stack_info.env_prefix == "xpro" else ""}
+          PRIVACY: https://{edxapp_config.require("marketing_domain") if stack_info.env_prefix != "mitxonline" else edxapp_config.require("mit_learn_domain")}/privacy{"-policy/" if stack_info.env_prefix == "xpro" else ""}
+          TOS: https://{edxapp_config.require("marketing_domain") if stack_info.env_prefix != "mitxonline" else edxapp_config.require("mit_learn_domain")}/terms{"-of-service/" if stack_info.env_prefix == "xpro" else ""}
+          ABOUT: https://{edxapp_config.require("marketing_domain") if stack_info.env_prefix != "mitxonline" else edxapp_config.require("mit_learn_domain")}/about{"-us" if stack_info.env_prefix == "xpro" else ""}
+          HONOR: https://{edxapp_config.require("marketing_domain") if stack_info.env_prefix != "mitxonline" else edxapp_config.require("mit_learn_domain")}/honor-code/
           ACCESSIBILITY: https://accessibility.mit.edu/
           CONTACT: https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/
           TOS_AND_HONOR: ''
