@@ -65,6 +65,7 @@ def _build_interpolated_config_template(
         - https://{edxapp_config.require("marketing_domain") if stack_info.env_prefix != "mitxonline" else edxapp_config.require("mitxonline_domain")}
         - https://{runtime_config["notes_domain"]}
         - https://{edxapp_config.require("learn_ai_frontend_domain")}
+        - https://{edxapp_config.require("mit_learn_domain")}
         - https://{stack_info.env_prefix}-{stack_info.env_suffix}-edxapp-storage.s3.amazonaws.com  # Fix ORA upload bug
         - https://idp.mit.edu  # For residential login
         COURSE_IMPORT_EXPORT_BUCKET: {course_bucket_name}
@@ -126,6 +127,7 @@ def _build_interpolated_config_template(
         - {edxapp_config.require_object("domains")["lms"]}
         - {edxapp_config.require_object("domains")["preview"]}
         - {edxapp_config.get("mitxonline_domain") or edxapp_config.get("marketing_domain")}
+        - {edxapp_config.get("mit_learn_domain")}
         LOGO_URL: https://{edxapp_config.require_object("domains")["lms"]}/static/{stack_info.env_prefix}/images/logo.svg
         LOGO_URL_PNG_FOR_EMAIL: https://{edxapp_config.require_object("domains")["lms"]}/static/{stack_info.env_prefix}/images/logo.png
         LOGO_TRADEMARK_URL: https://{edxapp_config.require_object("domains")["lms"]}/static/{stack_info.env_prefix}/images/{"mit-ol-logo" if stack_info.env_prefix == "xpro" else "mit-logo"}.svg
