@@ -30,6 +30,10 @@ from bridge.lib.magic_numbers import (
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.services import appdb
+from ol_infrastructure.components.services.cert_manager import (
+    OLCertManagerCert,
+    OLCertManagerCertConfig,
+)
 from ol_infrastructure.components.services.k8s import (
     OLApplicationK8s,
     OLApplicationK8sConfig,
@@ -1056,28 +1060,17 @@ mit_learn_ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource
     ),
 )
 
-# Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_tls_v2/
-# Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_tls/
-# LEGACY RETIREMENT : goes away
-# Won't need this because it will exist from the mit-learn namespace
-ecommerce_https_apisix_tls = kubernetes.apiextensions.CustomResource(
-    f"unified-ecommerce-{stack_info.env_suffix}-https-apisix-tls",
-    api_version="apisix.apache.org/v2",
-    kind="ApisixTls",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="ecommerce-https",
-        namespace=ecommerce_namespace,
-        labels=k8s_global_labels,
+ecommerce_https_cert = OLCertManagerCert(
+    f"unified-ecommerce-{stack_info.env_suffix}-https-cert",
+    cert_config=OLCertManagerCertConfig(
+        application_name="unified-ecommerce",
+        k8s_namespace=ecommerce_namespace,
+        k8s_labels=k8s_global_labels,
+        create_apisixtls_resource=True,
+        apisixtls_ingress_class="apache-apisix",
+        dest_secret_name="ecommerce-https-cert",  # noqa: S106  # pragma: allowlist secret
+        dns_names=[ecommerce_config.require("backend_domain")],
     ),
-    spec={
-        "ingressClassName": "apache-apisix",
-        "hosts": [ecommerce_config.require("backend_domain")],
-        # Use the shared ol-wildcard cert loaded into every cluster
-        "secret": {
-            "name": "ol-wildcard-cert",
-            "namespace": "operations",
-        },
-    },
 )
 
 
