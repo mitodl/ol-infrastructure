@@ -62,7 +62,7 @@ def _build_interpolated_config_template(
         - https://{edxapp_config.require_object("domains")["lms"]}
         - https://{edxapp_config.require_object("domains")["studio"]}
         - https://{edxapp_config.require_object("domains")["preview"]}
-        - https://{edxapp_config.require("marketing_domain")}
+        - https://{edxapp_config.require("marketing_domain") if stack_info.env_prefix != "mitxonline" else edxapp_config.require("mitxonline_domain")}
         - https://{runtime_config["notes_domain"]}
         - https://{edxapp_config.require("learn_ai_frontend_domain")}
         - https://{stack_info.env_prefix}-{stack_info.env_suffix}-edxapp-storage.s3.amazonaws.com  # Fix ORA upload bug
@@ -104,7 +104,7 @@ def _build_interpolated_config_template(
           # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
           STORAGE_TYPE: S3  # MODIFIED
         IDA_LOGOUT_URI_LIST:
-        - https://{edxapp_config.require("marketing_domain")}/logout
+        - https://{edxapp_config.require("marketing_domain") if stack_info.env_prefix != "mitxonline" else edxapp_config.require("mitxonline_domain")}/logout
         - https://{edxapp_config.require_object("domains")["studio"]}/logout
         - https://{edxapp_config.require("mit_learn_api_domain")}/logout
         LANGUAGE_COOKIE: {env_name}-openedx-language-preference
@@ -117,7 +117,6 @@ def _build_interpolated_config_template(
         MIT_LEARN_AI_XBLOCK_PROBLEM_SET_LIST_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai/api/v0/problem_set_list  # Added for ol_openedx_chat_xblock
         MIT_LEARN_AI_XBLOCK_CHAT_RATING_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai/api/v0/chat_sessions/  # Added for ol_openedx_chat_xblock
         MIT_LEARN_LOGO: https://{edxapp_config.require_object("domains")["lms"]}/static/mitxonline/images/mit-learn-logo.svg
-        MITXONLINE_BASE_URL: https://{edxapp_config.require("marketing_domain")}/ # ADDED - to support mitxonline-theme
         LEARNING_MICROFRONTEND_URL: https://{edxapp_config.require_object("domains")["lms"]}/learn
         LMS_BASE: {edxapp_config.require_object("domains")["lms"]}
         LMS_INTERNAL_ROOT_URL: https://{edxapp_config.require_object("domains")["lms"]}
@@ -126,20 +125,21 @@ def _build_interpolated_config_template(
         - {edxapp_config.require_object("domains")["studio"]}
         - {edxapp_config.require_object("domains")["lms"]}
         - {edxapp_config.require_object("domains")["preview"]}
-        - {edxapp_config.require("marketing_domain")}
+        - {edxapp_config.get("mitxonline_domain") or edxapp_config.get("marketing_domain")}
+        - {edxapp_config.require("mit_learn_domain")}
         LOGO_URL: https://{edxapp_config.require_object("domains")["lms"]}/static/{stack_info.env_prefix}/images/logo.svg
         LOGO_URL_PNG_FOR_EMAIL: https://{edxapp_config.require_object("domains")["lms"]}/static/{stack_info.env_prefix}/images/logo.png
         LOGO_TRADEMARK_URL: https://{edxapp_config.require_object("domains")["lms"]}/static/{stack_info.env_prefix}/images/{"mit-ol-logo" if stack_info.env_prefix == "xpro" else "mit-logo"}.svg
-        MARKETING_SITE_BASE_URL: https://{edxapp_config.require("marketing_domain")}/ # ADDED - to support mitxonline-theme
-        MARKETING_SITE_CHECKOUT_URL: https://{edxapp_config.get("marketing_domain") or edxapp_config.get("marketing_domain")}/cart/add/ # ADDED - to support mitxonline checkout
+        MARKETING_SITE_BASE_URL: https://{edxapp_config.get("mitxonline_domain") or edxapp_config.get("marketing_domain")}/ # ADDED - to support mitxonline-theme
+        MARKETING_SITE_CHECKOUT_URL: https://{edxapp_config.get("mitxonline_domain") or edxapp_config.get("marketing_domain")}/cart/add/ # ADDED - to support mitxonline checkout
         MKTG_URLS:
-          ROOT: https://{edxapp_config.require("marketing_domain")}/
+          ROOT: https://{edxapp_config.get("mitxonline_domain") or edxapp_config.get("marketing_domain")}/
         MKTG_URL_OVERRIDES:
-          COURSES: https://{edxapp_config.require("marketing_domain")}/{"catalog/" if stack_info.env_prefix == "xpro" else ""}
-          PRIVACY: https://{edxapp_config.require("marketing_domain")}/privacy{"-policy/" if stack_info.env_prefix == "xpro" else ""}
-          TOS: https://{edxapp_config.require("marketing_domain")}/terms{"-of-service/" if stack_info.env_prefix == "xpro" else ""}
-          ABOUT: https://{edxapp_config.require("marketing_domain")}/about{"-us" if stack_info.env_prefix == "xpro" else ""}
-          HONOR: https://{edxapp_config.require("marketing_domain")}/honor-code/
+          COURSES: https://{edxapp_config.require("marketing_domain") if stack_info.env_prefix != "mitxonline" else ""}/{"catalog/" if stack_info.env_prefix == "xpro" else ""}
+          PRIVACY: https://{edxapp_config.require("marketing_domain") if stack_info.env_prefix != "mitxonline" else ""}/privacy{"-policy/" if stack_info.env_prefix == "xpro" else ""}
+          TOS: https://{edxapp_config.require("marketing_domain") if stack_info.env_prefix != "mitxonline" else edxapp_config.require("mitxonline_domain")}/terms{"-of-service/" if stack_info.env_prefix == "xpro" else ""}
+          ABOUT: https://{edxapp_config.require("marketing_domain") if stack_info.env_prefix != "mitxonline" else edxapp_config.require("mitxonline_domain")}/about{"-us" if stack_info.env_prefix == "xpro" else ""}
+          HONOR: https://{edxapp_config.require("marketing_domain") if stack_info.env_prefix != "mitxonline" else ""}/honor-code/
           ACCESSIBILITY: https://accessibility.mit.edu/
           CONTACT: https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/
           TOS_AND_HONOR: ''
@@ -190,6 +190,12 @@ def _build_interpolated_config_template(
         template_parts.append(
             f"""
         XPRO_BASE_URL: https://{edxapp_config.require("marketing_domain")}"""
+        )
+
+    if stack_info.env_prefix == "mitxonline":
+        template_parts.append(
+            f"""
+        MITXONLINE_BASE_URL: https://{edxapp_config.require("marketing_domain")}/ # ADDED - to support mitxonline-theme"""
         )
 
     return textwrap.dedent("".join(template_parts))
