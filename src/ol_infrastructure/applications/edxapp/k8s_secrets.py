@@ -136,6 +136,7 @@ class EdxappSecrets:
     learn_ai_canvas_syllabus_token: OLVaultK8SSecret
     cms_oauth: OLVaultK8SSecret
     lms_oauth: OLVaultK8SSecret
+    git_export_ssh_key: OLVaultK8SSecret
 
     db_creds_secret_name: str
     db_connections_secret_name: str
@@ -147,6 +148,7 @@ class EdxappSecrets:
     learn_ai_canvas_syllabus_token_secret_name: str
     cms_oauth_secret_name: str
     lms_oauth_secret_name: str
+    git_export_ssh_key_secret_name: str
 
 
 def create_k8s_secrets(
@@ -499,6 +501,28 @@ def create_k8s_secrets(
         ),
     )
 
+    git_export_ssh_key_secret_name = "git-export-ssh-key"  # pragma: allowlist secret
+    git_export_ssh_key_secret = OLVaultK8SSecret(
+        f"ol-{stack_info.env_prefix}-edxapp-git-export-ssh-key-{stack_info.env_suffix}",
+        OLVaultK8SStaticSecretConfig(
+            name=git_export_ssh_key_secret_name,
+            namespace=namespace,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=git_export_ssh_key_secret_name,
+            labels=k8s_global_labels,
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="global/github-enterprise-ssh",
+            templates={
+                "private_key": '{{ get .Secrets "private_key" }}',
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True, depends_on=[vault_k8s_resources]
+        ),
+    )
+
     return EdxappSecrets(
         db_creds=db_creds_secret,
         db_connections=db_connections_secret,
@@ -510,6 +534,7 @@ def create_k8s_secrets(
         learn_ai_canvas_syllabus_token=learn_ai_canvas_syllabus_token_secret_secret,
         cms_oauth=cms_oauth_secret,
         lms_oauth=lms_oauth_secret,
+        git_export_ssh_key=git_export_ssh_key_secret,
         db_creds_secret_name=db_creds_secret_name,
         db_connections_secret_name=db_connections_secret_name,
         mongo_db_creds_secret_name=mongo_db_creds_secret_name,
@@ -520,4 +545,5 @@ def create_k8s_secrets(
         learn_ai_canvas_syllabus_token_secret_name=learn_ai_canvas_syllabus_token_secret_name,
         cms_oauth_secret_name=cms_oauth_secret_name,
         lms_oauth_secret_name=lms_oauth_secret_name,
+        git_export_ssh_key_secret_name=git_export_ssh_key_secret_name,
     )

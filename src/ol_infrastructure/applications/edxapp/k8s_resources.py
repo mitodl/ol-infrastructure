@@ -348,6 +348,12 @@ def create_k8s_resources(  # noqa: C901
             mount_path="/openedx/config/waffle-flags.yaml",
             sub_path="waffle-flags.yaml",
         ),
+        kubernetes.core.v1.VolumeMountArgs(
+            name=secrets.git_export_ssh_key_secret_name,
+            mount_path="/openedx/.ssh/id_rsa",
+            sub_path="private_key",
+            read_only=True,
+        ),
         *staticfiles_volume_mounts,
     ]
 
@@ -430,6 +436,11 @@ def create_k8s_resources(  # noqa: C901
                     spec=kubernetes.core.v1.PodSpecArgs(
                         service_account_name=vault_k8s_resources.service_account_name,
                         restart_policy="OnFailure",
+                        security_context=kubernetes.core.v1.PodSecurityContextArgs(
+                            run_as_user=1000,
+                            run_as_group=1000,
+                            fs_group=1000,
+                        ),
                         volumes=edxapp_volumes,
                         init_containers=[
                             staticfiles_init_container,
@@ -491,6 +502,7 @@ def create_k8s_resources(  # noqa: C901
         secrets.general_secrets_name,
         secrets.forum_secret_name,
         secrets.learn_ai_canvas_syllabus_token_secret_name,
+        secrets.git_export_ssh_key_secret_name,
         # Just LMS specific resources below this line
         secrets.lms_oauth_secret_name,
     ]
@@ -508,7 +520,12 @@ def create_k8s_resources(  # noqa: C901
     lms_edxapp_volumes = [
         kubernetes.core.v1.VolumeArgs(
             name=secret_name,
-            secret=kubernetes.core.v1.SecretVolumeSourceArgs(secret_name=secret_name),
+            secret=kubernetes.core.v1.SecretVolumeSourceArgs(
+                secret_name=secret_name,
+                default_mode=0o600
+                if secret_name == secrets.git_export_ssh_key_secret_name
+                else None,
+            ),
         )
         for secret_name in lms_edxapp_secret_names
     ]
@@ -635,6 +652,11 @@ def create_k8s_resources(  # noqa: C901
                 spec=kubernetes.core.v1.PodSpecArgs(
                     affinity=_create_affinity_args(lms_webapp_labels),
                     service_account_name=vault_k8s_resources.service_account_name,
+                    security_context=kubernetes.core.v1.PodSecurityContextArgs(
+                        run_as_user=1000,
+                        run_as_group=1000,
+                        fs_group=1000,
+                    ),
                     volumes=lms_edxapp_volumes,
                     init_containers=[
                         staticfiles_init_container,
@@ -687,6 +709,10 @@ def create_k8s_resources(  # noqa: C901
                         kubernetes.core.v1.ContainerArgs(
                             name="vector",
                             image="timberio/vector:0.34.1-alpine",
+                            security_context=kubernetes.core.v1.SecurityContextArgs(
+                                run_as_group=0,
+                                run_as_user=0,
+                            ),
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="ENVIRONMENT",
@@ -777,6 +803,11 @@ def create_k8s_resources(  # noqa: C901
                 spec=kubernetes.core.v1.PodSpecArgs(
                     affinity=_create_affinity_args(lms_celery_labels),
                     service_account_name=vault_k8s_resources.service_account_name,
+                    security_context=kubernetes.core.v1.PodSecurityContextArgs(
+                        run_as_user=1000,
+                        run_as_group=1000,
+                        fs_group=1000,
+                    ),
                     volumes=lms_edxapp_volumes,
                     init_containers=[
                         staticfiles_init_container,  # strictly speaking, not required
@@ -916,6 +947,7 @@ def create_k8s_resources(  # noqa: C901
         secrets.general_secrets_name,
         secrets.forum_secret_name,
         secrets.learn_ai_canvas_syllabus_token_secret_name,
+        secrets.git_export_ssh_key_secret_name,
         # Just CMS specific resources below this line
         secrets.cms_oauth_secret_name,
     ]
@@ -943,7 +975,12 @@ def create_k8s_resources(  # noqa: C901
     cms_edxapp_volumes = [
         kubernetes.core.v1.VolumeArgs(
             name=secret_name,
-            secret=kubernetes.core.v1.SecretVolumeSourceArgs(secret_name=secret_name),
+            secret=kubernetes.core.v1.SecretVolumeSourceArgs(
+                secret_name=secret_name,
+                default_mode=0o600
+                if secret_name == secrets.git_export_ssh_key_secret_name
+                else None,
+            ),
         )
         for secret_name in cms_edxapp_secret_names
     ]
@@ -1063,6 +1100,11 @@ def create_k8s_resources(  # noqa: C901
                 spec=kubernetes.core.v1.PodSpecArgs(
                     affinity=_create_affinity_args(cms_webapp_labels),
                     service_account_name=vault_k8s_resources.service_account_name,
+                    security_context=kubernetes.core.v1.PodSecurityContextArgs(
+                        run_as_user=1000,
+                        run_as_group=1000,
+                        fs_group=1000,
+                    ),
                     volumes=cms_edxapp_volumes,
                     init_containers=[
                         staticfiles_init_container,
@@ -1115,6 +1157,10 @@ def create_k8s_resources(  # noqa: C901
                         kubernetes.core.v1.ContainerArgs(
                             name="vector",
                             image="timberio/vector:0.34.1-alpine",
+                            security_context=kubernetes.core.v1.SecurityContextArgs(
+                                run_as_group=0,
+                                run_as_user=0,
+                            ),
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="ENVIRONMENT",
@@ -1204,6 +1250,11 @@ def create_k8s_resources(  # noqa: C901
                 spec=kubernetes.core.v1.PodSpecArgs(
                     affinity=_create_affinity_args(cms_celery_labels),
                     service_account_name=vault_k8s_resources.service_account_name,
+                    security_context=kubernetes.core.v1.PodSecurityContextArgs(
+                        run_as_user=1000,
+                        run_as_group=1000,
+                        fs_group=1000,
+                    ),
                     volumes=cms_edxapp_volumes,
                     init_containers=[
                         staticfiles_init_container,  # strictly speaking, not required
