@@ -36,6 +36,10 @@ from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.components.services import appdb
+from ol_infrastructure.components.services.cert_manager import (
+    OLCertManagerCert,
+    OLCertManagerCertConfig,
+)
 from ol_infrastructure.components.services.k8s import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
@@ -1172,24 +1176,17 @@ learn_ai_https_apisix_route = OLApisixRoute(
     ),
 )
 
-learn_ai_https_apisix_tls = kubernetes.apiextensions.CustomResource(
-    f"learn-ai-{stack_info.env_suffix}-https-apisix-tls",
-    api_version="apisix.apache.org/v2",
-    kind="ApisixTls",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="learn-ai-https",
-        namespace=learn_ai_namespace,
-        labels=k8s_global_labels,
+learn_ai_https_cert = OLCertManagerCert(
+    f"learn-ai-{stack_info.env_suffix}-https-cert",
+    cert_config=OLCertManagerCertConfig(
+        application_name="learn-ai",
+        k8s_namespace=learn_ai_namespace,
+        k8s_labels=k8s_global_labels,
+        create_apisixtls_resource=True,
+        apisixtls_ingress_class="apache-apisix",
+        dest_secret_name="learn-ai-https-cert",  # noqa: S106  # pragma: allowlist secret
+        dns_names=[learn_ai_api_domain],
     ),
-    spec={
-        "hosts": [learn_ai_api_domain],
-        "ingressClassName": "apache-apisix",
-        # Use the shared ol-wildcard cert loaded into every cluster
-        "secret": {
-            "name": "ol-wildcard-cert",
-            "namespace": "operations",
-        },
-    },
 )
 learn_ai_https_apisix_consumer = kubernetes.apiextensions.CustomResource(
     f"learn-ai-{stack_info.env_suffix}-https-apisix-consumer",
