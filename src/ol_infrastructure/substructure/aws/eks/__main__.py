@@ -4,7 +4,7 @@ from pathlib import Path
 import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, ResourceOptions, StackReference
 
 from bridge.lib.versions import (
     GRAFANA_K8S_MONITORING_CHART_VERSION,
@@ -76,109 +76,6 @@ k8s_provider = kubernetes.Provider(
     "k8s-provider",
     kubeconfig=cluster_stack.require_output("kube_config"),
 )
-
-############################################################
-# Secondary resources for vault-secrets-operator
-############################################################
-vault_traefik_policy_name = f"{stack_info.env_prefix}-eks-traefik"
-vault_traefik_policy = vault.Policy(
-    f"{cluster_name}-eks-vault-traefik-policy",
-    name=vault_traefik_policy_name,
-    policy=Path(__file__).parent.joinpath("operations_vault_policy.hcl").read_text(),
-)
-vault_traefik_auth_backend_role = vault.kubernetes.AuthBackendRole(
-    f"{cluster_name}-traefik-gateway-vault-auth-backend-role",
-    role_name="traefik-gateway",
-    backend=cluster_stack.require_output("vault_auth_endpoint"),
-    bound_service_account_names=["*"],
-    bound_service_account_namespaces=["operations"],
-    token_policies=[vault_traefik_policy_name],
-)
-
-operations_vault_k8s_resources_config = OLVaultK8SResourcesConfig(
-    application_name="operations",
-    namespace="operations",
-    labels=k8s_global_labels,
-    vault_address=f"https://vault-{stack_info.env_suffix}.odl.mit.edu",
-    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
-    vault_auth_role_name=vault_traefik_auth_backend_role.role_name,
-)
-
-operations_vault_k8s_resources = OLVaultK8SResources(
-    resource_config=operations_vault_k8s_resources_config,
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        delete_before_replace=True,
-    ),
-)
-star_odl_mit_edu_secret_name = (
-    "odl-wildcard-cert"  # pragma: allowlist secret #  noqa: S105
-)
-star_odl_mit_edu_static_secret_config = OLVaultK8SStaticSecretConfig(
-    name="vault-kv-global-odl-wildcard",
-    namespace="operations",
-    labels=k8s_global_labels,
-    dest_secret_labels=k8s_global_labels,
-    dest_secret_name=star_odl_mit_edu_secret_name,
-    dest_secret_type="kubernetes.io/tls",  # noqa: S106  # pragma: allowlist secret
-    mount="secret-global",
-    mount_type="kv-v2",
-    path="odl-wildcard",
-    templates={
-        "tls.key": '{{ get .Secrets "key_with_proper_newlines" }}',
-        "tls.crt": '{{ get .Secrets "cert_with_proper_newlines" }}',
-        # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_tls/
-        "key": '{{ get .Secrets "key_with_proper_newlines" }}',
-        "cert": '{{ get .Secrets "cert_with_proper_newlines" }}',
-    },
-    refresh_after="1h",
-    vaultauth=operations_vault_k8s_resources.auth_name,
-)
-star_odl_mit_edu_static_secret = OLVaultK8SSecret(
-    f"{cluster_name}-odl-mit-edu-wildcard-static-secret",
-    resource_config=star_odl_mit_edu_static_secret_config,
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        delete_before_replace=True,
-    ),
-)
-export("star_odl_mit_edu_secret_name", star_odl_mit_edu_secret_name)
-export("star_odl_mit_edu_secret_namespace", "operations")
-
-star_ol_mit_edu_secret_name = (
-    "ol-wildcard-cert"  # pragma: allowlist secret #  noqa: S105
-)
-star_ol_mit_edu_static_secret_config = OLVaultK8SStaticSecretConfig(
-    name="vault-kv-global-ol-wildcard",
-    namespace="operations",
-    labels=k8s_global_labels,
-    dest_secret_labels=k8s_global_labels,
-    dest_secret_name=star_ol_mit_edu_secret_name,
-    dest_secret_type="kubernetes.io/tls",  # noqa: S106  # pragma: allowlist secret
-    mount="secret-global",
-    mount_type="kv-v2",
-    path="ol-wildcard",
-    templates={
-        "tls.key": '{{ get .Secrets "key_with_proper_newlines" }}',
-        "tls.crt": '{{ get .Secrets "cert_with_proper_newlines" }}',
-        # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_tls/
-        "key": '{{ get .Secrets "key_with_proper_newlines" }}',
-        "cert": '{{ get .Secrets "cert_with_proper_newlines" }}',
-    },
-    refresh_after="1h",
-    vaultauth=operations_vault_k8s_resources.auth_name,
-)
-star_ol_mit_edu_static_secret = OLVaultK8SSecret(
-    f"{cluster_name}-ol-mit-edu-wildcard-static-secret",
-    resource_config=star_ol_mit_edu_static_secret_config,
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        delete_before_replace=True,
-    ),
-)
-export("star_ol_mit_edu_secret_name", star_ol_mit_edu_secret_name)
-export("star_ol_mit_edu_secret_namespace", "operations")
-
 
 ############################################################
 # Secondary resources for cert-manager
