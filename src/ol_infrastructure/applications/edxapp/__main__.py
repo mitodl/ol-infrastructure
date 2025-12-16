@@ -776,12 +776,20 @@ edxapp_mysql_role_statements.pop("app")
 edxapp_mysql_role_statements["edxapp"] = {
     "create": [
         Template("""CREATE DATABASE IF NOT EXISTS edxapp;"""),
+        Template("""CREATE DATABASE IF NOT EXISTS edxapp_csmh;"""),
         Template("""CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"""),
         Template(
             """
             GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER,
             REFERENCES, CREATE TEMPORARY TABLES, LOCK TABLES, CREATE VIEW, SHOW VIEW
             ON edxapp.* TO '{{name}}'@'%';
+            """
+        ),
+        Template(
+            """
+            GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER,
+            REFERENCES, CREATE TEMPORARY TABLES, LOCK TABLES, CREATE VIEW, SHOW VIEW
+            ON edxapp_csmh.* TO '{{name}}'@'%';
             """
         ),
     ],

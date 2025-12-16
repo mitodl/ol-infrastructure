@@ -159,7 +159,7 @@ def create_k8s_secrets(
                 dest_secret_name=db_connections_secret_name,
                 labels=k8s_global_labels,
                 mount=f"mariadb-{stack_info.env_prefix}",
-                path="creds/edxapp-csmh",
+                path="creds/edxapp",
                 templates={
                     "01-database-connections.yaml": get_database_connections_template(
                         db_address=db["address"], db_port=db["port"]
