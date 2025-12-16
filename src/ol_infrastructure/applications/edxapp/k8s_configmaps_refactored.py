@@ -523,10 +523,6 @@ def create_k8s_configmaps(
         "RECALCULATE_GRADES_ROUTING_KEY": "edx.lms.core.default",
         "RESTRICT_ENROLL_SOCIAL_PROVIDERS": ["mit-kerberos"],
         "STUDENT_FILEUPLOAD_MAX_SIZE": 52428800,
-        "THIRD_PARTY_AUTH_BACKENDS": [
-            "common.djangoapps.third_party_auth.saml.SAMLAuthBackend",
-            "common.djangoapps.third_party_auth.lti.LTIAuthBackend",
-        ],
         "TRACKING_SEGMENTIO_WEBHOOK_SECRET": "",
         "VERIFY_STUDENT": {
             "DAYS_GOOD_FOR": 365,
@@ -537,6 +533,25 @@ def create_k8s_configmaps(
         },
         "WRITABLE_GRADEBOOK_URL": "/gradebook",
     }
+
+    # Deployment-specific THIRD_PARTY_AUTH_BACKENDS
+    if stack_info.env_prefix in ["mitx", "mitx-staging"]:
+        lms_general_config_content["THIRD_PARTY_AUTH_BACKENDS"] = [
+            "common.djangoapps.third_party_auth.saml.SAMLAuthBackend",
+            "common.djangoapps.third_party_auth.lti.LTIAuthBackend",
+        ]
+    elif stack_info.env_prefix in ["xpro", "mitxonline"]:
+        lms_general_config_content["THIRD_PARTY_AUTH_BACKENDS"] = [
+            "ol_social_auth.backends.OLOAuth2",
+            "social_core.backends.google.GoogleOAuth2",
+            "social_core.backends.linkedin.LinkedinOAuth2",
+            "social_core.backends.facebook.FacebookOAuth2",
+            "social_core.backends.azuread.AzureADOAuth2",
+            "common.djangoapps.third_party_auth.appleid.AppleIdAuth",
+            "common.djangoapps.third_party_auth.identityserver3.IdentityServer3",
+            "common.djangoapps.third_party_auth.saml.SAMLAuthBackend",
+            "common.djangoapps.third_party_auth.lti.LTIAuthBackend",
+        ]
 
     # Add residential-specific LMS features
     if stack_info.env_prefix in ["mitx", "mitx-staging"]:

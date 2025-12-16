@@ -455,6 +455,10 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
     # Deployment-specific overrides
     deployment_overrides = {
         "mitx": {
+            "AUTHENTICATION_BACKENDS": [
+                "common.djangoapps.third_party_auth.saml.SAMLAuthBackend",
+                "common.djangoapps.third_party_auth.lti.LTIAuthBackend",
+            ],
             "DEFAULT_SITE_THEME": "mitx",
             "PLATFORM_NAME": "MITx Residential",
             "PLATFORM_DESCRIPTION": "MITx Residential",
@@ -473,6 +477,10 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
             "BULK_EMAIL_MAX_RETRIES": 5,
         },
         "mitx-staging": {
+            "AUTHENTICATION_BACKENDS": [
+                "common.djangoapps.third_party_auth.saml.SAMLAuthBackend",
+                "common.djangoapps.third_party_auth.lti.LTIAuthBackend",
+            ],
             "DEFAULT_SITE_THEME": "mitx",
             "PLATFORM_NAME": "MITx Residential",
             "PLATFORM_DESCRIPTION": "MITx Residential",
