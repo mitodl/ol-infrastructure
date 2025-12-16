@@ -14,7 +14,7 @@ from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.applications.edxapp.k8s_autoscaling import (
     create_autoscaling_resources,
 )
-from ol_infrastructure.applications.edxapp.k8s_configmaps_refactored import (
+from ol_infrastructure.applications.edxapp.k8s_configmaps import (
     create_k8s_configmaps,
 )
 from ol_infrastructure.applications.edxapp.k8s_secrets import create_k8s_secrets
