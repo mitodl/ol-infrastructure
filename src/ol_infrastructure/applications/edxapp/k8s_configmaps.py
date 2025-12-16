@@ -104,10 +104,6 @@ def _build_interpolated_config_template(
             location: grades/
           # TODO: Remove after Django 5.2 migration - replaced by STORAGES configuration
           STORAGE_TYPE: S3  # MODIFIED
-        IDA_LOGOUT_URI_LIST:
-        - https://{edxapp_config.get("marketing_domain") if stack_info.env_prefix != "mitxonline" else edxapp_config.get("mitxonline_domain")}/logout
-        - https://{edxapp_config.require_object("domains")["studio"]}/logout
-        - https://{edxapp_config.require("mit_learn_api_domain")}/logout
         LANGUAGE_COOKIE: {env_name}-openedx-language-preference
         MIT_LEARN_AI_API_URL: https://{edxapp_config.require("mit_learn_api_domain")}/ai  # Added for ol_openedx_chat
         MIT_LEARN_API_BASE_URL: https://{edxapp_config.require("mit_learn_api_domain")}/learn  # Added for ol_openedx_chat
@@ -133,17 +129,6 @@ def _build_interpolated_config_template(
         LOGO_TRADEMARK_URL: https://{edxapp_config.require_object("domains")["lms"]}/static/{stack_info.env_prefix}/images/{"mit-ol-logo" if stack_info.env_prefix == "xpro" else "mit-logo"}.svg
         MARKETING_SITE_BASE_URL: https://{edxapp_config.get("mitxonline_domain") or edxapp_config.get("marketing_domain")}/ # ADDED - to support mitxonline-theme
         MARKETING_SITE_CHECKOUT_URL: https://{edxapp_config.get("mitxonline_domain") or edxapp_config.get("marketing_domain")}/cart/add/ # ADDED - to support mitxonline checkout
-        MKTG_URLS:
-          ROOT: https://{edxapp_config.get("mitxonline_domain") or edxapp_config.get("marketing_domain")}/
-        MKTG_URL_OVERRIDES:
-          COURSES: https://{edxapp_config.get("marketing_domain") if stack_info.env_prefix != "mitxonline" else ""}/{"catalog/" if stack_info.env_prefix == "xpro" else ""}
-          PRIVACY: https://{edxapp_config.get("marketing_domain") if stack_info.env_prefix != "mitxonline" else ""}/privacy{"-policy/" if stack_info.env_prefix == "xpro" else ""}
-          TOS: https://{edxapp_config.get("marketing_domain") if stack_info.env_prefix != "mitxonline" else edxapp_config.get("mitxonline_domain")}/terms{"-of-service/" if stack_info.env_prefix == "xpro" else ""}
-          ABOUT: https://{edxapp_config.get("marketing_domain") if stack_info.env_prefix != "mitxonline" else edxapp_config.get("mitxonline_domain")}/about{"-us" if stack_info.env_prefix == "xpro" else ""}
-          HONOR: https://{edxapp_config.get("marketing_domain") if stack_info.env_prefix != "mitxonline" else ""}/honor-code/
-          ACCESSIBILITY: https://accessibility.mit.edu/
-          CONTACT: https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/
-          TOS_AND_HONOR: ''
         NOTIFICATIONS_DEFAULT_FROM_EMAIL: {edxapp_config.get("bulk_email_default_from_email") or edxapp_config.require("sender_email_address")}
         PAYMENT_SUPPORT_EMAIL: {edxapp_config.require("sender_email_address")}
         PREVIEW_LMS_BASE: {edxapp_config.require_object("domains")["preview"]}
@@ -183,6 +168,15 @@ def _build_interpolated_config_template(
         template_parts.append(
             f"""
         CANVAS_BASE_URL: {edxapp_config.require("canvas_base_url")}
+        MKTG_URL_OVERRIDES:
+          COURSES: https://{edxapp_config.require("marketing_domain")}/
+          PRIVACY: https://{edxapp_config.require("marketing_domain")}/privacy
+          TOS: https://{edxapp_config.require("marketing_domain")}/terms
+          ABOUT: https://{edxapp_config.require("marketing_domain")}/about
+          HONOR: https://{edxapp_config.require("marketing_domain")}/honor-code/
+          ACCESSIBILITY: https://accessibility.mit.edu/
+          CONTACT: https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/
+          TOS_AND_HONOR: ''
         """
         )
 
@@ -190,13 +184,51 @@ def _build_interpolated_config_template(
     if stack_info.env_prefix == "xpro":
         template_parts.append(
             f"""
-        XPRO_BASE_URL: https://{edxapp_config.get("marketing_domain")}"""
+        XPRO_BASE_URL: https://{edxapp_config.require("marketing_domain")}
+        MKTG_URL_OVERRIDES:
+          COURSES: https://{edxapp_config.require("marketing_domain")}/catalog/
+          PRIVACY: https://{edxapp_config.require("marketing_domain")}/privacy-policy/
+          TOS: https://{edxapp_config.require("marketing_domain")}/terms-of-service/
+          ABOUT: https://{edxapp_config.require("marketing_domain")}/about-us
+          HONOR: https://{edxapp_config.require("marketing_domain")}/honor-code/
+          ACCESSIBILITY: https://accessibility.mit.edu/
+          CONTACT: https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/
+          TOS_AND_HONOR: ''
+
+        """
         )
 
+    # Special configuration unique to residential and xpro
+    if stack_info.env_prefix in ["mitx", "mitx-staging", "xpro"]:
+        template_parts.append(
+            f"""
+        IDA_LOGOUT_URI_LIST:
+        - https://{edxapp_config.require("marketing_domain")}/logout
+        - https://{edxapp_config.require_object("domains")["studio"]}/logout
+        - https://{edxapp_config.require("mit_learn_api_domain")}/logout
+        MKTG_URLS:
+          ROOT: https://{edxapp_config.require("marketing_domain")}/
+        """
+        )
+
+    # Configuration unique to MITx Online
     if stack_info.env_prefix == "mitxonline":
         template_parts.append(
             f"""
-        MITXONLINE_BASE_URL: https://{edxapp_config.get("mitxonline_domain")}/ # ADDED - to support mitxonline-theme"""
+        MITXONLINE_BASE_URL: https://{edxapp_config.require("marketing_domain")}/ # ADDED - to support mitxonline-theme
+        IDA_LOGOUT_URI_LIST:
+        - https://{edxapp_config.require("mitxonline_domain")}/logout
+        - https://{edxapp_config.require_object("domains")["studio"]}/logout
+        - https://{edxapp_config.require("mit_learn_api_domain")}/logout
+        MKTG_URLS:
+          ROOT: https://{edxapp_config.require("marketing_domain")}/
+        MKTG_URL_OVERRIDES:
+          TOS: https://{edxapp_config.require("mit_learn_domain")}/terms
+          ABOUT: https://{edxapp_config.require("mit_learn_domain")}/about
+          ACCESSIBILITY: https://accessibility.mit.edu/
+          CONTACT: https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/
+          TOS_AND_HONOR: ''
+        """
         )
 
     return textwrap.dedent("".join(template_parts))
