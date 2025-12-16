@@ -7,6 +7,7 @@ replacing the repetitive f-string concatenation approach with cleaner,
 testable dictionary-based configuration.
 """
 
+import copy
 from typing import Any
 
 import yaml
@@ -165,6 +166,9 @@ def secrets_dict_to_yaml_template(secrets: dict[str, Any]) -> str:
     # Register custom representer
     CustomDumper.add_representer(str, _str_representer)
 
+    # Override ignore_aliases to disable YAML anchors/aliases
+    CustomDumper.ignore_aliases = lambda self, data: True  # type: ignore[method-assign]  # noqa: ARG005
+
     # Dump to YAML
     return yaml.dump(
         secrets, Dumper=CustomDumper, default_flow_style=False, sort_keys=False
@@ -227,14 +231,14 @@ def get_database_connections_template(db_address: str, db_port: int) -> tuple[st
                 "ATOMIC_REQUESTS": True,
                 "CONN_MAX_AGE": 0,
                 "NAME": "edxapp",
-                "OPTIONS": db_options,
-                **mysql_creds,
+                "OPTIONS": copy.deepcopy(db_options),
+                **copy.deepcopy(mysql_creds),
             },
             "read_replica": {
                 "CONN_MAX_AGE": 0,
                 "NAME": "edxapp",
-                "OPTIONS": db_options,
-                **mysql_creds,
+                "OPTIONS": copy.deepcopy(db_options),
+                **copy.deepcopy(mysql_creds),
             },
             "student_module_history": {
                 "CONN_MAX_AGE": 0,
@@ -242,7 +246,7 @@ def get_database_connections_template(db_address: str, db_port: int) -> tuple[st
                 "HOST": db_address,
                 "PORT": db_port,
                 "NAME": "edxapp_csmh",
-                "OPTIONS": db_options,
+                "OPTIONS": copy.deepcopy(db_options),
                 "USER": '{{ get .Secrets "username" }}',
                 "PASSWORD": '{{ get .Secrets "password" }}',
             },
@@ -285,20 +289,20 @@ def get_mongodb_credentials_template(
         "collection": "modulestore",
         "connectTimeoutMS": 2000,
         "socketTimeoutMS": 3000,
-        **mongo_params,
+        **copy.deepcopy(mongo_params),
     }
 
     # Build complete config structure
     config = {
-        "mongodb_settings": mongo_params,
-        "DOC_STORE_CONFIG": doc_store_config,
+        "mongodb_settings": copy.deepcopy(mongo_params),
+        "DOC_STORE_CONFIG": copy.deepcopy(doc_store_config),
         "CONTENTSTORE": {
             "ADDITIONAL_OPTIONS": {},
-            "DOC_STORE_CONFIG": doc_store_config.copy(),
+            "DOC_STORE_CONFIG": copy.deepcopy(doc_store_config),
             "ENGINE": "xmodule.contentstore.mongo.MongoContentStore",
             "OPTIONS": {
                 "auth_source": "",
-                **mongo_params,
+                **copy.deepcopy(mongo_params),
             },
         },
         "MODULESTORE": {
@@ -310,7 +314,7 @@ def get_mongodb_credentials_template(
                         {
                             "ENGINE": "xmodule.modulestore.split_mongo.split_draft.DraftVersioningModuleStore",
                             "NAME": "split",
-                            "DOC_STORE_CONFIG": doc_store_config.copy(),
+                            "DOC_STORE_CONFIG": copy.deepcopy(doc_store_config),
                             "OPTIONS": {
                                 "default_class": "xmodule.hidden_block.HiddenBlock",
                                 "fs_root": "/openedx/data/var/edxapp/data",
@@ -320,7 +324,7 @@ def get_mongodb_credentials_template(
                         {
                             "ENGINE": "xmodule.modulestore.mongo.DraftMongoModuleStore",
                             "NAME": "draft",
-                            "DOC_STORE_CONFIG": doc_store_config.copy(),
+                            "DOC_STORE_CONFIG": copy.deepcopy(doc_store_config),
                             "OPTIONS": {
                                 "default_class": "xmodule.hidden_block.HiddenBlock",
                                 "fs_root": "/openedx/data/var/edxapp/data",
@@ -394,21 +398,32 @@ def get_general_secrets_yaml(
     # Add CACHES configuration (duplicates redis_cache_config for each cache)
     redis_cache_base = secrets.pop("redis_cache_config")
     secrets["CACHES"] = {
-        "celery": {**redis_cache_base, "KEY_PREFIX": "celery", "TIMEOUT": "7200"},
-        "configuration": {**redis_cache_base, "KEY_PREFIX": "configuration"},
+        "celery": {
+            **copy.deepcopy(redis_cache_base),
+            "KEY_PREFIX": "celery",
+            "TIMEOUT": "7200",
+        },
+        "configuration": {
+            **copy.deepcopy(redis_cache_base),
+            "KEY_PREFIX": "configuration",
+        },
         "course_structure_cache": {
-            **redis_cache_base,
+            **copy.deepcopy(redis_cache_base),
             "KEY_PREFIX": "course_structure",
             "TIMEOUT": "7200",
         },
-        "default": {**redis_cache_base, "KEY_PREFIX": "default", "VERSION": "1"},
-        "general": {**redis_cache_base, "KEY_PREFIX": "general"},
+        "default": {
+            **copy.deepcopy(redis_cache_base),
+            "KEY_PREFIX": "default",
+            "VERSION": "1",
+        },
+        "general": {**copy.deepcopy(redis_cache_base), "KEY_PREFIX": "general"},
         "mongo_metadata_inheritance": {
-            **redis_cache_base,
+            **copy.deepcopy(redis_cache_base),
             "KEY_PREFIX": "mongo_metadata_inheritance",
             "TIMEOUT": 300,
         },
-        "staticfiles": {**redis_cache_base, "KEY_PREFIX": "staticfiles"},
+        "staticfiles": {**copy.deepcopy(redis_cache_base), "KEY_PREFIX": "staticfiles"},
     }
 
     # Apply deployment overrides

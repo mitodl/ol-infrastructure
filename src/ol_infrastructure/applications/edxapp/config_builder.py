@@ -604,9 +604,18 @@ def render_yaml(config: ConfigDict) -> str:
     Returns:
         YAML string representation
     """
-    # Use safe_dump with explicit settings for consistent formatting
-    return yaml.safe_dump(
+
+    # Create custom SafeDumper that ignores aliases to prevent duplicate anchor errors
+    class NoAliasSafeDumper(yaml.SafeDumper):
+        pass
+
+    # Override ignore_aliases to disable YAML anchors/aliases
+    NoAliasSafeDumper.ignore_aliases = lambda self, data: True  # type: ignore[method-assign]  # noqa: ARG005
+
+    # Use safe_dump with custom dumper and explicit settings for consistent formatting
+    return yaml.dump(
         config,
+        Dumper=NoAliasSafeDumper,
         default_flow_style=False,
         sort_keys=False,
         allow_unicode=True,
