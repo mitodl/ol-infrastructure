@@ -758,7 +758,7 @@ def create_k8s_resources(  # noqa: C901
         ),
         opts=pulumi.ResourceOptions(
             depends_on=[
-                *lms_edxapp_config_sources.values(),
+                *[v for v in lms_edxapp_config_sources.values() if v is not None],
                 lms_pre_deploy_migrate_job,
                 lms_pre_deploy_waffleflag_job,
                 vector_configmap,
@@ -1082,7 +1082,10 @@ def create_k8s_resources(  # noqa: C901
         args=["cms", "migrate", "--noinput"],
         purpose="migrate",
         opts=ResourceOptions(
-            depends_on=[*cms_edxapp_config_sources.values(), lms_pre_deploy_migrate_job]
+            depends_on=[
+                *[v for v in cms_edxapp_config_sources.values() if v is not None],
+                lms_pre_deploy_migrate_job,
+            ]
         ),
     )
     # It is important that the CMS and LMS deployment have distinct labels attached.
@@ -1208,7 +1211,7 @@ def create_k8s_resources(  # noqa: C901
         ),
         opts=pulumi.ResourceOptions(
             depends_on=[
-                *cms_edxapp_config_sources.values(),
+                *[v for v in cms_edxapp_config_sources.values() if v is not None],
                 cms_pre_deploy_migrate_job,
                 vector_configmap,
             ]
@@ -1302,7 +1305,9 @@ def create_k8s_resources(  # noqa: C901
                 ),
             ),
         ),
-        opts=pulumi.ResourceOptions(depends_on=[*cms_edxapp_config_sources.values()]),
+        opts=pulumi.ResourceOptions(
+            depends_on=[v for v in cms_edxapp_config_sources.values() if v is not None]
+        ),
     )
 
     # Create autoscaling resources (ScaledObjects, TriggerAuthentications, etc.)
