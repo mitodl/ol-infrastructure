@@ -31,10 +31,10 @@ config:
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 100
-      instance_type: "r7a.large"
+      instance_type: "r7a.2xlarge"
       gpu: false
       labels:
-        node_size: r7a.large
+        node_size: r7a.2xlarge
         ondemand: true
         ol.mit.edu/core_node: true
         ol.mit.edu/gpu_node: false
