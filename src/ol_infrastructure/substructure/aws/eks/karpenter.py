@@ -442,7 +442,7 @@ def setup_karpenter(  # noqa: PLR0913
             },
             "disruption": {
                 "consolidationPolicy": "WhenEmptyOrUnderutilized",
-                "consolidateAfter": "1h",
+                "consolidateAfter": "10m",
             },
             "limits": {
                 "cpu": "128",
