@@ -494,7 +494,7 @@ def create_k8s_resources(  # noqa: C901
         configmaps.lms_general_config_name: configmaps.lms_general,
         configmaps.lms_interpolated_config_name: configmaps.lms_interpolated,
     }
-    if secrets.xqueue_secret_name:
+    if secrets.xqueue:
         lms_edxapp_config_sources[secrets.xqueue_secret_name] = secrets.xqueue
     lms_edxapp_secret_names = [
         secrets.db_creds_secret_name,
@@ -508,7 +508,7 @@ def create_k8s_resources(  # noqa: C901
         # Just LMS specific resources below this line
         secrets.lms_oauth_secret_name,
     ]
-    if secrets.xqueue_secret_name:
+    if secrets.xqueue:
         lms_edxapp_secret_names.append(secrets.xqueue_secret_name)
     lms_edxapp_configmap_names = [
         configmaps.general_config_name,
@@ -945,7 +945,7 @@ def create_k8s_resources(  # noqa: C901
         configmaps.cms_general_config_name: configmaps.cms_general,
         configmaps.cms_interpolated_config_name: configmaps.cms_interpolated,
     }
-    if secrets.xqueue_secret_name:
+    if secrets.xqueue:
         cms_edxapp_config_sources[secrets.xqueue_secret_name] = secrets.xqueue
     cms_edxapp_secret_names = [
         secrets.db_creds_secret_name,
@@ -959,7 +959,7 @@ def create_k8s_resources(  # noqa: C901
         # Just CMS specific resources below this line
         secrets.cms_oauth_secret_name,
     ]
-    if secrets.xqueue_secret_name:
+    if secrets.xqueue:
         cms_edxapp_secret_names.append(secrets.xqueue_secret_name)
     cms_edxapp_configmap_names = [
         configmaps.general_config_name,
