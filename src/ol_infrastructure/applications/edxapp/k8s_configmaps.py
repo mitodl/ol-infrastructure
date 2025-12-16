@@ -194,7 +194,6 @@ def _build_interpolated_config_template(
           ACCESSIBILITY: https://accessibility.mit.edu/
           CONTACT: https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/
           TOS_AND_HONOR: ''
-
         """
         )
 
