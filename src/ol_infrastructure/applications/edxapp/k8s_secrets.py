@@ -46,7 +46,7 @@ class EdxappSecrets:
     forum: OLVaultK8SSecret
     learn_ai_canvas_syllabus_token: OLVaultK8SSecret
     cms_oauth: OLVaultK8SSecret
-    lms_oauth: OLVaultK8SSecret
+    lms_oauth: OLVaultK8SSecret | None
     git_export_ssh_key: OLVaultK8SSecret
 
     db_creds_secret_name: str
@@ -58,7 +58,7 @@ class EdxappSecrets:
     forum_secret_name: str
     learn_ai_canvas_syllabus_token_secret_name: str
     cms_oauth_secret_name: str
-    lms_oauth_secret_name: str
+    lms_oauth_secret_name: str | None
     git_export_ssh_key_secret_name: str
 
 
@@ -325,19 +325,22 @@ def create_k8s_secrets(
         },
     )
 
-    # LMS OAuth secret (static)
-    lms_oauth_secret = builder.create_static(
-        name="lms-oauth-credentials",
-        resource_name="lms-oauth-secret",
-        secret_name=lms_oauth_secret_name,
-        mount=f"secret-{stack_info.env_prefix}",
-        path="edxapp",
-        templates={
-            "80-lms-oauth-credentials.yaml": f"""SOCIAL_AUTH_OAUTH_SECRETS:
+    # LMS OAuth secret (conditional - only for xpro and mitxonline)
+    if stack_info.env_prefix in ["xpro", "mitxonline"]:
+        lms_oauth_secret = builder.create_static(
+            name="lms-oauth-credentials",
+            resource_name="lms-oauth-secret",
+            secret_name=lms_oauth_secret_name,
+            mount=f"secret-{stack_info.env_prefix}",
+            path="edxapp",
+            templates={
+                "80-lms-oauth-credentials.yaml": f"""SOCIAL_AUTH_OAUTH_SECRETS:
     ol-oauth2: {{{{ get .Secrets "{stack_info.env_prefix}_oauth_secret" }}}}
 """,
-        },
-    )
+            },
+        )
+    else:
+        lms_oauth_secret = None
 
     # Git export SSH key secret (static, operations mount)
     git_export_ssh_key_secret = builder.create_static(

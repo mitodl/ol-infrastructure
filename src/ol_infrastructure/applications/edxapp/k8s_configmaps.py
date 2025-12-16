@@ -542,6 +542,7 @@ def create_k8s_configmaps(
             "common.djangoapps.third_party_auth.saml.SAMLAuthBackend",
             "common.djangoapps.third_party_auth.lti.LTIAuthBackend",
         ]
+        lms_general_config_content["THIRD_PARTY_AUTH_SAML_FETCH_PERIOD_HOURS"] = 24
         # Residential-specific settings
         lms_general_config_content["RESTRICT_ENROLL_SOCIAL_PROVIDERS"] = [
             "mit-kerberos"

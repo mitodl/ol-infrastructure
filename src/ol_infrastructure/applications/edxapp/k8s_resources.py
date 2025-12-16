@@ -490,12 +490,13 @@ def create_k8s_resources(  # noqa: C901
         configmaps.general_config_name: configmaps.general,
         configmaps.interpolated_config_name: configmaps.interpolated,
         # Just LMS specific resources below this line
-        secrets.lms_oauth_secret_name: secrets.lms_oauth,
         configmaps.lms_general_config_name: configmaps.lms_general,
         configmaps.lms_interpolated_config_name: configmaps.lms_interpolated,
     }
     if secrets.xqueue:
         lms_edxapp_config_sources[secrets.xqueue_secret_name] = secrets.xqueue
+    if secrets.lms_oauth:
+        lms_edxapp_config_sources[secrets.lms_oauth_secret_name] = secrets.lms_oauth
     lms_edxapp_secret_names = [
         secrets.db_creds_secret_name,
         secrets.db_connections_secret_name,
@@ -505,11 +506,11 @@ def create_k8s_resources(  # noqa: C901
         secrets.forum_secret_name,
         secrets.learn_ai_canvas_syllabus_token_secret_name,
         secrets.git_export_ssh_key_secret_name,
-        # Just LMS specific resources below this line
-        secrets.lms_oauth_secret_name,
     ]
     if secrets.xqueue:
         lms_edxapp_secret_names.append(secrets.xqueue_secret_name)
+    if secrets.lms_oauth:
+        lms_edxapp_secret_names.append(secrets.lms_oauth_secret_name)
     lms_edxapp_configmap_names = [
         configmaps.general_config_name,
         configmaps.interpolated_config_name,
