@@ -334,6 +334,7 @@ def build_base_general_config() -> ConfigDict:
         "TECH_SUPPORT_EMAIL": "odl-devops@mit.edu",
         "TIME_ZONE": "America/New_York",
         "USERNAME_REPLACEMENT_WORKER": "OVERRIDE THIS WITH A VALID USERNAME",
+        "SITE_ID": None,  # Use CurrentSiteMiddleware for dynamic site lookup
         "USE_X_FORWARDED_HOST": True,  # Trust X-Forwarded-Host from APISIX proxy
         "VIDEO_IMAGE_MAX_AGE": 31536000,
         "VIDEO_IMAGE_SETTINGS": {
