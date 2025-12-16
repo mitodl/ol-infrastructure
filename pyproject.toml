@@ -204,7 +204,7 @@ inline-quotes = "double"
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/**" = ["T201", "ERA001", "B", "BLE001", "PLR", "E501", "G004", "FBT", "C90", "INP001"]
-"tests/**" = ["S101", "PLR2004", "RUF059"]
+"tests/**" = ["S101", "PLR2004", "RUF059", "S106", "SLF001", "ERA001"]
 "test_*.py" = ["S101"]
 "src/ol_infrastructure/substructure/vault/pki/__main__.py" = ["E501"]
 "src/ol_infrastructure/lib/fastly.py" = ["E501"]

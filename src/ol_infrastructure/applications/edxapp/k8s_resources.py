@@ -14,7 +14,9 @@ from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.applications.edxapp.k8s_autoscaling import (
     create_autoscaling_resources,
 )
-from ol_infrastructure.applications.edxapp.k8s_configmaps import create_k8s_configmaps
+from ol_infrastructure.applications.edxapp.k8s_configmaps import (
+    create_k8s_configmaps,
+)
 from ol_infrastructure.applications.edxapp.k8s_secrets import create_k8s_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache
 from ol_infrastructure.components.aws.database import OLAmazonDB
@@ -619,7 +621,9 @@ def create_k8s_resources(  # noqa: C901
         command=["python", "manage.py"],
         args=["lms", "migrate", "--noinput"],
         purpose="migrate",
-        opts=ResourceOptions(depends_on=[*lms_edxapp_config_sources.values()]),
+        opts=ResourceOptions(
+            depends_on=[v for v in lms_edxapp_config_sources.values() if v is not None]
+        ),
     )
     lms_pre_deploy_waffleflag_job = _create_pre_deploy_job(
         service_type="lms",
@@ -629,7 +633,9 @@ def create_k8s_resources(  # noqa: C901
         command=["python", "set_waffle_flags.py"],
         args=["/openedx/config/waffle-flags.yaml"],
         purpose="waffleflags",
-        opts=ResourceOptions(depends_on=[*lms_edxapp_config_sources.values()]),
+        opts=ResourceOptions(
+            depends_on=[v for v in lms_edxapp_config_sources.values() if v is not None]
+        ),
     )
     # It is important that the CMS and LMS deployment have distinct labels attached.
     lms_webapp_labels = k8s_global_labels | {
@@ -752,7 +758,7 @@ def create_k8s_resources(  # noqa: C901
         ),
         opts=pulumi.ResourceOptions(
             depends_on=[
-                *lms_edxapp_config_sources.values(),
+                *[v for v in lms_edxapp_config_sources.values() if v is not None],
                 lms_pre_deploy_migrate_job,
                 lms_pre_deploy_waffleflag_job,
                 vector_configmap,
@@ -847,7 +853,9 @@ def create_k8s_resources(  # noqa: C901
                 ),
             ),
         ),
-        opts=pulumi.ResourceOptions(depends_on=[*lms_edxapp_config_sources.values()]),
+        opts=pulumi.ResourceOptions(
+            depends_on=[v for v in lms_edxapp_config_sources.values() if v is not None]
+        ),
     )
 
     # Celery deployment do not require service definitions
@@ -911,7 +919,7 @@ def create_k8s_resources(  # noqa: C901
         ),
         opts=pulumi.ResourceOptions(
             depends_on=[
-                *lms_edxapp_config_sources.values(),
+                *[v for v in lms_edxapp_config_sources.values() if v is not None],
                 lms_pre_deploy_migrate_job,
                 lms_pre_deploy_waffleflag_job,
             ]
@@ -1074,7 +1082,10 @@ def create_k8s_resources(  # noqa: C901
         args=["cms", "migrate", "--noinput"],
         purpose="migrate",
         opts=ResourceOptions(
-            depends_on=[*cms_edxapp_config_sources.values(), lms_pre_deploy_migrate_job]
+            depends_on=[
+                *[v for v in cms_edxapp_config_sources.values() if v is not None],
+                lms_pre_deploy_migrate_job,
+            ]
         ),
     )
     # It is important that the CMS and LMS deployment have distinct labels attached.
@@ -1200,7 +1211,7 @@ def create_k8s_resources(  # noqa: C901
         ),
         opts=pulumi.ResourceOptions(
             depends_on=[
-                *cms_edxapp_config_sources.values(),
+                *[v for v in cms_edxapp_config_sources.values() if v is not None],
                 cms_pre_deploy_migrate_job,
                 vector_configmap,
             ]
@@ -1294,7 +1305,9 @@ def create_k8s_resources(  # noqa: C901
                 ),
             ),
         ),
-        opts=pulumi.ResourceOptions(depends_on=[*cms_edxapp_config_sources.values()]),
+        opts=pulumi.ResourceOptions(
+            depends_on=[v for v in cms_edxapp_config_sources.values() if v is not None]
+        ),
     )
 
     # Create autoscaling resources (ScaledObjects, TriggerAuthentications, etc.)
