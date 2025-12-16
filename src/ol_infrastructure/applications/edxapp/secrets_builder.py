@@ -114,7 +114,7 @@ def _apply_deployment_secret_overrides(
         secrets["EMAIL_HOST_USER"] = '{{ get .Secrets "email_username" }}'
         secrets["EMAIL_HOST_PASSWORD"] = '{{ get .Secrets "email_password" }}'
 
-    # mitx and mitx-staging have SAML configuration
+    # mitx and mitx-staging have SAML configuration and YouTube API key
     if env_prefix in ("mitx", "mitx-staging"):
         secrets["SOCIAL_AUTH_SAML_SP_PRIVATE_KEY"] = (
             '{{ get .Secrets "saml_private_key" }}'
@@ -122,6 +122,7 @@ def _apply_deployment_secret_overrides(
         secrets["SOCIAL_AUTH_SAML_SP_PUBLIC_CERT"] = (
             '{{ get .Secrets "saml_public_cert" }}'
         )
+        secrets["YOUTUBE_API_KEY"] = '{{ get .Secrets "youtube_api_key" }}'
 
     # Proctoring backend configuration
     default_backend = "null" if env_prefix == "xpro" else "proctortrack"

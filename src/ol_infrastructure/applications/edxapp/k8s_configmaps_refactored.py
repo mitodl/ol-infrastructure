@@ -96,6 +96,7 @@ def _build_interpolated_config_dict(
         "CELERY_BROKER_HOSTNAME": runtime_config["redis_hostname"],
         "CMS_BASE": domains["studio"],
         "CONTACT_EMAIL": edxapp_config.require("sender_email_address"),
+        # Base CORS origins - canvas.mit.edu and idp.mit.edu added conditionally below
         "CORS_ORIGIN_WHITELIST": [
             f"https://{domains['lms']}",
             f"https://{domains['studio']}",
@@ -105,7 +106,7 @@ def _build_interpolated_config_dict(
             f"https://{edxapp_config.require('learn_ai_frontend_domain')}",
             f"https://{edxapp_config.require('mit_learn_domain')}",
             f"https://{env_name}-edxapp-storage.s3.amazonaws.com",
-            "https://idp.mit.edu",
+            "https://canvas.mit.edu",
         ],
         "COURSE_IMPORT_EXPORT_BUCKET": course_bucket_name,
         "CROSS_DOMAIN_CSRF_COOKIE_DOMAIN": domains["lms"],
@@ -194,6 +195,10 @@ def _build_interpolated_config_dict(
 
     # Residential-specific configuration (mitx, mitx-staging)
     if stack_info.env_prefix in ["mitx", "mitx-staging"]:
+        # Add Canvas and MIT IDP to CORS whitelist for residential deployments
+        config["CORS_ORIGIN_WHITELIST"].append(
+            "https://idp.mit.edu",
+        )
         config["CSRF_TRUSTED_ORIGINS"] = [
             "https://canvas.mit.edu",
             f"https://{domains['lms']}",
