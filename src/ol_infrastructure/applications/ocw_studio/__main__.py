@@ -12,8 +12,16 @@ from pathlib import Path
 import pulumi_github as github
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
-from pulumi import Config, InvokeOptions, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, get_caller_identity, iam, s3
+from pulumi import (
+    ROOT_STACK_RESOURCE,
+    Alias,
+    Config,
+    InvokeOptions,
+    ResourceOptions,
+    StackReference,
+    export,
+)
+from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.secrets.sops import read_yaml_secrets
@@ -22,6 +30,7 @@ from ol_infrastructure.components.aws.mediaconvert import (
     MediaConvertConfig,
     OLMediaConvert,
 )
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
@@ -64,34 +73,17 @@ aws_account = get_caller_identity()
 
 # Bucket used to store file uploads from ocw-studio app.
 ocw_storage_bucket_name = f"ol-ocw-studio-app-{stack_info.env_suffix}"
-ocw_storage_bucket = s3.Bucket(
-    f"ol-ocw-studio-app-{stack_info.env_suffix}",
-    bucket=ocw_storage_bucket_name,
-    tags=aws_config.tags,
-)
-ocw_storage_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "ol-ocw-studio-app-ownership-controls",
-    bucket=ocw_storage_bucket.id,
-    rule=s3.BucketOwnershipControlsRuleArgs(
-        object_ownership="BucketOwnerPreferred",
-    ),
-)
-s3.BucketVersioning(
-    "ol-ocw-studio-app-bucket-versioning",
-    bucket=ocw_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Enabled"
-    ),
-)
-ocw_storage_bucket_public_access = s3.BucketPublicAccessBlock(
-    "ol-ocw-studio-app-bucket-public-access-controls",
-    bucket=ocw_storage_bucket.id,
+
+ocw_storage_bucket_config = S3BucketConfig(
+    bucket_name=ocw_storage_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerPreferred",
+    block_public_acls=False,
     block_public_policy=False,
-)
-s3.BucketPolicy(
-    "ol-ocw-studio-app-bucket-policy",
-    bucket=ocw_storage_bucket.id,
-    policy=json.dumps(
+    ignore_public_acls=False,
+    restrict_public_buckets=False,
+    tags=aws_config.tags,
+    bucket_policy_document=json.dumps(
         {
             "Version": "2008-10-17",
             "Statement": [
@@ -104,10 +96,33 @@ s3.BucketPolicy(
             ],
         }
     ),
+)
+
+ocw_storage_bucket = OLBucket(
+    "ocw-studio-app-bucket",
+    config=ocw_storage_bucket_config,
     opts=ResourceOptions(
-        depends_on=[
-            ocw_storage_bucket_public_access,
-            ocw_storage_bucket_ownership_controls,
+        aliases=[
+            Alias(
+                name=f"ol-ocw-studio-app-{stack_info.env_suffix}",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="ol-ocw-studio-app-ownership-controls",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="ol-ocw-studio-app-bucket-versioning",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="ol-ocw-studio-app-bucket-public-access-controls",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="ol-ocw-studio-app-bucket-policy",
+                parent=ROOT_STACK_RESOURCE,
+            ),
         ]
     ),
 )
