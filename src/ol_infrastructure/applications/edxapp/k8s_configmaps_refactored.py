@@ -475,8 +475,6 @@ def create_k8s_configmaps(
         "GOOGLE_ANALYTICS_TRACKING_ID": "",
         "GOOGLE_SITE_VERIFICATION_ID": "",
         "HTTPS": "on",
-        "LEARNER_HOME_MFE_REDIRECT_PERCENTAGE": 100,
-        "LEARNER_HOME_MICROFRONTEND_URL": "/dashboard/",
         "LTI_AGGREGATE_SCORE_PASSBACK_DELAY": 900,
         "LTI_USER_EMAIL_DOMAIN": "lti.example.com",
         "MAILCHIMP_NEW_USER_LIST_ID": None,
@@ -521,7 +519,6 @@ def create_k8s_configmaps(
         "REGISTRATION_RATELIMIT": "1000000/minute",
         "RATELIMIT_RATE": "600/m",
         "RECALCULATE_GRADES_ROUTING_KEY": "edx.lms.core.default",
-        "RESTRICT_ENROLL_SOCIAL_PROVIDERS": ["mit-kerberos"],
         "STUDENT_FILEUPLOAD_MAX_SIZE": 52428800,
         "TRACKING_SEGMENTIO_WEBHOOK_SECRET": "",
         "VERIFY_STUDENT": {
@@ -540,7 +537,17 @@ def create_k8s_configmaps(
             "common.djangoapps.third_party_auth.saml.SAMLAuthBackend",
             "common.djangoapps.third_party_auth.lti.LTIAuthBackend",
         ]
-    elif stack_info.env_prefix in ["xpro", "mitxonline"]:
+        # Residential-specific settings
+        lms_general_config_content["RESTRICT_ENROLL_SOCIAL_PROVIDERS"] = [
+            "mit-kerberos"
+        ]
+        lms_general_config_content["LEARNER_HOME_MFE_REDIRECT_PERCENTAGE"] = 100
+        lms_general_config_content["LEARNER_HOME_MICROFRONTEND_URL"] = "/dashboard/"
+        lms_general_config_content["FEATURES"] = {
+            "ENABLE_INSTRUCTOR_BACKGROUND_TASKS": True,
+            "MAX_PROBLEM_RESPONSES_COUNT": 10000,
+        }
+    elif stack_info.env_prefix == "xpro":
         lms_general_config_content["THIRD_PARTY_AUTH_BACKENDS"] = [
             "ol_social_auth.backends.OLOAuth2",
             "social_core.backends.google.GoogleOAuth2",
@@ -552,13 +559,20 @@ def create_k8s_configmaps(
             "common.djangoapps.third_party_auth.saml.SAMLAuthBackend",
             "common.djangoapps.third_party_auth.lti.LTIAuthBackend",
         ]
-
-    # Add residential-specific LMS features
-    if stack_info.env_prefix in ["mitx", "mitx-staging"]:
-        lms_general_config_content["FEATURES"] = {
-            "ENABLE_INSTRUCTOR_BACKGROUND_TASKS": True,
-            "MAX_PROBLEM_RESPONSES_COUNT": 10000,
-        }
+        lms_general_config_content["LEARNER_HOME_MICROFRONTEND_URL"] = "/dashboard/"
+    elif stack_info.env_prefix == "mitxonline":
+        lms_general_config_content["THIRD_PARTY_AUTH_BACKENDS"] = [
+            "ol_social_auth.backends.OLOAuth2",
+            "social_core.backends.google.GoogleOAuth2",
+            "social_core.backends.linkedin.LinkedinOAuth2",
+            "social_core.backends.facebook.FacebookOAuth2",
+            "social_core.backends.azuread.AzureADOAuth2",
+            "common.djangoapps.third_party_auth.appleid.AppleIdAuth",
+            "common.djangoapps.third_party_auth.identityserver3.IdentityServer3",
+            "common.djangoapps.third_party_auth.saml.SAMLAuthBackend",
+            "common.djangoapps.third_party_auth.lti.LTIAuthBackend",
+        ]
+        # mitxonline has no LEARNER_HOME_MICROFRONTEND_URL
 
     lms_general_config_map = kubernetes.core.v1.ConfigMap(
         f"ol-{stack_info.env_prefix}-edxapp-lms-general-config-{stack_info.env_suffix}",
