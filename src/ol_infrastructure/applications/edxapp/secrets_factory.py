@@ -56,7 +56,7 @@ class VaultSecretBuilder:
         self.k8s_global_labels = k8s_global_labels
         self.vault_k8s_resources = vault_k8s_resources
 
-    def _get_resource_name(self, name: str) -> str:
+    def get_resource_name(self, name: str) -> str:
         """Generate Pulumi resource name for secrets.
 
         Args:
@@ -67,7 +67,7 @@ class VaultSecretBuilder:
         """
         return f"ol-{self.stack_info.env_prefix}-edxapp-{name}-{self.stack_info.env_suffix}"
 
-    def _get_common_options(self) -> ResourceOptions:
+    def get_common_options(self) -> ResourceOptions:
         """Generate common resource options."""
         return ResourceOptions(
             delete_before_replace=True,
@@ -102,7 +102,7 @@ class VaultSecretBuilder:
         mount = mount.replace("{env_prefix}", self.stack_info.env_prefix)
 
         return OLVaultK8SSecret(
-            self._get_resource_name(resource_name or name),
+            self.get_resource_name(resource_name or name),
             OLVaultK8SStaticSecretConfig(
                 name=secret_name,
                 namespace=self.namespace,
@@ -115,7 +115,7 @@ class VaultSecretBuilder:
                 templates=templates,
                 vaultauth=self.vault_k8s_resources.auth_name,
             ),
-            opts=self._get_common_options(),
+            opts=self.get_common_options(),
         )
 
     def create_dynamic(
@@ -161,7 +161,7 @@ class VaultSecretBuilder:
         def _create_secret_with_outputs(_: Any) -> OLVaultK8SSecret:
             """Create secret with access to Output values."""
             return OLVaultK8SSecret(
-                self._get_resource_name(f"dynamic-secret-{name}"),
+                self.get_resource_name(f"dynamic-secret-{name}"),
                 OLVaultK8SStaticSecretConfig(
                     name=secret_name,
                     namespace=self.namespace,
@@ -174,7 +174,7 @@ class VaultSecretBuilder:
                     templates=templates,
                     vaultauth=self.vault_k8s_resources.auth_name,
                 ),
-                opts=self._get_common_options(),
+                opts=self.get_common_options(),
             )
 
         return _create_secret_with_outputs

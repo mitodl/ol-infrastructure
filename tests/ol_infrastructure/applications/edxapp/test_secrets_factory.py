@@ -65,13 +65,13 @@ class TestVaultSecretBuilder:
 
     def test_get_resource_name(self, vault_builder):
         """Test resource name generation."""
-        name = vault_builder._get_resource_name()
+        name = vault_builder.get_resource_name("test-secret")
         assert "mitx" in name
         assert "qa" in name
 
     def test_get_common_options(self, vault_builder):
         """Test common options generation."""
-        opts = vault_builder._get_common_options()
+        opts = vault_builder.get_common_options()
         assert opts.delete_before_replace is True
         assert opts.depends_on is not None
 

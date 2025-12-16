@@ -1,4 +1,4 @@
-# ruff: noqa: E501, S105, PLR0913, SLF001
+# ruff: noqa: E501, S105, PLR0913
 # mypy: ignore-errors
 """Kubernetes secrets for edxapp using Vault integration.
 
@@ -125,7 +125,7 @@ def create_k8s_secrets(
         port=edxapp_db.db_instance.port,
     ).apply(
         lambda db: OLVaultK8SSecret(
-            builder._get_resource_name("db-creds-secret"),
+            builder.get_resource_name("db-creds-secret"),
             OLVaultK8SDynamicSecretConfig(
                 name=db_creds_secret_name,
                 namespace=namespace,
@@ -141,7 +141,7 @@ def create_k8s_secrets(
                 },
                 vaultauth=vault_k8s_resources.auth_name,
             ),
-            opts=builder._get_common_options(),
+            opts=builder.get_common_options(),
         )
     )
 
@@ -151,7 +151,7 @@ def create_k8s_secrets(
         port=edxapp_db.db_instance.port,
     ).apply(
         lambda db: OLVaultK8SSecret(
-            builder._get_resource_name("db-connections-secret"),
+            builder.get_resource_name("db-connections-secret"),
             OLVaultK8SDynamicSecretConfig(
                 name=db_connections_secret_name,
                 namespace=namespace,
@@ -167,7 +167,7 @@ def create_k8s_secrets(
                 },
                 vaultauth=vault_k8s_resources.auth_name,
             ),
-            opts=builder._get_common_options(),
+            opts=builder.get_common_options(),
         )
     )
 
@@ -179,7 +179,7 @@ def create_k8s_secrets(
         ],
     ).apply(
         lambda mongodb: OLVaultK8SSecret(
-            builder._get_resource_name("mongo-db-creds-secret"),
+            builder.get_resource_name("mongo-db-creds-secret"),
             OLVaultK8SStaticSecretConfig(
                 name=mongo_db_creds_secret_name,
                 namespace=namespace,
@@ -197,7 +197,7 @@ def create_k8s_secrets(
                 },
                 vaultauth=vault_k8s_resources.auth_name,
             ),
-            opts=builder._get_common_options(),
+            opts=builder.get_common_options(),
         )
     )
 
@@ -209,7 +209,7 @@ def create_k8s_secrets(
         ],
     ).apply(
         lambda mongodb: OLVaultK8SSecret(
-            builder._get_resource_name("mongo-forum-creds-secret"),
+            builder.get_resource_name("mongo-forum-creds-secret"),
             OLVaultK8SStaticSecretConfig(
                 name=mongo_db_forum_secret_name,
                 namespace=namespace,
@@ -227,7 +227,7 @@ def create_k8s_secrets(
                 },
                 vaultauth=vault_k8s_resources.auth_name,
             ),
-            opts=builder._get_common_options(),
+            opts=builder.get_common_options(),
         )
     )
 
@@ -236,7 +236,7 @@ def create_k8s_secrets(
         redis_hostname=edxapp_cache.address,
     ).apply(
         lambda redis_cache: OLVaultK8SSecret(
-            builder._get_resource_name("general-secret"),
+            builder.get_resource_name("general-secret"),
             OLVaultK8SStaticSecretConfig(
                 name=general_secrets_name,
                 namespace=namespace,
@@ -256,7 +256,7 @@ def create_k8s_secrets(
                 },
                 vaultauth=vault_k8s_resources.auth_name,
             ),
-            opts=builder._get_common_options(),
+            opts=builder.get_common_options(),
         )
     )
 

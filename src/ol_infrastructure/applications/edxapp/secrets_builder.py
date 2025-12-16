@@ -154,11 +154,8 @@ def secrets_dict_to_yaml_template(secrets: dict[str, Any]) -> str:
         YAML string suitable for Vault templating
     """
 
-    # Custom representer for handling Vault template strings
+    # Custom representer for strings (always use plain scalar style)
     def _str_representer(dumper: Any, data: str) -> Any:
-        if data.startswith("{{") and data.endswith("}}"):
-            # Vault template - use literal block to avoid quoting
-            return dumper.represent_scalar("tag:yaml.org,2002:str", data)
         return dumper.represent_scalar("tag:yaml.org,2002:str", data)
 
     # Create custom dumper class

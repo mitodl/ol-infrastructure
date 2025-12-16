@@ -9,12 +9,12 @@ single source of truth for shared configuration across all deployments.
 """
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypeAlias
 
 import yaml
 
 # Type alias for configuration dictionaries
-type ConfigDict = dict[str, Any]
+ConfigDict: TypeAlias = dict[str, Any]  # noqa: UP040
 
 
 @dataclass
@@ -383,100 +383,57 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
     Returns:
         Configuration overrides for the specified deployment
     """
-    # Base overrides applicable to all deployments
+    # Shared configuration for mitx and mitx-staging
+    mitx_shared_config = {
+        "AUTHENTICATION_BACKENDS": [
+            "common.djangoapps.third_party_auth.saml.SAMLAuthBackend",
+            "common.djangoapps.third_party_auth.lti.LTIAuthBackend",
+        ],
+        "DEFAULT_SITE_THEME": "mitx",
+        "PLATFORM_NAME": "MITx Residential",
+        "PLATFORM_DESCRIPTION": "MITx Residential",
+        "PRESS_EMAIL": "support@mitx.mit.edu",
+        "MITX_REDIRECT_ENABLED": False,
+        "SYSADMIN_DEFAULT_BRANCH": "live",
+        "EMAIL_HOST": "outgoing.mit.edu",
+        "EMAIL_PORT": 587,
+        "EMAIL_USE_TLS": True,
+        "COURSE_MODE_DEFAULTS": {
+            "name": "Honor",
+            "android_sku": None,
+            "bulk_sku": None,
+            "currency": "usd",
+            "description": None,
+            "expiration_datetime": None,
+            "ios_sku": None,
+            "min_price": 0,
+            "sku": None,
+            "slug": "honor",
+            "suggested_prices": "",
+        },
+        "RETIREMENT_STATES": [
+            "PENDING",
+            "ERRORED",
+            "ABORTED",
+            "COMPLETE",
+        ],
+        "FEATURES": {
+            "DISABLE_HONOR_CERTIFICATES": True,
+            "DISABLE_START_DATES": True,
+            "ENABLE_CANVAS_INTEGRATION": True,
+            "ENABLE_LTI_PROVIDER": True,
+            "ENABLE_MKTG_SITE": False,
+            "ENABLE_ORA_USERNAMES_ON_DATA_EXPORT": False,
+            "REROUTE_ACTIVATION_EMAIL": "mitx-support@mit.edu",
+        },
+        "BULK_EMAIL_DEFAULT_RETRY_DELAY": 30,
+        "BULK_EMAIL_MAX_RETRIES": 5,
+    }
 
     # Deployment-specific overrides
     deployment_overrides = {
-        "mitx": {
-            "AUTHENTICATION_BACKENDS": [
-                "common.djangoapps.third_party_auth.saml.SAMLAuthBackend",
-                "common.djangoapps.third_party_auth.lti.LTIAuthBackend",
-            ],
-            "DEFAULT_SITE_THEME": "mitx",
-            "PLATFORM_NAME": "MITx Residential",
-            "PLATFORM_DESCRIPTION": "MITx Residential",
-            "PRESS_EMAIL": "support@mitx.mit.edu",
-            "MITX_REDIRECT_ENABLED": False,
-            "SYSADMIN_DEFAULT_BRANCH": "live",
-            "EMAIL_HOST": "outgoing.mit.edu",
-            "EMAIL_PORT": 587,
-            "EMAIL_USE_TLS": True,
-            "COURSE_MODE_DEFAULTS": {
-                "name": "Honor",
-                "android_sku": None,
-                "bulk_sku": None,
-                "currency": "usd",
-                "description": None,
-                "expiration_datetime": None,
-                "ios_sku": None,
-                "min_price": 0,
-                "sku": None,
-                "slug": "honor",
-                "suggested_prices": "",
-            },
-            "RETIREMENT_STATES": [
-                "PENDING",
-                "ERRORED",
-                "ABORTED",
-                "COMPLETE",
-            ],
-            "FEATURES": {
-                "DISABLE_HONOR_CERTIFICATES": True,
-                "DISABLE_START_DATES": True,
-                "ENABLE_CANVAS_INTEGRATION": True,
-                "ENABLE_LTI_PROVIDER": True,
-                "ENABLE_MKTG_SITE": False,
-                "ENABLE_ORA_USERNAMES_ON_DATA_EXPORT": False,
-                "REROUTE_ACTIVATION_EMAIL": "mitx-support@mit.edu",
-            },
-            "BULK_EMAIL_DEFAULT_RETRY_DELAY": 30,
-            "BULK_EMAIL_MAX_RETRIES": 5,
-        },
-        "mitx-staging": {
-            "AUTHENTICATION_BACKENDS": [
-                "common.djangoapps.third_party_auth.saml.SAMLAuthBackend",
-                "common.djangoapps.third_party_auth.lti.LTIAuthBackend",
-            ],
-            "DEFAULT_SITE_THEME": "mitx",
-            "PLATFORM_NAME": "MITx Residential",
-            "PLATFORM_DESCRIPTION": "MITx Residential",
-            "PRESS_EMAIL": "support@mitx.mit.edu",
-            "MITX_REDIRECT_ENABLED": False,
-            "SYSADMIN_DEFAULT_BRANCH": "live",
-            "EMAIL_HOST": "outgoing.mit.edu",
-            "EMAIL_PORT": 587,
-            "EMAIL_USE_TLS": True,
-            "COURSE_MODE_DEFAULTS": {
-                "name": "Honor",
-                "android_sku": None,
-                "bulk_sku": None,
-                "currency": "usd",
-                "description": None,
-                "expiration_datetime": None,
-                "ios_sku": None,
-                "min_price": 0,
-                "sku": None,
-                "slug": "honor",
-                "suggested_prices": "",
-            },
-            "RETIREMENT_STATES": [
-                "PENDING",
-                "ERRORED",
-                "ABORTED",
-                "COMPLETE",
-            ],
-            "FEATURES": {
-                "DISABLE_HONOR_CERTIFICATES": True,
-                "DISABLE_START_DATES": True,
-                "ENABLE_CANVAS_INTEGRATION": True,
-                "ENABLE_LTI_PROVIDER": True,
-                "ENABLE_MKTG_SITE": False,
-                "ENABLE_ORA_USERNAMES_ON_DATA_EXPORT": False,
-                "REROUTE_ACTIVATION_EMAIL": "mitx-support@mit.edu",
-            },
-            "BULK_EMAIL_DEFAULT_RETRY_DELAY": 30,
-            "BULK_EMAIL_MAX_RETRIES": 5,
-        },
+        "mitx": mitx_shared_config,
+        "mitx-staging": mitx_shared_config,
         "xpro": {
             "DEFAULT_SITE_THEME": "xpro",
             "PLATFORM_NAME": "MIT xPRO",
