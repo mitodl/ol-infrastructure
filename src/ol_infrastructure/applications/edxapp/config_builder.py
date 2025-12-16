@@ -394,7 +394,6 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
         "PLATFORM_DESCRIPTION": "MITx Residential",
         "PRESS_EMAIL": "support@mitx.mit.edu",
         "MITX_REDIRECT_ENABLED": False,
-        "SYSADMIN_DEFAULT_BRANCH": "live",
         "EMAIL_HOST": "outgoing.mit.edu",
         "EMAIL_PORT": 587,
         "EMAIL_USE_TLS": True,
@@ -421,19 +420,29 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
             "DISABLE_HONOR_CERTIFICATES": True,
             "DISABLE_START_DATES": True,
             "ENABLE_CANVAS_INTEGRATION": True,
+            "ENABLE_CONTENT_LIBRARIES": True,
             "ENABLE_LTI_PROVIDER": True,
             "ENABLE_MKTG_SITE": False,
             "ENABLE_ORA_USERNAMES_ON_DATA_EXPORT": False,
+            "ENABLE_RAPID_RESPONSE_AUTHOR_VIEW": True,
+            "ENABLE_THIRD_PARTY_ONLY_AUTH": True,
             "REROUTE_ACTIVATION_EMAIL": "mitx-support@mit.edu",
         },
         "BULK_EMAIL_DEFAULT_RETRY_DELAY": 30,
         "BULK_EMAIL_MAX_RETRIES": 5,
+        "X_FRAME_OPTIONS": "ALLOW-FROM canvas.mit.edu",
     }
+    mitx = {"SYSADMIN_DEFAULT_BRANCH": "live", **mitx_shared_config}
+    mitx.update(
+        {
+            "COURSE_CATALOG_VISIBILITY_PERMISSION": "staff",
+        }
+    )
 
     # Deployment-specific overrides
     deployment_overrides = {
-        "mitx": mitx_shared_config,
-        "mitx-staging": mitx_shared_config,
+        "mitx": mitx,
+        "mitx-staging": {"SYSADMIN_DEFAULT_BRANCH": "master", **mitx_shared_config},
         "xpro": {
             "DEFAULT_SITE_THEME": "xpro",
             "PLATFORM_NAME": "MIT xPRO",
