@@ -15,9 +15,16 @@ from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import (
+    ROOT_STACK_RESOURCE,
+    Alias,
+    Config,
+    ResourceOptions,
+    StackReference,
+    export,
+)
 from pulumi.config import get_config
-from pulumi_aws import ec2, get_caller_identity, s3
+from pulumi_aws import ec2, get_caller_identity
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.lib.versions import DAGSTER_CHART_VERSION
@@ -26,6 +33,7 @@ from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBindingConfig,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.apisix_gateway_api import (
     OLApisixHTTPRoute,
     OLApisixHTTPRouteConfig,
@@ -265,36 +273,70 @@ parliament_config = {
 }
 
 # Keep existing S3 buckets (they already exist and store important data)
-dagster_runtime_bucket = s3.Bucket(
-    dagster_bucket_name,
-    bucket=dagster_bucket_name,
-    acl="private",
+# Migrated to OLBucket component for standardized management
+dagster_runtime_bucket_config = S3BucketConfig(
+    bucket_name=dagster_bucket_name,
+    versioning_enabled=True,
+    server_side_encryption_enabled=True,
     tags=aws_config.tags,
-    versioning={"enabled": True},
-    server_side_encryption_configuration={
-        "rule": {
-            "applyServerSideEncryptionByDefault": {
-                "sseAlgorithm": "aws:kms",
-            },
-        },
-    },
+)
+dagster_runtime_bucket = OLBucket(
+    "dagster-runtime",
+    config=dagster_runtime_bucket_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"dagster-{dagster_environment}",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="dagster-runtime-bucket-ownership-controls",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="dagster-runtime-bucket-versioning",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="dagster-runtime-bucket-server-side-encryption",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+        ]
+    ),
 )
 
 # Bucket to store gcs import of edxorg course tarballs
+# Migrated to OLBucket component for standardized management
 edxorg_courses_bucket_name = f"edxorg-{stack_info.env_suffix}-edxapp-courses"
-edxorg_courses_bucket = s3.Bucket(
-    edxorg_courses_bucket_name,
-    bucket=edxorg_courses_bucket_name,
-    acl="private",
+edxorg_courses_bucket_config = S3BucketConfig(
+    bucket_name=edxorg_courses_bucket_name,
+    versioning_enabled=True,
+    server_side_encryption_enabled=True,
     tags=aws_config.tags,
-    versioning={"enabled": True},
-    server_side_encryption_configuration={
-        "rule": {
-            "applyServerSideEncryptionByDefault": {
-                "sseAlgorithm": "aws:kms",
-            },
-        },
-    },
+)
+edxorg_courses_bucket = OLBucket(
+    "edxorg-courses",
+    config=edxorg_courses_bucket_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=edxorg_courses_bucket_name,
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="edxorg-courses-bucket-ownership-controls",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="edxorg-courses-bucket-versioning",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="edxorg-courses-bucket-server-side-encryption",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+        ]
+    ),
 )
 
 

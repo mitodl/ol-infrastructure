@@ -21,7 +21,15 @@ from typing import Any
 
 import pulumi_tls as tls
 import yaml
-from pulumi import Config, Output, StackReference, export
+from pulumi import (
+    ROOT_STACK_RESOURCE,
+    Alias,
+    Config,
+    Output,
+    ResourceOptions,
+    StackReference,
+    export,
+)
 from pulumi_aws import (
     acmpca,
     ec2,
@@ -48,6 +56,7 @@ from ol_infrastructure.components.aws.auto_scale_group import (
     OLTargetGroupConfig,
     TagSpecification,
 )
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.lib.aws.ec2_helper import DiskTypes, InstanceTypes
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -251,39 +260,54 @@ vault_instance_profile = iam.InstanceProfile(
     path=f"/ol-applications/vault/{stack_info.env_prefix}/{stack_info.env_suffix}/",
 )
 
-# Backup Bucket
-backup_bucket = s3.Bucket(
-    "vault-backup-bucket",
-    bucket=vault_backup_bucket,
-    acl="private",
-    lifecycle_rules=[
-        s3.BucketLifecycleRuleArgs(
-            enabled=True,
-            id="reduce_storage_costs",
-            transitions=[
-                s3.BucketLifecycleRuleTransitionArgs(
-                    days=30, storage_class="INTELLIGENT_TIERING"
-                ),
-            ],
-        ),
-        s3.BucketLifecycleRuleArgs(
-            enabled=True,
-            id="delete_older_than_one_year",
-            expiration=s3.BucketLifecycleRuleExpirationArgs(
-                days=365,
-            ),
-        ),
-    ],
-    versioning=s3.BucketVersioningArgs(enabled=False),
-    server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
-        rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
-                sse_algorithm="aws:kms",
-                kms_master_key_id=vault_unseal_key["id"],
-            ),
-        )
+# Backup Bucket - Migrated to OLBucket component for standardized management
+# Preserves existing lifecycle rules: 30-day intelligent tiering + 365-day deletion
+vault_delete_rule = s3.BucketLifecycleConfigurationRuleArgs(
+    id="delete_older_than_one_year",
+    status="Enabled",
+    expiration=s3.BucketLifecycleConfigurationRuleExpirationArgs(
+        days=365,
     ),
+)
+
+backup_bucket_config = S3BucketConfig(
+    bucket_name=vault_backup_bucket,
+    versioning_enabled=False,  # Preserve disabled state (intentional for backup bucket)
+    server_side_encryption_enabled=True,
+    kms_key_id=vault_unseal_key["id"],  # CRITICAL: Preserve for Vault auto-unseal
+    intelligent_tiering_enabled=True,
+    intelligent_tiering_days=30,  # Match existing 30-day transition
+    lifecycle_rules=[vault_delete_rule],  # 365-day deletion rule
     tags=aws_config.merged_tags(),
+)
+
+backup_bucket = OLBucket(
+    "vault-backup",
+    config=backup_bucket_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name="vault-backup-bucket",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="vault-backup-bucket-ownership-controls",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="vault-backup-bucket-server-side-encryption",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="vault-backup-bucket-intelligent-tiering",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="vault-backup-bucket-lifecycle-configuration",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+        ]
+    ),
 )
 
 # Security Group
@@ -581,7 +605,7 @@ vault_public_dns = route53.Record(
 export(
     "vault_server",
     {
-        "backup_bucket": backup_bucket.bucket,
+        "backup_bucket": backup_bucket.bucket_v2.bucket,
         "cluster_address": vault_public_dns.fqdn.apply("https://{}".format),
         "environment_namespace": f"{stack_info.env_prefix}.{stack_info.env_suffix}",
         "instance_profile_arn": vault_instance_profile.arn,

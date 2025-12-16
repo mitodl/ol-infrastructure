@@ -6,6 +6,7 @@ and intelligent tiering for cost optimization.
 """
 
 import pulumi
+from pulumi import Output
 from pulumi_aws import s3
 from pydantic import ConfigDict, Field, model_validator
 
@@ -88,11 +89,12 @@ class S3BucketConfig(AWSBase):
         default=False,
         description="Whether server-side encryption is enabled for the bucket.",
     )
-    kms_key_id: str | None = Field(
+    kms_key_id: str | Output[str] | None = Field(
         default=None,
         description=(
             "The KMS key ID to use for server-side encryption. "
-            "Required if server_side_encryption_enabled is True."
+            "Can be a string or Pulumi Output[str]. "
+            "If not provided, uses AWS-managed key."
         ),
     )
     bucket_key_enabled: bool | None = Field(
@@ -160,12 +162,12 @@ class S3BucketConfig(AWSBase):
 
     @model_validator(mode="after")
     def check_encryption_config(self) -> "S3BucketConfig":
-        """Validate that KMS key ID is provided if server-side encryption is enabled."""
-        if self.server_side_encryption_enabled and not self.kms_key_id:
-            error_message = (
-                "kms_key_id must be provided if server_side_encryption_enabled is True."
-            )
-            raise ValueError(error_message)
+        """Validate encryption configuration.
+
+        Note: When server_side_encryption_enabled is True but kms_key_id is None,
+        AWS uses its default managed key for encryption (valid configuration).
+        """
+        # No validation needed - both AWS-managed and customer-managed keys are valid
         return self
 
 
