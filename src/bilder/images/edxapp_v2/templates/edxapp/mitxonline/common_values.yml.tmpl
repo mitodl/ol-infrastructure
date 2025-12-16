@@ -252,7 +252,8 @@ CORS_ORIGIN_WHITELIST:
   - https://{{ key "edxapp/lms-domain" }}
   - https://{{ key "edxapp/studio-domain" }}
   - https://{{ key "edxapp/preview-domain" }}
-  - https://{{ key "edxapp/marketing-domain" }}
+  - https://{{ key "edxapp/mit-learn-domain" }}
+  - https://{{ key "edxapp/mitxonline-domain" }}
   - https://{{ key "edx/notes-api-host" }}
   - https://{{ key "edxapp/learn-ai-frontend-domain" }}
   - https://{{ env "ENVIRONMENT" }}-edxapp-storage.s3.amazonaws.com  # Fix ORA upload bug
@@ -411,7 +412,7 @@ HELP_TOKENS_BOOKS:
 ICP_LICENSE: null
 ICP_LICENSE_INFO: {}
 IDA_LOGOUT_URI_LIST:
-  - https://{{ key "edxapp/marketing-domain" }}/logout
+  - https://{{ key "edxapp/mitxonline-domain" }}/logout
   - https://{{ key "edxapp/studio-domain" }}/logout
   - https://{{ key "edxapp/learn-api-domain" }}/logout
 ID_VERIFICATION_SUPPORT_LINK: ''
@@ -444,18 +445,19 @@ LOGIN_REDIRECT_WHITELIST:  # MODIFIED
   - {{ key "edxapp/studio-domain" }}
   - {{ key "edxapp/lms-domain" }}
   - {{ key "edxapp/preview-domain" }}
-  - {{ key "edxapp/marketing-domain" }}
+  - {{ key "edxapp/mitxonline-domain" }}
+  - {{ key "edxapp/mit-learn-domain" }}
 LOG_DIR: /openedx/data/var/log/ed/openedx/data/var/log/edx
 LOGO_URL: https://{{ key "edxapp/lms-domain" }}/static/mitxonline/images/logo.svg
 LOGO_URL_PNG_FOR_EMAIL: https://{{ key "edxapp/lms-domain" }}/static/mitxonline/images/logo.png
 LOGO_TRADEMARK_URL: https://{{ key "edxapp/lms-domain" }}/static/mitxonline/images/mit-logo.svg
 MAINTENANCE_BANNER_TEXT: Sample banner message
-MARKETING_SITE_BASE_URL: https://{{ key "edxapp/marketing-domain" }}/ # ADDED - to support mitxonline-theme
+MARKETING_SITE_BASE_URL: https://{{ key "edxapp/mitxonline-domain" }}/ # ADDED - to support mitxonline-theme
 MARKETING_SITE_CHECKOUT_URL: https://{{ key "edxapp/mitxonline-domain" }}/cart/add/ # ADDED - to support mitxonline checkout
 MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within the bucket. No leading / allowed
 MEDIA_URL: /media/
 MICROSITE_CONFIGURATION: {}
-MIT_BASE_URL: https://web.mit.edu # Keeping it hardcoded till we change MARKETING_SITE_BASE_URL
+MIT_BASE_URL: https://web.mit.edu
 MITX_REDIRECT_ENABLED: True
 MITX_REDIRECT_ALLOW_RE_LIST:  # ADDED VALUE
   - "^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/|lti_provider)"
@@ -466,7 +468,7 @@ MITX_REDIRECT_ALLOW_RE_LIST:  # ADDED VALUE
   - "^/courses/.*/courseware-search/enabled/?$"
 MITXONLINE_BASE_URL: https://{{ key "edxapp/mitxonline-domain" }}/ # ADDED - to support mitxonline-theme
 MKTG_URLS:
-    ROOT: https://{{ key "edxapp/marketing-domain" }}/
+    ROOT: https://{{ key "edxapp/mitxonline-domain" }}/
 MKTG_URL_LINK_MAP:
     TOS: tos
     ABOUT: about

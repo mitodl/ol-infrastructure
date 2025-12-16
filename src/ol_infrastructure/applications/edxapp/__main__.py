@@ -1175,6 +1175,7 @@ consul_kv_data = {
     "lms-domain": edxapp_domains["lms"],
     "marketing-domain": edxapp_config.get("marketing_domain") or "",
     "mitxonline-domain": edxapp_config.get("mitxonline_domain") or "",
+    "mit-learn-domain": edxapp_config.get("mit_learn_domain") or "",
     "preview-domain": edxapp_domains["preview"],
     "rds-host": edxapp_db.db_instance.address,
     "proctortrack-base-url": edxapp_config.get("proctortrack_url") or "",
