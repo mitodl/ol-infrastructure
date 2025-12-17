@@ -246,7 +246,7 @@ ocw_studio_db_security_group = ec2.SecurityGroup(
     vpc_id=apps_vpc["id"],
 )
 rds_defaults = defaults(stack_info)["rds"]
-rds_defaults["use_blue_green"] = False
+rds_defaults["use_blue_green"] = ocw_studio_config.get("db_use_blue_green") or False
 ocw_studio_db_config = OLPostgresDBConfig(
     instance_name=f"ocw-studio-db-applications-{stack_info.env_suffix}",
     password=ocw_studio_config.require("db_password"),
