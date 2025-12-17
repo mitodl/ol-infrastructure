@@ -49,8 +49,9 @@ config:
     secure: v1:jgBYHCVD4xbM2TGu:P0rmQmQm2SYH/pQh928vZq5C5ZRXWQsKvRijEitpVjsIo5YfzyYGM84GOIQQG2FTINUdINXCGkWXHNUsfYFGq1dKcOsrql9n5nUka8k/4bWcqEuyBy0dI0bCpoEf6Ui0hL1On/Or4/rV7itDycwjIsTe7Eq6pE2oLRw+64RV77e3ho9f1M/63BC00rzYynBkaw==
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
-    communications: communications
     authoring: authoring
+    communications: communications
+    discussions: discuss
     gradebook: gradebook
     learner_dashboard: dashboard
     learning: learn

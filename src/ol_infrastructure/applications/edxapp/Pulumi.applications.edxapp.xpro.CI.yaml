@@ -50,6 +50,7 @@ config:
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     authoring: authoring
+    discussions: discuss
     gradebook: gradebook
     learning: learn
     ora_grading: ora-grading

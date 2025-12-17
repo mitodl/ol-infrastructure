@@ -52,8 +52,9 @@ config:
   edxapp:elb_healthcheck_interval: "30"
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
-    communications: communications
     authoring: authoring
+    communications: communications
+    discussions: discuss
     gradebook: gradebook
     learner_dashboard: dashboard
     learning: learn
