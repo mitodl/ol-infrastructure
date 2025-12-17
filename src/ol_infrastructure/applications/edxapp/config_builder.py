@@ -327,7 +327,7 @@ def build_base_general_config() -> ConfigDict:
         "ENABLE_CORS_HEADERS": False,
         "ENABLE_COURSE_OLX_VALIDATION": False,
         "ENABLE_DISCUSSION_SERVICE": True,
-        "ENABLE_EDXNOTES": False,
+        "ENABLE_EDXNOTES": True,
         "ENABLE_HELP_LINK": True,
         "ENABLE_MKTG_SITE": False,
         "ENABLE_MOBILE_REST_API": False,
@@ -590,7 +590,6 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
                 },
             },
             # Module-level settings overrides for mitxonline
-            "ENABLE_EDXNOTES": True,  # Extracted to module-level
             "ENABLE_MKTG_SITE": True,  # Extracted to module-level
             "LICENSING": True,  # Extracted to module-level
             "MILESTONES_APP": True,  # Extracted to module-level
