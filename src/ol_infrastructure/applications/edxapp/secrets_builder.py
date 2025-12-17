@@ -38,7 +38,7 @@ def build_base_general_secrets_dict(
     # Base secrets shared across all deployments
     base_secrets: dict[str, Any] = {
         "CELERY_BROKER_PASSWORD": '{{ get .Secrets "redis_auth_token" }}',
-        "FERNET_KEYS": '{{ get .Secrets "fernet_keys" }}',
+        "FERNET_KEYS": '{{ (fromJson (get .Secrets "fernet_keys")) }}',
         "redis_cache_config": {
             "BACKEND": "django_redis.cache.RedisCache",
             "LOCATION": f"rediss://default@{redis_hostname}:6379/0",
