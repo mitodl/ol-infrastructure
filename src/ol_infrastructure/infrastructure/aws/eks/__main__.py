@@ -61,6 +61,7 @@ from ol_infrastructure.lib.aws.iam_helper import (
     IAM_POLICY_VERSION,
     lint_iam_policy,
 )
+from ol_infrastructure.lib.fastly import get_fastly_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -928,6 +929,11 @@ create_core_dns_resources(
 )
 
 ############################################################
+# Setup Fastly provider (shared by Traefik and APISIX)
+############################################################
+fastly_provider = get_fastly_provider(wrap_in_pulumi_options=False)
+
+############################################################
 # Setup AWS integrations
 # AWS Load Balancer Controller, AWS Node Termination Handler
 ############################################################
@@ -959,6 +965,7 @@ gateway_api_crds = setup_traefik(
     aws_config=aws_config,
     cluster=cluster,
     lb_controller=lb_controller,
+    fastly_provider=fastly_provider,
 )
 
 setup_apisix(
@@ -976,6 +983,7 @@ setup_apisix(
     aws_config=aws_config,
     cluster=cluster,
     lb_controller=lb_controller,
+    fastly_provider=fastly_provider,
 )
 
 

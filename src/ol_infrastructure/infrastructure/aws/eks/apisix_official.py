@@ -7,8 +7,9 @@ This module deploys the Apache APISIX chart from https://apache.github.io/apisix
 import textwrap
 
 import pulumi_eks as eks
+import pulumi_fastly as fastly
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, ResourceOptions
+from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from bridge.lib.magic_numbers import AWS_LOAD_BALANCER_NAME_MAX_LENGTH
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -33,6 +34,7 @@ def setup_apisix(
     aws_config: AWSBase,
     cluster: eks.Cluster,
     lb_controller,
+    fastly_provider: fastly.Provider,
 ):
     """
     Configure and install the Apache APISIX ingress controller.
@@ -56,6 +58,8 @@ def setup_apisix(
     :param target_vpc: The target VPC object.
     :param aws_config: The AWS configuration object.
     :param cluster: The EKS cluster object.
+    :param lb_controller: The AWS Load Balancer Controller.
+    :param fastly_provider: The Fastly provider instance.
     """
     apisix_domains = eks_config.get_object("apisix_domains") or []
 
@@ -74,6 +78,16 @@ def setup_apisix(
         "app.kubernetes.io/name": "apache-apisix",
         "app.kubernetes.io/component": "gateway",
     }
+
+    # Get Fastly IP ranges for trusted proxy configuration
+    fastly_ips = Output.all(
+        fastly.get_fastly_ip_ranges(
+            opts=InvokeOptions(provider=fastly_provider)
+        ).cidr_blocks,
+        fastly.get_fastly_ip_ranges(
+            opts=InvokeOptions(provider=fastly_provider)
+        ).ipv6_cidr_blocks,
+    ).apply(lambda blocks: [*blocks[0], *blocks[1]])
 
     kubernetes.helm.v3.Release(
         f"{cluster_name}-apisix-official-helm-release",
@@ -160,6 +174,7 @@ def setup_apisix(
                             "config_provider": "yaml",
                         },
                     },
+                    "trustedAddresses": fastly_ips,
                     "admin": {
                         "enabled": True,
                         "type": "ClusterIP",

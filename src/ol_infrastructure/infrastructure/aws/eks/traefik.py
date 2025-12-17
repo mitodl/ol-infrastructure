@@ -6,7 +6,6 @@ from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from bridge.lib.magic_numbers import AWS_LOAD_BALANCER_NAME_MAX_LENGTH
 from ol_infrastructure.lib.aws.eks_helper import ECR_DOCKERHUB_REGISTRY
-from ol_infrastructure.lib.fastly import get_fastly_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 
 
@@ -24,6 +23,7 @@ def setup_traefik(
     aws_config: AWSBase,
     cluster,
     lb_controller,
+    fastly_provider: fastly.Provider,
 ):
     """
     Configure and install the Traefik ingress controller.
@@ -40,6 +40,8 @@ def setup_traefik(
     :param target_vpc: The target VPC object.
     :param aws_config: The AWS configuration object.
     :param cluster: The EKS cluster object.
+    :param lb_controller: The AWS Load Balancer Controller.
+    :param fastly_provider: The Fastly provider instance.
 
     :return: The Gateway API CRDs.
     """
@@ -62,8 +64,6 @@ def setup_traefik(
             depends_on=[cluster],
         ),
     )
-
-    fastly_provider = get_fastly_provider(wrap_in_pulumi_options=False)
 
     # This helm release installs the traefik k8s gateway api controller
     # which will server as the ingress point for ALL connections going into
