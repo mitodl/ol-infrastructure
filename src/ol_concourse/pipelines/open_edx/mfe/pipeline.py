@@ -149,7 +149,7 @@ def mfe_params(
     }
 
 
-def mfe_job(
+def mfe_job(  # noqa: C901, PLR0915
     open_edx: OpenEdxVars,
     mfe: OpenEdxApplicationVersion,
     open_edx_deployment: DeploymentEnvRelease,
@@ -201,7 +201,7 @@ def mfe_job(
     mfe_smoot_design_overrides = ""
     copy_ai_drawer_components = []
 
-    if OpenEdxMicroFrontend[mfe_name].value == OpenEdxMicroFrontend.learn.value:
+    if mfe.application == OpenEdxMicroFrontend.learn:
         mfe_smoot_design_overrides = """
         npm pack @mitodl/smoot-design@^6.12.0
         tar -xvzf mitodl-smoot-design*.tgz
@@ -216,32 +216,54 @@ def mfe_job(
         )
         copy_ai_drawer_components = [
             (
-                f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+                f"echo 'Copying AIDrawerManagerSidebar.jsx...' && "
+                f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
                 f"AIDrawerManagerSidebar.jsx "
                 f"{mfe_build_dir.name}/AIDrawerManagerSidebar.jsx"
             ),
             (
-                f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+                f"echo 'Copying SidebarAIDrawerCoordinator.jsx...' && "
+                f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
                 f"SidebarAIDrawerCoordinator.jsx "
                 f"{mfe_build_dir.name}/SidebarAIDrawerCoordinator.jsx"
             ),
         ]
 
+    is_learning_mfe = mfe.application == OpenEdxMicroFrontend.learn
     mfe_setup_steps = [
+        f"echo 'Starting MFE setup for {mfe_name}...'",
+        f"echo 'Learning MFE detected: {is_learning_mfe}'",
         f"cp -r {mfe_repo.name}/* {mfe_build_dir.name}",
         (
-            f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+            f"echo 'Copying Footer.jsx...' && "
+            f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
             f"Footer.jsx {mfe_build_dir.name}/Footer.jsx"
         ),
         (
-            f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+            f"echo 'Copying env.config from {slot_config_file}.env.jsx...' && "
+            f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
             f"{slot_config_file}.env.jsx "
             f"{mfe_build_dir.name}/env.config.jsx"
         ),
     ]
     if copy_common_config:
-        mfe_setup_steps.append(copy_common_config)
-    mfe_setup_steps.extend(copy_ai_drawer_components)
+        mfe_setup_steps.append(
+            f"echo 'Copying common-mfe-config.env.jsx...' && {copy_common_config}"
+        )
+    if copy_ai_drawer_components:
+        mfe_setup_steps.append("echo 'Copying AI drawer components...'")
+        mfe_setup_steps.extend(copy_ai_drawer_components)
+        mfe_setup_steps.append(
+            f"echo 'Listing files in {mfe_build_dir.name}:' && "
+            f"ls -la {mfe_build_dir.name}/ | "
+            f"grep -E '(env\\.config|Sidebar|AIDrawer)' || "
+            f"echo 'No AI drawer files found!'"
+        )
+    else:
+        mfe_setup_steps.append(
+            "echo 'AI drawer components NOT being copied "
+            "(not learning MFE or condition failed)'"
+        )
 
     # Add styles.scss copy for Residential deployments
     if open_edx_deployment.deployment_name in ["mitx", "mitx-staging"]:
