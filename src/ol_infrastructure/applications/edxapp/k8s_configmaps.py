@@ -472,7 +472,7 @@ def create_k8s_configmaps(
         "COMMUNICATIONS_MICROFRONTEND_URL": "/communications",
         "CONTACT_MAILING_ADDRESS": "SET-ME-PLEASE",
         "CREDIT_HELP_LINK_URL": "",
-        "DCS_SESSION_COOKIE_SAMESITE": "Lax",
+        "DCS_SESSION_COOKIE_SAMESITE": "None",
         "DCS_SESSION_COOKIE_SAMESITE_FORCE_ALL": True,
         "ENABLE_INSTRUCTOR_LEGACY_DASHBOARD": True,
         "GIT_REPO_DIR": "/openedx/data/export_course_repos",
