@@ -6,6 +6,13 @@ nested f-strings and duplicate YAML files with maintainable, testable code.
 
 The architecture supports per-deployment customization while maintaining a
 single source of truth for shared configuration across all deployments.
+
+Settings Structure (aligning with Open edX's three-tier architecture):
+- Module-level settings: Individual feature flags extracted from FEATURES dict
+- FEATURES dict: Remaining feature flags that don't have module-level equivalents
+- Deployment overrides: Per-environment customizations
+
+See: https://github.com/openedx/edx-platform/blob/master/openedx/envs/common.py
 """
 
 from dataclasses import dataclass
@@ -55,6 +62,10 @@ def build_base_general_config() -> ConfigDict:
 
     This contains all settings shared across deployments. Deployment-specific
     overrides are applied via the deployment config dictionaries.
+
+    Module-level settings (extracted from FEATURES dict) are now top-level keys,
+    following the pattern in openedx/envs/common.py. The FEATURES dict contains
+    only feature flags that don't have module-level equivalents.
 
     Returns:
         Base configuration dictionary
@@ -151,74 +162,6 @@ def build_base_general_config() -> ConfigDict:
         "FACEBOOK_API_VERSION": "v2.1",
         "FACEBOOK_APP_ID": "FACEBOOK_APP_ID",
         "FACEBOOK_APP_SECRET": "FACEBOOK_APP_SECRET",  # pragma: allowlist secret
-        "FEATURES": {
-            "AUTH_USE_OPENID_PROVIDER": True,
-            "AUTOMATIC_AUTH_FOR_TESTING": False,
-            "CUSTOM_COURSES_EDX": False,
-            "CERTIFICATES_HTML_VIEW": False,
-            "EMBARGO": True,
-            "ENABLE_BLAKE2B_HASHING": True,
-            "ENABLE_BULK_ENROLLMENT_VIEW": False,
-            "ENABLE_COMBINED_LOGIN_REGISTRATION": True,
-            "ENABLE_CORS_HEADERS": True,
-            "ENABLE_COUNTRY_ACCESS": False,
-            "ENABLE_COURSE_HOME_REDIRECT": True,
-            "ENABLE_COURSEWARE_INDEX": True,
-            "ENABLE_COURSEWARE_SEARCH": True,
-            "ENABLE_CONTENT_LIBRARY_INDEX": True,
-            "ENABLE_LIBRARY_AUTHORING_MICROFRONTEND": True,
-            "ENABLE_LIBRARY_INDEX": True,
-            "ENABLE_CREDIT_API": False,
-            "ENABLE_CREDIT_ELIGIBILITY": False,
-            "ENABLE_CROSS_DOMAIN_CSRF_COOKIE": True,
-            "ENABLE_CSMH_EXTENDED": True,
-            "ENABLE_DISCUSSION_HOME_PANEL": True,
-            "ENABLE_DISCUSSION_SERVICE": True,
-            "ENABLE_EDXNOTES": True,
-            "ENABLE_EDX_USERNAME_CHANGER": True,
-            "ENABLE_ENROLLMENT_RESET": False,
-            "ENABLE_EXPORT_GIT": True,
-            "ENABLE_GIT_AUTO_EXPORT": True,
-            "ENABLE_GRADE_DOWNLOADS": True,
-            "ENABLE_INSTRUCTOR_ANALYTICS": False,
-            "ENABLE_MKTG_SITE": False,
-            "ENABLE_MOBILE_REST_API": True,
-            "ENABLE_OAUTH2_PROVIDER": True,
-            "ENABLE_OTHER_COURSE_SETTINGS": True,
-            "ENABLE_ORA_USERNAMES_ON_DATA_EXPORT": False,
-            "ENABLE_PUBLISHER": False,
-            "ENABLE_READING_FROM_MULTIPLE_HISTORY_TABLES": True,
-            "ENABLE_SPECIAL_EXAMS": True,
-            "ENABLE_THIRD_PARTY_AUTH": True,
-            "ENABLE_UNICODE_USERNAME": True,
-            "ENABLE_VIDEO_UPLOAD_PIPELINE": True,
-            "SHOW_FOOTER_LANGUAGE_SELECTOR": False,
-            "SHOW_HEADER_LANGUAGE_SELECTOR": False,
-            "SKIP_EMAIL_VALIDATION": True,
-            "ALLOW_PUBLIC_ACCOUNT_CREATION": True,
-            "ALLOW_ALL_ADVANCED_COMPONENTS": True,
-            "ALLOW_COURSE_STAFF_GRADE_DOWNLOADS": True,
-            "ALLOW_HIDING_DISCUSSION_TAB": True,
-            "AUTH_USE_CERTIFICATES": False,
-            "BYPASS_ACTIVATION_EMAIL_FOR_EXTAUTH": True,
-            "CERTIFICATES_ENABLED": False,
-            "DISABLE_LOGIN_BUTTON": False,
-            "ENABLE_AUTO_COURSE_REGISTRATION": True,
-            "ENABLE_COURSE_BLOCKS_NAVIGATION_API": True,
-            "ENABLE_INSTRUCTOR_EMAIL": True,
-            "ENABLE_INSTRUCTOR_REMOTE_GRADEBOOK_CONTROLS": True,
-            "ENABLE_PAID_COURSE_REGISTRATION": False,
-            "ENABLE_PREREQUISITE_COURSES": True,
-            "ENABLE_RENDER_XBLOCK_API": True,
-            "ENABLE_SHOPPING_CART": True,
-            "ENABLE_SYSADMIN_DASHBOARD": True,
-            "LICENSING": True,
-            "MILESTONES_APP": True,
-            "REQUIRE_COURSE_EMAIL_AUTH": False,
-            "RESTRICT_ENROLL_BY_REG_METHOD": False,
-            "SESSION_COOKIE_SECURE": True,
-            "DISABLE_FORUM_V2": True,
-        },
         "FEEDBACK_SUBMISSION_EMAIL": "",
         "FILE_UPLOAD_STORAGE_PREFIX": "submissions_attachments",
         "FINANCIAL_REPORTS": {
@@ -371,6 +314,93 @@ def build_base_general_config() -> ConfigDict:
         "ZENDESK_OAUTH_ACCESS_TOKEN": "",
         "ZENDESK_URL": "",
         "ZENDESK_USER": "",
+        # ============================================================================
+        # Module-level settings (extracted from FEATURES dict per openedx/envs/common.py)
+        # These are no longer nested in the FEATURES dict
+        # ============================================================================
+        "AUTOPLAY_VIDEOS": False,
+        "AUTOMATIC_AUTH_FOR_TESTING": False,
+        "CUSTOM_COURSES_EDX": False,
+        "DISABLE_START_DATES": False,
+        "EMBARGO": False,
+        "ENABLE_AUTOADVANCE_VIDEOS": False,
+        "ENABLE_CORS_HEADERS": False,
+        "ENABLE_COURSE_OLX_VALIDATION": False,
+        "ENABLE_DISCUSSION_SERVICE": True,
+        "ENABLE_EDXNOTES": False,
+        "ENABLE_HELP_LINK": True,
+        "ENABLE_MKTG_SITE": False,
+        "ENABLE_MOBILE_REST_API": False,
+        "ENABLE_OAUTH2_PROVIDER": False,
+        "ENABLE_PUBLISHER": False,
+        "ENABLE_SERVICE_STATUS": False,
+        "ENABLE_SPECIAL_EXAMS": False,
+        "ENABLE_TEAMS": True,
+        "ENABLE_TEXTBOOK": True,
+        "ENABLE_VIDEO_BUMPER": False,
+        "FALLBACK_TO_ENGLISH_TRANSCRIPTS": True,
+        "LICENSING": False,
+        "MILESTONES_APP": False,
+        "ENABLE_PREREQUISITE_COURSES": False,
+        "RESTRICT_AUTOMATIC_AUTH": True,
+        "SHOW_BUMPER_PERIODICITY": 7 * 24 * 3600,  # 7 days in seconds
+        "SHOW_FOOTER_LANGUAGE_SELECTOR": False,
+        "SHOW_HEADER_LANGUAGE_SELECTOR": False,
+        "CERTIFICATES_HTML_VIEW": False,
+        # ============================================================================
+        # FEATURES dict - for remaining feature flags without module-level equivalents
+        # ============================================================================
+        "FEATURES": {
+            "ALLOW_ALL_ADVANCED_COMPONENTS": True,
+            "ALLOW_COURSE_STAFF_GRADE_DOWNLOADS": True,
+            "ALLOW_HIDING_DISCUSSION_TAB": True,
+            "ALLOW_PUBLIC_ACCOUNT_CREATION": True,
+            "AUTH_USE_CERTIFICATES": False,
+            "AUTH_USE_OPENID_PROVIDER": True,
+            "BYPASS_ACTIVATION_EMAIL_FOR_EXTAUTH": True,
+            "CERTIFICATES_ENABLED": False,
+            "DISABLE_FORUM_V2": True,
+            "DISABLE_LOGIN_BUTTON": False,
+            "ENABLE_AUTO_COURSE_REGISTRATION": True,
+            "ENABLE_BLAKE2B_HASHING": True,
+            "ENABLE_BULK_ENROLLMENT_VIEW": False,
+            "ENABLE_COMBINED_LOGIN_REGISTRATION": True,
+            "ENABLE_CONTENT_LIBRARY_INDEX": True,
+            "ENABLE_COUNTRY_ACCESS": False,
+            "ENABLE_COURSE_BLOCKS_NAVIGATION_API": True,
+            "ENABLE_COURSE_HOME_REDIRECT": True,
+            "ENABLE_COURSEWARE_INDEX": True,
+            "ENABLE_COURSEWARE_SEARCH": True,
+            "ENABLE_CREDIT_API": False,
+            "ENABLE_CREDIT_ELIGIBILITY": False,
+            "ENABLE_CROSS_DOMAIN_CSRF_COOKIE": True,
+            "ENABLE_CSMH_EXTENDED": True,
+            "ENABLE_DISCUSSION_HOME_PANEL": True,
+            "ENABLE_EDX_USERNAME_CHANGER": True,
+            "ENABLE_ENROLLMENT_RESET": False,
+            "ENABLE_EXPORT_GIT": True,
+            "ENABLE_GIT_AUTO_EXPORT": True,
+            "ENABLE_GRADE_DOWNLOADS": True,
+            "ENABLE_INSTRUCTOR_ANALYTICS": False,
+            "ENABLE_INSTRUCTOR_EMAIL": True,
+            "ENABLE_INSTRUCTOR_REMOTE_GRADEBOOK_CONTROLS": True,
+            "ENABLE_LIBRARY_AUTHORING_MICROFRONTEND": True,
+            "ENABLE_LIBRARY_INDEX": True,
+            "ENABLE_ORA_USERNAMES_ON_DATA_EXPORT": False,
+            "ENABLE_OTHER_COURSE_SETTINGS": True,
+            "ENABLE_PAID_COURSE_REGISTRATION": False,
+            "ENABLE_READING_FROM_MULTIPLE_HISTORY_TABLES": True,
+            "ENABLE_RENDER_XBLOCK_API": True,
+            "ENABLE_SHOPPING_CART": True,
+            "ENABLE_SYSADMIN_DASHBOARD": True,
+            "ENABLE_THIRD_PARTY_AUTH": True,
+            "ENABLE_UNICODE_USERNAME": True,
+            "ENABLE_VIDEO_UPLOAD_PIPELINE": True,
+            "REQUIRE_COURSE_EMAIL_AUTH": False,
+            "RESTRICT_ENROLL_BY_REG_METHOD": False,
+            "SESSION_COOKIE_SECURE": True,
+            "SKIP_EMAIL_VALIDATION": True,
+        },
     }
 
 
@@ -416,16 +446,19 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
             "ABORTED",
             "COMPLETE",
         ],
+        # Module-level settings overrides for residential
+        "DISABLE_START_DATES": True,
+        "ENABLE_MKTG_SITE": False,  # Extracted to module-level
+        # FEATURES overrides for residential (only non-module-level flags)
         "FEATURES": {
             "DISABLE_HONOR_CERTIFICATES": True,
-            "DISABLE_START_DATES": True,
             "ENABLE_CANVAS_INTEGRATION": True,
             "ENABLE_CONTENT_LIBRARIES": True,
             "ENABLE_LTI_PROVIDER": True,
-            "ENABLE_MKTG_SITE": False,
             "ENABLE_ORA_USERNAMES_ON_DATA_EXPORT": False,
             "ENABLE_RAPID_RESPONSE_AUTHOR_VIEW": True,
             "ENABLE_THIRD_PARTY_ONLY_AUTH": True,
+            "MAX_PROBLEM_RESPONSES_COUNT": 10000,
             "REROUTE_ACTIVATION_EMAIL": "mitx-support@mit.edu",
         },
         "BULK_EMAIL_DEFAULT_RETRY_DELAY": 30,
@@ -489,12 +522,14 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
                 "ABORTED",
                 "COMPLETE",
             ],
+            # Module-level settings overrides for xpro
+            "ENABLE_MKTG_SITE": True,  # Extracted to module-level
+            "LICENSING": True,  # Extracted to module-level
+            # FEATURES overrides for xpro (only non-module-level flags)
             "FEATURES": {
                 "ENABLE_LTI_PROVIDER": False,
-                "ENABLE_MKTG_SITE": True,
                 "ENABLE_ORA_USERNAMES_ON_DATA_EXPORT": True,
                 "ENABLE_SYSADMIN_DASHBOARD": True,
-                "LICENSING": True,
                 "REROUTE_ACTIVATION_EMAIL": "support@xpro.mit.edu",
             },
         },
@@ -554,18 +589,21 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
                     "args": ["Daily"],
                 },
             },
+            # Module-level settings overrides for mitxonline
+            "ENABLE_EDXNOTES": True,  # Extracted to module-level
+            "ENABLE_MKTG_SITE": True,  # Extracted to module-level
+            "LICENSING": True,  # Extracted to module-level
+            "MILESTONES_APP": True,  # Extracted to module-level
+            # FEATURES overrides for mitxonline (only non-module-level flags)
             "FEATURES": {
                 "ALLOW_COURSE_STAFF_GRADE_DOWNLOADS": True,
-                "ENABLE_EDXNOTES": True,
                 "ENABLE_EXAM_SETTINGS_HTML_VIEW": True,
                 "ENABLE_AUTO_GITHUB_REPO_CREATION": True,
                 "ENABLE_FORUM_DAILY_DIGEST": True,
                 "ENABLE_LTI_PROVIDER": True,
-                "ENABLE_MKTG_SITE": True,
                 "ENABLE_NEW_BULK_EMAIL_EXPERIENCE": True,
                 "ENABLE_V2_CERT_DISPLAY_SETTINGS": True,
                 "ENABLE_BULK_USER_RETIREMENT": True,
-                "MILESTONES_APP": True,
             },
             "OAUTH2_PROVIDER": {
                 "ALLOWED_REDIRECT_URI_SCHEMES": [
