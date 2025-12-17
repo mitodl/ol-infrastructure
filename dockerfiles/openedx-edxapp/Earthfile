@@ -220,7 +220,8 @@ docker-image:
     && chmod 0700 /openedx/.ssh \
     && ssh-keyscan 'github.com' 'github.mit.edu' >> /openedx/.ssh/known_hosts \
     && chmod 0600 /openedx/.ssh/known_hosts \
-    && mkdir -p /openedx/data/export_course_repos
+    && mkdir -p /openedx/data/export_course_repos \
+    && git config --global --add safe.directory '*'
   CMD uwsgi uwsgi.ini
   SAVE IMAGE mitodl/edxapp-$DEPLOYMENT_NAME-$RELEASE_NAME:latest
 
