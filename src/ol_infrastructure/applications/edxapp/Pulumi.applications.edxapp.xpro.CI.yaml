@@ -11,6 +11,7 @@ config:
   - ["course_experience.relative_dates_disable_reset", "--create", "--everyone"]
   - ["course_home.course_home_mfe_progress_tab", "--create", "--everyone"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
+  - ["discussions.enable_discussions_mfe", "--create", "--everyone"]
   - ["effort_estimation.disabled", "--create", "--superusers", "--everyone"]
   - ["forum_v2.enable_mysql_backend", "--create", "--everyone"]
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
