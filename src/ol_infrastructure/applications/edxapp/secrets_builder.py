@@ -38,7 +38,7 @@ def build_base_general_secrets_dict(
     # Base secrets shared across all deployments
     base_secrets: dict[str, Any] = {
         "CELERY_BROKER_PASSWORD": '{{ get .Secrets "redis_auth_token" }}',
-        "FERNET_KEYS": '{{ (fromJson (get .Secrets "fernet_keys")) }}',
+        "FERNET_KEYS": '{{ (fromJson (get .Secrets "fernet_keys")) | toYaml }}',
         "redis_cache_config": {
             "BACKEND": "django_redis.cache.RedisCache",
             "LOCATION": f"rediss://default@{redis_hostname}:6379/0",
@@ -155,8 +155,12 @@ def secrets_dict_to_yaml_template(secrets: dict[str, Any]) -> str:
         YAML string suitable for Vault templating
     """
 
-    # Custom representer for strings (always use plain scalar style)
+    # Custom representer for strings (use plain style for Vault templates, quoted for others)
     def _str_representer(dumper: Any, data: str) -> Any:
+        # Use plain scalar style (no quotes) for Vault template strings ({{ ... }})
+        # Use default quoted style for regular strings
+        if data.startswith("{{") and data.endswith("}}"):
+            return dumper.represent_scalar("tag:yaml.org,2002:str", data, style=None)
         return dumper.represent_scalar("tag:yaml.org,2002:str", data)
 
     # Create custom dumper class
