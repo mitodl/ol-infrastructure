@@ -155,12 +155,12 @@ def secrets_dict_to_yaml_template(secrets: dict[str, Any]) -> str:
         YAML string suitable for Vault templating
     """
 
-    # Custom representer for strings (use plain style for Vault templates, quoted for others)
+    # Extract FERNET_KEYS to render it unquoted (as raw Vault template)
+    fernet_keys = secrets.pop("FERNET_KEYS", None)
+
+    # Custom representer for strings (control quoting behavior)
     def _str_representer(dumper: Any, data: str) -> Any:
-        # Use plain scalar style (no quotes) for Vault template strings ({{ ... }})
-        # Use default quoted style for regular strings
-        if data.startswith("{{") and data.endswith("}}"):
-            return dumper.represent_scalar("tag:yaml.org,2002:str", data, style=None)
+        # Use default YAML string representation (which quotes as needed)
         return dumper.represent_scalar("tag:yaml.org,2002:str", data)
 
     # Create custom dumper class
@@ -174,9 +174,19 @@ def secrets_dict_to_yaml_template(secrets: dict[str, Any]) -> str:
     CustomDumper.ignore_aliases = lambda self, data: True  # type: ignore[method-assign]  # noqa: ARG005
 
     # Dump to YAML
-    return yaml.dump(
+    yaml_output = yaml.dump(
         secrets, Dumper=CustomDumper, default_flow_style=False, sort_keys=False
     )
+
+    # Prepend FERNET_KEYS as unquoted Vault template
+    if fernet_keys:
+        yaml_output = f"FERNET_KEYS: {fernet_keys}\n" + yaml_output
+
+    # Restore FERNET_KEYS to dict in case it's used again
+    if fernet_keys:
+        secrets["FERNET_KEYS"] = fernet_keys
+
+    return yaml_output
 
 
 def get_database_credentials_template(db_address: str, db_port: int) -> tuple[str, str]:
