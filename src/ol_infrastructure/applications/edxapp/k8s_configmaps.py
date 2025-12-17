@@ -536,6 +536,12 @@ def create_k8s_configmaps(
         "WRITABLE_GRADEBOOK_URL": "/gradebook",
     }
 
+    # Initialize FEATURES from base config, allowing deployment-specific additions
+    base_features: dict[str, Any] = build_general_config(stack_info.env_prefix)[
+        "FEATURES"
+    ]
+    lms_general_config_content["FEATURES"] = base_features
+
     # Deployment-specific THIRD_PARTY_AUTH_BACKENDS
     if stack_info.env_prefix in ["mitx", "mitx-staging"]:
         lms_general_config_content["THIRD_PARTY_AUTH_BACKENDS"] = [
@@ -549,10 +555,13 @@ def create_k8s_configmaps(
         ]
         lms_general_config_content["LEARNER_HOME_MFE_REDIRECT_PERCENTAGE"] = 100
         lms_general_config_content["LEARNER_HOME_MICROFRONTEND_URL"] = "/dashboard/"
-        lms_general_config_content["FEATURES"] = {
-            "ENABLE_INSTRUCTOR_BACKGROUND_TASKS": True,
-            "MAX_PROBLEM_RESPONSES_COUNT": 10000,
-        }
+        # Merge residential-specific features with base features
+        base_features.update(
+            {
+                "ENABLE_INSTRUCTOR_BACKGROUND_TASKS": True,
+                "MAX_PROBLEM_RESPONSES_COUNT": 10000,
+            }
+        )
     elif stack_info.env_prefix == "xpro":
         lms_general_config_content["THIRD_PARTY_AUTH_BACKENDS"] = [
             "ol_social_auth.backends.OLOAuth2",
