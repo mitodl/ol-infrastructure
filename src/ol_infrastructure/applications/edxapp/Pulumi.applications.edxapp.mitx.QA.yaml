@@ -37,7 +37,6 @@ config:
   - ["learner_home_mfe.enabled", "--create", "--superusers", "--everyone"]
   - ["learner_recommendations.enable_dashboard_recommendations", "--create", "--superusers",
     "--everyone"]
-  - ["legacy_studio.home", "--deactivate"]
   - ["new_core_editors.use_new_problem_editor", "--create", "--everyone"]
   - ["new_core_editors.use_new_text_editor", "--create", "--superusers", "--everyone"]
   - ["new_core_editors.use_new_video_editor", "--create", "--superusers", "--everyone"]
