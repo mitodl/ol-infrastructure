@@ -34,7 +34,6 @@ from pulumi_aws import (
     iam,
     lb,
     route53,
-    s3,
     ses,
 )
 from pulumi_consul import Node, Service, ServiceCheckArgs
@@ -53,6 +52,7 @@ from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.applications.edxapp.k8s_resources import create_k8s_resources
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultMysqlDatabaseConfig,
@@ -283,35 +283,23 @@ def cloud_init_user_data_func(
 # S3 Buckets #
 ##############
 
+# MFE bucket - serves micro-frontend assets
 edxapp_mfe_bucket_name = f"{env_name}-edxapp-mfe"
-edxapp_mfe_bucket = s3.Bucket(
-    "edxapp-mfe-s3-bucket",
-    bucket=edxapp_mfe_bucket_name,
-    tags=aws_config.tags,
-)
-edxapp_mfe_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "edxapp-mfe-ownership-controls",
-    bucket=edxapp_mfe_bucket.id,
-    rule=s3.BucketOwnershipControlsRuleArgs(
-        object_ownership="BucketOwnerPreferred",
-    ),
-)
-s3.BucketVersioning(
-    "edxapp-mfe-bucket-versioning",
-    bucket=edxapp_mfe_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Suspended"
-    ),
-)
-edxapp_mfe_bucket_public_access = s3.BucketPublicAccessBlock(
-    "edxapp-mfe-bucket-public-access-controls",
-    bucket=edxapp_mfe_bucket.id,
+edxapp_mfe_bucket_config = S3BucketConfig(
+    bucket_name=edxapp_mfe_bucket_name,
+    versioning_enabled=False,  # Suspended
+    ownership_controls="BucketOwnerPreferred",
+    block_public_acls=False,
     block_public_policy=False,
-)
-s3.BucketPolicy(
-    "edxapp-mfe-bucket-policy",
-    bucket=edxapp_mfe_bucket.id,
-    policy=lint_iam_policy(
+    ignore_public_acls=False,
+    restrict_public_buckets=False,
+    cors_rules=[
+        {
+            "allowed_methods": ["GET", "HEAD"],
+            "allowed_origins": ["*"],
+        }
+    ],
+    bucket_policy_document=lint_iam_policy(
         {
             "Version": IAM_POLICY_VERSION,
             "Statement": [
@@ -325,49 +313,36 @@ s3.BucketPolicy(
         },
         stringify=True,
     ),
-    opts=ResourceOptions(
-        depends_on=[
-            edxapp_mfe_bucket_public_access,
-            edxapp_mfe_bucket_ownership_controls,
-        ]
-    ),
-)
-s3.BucketCorsConfiguration(
-    "edxapp-mfe-bucket-cors-rules",
-    bucket=edxapp_mfe_bucket.id,
-    cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
-)
-
-
-storage_bucket_name = f"{env_name}-edxapp-storage"
-edxapp_storage_bucket = s3.Bucket(
-    "edxapp-storage-s3-bucket",
-    bucket=storage_bucket_name,
     tags=aws_config.tags,
 )
-edxapp_storage_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "edxapp-storage-ownership-controls",
-    bucket=edxapp_storage_bucket.id,
-    rule=s3.BucketOwnershipControlsRuleArgs(
-        object_ownership="BucketOwnerPreferred",
-    ),
+edxapp_mfe_bucket = OLBucket(
+    "edxapp-mfe-bucket",
+    config=edxapp_mfe_bucket_config,
 )
-s3.BucketVersioning(
-    "edxapp-storage-bucket-versioning",
-    bucket=edxapp_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Enabled"
-    ),
-)
-edxapp_storage_bucket_public_access = s3.BucketPublicAccessBlock(
-    "edxapp-storage-bucket-public-access-controls",
-    bucket=edxapp_storage_bucket.id,
+
+
+# Storage bucket - application file uploads
+storage_bucket_name = f"{env_name}-edxapp-storage"
+edxapp_storage_bucket_config = S3BucketConfig(
+    bucket_name=storage_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerPreferred",
+    block_public_acls=False,
     block_public_policy=False,
-)
-s3.BucketPolicy(
-    "edxapp-storage-bucket-policy",
-    bucket=edxapp_storage_bucket.id,
-    policy=lint_iam_policy(
+    ignore_public_acls=False,
+    restrict_public_buckets=False,
+    cors_rules=[
+        {
+            "allowed_headers": ["*"],
+            "allowed_methods": ["GET", "PUT", "POST", "HEAD"],
+            "allowed_origins": [
+                f"https://{domain}" for domain in edxapp_domains.values()
+            ],
+            "expose_headers": ["ETag"],
+            "max_age_seconds": 3000,
+        }
+    ],
+    bucket_policy_document=lint_iam_policy(
         {
             "Version": IAM_POLICY_VERSION,
             "Statement": [
@@ -375,107 +350,64 @@ s3.BucketPolicy(
                     "Effect": "Allow",
                     "Principal": "*",
                     "Action": "s3:GetObject",
-                    "Resource": (
-                        f"arn:aws:s3:::{storage_bucket_name}/media/video-images/*"
-                    ),
+                    "Resource": f"arn:aws:s3:::{storage_bucket_name}/media/video-images/*",
                 }
             ],
         },
         stringify=True,
     ),
-    opts=ResourceOptions(
-        depends_on=[
-            edxapp_storage_bucket_public_access,
-            edxapp_storage_bucket_ownership_controls,
-        ]
-    ),
+    tags=aws_config.tags,
 )
-s3.BucketCorsConfiguration(
-    "edxapp-storage-bucket-cors-rules",
-    bucket=edxapp_storage_bucket.id,
-    cors_rules=[
-        s3.BucketCorsConfigurationCorsRuleArgs(
-            allowed_headers=["*"],
-            allowed_methods=["GET", "PUT", "POST", "HEAD"],
-            allowed_origins=[f"https://{domain}" for domain in edxapp_domains.values()],
-            expose_headers=["ETag"],
-            max_age_seconds=3000,
-        )
-    ],
+edxapp_storage_bucket = OLBucket(
+    "edxapp-storage-bucket",
+    config=edxapp_storage_bucket_config,
 )
 
+
+# Courses bucket - course content
 course_bucket_name = f"{env_name}-edxapp-courses"
-edxapp_course_bucket = s3.Bucket(
-    "edxapp-courses-s3-bucket",
-    bucket=course_bucket_name,
+edxapp_courses_bucket_config = S3BucketConfig(
+    bucket_name=course_bucket_name,
+    versioning_enabled=False,  # Suspended
     tags=aws_config.tags,
 )
-s3.BucketVersioning(
-    "edxapp-course-bucket-versioning",
-    bucket=edxapp_course_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Suspended"
-    ),
+edxapp_course_bucket = OLBucket(
+    "edxapp-courses-bucket",
+    config=edxapp_courses_bucket_config,
 )
 
+
+# Grades bucket - student grades and records
 grades_bucket_name = f"{env_name}-edxapp-grades"
-edxapp_grades_bucket = s3.Bucket(
-    "edxapp-grades-s3-bucket",
-    bucket=grades_bucket_name,
+edxapp_grades_bucket_config = S3BucketConfig(
+    bucket_name=grades_bucket_name,
+    versioning_enabled=True,
     tags=aws_config.tags,
 )
-s3.BucketVersioning(
-    "edxapp-grades-bucket-versioning",
-    bucket=edxapp_grades_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Enabled"
-    ),
+edxapp_grades_bucket = OLBucket(
+    "edxapp-grades-bucket",
+    config=edxapp_grades_bucket_config,
 )
 
 
+# Tracking bucket - event logs and tracking data (encrypted with KMS)
 tracking_bucket_name = f"{env_name}-edxapp-tracking"
-edxapp_tracking_bucket = s3.Bucket(
-    "edxapp-tracking-logs-s3-bucket",
-    bucket=tracking_bucket_name,
-    tags=aws_config.tags,
-)
-edxapp_mfe_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "edxapp-tracking-logs-bucket-ownership-controls",
-    bucket=edxapp_tracking_bucket.id,
-    rule=s3.BucketOwnershipControlsRuleArgs(
-        object_ownership="BucketOwnerPreferred",
-    ),
-)
-edxapp_tracking_bucket_public_access = s3.BucketPublicAccessBlock(
-    "edxapp-tracking-logs-bucket-public-access-controls",
-    bucket=edxapp_tracking_bucket.id,
-    block_public_policy=True,
-)
-edxapp_tracking_bucket_encryption = s3.BucketServerSideEncryptionConfiguration(
-    "edxapp-tracking-logs-s3-bucket-encryption",
-    bucket=edxapp_tracking_bucket.id,
-    rules=[
-        s3.BucketServerSideEncryptionConfigurationRuleArgs(
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
-                sse_algorithm="aws:kms",
-                kms_master_key_id=kms_s3_key["id"],
-            ),
-            bucket_key_enabled=True,
-        ),
-    ],
-)
-s3.BucketVersioning(
-    "edxapp-tracking-logs-bucket-versioning",
-    bucket=edxapp_tracking_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Enabled"
-    ),
-)
-s3.BucketPublicAccessBlock(
-    "edxapp-tracking-bucket-prevent-public-access",
-    bucket=edxapp_tracking_bucket.bucket,
+edxapp_tracking_bucket_config = S3BucketConfig(
+    bucket_name=tracking_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerPreferred",
     block_public_acls=True,
     block_public_policy=True,
+    ignore_public_acls=True,
+    restrict_public_buckets=True,
+    server_side_encryption_enabled=True,
+    kms_key_id=kms_s3_key["id"],
+    bucket_key_enabled=True,
+    tags=aws_config.tags,
+)
+edxapp_tracking_bucket = OLBucket(
+    "edxapp-tracking-bucket",
+    config=edxapp_tracking_bucket_config,
 )
 
 ########################
@@ -1647,13 +1579,13 @@ edxapp_fastly_service = fastly.ServiceVcl(
     comment="Managed by Pulumi",
     backends=[
         fastly.ServiceVclBackendArgs(
-            address=edxapp_mfe_bucket.bucket_domain_name,
+            address=edxapp_mfe_bucket.bucket_v2.bucket_domain_name,
             name="MFE S3 Bucket",
-            override_host=edxapp_mfe_bucket.bucket_domain_name,
+            override_host=edxapp_mfe_bucket.bucket_v2.bucket_domain_name,
             port=DEFAULT_HTTPS_PORT,
             request_condition="MFE Path",
-            ssl_cert_hostname=edxapp_mfe_bucket.bucket_domain_name,
-            ssl_sni_hostname=edxapp_mfe_bucket.bucket_domain_name,
+            ssl_cert_hostname=edxapp_mfe_bucket.bucket_v2.bucket_domain_name,
+            ssl_sni_hostname=edxapp_mfe_bucket.bucket_v2.bucket_domain_name,
             use_ssl=True,
         ),
         fastly.ServiceVclBackendArgs(
