@@ -67,6 +67,7 @@ config:
     SESSION_COOKIE_NAME: "session_mitxonline_rc"
     MIT_LEARN_FROM_EMAIL: "MIT Learn <mitlearn-support@mit.edu>"
     MIT_LEARN_DASHBOARD_URL: "https://learn.mit.edu/dashboard"
+    VERIFIABLE_CREDENTIAL_SIGNER_URL: "http://dcc.rc.learn.mit.edu/instance/default/credentials/issue"
   redis:password:
     secure: v1:rFyMZ8hojMNVgkJb:YmQuqHaePqYVtbE4nJXFupDfowZvdjH6AXsKOPJpGgWCdXFrOy9zzNDu2zCiMFkXPVRc1iobr/au9viSl7GZX4f7lw==
   vault:address: https://vault-qa.odl.mit.edu
