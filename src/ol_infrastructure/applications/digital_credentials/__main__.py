@@ -22,6 +22,10 @@ from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
 )
+from ol_infrastructure.components.services.cert_manager import (
+    OLCertManagerCert,
+    OLCertManagerCertConfig,
+)
 from ol_infrastructure.components.services.k8s import (
     OLApisixRoute,
     OLApisixRouteConfig,
@@ -416,7 +420,7 @@ issuer_coordinator_service = kubernetes.core.v1.Service(
 )
 
 ################################################
-# APISix Ingress Route
+# TLS Certificate Management
 ################################################
 
 # Get domain configuration
@@ -424,6 +428,28 @@ issuer_coordinator_domain = (
     digital_credentials_config.get("issuer_coordinator_domain")
     or f"issuer-coordinator-{stack_info.env_suffix}.odl.mit.edu"
 )
+
+# TLS secret name for cert-manager
+tls_secret_name = "issuer-coordinator-tls"  # pragma: allowlist secret  # noqa: S105
+
+# Create TLS certificate for APISix
+issuer_coordinator_cert = OLCertManagerCert(
+    f"issuer-coordinator-tls-cert-{stack_info.env_suffix}",
+    cert_config=OLCertManagerCertConfig(
+        application_name="issuer-coordinator",
+        k8s_namespace=dcc_namespace,
+        k8s_labels=k8s_global_labels,
+        create_apisixtls_resource=True,
+        apisixtls_ingress_class=digital_credentials_config.get("apisix_ingress_class")
+        or "apache-apisix",
+        dest_secret_name=tls_secret_name,
+        dns_names=[issuer_coordinator_domain],
+    ),
+)
+
+################################################
+# APISix Ingress Route
+################################################
 
 # Create APISix route with key-auth authentication
 issuer_coordinator_apisix_route = OLApisixRoute(
@@ -441,7 +467,9 @@ issuer_coordinator_apisix_route = OLApisixRoute(
             backend_resolve_granularity="service",
         ),
     ],
-    opts=ResourceOptions(depends_on=[issuer_coordinator_service]),
+    opts=ResourceOptions(
+        depends_on=[issuer_coordinator_service, issuer_coordinator_cert]
+    ),
 )
 
 ################################################
