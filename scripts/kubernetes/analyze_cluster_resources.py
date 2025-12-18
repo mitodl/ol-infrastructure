@@ -17,6 +17,7 @@ Requirements:
 """
 
 import json
+import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -135,6 +136,7 @@ class InstanceTypeCapacity:
     cpu_cores: Decimal
     memory_gb: Decimal
     price_per_hour: Decimal = Decimal("0")
+    generation: int = 0  # Generation number (e.g., 3, 4, 5, 6, 7)
 
     @property
     def memory_bytes(self) -> Decimal:
@@ -151,6 +153,28 @@ class InstanceTypeCapacity:
         # Score based on total capacity, with slight preference for larger instances
         # This will naturally select larger instances when efficiency is similar
         return self.cpu_cores * self.memory_gb
+
+
+def extract_generation_from_instance_type(instance_type: str) -> int:
+    """Extract generation number from instance type name.
+
+    Examples:
+        t3.micro -> 3
+        m6i.xlarge -> 6
+        c7g.2xlarge -> 7
+        r5.large -> 5
+
+    Returns 0 if generation cannot be extracted.
+    """
+    # Instance type format: family[subtype]generation[size]
+    # Extract the digit(s) before the last period or end of string
+    match = re.search(r"([a-z]+)(\d+)([a-z]*(?:\.|$))", instance_type)
+    if match:
+        try:
+            return int(match.group(2))
+        except (ValueError, IndexError):
+            pass
+    return 0
 
 
 def parse_resource_quantity(quantity: str | None) -> Decimal:
@@ -443,6 +467,7 @@ def get_instance_types(region: str) -> dict[str, InstanceTypeCapacity]:
                         instance_type=inst_type,
                         cpu_cores=Decimal(vcpu),
                         memory_gb=Decimal(memory_mib) / Decimal("1024"),
+                        generation=extract_generation_from_instance_type(inst_type),
                     )
 
     except Exception as e:
@@ -672,14 +697,24 @@ def recommend_baseline_nodes(
         monthly_cost = hourly_cost * Decimal("730")  # ~730 hours/month
         yearly_cost = monthly_cost * Decimal("12")
 
-        # Scoring: prefer low waste but also bias toward fewer nodes
-        # Score = waste_penalty + (nodes_preference - where larger nodes = lower node count)
-        # This ensures we select fewer, larger nodes when alternatives are similar
+        # Scoring: prefer low waste, low cost, newer generations, and fewer nodes
+        # Penalties (lower is better):
+        #  - waste_penalty: avg_waste percent
+        #  - cost_penalty: hourly_cost (normalized by dividing by 10)
+        #  - node_preference_penalty: nodes_needed (prefer fewer nodes)
+        #  - generation_bonus: -capacity.generation (newer generations score better)
         node_preference_penalty = Decimal(nodes_needed) * Decimal("0.1")
-        config_score = avg_waste + node_preference_penalty
+        cost_penalty = hourly_cost / Decimal("10")  # Normalize cost to be comparable
+        generation_bonus = -Decimal(max(capacity.generation, 1)) * Decimal(
+            "0.5"
+        )  # Newer is better
+        config_score = (
+            avg_waste + node_preference_penalty + cost_penalty + generation_bonus
+        )
 
         config = {
             "instance_type": inst_type,
+            "generation": capacity.generation,
             "instance_vcpu": float(capacity.cpu_cores),
             "instance_memory_gb": float(capacity.memory_gb),
             "node_count": int(nodes_needed),
@@ -711,6 +746,7 @@ def recommend_baseline_nodes(
             "instance_type": recommended_config["instance_type"]
             if recommended_config
             else None,
+            "generation": recommended_config["generation"] if recommended_config else 0,
             "instance_vcpu": recommended_config["instance_vcpu"]
             if recommended_config
             else 0,
@@ -824,7 +860,9 @@ def print_report(
     req_memory_gb = total_requests.memory_bytes / Decimal("1024") ** 3
 
     rec = recommendation["recommended"]
-    print(f"Recommended Instance Type: {rec['instance_type']}")
+    print(
+        f"Recommended Instance Type: {rec['instance_type']} (Generation {rec['generation']})"
+    )
     print(
         f"  Instance Spec: {rec['instance_vcpu']:.0f} vCPU, {rec['instance_memory_gb']:.0f} GB RAM"
     )
@@ -843,7 +881,7 @@ def print_report(
     print("\n### TOP 5 ALTERNATIVE CONFIGURATIONS ###\n")
     for i, cfg in enumerate(recommendation["top_alternatives"][:5], 1):
         print(
-            f"{i}. {cfg['instance_type']} ({cfg['instance_vcpu']:.0f}C {cfg['instance_memory_gb']:.0f}GB) x {cfg['node_count']}"
+            f"{i}. {cfg['instance_type']} Gen{cfg['generation']} ({cfg['instance_vcpu']:.0f}C {cfg['instance_memory_gb']:.0f}GB) x {cfg['node_count']}"
         )
         print(
             f"   Total Capacity: {cfg['total_cpu']:.1f} CPU, {cfg['total_memory_gb']:.1f} GB RAM"
