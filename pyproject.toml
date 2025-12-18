@@ -36,6 +36,7 @@ dependencies = [
     "pulumiverse-time>=0.1.1",
     "kubernetes>=34.1.0",
     "parliament@git+https://github.com/mitodl/parliament",
+    "cyclopts>=4.4.0",
 ]
 
 [project.urls]
