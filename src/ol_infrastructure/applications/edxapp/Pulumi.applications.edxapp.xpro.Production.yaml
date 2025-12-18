@@ -45,6 +45,7 @@ config:
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     authoring: authoring
+    communications: communications
     discussions: discuss
     gradebook: gradebook
     learning: learn
@@ -104,5 +105,5 @@ config:
         memory_limit: "2Gi"
   edxapp:k8s_deployment: true
   edxapp:k8s_cutover: true
-  edxapp:disable_ec2_deployment: false
+  edxapp:disable_ec2_deployment: true
   edxapp:k8s_vpc: applications_vpc

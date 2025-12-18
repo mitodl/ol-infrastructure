@@ -51,6 +51,7 @@ config:
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     authoring: authoring
+    communications: communications
     discussions: discuss
     gradebook: gradebook
     learning: learn
