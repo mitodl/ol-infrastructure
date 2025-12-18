@@ -554,6 +554,15 @@ def get_instance_pricing(
                 f"Successfully fetched pricing for {priced_count}/{len(instance_types)} instance types",
                 file=sys.stderr,
             )
+            # Log which instance types are missing pricing
+            unpriced_types = [
+                name for name, it in instance_types.items() if it.price_per_hour == 0
+            ]
+            if unpriced_types:
+                print(
+                    f"Warning: {len(unpriced_types)} instance types have no pricing data: {', '.join(sorted(unpriced_types)[:10])}{'...' if len(unpriced_types) > 10 else ''}",
+                    file=sys.stderr,
+                )
 
     except Exception as e:
         print(f"Warning: Could not fetch pricing data: {e}", file=sys.stderr)
@@ -574,6 +583,27 @@ def _get_pricing_region(aws_region: str) -> str:
         "ap-southeast-2": "Asia Pacific (Sydney)",
     }
     return region_mapping.get(aws_region, aws_region)
+
+
+def debug_instance_type_pricing(
+    instance_type: str, instance_types: dict[str, InstanceTypeCapacity]
+) -> None:
+    """Debug pricing for a specific instance type."""
+    if instance_type not in instance_types:
+        print(
+            f"Instance type '{instance_type}' not found in available types",
+            file=sys.stderr,
+        )
+        return
+
+    capacity = instance_types[instance_type]
+    print(f"\nDEBUG: {instance_type}", file=sys.stderr)
+    print("  Found in instance types: Yes", file=sys.stderr)
+    print(f"  CPU: {capacity.cpu_cores}", file=sys.stderr)
+    print(f"  Memory: {capacity.memory_gb} GB", file=sys.stderr)
+    print(f"  Price per hour: ${float(capacity.price_per_hour):.4f}", file=sys.stderr)
+    if capacity.price_per_hour == 0:
+        print("  ⚠️  WARNING: No pricing data available!", file=sys.stderr)
 
 
 def get_instance_pricing_fallback(
@@ -619,6 +649,15 @@ def get_instance_pricing_fallback(
             f"Fetched fallback pricing from vantage.sh for {priced_count}/{len(instance_types)} instance types",
             file=sys.stderr,
         )
+        # Log which instance types are still missing pricing
+        unpriced_types = [
+            name for name, it in instance_types.items() if it.price_per_hour == 0
+        ]
+        if unpriced_types:
+            print(
+                f"Warning: {len(unpriced_types)} instance types still have no pricing data: {', '.join(sorted(unpriced_types)[:10])}{'...' if len(unpriced_types) > 10 else ''}",
+                file=sys.stderr,
+            )
     except Exception as e:
         print(
             f"Warning: Could not fetch fallback pricing from vantage.sh: {e}",
@@ -917,19 +956,33 @@ def main(
         cluster_name: EKS cluster name.
         region: AWS region.
         kubeconfig: Path to kubeconfig file (default: ~/.kube/config).
-        context: Kubernetes context to use.
+        context: Kubernetes context to use (default: use cluster_name).
         headroom: Headroom percentage for autoscaling (default: 20%).
         json_output: Output results as JSON.
         detailed: Show detailed breakdown of each workload.
     """
     try:
+        # Resolve context: use explicit context if provided, otherwise use cluster_name
+        resolved_context = context or cluster_name
+
         # Load Kubernetes config
         if kubeconfig:
-            config.load_kube_config(config_file=kubeconfig, context=context)
+            config.load_kube_config(config_file=kubeconfig, context=resolved_context)
         else:
-            config.load_kube_config(context=context)
+            config.load_kube_config(context=resolved_context)
+
+        # Verify we're connected to the right cluster
+        print(
+            f"Connected to cluster context: {resolved_context}",
+            file=sys.stderr,
+        )
     except Exception as e:
         print(f"Error loading Kubernetes config: {e}", file=sys.stderr)
+        print(
+            f"Note: Context defaulted to '{context or cluster_name}'. "
+            f"Use --context to specify a different context.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # Create API clients
@@ -989,6 +1042,18 @@ def main(
     recommendation = recommend_baseline_nodes(
         required_cpu, required_memory_gb, instance_types, headroom
     )
+
+    # Debug recommended instance type if it has no pricing
+    recommended_type = recommendation.get("recommended", {}).get("instance_type")
+    if recommended_type and recommended_type in instance_types:
+        capacity = instance_types[recommended_type]
+        if capacity.price_per_hour == 0:
+            print(
+                f"⚠️  PRICING ISSUE: Recommended instance type '{recommended_type}' has $0 cost. "
+                f"Pricing data may not be available for this instance type in region '{region}'.",
+                file=sys.stderr,
+            )
+            debug_instance_type_pricing(recommended_type, instance_types)
 
     if json_output:
         result = {
