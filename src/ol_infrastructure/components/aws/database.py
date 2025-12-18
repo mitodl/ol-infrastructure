@@ -180,8 +180,10 @@ class OLMariaDBConfig(OLDBConfig):
         {"name": "character_set_filesystem", "value": "utf8mb4"},
         {"name": "character_set_results", "value": "utf8mb4"},
         {"name": "character_set_server", "value": "utf8mb4"},
-        {"name": "collation_server", "value": "utf8mb4_unicode_ci"},
         {"name": "collation_connection", "value": "utf8mb4_unicode_ci"},
+        {"name": "collation_server", "value": "utf8mb4_unicode_ci"},
+        {"name": "rds.blue_green_replication_type", "value": "logical"},
+        {"name": "rds.logical_replication", "value": 1},
         {"name": "time_zone", "value": "UTC"},
     ]
 
