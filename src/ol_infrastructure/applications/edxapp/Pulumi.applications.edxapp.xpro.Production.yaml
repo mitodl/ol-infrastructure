@@ -53,11 +53,11 @@ config:
   edxapp:enable_xqueue: false
   edxapp:framework: "earthly"
   edxapp:mail_domain: edxapp-mail-production.xpro.mit.edu
-  edxapp:min_web_nodes: "3"
-  edxapp:min_worker_nodes: "2"
+  edxapp:min_web_nodes: "1"
+  edxapp:min_worker_nodes: "0"
   edxapp:sender_email_address: support@xpro.mit.edu
-  edxapp:web_node_capacity: "5"
-  edxapp:worker_node_capacity: "3"
+  edxapp:web_node_capacity: "2"
+  edxapp:worker_node_capacity: "0"
   edxapp:worker_instance_type: "m7a.medium"
   mongodb:atlas_project_id: 61b727c6b5bd11656741308b
   vault:address: https://vault-production.odl.mit.edu
