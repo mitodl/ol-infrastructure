@@ -359,7 +359,6 @@ def build_base_general_config() -> ConfigDict:
             "AUTH_USE_OPENID_PROVIDER": True,
             "BYPASS_ACTIVATION_EMAIL_FOR_EXTAUTH": True,
             "CERTIFICATES_ENABLED": False,
-            "DISABLE_FORUM_V2": True,
             "DISABLE_LOGIN_BUTTON": False,
             "ENABLE_AUTO_COURSE_REGISTRATION": True,
             "ENABLE_BLAKE2B_HASHING": True,
@@ -415,10 +414,6 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
     """
     # Shared configuration for mitx and mitx-staging
     mitx_shared_config = {
-        "AUTHENTICATION_BACKENDS": [
-            "common.djangoapps.third_party_auth.saml.SAMLAuthBackend",
-            "common.djangoapps.third_party_auth.lti.LTIAuthBackend",
-        ],
         "DEFAULT_SITE_THEME": "mitx",
         "PLATFORM_NAME": "MITx Residential",
         "PLATFORM_DESCRIPTION": "MITx Residential",
