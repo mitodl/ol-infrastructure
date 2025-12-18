@@ -701,7 +701,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                     "requests": {"memory": "500Mi", "cpu": "100m"},
                     "limits": {"memory": "1Gi", "cpu": "200m"},
                 },
-                "syncJobMaxTimeoutDays": 15,
+                "syncJobMaxTimeoutDays": 45,
             },
             "workloadLauncher": {
                 "enabled": True,
