@@ -451,6 +451,7 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
         "ENABLE_MKTG_SITE": False,  # Extracted to module-level
         # FEATURES overrides for residential (only non-module-level flags)
         "FEATURES": {
+            "ALLOW_PUBLIC_ACCOUNT_CREATION": True,
             "DISABLE_HONOR_CERTIFICATES": True,
             "ENABLE_CANVAS_INTEGRATION": True,
             "ENABLE_CONTENT_LIBRARIES": True,
