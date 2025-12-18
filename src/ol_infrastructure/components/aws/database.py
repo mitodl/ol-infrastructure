@@ -159,10 +159,9 @@ class OLPostgresDBConfig(OLDBConfig):
     parameter_overrides: list[dict[str, str | bool | int | float]] = [  # noqa: RUF012
         {"name": "autovacuum", "value": 1},
         {"name": "client_encoding", "value": "UTF-8"},
+        {"name": "rds.blue_green_replication_type", "value": "logical"},
         {"name": "rds.force_ssl", "value": 1},
-        # TMM 2025-08-20: This should be true, but will require manual intervention
-        # across our fleet of instances to get configured.
-        # {"name": "rds.logical_replication", "value": 1},  # noqa: ERA001
+        {"name": "rds.logical_replication", "value": 1},
         {"name": "timezone", "value": "UTC"},
     ]
 
@@ -182,8 +181,6 @@ class OLMariaDBConfig(OLDBConfig):
         {"name": "character_set_server", "value": "utf8mb4"},
         {"name": "collation_connection", "value": "utf8mb4_unicode_ci"},
         {"name": "collation_server", "value": "utf8mb4_unicode_ci"},
-        {"name": "rds.blue_green_replication_type", "value": "logical"},
-        {"name": "rds.logical_replication", "value": 1},
         {"name": "time_zone", "value": "UTC"},
     ]
 
