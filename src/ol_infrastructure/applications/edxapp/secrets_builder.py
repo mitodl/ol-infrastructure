@@ -157,6 +157,7 @@ def secrets_dict_to_yaml_template(secrets: dict[str, Any]) -> str:
 
     # Extract FERNET_KEYS to render it unquoted (as raw Vault template)
     fernet_keys = secrets.pop("FERNET_KEYS", None)
+    retired_user_salts = secrets.pop("RETIRED_USER_SALTS", None)
 
     # Custom representer for strings (control quoting behavior)
     def _str_representer(dumper: Any, data: str) -> Any:
@@ -180,7 +181,10 @@ def secrets_dict_to_yaml_template(secrets: dict[str, Any]) -> str:
 
     # Prepend FERNET_KEYS as unquoted Vault template
     if fernet_keys:
-        yaml_output = f"FERNET_KEYS: {fernet_keys}\n" + yaml_output
+        yaml_output = (
+            f"FERNET_KEYS: {fernet_keys}\nRETIRED_USER_SALTS: {retired_user_salts}\n"
+            + yaml_output
+        )
 
     # Restore FERNET_KEYS to dict in case it's used again
     if fernet_keys:
