@@ -327,6 +327,18 @@ def create_k8s_resources(  # noqa: C901
         volume_mounts=staticfiles_volume_mounts,
     )
 
+    # Init container that ensures the export_course_repos directory exists
+    openedx_data_volume_mount = kubernetes.core.v1.VolumeMountArgs(
+        name="openedx-data",
+        mount_path="/openedx/data",
+    )
+    export_course_repos_init_container = kubernetes.core.v1.ContainerArgs(
+        name="export-course-repos-mkdir",
+        image=cached_image_uri("busybox:1.35"),
+        command=["/bin/sh", "-c", "mkdir -p /openedx/data/export_course_repos"],
+        volume_mounts=[openedx_data_volume_mount],
+    )
+
     # Setup the volume mount lists for the webapp and celery containers
     common_volume_mounts = [
         kubernetes.core.v1.VolumeMountArgs(
@@ -446,6 +458,7 @@ def create_k8s_resources(  # noqa: C901
                         volumes=edxapp_volumes,
                         init_containers=[
                             staticfiles_init_container,
+                            export_course_repos_init_container,
                             _create_config_aggregator_init_container(
                                 service_type, edxapp_init_volume_mounts
                             ),
@@ -667,6 +680,7 @@ def create_k8s_resources(  # noqa: C901
                     volumes=lms_edxapp_volumes,
                     init_containers=[
                         staticfiles_init_container,
+                        export_course_repos_init_container,
                         # This init container will concatenate all the config files that come from
                         # the umpteen secrets and configmaps into a single file that edxapp expects
                         _create_config_aggregator_init_container(
@@ -818,6 +832,7 @@ def create_k8s_resources(  # noqa: C901
                     volumes=lms_edxapp_volumes,
                     init_containers=[
                         staticfiles_init_container,  # strictly speaking, not required
+                        export_course_repos_init_container,
                         _create_config_aggregator_init_container(
                             "lms", lms_edxapp_init_volume_mounts
                         ),
@@ -889,6 +904,7 @@ def create_k8s_resources(  # noqa: C901
                     volumes=lms_edxapp_volumes,
                     init_containers=[
                         staticfiles_init_container,
+                        export_course_repos_init_container,
                         # This init container will concatenate all the config files that come from
                         # the umpteen secrets and configmaps into a single file that edxapp expects
                         _create_config_aggregator_init_container(
@@ -1120,6 +1136,7 @@ def create_k8s_resources(  # noqa: C901
                     volumes=cms_edxapp_volumes,
                     init_containers=[
                         staticfiles_init_container,
+                        export_course_repos_init_container,
                         # This init container will concatenate all the config files that come from
                         # the umpteen secrets and configmaps into a single file that edxapp expects
                         _create_config_aggregator_init_container(
@@ -1270,6 +1287,7 @@ def create_k8s_resources(  # noqa: C901
                     volumes=cms_edxapp_volumes,
                     init_containers=[
                         staticfiles_init_container,  # strictly speaking, not required
+                        export_course_repos_init_container,
                         _create_config_aggregator_init_container(
                             "cms", cms_edxapp_init_volume_mounts
                         ),
@@ -1381,6 +1399,9 @@ def create_k8s_resources(  # noqa: C901
                     edxapp_config.require_object("domains")["lms"],
                 ],
                 paths=["/*"],
+                timeout_connect="300s",
+                timeout_read="300s",
+                timeout_send="300s",
                 backend_service_name=lms_webapp_deployment_name,
                 backend_service_port="http",
             ),
