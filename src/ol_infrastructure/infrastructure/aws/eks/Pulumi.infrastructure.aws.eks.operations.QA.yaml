@@ -5,32 +5,33 @@ config:
   environment:business_unit: operations
   environment:target_vpc: operations_vpc
   eks:allowed_dns_zones:
-  - ".odl.mit.edu"
-  - "odl.mit.edu"
-  - ".ol.mit.edu"
-  - "ol.mit.edu"
+  - .odl.mit.edu
+  - odl.mit.edu
+  - .ol.mit.edu
+  - ol.mit.edu
   eks:backup: false
-  eks:developer_role_policy_name: "AmazonEKSAdminPolicy"
-  eks:developer_role_kubernetes_groups: ["admin"]
+  eks:developer_role_policy_name: AmazonEKSAdminPolicy
+  eks:developer_role_kubernetes_groups:
+  - admin
   eks:ebs_csi_provisioner: true
   eks:efs_csi_provisioner: true
-  eks:gateway_release_channel: "experimental"
+  eks:gateway_release_channel: experimental
   eks:namespaces:
-  - "keycloak"
-  - "botkube"
-  - "kubewatch"
+  - keycloak
+  - botkube
+  - kubewatch
   eks:nodegroups:
     worker-xlarge:
-      instance_type: "r7a.xlarge"
+      instance_type: c7a.large
       labels:
         ondemand: true
-        node_size: r7a.xlarge
+        node_size: c7a.large
         ol.mit.edu/core_node: true
       disk_size_gb: 500
       scaling:
-        desired: 3
-        min: 2
-        max: 4
+        desired: 4
+        min: 3
+        max: 6
       version:
       tags: {}
       taints: {}

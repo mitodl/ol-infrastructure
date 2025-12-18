@@ -3,12 +3,12 @@ secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAGCwktIRKBNDvpmkXt/c+k+AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMbXJKd+Kvl9/IKEZAAgEQgDtZ8aTAeFdJd6wMCMf97aYf493JS0SsieKbwXyDWE4wlEmPKoIuNZfqx8v7iBndlFQjxwKxA8dNfALKtw==
 config:
   eks:allowed_dns_zones:
-  - ".odl.mit.edu"
-  - "odl.mit.edu"
-  - ".ol.mit.edu"
-  - "ol.mit.edu"
-  - ".mitx.mit.edu"
-  - "mitx.mit.edu"
+  - .odl.mit.edu
+  - odl.mit.edu
+  - .ol.mit.edu
+  - ol.mit.edu
+  - .mitx.mit.edu
+  - mitx.mit.edu
   eks:backup: true
   eks:apisix_domains:
   - courses-backend.mitx.mit.edu
@@ -17,32 +17,33 @@ config:
   - courses-backend-staging.mitx.mit.edu
   - studio-backend-staging.mitx.mit.edu
   - preview-staging.mitx.mit.edu
-  eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
-  eks:developer_role_kubernetes_groups: ["admin"]
-  eks:developer_role_scope: "cluster"
-  eks:ebs_csi_provisioner: "true"
-  eks:efs_csi_provisioner: "true"
-  eks:gateway_release_channel: "experimental"
+  eks:developer_role_policy_name: AmazonEKSClusterAdminPolicy
+  eks:developer_role_kubernetes_groups:
+  - admin
+  eks:developer_role_scope: cluster
+  eks:ebs_csi_provisioner: 'true'
+  eks:efs_csi_provisioner: 'true'
+  eks:gateway_release_channel: experimental
   eks:namespaces:
-  - "botkube"
-  - "kubewatch"
-  - "mitx-openedx"
-  - "mitx-staging-openedx"
+  - botkube
+  - kubewatch
+  - mitx-openedx
+  - mitx-staging-openedx
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 100
-      instance_type: "r7a.2xlarge"
+      instance_type: m7i.xlarge
       gpu: false
       labels:
-        node_size: r7a.2xlarge
+        node_size: m7i.xlarge
         ondemand: true
         ol.mit.edu/core_node: true
         ol.mit.edu/gpu_node: false
       node_group_options: {}
       scaling:
         desired: 3
-        max: 5
-        min: 2
+        max: 6
+        min: 3
       tags:
         cluster: residential-production
       taints: {}

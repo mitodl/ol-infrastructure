@@ -3,65 +3,66 @@ secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHjmo6C0sCNz3fdkFlhbu0tdBZxnHmPYSnqtmocvGiuNygEdN0axOMy9AVpifVL7RUMrAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMKtlDiPRGq+lWNb+VAgEQgDtQ4gK42ds9xpBVRtOLvCzRZI75PdeovVSqjVZNL65Fz75d9fw80IJql9yNQTWodlaT+OLkyeJLh1EMcw==
 config:
   eks:allowed_dns_zones:
-  - ".odl.mit.edu"
-  - "odl.mit.edu"
-  - ".ol.mit.edu"
-  - "ol.mit.edu"
-  - "learn.mit.edu"
-  - ".learn.mit.edu"
-  - "mitxonline.mit.edu"
-  - ".mitxonline.mit.edu"
-  - "xpro.mit.edu"
-  - ".xpro.mit.edu"
+  - .odl.mit.edu
+  - odl.mit.edu
+  - .ol.mit.edu
+  - ol.mit.edu
+  - learn.mit.edu
+  - .learn.mit.edu
+  - mitxonline.mit.edu
+  - .mitxonline.mit.edu
+  - xpro.mit.edu
+  - .xpro.mit.edu
   eks:backup: true
   eks:apisix_admin_key:
     secure: v1:PafPE9cAPNoOSOrU:8V16zZH9OGc1jgfZffXRDLvb6ROksZLULaYJvdjHgPCG/zmB/8nA8EMZb8X2/O74
   eks:apisix_viewer_key:
     secure: v1:Iozn2qrhdgmfpCXw:1H82fWngqaTZzOrgGp+jykq0+p/YOKTs5KE7rIPxhGZ1PbjCQ8Clz9+JzXqLQfCu
   eks:apisix_domains:
-  - "api-learn-ai.ol.mit.edu"
-  - "api-pay.ol.mit.edu"
-  - "api.learn.mit.edu"
-  - "api.mitxonline.mit.edu"
-  - "binder.learn.mit.edu"
-  - "courses-backend.learn.mit.edu"
-  - "dcc.learn.mit.edu"
-  - "nb.learn.mit.edu"
-  - "authoring.nb.learn.mit.edu"
-  - "studio-backend.learn.mit.edu"
-  - "studio-backend.xpro.mit.edu"
-  - "courses-backend.xpro.mit.edu"
-  - "preview.xpro.mit.edu"
-  - "tika-production.ol.mit.edu"
-  eks:apisix_min_replicas: "5"
-  eks:apisix_max_replicas: "10"
-  eks:apisix_memory: "1000Mi"
-  eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
-  eks:developer_role_kubernetes_groups: ["admin"]
-  eks:developer_role_scope: "cluster"
-  eks:ebs_csi_provisioner: "true"
-  eks:efs_csi_provisioner: "true"
-  eks:gateway_release_channel: "experimental"
+  - api-learn-ai.ol.mit.edu
+  - api-pay.ol.mit.edu
+  - api.learn.mit.edu
+  - api.mitxonline.mit.edu
+  - binder.learn.mit.edu
+  - courses-backend.learn.mit.edu
+  - dcc.learn.mit.edu
+  - nb.learn.mit.edu
+  - authoring.nb.learn.mit.edu
+  - studio-backend.learn.mit.edu
+  - studio-backend.xpro.mit.edu
+  - courses-backend.xpro.mit.edu
+  - preview.xpro.mit.edu
+  - tika-production.ol.mit.edu
+  eks:apisix_min_replicas: '5'
+  eks:apisix_max_replicas: '10'
+  eks:apisix_memory: 1000Mi
+  eks:developer_role_policy_name: AmazonEKSClusterAdminPolicy
+  eks:developer_role_kubernetes_groups:
+  - admin
+  eks:developer_role_scope: cluster
+  eks:ebs_csi_provisioner: 'true'
+  eks:efs_csi_provisioner: 'true'
+  eks:gateway_release_channel: experimental
   eks:namespaces:
-  - "botkube"
-  - "digital-credentials"
-  - "ecommerce"
-  - "jupyter"
-  - "jupyter-authoring"
-  - "kubewatch"
-  - "learn-ai"
-  - "mitlearn"
-  - "mitxonline"
-  - "mitxonline-openedx"
-  - "odl-video-service"
-  - "tika"
-  - "xpro-openedx"
+  - botkube
+  - digital-credentials
+  - ecommerce
+  - jupyter
+  - jupyter-authoring
+  - kubewatch
+  - learn-ai
+  - mitlearn
+  - mitxonline
+  - mitxonline-openedx
+  - odl-video-service
+  - tika
+  - xpro-openedx
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 1000
-      instance_type: "r7a.2xlarge"
+      instance_type: m7i.2xlarge
       labels:
-        node_size: r7a.2xlarge
+        node_size: m7i.2xlarge
         ondemand: true
         ol.mit.edu/core_node: true
         ol.mit.edu/gpu_node: false
@@ -76,7 +77,7 @@ config:
       version:
     gpu-worker-xlarge:
       disk_size_gb: 1000
-      instance_type: "g4dn.xlarge"
+      instance_type: g4dn.xlarge
       gpu: true
       labels:
         node_size: g4dn.xlarge
@@ -90,8 +91,11 @@ config:
         min: 1
       tags:
         cluster: applications-production
-        gpu: "true"
-      taints: {"ol.mit.edu/gpu_node": {value: "true", effect: "NoSchedule"}}
+        gpu: 'true'
+      taints:
+        ol.mit.edu/gpu_node:
+          value: 'true'
+          effect: NoSchedule
       version:
   eks:traefik_min_replicas: 5
   eks:traefik_max_replicas: 10

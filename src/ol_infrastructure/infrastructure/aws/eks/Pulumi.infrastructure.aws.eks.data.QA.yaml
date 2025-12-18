@@ -3,45 +3,46 @@ secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHgQW+3bag/cl2fPG3dPdqAPbfcsZuwI7rETXZsx85HRpgFHpqW8dqPwpO+48iRjSPKlAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMT8+E8dJESaABQvpwAgEQgDuViDwWFIt7k1e04QwP3dBW2YCjvz7RUJdyesx59jYHfjXxmnDGziscc9wq1kN3UPp1+uaZf5qBfmA/oQ==
 config:
   eks:allowed_dns_zones:
-  - ".odl.mit.edu"
-  - "odl.mit.edu"
-  - ".ol.mit.edu"
-  - "ol.mit.edu"
+  - .odl.mit.edu
+  - odl.mit.edu
+  - .ol.mit.edu
+  - ol.mit.edu
   eks:backup: true
   eks:apisix_admin_key:
     secure: v1:7MeUlqKSTbqRovyg:d+PtadLdy5md0WQvYWbW3rBF5WHO4mvN69eXpegY72UNos0qGAoWBT/o6eSGxKsjZDllxfFpFEUvKUuOTpjQDl14cDW9khKyaTQFrpJq3WI=
   eks:apisix_domains:
-  - "airbyte-qa.odl.mit.edu"
-  - "api-airbyte-qa.odl.mit.edu"
-  - "pipelines-qa.odl.mit.edu"
+  - airbyte-qa.odl.mit.edu
+  - api-airbyte-qa.odl.mit.edu
+  - pipelines-qa.odl.mit.edu
   eks:apisix_viewer_key:
     secure: v1:FXn/5LA92VaA0LDu:+M5NNNgprjafZJTssawGZoRrI9ZEoiGKbRa3oVh4YjtZO4B5MLwXgfRvfWyY1zSbT0LJxxMJT90KQtWN3MsWobIseTYXLrdnPcpcYXY9lmg=
-  eks:developer_role_kubernetes_groups: ["admin"]
-  eks:developer_role_policy_name: "AmazonEKSAdminPolicy"
-  eks:ebs_csi_provisioner: "true"
-  eks:efs_csi_provisioner: "true"
-  eks:gateway_release_channel: "experimental"
+  eks:developer_role_kubernetes_groups:
+  - admin
+  eks:developer_role_policy_name: AmazonEKSAdminPolicy
+  eks:ebs_csi_provisioner: 'true'
+  eks:efs_csi_provisioner: 'true'
+  eks:gateway_release_channel: experimental
   eks:namespaces:
-  - "airbyte"
-  - "dagster"
-  - "kubewatch"
-  - "open-metadata"
-  - "qdrant"
-  - "starrocks"
-  - "superset"
+  - airbyte
+  - dagster
+  - kubewatch
+  - open-metadata
+  - qdrant
+  - starrocks
+  - superset
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 500
-      instance_type: "r7a.xlarge"
+      instance_type: c5n.xlarge
       labels:
-        node_size: r7a.xlarge
+        node_size: c5n.xlarge
         ondemand: true
         ol.mit.edu/core_node: true
       node_group_options: {}
       scaling:
         desired: 3
         max: 5
-        min: 2
+        min: 3
       tags: {}
       taints: {}
       version:

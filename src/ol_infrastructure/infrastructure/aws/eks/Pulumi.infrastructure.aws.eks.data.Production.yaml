@@ -3,46 +3,46 @@ secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHjmo6C0sCNz3fdkFlhbu0tdBZxnHmPYSnqtmocvGiuNygGvhXhSXiQ1XmPuxswm2OtcAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMTuh7nmhVuOpDSvyZAgEQgDuh3GDgOQHD2wbrhWUWE2wIUfXQxWNm83tq0ambQmpQqnAr9hajUcnokJAsLf0H8AKhFvUp8SAMbLaHtA==
 config:
   eks:allowed_dns_zones:
-  - ".odl.mit.edu"
-  - "odl.mit.edu"
-  - ".ol.mit.edu"
-  - "ol.mit.edu"
+  - .odl.mit.edu
+  - odl.mit.edu
+  - .ol.mit.edu
+  - ol.mit.edu
   eks:backup: true
   eks:apisix_admin_key:
     secure: v1:+4IwDMDzHiVsfnbo:vr+qOCr5SVJhBDoy0N8JL0Mw+1nrcOWNktlN5AKPCCLtAVIJfFWo8m/UJcje8esGgzIql50D/Wj7n8AX3K9zVzh1A6IAws/iZ2GW7B5D0Rw=
   eks:apisix_domains:
-  - "airbyte.odl.mit.edu"
-  - "api-airbyte.odl.mit.edu"
-  - "pipelines.odl.mit.edu"
-  eks:apisix_min_replicas: "3"
-  eks:apisix_max_replicas: "10"
-  eks:apisix_memory: "800Mi"
+  - airbyte.odl.mit.edu
+  - api-airbyte.odl.mit.edu
+  - pipelines.odl.mit.edu
+  eks:apisix_min_replicas: '3'
+  eks:apisix_max_replicas: '10'
+  eks:apisix_memory: 800Mi
   eks:apisix_viewer_key:
     secure: v1:j5+aTOfRBG8QiV+V:C6NTWitDBjV4DkOQGApae7GHK9w1wOFAlS7ACNu/s728A5q1zDWv9E13E2hs0IlAtMnP17KJR0HZjxDlg5fckv2nguEVgNA/d90j1XWlFY8=
-  eks:ebs_csi_provisioner: "true"
-  eks:efs_csi_provisioner: "true"
-  eks:gateway_release_channel: "experimental"
+  eks:ebs_csi_provisioner: 'true'
+  eks:efs_csi_provisioner: 'true'
+  eks:gateway_release_channel: experimental
   eks:namespaces:
-  - "airbyte"
-  - "dagster"
-  - "kubewatch"
-  - "open-metadata"
-  - "qdrant"
-  - "starrocks"
-  - "superset"
+  - airbyte
+  - dagster
+  - kubewatch
+  - open-metadata
+  - qdrant
+  - starrocks
+  - superset
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 500
-      instance_type: "r7a.xlarge"
+      instance_type: c5n.xlarge
       labels:
-        node_size: r7a.xlarge
+        node_size: c5n.xlarge
         ondemand: true
         ol.mit.edu/core_node: true
       node_group_options: {}
       scaling:
         desired: 4
         max: 6
-        min: 2
+        min: 3
       tags: {}
       taints: {}
       version:

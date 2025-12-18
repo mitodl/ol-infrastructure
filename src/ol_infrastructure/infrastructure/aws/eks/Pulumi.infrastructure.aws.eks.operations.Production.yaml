@@ -5,38 +5,38 @@ config:
   environment:business_unit: operations
   environment:target_vpc: operations_vpc
   eks:allowed_dns_zones:
-  - ".odl.mit.edu"
-  - "odl.mit.edu"
-  - ".ol.mit.edu"
-  - "ol.mit.edu"
+  - .odl.mit.edu
+  - odl.mit.edu
+  - .ol.mit.edu
+  - ol.mit.edu
   eks:backup: true
-  eks:apisix_min_replicas: "3"
-  eks:apisix_max_replicas: "10"
+  eks:apisix_min_replicas: '3'
+  eks:apisix_max_replicas: '10'
   eks:ebs_csi_provisioner: true
   eks:efs_csi_provisioner: true
-  eks:gateway_release_channel: "experimental"
+  eks:gateway_release_channel: experimental
   eks:namespaces:
-  - "keycloak"
-  - "botkube"
-  - "kubewatch"
+  - keycloak
+  - botkube
+  - kubewatch
   eks:nodegroups:
     worker-xlarge:
-      instance_type: "r7a.xlarge"
+      instance_type: c7a.large
       labels:
         ondemand: true
-        node_size: r7a.xlarge
+        node_size: c7a.large
         ol.mit.edu/core_node: true
       disk_size_gb: 500
       scaling:
-        desired: 3
-        min: 2
-        max: 4
+        desired: 5
+        min: 4
+        max: 7
       version:
       tags: {}
       taints: {}
       node_group_options: {}
-  eks:traefik_min_replicas: "5"
-  eks:traefik_max_replicas: "10"
+  eks:traefik_min_replicas: '5'
+  eks:traefik_max_replicas: '10'
   eks:apisix_admin_key:
     secure: v1:NTLLGGbH5LPu0xN5:hfDvIZrarmefhVVvakAX6steeTZsYusUMlDWdjSmBhyJFfEBlIj9rAxP/hbci4Li3sN8wF7KBf+L6Tk=
   eks:apisix_viewer_key:
