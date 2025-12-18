@@ -3,69 +3,70 @@ secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHgQW+3bag/cl2fPG3dPdqAPbfcsZuwI7rETXZsx85HRpgHNo53bGgSBEnvNmModglvmAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMApkzxmwjrcsp+6wUAgEQgDtZaoHarOGlsVAbII/zlv2+IJRb3vk+B1fGRP87r4AmfvPdh44HPYeGH3D+xmNTClyRw+B0IzHy/3czAw==
 config:
   eks:allowed_dns_zones:
-  - ".odl.mit.edu"
-  - "odl.mit.edu"
-  - ".ol.mit.edu"
-  - "ol.mit.edu"
-  - "learn.mit.edu"
-  - ".learn.mit.edu"
-  - "mitxonline.mit.edu"
-  - ".mitxonline.mit.edu"
-  - "xpro.mit.edu"
-  - ".xpro.mit.edu"
+  - .odl.mit.edu
+  - odl.mit.edu
+  - .ol.mit.edu
+  - ol.mit.edu
+  - learn.mit.edu
+  - .learn.mit.edu
+  - mitxonline.mit.edu
+  - .mitxonline.mit.edu
+  - xpro.mit.edu
+  - .xpro.mit.edu
   eks:backup: false
   eks:apisix_admin_key:
     secure: v1:AndQEZrEKm/Q3QyP:60BdyhdeUbx2ds+YdP3vN5+Q0nIA0AyqLjtUo0XSj0f4vQQc6f5PsLJOKwZj1/4T
   eks:apisix_viewer_key:
     secure: v1:T9I4WZSeg3lYawlD:d59YkDPqEo372v1ibNCtyYcGjxW0xXC2eXyTADHHZ4QeQ+gD8JuN3pCv78nNVQ/d
   eks:apisix_domains:
-  - "api-learn-ai-qa.ol.mit.edu"
-  - "api-pay-qa.ol.mit.edu"
-  - "api.rc.learn.mit.edu"
-  - "api.rc.mitxonline.mit.edu"
-  - "courses-backend.rc.learn.mit.edu"
-  - "dcc.rc.learn.mit.edu"
-  - "nb.rc.learn.mit.edu"
-  - "authoring.nb.rc.learn.mit.edu"
-  - "preview.courses.rc.learn.mit.edu"
-  - "studio-backend.rc.learn.mit.edu"
-  - "studio-backend.rc.xpro.mit.edu"
-  - "courses-backend.rc.xpro.mit.edu"
-  - "preview-rc.xpro.mit.edu"
-  - "tika-qa.ol.mit.edu"
-  eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
-  eks:developer_role_kubernetes_groups: ["admin"]
-  eks:developer_role_scope: "cluster"
-  eks:ebs_csi_provisioner: "true"
-  eks:efs_csi_provisioner: "true"
-  eks:gateway_release_channel: "experimental"
+  - api-learn-ai-qa.ol.mit.edu
+  - api-pay-qa.ol.mit.edu
+  - api.rc.learn.mit.edu
+  - api.rc.mitxonline.mit.edu
+  - courses-backend.rc.learn.mit.edu
+  - dcc.rc.learn.mit.edu
+  - nb.rc.learn.mit.edu
+  - authoring.nb.rc.learn.mit.edu
+  - preview.courses.rc.learn.mit.edu
+  - studio-backend.rc.learn.mit.edu
+  - studio-backend.rc.xpro.mit.edu
+  - courses-backend.rc.xpro.mit.edu
+  - preview-rc.xpro.mit.edu
+  - tika-qa.ol.mit.edu
+  eks:developer_role_policy_name: AmazonEKSClusterAdminPolicy
+  eks:developer_role_kubernetes_groups:
+  - admin
+  eks:developer_role_scope: cluster
+  eks:ebs_csi_provisioner: 'true'
+  eks:efs_csi_provisioner: 'true'
+  eks:gateway_release_channel: experimental
   eks:namespaces:
-  - "botkube"
-  - "digital-credentials"
-  - "ecommerce"
-  - "jupyter"
-  - "jupyter-authoring"
-  - "kubewatch"
-  - "learn-ai"
-  - "mitlearn"
-  - "mitxonline"
-  - "mitxonline-openedx"
-  - "odl-video-service"
-  - "tika"
-  - "xpro-openedx"
+  - botkube
+  - digital-credentials
+  - ecommerce
+  - jupyter
+  - jupyter-authoring
+  - kubewatch
+  - learn-ai
+  - mitlearn
+  - mitxonline
+  - mitxonline-openedx
+  - odl-video-service
+  - tika
+  - xpro-openedx
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 1000
-      instance_type: "r7a.xlarge"
+      instance_type: m7i.2xlarge
       labels:
-        node_size: r7a.xlarge
+        node_size: m7i.2xlarge
         ondemand: true
         ol.mit.edu/core_node: true
         ol.mit.edu/gpu_node: false
       node_group_options: {}
       scaling:
         desired: 3
-        max: 6
+        max: 5
         min: 3
       tags:
         cluster: applications-qa
@@ -73,7 +74,7 @@ config:
       version:
     gpu-worker-xlarge:
       disk_size_gb: 1000
-      instance_type: "g4dn.xlarge"
+      instance_type: g4dn.xlarge
       gpu: true
       labels:
         node_size: g4dn.xlarge
@@ -87,8 +88,11 @@ config:
         min: 1
       tags:
         cluster: applications-qa
-        gpu: "true"
-      taints: {"ol.mit.edu/gpu_node": {value: "true", effect: "NoSchedule"}}
+        gpu: 'true'
+      taints:
+        ol.mit.edu/gpu_node:
+          value: 'true'
+          effect: NoSchedule
       version:
   environment:business_unit: operations
   environment:target_vpc: applications_vpc

@@ -3,12 +3,12 @@ secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHjZAY5LtmRWGljev0oiDGn0jR5cRwD4IVXCn50TW5i0qQG3cvQh+mePBasD7eDrmhIrAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMQPzgr0zbS9ukKkIOAgEQgDt9Z6Z32SlTCDR9hugE5XIzUi2DFkg/DbUqOx5O+r2fWGwjxMPMpTcNhOnaGf4iXks5qOmS7EemrBIoHg==
 config:
   eks:allowed_dns_zones:
-  - ".odl.mit.edu"
-  - "odl.mit.edu"
-  - ".ol.mit.edu"
-  - "ol.mit.edu"
-  - ".mitx.mit.edu"
-  - "mitx.mit.edu"
+  - .odl.mit.edu
+  - odl.mit.edu
+  - .ol.mit.edu
+  - ol.mit.edu
+  - .mitx.mit.edu
+  - mitx.mit.edu
   eks:backup: false
   eks:apisix_domains:
   - courses-backend.qa.mitx.mit.edu
@@ -17,32 +17,33 @@ config:
   - courses-backend-staging.qa.mitx.mit.edu
   - studio-backend-staging.qa.mitx.mit.edu
   - preview-mitx-qa-draft.mitx.mit.edu
-  eks:developer_role_policy_name: "AmazonEKSClusterAdminPolicy"
-  eks:developer_role_kubernetes_groups: ["admin"]
-  eks:developer_role_scope: "cluster"
-  eks:ebs_csi_provisioner: "true"
-  eks:efs_csi_provisioner: "true"
-  eks:gateway_release_channel: "experimental"
+  eks:developer_role_policy_name: AmazonEKSClusterAdminPolicy
+  eks:developer_role_kubernetes_groups:
+  - admin
+  eks:developer_role_scope: cluster
+  eks:ebs_csi_provisioner: 'true'
+  eks:efs_csi_provisioner: 'true'
+  eks:gateway_release_channel: experimental
   eks:namespaces:
-  - "botkube"
-  - "kubewatch"
-  - "mitx-openedx"
-  - "mitx-staging-openedx"
+  - botkube
+  - kubewatch
+  - mitx-openedx
+  - mitx-staging-openedx
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 100
-      instance_type: "r7a.large"
+      instance_type: m7i.large
       gpu: false
       labels:
-        node_size: r7a.large
+        node_size: m7i.large
         ondemand: true
         ol.mit.edu/core_node: true
         ol.mit.edu/gpu_node: false
       node_group_options: {}
       scaling:
-        desired: 3
-        max: 5
-        min: 2
+        desired: 4
+        max: 6
+        min: 3
       tags:
         cluster: residential-qa
       taints: {}

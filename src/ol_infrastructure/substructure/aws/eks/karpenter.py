@@ -344,7 +344,7 @@ def setup_karpenter(  # noqa: PLR0913
                 {
                     "deviceName": "/dev/xvda",
                     "ebs": {
-                        "volumeSize": "1000Gi",
+                        "volumeSize": "300Gi",
                         "volumeType": "gp3",
                         "iops": 3000,
                         "throughput": 125,
@@ -375,7 +375,11 @@ def setup_karpenter(  # noqa: PLR0913
         ),
     )
 
-    default_node_labels = {**k8s_global_labels, "ol.mit.edu/gpu_node": "false"}
+    default_node_labels = {
+        **k8s_global_labels,
+        "ol.mit.edu/core_node": "false",
+        "ol.mit.edu/gpu_node": "false",
+    }
     kubernetes.apiextensions.CustomResource(
         f"{cluster_name}-karpenter-default-node-pool",
         api_version="karpenter.sh/v1",
@@ -442,7 +446,7 @@ def setup_karpenter(  # noqa: PLR0913
             },
             "disruption": {
                 "consolidationPolicy": "WhenEmptyOrUnderutilized",
-                "consolidateAfter": "1h",
+                "consolidateAfter": "10m",
             },
             "limits": {
                 "cpu": "128",
@@ -455,7 +459,11 @@ def setup_karpenter(  # noqa: PLR0913
         ),
     )
 
-    gpu_node_labels = {**k8s_global_labels, "ol.mit.edu/gpu_node": "true"}
+    gpu_node_labels = {
+        **k8s_global_labels,
+        "ol.mit.edu/core_node": "false",
+        "ol.mit.edu/gpu_node": "true",
+    }
 
     # Karpenter will select this NodePool for pods with a node selector matching
     # "ol.mit.edu/gpu_node": "true". When a pod is unschedulable, Karpenter evaluates
@@ -514,7 +522,7 @@ def setup_karpenter(  # noqa: PLR0913
                         {
                             "key": "karpenter.sh/capacity-type",
                             "operator": "In",
-                            "values": ["spot"],
+                            "values": ["spot", "on-demand"],
                         },
                     ],
                 },
