@@ -52,6 +52,6 @@ config:
   ocw_studio:app_domain: ocw-studio.odl.mit.edu
   ocw_studio:db_password:
     secure: v1:KkTvlMKkKDXJiaQM:W+vNsxirVQXnvf1FvsokCi49hercEQP+1nmCGvhuOfQZYEqYvPW/Y+eraoQ71t2THGB3xtvwf55DmHVqD87Gf+CvZCPnSMEYGIRmouZZ6xlnXRK1Ph0e/rbO
-  ocw_studio:db_use_blue_green: true
+  ocw_studio:db_use_blue_green: false
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
