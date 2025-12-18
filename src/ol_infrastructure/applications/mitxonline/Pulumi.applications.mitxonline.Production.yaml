@@ -75,6 +75,7 @@ config:
     UWSGI_THREADS: "25"
     MIT_LEARN_FROM_EMAIL: "MIT Learn <mitlearn-support@mit.edu>"
     MIT_LEARN_DASHBOARD_URL: "https://learn.mit.edu/dashboard"
+    VERIFIABLE_CREDENTIAL_SIGNER_URL: "http://dcc.learn.mit.edu/instance/default/credentials/issue"
   redis:password:
     secure: v1:yvRUeBECxXQn0EuQ:CzfHq2P7kQGgULkRI7EFThTAnZyxq4uLvCTAdCYWpgvKl6Hwir6Gfk6UgU//ceOEKXrLVw6mRf34oWU=
   redis:instance_type: cache.r7g.2xlarge
