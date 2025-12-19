@@ -115,11 +115,16 @@ connector_payload = {
     ],
 }
 
-redacted_payload = dict(connector_payload)
-redacted_payload["credential"] = "***REDACTED***"
+safe_payload = {
+    "name": connector_payload["name"],
+    "description": connector_payload["description"],
+    "version": connector_payload["version"],
+    "protocol": connector_payload["protocol"],
+    "model": connector_payload["parameters"]["model"],
+}
 logger.info(
-    "Connector payload (redacted credentials): %s",
-    json.dumps(redacted_payload, indent=2),
+    "Connector payload (credentials and sensitive fields excluded): %s",
+    json.dumps(safe_payload, indent=2),
 )
 
 logger.info("Configuring connector...")
