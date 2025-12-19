@@ -33,9 +33,9 @@ config:
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 500
-      instance_type: c5n.xlarge
+      instance_type: r7a.xlarge
       labels:
-        node_size: c5n.xlarge
+        node_size: r7a.xlarge
         ondemand: true
         ol.mit.edu/core_node: true
       node_group_options: {}
