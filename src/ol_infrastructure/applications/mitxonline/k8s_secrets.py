@@ -353,4 +353,34 @@ def create_mitxonline_k8s_secrets(
         secret_names.append(secret_name)
         secret_resources.append(secret_resource)
 
+    digital_credentials_secrets_configs: list[dict[str, Any]] = [
+        {
+            "base_name": "digital-credentials",
+            "path": "issuer-coordinator",
+            "templates": {
+                "VERIFIABLE_CREDENTIAL_BEARER_TOKEN": '{{ get .Secrets "tenant_tokens" "TENANT_TOKEN_DEFAULT" }}',
+            },
+        },
+        {
+            "base_name": "digital-credentials",
+            "path": "signing-service",
+            "templates": {
+                "VERIFIABLE_CREDENTIAL_DID": '{{ get .Secrets "tenants_did_keys" "DEFAULT" }}',
+            },
+        },
+    ]
+    for config in digital_credentials_secrets_configs:
+        secret_name, secret_resource = _create_static_secret(
+            stack_info=stack_info,
+            secret_base_name=f"digital-credentials-{config['base_name']}",
+            namespace=mitxonline_namespace,
+            labels=k8s_global_labels,
+            mount="secret-digital-credentials",
+            path=config["path"],
+            templates=config["templates"],
+            vaultauth=vaultauth,
+        )
+        secret_names.append(secret_name)
+        secret_resources.append(secret_resource)
+
     return secret_names, secret_resources
