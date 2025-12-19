@@ -702,7 +702,7 @@ def create_k8s_resources(  # noqa: C901
                                 "--workers",
                                 "1",
                                 "--log-level",
-                                "warn",
+                                edxapp_config.get("log_level") or "warn",
                                 "--static-path-mount",
                                 "/openedx/staticfiles",
                                 "lms.wsgi:application",

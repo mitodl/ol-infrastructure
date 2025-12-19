@@ -129,3 +129,4 @@ config:
   edxapp:k8s_cutover: true
   edxapp:disable_ec2_deployment: true
   edxapp:k8s_vpc: residential_mitx_vpc
+  edxapp:log_level: "debug"
