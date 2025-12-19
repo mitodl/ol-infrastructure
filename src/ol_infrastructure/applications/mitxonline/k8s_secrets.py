@@ -365,7 +365,7 @@ def create_mitxonline_k8s_secrets(
             "base_name": "signing-service",
             "path": "signing-service",
             "templates": {
-                "VERIFIABLE_CREDENTIAL_DID": '{{ get .Secrets "tenants_did_keys" "DEFAULT" "publicKeyMultibase" }}',
+                "VERIFIABLE_CREDENTIAL_DID": '{{ get .Secrets "tenants_did_keys.DEFAULT.keyPair.publicKeyMultibase" }}',
             },
         },
     ]
