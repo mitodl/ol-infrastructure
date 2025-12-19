@@ -115,16 +115,10 @@ connector_payload = {
     ],
 }
 
-safe_payload = {
-    "name": connector_payload["name"],
-    "description": connector_payload["description"],
-    "version": connector_payload["version"],
-    "protocol": connector_payload["protocol"],
-    "model": connector_payload["parameters"]["model"],
-}
 logger.info(
-    "Connector payload (credentials and sensitive fields excluded): %s",
-    json.dumps(safe_payload, indent=2),
+    "Preparing connector configuration (credentials excluded) for name='%s', model='%s'",
+    connector_name,
+    args["openai_model"],
 )
 
 logger.info("Configuring connector...")
