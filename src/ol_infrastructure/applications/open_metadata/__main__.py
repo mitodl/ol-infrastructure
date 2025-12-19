@@ -156,6 +156,28 @@ open_metadata_role_statements["app"]["create"].append(
         $$do$$;"""  # noqa: E501
     )
 )
+open_metadata_role_statements["app"]["create"].append(
+    Template(
+        """
+        DO
+        $$do$$
+        BEGIN
+           IF EXISTS (
+              SELECT FROM pg_catalog.pg_extension
+              WHERE  extname = 'pg_trgm') THEN
+                  RAISE NOTICE 'Extension "pg_trgm" already exists. Skipping.';
+           ELSE
+              BEGIN   -- nested block
+                 CREATE EXTENSION pg_trgm;
+              EXCEPTION
+                 WHEN duplicate_object THEN
+                    RAISE NOTICE 'Extension "pg_trgm" was just created by a concurrent transaction. Skipping.';
+              END;
+           END IF;
+        END
+        $$do$$;"""  # noqa: E501
+    )
+)
 
 open_metadata_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=open_metadata_db_config.db_name,
