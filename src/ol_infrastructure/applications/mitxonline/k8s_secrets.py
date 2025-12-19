@@ -358,7 +358,7 @@ def create_mitxonline_k8s_secrets(
             "base_name": "issuer-coordinator",
             "path": "issuer-coordinator",
             "templates": {
-                "VERIFIABLE_CREDENTIAL_BEARER_TOKEN": '{{ get .Secrets "tenant_tokens" "TENANT_TOKEN_DEFAULT" }}',
+                "VERIFIABLE_CREDENTIAL_BEARER_TOKEN": '{{ get .Secrets "tenant_tokens.TENANT_TOKEN_DEFAULT" }}',
             },
         },
         {
