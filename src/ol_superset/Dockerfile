@@ -1,4 +1,4 @@
-ARG SUPERSET_TAG=5.0.0
+ARG SUPERSET_TAG=6.0.0
 FROM apache/superset:${SUPERSET_TAG}
 COPY --link requirements.txt /tmp/requirements.txt
 COPY static/assets/images/ol-data-platform-logo.svg /app/superset/static/assets/images/ol-data-platform-logo.svg
