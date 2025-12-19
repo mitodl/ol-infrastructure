@@ -23,3 +23,13 @@ PUT _cluster/settings
 }
 ```
 She said that this was not needed for production clusters, only in RC. Documented here incase that isn't true.
+
+### ML Stuff for Anastasia v2
+
+Important links:
+- https://docs.opensearch.org/latest/tutorials/vector-search/semantic-search/semantic-search-openai/
+- https://docs.aws.amazon.com/opensearch-service/latest/developerguide/ml-external-connector.html
+
+To enable the ML features for Anastasia + hybrid search we have to do the steps outlined in the above links. For `mitlearn` clusters, this is largely automated except for one click-ops step that must take place which is step 3.2 from the first link: https://docs.opensearch.org/latest/tutorials/vector-search/semantic-search/semantic-search-openai/#step-32-map-a-backend-role
+
+For this you will use the arn output in by the stack under the key `connector_management_role_arn`. Once that is done and the stack is up, you can run the `configure_openai_connector.py` script to finish the setup.
