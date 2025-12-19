@@ -51,7 +51,7 @@ def build_superset_docker_pipeline() -> Pipeline:
     )
 
     superset_image = registry_image(
-        name=Identifier("supserset-image"),
+        name=Identifier("superset-image"),
         image_repository="mitodl/superset",
         username="((dockerhub.username))",
         password="((dockerhub.password))",  # noqa: S106
