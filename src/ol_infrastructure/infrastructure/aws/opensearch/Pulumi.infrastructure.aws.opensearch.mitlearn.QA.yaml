@@ -10,6 +10,6 @@ config:
   opensearch:cluster_size: "3"
   opensearch:disable_consul_components: true
   opensearch:disk_size_gb: "60"
-  opensearch:engine_version: "OpenSearch_3.1"
+  opensearch:engine_version: "OpenSearch_3.3"
   opensearch:public_web: "true"
   opensearch:secured_cluster: "true"
