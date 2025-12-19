@@ -115,7 +115,12 @@ connector_payload = {
     ],
 }
 
-logger.info("Connector payload: %s", json.dumps(connector_payload, indent=2))
+redacted_payload = dict(connector_payload)
+redacted_payload["credential"] = "***REDACTED***"
+logger.info(
+    "Connector payload (redacted credentials): %s",
+    json.dumps(redacted_payload, indent=2),
+)
 
 logger.info("Configuring connector...")
 
