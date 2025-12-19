@@ -164,7 +164,12 @@ vault.kv.SecretV2(
     f"signing-service-vault-secret-{stack_info.env_suffix}",
     mount=digital_credentials_vault_kv_path,
     name="signing-service",
-    data_json=json.dumps({"tenants": signing_service_tenants}),
+    data_json=json.dumps(
+        {
+            "tenants": signing_service_tenants,
+            "tenants_did_keys": signing_service_secrets["tenants"],
+        }
+    ),
 )
 
 # Write issuer coordinator secrets to Vault KV
