@@ -23,7 +23,7 @@ def build_superset_docker_pipeline() -> Pipeline:
         name=Identifier("superset-release"),
         owner="apache",
         repository="superset",
-        tag_filter="^5",
+        tag_filter="^6",
         order_by="time",
     )
 
