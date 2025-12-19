@@ -7,6 +7,7 @@ from parliament.finding import Finding
 
 IAM_POLICY_VERSION = "2012-10-17"
 
+# All users with admin access to AWS
 ADMIN_USERNAMES = [
     "cpatti",
     "dansubak",
@@ -19,6 +20,16 @@ ADMIN_USERNAMES = [
     "tmacey",
 ]
 
+# DevOps team members
+DEVOPS_ADMIN_USERNAMES = [
+    "cpatti",
+    "mas48",
+    "qhoque",
+    "shaidar",
+    "tmacey",
+]
+
+# DevOps team members plus some special extras
 EKS_ADMIN_USERNAMES = [
     "cpatti",
     "dansubak",
@@ -28,6 +39,7 @@ EKS_ADMIN_USERNAMES = [
     "tmacey",
 ]
 
+# Unused
 EKS_DEVELOPER_USERNAMES = [
     "ambady",
     "abeglova",
