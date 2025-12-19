@@ -32,16 +32,16 @@ config:
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 100
-      instance_type: m7i.large
+      instance_type: m7i.xlarge
       gpu: false
       labels:
-        node_size: m7i.large
+        node_size: m7i.xlarge
         ondemand: true
         ol.mit.edu/core_node: true
         ol.mit.edu/gpu_node: false
       node_group_options: {}
       scaling:
-        desired: 4
+        desired: 3
         max: 6
         min: 3
       tags:
