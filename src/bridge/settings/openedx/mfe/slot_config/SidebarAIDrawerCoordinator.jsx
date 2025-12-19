@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { getConfig } from '@edx/frontend-platform';
 import { useModel } from '@src/generic/model-store';
@@ -25,8 +25,11 @@ const SidebarAIDrawerCoordinator = ({ courseId }) => {
     const currentSidebar = contextValue?.currentSidebar ?? null;
     const toggleSidebar = contextValue?.toggleSidebar ?? (() => {});
     const shouldDisplayFullScreen = contextValue?.shouldDisplayFullScreen ?? false;
+    const unitId = contextValue?.unitId ?? null;
 
     const [showAIDrawer, setShowAIDrawer] = useState(false);
+    const prevUnitIdRef = useRef(unitId);
+    const showAIDrawerRef = useRef(false);
 
     const messageOrigin = useMemo(() => {
         const lmsBaseUrl = getConfig().LMS_BASE_URL;
@@ -65,6 +68,26 @@ const SidebarAIDrawerCoordinator = ({ courseId }) => {
             setShowAIDrawer(false);
         }
     }, [currentSidebar]);
+
+    useEffect(() => {
+        showAIDrawerRef.current = showAIDrawer;
+    }, [showAIDrawer]);
+
+    useEffect(() => {
+        if (prevUnitIdRef.current && prevUnitIdRef.current !== unitId && unitId !== null) {
+            // Only send close message if drawer is actually open
+            if (showAIDrawerRef.current) {
+                window.postMessage(
+                    {
+                        type: 'smoot-design::ai-drawer-close',
+                    },
+                    messageOrigin
+                );
+            }
+            setShowAIDrawer(false);
+        }
+        prevUnitIdRef.current = unitId;
+    }, [unitId, messageOrigin]);
 
     return (
         <>
