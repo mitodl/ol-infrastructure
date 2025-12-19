@@ -1,6 +1,7 @@
 """Deploy Superset to EKS."""
 
 import json
+import os
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
@@ -35,8 +36,8 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
-    cached_image_uri,
     check_cluster_namespace,
+    ecr_image_uri,
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
@@ -68,6 +69,8 @@ data_vpc = network_stack.require_output("data_vpc")
 superset_env = f"data-{stack_info.env_suffix}"
 superset_vault_kv_path = vault_mount_stack.require_output("superset_kv")["path"]
 aws_config = AWSBase(tags={"OU": "data", "Environment": superset_env})
+
+SUPERSET_TAG = os.environ.get("SUPERSET_IMAGE_TAG", "latest")
 
 # Kubernetes provider setup
 # mypy/pylance: Output[str] is acceptable at runtime
@@ -508,8 +511,8 @@ superset_chart = kubernetes.helm.v3.Release(
             "fullnameOverride": "superset",
             "image": {
                 # Use our custom image that bundles config and deps
-                "repository": cached_image_uri("mitodl/superset"),
-                "tag": "latest",
+                "repository": ecr_image_uri("mitodl/superset"),
+                "tag": SUPERSET_TAG,
             },
             # Bring your own Postgres/Redis
             "postgresql": {"enabled": False},

@@ -4,13 +4,18 @@ from ol_concourse.lib.containers import container_build_task
 from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
+    AnonymousResource,
+    Command,
     GetStep,
     Identifier,
     Input,
     Job,
     LoadVarStep,
     Pipeline,
+    Platform,
     PutStep,
+    TaskConfig,
+    TaskStep,
 )
 from ol_concourse.lib.resources import git_repo, github_release, registry_image
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
@@ -50,6 +55,12 @@ def build_superset_docker_pipeline() -> Pipeline:
         image_repository="mitodl/superset",
         username="((dockerhub.username))",
         password="((dockerhub.password))",  # noqa: S106
+        image_tag=None,
+        # While check_every=never, defining tag_regex helps Concourse UI understand
+        # resource versions
+        tag_regex=r"^[0-9a-f]{4,40}$",  # Git short ref
+        sort_by_creation=True,
+        ecr_region="us-east-1",
     )
 
     docker_build_job = Job(
@@ -69,6 +80,27 @@ def build_superset_docker_pipeline() -> Pipeline:
                     "BUILD_ARG_SUPERSET_TAG": "((.:superset_tag))",
                 },
                 build_args=[],
+            ),
+            TaskStep(
+                task=Identifier("ensure-ecr-repository"),
+                config=TaskConfig(
+                    platform=Platform.linux,
+                    image_resource=AnonymousResource(
+                        type="registry-image",
+                        source={"repository": "amazon/aws-cli", "tag": "latest"},
+                    ),
+                    params={
+                        "REPO_NAME": superset_image.source["repository"],
+                        "AWS_PAGER": "cat",
+                    },
+                    run=Command(
+                        path="sh",
+                        args=[
+                            "-exc",
+                            "aws ecr describe-repositories --repository-names ${REPO_NAME} || aws ecr create-repository --repository-name ${REPO_NAME}",  # noqa: E501
+                        ],
+                    ),
+                ),
             ),
             PutStep(
                 put=superset_image.name,
@@ -93,6 +125,7 @@ def build_superset_docker_pipeline() -> Pipeline:
                 get=superset_image.name, trigger=True, passed=[docker_build_job.name]
             )
         ],
+        env_vars_from_files={"SUPERSET_IMAGE_TAG": f"{superset_image.name}/tag"},
     )
 
     combined_fragment = PipelineFragment(
