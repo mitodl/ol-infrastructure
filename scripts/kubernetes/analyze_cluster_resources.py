@@ -815,6 +815,7 @@ def print_report(
     nodegroups: list[NodeGroupMetrics],
     nodes_info: dict[str, dict[str, Any]],
     recommendation: dict[str, Any],
+    headroom_percentage: int = DEFAULT_HEADROOM_PERCENTAGE,
 ):
     """Print analysis report."""
     print("\n" + "=" * 80)
@@ -907,9 +908,10 @@ def print_report(
     )
     print(f"Recommended Node Count: {rec['node_count']}")
     print(f"Estimated Resource Waste: {rec['avg_waste_percent']:.1f}%%")
-    print(f"\nRequired Resources (with {DEFAULT_HEADROOM_PERCENTAGE}%% headroom):")
-    print(f"  CPU: {float(req_cpu * Decimal('1.2')):.1f} cores")
-    print(f"  Memory: {float(req_memory_gb * Decimal('1.2')):.2f} GB")
+    headroom_multiplier = Decimal(100 + headroom_percentage) / Decimal(100)
+    print(f"\nRequired Resources (with {headroom_percentage}%% headroom):")
+    print(f"  CPU: {float(req_cpu * headroom_multiplier):.1f} cores")
+    print(f"  Memory: {float(req_memory_gb * headroom_multiplier):.2f} GB")
 
     print("\n### ESTIMATED COSTS ###\n")
     print("Recommended Configuration:")
@@ -1078,7 +1080,7 @@ def main(
         }
         print(json.dumps(result, indent=2))
     else:
-        print_report(workloads, nodegroups, nodes_info, recommendation)
+        print_report(workloads, nodegroups, nodes_info, recommendation, headroom)
 
         if detailed:
             print("\n### WORKLOAD DETAILS ###\n")
