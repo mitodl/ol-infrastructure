@@ -355,17 +355,17 @@ def create_mitxonline_k8s_secrets(
 
     digital_credentials_secrets_configs: list[dict[str, Any]] = [
         {
-            "base_name": "digital-credentials",
+            "base_name": "issuer-coordinator",
             "path": "issuer-coordinator",
             "templates": {
                 "VERIFIABLE_CREDENTIAL_BEARER_TOKEN": '{{ get .Secrets "tenant_tokens" "TENANT_TOKEN_DEFAULT" }}',
             },
         },
         {
-            "base_name": "digital-credentials",
+            "base_name": "signing-service",
             "path": "signing-service",
             "templates": {
-                "VERIFIABLE_CREDENTIAL_DID": '{{ get .Secrets "tenants_did_keys" "DEFAULT" }}',
+                "VERIFIABLE_CREDENTIAL_DID": '{{ get .Secrets "tenants_did_keys" "DEFAULT" "publicKeyMultibase" }}',
             },
         },
     ]
