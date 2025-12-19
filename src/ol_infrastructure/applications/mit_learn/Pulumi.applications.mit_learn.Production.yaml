@@ -97,6 +97,7 @@ config:
     POSTHOG_PROJECT_ID: "63497"
     POSTHOG_TIMEOUT_MS: 1000
     QDRANT_HOST: "https://0567dbd5-d68d-4d9e-8c41-954ef5de90ae.us-east-1-0.aws.cloud.qdrant.io"
+    QDRANT_CHUNK_SIZE: 3
     SEE_API_ENABLED: "true"
     SENTRY_PROFILES_SAMPLE_RATE: "0.25"
     SENTRY_TRACES_SAMPLE_RATE: "0.25"
