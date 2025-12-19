@@ -25,6 +25,15 @@ path "secret-mitxonline" {
 path "secret-mitxonline/*" {
   capabilities = ["read"]
 }
+
+# MITXOnline needs access to the DID and bearer tokens for authentication with Digital Credentials services
+path "secret-digital-credentials/data/signing-service" {
+  capabilities = ["read"]
+}
+
+path "secret-digital-credentials/data/issuer-coordinator" {
+  capabilities = ["read"]
+}
 # vault-secrets-operator is a little more particular about
 # managing its own leases, give it the permissions it needs
 # for dynamic secret renwals / revocation without giving
