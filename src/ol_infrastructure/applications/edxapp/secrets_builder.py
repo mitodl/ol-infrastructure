@@ -107,7 +107,6 @@ def _apply_deployment_secret_overrides(
 
     # mitxonline-specific configuration
     if env_prefix == "mitxonline":
-        secrets["GITHUB_ACCESS_TOKEN"] = '{{ get .Secrets "github_access_token" }}'
         secrets["DEEPL_API_KEY"] = '{{ get .Secrets "deepl_api_key" }}'
 
     # xpro and mitx share email configuration
@@ -141,6 +140,8 @@ def _apply_deployment_secret_overrides(
 
     # Always include null backend
     secrets["PROCTORING_BACKENDS"]["null"] = {}
+    # Always include GitHub access token
+    secrets["GITHUB_ACCESS_TOKEN"] = '{{ get .Secrets "github_access_token" }}'
 
     return secrets
 
