@@ -845,7 +845,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
                 attribute_name_map={
-                    "email": "urn:oid:0.9.2342.19200300.100.1.3",
+                    "email": "urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
                     "firstName": "urn:oid:2.5.4.42",
                     "lastName": "urn:oid:2.5.4.4",
                     "fullName": "urn:oid:2.5.4.3",
