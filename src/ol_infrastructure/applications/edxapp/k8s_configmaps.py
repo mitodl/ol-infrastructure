@@ -411,7 +411,6 @@ def create_k8s_configmaps(
     if stack_info.env_prefix in ["mitx", "mitx-staging"]:
         cms_general_config_content["FEATURES"] = {
             "ENABLE_INSTRUCTOR_BACKGROUND_TASKS": True,
-            "ENABLE_NEW_BULK_EMAIL_EXPERIENCE": True,
             "MAX_PROBLEM_RESPONSES_COUNT": 10000,
         }
         cms_general_config_content["SEGMENT_IO"] = False
