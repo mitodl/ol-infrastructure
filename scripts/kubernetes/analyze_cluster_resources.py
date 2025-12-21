@@ -588,17 +588,21 @@ def bin_pack_pods(
     # Packing efficiency: min(CPU util, Memory util) to show bottleneck
     packing_eff = min(avg_cpu_util, avg_mem_util)
 
-    # Fragmentation waste: average wasted space per node (as percentage of available capacity)
-    total_waste = sum(
-        n["cpu"] / available_cpu_per_node + n["memory"] / available_memory_per_node
-        for n in nodes
-        if available_cpu_per_node > 0 and available_memory_per_node > 0
-    )
-    avg_waste_percent = (
-        (total_waste / Decimal(node_count) * Decimal(100))
-        if available_cpu_per_node > 0 and available_memory_per_node > 0
-        else Decimal(0)
-    )
+    # Fragmentation waste: average wasted space per node as percentage of total available capacity
+    # Calculate waste per node as max(CPU waste %, Memory waste %) to show the bottleneck
+    total_waste_percent = Decimal("0")
+
+    if available_cpu_per_node > 0 and available_memory_per_node > 0:
+        for node in nodes:
+            cpu_waste_pct = (node["cpu"] / available_cpu_per_node) * Decimal("100")
+            mem_waste_pct = (node["memory"] / available_memory_per_node) * Decimal(
+                "100"
+            )
+            # Take the maximum waste percentage for this node (bottleneck dimension)
+            total_waste_percent += max(cpu_waste_pct, mem_waste_pct)
+        avg_waste_percent = total_waste_percent / Decimal(node_count)
+    else:
+        avg_waste_percent = Decimal("0")
 
     # Pod fit distribution
     pod_fit: dict[tuple[Decimal, Decimal], int] = {}
@@ -1166,12 +1170,13 @@ def recommend_baseline_nodes(
     for inst_type, capacity in sorted(
         suitable_types.items(), key=lambda x: -x[1].efficiency_score
     ):
-        # Calculate how many nodes needed
+        # Calculate how many nodes needed (ceiling division to ensure capacity)
+        # Use -(-a // b) for ceiling division with Decimal
         nodes_for_cpu = int(
-            (required_cpu_with_headroom / capacity.cpu_cores).to_integral_value()
+            -(-required_cpu_with_headroom / capacity.cpu_cores).to_integral_value()
         )
         nodes_for_memory = int(
-            (required_memory_with_headroom / capacity.memory_gb).to_integral_value()
+            -(-required_memory_with_headroom / capacity.memory_gb).to_integral_value()
         )
 
         # Enforce minimum of 3 nodes for high availability
@@ -1198,19 +1203,23 @@ def recommend_baseline_nodes(
         monthly_cost = hourly_cost * Decimal("730")  # ~730 hours/month
         yearly_cost = monthly_cost * Decimal("12")
 
-        # Scoring: prefer low waste, low cost, newer generations, and fewer nodes
+        # Scoring: prefer fewer nodes, low waste, low cost, and newer generations
         # Penalties (lower is better):
-        #  - waste_penalty: avg_waste percent
-        #  - cost_penalty: hourly_cost (normalized by dividing by 10)
-        #  - node_preference_penalty: nodes_needed (prefer fewer nodes)
+        #  - waste_penalty: avg_waste (multiplied by 2 to heavily penalize waste)
+        #  - node_preference_penalty: nodes_needed (prefer fewer nodes - strongest bias)
+        #  - cost_penalty: hourly_cost (normalized to be comparable)
         #  - generation_bonus: -capacity.generation (newer generations score better)
-        node_preference_penalty = Decimal(nodes_needed) * Decimal("0.1")
+        # Heavily bias toward fewer, larger nodes and lower waste
+        waste_penalty = avg_waste * Decimal("2")  # Penalize waste more heavily
+        node_preference_penalty = Decimal(nodes_needed) * Decimal(
+            "100"
+        )  # Very strong bias for fewer nodes
         cost_penalty = hourly_cost / Decimal("10")  # Normalize cost to be comparable
         generation_bonus = -Decimal(max(capacity.generation, 1)) * Decimal(
             "0.5"
         )  # Newer is better
         config_score = (
-            avg_waste + node_preference_penalty + cost_penalty + generation_bonus
+            waste_penalty + node_preference_penalty + cost_penalty + generation_bonus
         )
 
         config = {
