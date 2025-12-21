@@ -3,15 +3,17 @@
 
 This script:
 1. Enumerates all stable workloads (Deployments, StatefulSets, DaemonSets)
-2. Collects CPU and RAM requests/limits
-3. Aggregates resource requirements
-4. Analyzes current nodegroups and capacity
-5. Recommends optimal baseline node configuration using AWS instance types
-6. Provides bin packing analysis for efficient resource utilization
+2. Collects CPU and RAM requests/limits (static declarations)
+3. Collects actual resource usage over time via kubetop/metrics-server
+4. Aggregates resource requirements and observed usage
+5. Analyzes current nodegroups and capacity
+6. Recommends optimal baseline node configuration using AWS instance types
+7. Provides bin packing analysis for efficient resource utilization
 
 Requirements:
 - kubectl configured and authenticated to cluster
 - AWS CLI configured with credentials
+- metrics-server running in cluster (for kubetop queries)
 - Python 3.13+
 - Libraries: boto3, kubernetes
 """
@@ -41,7 +43,8 @@ MEMORY_UNITS = {
 }
 
 CPU_UNITS = {
-    "m": Decimal("0.001"),
+    "m": Decimal("0.001"),  # millicores
+    "n": Decimal("0.000000001"),  # nanocores
     "": Decimal("1"),  # default is cores
 }
 
@@ -98,6 +101,9 @@ class WorkloadMetrics:
     replicas: int = 1
     requests: ResourceRequest = field(default_factory=ResourceRequest)
     limits: ResourceRequest = field(default_factory=ResourceRequest)
+    actual_usage_avg: ResourceRequest = field(default_factory=ResourceRequest)
+    actual_usage_peak: ResourceRequest = field(default_factory=ResourceRequest)
+    actual_usage_p95: ResourceRequest = field(default_factory=ResourceRequest)
 
     def total_requests(self) -> ResourceRequest:
         """Get total requests across all replicas."""
@@ -112,6 +118,79 @@ class WorkloadMetrics:
             cpu_cores=self.limits.cpu_cores * self.replicas,
             memory_bytes=self.limits.memory_bytes * self.replicas,
         )
+
+    def total_actual_usage_avg(self) -> ResourceRequest:
+        """Get average actual usage across all replicas."""
+        return ResourceRequest(
+            cpu_cores=self.actual_usage_avg.cpu_cores * self.replicas,
+            memory_bytes=self.actual_usage_avg.memory_bytes * self.replicas,
+        )
+
+    def total_actual_usage_peak(self) -> ResourceRequest:
+        """Get peak actual usage across all replicas."""
+        return ResourceRequest(
+            cpu_cores=self.actual_usage_peak.cpu_cores * self.replicas,
+            memory_bytes=self.actual_usage_peak.memory_bytes * self.replicas,
+        )
+
+    def total_actual_usage_p95(self) -> ResourceRequest:
+        """Get 95th percentile actual usage across all replicas."""
+        return ResourceRequest(
+            cpu_cores=self.actual_usage_p95.cpu_cores * self.replicas,
+            memory_bytes=self.actual_usage_p95.memory_bytes * self.replicas,
+        )
+
+
+@dataclass
+class PodResourceProfile:
+    """Profile of pod resource requirements (atomic unit)."""
+
+    namespace: str
+    workload_name: str
+    workload_kind: str
+    pod_count: int  # Number of pods with this profile
+    cpu_cores: Decimal
+    memory_bytes: Decimal
+
+    def total_cpu(self) -> Decimal:
+        """Total CPU for all pods with this profile."""
+        return self.cpu_cores * self.pod_count
+
+    def total_memory(self) -> Decimal:
+        """Total memory for all pods with this profile."""
+        return self.memory_bytes * self.pod_count
+
+    def __hash__(self) -> int:
+        """Make hashable for deduplication."""
+        return hash((self.cpu_cores, self.memory_bytes))
+
+    def __eq__(self, other: object) -> bool:
+        """Compare by resource requirements."""
+        if not isinstance(other, PodResourceProfile):
+            return NotImplemented
+        return (
+            self.cpu_cores == other.cpu_cores
+            and self.memory_bytes == other.memory_bytes
+        )
+
+
+@dataclass
+class BinPackingResult:
+    """Result of bin-packing analysis for an instance type."""
+
+    instance_type: str
+    cpu_cores: Decimal
+    memory_gb: Decimal
+    node_count: int
+    pod_fit: dict[tuple[Decimal, Decimal], int]  # (cpu, mem) -> pods per node
+    packing_efficiency: Decimal  # 0-100, higher is better
+    cpu_utilization: Decimal  # Average CPU utilization per node
+    memory_utilization: Decimal  # Average memory utilization per node
+    fragmentation_waste: Decimal  # Wasted space due to poor packing
+
+    def total_hourly_cost(self, price_per_hour: Decimal) -> Decimal:
+        """Calculate hourly cost."""
+        return price_per_hour * Decimal(self.node_count)
 
 
 @dataclass
@@ -200,9 +279,28 @@ def parse_cpu_quantity(cpu_str: str | None) -> Decimal:
         return Decimal("0")
 
     cpu_str = cpu_str.strip()
-    if cpu_str.endswith("m"):
-        return Decimal(cpu_str[:-1]) / Decimal("1000")
-    return Decimal(cpu_str)
+
+    # Check for known CPU units in order of specificity (longest first)
+    for unit, multiplier in sorted(CPU_UNITS.items(), key=lambda x: -len(x[0])):
+        if unit and cpu_str.endswith(unit):
+            try:
+                return Decimal(cpu_str[: -len(unit)]) * multiplier
+            except Exception as e:
+                print(
+                    f"Warning: Failed to parse CPU quantity {cpu_str}: {e}",
+                    file=sys.stderr,
+                )
+                return Decimal("0")
+
+    # Default case: no unit suffix, interpret as cores
+    try:
+        return Decimal(cpu_str)
+    except Exception as e:
+        print(
+            f"Warning: Failed to parse CPU quantity {cpu_str}: {e}",
+            file=sys.stderr,
+        )
+        return Decimal("0")
 
 
 def parse_memory_quantity(mem_str: str | None) -> Decimal:
@@ -224,6 +322,309 @@ def parse_memory_quantity(mem_str: str | None) -> Decimal:
                 continue
 
     return Decimal("0")
+
+
+def get_pod_metrics(
+    api_instance: client.CustomObjectsApi, namespace: str
+) -> dict[str, dict[str, ResourceRequest]]:
+    """Get actual resource usage metrics for pods in a namespace via metrics-server.
+
+    Returns dict mapping pod name to {avg, peak, p95} ResourceRequest.
+    """
+    pod_metrics: dict[str, dict[str, ResourceRequest]] = {}
+
+    try:
+        metrics = api_instance.list_namespaced_custom_object(
+            group="metrics.k8s.io",
+            version="v1beta1",
+            namespace=namespace,
+            plural="pods",
+        )
+
+        for item in metrics.get("items", []):
+            pod_name = item["metadata"]["name"]
+            containers = item.get("containers", [])
+
+            # Aggregate metrics across all containers in the pod
+            total_cpu = Decimal("0")
+            total_memory = Decimal("0")
+
+            for container in containers:
+                if "usage" in container:
+                    usage = container["usage"]
+                    cpu_str = usage.get("cpu", "0")
+                    memory_str = usage.get("memory", "0")
+
+                    total_cpu += parse_cpu_quantity(cpu_str)
+                    total_memory += parse_memory_quantity(memory_str)
+
+            if total_cpu > 0 or total_memory > 0:
+                pod_metrics[pod_name] = {
+                    "current": ResourceRequest(
+                        cpu_cores=total_cpu,
+                        memory_bytes=total_memory,
+                    )
+                }
+
+    except client.exceptions.ApiException as e:
+        if (
+            e.status != 404
+        ):  # 404 means metrics not available (OK if metrics-server not installed)
+            print(
+                f"Warning: Could not fetch pod metrics for {namespace}: {e}",
+                file=sys.stderr,
+            )
+
+    return pod_metrics
+
+
+def aggregate_pod_metrics(
+    workloads: list[WorkloadMetrics],
+    pod_metrics_by_namespace: dict[str, dict[str, dict[str, ResourceRequest]]],
+) -> None:
+    """Aggregate pod metrics into workload metrics.
+
+    For each workload, collects metrics from its pods and calculates avg, peak, p95.
+    Updates WorkloadMetrics in-place.
+    """
+    for workload in workloads:
+        namespace = workload.namespace
+        pod_metrics = pod_metrics_by_namespace.get(namespace, {})
+
+        # Try to find pods matching this workload
+        # This is a heuristic: pods created by Deployments/StatefulSets have names like "name-<random>"
+        matching_pods = []
+        for pod_name, metrics in pod_metrics.items():
+            # Check if pod name starts with workload name
+            if pod_name.startswith(workload.name + "-"):
+                matching_pods.append(metrics.get("current", ResourceRequest()))
+
+        if matching_pods:
+            # Calculate statistics
+            avg_cpu = sum(m.cpu_cores for m in matching_pods) / Decimal(
+                len(matching_pods)
+            )
+            avg_memory = sum(m.memory_bytes for m in matching_pods) / Decimal(
+                len(matching_pods)
+            )
+            peak_cpu = max(m.cpu_cores for m in matching_pods)
+            peak_memory = max(m.memory_bytes for m in matching_pods)
+
+            # Simple p95: sort and take 95th percentile
+            sorted_cpu = sorted([m.cpu_cores for m in matching_pods])
+            sorted_memory = sorted([m.memory_bytes for m in matching_pods])
+            p95_idx = max(0, int(len(matching_pods) * 0.95) - 1)
+            p95_cpu = sorted_cpu[p95_idx] if sorted_cpu else Decimal("0")
+            p95_memory = sorted_memory[p95_idx] if sorted_memory else Decimal("0")
+
+            workload.actual_usage_avg = ResourceRequest(
+                cpu_cores=avg_cpu,
+                memory_bytes=avg_memory,
+            )
+            workload.actual_usage_peak = ResourceRequest(
+                cpu_cores=peak_cpu,
+                memory_bytes=peak_memory,
+            )
+            workload.actual_usage_p95 = ResourceRequest(
+                cpu_cores=p95_cpu,
+                memory_bytes=p95_memory,
+            )
+
+
+def extract_pod_profiles(
+    workloads: list[WorkloadMetrics],
+) -> tuple[list[PodResourceProfile], ResourceRequest]:
+    """Extract atomic pod resource profiles from workloads.
+
+    Groups pods by their resource requirements (atomic units).
+    Deduplicates profiles where the same pod type appears in multiple workloads.
+
+    Returns:
+        (profiles, daemonset_reserved_per_node) - Pod profiles list and per-node DaemonSet resource reservation
+    """
+    profiles: dict[tuple[Decimal, Decimal], PodResourceProfile] = {}
+    daemonset_reserved = ResourceRequest()
+
+    for wl in workloads:
+        # Skip workloads with zero requests
+        if wl.requests.cpu_cores == 0 and wl.requests.memory_bytes == 0:
+            continue
+
+        key = (wl.requests.cpu_cores, wl.requests.memory_bytes)
+
+        # DaemonSets reserve resources on EVERY node, not as a pool
+        if wl.kind == WorkloadType.DAEMONSET.value:
+            daemonset_reserved += wl.requests
+            # Don't add DaemonSets to regular pod profiles for bin-packing
+            # since they're handled separately as per-node reservations
+            continue
+
+        if key not in profiles:
+            profiles[key] = PodResourceProfile(
+                namespace=wl.namespace,
+                workload_name=wl.name,
+                workload_kind=wl.kind,
+                pod_count=wl.replicas,
+                cpu_cores=wl.requests.cpu_cores,
+                memory_bytes=wl.requests.memory_bytes,
+            )
+        else:
+            # Aggregate pod count for duplicate profiles
+            profiles[key].pod_count += wl.replicas
+
+    pod_list = sorted(
+        profiles.values(),
+        key=lambda p: (-p.total_cpu(), -p.total_memory()),  # Largest first
+    )
+
+    return pod_list, daemonset_reserved
+
+
+def bin_pack_pods(
+    pod_profiles: list[PodResourceProfile],
+    instance_type: str,
+    instance_cpu: Decimal,
+    instance_memory_gb: Decimal,
+    daemonset_reserved: ResourceRequest | None = None,
+) -> BinPackingResult:
+    """Perform first-fit decreasing bin packing analysis.
+
+    Simulates packing pods onto nodes of a given instance type.
+    Accounts for per-node DaemonSet resource reservations.
+    Returns packing efficiency and fragmentation metrics.
+
+    Args:
+        pod_profiles: List of pod resource profiles to pack
+        instance_type: Name of the instance type
+        instance_cpu: CPU cores per instance
+        instance_memory_gb: Memory GB per instance
+        daemonset_reserved: Per-node resource reservation for DaemonSets
+    """
+    instance_memory_bytes = instance_memory_gb * Decimal("1024") ** 3
+
+    # Account for per-node DaemonSet reservations
+    if daemonset_reserved is None:
+        daemonset_reserved = ResourceRequest()
+
+    available_cpu_per_node = instance_cpu - daemonset_reserved.cpu_cores
+    available_memory_per_node = instance_memory_bytes - daemonset_reserved.memory_bytes
+
+    # Track remaining space on each node
+    nodes: list[dict[str, Decimal | int]] = []
+
+    # Remaining pods to place
+    remaining_pods = {(p.cpu_cores, p.memory_bytes): p.pod_count for p in pod_profiles}
+
+    # First-fit decreasing: try to fit largest pods first
+    for profile in pod_profiles:
+        pod_cpu = profile.cpu_cores
+        pod_mem = profile.memory_bytes
+        pods_to_place = remaining_pods.get((pod_cpu, pod_mem), 0)
+
+        while pods_to_place > 0:
+            # Find a node with enough space
+            placed = False
+
+            for node in nodes:
+                if node["cpu"] >= pod_cpu and node["memory"] >= pod_mem:
+                    node["cpu"] -= pod_cpu
+                    node["memory"] -= pod_mem
+                    node["pod_count"] += 1
+                    pods_to_place -= 1
+                    placed = True
+                    break
+
+            # If no node has space, create a new one
+            if not placed:
+                nodes.append(
+                    {
+                        "cpu": available_cpu_per_node - pod_cpu,
+                        "memory": available_memory_per_node - pod_mem,
+                        "pod_count": 1,
+                    }
+                )
+                pods_to_place -= 1
+
+    # Calculate metrics
+    node_count = len(nodes)
+
+    if node_count == 0:
+        return BinPackingResult(
+            instance_type=instance_type,
+            cpu_cores=instance_cpu,
+            memory_gb=instance_memory_gb,
+            node_count=0,
+            pod_fit={},
+            packing_efficiency=Decimal("0"),
+            cpu_utilization=Decimal("0"),
+            memory_utilization=Decimal("0"),
+            fragmentation_waste=Decimal("0"),
+        )
+
+    # Calculate utilization
+    # Total used = (instance capacity - remaining space) per node
+    total_cpu_used = available_cpu_per_node * Decimal(node_count) - sum(
+        n["cpu"] for n in nodes
+    )
+    total_memory_used = available_memory_per_node * Decimal(node_count) - sum(
+        n["memory"] for n in nodes
+    )
+
+    # Utilization is calculated against available capacity (excluding DaemonSet reservations)
+    avg_cpu_util = (
+        (total_cpu_used / (available_cpu_per_node * Decimal(node_count))) * Decimal(100)
+        if available_cpu_per_node > 0
+        else Decimal(0)
+    )
+    avg_mem_util = (
+        (
+            (total_memory_used / (available_memory_per_node * Decimal(node_count)))
+            * Decimal(100)
+        )
+        if available_memory_per_node > 0
+        else Decimal(0)
+    )
+
+    # Packing efficiency: min(CPU util, Memory util) to show bottleneck
+    packing_eff = min(avg_cpu_util, avg_mem_util)
+
+    # Fragmentation waste: average wasted space per node (as percentage of available capacity)
+    total_waste = sum(
+        n["cpu"] / available_cpu_per_node + n["memory"] / available_memory_per_node
+        for n in nodes
+        if available_cpu_per_node > 0 and available_memory_per_node > 0
+    )
+    avg_waste_percent = (
+        (total_waste / Decimal(node_count) * Decimal(100))
+        if available_cpu_per_node > 0 and available_memory_per_node > 0
+        else Decimal(0)
+    )
+
+    # Pod fit distribution
+    pod_fit: dict[tuple[Decimal, Decimal], int] = {}
+    for profile in pod_profiles:
+        # Count how many of this profile fit per node
+        pods_per_node = 0
+        for node in nodes:
+            if (
+                available_cpu_per_node - node["cpu"] >= profile.cpu_cores
+                and available_memory_per_node - node["memory"] >= profile.memory_bytes
+            ):
+                pods_per_node += 1
+        if pods_per_node > 0:
+            pod_fit[(profile.cpu_cores, profile.memory_bytes)] = pods_per_node
+
+    return BinPackingResult(
+        instance_type=instance_type,
+        cpu_cores=instance_cpu,
+        memory_gb=instance_memory_gb,
+        node_count=node_count,
+        pod_fit=pod_fit,
+        packing_efficiency=packing_eff,
+        cpu_utilization=avg_cpu_util,
+        memory_utilization=avg_mem_util,
+        fragmentation_waste=avg_waste_percent,
+    )
 
 
 def get_workload_metrics(api_instance: client.AppsV1Api) -> list[WorkloadMetrics]:
@@ -665,6 +1066,67 @@ def get_instance_pricing_fallback(
         )
 
 
+def recommend_with_bin_packing(
+    pod_profiles: list[PodResourceProfile],
+    instance_types: dict[str, InstanceTypeCapacity],
+    headroom_percentage: int = DEFAULT_HEADROOM_PERCENTAGE,  # noqa: ARG001
+    daemonset_reserved: ResourceRequest | None = None,
+) -> list[tuple[BinPackingResult, Decimal]]:
+    """Recommend instance types optimized for bin-packing efficiency.
+
+    Performs bin-packing analysis on each instance type and ranks by packing efficiency.
+    Accounts for per-node DaemonSet resource reservations.
+    Returns sorted list of (BinPackingResult, monthly_cost) tuples.
+
+    Args:
+        pod_profiles: List of pod resource profiles to pack
+        instance_types: Available AWS instance types
+        headroom_percentage: Headroom percentage for autoscaling
+        daemonset_reserved: Per-node resource reservation for DaemonSets
+    """
+    results: list[tuple[BinPackingResult, Decimal]] = []
+
+    # Filter for general purpose instances
+    suitable_types = {
+        k: v
+        for k, v in instance_types.items()
+        if any(
+            prefix in k for prefix in ["t3", "t4", "m5", "m6", "m7", "c5", "c6", "c7"]
+        )
+    }
+
+    if not suitable_types:
+        suitable_types = instance_types
+
+    for inst_type, capacity in suitable_types.items():
+        # Perform bin-packing simulation with DaemonSet reservation
+        bin_result = bin_pack_pods(
+            pod_profiles,
+            inst_type,
+            capacity.cpu_cores,
+            capacity.memory_gb,
+            daemonset_reserved=daemonset_reserved,
+        )
+
+        # Enforce minimum 3 nodes for HA
+        final_node_count = max(bin_result.node_count, 3)
+
+        # Scale up nodes if we've enforced the minimum
+        if final_node_count > bin_result.node_count:
+            bin_result.node_count = final_node_count
+
+        # Calculate cost
+        hourly_cost = capacity.price_per_hour * Decimal(final_node_count)
+        monthly_cost = hourly_cost * Decimal("730")
+
+        results.append((bin_result, monthly_cost))
+
+    # Sort by packing efficiency (higher is better), then by cost
+    results.sort(key=lambda x: (-x[0].packing_efficiency, x[1]))
+
+    return results
+
+
 def recommend_baseline_nodes(
     required_cpu: Decimal,
     required_memory_gb: Decimal,
@@ -810,12 +1272,72 @@ def recommend_baseline_nodes(
     }
 
 
+def print_bin_packing_analysis(
+    pod_profiles: list[PodResourceProfile],
+    bin_packing_results: list[tuple[BinPackingResult, Decimal]],
+    daemonset_reserved: ResourceRequest | None = None,
+) -> None:
+    """Print bin-packing analysis report.
+
+    Args:
+        pod_profiles: Pod resource profiles
+        bin_packing_results: Bin-packing results for each instance type
+        daemonset_reserved: Per-node DaemonSet resource reservation
+    """
+    print("\n### BIN-PACKING ANALYSIS (Atomic Pod Units) ###\n")
+    print(f"Unique pod resource profiles: {len(pod_profiles)}")
+    print(f"Total pods: {sum(p.pod_count for p in pod_profiles)}")
+
+    # Show DaemonSet reservations if present
+    if daemonset_reserved and (
+        daemonset_reserved.cpu_cores > 0 or daemonset_reserved.memory_bytes > 0
+    ):
+        ds_cpu = float(daemonset_reserved.cpu_cores)
+        ds_mem = float(daemonset_reserved.memory_bytes / (1024**3))
+        print(f"\nPer-node DaemonSet Reservation: {ds_cpu:.3f} CPU, {ds_mem:.2f} GB")
+        print(
+            "  (This capacity is reserved on every node and not available for regular workloads)"
+        )
+
+    print("\nPod Profiles (sorted by resource requirement):")
+    for profile in pod_profiles:
+        print(
+            f"  {profile.workload_name} ({profile.workload_kind}): "
+            f"{profile.pod_count} pods x {float(profile.cpu_cores):.3f}C {float(profile.memory_bytes / (1024**3)):.2f}GB"
+        )
+
+    print("\n### BIN-PACKING EFFICIENCY RANKINGS ###\n")
+    for i, (bin_result, monthly_cost) in enumerate(bin_packing_results[:10], 1):
+        print(f"{i}. {bin_result.instance_type}")
+        print(
+            f"   Instance: {float(bin_result.cpu_cores):.0f}C {float(bin_result.memory_gb):.0f}GB"
+        )
+        print(f"   Nodes needed: {bin_result.node_count}")
+        print(f"   Packing efficiency: {float(bin_result.packing_efficiency):.1f}%")
+        print(f"   CPU utilization: {float(bin_result.cpu_utilization):.1f}%")
+        print(f"   Memory utilization: {float(bin_result.memory_utilization):.1f}%")
+        print(f"   Fragmentation waste: {float(bin_result.fragmentation_waste):.1f}%")
+        print(f"   Monthly cost: ${float(monthly_cost):.2f}")
+
+        # Show pod fit distribution
+        if bin_result.pod_fit:
+            print("   Pod fit per node:")
+            for (cpu, mem), count in sorted(bin_result.pod_fit.items()):
+                print(
+                    f"     {float(cpu):.3f}C {float(mem / (1024**3)):.2f}GB → {count} pods/node"
+                )
+        print()
+
+
 def print_report(
     workloads: list[WorkloadMetrics],
     nodegroups: list[NodeGroupMetrics],
     nodes_info: dict[str, dict[str, Any]],
     recommendation: dict[str, Any],
+    pod_profiles: list[PodResourceProfile] | None = None,
+    bin_packing_results: list[tuple[BinPackingResult, Decimal]] | None = None,
     headroom_percentage: int = DEFAULT_HEADROOM_PERCENTAGE,
+    daemonset_reserved: ResourceRequest | None = None,
 ):
     """Print analysis report."""
     print("\n" + "=" * 80)
@@ -831,12 +1353,38 @@ def print_report(
 
     print("\n### WORKLOAD SUMMARY ###\n")
     print(f"Total workloads: {len(workloads)}")
-    print("\nAggregated Requests:")
+    print("\nAggregated Requests (declared):")
     for key, value in total_requests.to_human_readable().items():
         print(f"  {key}: {value}")
-    print("\nAggregated Limits:")
+    print("\nAggregated Limits (declared):")
     for key, value in total_limits.to_human_readable().items():
         print(f"  {key}: {value}")
+
+    # Show actual usage metrics if available
+    total_actual_avg = sum(
+        (wl.total_actual_usage_avg() for wl in workloads),
+        ResourceRequest(),
+    )
+    total_actual_peak = sum(
+        (wl.total_actual_usage_peak() for wl in workloads),
+        ResourceRequest(),
+    )
+    total_actual_p95 = sum(
+        (wl.total_actual_usage_p95() for wl in workloads),
+        ResourceRequest(),
+    )
+
+    if total_actual_avg.cpu_cores > 0 or total_actual_avg.memory_bytes > 0:
+        print("\nActual Usage (observed via metrics-server):")
+        print(
+            f"  Average: {float(total_actual_avg.cpu_cores):.3f} CPU, {float(total_actual_avg.memory_bytes / (1024**3)):.2f} GB"
+        )
+        print(
+            f"  Peak:    {float(total_actual_peak.cpu_cores):.3f} CPU, {float(total_actual_peak.memory_bytes / (1024**3)):.2f} GB"
+        )
+        print(
+            f"  P95:     {float(total_actual_p95.cpu_cores):.3f} CPU, {float(total_actual_p95.memory_bytes / (1024**3)):.2f} GB"
+        )
 
     print("\n### WORKLOAD BREAKDOWN ###\n")
     workload_by_type: dict[str, ResourceRequest] = defaultdict(
@@ -892,6 +1440,12 @@ def print_report(
         print(f"  Total Allocatable CPU: {float(total_node_cpu):.1f} cores")
         print(
             f"  Total Allocatable Memory: {float(total_node_memory / (1024**3)):.2f} GB"
+        )
+
+    # Print bin-packing analysis if available
+    if pod_profiles and bin_packing_results:
+        print_bin_packing_analysis(
+            pod_profiles, bin_packing_results, daemonset_reserved
         )
 
     print("\n### BASELINE NODE RECOMMENDATION ###\n")
@@ -951,6 +1505,7 @@ def main(
     headroom: int = DEFAULT_HEADROOM_PERCENTAGE,
     json_output: bool = False,
     detailed: bool = False,
+    use_actual_usage: bool = False,
 ) -> None:
     """Analyze Kubernetes cluster resources and recommend baseline nodes.
 
@@ -962,6 +1517,7 @@ def main(
         headroom: Headroom percentage for autoscaling (default: 20%).
         json_output: Output results as JSON.
         detailed: Show detailed breakdown of each workload.
+        use_actual_usage: Use actual observed usage (via metrics-server) instead of declared requests for recommendations.
     """
     try:
         # Resolve context: use explicit context if provided, otherwise use cluster_name
@@ -990,10 +1546,36 @@ def main(
     # Create API clients
     apps_api = client.AppsV1Api()
     core_api = client.CoreV1Api()
+    custom_api = client.CustomObjectsApi()
 
     # Collect data
     print("Collecting workload metrics...", file=sys.stderr)
     workloads = get_workload_metrics(apps_api)
+
+    # Attempt to collect actual usage metrics from metrics-server
+    print("Collecting actual resource usage (via metrics-server)...", file=sys.stderr)
+    pod_metrics_by_namespace: dict[str, dict[str, dict[str, ResourceRequest]]] = {}
+    namespaces_to_check = {wl.namespace for wl in workloads}
+
+    metrics_available = False
+    for namespace in sorted(namespaces_to_check):
+        pod_metrics = get_pod_metrics(custom_api, namespace)
+        if pod_metrics:
+            pod_metrics_by_namespace[namespace] = pod_metrics
+            metrics_available = True
+            print(
+                f"  Found metrics for {len(pod_metrics)} pods in {namespace}",
+                file=sys.stderr,
+            )
+
+    if metrics_available:
+        print("Aggregating pod metrics into workloads...", file=sys.stderr)
+        aggregate_pod_metrics(workloads, pod_metrics_by_namespace)
+    else:
+        print(
+            "Warning: No metrics data found. Ensure metrics-server is installed and running.",
+            file=sys.stderr,
+        )
 
     print("Collecting node metrics...", file=sys.stderr)
     nodes_info = get_node_metrics(core_api)
@@ -1033,17 +1615,58 @@ def main(
         )
 
     # Calculate recommendation
-    total_requests = sum(
-        (wl.total_requests() for wl in workloads),
-        ResourceRequest(),
-    )
-    required_cpu = total_requests.cpu_cores
-    required_memory_gb = total_requests.memory_bytes / Decimal("1024") ** 3
+    # Use actual usage if available and requested, otherwise fall back to declared requests
+    if use_actual_usage and metrics_available:
+        total_usage = sum(
+            (wl.total_actual_usage_p95() for wl in workloads),
+            ResourceRequest(),
+        )
+        required_cpu = total_usage.cpu_cores
+        required_memory_gb = total_usage.memory_bytes / Decimal("1024") ** 3
+        print(
+            "Using 95th percentile actual usage for recommendations",
+            file=sys.stderr,
+        )
+    else:
+        if use_actual_usage and not metrics_available:
+            print(
+                "Warning: --use-actual-usage requested but metrics not available, falling back to declared requests",
+                file=sys.stderr,
+            )
+        total_requests = sum(
+            (wl.total_requests() for wl in workloads),
+            ResourceRequest(),
+        )
+        required_cpu = total_requests.cpu_cores
+        required_memory_gb = total_requests.memory_bytes / Decimal("1024") ** 3
 
     print("Calculating recommendations...", file=sys.stderr)
     recommendation = recommend_baseline_nodes(
         required_cpu, required_memory_gb, instance_types, headroom
     )
+
+    # Perform bin-packing analysis for atomic pod units
+    print("Analyzing bin-packing efficiency for atomic pod units...", file=sys.stderr)
+    pod_profiles, daemonset_reserved = extract_pod_profiles(workloads)
+
+    # Log DaemonSet resource reservations
+    if daemonset_reserved.cpu_cores > 0 or daemonset_reserved.memory_bytes > 0:
+        ds_cpu = float(daemonset_reserved.cpu_cores)
+        ds_mem = float(daemonset_reserved.memory_bytes / (1024**3))
+        print(
+            f"  DaemonSet per-node reservation: {ds_cpu:.3f} CPU, {ds_mem:.2f} GB",
+            file=sys.stderr,
+        )
+
+    bin_packing_results: list[tuple[BinPackingResult, Decimal]] | None = None
+    if pod_profiles:
+        bin_packing_results = recommend_with_bin_packing(
+            pod_profiles, instance_types, headroom, daemonset_reserved
+        )
+        print(
+            f"  Found {len(pod_profiles)} unique pod resource profiles (DaemonSets handled separately)",
+            file=sys.stderr,
+        )
 
     # Debug recommended instance type if it has no pricing
     recommended_type = recommendation.get("recommended", {}).get("instance_type")
@@ -1058,12 +1681,37 @@ def main(
             debug_instance_type_pricing(recommended_type, instance_types)
 
     if json_output:
+        # Prepare usage metrics for JSON output
+        total_actual_avg = sum(
+            (wl.total_actual_usage_avg() for wl in workloads),
+            ResourceRequest(),
+        )
+        total_actual_peak = sum(
+            (wl.total_actual_usage_peak() for wl in workloads),
+            ResourceRequest(),
+        )
+        total_actual_p95 = sum(
+            (wl.total_actual_usage_p95() for wl in workloads),
+            ResourceRequest(),
+        )
+
         result = {
             "cluster": cluster_name,
             "region": region,
             "workload_count": len(workloads),
-            "total_cpu_cores": float(required_cpu),
-            "total_memory_gb": float(required_memory_gb),
+            "metrics_available": metrics_available,
+            "declared_resources": {
+                "total_cpu_cores": float(required_cpu),
+                "total_memory_gb": float(required_memory_gb),
+            },
+            "actual_usage": {
+                "average_cpu_cores": float(total_actual_avg.cpu_cores),
+                "average_memory_gb": float(total_actual_avg.memory_bytes / (1024**3)),
+                "peak_cpu_cores": float(total_actual_peak.cpu_cores),
+                "peak_memory_gb": float(total_actual_peak.memory_bytes / (1024**3)),
+                "p95_cpu_cores": float(total_actual_p95.cpu_cores),
+                "p95_memory_gb": float(total_actual_p95.memory_bytes / (1024**3)),
+            },
             "nodegroups": [
                 {
                     "name": ng.name,
@@ -1080,7 +1728,16 @@ def main(
         }
         print(json.dumps(result, indent=2))
     else:
-        print_report(workloads, nodegroups, nodes_info, recommendation, headroom)
+        print_report(
+            workloads,
+            nodegroups,
+            nodes_info,
+            recommendation,
+            pod_profiles if pod_profiles else None,
+            bin_packing_results if bin_packing_results else None,
+            headroom,
+            daemonset_reserved,
+        )
 
         if detailed:
             print("\n### WORKLOAD DETAILS ###\n")
@@ -1088,12 +1745,27 @@ def main(
                 workloads, key=lambda x: (-x.total_requests().cpu_cores, x.name)
             ):
                 req = wl.total_requests()
+                avg = wl.total_actual_usage_avg()
+                peak = wl.total_actual_usage_peak()
+                p95 = wl.total_actual_usage_p95()
+
                 print(f"{wl.namespace}/{wl.name} ({wl.kind})")
                 print(f"  Replicas: {wl.replicas}")
                 print(
-                    f"  CPU: {float(req.cpu_cores):.3f} cores ({int(req.cpu_cores * 1000)}m)"
+                    f"  Declared Requests - CPU: {float(req.cpu_cores):.3f} cores ({int(req.cpu_cores * 1000)}m), Memory: {float(req.memory_bytes / (1024**3)):.2f} GB"
                 )
-                print(f"  Memory: {float(req.memory_bytes / (1024**3)):.2f} GB")
+
+                if avg.cpu_cores > 0 or avg.memory_bytes > 0:
+                    print("  Actual Usage:")
+                    print(
+                        f"    Average - CPU: {float(avg.cpu_cores):.3f} cores, Memory: {float(avg.memory_bytes / (1024**3)):.2f} GB"
+                    )
+                    print(
+                        f"    Peak    - CPU: {float(peak.cpu_cores):.3f} cores, Memory: {float(peak.memory_bytes / (1024**3)):.2f} GB"
+                    )
+                    print(
+                        f"    P95     - CPU: {float(p95.cpu_cores):.3f} cores, Memory: {float(p95.memory_bytes / (1024**3)):.2f} GB"
+                    )
 
 
 if __name__ == "__main__":
