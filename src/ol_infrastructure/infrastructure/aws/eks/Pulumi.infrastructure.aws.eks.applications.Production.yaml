@@ -60,17 +60,17 @@ config:
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 1000
-      instance_type: m7i.2xlarge
+      instance_type: m7a.4xlarge
       labels:
-        node_size: m7i.2xlarge
+        node_size: m7a.4xlarge
         ondemand: true
         ol.mit.edu/core_node: true
         ol.mit.edu/gpu_node: false
       node_group_options: {}
       scaling:
-        desired: 4
+        desired: 3
         max: 8
-        min: 4
+        min: 3
       tags:
         cluster: applications-production
       taints: {}
