@@ -89,6 +89,7 @@ config:
   vault_server:env_namespace: operations.ci
   edxapp:enable_xqueue: true
   edxapp:xqueue_domain: xqueue.mitxonline.ci.odl.mit.edu
+  edxapp:enable_auto_language_selection: true
   edxapp:framework: "earthly"
   edxapp:min_web_nodes: "1"
   edxapp:min_worker_nodes: "1"
