@@ -107,13 +107,13 @@ config:
       lms:
         cpu_request: "250m"
         memory_request: "2Gi"
-        memory_limit: "2Gi"
+        memory_limit: "4Gi"
       cms:
         cpu_request: "250m"
         memory_request: "2Gi"
-        memory_limit: "2Gi"
-  edxapp:k8s_deployment: "true"
-  edxapp:k8s_cutover: "true"
-  edxapp:disable_ec2_deployment: "true"
+        memory_limit: "4Gi"
+  edxapp:k8s_deployment: true
+  edxapp:k8s_cutover: true
+  edxapp:disable_ec2_deployment: true
   edxapp:k8s_vpc: residential_mitx_vpc
   edxapp:canvas_base_url: https://canvas.mit.edu
