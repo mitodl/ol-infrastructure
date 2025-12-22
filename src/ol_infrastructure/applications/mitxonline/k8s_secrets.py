@@ -358,14 +358,14 @@ def create_mitxonline_k8s_secrets(
             "base_name": "issuer-coordinator",
             "path": "issuer-coordinator",
             "templates": {
-                "VERIFIABLE_CREDENTIAL_BEARER_TOKEN": '{{ get .Secrets "tenant_tokens.TENANT_TOKEN_DEFAULT" }}',
+                "VERIFIABLE_CREDENTIAL_BEARER_TOKEN": '{{ get (get .Secrets "tenant_tokens") "TENANT_TOKEN_DEFAULT" }}',
             },
         },
         {
             "base_name": "signing-service",
             "path": "signing-service",
             "templates": {
-                "VERIFIABLE_CREDENTIAL_DID": '{{ get .Secrets "tenants_did_keys.DEFAULT.keyPair.publicKeyMultibase" }}',
+                "VERIFIABLE_CREDENTIAL_DID": '{{ $json := get (get .Secrets "tenants_did_keys") "DEFAULT" | fromJson }}{{ get (get $json "keyPair") "publicKeyMultibase" }}',
             },
         },
     ]
@@ -376,6 +376,7 @@ def create_mitxonline_k8s_secrets(
             namespace=mitxonline_namespace,
             labels=k8s_global_labels,
             mount="secret-digital-credentials",
+            mount_type="kv-v2",
             path=config["path"],
             templates=config["templates"],
             vaultauth=vaultauth,
