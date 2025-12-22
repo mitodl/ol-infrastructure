@@ -186,7 +186,7 @@ const AutoSelectLanguage = () => {
   }
 
   async function fetchCourseLanguage(courseKey) {
-    const url = `${lmsBaseURL}/api/ol-openedx-course-translations/course-language/${courseKey}`;
+    const url = `${lmsBaseURL}/course-translations/api/course-language/${courseKey}`;
     try {
       const { data } = await getAuthenticatedHttpClient().get(url);
       return data?.language;
