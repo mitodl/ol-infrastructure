@@ -753,6 +753,15 @@ edxapp_notes_vault_auth_role = vault.aws.AuthBackendRole(
 ##########################
 #     Database Setup     #
 ##########################
+if (
+    edxapp_config.get_bool("k8s_deployment")
+    and edxapp_config.get_bool("k8s_cutover")
+    and edxapp_config.get_bool("disable_ec2_deployment")
+):
+    rds_subnet = k8s_vpc["rds_subnet"]
+else:
+    rds_subnet = edxapp_vpc["rds_subnet"]
+
 rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["instance_size"] = (
     edxapp_config.get("db_instance_size") or rds_defaults["instance_size"]
@@ -760,7 +769,7 @@ rds_defaults["instance_size"] = (
 edxapp_db_config = OLMariaDBConfig(
     instance_name=f"edxapp-db-{env_name}",
     password=edxapp_config.require("db_password"),
-    subnet_group_name=edxapp_vpc["rds_subnet"],
+    subnet_group_name=rds_subnet,
     security_groups=[edxapp_db_security_group],
     engine_major_version=edxapp_config.get("db_version") or "11.8",
     tags=aws_config.tags,
