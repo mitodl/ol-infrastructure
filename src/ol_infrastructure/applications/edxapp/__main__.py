@@ -201,6 +201,19 @@ mongodb_cluster_uri = mongodb_atlas_stack.require_output("atlas_cluster")[
     "connection_strings"
 ][0]
 
+if (
+    edxapp_config.get_bool("k8s_deployment")
+    and edxapp_config.get_bool("k8s_cutover")
+    and edxapp_config.get_bool("disable_ec2_deployment")
+):
+    rds_subnet = k8s_vpc["rds_subnet"]
+    db_secgroup_vpc_id = k8s_vpc["id"]
+    cache_subnet_group = k8s_vpc["elasticache_subnet"]
+else:
+    rds_subnet = edxapp_vpc["rds_subnet"]
+    db_secgroup_vpc_id = edxapp_vpc_id
+    cache_subnet_group = edxapp_vpc["elasticache_subnet"]
+
 
 ##############
 # Helper for creating user_data
@@ -643,7 +656,7 @@ edxapp_db_security_group = ec2.SecurityGroup(
         ),
     ],
     tags=aws_config.tags,
-    vpc_id=edxapp_vpc_id,
+    vpc_id=db_secgroup_vpc_id,
 )
 
 ######################
@@ -753,15 +766,6 @@ edxapp_notes_vault_auth_role = vault.aws.AuthBackendRole(
 ##########################
 #     Database Setup     #
 ##########################
-if (
-    edxapp_config.get_bool("k8s_deployment")
-    and edxapp_config.get_bool("k8s_cutover")
-    and edxapp_config.get_bool("disable_ec2_deployment")
-):
-    rds_subnet = k8s_vpc["rds_subnet"]
-else:
-    rds_subnet = edxapp_vpc["rds_subnet"]
-
 rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["instance_size"] = (
     edxapp_config.get("db_instance_size") or rds_defaults["instance_size"]
