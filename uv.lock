@@ -1343,16 +1343,16 @@ wheels = [
 
 [[package]]
 name = "pulumi-aws-native"
-version = "1.44.0"
+version = "1.45.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "parver" },
     { name = "pulumi" },
     { name = "semver" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b6/82/6969bc4703b3298871d8ba06aee96e5a53bb5f6c49c614e93c4207b8b766/pulumi_aws_native-1.44.0.tar.gz", hash = "sha256:5116ec3ea0d2661ae193c2da2aae4f2de98e4fbca659d4986ca9773cf2c7040d", size = 8195459, upload-time = "2025-12-19T20:18:27.767Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/44/4c/d0b643cdfc4e61f067910b1b7075e6793eb2cf2762ff169ecd032f7452c9/pulumi_aws_native-1.45.0.tar.gz", hash = "sha256:f6dfc849961ef249989c3b4a5ea735dc3cea79e95e2b503c0b9ffb0f46036aad", size = 8200927, upload-time = "2025-12-22T07:28:29.96Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ea/a2/28bfcc6d75871e0e3540fca29040259b81a5eaf0833359df66cd2fe4a60b/pulumi_aws_native-1.44.0-py3-none-any.whl", hash = "sha256:b15593254a1b4ff272e36b43abffdcfa392bba1f07d600fe07831e6ebaa18c31", size = 11576124, upload-time = "2025-12-19T20:18:25.611Z" },
+    { url = "https://files.pythonhosted.org/packages/7d/9e/cdff7ea7b8189431ddf9545c8fc23df986b633e5909de66d6fd00351660c/pulumi_aws_native-1.45.0-py3-none-any.whl", hash = "sha256:2bd81567293d3428ae69d3b3107e6520b4183c6e9c9c1d31c9e1ced463dd78df", size = 11580666, upload-time = "2025-12-22T07:28:27.583Z" },
 ]
 
 [[package]]
@@ -1401,16 +1401,16 @@ wheels = [
 
 [[package]]
 name = "pulumi-fastly"
-version = "11.2.0"
+version = "11.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "parver" },
     { name = "pulumi" },
     { name = "semver" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c6/26/7c241f54a10238cfa66a919568170dd65050c3455631b087c88c58ca9925/pulumi_fastly-11.2.0.tar.gz", hash = "sha256:03b51679f3795bf37f43eacd351483cd20afa4e4ebd679b9e14de9b9a67d8031", size = 224951, upload-time = "2025-11-21T03:55:27.347Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ff/9f/b55457710923d6684abae5fe298eb8ca548b05ebee38cc18c48a9a8205e6/pulumi_fastly-11.3.0.tar.gz", hash = "sha256:9761daf9f6cbf51c7c2754063aed26ec86b41194126afc3e8e9b11beee53e242", size = 225094, upload-time = "2025-12-22T04:03:48.824Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/57/78/7902ae763e5f37149fd8abc7645074cefb87dee6ebbfa500ae5665216558/pulumi_fastly-11.2.0-py3-none-any.whl", hash = "sha256:b342086acbc610e9c7aba78ca9df8a8160eaad1b6501bf6b4cd960c1c733aa11", size = 335685, upload-time = "2025-11-21T03:55:25.891Z" },
+    { url = "https://files.pythonhosted.org/packages/89/a4/cbf192935cdd6cc494d968efd174e5c7e4606f32b70af9d32156c0976239/pulumi_fastly-11.3.0-py3-none-any.whl", hash = "sha256:afdb671db674544915451b656a9ff6b99925fae2c5878f5d1e5330c0b91b6c58", size = 335841, upload-time = "2025-12-22T04:03:47.164Z" },
 ]
 
 [[package]]
