@@ -27,11 +27,11 @@ path "secret-mitxonline/*" {
 }
 
 # MITXOnline needs access to the DID and bearer tokens for authentication with Digital Credentials services
-path "secret-digital-credentials/data/issuer-coordinator" {
+path "secret-digital-credentials/issuer-coordinator" {
   capabilities = ["read"]
 }
 
-path "secret-digital-credentials/data/signing-service" {
+path "secret-digital-credentials/signing-service" {
   capabilities = ["read"]
 }
 
