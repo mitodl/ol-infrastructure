@@ -615,7 +615,7 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
                             "the code is completely unknown"),
                     ("Failed async course content export to git (course id:",
                             "course-v1:TIMxM+99.123x+3T2022)"),
-                    ("Failed to pull git repository: b\"fatal: Unable to",
+                    ('Failed to pull git repository: b"fatal: Unable to',
                     "create '/openedx/data/export_course_repos/TIMxM-99.",
                     "123x-3T2022/.git/index.lock': File exists.\n\n",
                     "Another git process seems to be running in this",
