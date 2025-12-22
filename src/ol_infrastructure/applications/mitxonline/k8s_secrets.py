@@ -365,7 +365,8 @@ def create_mitxonline_k8s_secrets(
             "base_name": "signing-service",
             "path": "signing-service",
             "templates": {
-                "VERIFIABLE_CREDENTIAL_DID": '{{ index .Secrets "data" "tenants_did_keys" "DEFAULT" "keyPair" "publicKeyMultibase" }}',
+                # This doesn't work yet, the value of tenants_did_keys.DEFAULT is stringified JSON
+                "VERIFIABLE_CREDENTIAL_BEARER_TOKEN": '{{ get (get (get (get .Secrets "tenants_did_keys") "DEFAULT") "keyPair") "publicKeyMultibase"}}',
             },
         },
     ]
