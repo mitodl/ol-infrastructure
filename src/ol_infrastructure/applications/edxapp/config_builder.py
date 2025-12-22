@@ -605,6 +605,26 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
                     "edu.mit.learn.app",
                 ],
             },
+            "SENTRY_IGNORED_EXCEPTION_MESSAGES": [
+                    ("Tried to inspect an unsupported, broken, or",
+                            "missing downstream->upstream link:",
+                            "'block-v1:[email][email]'->'None'"),
+                    ("Invalid HTTP_HOST header: 'vqbjqfz3ldd42z6qff3t2h5cr62c5rok._domainkey.huggingface.co'.",
+                            "The domain name provided is not valid according to RFC 1034/1035."),
+                    ("A label was requested for language code `ht` but",
+                            "the code is completely unknown"),
+                    ("Failed async course content export to git (course id:",
+                            "course-v1:TIMxM+99.123x+3T2022)"),
+                    ("Failed to pull git repository: b\"fatal: Unable to",
+                    "create '/openedx/data/export_course_repos/TIMxM-99.",
+                    "123x-3T2022/.git/index.lock': File exists.\n\n",
+                    "Another git process seems to be running in this",
+                    "repository, e.g.\nan editor opened by 'git commit'",
+                    ". Please make sure all processes\nare terminated",
+                    "then try again. If it still fails, a git process\n",
+                    "may have crashed in this repository earlier:",
+                    "\nremove the file manually to continue.\n")
+            ],
         },
     }
 
