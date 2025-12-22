@@ -64,7 +64,7 @@ config:
   edxapp:learn_ai_frontend_domain: "learn-ai-qa.ol.mit.edu"
   edxapp:backend_lms_domain: courses-backend.rc.xpro.mit.edu
   edxapp:backend_studio_domain: studio-backend.rc.xpro.mit.edu
-  edxapp:backend_preview_domain: preview-rc.xpro.mit.edu
+  edxapp:backend_preview_domain: preview-backend.rc.xpro.mit.edu
   edxapp:k8s_replicas:
     webapp:
       cms:
