@@ -42,7 +42,7 @@ config:
   - ["studio.library_authoring_mfe", "--deactivate"]
   - ["legacy_studio.certificates", "--create", "--everyone"]
   edxapp:business_unit: residential
-  edxapp:db_max_storage_gb: "1000"
+  edxapp:db_max_storage_gb: "1500"
   edxapp:db_password:
     secure: v1:vkG4n/X+C+SBaMf7:W/zi1Bxqkab0Hx1HAAiVhZuj/8WOJ7v94lxfERa5YIF5dD037uuULgPxIt+3zzHVur26pBcVIk4=
   edxapp:db_use_blue_green: "true"
