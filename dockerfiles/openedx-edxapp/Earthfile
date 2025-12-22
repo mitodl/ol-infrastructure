@@ -151,7 +151,7 @@ fetch-translations:
       python manage.py lms compile_xblock_translations && \
       ## pull translations via atlas
       atlas pull $OPENEDX_ATLAS_OPTIONS \
-        translations/edx-platform/conf/locale:conf/locale \
+        translations/edx-platform/conf/locale:conf/locale && \
       python manage.py lms compilemessages && \
       python manage.py lms compilejsi18n
     ENV DJANGO_SETTINGS_MODULE cms.envs.mitol.i18n
