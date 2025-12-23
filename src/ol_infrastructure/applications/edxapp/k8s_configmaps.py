@@ -304,7 +304,7 @@ class EdxappConfigMaps:
     waffle_flags_yaml_config_name: str
 
 
-def create_k8s_configmaps(
+def create_k8s_configmaps(  # noqa: PLR0915
     stack_info: StackInfo,
     namespace: str,
     k8s_global_labels: dict[str, str],
@@ -351,6 +351,9 @@ def create_k8s_configmaps(
     grades_bucket_name = f"{env_name}-edxapp-grades"
     storage_bucket_name = f"{env_name}-edxapp-storage"
     ses_configuration_set = f"edxapp-{env_name}"
+
+    # Extract base features early for use in both CMS and LMS configs
+    base_features: dict[str, Any] = general_config_dict["FEATURES"]
 
     # Load interpolated configuration from dictionary
     interpolated_config_name = "60-interpolated-config-yaml"
@@ -407,15 +410,20 @@ def create_k8s_configmaps(
         "ORA_SETTINGS_HELP_URL": "https://edx.readthedocs.io/projects/open-edx-building-and-running-a-course/en/latest/course_assets/pages.html#configuring-course-level-open-response-assessment-settings",
     }
 
+    # Initialize CMS FEATURES from base config
+    cms_features = base_features.copy()
+
     # Add CMS-specific features for residential deployments
     if stack_info.env_prefix in ["mitx", "mitx-staging"]:
-        cms_general_config_content["FEATURES"].update(
+        cms_features.update(
             {
                 "ENABLE_INSTRUCTOR_BACKGROUND_TASKS": True,
                 "MAX_PROBLEM_RESPONSES_COUNT": 10000,
             }
         )
         cms_general_config_content["SEGMENT_IO"] = False
+
+    cms_general_config_content["FEATURES"] = cms_features
 
     cms_general_config_map = kubernetes.core.v1.ConfigMap(
         f"ol-{stack_info.env_prefix}-edxapp-cms-general-config-{stack_info.env_suffix}",
@@ -537,13 +545,10 @@ def create_k8s_configmaps(
         "WRITABLE_GRADEBOOK_URL": "/gradebook",
     }
 
-    # Initialize FEATURES from base config, allowing deployment-specific additions
-    base_features: dict[str, Any] = build_general_config(stack_info.env_prefix)[
-        "FEATURES"
-    ]
-    lms_general_config_content["FEATURES"] = base_features
+    # Build deployment-specific FEATURES by copying base and adding overrides
+    deployment_features = base_features.copy()
 
-    # Deployment-specific THIRD_PARTY_AUTH_BACKENDS
+    # Deployment-specific THIRD_PARTY_AUTH_BACKENDS and FEATURES
     if stack_info.env_prefix in ["mitx", "mitx-staging"]:
         lms_general_config_content["THIRD_PARTY_AUTH_BACKENDS"] = [
             "common.djangoapps.third_party_auth.saml.SAMLAuthBackend",
@@ -557,7 +562,7 @@ def create_k8s_configmaps(
         lms_general_config_content["LEARNER_HOME_MFE_REDIRECT_PERCENTAGE"] = 100
         lms_general_config_content["LEARNER_HOME_MICROFRONTEND_URL"] = "/dashboard/"
         # Merge residential-specific features with base features
-        base_features.update(
+        deployment_features.update(
             {
                 "ENABLE_INSTRUCTOR_BACKGROUND_TASKS": True,
                 "MAX_PROBLEM_RESPONSES_COUNT": 10000,
@@ -589,6 +594,9 @@ def create_k8s_configmaps(
             "common.djangoapps.third_party_auth.lti.LTIAuthBackend",
         ]
         # mitxonline has no LEARNER_HOME_MICROFRONTEND_URL
+
+    # Assign the deployment-specific FEATURES (already enriched with base config)
+    lms_general_config_content["FEATURES"] = deployment_features
 
     lms_general_config_map = kubernetes.core.v1.ConfigMap(
         f"ol-{stack_info.env_prefix}-edxapp-lms-general-config-{stack_info.env_suffix}",
