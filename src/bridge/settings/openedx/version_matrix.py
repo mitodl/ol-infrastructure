@@ -17,7 +17,7 @@ class OpenLearningOpenEdxDeployment(Enum):
             # features as they land. (TMM 2025-05-20)
             EnvRelease("CI", OpenEdxSupportedRelease["master"]),
             EnvRelease("QA", OpenEdxSupportedRelease["ulmo"]),
-            EnvRelease("Production", OpenEdxSupportedRelease["teak"]),
+            EnvRelease("Production", OpenEdxSupportedRelease["ulmo"]),
         ],
     )
     mitx_staging = DeploymentEnvRelease(
@@ -27,7 +27,7 @@ class OpenLearningOpenEdxDeployment(Enum):
             # features as they land. (TMM 2025-05-20)
             EnvRelease("CI", OpenEdxSupportedRelease["master"]),
             EnvRelease("QA", OpenEdxSupportedRelease["ulmo"]),
-            EnvRelease("Production", OpenEdxSupportedRelease["teak"]),
+            EnvRelease("Production", OpenEdxSupportedRelease["ulmo"]),
         ],
     )
     mitxonline = DeploymentEnvRelease(
