@@ -1,6 +1,6 @@
 ARG PYTHON_VERSION=3.11
 FROM python:${PYTHON_VERSION}-slim-trixie
-ARG OPENEDX_COMMON_VERSION=release/ulmo
+ARG OPENEDX_COMMON_VERSION=master
 ENV DJANGO_SETTINGS_MODULE=xqueue.env_config
 
 RUN apt-get update && \
