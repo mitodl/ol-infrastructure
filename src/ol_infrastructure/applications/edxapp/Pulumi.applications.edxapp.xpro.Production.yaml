@@ -40,6 +40,7 @@ config:
     preview: preview.xpro.mit.edu
     studio: studio.xpro.mit.edu
   edxapp:marketing_domain: xpro.mit.edu
+  edxapp:move_db: true
   edxapp:edx_forum_secrets:
     secure: v1:YHqAWSdn7TNUn7d+:IBgiGsl4r8vymID8NV43rnfJy+qsJSXm/jXaWWALUfF9zXqRO4zJZhLS0d+etijGVwaZnF8v5zXlo+EczFrCe7ICHpS85zHgifbfDcw=
   edxapp:enable_notes: "True"

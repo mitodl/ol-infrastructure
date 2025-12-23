@@ -201,11 +201,7 @@ mongodb_cluster_uri = mongodb_atlas_stack.require_output("atlas_cluster")[
     "connection_strings"
 ][0]
 
-if (
-    edxapp_config.get_bool("k8s_deployment")
-    and edxapp_config.get_bool("k8s_cutover")
-    and edxapp_config.get_bool("disable_ec2_deployment")
-):
+if edxapp_config.get_bool("move_db") or False:
     rds_subnet = k8s_vpc["rds_subnet"]
     db_secgroup_vpc_id = k8s_vpc["id"]
     cache_subnet_group = k8s_vpc["elasticache_subnet"]

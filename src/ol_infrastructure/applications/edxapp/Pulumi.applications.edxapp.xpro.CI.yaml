@@ -43,6 +43,7 @@ config:
   edxapp:mit_learn_api_domain: api.ci.learn.mit.edu
   edxapp:mit_learn_domain: ci.learn.mit.edu
   edxapp:marketing_domain: xpro-ci.odl.mit.edu
+  edxapp:move_db: true
   edxapp:edx_forum_secrets:
     secure: v1:QSW6gq7cQ6t65Glo:OGJ5X4YYEi2ZdyrpnML25p10mQrodNNLaF5zyV1242ZcQz1TkRsTdpmv9HghIhgHxykYd2NK7kyRkvphd5pfI56xAg/de/8PuHNuPx5kg3IZCrFktYuE2Nyzjxhg7aGHNhA6JQEf95925WPwAG3V
   edxapp:elb_healthcheck_interval: "30"

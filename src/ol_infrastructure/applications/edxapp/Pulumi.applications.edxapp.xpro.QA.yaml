@@ -39,6 +39,7 @@ config:
     preview: preview-rc.xpro.mit.edu
     studio: studio-rc.xpro.mit.edu
   edxapp:marketing_domain: rc.xpro.mit.edu
+  edxapp:move_db: true
   edxapp:edx_forum_secrets:
     secure: v1:Tpg1BEYCoSw2D6HQ:yGnhmeKYzo+EetdiUpY/7VzE9vq+OtX/O02d6ugQwMI3D57r3yvxtsY3u+lRYwr0R2yvvVr/Lhm9xXQ3EfycxNtpOUxviHCFsL5wXLA=
   edxapp:elb_healthcheck_interval: "30"

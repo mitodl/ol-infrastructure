@@ -64,6 +64,7 @@ config:
   edxapp:mail_domain: edxapp-mail-staging-ci.mitx.mit.edu
   edxapp:min_web_nodes: "1"
   edxapp:min_worker_nodes: "1"
+  edxapp:move_db: true
   edxapp:sender_email_address: support@edxapp-mail-staging-ci.mitx.mit.edu
   edxapp:target_vpc: residential_mitx_staging_vpc
   edxapp:web_node_capacity: "1"

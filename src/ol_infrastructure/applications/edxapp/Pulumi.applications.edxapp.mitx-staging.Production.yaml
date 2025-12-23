@@ -60,6 +60,7 @@ config:
     learning: learn
     ora_grading: ora-grading
   edxapp:google_analytics_id: ""
+  edxapp:move_db: true
   edxapp:mail_domain: edxapp-mail-staging-production.mitx.mit.edu
   edxapp:min_web_nodes: "1"
   edxapp:min_worker_nodes: 0

@@ -72,6 +72,7 @@ config:
     ora_grading: ora-grading
   edxapp:google_analytics_id: ""
   edxapp:mail_domain: edxapp-mail-ci.mitx.mit.edu
+  edxapp:move_db: true
   edxapp:min_web_nodes: "1"
   edxapp:min_worker_nodes: "1"
   edxapp:sender_email_address: mitx-support+ci@mit.edu
