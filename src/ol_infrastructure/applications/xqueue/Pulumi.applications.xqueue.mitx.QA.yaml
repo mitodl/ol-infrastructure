@@ -6,10 +6,11 @@ config:
   consul:address: https://consul-mitx-qa.odl.mit.edu
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
-  xqueue:auto_scale:
-    desired: 1
-    max: 2
-    min: 1
   xqueue:business_unit: residential
-  xqueue:instance_type: t3a.medium
   xqueue:target_vpc: residential_mitx_vpc
+  xqueue:deploy_to_k8s: true
+  xqueue:cluster: residential
+  xqueue:namespace: mitx-openedx
+  xqueue:domain: xqueue.mitx.qa.odl.mit.edu
+  xqueue:min_replicas: 1
+  xqueue:max_replicas: 2

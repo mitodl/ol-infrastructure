@@ -4,12 +4,13 @@ encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQHeB2hdIECF1pMxPH
 config:
   aws:region: us-east-1
   consul:address: https://consul-mitx-ci.odl.mit.edu
-  xqueue:auto_scale:
-    desired: 1
-    max: 2
-    min: 1
-  xqueue:instance_type: t3a.medium
   xqueue:business_unit: residential
   xqueue:target_vpc: residential_mitx_vpc
+  xqueue:deploy_to_k8s: true
+  xqueue:cluster: residential
+  xqueue:namespace: mitx-openedx
+  xqueue:domain: xqueue.mitx.ci.odl.mit.edu
+  xqueue:min_replicas: 1
+  xqueue:max_replicas: 2
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci

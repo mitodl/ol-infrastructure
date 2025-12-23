@@ -4,11 +4,13 @@ encryptedkey: AQICAHgQW+3bag/cl2fPG3dPdqAPbfcsZuwI7rETXZsx85HRpgHDzucz0B/FqJGquA
 config:
   aws:region: us-east-1
   consul:address: https://consul-mitxonline-qa.odl.mit.edu
-  xqueue:auto_scale:
-    desired: 1
-    max: 2
-    min: 1
   xqueue:business_unit: mitxonline
   xqueue:target_vpc: mitxonline_vpc
+  xqueue:deploy_to_k8s: true
+  xqueue:cluster: applications
+  xqueue:namespace: mitxonline-openedx
+  xqueue:domain: xqueue.mitxonline.qa.odl.mit.edu
+  xqueue:min_replicas: 1
+  xqueue:max_replicas: 2
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa

@@ -4,11 +4,13 @@ encryptedkey: AQICAHi7xhTkB8tf1ObyPMxDhODJja4Mn4jyIo32zZVlOiZPFgGS9UkGtHI7d/QvSp
 config:
   aws:region: us-east-1
   consul:address: https://consul-mitx-staging-qa.odl.mit.edu
-  xqueue:auto_scale:
-    desired: 1
-    max: 2
-    min: 1
   xqueue:business_unit: residential-staging
   xqueue:target_vpc: residential_mitx_staging_vpc
+  xqueue:deploy_to_k8s: true
+  xqueue:cluster: residential
+  xqueue:namespace: mitx-openedx
+  xqueue:domain: xqueue.mitx-staging-qa.odl.mit.edu
+  xqueue:min_replicas: 1
+  xqueue:max_replicas: 2
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa

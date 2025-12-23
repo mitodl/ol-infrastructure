@@ -4,12 +4,14 @@ encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQFOyUI2BhcEDcfVB2
 config:
   aws:region: us-east-1
   consul:address: https://consul-mitx-staging-ci.odl.mit.edu
-  xqueue:auto_scale:
-    desired: 1
-    max: 2
-    min: 1
   xqueue:business_unit: residential-staging
   xqueue:target_vpc: residential_mitx_staging_vpc
   xqueue:web_host_domain: forum-staging-ci.odl.mit.edu
+  xqueue:deploy_to_k8s: true
+  xqueue:cluster: residential
+  xqueue:namespace: mitx-openedx
+  xqueue:domain: xqueue.mitx-staging-ci.odl.mit.edu
+  xqueue:min_replicas: 1
+  xqueue:max_replicas: 2
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci

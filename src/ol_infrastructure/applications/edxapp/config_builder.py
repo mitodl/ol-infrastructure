@@ -322,7 +322,7 @@ def build_base_general_config() -> ConfigDict:
         "AUTOMATIC_AUTH_FOR_TESTING": False,
         "CUSTOM_COURSES_EDX": False,
         "DISABLE_START_DATES": False,
-        "EMBARGO": False,
+        "EMBARGO": True,
         "ENABLE_AUTOADVANCE_VIDEOS": False,
         "ENABLE_CORS_HEADERS": False,
         "ENABLE_COURSE_OLX_VALIDATION": False,
