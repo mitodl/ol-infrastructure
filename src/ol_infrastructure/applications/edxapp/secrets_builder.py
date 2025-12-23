@@ -446,6 +446,8 @@ def get_general_secrets_yaml(
     }
 
     # Apply deployment overrides
-    secrets = _apply_deployment_secret_overrides(stack_info.env_prefix, secrets)
+    secrets = _apply_deployment_secret_overrides(
+        stack_info.env_prefix, secrets, proctortrack_url
+    )
 
     return secrets_dict_to_yaml_template(secrets)
