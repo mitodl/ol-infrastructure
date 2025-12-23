@@ -409,10 +409,12 @@ def create_k8s_configmaps(
 
     # Add CMS-specific features for residential deployments
     if stack_info.env_prefix in ["mitx", "mitx-staging"]:
-        cms_general_config_content["FEATURES"] = {
-            "ENABLE_INSTRUCTOR_BACKGROUND_TASKS": True,
-            "MAX_PROBLEM_RESPONSES_COUNT": 10000,
-        }
+        cms_general_config_content["FEATURES"].update(
+            {
+                "ENABLE_INSTRUCTOR_BACKGROUND_TASKS": True,
+                "MAX_PROBLEM_RESPONSES_COUNT": 10000,
+            }
+        )
         cms_general_config_content["SEGMENT_IO"] = False
 
     cms_general_config_map = kubernetes.core.v1.ConfigMap(
