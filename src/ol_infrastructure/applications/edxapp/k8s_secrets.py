@@ -71,7 +71,6 @@ def create_k8s_secrets(
     namespace: str,
     stack_info: StackInfo,
     vault_k8s_resources: OLVaultK8SResources,
-    xqueue_stack: StackReference,
 ) -> EdxappSecrets:
     """Create all Kubernetes secrets for edxapp using registry pattern.
 
@@ -87,7 +86,6 @@ def create_k8s_secrets(
         namespace: Kubernetes namespace for secrets
         stack_info: Stack information (env_prefix, env_suffix)
         vault_k8s_resources: Vault Kubernetes authentication resources
-        xqueue_stack: Stack reference to xqueue application
 
     Returns:
         EdxappSecrets dataclass with all created secrets
@@ -264,27 +262,23 @@ def create_k8s_secrets(
 
     # Xqueue secret (conditional - only if enabled)
     if edxapp_config.get_bool("enable_xqueue"):
-        xqueue_domain = xqueue_stack.get_output("xqueue_domain")
-
-        def create_xqueue_secret(domain: str) -> OLVaultK8SSecret:
-            return builder.create_static(
-                name="xqueue-secrets",
-                resource_name="xqueue-secret",
-                secret_name=xqueue_secret_name,
-                mount=f"secret-{stack_info.env_prefix}",
-                path="edx-xqueue",
-                templates={
-                    "11-xqueue-secrets.yaml": textwrap.dedent(f"""
-                        XQUEUE_INTERFACE:
-                          django_auth:
-                            password: {{{{ get .Secrets "edxapp_password" }}}}
-                            username: edxapp
-                          url: https://{domain}
-                    """),
-                },
-            )
-
-        xqueue_secret_secret = xqueue_domain.apply(create_xqueue_secret)
+        xqueue_domain = edxapp_config.require("xqueue_domain")
+        xqueue_secret_secret = builder.create_static(
+            name="xqueue-secrets",
+            resource_name="xqueue-secret",
+            secret_name=xqueue_secret_name,
+            mount=f"secret-{stack_info.env_prefix}",
+            path="edx-xqueue",
+            templates={
+                "11-xqueue-secrets.yaml": textwrap.dedent(f"""
+                    XQUEUE_INTERFACE:
+                      django_auth:
+                        password: {{{{ get .Secrets "edxapp_password" }}}}
+                        username: edxapp
+                      url: https://{xqueue_domain}
+                """),
+            },
+        )
     else:
         xqueue_secret_secret = None
 

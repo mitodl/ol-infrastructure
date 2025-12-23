@@ -80,6 +80,8 @@ config:
   edxapp:framework: "earthly"
   edxapp:web_node_capacity: "1"
   edxapp:worker_node_capacity: "1"
+  edxapp:enable_xqueue: true
+  edxapp:xqueue_domain: xqueue.mitx.ci.odl.mit.edu
   mongodb:atlas_project_id: 617858f961f3016e0ade73e7
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci

@@ -81,6 +81,8 @@ config:
   edxapp:web_node_capacity: "2"
   edxapp:worker_node_capacity: "1"
   edxapp:framework: "earthly"
+  edxapp:enable_xqueue: true
+  edxapp:xqueue_domain: xqueue.mitx.qa.odl.mit.edu
   mongodb:atlas_project_id: 61a8f2d2c263e144f50f13b4
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
