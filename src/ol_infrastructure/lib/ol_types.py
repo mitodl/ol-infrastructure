@@ -79,6 +79,7 @@ class Services(str, Enum):
     tika = "tika"
     vector_log_proxy = "vector-log-proxy"
     xpro = "xpro"
+    xqueue = "xqueue"
 
 
 @unique

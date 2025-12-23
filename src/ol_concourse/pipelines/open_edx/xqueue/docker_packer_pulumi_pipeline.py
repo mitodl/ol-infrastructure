@@ -38,7 +38,10 @@ def build_xqueue_pipeline(release_name: str):
         name=Identifier("xqueue-dockerfile"),
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
-        paths=["dockerfiles/openedx-xqueue/Dockerfile"],
+        paths=[
+            "dockerfiles/openedx-xqueue/Dockerfile",
+            "dockerfiles/openedx-xqueue/env_config.py",
+        ],
     )
 
     xqueue_packer_code = git_repo(

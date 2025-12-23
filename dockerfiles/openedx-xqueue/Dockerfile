@@ -1,7 +1,7 @@
 ARG PYTHON_VERSION=3.8
 FROM python:${PYTHON_VERSION}-slim-trixie
 ARG OPENEDX_COMMON_VERSION=open-release/quince.master
-ENV DJANGO_SETTINGS_MODULE=xqueue.production
+ENV DJANGO_SETTINGS_MODULE=xqueue.env_config
 
 RUN apt-get update && \
   apt-get install --no-install-recommends -y git-core mariadb-client default-libmysqlclient-dev build-essential ntp libssl-dev pkg-config && \
@@ -13,6 +13,9 @@ RUN apt-get update && \
   git clone https://github.com/openedx/xqueue.git --branch $OPENEDX_COMMON_VERSION --depth 1 /edx/app/xqueue
 WORKDIR /edx/app/xqueue
 RUN pip install --no-cache-dir wheel && pip install --no-cache-dir -r requirements.txt
+
+# Copy Django settings module for environment variable configuration
+COPY --chown=app:app env_config.py xqueue/env_config.py
 
 USER app
 
