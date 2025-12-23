@@ -122,6 +122,9 @@ mongodb_atlas_stack = StackReference(
 notes_stack = StackReference(
     f"applications.edxnotes.{stack_info.env_prefix}.{stack_info.name}"
 )
+xqueue_stack = StackReference(
+    f"applications.xqueue.{stack_info.env_prefix}.{stack_info.name}"
+)
 
 #############
 # Variables #
@@ -1923,6 +1926,7 @@ if edxapp_config.get_bool("k8s_deployment"):
         stack_info=stack_info,
         vault_config=Config("vault"),
         vault_policy=edxapp_vault_policy,
+        xqueue_stack=xqueue_stack,
     )
 
 export_dict = {

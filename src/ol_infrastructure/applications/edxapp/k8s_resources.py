@@ -66,6 +66,7 @@ def create_k8s_resources(  # noqa: C901
     stack_info: StackInfo,
     vault_config: Config,
     vault_policy: vault.Policy,
+    xqueue_stack: StackReference,
 ):
     env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
     lms_webapp_deployment_name = f"{env_name}-edxapp-lms-webapp"
@@ -242,6 +243,7 @@ def create_k8s_resources(  # noqa: C901
         namespace=namespace,
         stack_info=stack_info,
         vault_k8s_resources=vault_k8s_resources,
+        xqueue_stack=xqueue_stack,
     )
     configmaps = create_k8s_configmaps(
         stack_info=stack_info,

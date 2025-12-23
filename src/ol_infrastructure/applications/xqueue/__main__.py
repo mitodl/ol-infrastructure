@@ -497,4 +497,5 @@ if not deploy_to_k8s:
         lt_config=lt_config,
     )
 
+    export("xqueue_domain", xqueue_config.require("domain"))
     export("security_group_id", xqueue_server_security_group.id)

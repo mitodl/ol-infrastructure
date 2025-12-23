@@ -367,6 +367,13 @@ consul_template_configuration = {
         vault=ConsulTemplateVaultConfig(),
         template=[
             # https://github.com/mitodl/xqueue-watcher?tab=readme-ov-file#running-xqueue-watcher
+            # NOTE: The grader_config.json fetched from Vault should contain the correct
+            # xqueue domain as defined in the xqueue Pulumi stack configuration.
+            # The xqueue domain should be configured in Vault secret:
+            # secret-xqwatcher/{DEPLOYMENT}-grader-config -> confd_json
+            # Ensure the grader configuration JSON includes the correct xqueue URL from the
+            # Pulumi stack (applications.xqueue.{DEPLOYMENT}.{ENVIRONMENT}) which exports
+            # xqueue:domain from its stack configuration.
             ConsulTemplateTemplate(
                 contents=(
                     f'{{{{- with secret "secret-xqwatcher/{DEPLOYMENT}-grader-config" -}}}}'

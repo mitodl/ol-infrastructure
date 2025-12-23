@@ -6,7 +6,6 @@ config:
   consul:address: https://consul-mitx-staging-ci.odl.mit.edu
   xqueue:business_unit: residential-staging
   xqueue:target_vpc: residential_mitx_vpc
-  xqueue:web_host_domain: forum-staging-ci.odl.mit.edu
   xqueue:deploy_to_k8s: true
   xqueue:cluster: residential
   xqueue:namespace: mitx-openedx
