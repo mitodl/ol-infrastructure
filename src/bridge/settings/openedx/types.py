@@ -102,7 +102,6 @@ class OpenEdxSupportedRelease(str, Enum):
         return enum_element
 
     master = ("master", "master", "3.12", "24")
-    teak = ("teak", "release/teak", "3.11", "20")
     ulmo = ("ulmo", "release/ulmo", "3.11", "24")
 
     def __str__(self):
