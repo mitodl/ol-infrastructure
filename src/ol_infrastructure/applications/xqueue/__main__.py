@@ -248,35 +248,34 @@ if deploy_to_k8s:
     # These are exposed as environment variables to the Django settings module
     db_creds_secret_name = "xqueue-db-creds"  # noqa: S105  # pragma: allowlist secret
 
-    # Build templates dict with DB_HOST from Pulumi Output
-    def build_db_creds_templates(db_address: str) -> dict[str, str]:
-        """Build database credentials templates with DB_HOST."""
-        return {
-            "DB_USER": "{{ .Secrets.username }}",
-            "DB_PASSWORD": "{{ .Secrets.password }}",
-            "DB_HOST": db_address,
-        }
+    def create_db_creds_secret(db_address: str) -> OLVaultK8SSecret:
+        """Create database credentials secret with resolved DB_HOST."""
+        return OLVaultK8SSecret(
+            f"xqueue-{env_name}-db-creds-secret",
+            OLVaultK8SDynamicSecretConfig(
+                name="xqueue-db-creds",
+                namespace=namespace,
+                dest_secret_labels=k8s_global_labels.model_dump(),
+                dest_secret_name=db_creds_secret_name,
+                labels=k8s_global_labels.model_dump(),
+                mount=f"mariadb-{stack_info.env_prefix}",
+                path="creds/xqueue",
+                restart_target_kind="Deployment",
+                restart_target_name="xqueue-app",
+                templates={
+                    "DB_USER": "{{ .Secrets.username }}",
+                    "DB_PASSWORD": "{{ .Secrets.password }}",
+                    "DB_HOST": db_address,
+                },
+                vaultauth=vault_k8s_resources.auth_name,
+            ),
+            opts=ResourceOptions(
+                delete_before_replace=True,
+                depends_on=vault_k8s_resources,
+            ),
+        )
 
-    db_creds_secret = OLVaultK8SSecret(
-        f"xqueue-{env_name}-db-creds-secret",
-        OLVaultK8SDynamicSecretConfig(
-            name="xqueue-db-creds",
-            namespace=namespace,
-            dest_secret_labels=k8s_global_labels.model_dump(),
-            dest_secret_name=db_creds_secret_name,
-            labels=k8s_global_labels.model_dump(),
-            mount=f"mariadb-{stack_info.env_prefix}",
-            path="creds/xqueue",
-            restart_target_kind="Deployment",
-            restart_target_name="xqueue-app",
-            templates=db_host.apply(build_db_creds_templates),
-            vaultauth=vault_k8s_resources.auth_name,
-        ),
-        opts=ResourceOptions(
-            delete_before_replace=True,
-            depends_on=vault_k8s_resources,
-        ),
-    )
+    db_creds_secret = db_host.apply(create_db_creds_secret)
 
     # Create VaultSecret for user credentials (edxapp and xqwatcher passwords)
     xqueue_creds_secret_name = "xqueue-user-creds"  # noqa: S105  # pragma: allowlist secret
@@ -330,6 +329,7 @@ if deploy_to_k8s:
         import_nginx_config=False,
         init_migrations=False,
         init_collectstatic=False,
+        application_port=XQUEUE_SERVICE_PORT,  # xqueue listens directly on 8040
         resource_requests={
             "cpu": "500m",
             "memory": "512Mi",
@@ -364,6 +364,7 @@ if deploy_to_k8s:
     )
 
     # Create the OLApplicationK8s component
+    # db_creds_secret is an Output, so we need to unwrap it for depends_on
     xqueue_k8s_app = OLApplicationK8s(
         ol_app_k8s_config=ol_app_k8s_config,
         opts=ResourceOptions(depends_on=[db_creds_secret, xqueue_creds_secret]),

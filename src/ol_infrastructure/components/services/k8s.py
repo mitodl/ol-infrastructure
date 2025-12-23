@@ -117,6 +117,9 @@ class OLApplicationK8sConfig(BaseModel):
     import_nginx_config: bool = Field(default=True)
     import_nginx_config_path: str = "files/web.conf"
     import_uwsgi_config: bool = Field(default=False)
+    application_port: int | None = (
+        None  # Override container/service port (default: 8073 with nginx, else 8040)
+    )
     resource_requests: dict[str, str] = Field(default={"cpu": "250m", "memory": "1Gi"})
     resource_limits: dict[str, str] = Field(default={"memory": "1Gi"})
     init_migrations: bool = Field(default=True)
@@ -245,6 +248,15 @@ class OLApplicationK8s(ComponentResource):
         self.application_lb_service_port_name: str = (
             ol_app_k8s_config.application_lb_service_port_name
         )
+
+        # Determine the application port to use
+        # If not specified, use DEFAULT_NGINX_PORT (8071) if nginx is enabled, else DEFAULT_WSGI_PORT (8073)
+        if ol_app_k8s_config.application_port is not None:
+            application_port = ol_app_k8s_config.application_port
+        elif ol_app_k8s_config.import_nginx_config:
+            application_port = DEFAULT_NGINX_PORT
+        else:
+            application_port = DEFAULT_WSGI_PORT
 
         # Determine the full name of the container image
         if ol_app_k8s_config.application_image_digest:
@@ -564,7 +576,7 @@ class OLApplicationK8s(ComponentResource):
                 image=app_image,
                 ports=[
                     kubernetes.core.v1.ContainerPortArgs(
-                        container_port=DEFAULT_WSGI_PORT
+                        container_port=application_port
                     )
                 ],
                 image_pull_policy=image_pull_policy,
@@ -840,8 +852,8 @@ class OLApplicationK8s(ComponentResource):
                 ports=[
                     kubernetes.core.v1.ServicePortArgs(
                         name=ol_app_k8s_config.application_lb_service_port_name,
-                        port=DEFAULT_NGINX_PORT,
-                        target_port=DEFAULT_NGINX_PORT,
+                        port=application_port,
+                        target_port=application_port,
                         protocol="TCP",
                         app_protocol=ol_app_k8s_config.application_lb_service_app_protocol,
                     ),
