@@ -479,7 +479,7 @@ def create_k8s_configmaps(
         "GOOGLE_ANALYTICS_TRACKING_ID": "",
         "GOOGLE_SITE_VERIFICATION_ID": "",
         "HTTPS": "on",
-        "LTI_AGGREGATE_SCORE_PASSBACK_DELAY": 900,
+        "LTI_AGGREGATE_SCORE_PASSBACK_DELAY": 60,
         "LTI_USER_EMAIL_DOMAIN": "lti.example.com",
         "MAILCHIMP_NEW_USER_LIST_ID": None,
         "OAUTH_DELETE_EXPIRED": True,
