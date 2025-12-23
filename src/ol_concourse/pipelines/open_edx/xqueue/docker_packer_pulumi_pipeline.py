@@ -19,7 +19,7 @@ from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PA
 
 def build_xqueue_pipeline(release_name: str):
     openedx_release = OpenEdxSupportedRelease[release_name]
-    xqueue_branch = openedx_release.branch
+    xqueue_branch = "master"
     xqueue_repo = git_repo(
         name=Identifier("openedx-xqueue-code"),
         uri="https://github.com/openedx/xqueue",
