@@ -13,10 +13,10 @@ config:
   eks:apisix_domains:
   - courses-backend.mitx.mit.edu
   - studio-backend.mitx.mit.edu
-  - preview.mitx.mit.edu
+  - preview-backend.mitx.mit.edu
   - courses-backend-staging.mitx.mit.edu
   - studio-backend-staging.mitx.mit.edu
-  - preview-staging.mitx.mit.edu
+  - preview-backend-staging.mitx.mit.edu
   eks:developer_role_policy_name: AmazonEKSClusterAdminPolicy
   eks:developer_role_kubernetes_groups:
   - admin
