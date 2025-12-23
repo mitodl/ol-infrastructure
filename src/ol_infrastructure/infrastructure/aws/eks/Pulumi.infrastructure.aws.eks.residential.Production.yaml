@@ -41,7 +41,7 @@ config:
         ol.mit.edu/gpu_node: false
       node_group_options: {}
       scaling:
-        desired: 3
+        desired: 4
         max: 6
         min: 3
       tags:
