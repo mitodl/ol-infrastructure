@@ -14,8 +14,8 @@ from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
 
-# Import all defaults from xqueue's production settings
-from xqueue.production import *  # noqa: F403
+# Import all defaults from xqueue's settings
+from xqueue.settings import *  # noqa: F403
 
 # Explicitly declare security settings
 DEBUG = False
