@@ -3,7 +3,7 @@ secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHg/+QzF9hGIaoayDitgnEVHEhuaANONVQQOnqpkIsol1gGvgltnqRdtyMNsrOoIbUwSAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMA6OAn4FdsStjBNRVAgEQgDuZzYFhYyCL8FZA97bW2PeL4bjqG4Rhcrhz4jSunLItPSrX/QdGdW2BC1hXqtY6/m5D0sztwnjeRmP8hQ==
 config:
   xqueue:business_unit: residential-staging
-  xqueue:target_vpc: residential_mitx_staging_vpc
+  xqueue:target_vpc: residential_mitx_vpc
   xqueue:deploy_to_k8s: true
   xqueue:cluster: residential
   xqueue:namespace: mitx-openedx

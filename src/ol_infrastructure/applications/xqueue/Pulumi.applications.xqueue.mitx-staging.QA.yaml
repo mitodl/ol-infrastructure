@@ -5,7 +5,7 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-mitx-staging-qa.odl.mit.edu
   xqueue:business_unit: residential-staging
-  xqueue:target_vpc: residential_mitx_staging_vpc
+  xqueue:target_vpc: residential_mitx_vpc
   xqueue:deploy_to_k8s: true
   xqueue:cluster: residential
   xqueue:namespace: mitx-openedx

@@ -5,7 +5,7 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-mitxonline-qa.odl.mit.edu
   xqueue:business_unit: mitxonline
-  xqueue:target_vpc: mitxonline_vpc
+  xqueue:target_vpc: applications_vpc
   xqueue:deploy_to_k8s: true
   xqueue:cluster: applications
   xqueue:namespace: mitxonline-openedx

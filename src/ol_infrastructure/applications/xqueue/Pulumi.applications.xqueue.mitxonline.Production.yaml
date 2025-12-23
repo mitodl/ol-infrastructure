@@ -3,7 +3,7 @@ secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHjmo6C0sCNz3fdkFlhbu0tdBZxnHmPYSnqtmocvGiuNygHmkFgRVh87YRZcC80Wij/AAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMXDlqSjxWFG3faSJOAgEQgDsAXwQ5rksA9yfuXM+RXip5o0N61eff6Zeqw5wBmowQp6saee6UqZYS5a0D4j8HcxYLDSC5JEuNJiL0Nw==
 config:
   xqueue:business_unit: mitxonline
-  xqueue:target_vpc: mitxonline_vpc
+  xqueue:target_vpc: applications_vpc
   xqueue:deploy_to_k8s: true
   xqueue:cluster: applications
   xqueue:namespace: mitxonline-openedx
