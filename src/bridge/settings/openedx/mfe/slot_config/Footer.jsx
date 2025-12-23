@@ -185,6 +185,7 @@ const AutoSelectLanguage = () => {
     }
   }
 
+  // This API is provided by the ol-openedx-course-translations plugin https://github.com/mitodl/open-edx-plugins/tree/main/src/ol_openedx_course_translations
   async function fetchCourseLanguage(courseKey) {
     const url = `${lmsBaseURL}/course-translations/api/course-language/${courseKey}`;
     try {
