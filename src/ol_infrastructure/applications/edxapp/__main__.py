@@ -122,9 +122,13 @@ mongodb_atlas_stack = StackReference(
 notes_stack = StackReference(
     f"applications.edxnotes.{stack_info.env_prefix}.{stack_info.name}"
 )
-xqueue_stack = StackReference(
-    f"applications.xqueue.{stack_info.env_prefix}.{stack_info.name}"
-)
+if edxapp_config.get_bool("enable_xqueue"):
+    xqueue_stack = StackReference(
+        f"applications.xqueue.{stack_info.env_prefix}.{stack_info.name}"
+    )
+else:
+    xqueue_stack = None
+
 
 #############
 # Variables #
