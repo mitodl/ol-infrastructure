@@ -1,10 +1,10 @@
-ARG PYTHON_VERSION=3.8
+ARG PYTHON_VERSION=3.11
 FROM python:${PYTHON_VERSION}-slim-trixie
-ARG OPENEDX_COMMON_VERSION=open-release/quince.master
+ARG OPENEDX_COMMON_VERSION=release/ulmo
 ENV DJANGO_SETTINGS_MODULE=xqueue.env_config
 
 RUN apt-get update && \
-  apt-get install --no-install-recommends -y git-core mariadb-client default-libmysqlclient-dev build-essential libssl-dev pkg-config && \
+  apt-get install --no-install-recommends -y git-core mariadb-client default-libmysqlclient-dev build-essential openntpd libssl-dev pkg-config && \
   rm -rf /var/lib/apt/lists/* && \
   useradd -m --shell /bin/false app && \
   mkdir -p /edx/app/log/ && \
