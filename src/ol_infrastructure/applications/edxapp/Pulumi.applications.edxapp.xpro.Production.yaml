@@ -83,7 +83,7 @@ config:
         max: 10
       cms:
         min: 1
-        max: 4
+        max: 8
   edxapp:k8s_resources:
     webapp:
       lms:
