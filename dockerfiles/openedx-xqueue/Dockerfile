@@ -4,7 +4,7 @@ ARG OPENEDX_COMMON_VERSION=open-release/quince.master
 ENV DJANGO_SETTINGS_MODULE=xqueue.env_config
 
 RUN apt-get update && \
-  apt-get install --no-install-recommends -y git-core mariadb-client default-libmysqlclient-dev build-essential ntp libssl-dev pkg-config && \
+  apt-get install --no-install-recommends -y git-core mariadb-client default-libmysqlclient-dev build-essential libssl-dev pkg-config && \
   rm -rf /var/lib/apt/lists/* && \
   useradd -m --shell /bin/false app && \
   mkdir -p /edx/app/log/ && \
