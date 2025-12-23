@@ -6,7 +6,7 @@ config:
   xqueue:target_vpc: residential_mitx_vpc
   xqueue:deploy_to_k8s: true
   xqueue:cluster: residential
-  xqueue:namespace: mitx-openedx
+  xqueue:namespace: mitx-staging-openedx
   xqueue:domain: xqueue.mitx-staging-prod.odl.mit.edu
   xqueue:min_replicas: 2
   xqueue:max_replicas: 5
