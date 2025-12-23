@@ -779,6 +779,7 @@ edxapp_db_config = OLMariaDBConfig(
     tags=aws_config.tags,
     db_name="edxapp",
     storage=edxapp_config.get_int("db_storage_gb") or 50,
+    max_storage=edxapp_config.get_int("db_max_storage_gb") or 1000,
     use_blue_green=edxapp_config.get_bool("db_use_blue_green") or False,
     **rds_defaults,
 )
