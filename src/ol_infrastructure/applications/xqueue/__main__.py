@@ -39,6 +39,7 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
 from ol_infrastructure.lib.aws.eks_helper import (
+    cached_image_uri,
     default_psg_egress_args,
     get_default_psg_ingress_args,
     setup_k8s_provider,
@@ -197,9 +198,8 @@ if deploy_to_k8s:
     # Application configuration using environment variables
     # The new env_config.py Django settings module reads from environment variables
     # instead of XQUEUE_CFG pointing to a YAML file
-    db_host = edxapp_stack.require_output("edxapp")["mariadb"]
+    # Note: DB_HOST is Output, so we set it separately via deployment patch
     application_config = {
-        "DB_HOST": db_host,
         "DB_NAME": "xqueue",
         "DB_PORT": "3306",
         "CONSUMER_DELAY": "10",
@@ -214,6 +214,8 @@ if deploy_to_k8s:
         "UPLOAD_PATH_PREFIX": "xqueue",
         "XQUEUE_CFG": "/dev/null",
     }
+
+    db_host = edxapp_stack.require_output("edxapp")["mariadb"]
 
     # Read Vault policy template and replace DEPLOYMENT placeholder
     vault_policy_template = (
@@ -359,6 +361,60 @@ if deploy_to_k8s:
     xqueue_k8s_app = OLApplicationK8s(
         ol_app_k8s_config=ol_app_k8s_config,
         opts=ResourceOptions(depends_on=[db_creds_secret, xqueue_creds_secret]),
+    )
+
+    # Build selector labels from the application labels
+    # Match the labels created by OLApplicationK8s
+    deployment_selector_labels = k8s_global_labels.model_dump() | {
+        "ol.mit.edu/process": "webapp",
+        "ol.mit.edu/application": "xqueue",
+    }
+
+    # Determine docker image tag (same logic as above)
+    docker_image_tag = (
+        os.environ.get("XQUEUE_DOCKER_DIGEST")
+        or xqueue_config.get("docker_tag")
+        or openedx_release
+    )
+    app_image = f"mitodl/xqueue:{docker_image_tag}"
+    app_image = cached_image_uri(app_image)
+
+    # Patch the xqueue-app Deployment to add DB_HOST environment variable
+    # This is necessary because DB_HOST comes from a Pulumi Output (edxapp stack)
+    xqueue_deployment_patch = kubernetes.apps.v1.Deployment(
+        "xqueue-app-patch",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="xqueue-app",
+            namespace=namespace,
+        ),
+        spec=kubernetes.apps.v1.DeploymentSpecArgs(
+            selector=kubernetes.meta.v1.LabelSelectorArgs(
+                match_labels=deployment_selector_labels,
+            ),
+            template=kubernetes.core.v1.PodTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    labels=deployment_selector_labels,
+                ),
+                spec=kubernetes.core.v1.PodSpecArgs(
+                    containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="xqueue-app",
+                            image=app_image,
+                            env=[
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="DB_HOST",
+                                    value=db_host,
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        opts=ResourceOptions(
+            depends_on=xqueue_k8s_app,
+            ignore_changes=["spec.strategy"],
+        ),
     )
 
     # Gateway API routing with TLS certificate for external HTTPS access
