@@ -247,6 +247,16 @@ if deploy_to_k8s:
     # Create VaultSecret for database credentials
     # These are exposed as environment variables to the Django settings module
     db_creds_secret_name = "xqueue-db-creds"  # noqa: S105  # pragma: allowlist secret
+
+    # Build templates dict with DB_HOST from Pulumi Output
+    def build_db_creds_templates(db_address: str) -> dict[str, str]:
+        """Build database credentials templates with DB_HOST."""
+        return {
+            "DB_USER": "{{ .Secrets.username }}",
+            "DB_PASSWORD": "{{ .Secrets.password }}",
+            "DB_HOST": db_address,
+        }
+
     db_creds_secret = OLVaultK8SSecret(
         f"xqueue-{env_name}-db-creds-secret",
         OLVaultK8SDynamicSecretConfig(
@@ -259,11 +269,7 @@ if deploy_to_k8s:
             path="creds/xqueue",
             restart_target_kind="Deployment",
             restart_target_name="xqueue-app",
-            templates={
-                "DB_USER": "{{ .Secrets.username }}",
-                "DB_PASSWORD": "{{ .Secrets.password }}",
-                "DB_HOST": db_host.apply(lambda host: host),
-            },
+            templates=db_host.apply(build_db_creds_templates),
             vaultauth=vault_k8s_resources.auth_name,
         ),
         opts=ResourceOptions(
