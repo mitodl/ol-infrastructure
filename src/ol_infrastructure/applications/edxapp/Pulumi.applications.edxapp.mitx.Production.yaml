@@ -6,24 +6,30 @@ config:
   consul:address: https://consul-mitx-production.odl.mit.edu
   edxapp:waffle_flags:
   - ["content_tagging.disabled", "--create", "--everyone"]
-  - ["blockstore.use_blockstore_app_api", "--create", "--superusers", "--everyone"]
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
   - ["course_home.course_home_mfe_progress_tab", "--create", "--everyone"]
   - ["contentstore.new_studio_mfe.use_new_advanced_settings_page", "--create", "--superusers",
     "--everyone"]
-  - ["contentstore.new_studio_mfe.use_new_course_outline_page", "--deactivate"]
-  - ["contentstore.new_studio_mfe.use_new_course_team_page", "--deactivate"]
+  - ["contentstore.new_studio_mfe.use_new_course_outline_page", "--create", "--superusers",
+    "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_course_team_page", "--create", "--superusers",
+    "--everyone"]
   - ["contentstore.new_studio_mfe.use_new_export_page", "--create", "--superusers",
     "--everyone"]
   - ["contentstore.new_studio_mfe.use_new_files_uploads_page", "--create", "--superusers",
     "--everyone"]
-  - ["contentstore.new_studio_mfe.use_new_grading_page", "--deactivate"]
+  - ["contentstore.new_studio_mfe.use_new_grading_page", "--create", "--superusers",
+    "--everyone"]
   - ["contentstore.new_studio_mfe.use_new_import_page", "--create", "--superusers",
     "--everyone"]
-  - ["contentstore.new_studio_mfe.use_new_schedule_details_page", "--deactivate"]
+  - ["contentstore.new_studio_mfe.use_new_schedule_details_page", "--create", "--superusers",
+    "--everyone"]
   - ["contentstore.new_studio_mfe.use_new_updates_page", "--create", "--superusers",
     "--everyone"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
+  - ["discussions.enable_new_structure_discussions", "--create", "--everyone"]
+  - ["discussions.enable_discussions_mfe", "--create", "--everyone"]
+  - ["forum_v2.enable_mysql_backend", "--create", "--everyone"]
   - ["grades.bulk_management", "--create", "--superusers", "--everyone"]
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
   - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
@@ -34,7 +40,7 @@ config:
   - ["new_core_editors.use_new_problem_editor", "--create", "--everyone"]
   - ["new_core_editors.use_new_text_editor", "--create", "--superusers", "--everyone"]
   - ["new_core_editors.use_new_video_editor", "--create", "--superusers", "--everyone"]
-  - ["new_studio_mfe.use_new_home_page", "--deactivate"]
+  - ["new_studio_mfe.use_new_home_page", "--create", "--superusers", "--everyone"]
   - ["new_studio_mfe.use_tagging_taxonomy_list_page", "--create", "--superusers",
     "--everyone"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
