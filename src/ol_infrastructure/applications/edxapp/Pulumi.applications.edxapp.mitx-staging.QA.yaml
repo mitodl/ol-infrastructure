@@ -18,7 +18,7 @@ config:
   - ["contentstore.new_studio_mfe.use_new_updates_page", "--create", "--superusers",
     "--everyone"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
-  - ["discussions.enable_new_structure_discussions", "--create", "--everyone"]
+  - ["discussions.enable_new_structure_discussions", "--disable"]
   - ["discussions.enable_discussions_mfe", "--create", "--everyone"]
   - ["forum_v2.enable_mysql_backend", "--create", "--everyone"]
   - ["grades.bulk_management", "--create", "--superusers", "--everyone"]
