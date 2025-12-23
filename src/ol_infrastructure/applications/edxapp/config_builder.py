@@ -334,7 +334,7 @@ def build_base_general_config() -> ConfigDict:
         "ENABLE_OAUTH2_PROVIDER": True,
         "ENABLE_PUBLISHER": False,
         "ENABLE_SERVICE_STATUS": False,
-        "ENABLE_SPECIAL_EXAMS": False,
+        "ENABLE_SPECIAL_EXAMS": True,
         "ENABLE_TEAMS": True,
         "ENABLE_TEXTBOOK": True,
         "ENABLE_VIDEO_BUMPER": False,
