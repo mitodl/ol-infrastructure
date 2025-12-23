@@ -8,7 +8,7 @@ from bridge.settings.openedx.types import (
     OpenEdxApplication,
     OpenEdxSupportedRelease,
 )
-from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
+from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
@@ -45,7 +45,6 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
     )
 
     container_fragments = []
-    packer_fragments = []
     pulumi_fragments = []
     group_configs = []
 
@@ -95,29 +94,6 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                 repository="node",
                 tag_filter=rf"^v({node_version}\.\d+\.\d+)",
                 order_by="version",
-            )
-
-            # AMI code related resource setup
-            edx_ami_code = git_repo(
-                name=Identifier(
-                    f"edxapp-custom-image-{deployment_name}-{release_name}"
-                ),
-                uri="https://github.com/mitodl/ol-infrastructure",
-                branch="main",
-                depth=1,
-                check_every="10m",
-                paths=[
-                    "src/bridge/settings/openedx/",
-                    "src/bilder/components/",
-                    "src/bilder/images/edxapp_v2/deploy.py",
-                    "src/bilder/images/edxapp_v2/group_data/",
-                    "src/bilder/images/edxapp_v2/files/",
-                    "src/bilder/images/edxapp_v2/templates/vector/",
-                    f"src/bilder/images/edxapp_v2/templates/edxapp/{deployment_name}/",
-                    "src/bilder/images/edxapp_v2/custom_install.pkr.hcl",
-                    f"src/bilder/images/edxapp_v2/packer_vars/{deployment_name}.pkrvars.hcl",
-                    f"src/bilder/images/edxapp_v2/packer_vars/{release_name}.pkrvars.hcl",
-                ],
             )
 
             # Pulumi code related resource setup
@@ -252,7 +228,6 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                     resources=[
                         earthly_git_resource,
                         edx_registry_image_resource,
-                        edx_ami_code,
                         edx_pulumi_code,
                         nodejs_github_release,
                         *theme_git_resources,
@@ -261,57 +236,6 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                     jobs=[earthly_build_job],
                 )
             )
-
-            packer_fragments.append(
-                packer_jobs(
-                    dependencies=[
-                        GetStep(
-                            get=edx_registry_image_resource.name,
-                            trigger=True,
-                            passed=[earthly_build_job.name],
-                            params={"skip_download": True},
-                        ),
-                        GetStep(
-                            get=theme_git_resource.name,
-                            trigger=False,
-                            passed=[earthly_build_job.name],
-                        ),
-                        GetStep(
-                            get=edx_platform_git_resource.name,
-                            trigger=False,
-                            passed=[earthly_build_job.name],
-                        ),
-                    ],
-                    image_code=edx_ami_code,
-                    packer_template_path=(
-                        "src/bilder/images/edxapp_v2/custom_install.pkr.hcl"
-                    ),
-                    node_types=["web", "worker"],
-                    env_vars_from_files={
-                        "DOCKER_REPO_NAME": (
-                            f"{edx_registry_image_resource.name}/repository"
-                        ),
-                        "DOCKER_IMAGE_DIGEST": (
-                            f"{edx_registry_image_resource.name}/digest"
-                        ),
-                        "EDXAPP_COMMIT_SHA": (
-                            f"{edx_platform_git_resource.name}/.git/ref"
-                        ),
-                        "EDX_THEME_COMMIT_SHA": f"{theme_git_resource.name}/.git/ref",
-                    },
-                    packer_vars={"framework": "earthly"},
-                    extra_packer_params={
-                        "only": ["amazon-ebs.edxapp"],
-                        "var_files": [
-                            f"{edx_ami_code.name}/src/bilder/images/edxapp_v2/packer_vars/{release_name}.pkrvars.hcl",
-                            f"{edx_ami_code.name}/src/bilder/images/edxapp_v2/packer_vars/{deployment.deployment_name}.pkrvars.hcl",
-                        ],
-                    },
-                    job_name_suffix=f"{release_name}-{deployment.deployment_name}",
-                )
-            )
-            job_names.append(packer_fragments[-1].jobs[-1].name)
-            job_names.append(packer_fragments[-1].jobs[-2].name)
 
             pulumi_fragments.append(
                 pulumi_jobs_chain(
@@ -331,11 +255,6 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                             passed=[earthly_build_job.name],
                             params={"skip_download": True},
                         ),
-                        GetStep(
-                            get=packer_fragments[-1].resources[-1].name,
-                            trigger=True,
-                            passed=[packer_fragments[-1].jobs[-1].name],
-                        ),
                     ],
                     additional_env_vars={"OPENEDX_RELEASE": release_name},
                     env_vars_from_files={
@@ -348,7 +267,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
             job_names.extend([job.name for job in pulumi_fragments[-1].jobs])
 
         combined_fragments = PipelineFragment.combine_fragments(
-            *container_fragments, *packer_fragments, *pulumi_fragments
+            *container_fragments, *pulumi_fragments
         )
         group_config = GroupConfig(
             name=f"{release_name}",
@@ -375,7 +294,7 @@ if __name__ == "__main__":
         {
             "\n",
             (
-                "fly -t pr-inf set-pipeline -p earthly-packer-pulumi-edxapp-global -c"
+                "fly -t pr-inf set-pipeline -p docker-pulumi-edxapp-global -c"
                 " definition.json"
             ),
         }
