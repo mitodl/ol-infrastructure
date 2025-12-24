@@ -286,6 +286,10 @@ ReleaseMap: dict[
                 application="discussions",
                 application_type="MFE",
                 release="master",
+                translation_overrides=[
+                    "export ATLAS_OPTIONS='-r mitodl/mitxonline-translations -n main'",
+                    "make pull_translations",
+                ],
             ),
             OpenEdxApplicationVersion(
                 application="edx-platform",
@@ -309,8 +313,8 @@ ReleaseMap: dict[
                 application_type="MFE",
                 release="master",
                 translation_overrides=[
-                    "atlas pull -r mitodl/mitxonline-translations -n main translations/frontend-app-learning/src/i18n/messages:src/i18n/messages/frontend-app-learning",  # noqa: E501
-                    "node_modules/@edx/frontend-platform/i18n/scripts/intl-imports.js frontend-app-learning",  # noqa: E501
+                    "export ATLAS_OPTIONS='-r mitodl/mitxonline-translations -n main'",
+                    "make pull_translations",
                 ],
             ),
             OpenEdxApplicationVersion(

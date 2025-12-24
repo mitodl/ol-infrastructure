@@ -138,7 +138,7 @@ collected:
 fetch-translations:
   FROM +collected
   IF [ -e "/openedx/edx-platform/openedx/core/djangoapps/plugins/management/commands/pull_plugin_translations.py" ]
-    ARG OPENEDX_TRANSLATIONS_REPOSITORY=openedx/openedx-translations
+    ARG OPENEDX_TRANSLATIONS_REPOSITORY=mitodl/mitxonline-translations
     ARG OPENEDX_TRANSLATIONS_BRANCH=main
     ARG OPENEDX_ATLAS_OPTIONS="--repository $OPENEDX_TRANSLATIONS_REPOSITORY --revision $OPENEDX_TRANSLATIONS_BRANCH"
    ## Pull translations for edx_django_utils.plugins for both lms and cms
@@ -151,7 +151,7 @@ fetch-translations:
       python manage.py lms compile_xblock_translations && \
       ## pull translations via atlas
       atlas pull $OPENEDX_ATLAS_OPTIONS \
-        translations/edx-platform/conf/locale:conf/locale \
+        translations/edx-platform/conf/locale:conf/locale && \
       python manage.py lms compilemessages && \
       python manage.py lms compilejsi18n
     ENV DJANGO_SETTINGS_MODULE cms.envs.mitol.i18n
