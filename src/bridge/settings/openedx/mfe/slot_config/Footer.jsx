@@ -6,6 +6,7 @@ import { PluginSlot } from '@openedx/frontend-plugin-framework';
 import { getLoginRedirectUrl } from '@edx/frontend-platform/auth';
 import { AppContext } from '@edx/frontend-platform/react';
 import { useLocation } from 'react-router-dom';
+import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
 
 function RevealLinks({ label, children }) {
 
@@ -135,6 +136,118 @@ const ForceLoginRedirect = () => {
   return null;
 };
 
+const AutoSelectLanguage = () => {
+  const config = getConfig();
+  const location = useLocation();
+  const { authenticatedUser } = useContext(AppContext);
+
+  const lmsBaseURL = config.LMS_BASE_URL;
+  const studioBaseURL = config.STUDIO_BASE_URL;
+  const username = authenticatedUser?.username;
+  const DEVELOPMENT_ENVIRONMENT = "development";
+  const AUTHORING_APP_ID = "authoring";
+  const ENGLISH_LANG_CODE = "en";
+  const LANGUAGE_PREFERENCE_COOKIE_NAME =
+    config.LANGUAGE_PREFERENCE_COOKIE_NAME ||
+    process.env.LANGUAGE_PREFERENCE_COOKIE_NAME ||
+    `${process.env.ENVIRONMENT}-openedx-language-preference`;
+  const courseKeyRegex = /course-v1:[^/]+/;
+  const reloadCookieName = "authoringLangCookieReloaded";
+
+  // Helper to escape regex metacharacters in cookie name
+  const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const getCookie = (name) => {
+    const safeName = escapeRegExp(name);
+    const match = document.cookie.match(new RegExp(`(^| )${safeName}=([^;]+)`));
+    return match ? decodeURIComponent(match[2]) : null;
+  };
+  const setCookie = (name, value, days = 1) => {
+    const expires = new Date(Date.now() + days * 864e5).toUTCString();
+    document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/`;
+  };
+  const removeCookie = (name) => {
+    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+  };
+
+  async function setLanguage(baseURL, language) {
+    try {
+      const response = await getAuthenticatedHttpClient().patch(
+        `${baseURL}/api/user/v1/preferences/${username}`,
+        { "pref-lang": language },
+        { headers: { "Content-Type": "application/merge-patch+json" } }
+      );
+      return response.status === 204;
+    } catch (error) {
+      if (process.env.NODE_ENV === DEVELOPMENT_ENVIRONMENT) {
+        console.error("Language update failed:", error);
+      }
+      return false;
+    }
+  }
+
+  // This API is provided by the ol-openedx-course-translations plugin https://github.com/mitodl/open-edx-plugins/tree/main/src/ol_openedx_course_translations
+  async function fetchCourseLanguage(courseKey) {
+    const url = `${lmsBaseURL}/course-translations/api/course-language/${courseKey}`;
+    try {
+      const { data } = await getAuthenticatedHttpClient().get(url);
+      return data?.language;
+    } catch (error) {
+      if (process.env.NODE_ENV === DEVELOPMENT_ENVIRONMENT) {
+        console.warn("Course language fetch failed:", error);
+      }
+      return null;
+    }
+  }
+
+  useEffect(() => {
+    if (!username) return;
+
+    const cookieLang = getCookie(LANGUAGE_PREFERENCE_COOKIE_NAME);
+    // Studio (Authoring App) logic
+    if (process.env.APP_ID === AUTHORING_APP_ID) {
+      // Only reset if reload cookie does not exist and language is not English
+      if (cookieLang === ENGLISH_LANG_CODE || getCookie(reloadCookieName)) return;
+
+      (async () => {
+        try {
+          const updated = await setLanguage(studioBaseURL, ENGLISH_LANG_CODE);
+          if (updated) {
+            setCookie(reloadCookieName, "true");
+            window.location.reload();
+          }
+        } catch (error) {
+          if (process.env.NODE_ENV === DEVELOPMENT_ENVIRONMENT) {
+            console.error("Failed to set authoring language:", error);
+          }
+        }
+      })();
+      return;
+    }
+
+    const match = location.pathname.match(courseKeyRegex);
+    if (!match) return;
+
+    const courseKey = match[0];
+    (async () => {
+      const courseLang = await fetchCourseLanguage(courseKey);
+      if (
+        courseLang &&
+        cookieLang &&
+        courseLang !== cookieLang
+      ) {
+        const updated = await setLanguage(lmsBaseURL, courseLang);
+        if (updated) {
+          removeCookie(reloadCookieName); // Remove after setting in learning MFE
+          window.location.reload();
+        }
+      }
+    })();
+
+  }, [location.pathname, username]);
+
+  return null;
+};
+
 const AppziScript = () => {
   const appziUrl = process.env.APPZI_URL;
 
@@ -164,6 +277,9 @@ const Footer = () => {
     <footer className="d-flex flex-column align-items-stretch">
       <ForceLoginRedirect />
       <AppziScript />
+      {
+          (process.env.ENABLE_AUTO_LANGUAGE_SELECTION === "true") ? <AutoSelectLanguage /> : null
+      }
         <PluginSlot id="frontend.shell.footer.desktop.top.ui">
             <RevealLinks label={"Reveal Button"} />
         </PluginSlot>
