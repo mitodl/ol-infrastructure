@@ -394,7 +394,6 @@ def create_k8s_configmaps(  # noqa: PLR0915
     # CMS general configuration
     cms_general_config_name = "71-cms-general-config-yaml"
     cms_general_config_content: dict[str, Any] = {
-        "COURSE_AUTHORING_MICROFRONTEND_URL": "/authoring",
         "DISCUSSIONS_INCONTEXT_LEARNMORE_URL": "https://openedx.atlassian.net/wiki/spaces/COMM/pages/3470655498/Discussions+upgrade+Sidebar+and+new+topic+structure",
         "GIT_REPO_EXPORT_DIR": "/openedx/data/export_course_repos",
         "GIT_EXPORT_DEFAULT_IDENT": {
