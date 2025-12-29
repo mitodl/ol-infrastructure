@@ -174,7 +174,7 @@ def _build_interpolated_config_dict(
         ],
         "LOGO_URL": f"https://{domains['lms']}/static/{stack_info.env_prefix}/images/logo.svg",
         "LOGO_URL_PNG_FOR_EMAIL": f"https://{domains['lms']}/static/{stack_info.env_prefix}/images/logo.png",
-        "LOGO_TRADEMARK_URL": f"https://{domains['lms']}/static/{stack_info.env_prefix}/images/{('mit-ol-logo' if stack_info.env_prefix == 'xpro' else 'mit-logo')}.svg",
+        "LOGO_TRADEMARK_URL": f"https://{domains['lms']}/static/{stack_info.env_prefix}/images/{('mit-ol-logo' if stack_info.env_prefix in ['xpro', 'mitx'] else 'mit-logo')}.svg",
         "MARKETING_SITE_BASE_URL": f"https://{marketing_domain}/",
         "MARKETING_SITE_CHECKOUT_URL": f"https://{marketing_domain}/cart/add/",
         "NOTIFICATIONS_DEFAULT_FROM_EMAIL": (
