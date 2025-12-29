@@ -134,6 +134,7 @@ def build_base_general_config() -> ConfigDict:
         "COURSES_WITH_UNSAFE_CODE": [],
         "COURSES_INVITE_ONLY": True,
         "COURSE_ABOUT_VISIBILITY_PERMISSION": "see_exists",
+        "COURSE_AUTHORING_MICROFRONTEND_URL": "/authoring",
         "COURSE_CATALOG_API_URL": "http://localhost:8008/api/v1",
         "COURSE_CATALOG_URL_ROOT": "http://localhost:8008",
         "COURSE_CATALOG_VISIBILITY_PERMISSION": "staff",
