@@ -36,7 +36,6 @@ config:
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["studio.library_authoring_mfe", "--deactivate"]
-  - ["legacy_studio.certificates", "--create", "--everyone"]
   edxapp:business_unit: residential-staging
   edxapp:db_password:
     secure: v1:ZWtTTF60+1g61/XW:K9osJstG/oeHJvYXOUQS6KSIUuTcQFgR1cjECmosVk7BPLCJMPkzlLviW7swdiUhUIPErfyYNqs=
