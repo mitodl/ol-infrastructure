@@ -747,10 +747,10 @@ def create_k8s_resources(  # noqa: C901
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={
                                     "cpu": "100m",
-                                    "memory": "128Mi",
+                                    "memory": "512Mi",
                                 },
                                 limits={
-                                    "memory": "256Mi",
+                                    "memory": "512Mi",
                                 },
                             ),
                             volume_mounts=[
@@ -1203,10 +1203,10 @@ def create_k8s_resources(  # noqa: C901
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={
                                     "cpu": "100m",
-                                    "memory": "128Mi",
+                                    "memory": "512Mi",
                                 },
                                 limits={
-                                    "memory": "256Mi",
+                                    "memory": "512Mi",
                                 },
                             ),
                             volume_mounts=[
