@@ -24,6 +24,10 @@ path "secret-sandbox/*" {
   capabilities = ["create", "read", "update", "delete", "list"]
 }
 
+path "secrets-share/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+
 # To allow Devs to update creds and
 # run the replication on their own
 path "secret-concourse/ocw/ocw-studio-db-replication" {
