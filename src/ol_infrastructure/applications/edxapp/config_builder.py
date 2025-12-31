@@ -359,7 +359,6 @@ def build_base_general_config() -> ConfigDict:
             "AUTH_USE_CERTIFICATES": False,
             "AUTH_USE_OPENID_PROVIDER": True,
             "BYPASS_ACTIVATION_EMAIL_FOR_EXTAUTH": True,
-            "CERTIFICATES_ENABLED": False,
             "DISABLE_LOGIN_BUTTON": False,
             "ENABLE_AUTO_COURSE_REGISTRATION": True,
             "ENABLE_BLAKE2B_HASHING": True,
