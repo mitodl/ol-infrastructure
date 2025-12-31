@@ -799,6 +799,7 @@ for k, v in mimetypes.types_map.items():
     ):
         gzip_settings["extensions"].add(k.strip("."))
         gzip_settings["content_types"].add(v)
+bucket_backend_name = "MIT Learn S3 Media Storage"
 mitlearn_fastly_service = fastly.ServiceVcl(
     f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}",
     name=f"MIT Learn {stack_info.env_suffix}",
@@ -813,6 +814,16 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             ssl_sni_hostname=nextjs_heroku_domain,
             use_ssl=True,
         ),
+        fastly.ServiceVclBackendArgs(
+            address=f"{mitlearn_app_storage_bucket_name}.s3.us-east-1.amazonaws.com",
+            name=bucket_backend_name,
+            override_host=f"{mitlearn_app_storage_bucket_name}.s3.us-east-1.amazonaws.com",
+            port=443,
+            request_condition="Media asset requests",
+            ssl_cert_hostname=f"{mitlearn_app_storage_bucket_name}.s3.us-east-1.amazonaws.com",
+            ssl_sni_hostname=f"{mitlearn_app_storage_bucket_name}.s3.us-east-1.amazonaws.com",
+            use_ssl=True,
+        ),
     ],
     gzips=[
         fastly.ServiceVclGzipArgs(
@@ -825,7 +836,13 @@ mitlearn_fastly_service = fastly.ServiceVcl(
         brotli_compression=True,
     ),
     cache_settings=[],
-    conditions=[],
+    conditions=[
+        fastly.ServiceVclConditionArgs(
+            name="Media asset requests",
+            statement="var.is_media_request",
+            type="REQUEST",
+        )
+    ],
     dictionaries=[
         fastly.ServiceVclDictionaryArgs(name="path_redirects"),  # path level redirects
     ],
@@ -872,6 +889,35 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             ),
             type="recv",
             priority=10,
+        ),
+        fastly.ServiceVclSnippetArgs(
+            content=textwrap.dedent(r"""
+            declare local var.is_media_request BOOL;
+            set var.is_media_request = false;
+            if( req.url ~ "^/media" ) {
+              set var.is_media_request = true;
+              set req.url = regsub(req.url, "^/media/(.*)$", "/\1");
+              unset req.http.Cookie;
+            }"""),
+            name="Route media requests to S3",
+            priority=200,
+            type="recv",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            content=textwrap.dedent(f"""\
+            if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
+              unset bereq.http.Authorization;
+            }}"""),
+            name="Strip auth headers in S3 miss requests",
+            type="miss",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            content=textwrap.dedent(f"""\
+            if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
+              unset bereq.http.Authorization;
+            }}"""),
+            name="Strip auth headers in S3 pass requests",
+            type="pass",
         ),
         fastly.ServiceVclSnippetArgs(
             name="Redirect for to correct domain",
