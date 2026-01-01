@@ -19,7 +19,7 @@ services:
     - 8000:8000
     env_file: .env
   watch:
-    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/node:22.11.0@sha256:5c76d05034644fa8ecc9c2aa84e0a83cd981d0ef13af5455b87b9adf5b216561
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/node:24.11.0@sha256:e5bbac0e9b8a6e3b96a86a82bbbcf4c533a879694fd613ed616bae5116f6f243
     working_dir: /app
     command: >
       /bin/bash -c 'npm install && npm run start'
