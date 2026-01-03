@@ -1148,7 +1148,7 @@ requires-dist = [
     { name = "pulumi-github", specifier = ">=6.0.0,<7" },
     { name = "pulumi-keycloak", specifier = ">=6.0.0,<7" },
     { name = "pulumi-mailgun", specifier = ">=3.0.0,<4" },
-    { name = "pulumi-mongodbatlas", specifier = ">=3.3.0,<4" },
+    { name = "pulumi-mongodbatlas", specifier = ">=4,<5" },
     { name = "pulumi-tls", specifier = ">=5.0.0,<6" },
     { name = "pulumi-vault", specifier = ">=7,<8" },
     { name = "pulumiverse-heroku", specifier = ">=1.0.3,<2" },
@@ -1472,16 +1472,16 @@ wheels = [
 
 [[package]]
 name = "pulumi-mongodbatlas"
-version = "3.38.0"
+version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "parver" },
     { name = "pulumi" },
     { name = "semver" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/78/cd/b92d803aac1a52e211666e689baf62eb40e5b2ed96f3d0a322390053dabc/pulumi_mongodbatlas-3.38.0.tar.gz", hash = "sha256:c539f41451ac95fe2641e65fe3f40884860e49097daf5e6412488bbb628f6d06", size = 549329, upload-time = "2025-12-04T23:50:11.889Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1e/e5/e80348d08a0b82a03d2447006f2194a7d7be1a004028f0117fd6032a64f3/pulumi_mongodbatlas-4.0.0.tar.gz", hash = "sha256:67469b5ef982f58fccf9ee9f06ad930068e67ab84b691626ef03804290235192", size = 561169, upload-time = "2025-12-30T17:17:07.138Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7b/46/9c4ab68d93f42e2a35b8ba1c7d062ba79a9c5ad0f45903dd8be69bbb70de/pulumi_mongodbatlas-3.38.0-py3-none-any.whl", hash = "sha256:616a3e9237efa73ce949a7aec700cc89dde0263f8153ba1fd2d54aba1100cbb3", size = 768656, upload-time = "2025-12-04T23:50:10.376Z" },
+    { url = "https://files.pythonhosted.org/packages/1a/bd/8a225be6254942cecc7e96ff2de34bf12493e9040d45123fd276a8ca2709/pulumi_mongodbatlas-4.0.0-py3-none-any.whl", hash = "sha256:a7819649d0e8463eab244f7b5653d7d0550d68020e16d991cff65190e98d71ba", size = 778149, upload-time = "2025-12-30T17:17:05.429Z" },
 ]
 
 [[package]]
