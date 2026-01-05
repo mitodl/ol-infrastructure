@@ -618,12 +618,8 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
                     "A label was requested for language code `ht` but",
                     "the code is completely unknown",
                 ),
-                (
-                    "Failed async course content export to git",
-                ),
-                (
-                    "Failed to pull git repository",
-                ),
+                ("Failed async course content export to git",),
+                ("Failed to pull git repository",),
             ],
         },
     }
