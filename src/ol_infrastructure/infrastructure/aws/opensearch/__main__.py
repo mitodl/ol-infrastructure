@@ -306,6 +306,7 @@ if openai_connector_setup:
         "opensearch-openai-api-key",
         name=f"{environment_name}-opensearch-openai-api-key",
         tags=aws_config.merged_tags({"Name": f"{environment_name}-openai-api-key"}),
+        recovery_window_in_days=0,  # Allow immediate deletion for testing
     )
 
     aws.secretsmanager.SecretVersion(
