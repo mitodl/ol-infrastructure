@@ -13,3 +13,4 @@ config:
   opensearch:engine_version: "OpenSearch_3.1"
   opensearch:public_web: "true"  # this needs to stay true to avoid recreating
   opensearch:secured_cluster: "true"
+  opensearch:openai_connector_enabled: "true"

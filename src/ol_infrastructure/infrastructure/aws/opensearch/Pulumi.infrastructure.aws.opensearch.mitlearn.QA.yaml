@@ -13,3 +13,4 @@ config:
   opensearch:engine_version: "OpenSearch_3.3"
   opensearch:public_web: "true"
   opensearch:secured_cluster: "true"
+  opensearch:openai_connector_enabled: "true"
