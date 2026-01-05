@@ -25,7 +25,6 @@ config:
   eks:efs_csi_provisioner: 'true'
   eks:gateway_release_channel: experimental
   eks:namespaces:
-  - botkube
   - kubewatch
   - mitx-openedx
   - mitx-staging-openedx

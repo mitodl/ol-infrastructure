@@ -35,8 +35,6 @@ APISIX_CHART_VERSION = "2.12.5"
 AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION = "1.17.0"
 # renovate: datasource=helm depName=aws-node-termination-handler packageName=aws-node-termination-handler registryUrl=https://aws.github.io/eks-charts
 AWS_NODE_TERMINATION_HANDLER_CHART_VERSION = "0.27.2"
-# renovate: datasource=helm depName=botkube packageName=botkube registryUrl=https://charts.botkube.io
-BOTKUBE_CHART_VERSION = "v1.14.0"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager
 CERT_MANAGER_CHART_VERSION = "v1.16.1"
 # renovate: datasource=helm depName=dagster packageName=dagster registryUrl=https://dagster-io.github.io/helm

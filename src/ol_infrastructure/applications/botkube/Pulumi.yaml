@@ -1,6 +1,0 @@
----
-name: ol-infrastructure-botkube
-runtime: python
-description: MIT OL K8s Botkube
-backend:
-  url: s3://mitol-pulumi-state/
