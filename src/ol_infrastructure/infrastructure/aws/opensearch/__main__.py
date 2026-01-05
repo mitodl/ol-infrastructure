@@ -1,3 +1,4 @@
+import json
 import re
 from pathlib import Path
 
@@ -8,7 +9,11 @@ import pulumi_consul as consul
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.aws.ec2_helper import DiskTypes, default_egress_args
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.aws.iam_helper import (
+    DEVOPS_ADMIN_USERNAMES,
+    IAM_POLICY_VERSION,
+    lint_iam_policy,
+)
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
@@ -58,8 +63,11 @@ cluster_instance_type = (
     search_config.get("instance_type") or cluster_defaults["instance_type"]
 )
 disk_size = search_config.get_int("disk_size_gb") or 30
+
 is_public_web = search_config.get_bool("public_web") or False
 is_secured_cluster = search_config.get_bool("secured_cluster") or False
+openai_connector_setup = search_config.get_bool("openai_connector_enabled") or False
+
 consul_service_name = (
     search_config.get("consul_service_name") or "elasticsearch"
 )  # Default is for legacy compatability
@@ -79,11 +87,9 @@ for cidr in search_config.get_object("additional_trusted_cidrs") or []:
         msg = f"additional_trusted_cidr {cidr} is not a valid CIDR in 10.0.0.0/8 or 172.0.0.0/8"  # noqa: E501
         raise ValueError(msg)
 
-
 ##########
 # CREATE #
 ##########
-
 
 # Networking
 if is_public_web:
@@ -288,6 +294,139 @@ if not search_config.get("disable_consul_components"):
         opts=pulumi.ResourceOptions(provider=consul_provider),
     )
 
+
+# This only support MITLearn environments for right now
+if openai_connector_setup:
+    # Store the open_ai apikey in AWS Secrets Manager
+    openai_api_key = read_yaml_secrets(
+        Path(f"{stack_info.env_prefix}/secrets.{stack_info.env_suffix}.yaml")
+    )["openai"]["api_key"]
+
+    openai_secret = aws.secretsmanager.Secret(
+        "opensearch-openai-api-key",
+        name=f"{environment_name}-opensearch-openai-api-key",
+        tags=aws_config.merged_tags({"Name": f"{environment_name}-openai-api-key"}),
+        recovery_window_in_days=0,  # Allow immediate deletion for testing
+    )
+
+    aws.secretsmanager.SecretVersion(
+        "opensearch-openai-api-key-version",
+        secret_id=openai_secret.id,
+        secret_string=json.dumps({"api_key": openai_api_key}),
+    )
+
+    # Create an IAM role and policy to allow OpenSearch to access the secret
+    # in Secrets Manager
+    openai_connector_role = aws.iam.Role(
+        "opensearch-openai-connector-role",
+        assume_role_policy={
+            "Version": IAM_POLICY_VERSION,
+            "Statement": [
+                {
+                    "Action": "sts:AssumeRole",
+                    "Principal": {"Service": "opensearchservice.amazonaws.com"},
+                    "Effect": "Allow",
+                }
+            ],
+        },
+        tags=aws_config.merged_tags(
+            {"Name": f"{environment_name}-openai-connector-role"}
+        ),
+    )
+    openai_connector_policy = aws.iam.Policy(
+        "opensearch-openai-connector-policy",
+        policy=openai_secret.arn.apply(
+            lambda secret_arn: json.dumps(
+                {
+                    "Version": IAM_POLICY_VERSION,
+                    "Statement": [
+                        {
+                            "Action": [
+                                "secretsmanager:GetSecretValue",
+                                "secretsmanager:DescribeSecret",
+                            ],
+                            "Resource": secret_arn,
+                            "Effect": "Allow",
+                        }
+                    ],
+                }
+            )
+        ),
+    )
+
+    aws.iam.RolePolicyAttachment(
+        "opensearch-openai-connector-role-attachment",
+        role=openai_connector_role.name,
+        policy_arn=openai_connector_policy.arn,
+    )
+
+    ml_connector_access_policy = aws.iam.Policy(
+        "opensearch-ml-connector-access-policy",
+        policy=pulumi.Output.all(
+            role_arn=openai_connector_role.arn,
+            domain_arn=search_domain.arn,
+        ).apply(
+            lambda args: json.dumps(
+                {
+                    "Version": IAM_POLICY_VERSION,
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "iam:PassRole",
+                            "Resource": args["role_arn"],
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": "es:ESHttpPost",
+                            "Resource": f"{args['domain_arn']}/*",
+                        },
+                    ],
+                }
+            )
+        ),
+    )
+
+    current_identity = aws.get_caller_identity()
+    connector_management_role = aws.iam.Role(
+        "opensearch-connector-management-role",
+        assume_role_policy={
+            "Version": IAM_POLICY_VERSION,
+            "Statement": [
+                {
+                    "Action": "sts:AssumeRole",
+                    "Principal": {
+                        "AWS": [
+                            f"arn:aws:iam::{current_identity.account_id}:user/{username}"
+                            for username in DEVOPS_ADMIN_USERNAMES
+                        ]
+                    },
+                    "Effect": "Allow",
+                }
+            ],
+        },
+        tags=aws_config.merged_tags(
+            {"Name": f"{environment_name}-connector-management-role"}
+        ),
+    )
+
+    aws.iam.RolePolicyAttachment(
+        "opensearch-connector-management-role-policy-attachment",
+        role=connector_management_role.name,
+        policy_arn=ml_connector_access_policy.arn,
+    )
+
+    pulumi.export(
+        "openai_connector_role_arn",
+        openai_connector_role.arn,
+    )
+    pulumi.export(
+        "openai_secret_arn",
+        openai_secret.arn,
+    )
+    pulumi.export(
+        "connector_management_role_arn",
+        connector_management_role.arn,
+    )
 
 # Export Resources for shared use
 pulumi.export(
