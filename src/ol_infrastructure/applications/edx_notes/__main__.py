@@ -241,7 +241,7 @@ if deploy_to_k8s:
 
     # Application configuration (non-sensitive, static values only)
     application_config = {
-        "APP_PORT": APP_PORT,
+        "APP_PORT": str(APP_PORT),
         "ELASTICSEARCH_DSL_PORT": "443",
         "ELASTICSEARCH_DSL_USE_SSL": "true",
         "ELASTICSEARCH_DSL_VERIFY_CERTS": "false",
