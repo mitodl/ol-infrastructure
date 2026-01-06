@@ -233,7 +233,7 @@ if deploy_to_k8s:
     edxapp_output = edxapp_stack.require_output("edxapp")
     edxapp_db_address = edxapp_output["mariadb"]
 
-    # We use OLApplicationK8sConfig below, which assumes an NGINX sidecar infront
+    # We use OLApplicationK8sConfig below, which assumes an NGINX sidecar in front
     # of the actual application, which we do not have in this case. So we're going
     # to define an APP_PORT and use that for all probes as well as the listener port
     # of the application (refer to the Dockerfile for usage of APP_PORT)
