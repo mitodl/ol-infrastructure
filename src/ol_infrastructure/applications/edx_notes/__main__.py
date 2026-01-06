@@ -13,7 +13,7 @@ import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, get_caller_identity, iam, route53
 
-from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT, DEFAULT_NGINX_PORT
+from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.components.applications.eks import (
@@ -233,9 +233,15 @@ if deploy_to_k8s:
     edxapp_output = edxapp_stack.require_output("edxapp")
     edxapp_db_address = edxapp_output["mariadb"]
 
+    # We use OLApplicationK8sConfig below, which assumes an NGINX sidecar in front
+    # of the actual application, which we do not have in this case. So we're going
+    # to define an APP_PORT and use that for all probes as well as the listener port
+    # of the application (refer to the Dockerfile for usage of APP_PORT)
+    APP_PORT = 8071
+
     # Application configuration (non-sensitive, static values only)
     application_config = {
-        "APP_PORT": str(DEFAULT_NGINX_PORT),  # Must match Service port
+        "APP_PORT": str(APP_PORT),
         "ELASTICSEARCH_DSL_PORT": "443",
         "ELASTICSEARCH_DSL_USE_SSL": "true",
         "ELASTICSEARCH_DSL_VERIFY_CERTS": "false",
@@ -359,6 +365,7 @@ if deploy_to_k8s:
         application_image_digest=docker_image_tag,
         application_cmd_array=None,
         application_arg_array=None,
+        application_port=APP_PORT,
         vault_k8s_resource_auth_name=f"edx-notes-{stack_info.env_prefix}",
         registry="dockerhub",
         image_pull_policy="IfNotPresent",
@@ -377,7 +384,7 @@ if deploy_to_k8s:
             "liveness_probe": kubernetes.core.v1.ProbeArgs(
                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
                     path="/heartbeat",
-                    port=DEFAULT_NGINX_PORT,  # Must match APP_PORT
+                    port=APP_PORT,
                 ),
                 initial_delay_seconds=30,
                 period_seconds=10,
@@ -385,7 +392,7 @@ if deploy_to_k8s:
             "readiness_probe": kubernetes.core.v1.ProbeArgs(
                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
                     path="/heartbeat",
-                    port=DEFAULT_NGINX_PORT,  # Must match APP_PORT
+                    port=APP_PORT,
                 ),
                 initial_delay_seconds=10,
                 period_seconds=5,
@@ -393,7 +400,7 @@ if deploy_to_k8s:
             "startup_probe": kubernetes.core.v1.ProbeArgs(
                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
                     path="/heartbeat",
-                    port=DEFAULT_NGINX_PORT,  # Must match APP_PORT
+                    port=APP_PORT,
                 ),
                 initial_delay_seconds=10,
                 period_seconds=10,
@@ -432,7 +439,7 @@ if deploy_to_k8s:
             OLEKSGatewayRouteConfig(
                 backend_service_name="edx-notes",
                 backend_service_namespace=namespace,
-                backend_service_port=DEFAULT_NGINX_PORT,  # Service uses NGINX port
+                backend_service_port=APP_PORT,
                 name="edx-notes-https-root",
                 listener_name="https-web",
                 hostnames=[dns_name],
