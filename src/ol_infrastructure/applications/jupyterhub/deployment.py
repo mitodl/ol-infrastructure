@@ -393,7 +393,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                         "enabled": False,
                     },
                     "memory": {
-                        "limit": "2G",
+                        "limit": "4G",
                         "guarantee": "2G",
                     },
                     "cpu": {
