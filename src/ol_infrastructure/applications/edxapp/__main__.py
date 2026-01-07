@@ -1688,7 +1688,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
             use_ssl=True,
             request_condition="studio host",
             # Increase the timeout to account for slow API responses
-            first_byte_timeout=300000,
+            first_byte_timeout=600000,
             between_bytes_timeout=15000,
         ),
     ],
