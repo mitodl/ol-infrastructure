@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 import sys
 
 from bridge.settings.openedx.accessors import (
@@ -174,9 +175,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                                     earthly +all --DEPLOYMENT_NAME="$DEPLOYMENT_NAME" --RELEASE_NAME="$RELEASE_NAME" --EDX_PLATFORM_DIR="$EDX_PLATFORM_DIR" --THEME_DIR="$THEME_DIR" --PYTHON_VERSION="$PYTHON_VERSION" --NODE_VERSION="$NODE_VERSION";
                                     DIGEST=$(docker inspect --format '{{{{.Id}}}}' mitodl/edxapp-$DEPLOYMENT_NAME-$RELEASE_NAME | cut -d ":" -f2);
                                     echo "Saving docker image to tar file in the artifacts directory";
-                                    docker save -o ../../../artifacts/image.tar $DIGEST;
-                                    echo "Copying staticfiles archives to artifacts directory";
-                                    mv static*.tar.gz ../../../artifacts;""",  # noqa: E501
+                                    docker save -o ../../../artifacts/image.tar $DIGEST;""",
                                 ],
                             ),
                         ),
@@ -188,35 +187,6 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                             "image": "artifacts/image.tar",
                             "additional_tags": "artifacts/tag.txt",
                         },
-                    ),
-                    TaskStep(
-                        task=Identifier("publish-static-files"),
-                        config=TaskConfig(
-                            platform=Platform.linux,
-                            image_resource=AnonymousResource(
-                                type="registry-image",
-                                source={
-                                    "repository": "amazon/aws-cli",
-                                    "tag": "latest",
-                                },
-                            ),
-                            inputs=[
-                                Input(name="artifacts"),
-                                Input(name=edx_registry_image_resource.name),
-                            ],
-                            outputs=[],
-                            run=Command(
-                                path="sh",
-                                args=[
-                                    "-xc",
-                                    f"""RELEASE_NAME={release_name}
-                                    DEPLOYMENT_NAME={deployment_name}
-                                    DIGEST=$(cat {edx_registry_image_resource.name}/digest)
-                                    aws s3 cp artifacts/staticfiles-production.tar.gz s3://ol-eng-artifacts/edx-staticfiles/$DEPLOYMENT_NAME/$RELEASE_NAME/staticfiles-production-$DIGEST.tar.gz
-                                    aws s3 cp artifacts/staticfiles-nonprod.tar.gz s3://ol-eng-artifacts/edx-staticfiles/$DEPLOYMENT_NAME/$RELEASE_NAME/staticfiles-nonprod-$DIGEST.tar.gz""",  # noqa: E501
-                                ],
-                            ),
-                        ),
                     ),
                 ],
             )
