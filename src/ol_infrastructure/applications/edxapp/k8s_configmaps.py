@@ -584,6 +584,12 @@ def create_k8s_configmaps(  # noqa: PLR0915
             "common.djangoapps.third_party_auth.lti.LTIAuthBackend",
         ]
         lms_general_config_content["LEARNER_HOME_MICROFRONTEND_URL"] = "/dashboard/"
+        deployment_features.update(
+            {
+                "ENABLE_NEW_BULK_EMAIL_EXPERIENCE": False,
+            }
+        )
+
     elif stack_info.env_prefix == "mitxonline":
         lms_general_config_content["THIRD_PARTY_AUTH_BACKENDS"] = [
             "ol_social_auth.backends.OLOAuth2",
