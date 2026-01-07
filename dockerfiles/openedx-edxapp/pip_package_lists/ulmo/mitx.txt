@@ -1,5 +1,5 @@
 celery-redbeat==2.3.3  # Support for using Redis as the lock for Celery schedules
-granian==2.6.0
+granian==2.6.1
 django-redis==6.0.0
 ol-openedx-git-auto-export==0.7.1
 edx-sga
