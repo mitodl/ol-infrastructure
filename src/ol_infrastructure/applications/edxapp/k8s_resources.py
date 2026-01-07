@@ -274,57 +274,10 @@ def create_k8s_resources(  # noqa: C901
         msg = "Environment variable EDXAPP_DOCKER_IMAGE_DIGEST is not set. "
         raise OSError(msg)
     EDXAPP_DOCKER_IMAGE_DIGEST = os.environ["EDXAPP_DOCKER_IMAGE_DIGEST"]
+    edxapp_image = cached_image_uri(f"mitodl/edxapp@{EDXAPP_DOCKER_IMAGE_DIGEST}")
 
     OPENEDX_RELEASE: OpenEdxSupportedRelease = os.environ.get(
         "OPENEDX_RELEASE", "master"
-    )
-
-    ############################################
-    # Setup an init container that downloads and extracts the staticfiles
-    ############################################
-    edxapp_image = cached_image_uri(f"mitodl/edxapp@{EDXAPP_DOCKER_IMAGE_DIGEST}")
-    production_staticfiles_archive_name = (
-        f"staticfiles-production-{EDXAPP_DOCKER_IMAGE_DIGEST}.tar.gz"
-    )
-    nonprod_staticfiles_archive_name = (
-        f"staticfiles-nonprod-{EDXAPP_DOCKER_IMAGE_DIGEST}.tar.gz"
-    )
-    production_staticfiles_url = f"https://ol-eng-artifacts.s3.amazonaws.com/edx-staticfiles/{stack_info.env_prefix}/{OPENEDX_RELEASE}/{production_staticfiles_archive_name}"
-    nonprod_staticfiles_url = f"https://ol-eng-artifacts.s3.amazonaws.com/edx-staticfiles/{stack_info.env_prefix}/{OPENEDX_RELEASE}/{nonprod_staticfiles_archive_name}"
-
-    prod_dl_command = f"wget {production_staticfiles_url} -O /tmp/prod.tar.gz && tar -xf /tmp/prod.tar.gz --strip-components 2 -C /openedx/staticfiles"
-    nonprod_dl_command = f"wget {nonprod_staticfiles_url} -O /tmp/nonprod.tar.gz && tar -xf /tmp/nonprod.tar.gz --strip-components 2 -C /openedx/staticfiles"
-
-    if stack_info.env_suffix == "production":
-        dl_command = prod_dl_command
-    else:
-        dl_command = nonprod_dl_command
-
-    staticfiles_init_container_command = [
-        "/bin/sh",
-        "-c",
-        f"({dl_command}) || echo 'Could not download staticfiles'",
-    ]
-
-    staticfiles_volumes = [
-        kubernetes.core.v1.VolumeArgs(
-            name="staticfiles",
-            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
-        ),
-    ]
-
-    staticfiles_volume_mounts = [
-        kubernetes.core.v1.VolumeMountArgs(
-            name="staticfiles",
-            mount_path="/openedx/staticfiles",
-        ),
-    ]
-
-    staticfiles_init_container = kubernetes.core.v1.ContainerArgs(
-        name="staticfiles-downloader",
-        image=cached_image_uri("busybox:1.35"),
-        command=staticfiles_init_container_command,
-        volume_mounts=staticfiles_volume_mounts,
     )
 
     # Init container that ensures the export_course_repos directory exists
@@ -368,7 +321,6 @@ def create_k8s_resources(  # noqa: C901
             sub_path="private_key",
             read_only=True,
         ),
-        *staticfiles_volume_mounts,
     ]
 
     # The webapp deployment requires an addition mount of the uwsgi.ini configmap
@@ -457,7 +409,6 @@ def create_k8s_resources(  # noqa: C901
                         ),
                         volumes=edxapp_volumes,
                         init_containers=[
-                            staticfiles_init_container,
                             export_course_repos_init_container,
                             _create_config_aggregator_init_container(
                                 service_type, edxapp_init_volume_mounts
@@ -607,7 +558,6 @@ def create_k8s_resources(  # noqa: C901
             ),
         )
     )
-    lms_edxapp_volumes.extend(staticfiles_volumes)
 
     # Define the volumemounts for the init container that aggregates the config files
     lms_edxapp_init_volume_mounts = [
@@ -679,7 +629,6 @@ def create_k8s_resources(  # noqa: C901
                     ),
                     volumes=lms_edxapp_volumes,
                     init_containers=[
-                        staticfiles_init_container,
                         export_course_repos_init_container,
                         # This init container will concatenate all the config files that come from
                         # the umpteen secrets and configmaps into a single file that edxapp expects
@@ -831,7 +780,6 @@ def create_k8s_resources(  # noqa: C901
                     ),
                     volumes=lms_edxapp_volumes,
                     init_containers=[
-                        staticfiles_init_container,  # strictly speaking, not required
                         export_course_repos_init_container,
                         _create_config_aggregator_init_container(
                             "lms", lms_edxapp_init_volume_mounts
@@ -903,7 +851,6 @@ def create_k8s_resources(  # noqa: C901
                     service_account_name=vault_k8s_resources.service_account_name,
                     volumes=lms_edxapp_volumes,
                     init_containers=[
-                        staticfiles_init_container,
                         export_course_repos_init_container,
                         # This init container will concatenate all the config files that come from
                         # the umpteen secrets and configmaps into a single file that edxapp expects
@@ -1070,7 +1017,6 @@ def create_k8s_resources(  # noqa: C901
             ),
         )
     )
-    cms_edxapp_volumes.extend(staticfiles_volumes)
 
     # Define the volume mounts for the init container that aggregates the config files
     cms_edxapp_init_volume_mounts = [
@@ -1135,7 +1081,6 @@ def create_k8s_resources(  # noqa: C901
                     ),
                     volumes=cms_edxapp_volumes,
                     init_containers=[
-                        staticfiles_init_container,
                         export_course_repos_init_container,
                         # This init container will concatenate all the config files that come from
                         # the umpteen secrets and configmaps into a single file that edxapp expects
@@ -1158,7 +1103,7 @@ def create_k8s_resources(  # noqa: C901
                                 "--workers",
                                 "1",
                                 "--log-level",
-                                "warn",
+                                edxapp_config.get("log_level") or "warn",
                                 "--static-path-mount",
                                 "/openedx/staticfiles",
                                 "cms.wsgi:application",
@@ -1286,7 +1231,6 @@ def create_k8s_resources(  # noqa: C901
                     ),
                     volumes=cms_edxapp_volumes,
                     init_containers=[
-                        staticfiles_init_container,  # strictly speaking, not required
                         export_course_repos_init_container,
                         _create_config_aggregator_init_container(
                             "cms", cms_edxapp_init_volume_mounts

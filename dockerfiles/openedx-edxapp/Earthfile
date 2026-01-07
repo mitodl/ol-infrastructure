@@ -162,9 +162,8 @@ fetch-translations:
   END
   SAVE ARTIFACT /openedx/edx-platform /edx-platform
 
-build-static-assets-nonprod:
+build-static-assets:
   FROM +fetch-translations
-  # ENV JS_ENV_EXTRA_CONFIG '{"PROCTORTRACK_CDN_URL": "\"https://verificientstatic-preprod.storage.googleapis.com/cdn/fb_cjs/edx_preprod_cjs.IQEQWWZ2.js\"", "PROCTORTRACK_CONFIG_KEY": "\"1PKRwFPezxXj3TsD\""}'
   ENV JS_ENV_EXTRA_CONFIG='{"PROCTORTRACK_CDN_URL":"\"\"","PROCTORTRACK_CONFIG_KEY":"\"\""}'
   RUN pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/codejail.git@babbe784b48bb9888aa159d8b401cbe5e07f0af4#egg=codejail" \
     && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/django-wiki.git@0a1d555a1fa2834cc46367968aad907a5667317b#egg=django_wiki" \
@@ -181,37 +180,10 @@ build-static-assets-nonprod:
     && python manage.py cms collectstatic --noinput --settings=mitol.assets \
     && rdfind -makesymlinks true -followsymlinks true /openedx/staticfiles/ \
     && mkdir -p /openedx/data/export_course_repos \
-    && mkdir -p /openedx/data/var/log/edx \
-    && ls -ltrah /openedx/staticfiles \
-    && tar czf - /openedx/staticfiles > /openedx/staticfiles-nonprod.tar.gz
-  SAVE ARTIFACT /openedx/staticfiles-nonprod.tar.gz AS LOCAL staticfiles-nonprod.tar.gz
-
-build-static-assets-production:
-  FROM +fetch-translations
-  # ENV JS_ENV_EXTRA_CONFIG '{"PROCTORTRACK_CDN_URL": "\"https://verificientstatic.storage.googleapis.com/cdn/fb_cjs/edx_us_cjs.IQEQWWZ2.js\"", "PROCTORTRACK_CONFIG_KEY": "\"1PKRwFPezxXj3TsD\""}'
-  ENV JS_ENV_EXTRA_CONFIG='{"PROCTORTRACK_CDN_URL":"\"\"","PROCTORTRACK_CONFIG_KEY":"\"\""}'
-  RUN pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/codejail.git@babbe784b48bb9888aa159d8b401cbe5e07f0af4#egg=codejail" \
-    && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/django-wiki.git@0a1d555a1fa2834cc46367968aad907a5667317b#egg=django_wiki" \
-    && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/olxcleaner.git@2f0d6c7f126cbd69c9724b7b57a0b2565330a297#egg=olxcleaner"
-  ENV STATIC_ROOT_LMS=/openedx/staticfiles/
-  ENV NODE_ENV=prod
-  ARG --required DEPLOYMENT_NAME
-  RUN mkdir -p $STATIC_ROOT_LMS && npm run postinstall \
-    && npm run compile-sass -- --theme-dir /openedx/themes/ --theme $DEPLOYMENT_NAME \
-    && python manage.py lms collectstatic --noinput --settings=mitol.assets \
-    && python manage.py cms collectstatic --noinput --settings=mitol.assets \
-    && npm run webpack 2> /dev/null \
-    && python manage.py lms collectstatic --noinput --settings=mitol.assets \
-    && python manage.py cms collectstatic --noinput --settings=mitol.assets \
-    && rdfind -makesymlinks true -followsymlinks true /openedx/staticfiles/ \
-    && mkdir -p /openedx/data/export_course_repos \
-    && mkdir -p /openedx/data/var/log/edx \
-    && ls -ltrah /openedx/staticfiles \
-    && tar czf - /openedx/staticfiles > /openedx/staticfiles-production.tar.gz
-  SAVE ARTIFACT /openedx/staticfiles-production.tar.gz AS LOCAL staticfiles-production.tar.gz
+    && mkdir -p /openedx/data/var/log/edx
 
 docker-image:
-  FROM +fetch-translations
+  FROM +build-static-assets
   ARG --required DEPLOYMENT_NAME
   ARG --required RELEASE_NAME
   ENV DJANGO_SETTINGS_MODULE="invalid"
@@ -227,5 +199,3 @@ docker-image:
 
 all:
   BUILD +docker-image
-  BUILD +build-static-assets-production
-  BUILD +build-static-assets-nonprod
