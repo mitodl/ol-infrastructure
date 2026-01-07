@@ -227,6 +227,11 @@ ReleaseMap: dict[
                 release="ulmo",
             ),
             OpenEdxApplicationVersion(
+                application="communications",
+                application_type="MFE",
+                release="ulmo",
+            ),
+            OpenEdxApplicationVersion(
                 application="discussions",
                 application_type="MFE",
                 release="ulmo",
