@@ -127,6 +127,35 @@ def setup_grafana(
                         "traces": {
                             "enabled": True,
                         },
+                        "processors": {
+                            "tailSampling": {
+                                "enabled": True,
+                                "decisionWait": "5s",
+                                "numTraces": 100,
+                                "expectedNewTracesPerSecond": 10,
+                                "decisionCache": {
+                                    "sampledCacheSize": 1000,
+                                    "nonSampledCacheSize": 10000,
+                                },
+                                "policies": [
+                                    {
+                                        "name": "keep-errors",
+                                        "type": "status_code",
+                                        "status_codes": ["ERROR", "UNSET"],
+                                    },
+                                    {
+                                        "name": "sample-slow-traces",
+                                        "type": "latency",
+                                        "threshold_ms": 5000,
+                                    },
+                                    {
+                                        "name": "sample-15pct-traces",
+                                        "type": "probabilistic",
+                                        "sampling_percentage": 15,
+                                    },
+                                ],
+                            },
+                        },
                     },
                 ],
                 "clusterMetrics": {
