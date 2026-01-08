@@ -1,8 +1,0 @@
----
-secretsprovider: awskms://alias/infrastructure-secrets-ci
-encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQGIgol/Q7gzCKFUDKVSrCg5AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM+LqZ/cXGeg+linYlAgEQgDsI4jhB47ogIIKbiR8IZzDmtRQWNJ8HvC0aoafZ+qj7eu3/jJ5LoAUSBpXedGI2TvfdzUj2UfcNuhx1RA==
-config:
-  aws:region: us-east-1
-  environment:business_unit: mitxpro
-  environment:vpc_reference: xpro_vpc
-  consul:instance_type: burstable_nano
