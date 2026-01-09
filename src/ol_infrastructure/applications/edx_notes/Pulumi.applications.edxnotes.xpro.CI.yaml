@@ -12,7 +12,6 @@ config:
   edxnotes:business_unit: mitxpro
   edxnotes:dns_zone: xpro
   edxnotes:domain: xpro-notes-ci.xpro.mit.edu
-  edxnotes:deploy_to_k8s: true
   edxnotes:target_vpc: applications_vpc
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci

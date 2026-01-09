@@ -13,6 +13,5 @@ config:
   edxnotes:dns_zone: learn
   edxnotes:domain: notes.ci.learn.mit.edu
   edxnotes:target_vpc: applications_vpc
-  edxnotes:deploy_to_k8s: true
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
