@@ -792,8 +792,6 @@ def create_k8s_resources(  # noqa: C901
                             command=["celery"],
                             args=[
                                 "--app=lms.celery",
-                                "--config",
-                                '{"task_acks_late": true}',
                                 "worker",
                                 "-B",
                                 "-E",
@@ -1246,8 +1244,6 @@ def create_k8s_resources(  # noqa: C901
                             command=["celery"],
                             args=[
                                 "--app=cms.celery",
-                                "--config",
-                                '{"task_acks_late": true}',
                                 "worker",
                                 "-B",
                                 "-E",
