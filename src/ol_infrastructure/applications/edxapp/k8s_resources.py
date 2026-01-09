@@ -801,7 +801,7 @@ def create_k8s_resources(  # noqa: C901
                                 "100",
                                 "--exclude-queues=edx.cms.core.default",
                                 "-Ofair",
-                                "-conf",
+                                "--conf",
                                 '{"task_acks_late": true}',
                             ],
                             env=[
@@ -1255,7 +1255,7 @@ def create_k8s_resources(  # noqa: C901
                                 "100",
                                 "--exclude-queues=edx.lms.core.default",
                                 "-Ofair",
-                                "-conf",
+                                "--conf",
                                 '{"task_acks_late": true}',
                             ],
                             env=[
