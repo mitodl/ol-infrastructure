@@ -28,7 +28,6 @@ config:
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["studio.library_authoring_mfe", "--deactivate"]
-  - ["legacy_studio.certificates", "--create", "--everyone"]
   edxapp:business_unit: mitxpro
   edxapp:db_password:
     secure: v1:+Bcw4dSZUPqWY2cL:g/KKgzrmRlgx2SOuOOB4grCveVaNv5mZVuuFrpGgAGwKEussIqUWTBnFJknEdJ4Hjf5Jw/1W560=
