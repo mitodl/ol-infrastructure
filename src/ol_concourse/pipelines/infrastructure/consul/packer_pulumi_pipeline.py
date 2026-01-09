@@ -55,13 +55,9 @@ consul_ami_fragment = packer_jobs(
 consul_pulumi_infrastructure_fragments = []
 consul_pulumi_substructure_fragments = []
 for network in [
-    "mitx",
-    "mitx-staging",
-    "mitxonline",
     "apps",
     "data",
     "operations",
-    "xpro",
 ]:
     stages = ("CI", "QA", "Production")
     consul_pulumi_infrastructure_fragment = pulumi_jobs_chain(
@@ -79,13 +75,9 @@ for network in [
     )
     consul_pulumi_infrastructure_fragments.append(consul_pulumi_infrastructure_fragment)
 for network in [
-    "mitx",
-    "mitx-staging",
-    "mitxonline",
     "applications",
     "data",
     "operations",
-    "xpro",
 ]:
     consul_pulumi_substructure_fragment = pulumi_jobs_chain(
         consul_pulumi_substructure_code,
