@@ -3,14 +3,6 @@ secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQF9YmfNF58RnCeUtDmE8rlyAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMJfABvtxFYR5EziJnAgEQgDvt+5VhPgC9Gyu9XUjF+bLnjB8hNPmeiOmSWmNl0kK4YmQxRAMtMzB8HSFQL48FnYdt1aZgevAoIjuv4w==
 config:
   aws:region: us-east-1
-  codejail:auto_scale:
-    desired: 1
-    max: 3
-    min: 1
   codejail:business_unit: residential-staging
-  codejail:target_vpc: residential_mitx_staging_vpc
-  consul:address: https://consul-mitx-ci.odl.mit.edu
-  codejail:deploy_to_k8s: true
-  codejail:deploy_to_ec2: false
   codejail:replicas: 1
   codejail:target_cluster: residential

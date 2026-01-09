@@ -3,14 +3,6 @@ secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHi7xhTkB8tf1ObyPMxDhODJja4Mn4jyIo32zZVlOiZPFgFH5vIucphRR7Mq6OdG1kZeAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMHWKReg8qb4MysUw8AgEQgDuT6iLKN7HMLYRcVHEZL8Igienqic9lhMV77liJVysyDmU1cEyHwZ54z8Q2N5YGhqPNkmQvKcDKRdj+5g==
 config:
   aws:region: us-east-1
-  codejail:auto_scale:
-    desired: 1
-    max: 3
-    min: 1
-  codejail:deploy_to_k8s: true
-  codejail:deploy_to_ec2: false
   codejail:replicas: 2
   codejail:business_unit: mitxonline
-  codejail:target_vpc: mitxonline_vpc
-  consul:address: https://consul-mitxonline-qa.odl.mit.edu
   codejail:target_cluster: applications

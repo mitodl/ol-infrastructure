@@ -3,14 +3,6 @@ secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHg/+QzF9hGIaoayDitgnEVHEhuaANONVQQOnqpkIsol1gFIp45VyYwQaGk+qWWxFdcAAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMCiMPJ86XDVgWbNCXAgEQgDv9PVQtOO4pqjOvJTGrqe9X598O4IAjEl4Ldk7DMmDNo+F6z3nAGyLNMkqwRNMB6sXJ8tDvTZ6ZKpyEmw==
 config:
   aws:region: us-east-1
-  codejail:auto_scale:
-    desired: 3
-    max: 5
-    min: 2
   codejail:business_unit: mitxpro
-  codejail:target_vpc: xpro_vpc
-  consul:address: https://consul-mitxonline-production.odl.mit.edu
-  codejail:deploy_to_k8s: true
-  codejail:deploy_to_ec2: false
   codejail:replicas: 4
   codejail:target_cluster: applications
