@@ -802,6 +802,7 @@ def create_k8s_resources(  # noqa: C901
                                 "--queues=edx.lms.core.default,edx.lms.core.high,edx.lms.core.high_mem",
                                 "--exclude-queues=edx.cms.core.default",
                                 "-Ofair",
+                                "--concurrency=1",  # Don't try to use all cores on node
                             ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
@@ -1255,6 +1256,7 @@ def create_k8s_resources(  # noqa: C901
                                 "--queues=edx.cms.core.default",
                                 "--exclude-queues=edx.lms.core.default",
                                 "-Ofair",
+                                "--concurrency=1",  # Don't try to use all cores on node
                             ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
