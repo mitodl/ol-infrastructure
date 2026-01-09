@@ -3,12 +3,10 @@ secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHg/+QzF9hGIaoayDitgnEVHEhuaANONVQQOnqpkIsol1gGZqkri3+8SOk9DIVxQnCh1AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM/qGAASAEsRU3DPDKAgEQgDvAMqSBcSG7lfFy2jJQSdTgbtorlMY2S6RHwdsQP+nU3LA0QmKmVzJCClfcjWH7lE9/BTZky3gr5bZFug==
 config:
   aws:region: us-east-1
-  consul:address: https://consul-mitx-production.odl.mit.edu
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   xqueue:business_unit: residential
   xqueue:target_vpc: residential_mitx_vpc
-  xqueue:deploy_to_k8s: true
   xqueue:cluster: residential
   xqueue:namespace: mitx-openedx
   xqueue:domain: xqueue.mitx.odl.mit.edu

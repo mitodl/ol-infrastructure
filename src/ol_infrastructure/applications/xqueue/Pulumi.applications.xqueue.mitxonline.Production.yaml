@@ -4,13 +4,11 @@ encryptedkey: AQICAHjmo6C0sCNz3fdkFlhbu0tdBZxnHmPYSnqtmocvGiuNygHmkFgRVh87YRZcC8
 config:
   xqueue:business_unit: mitxonline
   xqueue:target_vpc: applications_vpc
-  xqueue:deploy_to_k8s: true
   xqueue:cluster: applications
   xqueue:namespace: mitxonline-openedx
   xqueue:domain: xqueue.mitxonline.odl.mit.edu
   xqueue:min_replicas: 1
   xqueue:max_replicas: 3
   aws:region: us-east-1
-  consul:address: https://consul-mitxonline-production.odl.mit.edu
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

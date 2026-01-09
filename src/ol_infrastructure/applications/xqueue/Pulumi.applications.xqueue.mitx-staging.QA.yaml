@@ -3,10 +3,8 @@ secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHi7xhTkB8tf1ObyPMxDhODJja4Mn4jyIo32zZVlOiZPFgGS9UkGtHI7d/QvSpEygzlWAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMq8bP4tsuMoL+vwfdAgEQgDszWyX31b83rAElLuQ9e18tPwOyvGM7wwlmZJWD7pT27S+FK7icJd1JnASFZuX47LGdnON8C+E9lGA13w==
 config:
   aws:region: us-east-1
-  consul:address: https://consul-mitx-staging-qa.odl.mit.edu
   xqueue:business_unit: residential-staging
   xqueue:target_vpc: residential_mitx_vpc
-  xqueue:deploy_to_k8s: true
   xqueue:cluster: residential
   xqueue:namespace: mitx-staging-openedx
   xqueue:domain: xqueue.mitx-staging-qa.odl.mit.edu

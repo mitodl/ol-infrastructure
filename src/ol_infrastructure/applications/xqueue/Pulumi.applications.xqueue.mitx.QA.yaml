@@ -3,12 +3,10 @@ secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHi7xhTkB8tf1ObyPMxDhODJja4Mn4jyIo32zZVlOiZPFgFcVVZJ9fiS5QB9xyJjDINQAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMJZ2MAm8hIEg0kbnRAgEQgDv5uZoB1wuVO42jz1YSrAmK5QMinkP42suaejiREEu1CebjvWtmS0fYIHaBmelAj3k8Q7p1EaiSpw34qg==
 config:
   aws:region: us-east-1
-  consul:address: https://consul-mitx-qa.odl.mit.edu
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
   xqueue:business_unit: residential
   xqueue:target_vpc: residential_mitx_vpc
-  xqueue:deploy_to_k8s: true
   xqueue:cluster: residential
   xqueue:namespace: mitx-openedx
   xqueue:domain: xqueue.mitx.qa.odl.mit.edu

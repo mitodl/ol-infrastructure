@@ -4,13 +4,11 @@ encryptedkey: AQICAHg/+QzF9hGIaoayDitgnEVHEhuaANONVQQOnqpkIsol1gGvgltnqRdtyMNsrO
 config:
   xqueue:business_unit: residential-staging
   xqueue:target_vpc: residential_mitx_vpc
-  xqueue:deploy_to_k8s: true
   xqueue:cluster: residential
   xqueue:namespace: mitx-staging-openedx
   xqueue:domain: xqueue.mitx-staging-prod.odl.mit.edu
   xqueue:min_replicas: 2
   xqueue:max_replicas: 5
   aws:region: us-east-1
-  consul:address: https://consul-mitx-staging-production.odl.mit.edu
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
