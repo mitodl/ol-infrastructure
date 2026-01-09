@@ -801,8 +801,6 @@ def create_k8s_resources(  # noqa: C901
                                 "100",
                                 "--exclude-queues=edx.cms.core.default",
                                 "-Ofair",
-                                "--conf",
-                                '{"task_acks_late": true}',
                             ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
@@ -1255,8 +1253,6 @@ def create_k8s_resources(  # noqa: C901
                                 "100",
                                 "--exclude-queues=edx.lms.core.default",
                                 "-Ofair",
-                                "--conf",
-                                '{"task_acks_late": true}',
                             ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
