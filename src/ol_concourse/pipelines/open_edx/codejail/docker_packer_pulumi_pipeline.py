@@ -4,7 +4,7 @@ from bridge.settings.openedx.accessors import filter_deployments_by_release
 from bridge.settings.openedx.types import DeploymentEnvRelease, OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_concourse.lib.containers import container_build_task
-from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
+from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     GetStep,
@@ -43,15 +43,6 @@ def build_codejail_pipeline(
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
         paths=["dockerfiles/openedx-codejail/"],
-    )
-
-    codejail_packer_code = git_repo(
-        name=Identifier("ol-infrastructure-build"),
-        uri="https://github.com/mitodl/ol-infrastructure",
-        paths=[
-            "src/bridge/settings/openedx/",
-            "src/bilder/images/codejail/",
-        ],
     )
 
     codejail_pulumi_code = git_repo(
@@ -107,24 +98,6 @@ def build_codejail_pipeline(
 
     loop_fragments = []
     for deployment in filter_deployments_by_release(release_name):
-        ami_fragment = packer_jobs(
-            dependencies=[
-                GetStep(
-                    get=codejail_registry_image.name,
-                    trigger=True,
-                    passed=[image_build_job.name],
-                )
-            ],
-            image_code=codejail_packer_code,
-            packer_template_path="src/bilder/images/codejail/codejail.pkr.hcl",
-            packer_vars={
-                "deployment": deployment.deployment_name,
-                "openedx_release": release_name,
-            },
-            job_name_suffix=deployment.deployment_name,
-        )
-        loop_fragments.append(ami_fragment)
-
         pulumi_fragment = pulumi_jobs_chain(
             codejail_pulumi_code,
             stack_names=[
@@ -139,11 +112,6 @@ def build_codejail_pipeline(
                     trigger=True,
                     passed=[image_build_job.name],
                     params={"skip_download": True},
-                ),
-                GetStep(
-                    get=ami_fragment.resources[-1].name,
-                    trigger=True,
-                    passed=[ami_fragment.jobs[-1].name],
                 ),
             ],
             env_vars_from_files={
@@ -164,7 +132,6 @@ def build_codejail_pipeline(
         resources=[
             *combined_fragments.resources,
             codejail_pulumi_code,
-            codejail_packer_code,
         ],
         jobs=combined_fragments.jobs,
     )
