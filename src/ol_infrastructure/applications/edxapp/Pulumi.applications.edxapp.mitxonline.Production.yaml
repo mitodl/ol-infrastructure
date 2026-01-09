@@ -132,7 +132,7 @@ config:
       cms:
         cpu_request: "250m"
         memory_request: "4Gi"
-        memory_limit: "4Gi"
+        memory_limit: "6Gi"
   edxapp:k8s_deployment: true
   edxapp:k8s_cutover: true
   edxapp:disable_ec2_deployment: true
