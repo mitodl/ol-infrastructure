@@ -15,5 +15,4 @@ config:
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   edxnotes:target_vpc: residential_mitx_vpc
-  edxnotes:deploy_to_k8s: true
   edxnotes:cluster: residential
