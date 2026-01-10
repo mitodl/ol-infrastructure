@@ -18,7 +18,7 @@ REDASH_VERSION = "9d273e4"
 TRAEFIK_VERSION = "3.6.6"
 TUTOR_PERMISSIONS_VERSION = "15.3.4"
 # renovate: datasource=github-releases depName=vault packageName=hashicorp/vault
-VAULT_VERSION = "1.21.1"
+VAULT_VERSION = "1.21.2"
 # renovate: datasource=docker depName=vector packageName=timberio/vector
 VECTOR_VERSION = "0.40.1"
 
