@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi import Alias, Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, get_caller_identity, route53, ses
 
 from bridge.lib.magic_numbers import (
@@ -20,7 +20,6 @@ from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
 )
-from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.eks import (
     OLEKSGateway,
@@ -35,6 +34,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib.aws.cache_helper import create_redis_cache
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     ecr_image_uri,
@@ -340,30 +340,28 @@ redis_cluster_security_group = ec2.SecurityGroup(
     vpc_id=data_vpc["id"],
 )
 
-redis_instance_type = (
-    redis_config.get("instance_type") or defaults(stack_info)["redis"]["instance_type"]
-)
+# Create Redis cache (auto-selects serverless for CI/QA, dedicated for Prod)
+redis_defaults_config = defaults(stack_info)["redis"]
 redis_auth_token = superset_secrets["redis"]["token"]
-redis_cache_config = OLAmazonRedisConfig(
-    encrypt_transit=True,
+
+superset_redis_cache = create_redis_cache(
+    stack_info=stack_info,
+    cache_name=f"superset-redis-{superset_env}",
+    description="Redis cluster for Superset tasks and caching",
+    security_group_ids=[redis_cluster_security_group.id],
+    subnet_group=data_vpc["elasticache_subnet"],
+    subnet_ids=data_vpc["subnet_ids"][:3],
     auth_token=redis_auth_token,
-    cluster_mode_enabled=False,
-    encrypted=True,
-    engine_version="7.2",
     engine="valkey",
-    instance_type=redis_instance_type,
+    engine_version="7.2",
+    instance_type=redis_config.get("instance_type")
+    or redis_defaults_config["instance_type"],
     num_instances=3,
-    shard_count=1,
-    auto_upgrade=True,
-    cluster_description="Redis cluster for edX platform tasks and caching",
-    cluster_name=f"superset-redis-{superset_env}",
-    security_groups=[redis_cluster_security_group.id],
-    subnet_group=data_vpc[
-        "elasticache_subnet"
-    ],  # the name of the subnet group created in the OLVPC component resource
     tags=aws_config.tags,
+    opts=ResourceOptions(
+        aliases=[Alias(name=f"superset-redis-{superset_env}-redis-elasticache-cluster")]
+    ),
 )
-superset_redis_cache = OLAmazonCache(redis_cache_config)
 
 ########################################
 # Vault Secrets synced into Kubernetes  #

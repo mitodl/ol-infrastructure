@@ -28,10 +28,6 @@ from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.mitxonline.k8s_secrets import (
     create_mitxonline_k8s_secrets,
 )
-from ol_infrastructure.components.aws.cache import (
-    OLAmazonCache,
-    OLAmazonRedisConfig,
-)
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -55,6 +51,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResourcesConfig,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib.aws.cache_helper import create_redis_cache
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     default_psg_egress_args,
@@ -427,29 +424,22 @@ redis_cluster_security_group = ec2.SecurityGroup(
     vpc_id=apps_vpc["id"],
     tags=aws_config.tags,
 )
+# Create Redis cache (automatically selects serverless for CI/QA, dedicated for Production)
+# Configuration can override via redis:use_serverless_cache boolean
 redis_defaults = defaults(stack_info)["redis"]
-redis_defaults["instance_type"] = (
-    redis_config.get("instance_type") or redis_defaults["instance_type"]
-)
-redis_cache_config = OLAmazonRedisConfig(
-    encrypt_transit=True,
-    auth_token=redis_config.require("password"),
-    cluster_mode_enabled=False,
-    encrypted=True,
-    engine_version="7.2",
-    engine="valkey",
-    num_instances=3,
-    shard_count=1,
-    auto_upgrade=True,
-    cluster_description="Redis cluster for MITxonline",
-    cluster_name=f"mitxonline-app-redis-{stack_info.env_suffix}",
+redis_cache = create_redis_cache(
+    stack_info=stack_info,
+    cache_name=f"mitxonline-app-redis-{stack_info.env_suffix}",
+    description="Redis cluster for MITxonline",
+    security_group_ids=[redis_cluster_security_group.id],
     subnet_group=apps_vpc["elasticache_subnet"],
-    security_groups=[redis_cluster_security_group.id],
+    subnet_ids=apps_vpc["subnet_ids"][:3],
+    auth_token=redis_config.require("password"),
+    engine="valkey",
+    engine_version="7.2",
+    instance_type=redis_config.get("instance_type") or redis_defaults["instance_type"],
+    num_instances=3,
     tags=aws_config.tags,
-    **redis_defaults,
-)
-redis_cache = OLAmazonCache(
-    redis_cache_config,
     opts=ResourceOptions(
         aliases=[
             Alias(

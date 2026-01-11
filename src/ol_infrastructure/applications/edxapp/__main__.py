@@ -1,5 +1,4 @@
 # ruff: noqa: E501
-
 """Provision and deploy the resources needed for an edxapp installation.
 
 - Create S3 buckets required by edxapp
@@ -51,12 +50,12 @@ from bridge.lib.magic_numbers import (
 from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.applications.edxapp.k8s_resources import create_k8s_resources
-from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultMysqlDatabaseConfig,
 )
+from ol_infrastructure.lib.aws.cache_helper import create_redis_cache
 from ol_infrastructure.lib.aws.ec2_helper import (
     DiskTypes,
     InstanceTypes,
@@ -1008,33 +1007,26 @@ redis_cluster_security_group = ec2.SecurityGroup(
     vpc_id=edxapp_vpc_id,
 )
 
-redis_instance_type = (
-    redis_config.get("instance_type") or defaults(stack_info)["redis"]["instance_type"]
-)
-redis_cache_config = OLAmazonRedisConfig(
-    encrypt_transit=True,
-    auth_token=read_yaml_secrets(
-        Path(f"edxapp/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
-    )["redis_auth_token"],
-    cluster_mode_enabled=False,
-    encrypted=True,
+# Create Redis cache (auto-selects serverless for CI/QA, dedicated for Prod)
+redis_defaults_config = defaults(stack_info)["redis"]
+redis_auth_token = read_yaml_secrets(
+    Path(f"edxapp/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
+)["redis_auth_token"]
+
+edxapp_redis_cache = create_redis_cache(
+    stack_info=stack_info,
+    cache_name=f"edxapp-redis-{env_name}",
+    description="Redis cluster for edX platform tasks and caching",
+    security_group_ids=[redis_cluster_security_group.id],
+    subnet_group=edxapp_vpc["elasticache_subnet"],
+    subnet_ids=edxapp_vpc["subnet_ids"][:3],
+    auth_token=redis_auth_token,
     engine="valkey",
     engine_version="7.2",
-    instance_type=redis_instance_type,
+    instance_type=redis_config.get("instance_type")
+    or redis_defaults_config["instance_type"],
     num_instances=3,
-    shard_count=1,
-    auto_upgrade=True,
-    cluster_description="Redis cluster for edX platform tasks and caching",
-    cluster_name=f"edxapp-redis-{env_name}",
-    parameter_overrides={"maxmemory-policy": "allkeys-lru"},
-    security_groups=[redis_cluster_security_group.id],
-    subnet_group=edxapp_vpc[
-        "elasticache_subnet"
-    ],  # the name of the subnet group created in the OLVPC component resource
     tags=aws_config.tags,
-)
-edxapp_redis_cache = OLAmazonCache(
-    redis_cache_config,
     opts=ResourceOptions(
         aliases=[Alias(name=f"edxapp-redis-{env_name}-redis-elasticache-cluster")]
     ),
@@ -1050,7 +1042,7 @@ edxapp_redis_consul_service = Service(
     "edxapp-redis-consul-service",
     node=edxapp_redis_consul_node.name,
     name="edxapp-redis",
-    port=redis_cache_config.port,
+    port=DEFAULT_REDIS_PORT,
     meta={
         "external-node": True,
         "external-probe": True,
@@ -1648,7 +1640,6 @@ fastly_access_logging_bucket = monitoring_stack.require_output(
 fastly_access_logging_iam_role = monitoring_stack.require_output(
     "fastly_access_logging_iam_role"
 )
-
 
 mfe_regex = "^/({})/".format("|".join(edxapp_mfe_paths))
 edxapp_fastly_service = fastly.ServiceVcl(
