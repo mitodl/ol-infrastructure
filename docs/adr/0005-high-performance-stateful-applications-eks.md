@@ -1,7 +1,7 @@
 # 0005. High Performance Stateful Applications in EKS
 
 **Status:** Proposed
-**Date:** 2025-11-20
+**Date:** 2025-11-21
 **Deciders:** Platform Team (pending approval)
 **Technical Story:** Architecture decision for running stateful workloads on EKS
 
@@ -835,6 +835,26 @@ spec:
 | Date | Reviewer | Decision | Notes |
 |------|----------|----------|-------|
 | 2025-11-20 | GitHub Copilot | Proposed | Created based on infrastructure analysis |
+| 2025-11-21 | Gemini | Edited | Created addendum on AZ coupling and node availability |
 | _TBD_ | _Platform Team_ | _Pending_ | Needs approval for dedicated node pool creation |
 
 **Last Updated:** 2025-11-20 (Updated constraints to allow additional storage classes and non-Karpenter nodes; added Option 6 for io2 Block Express)
+
+---
+
+### Addendum: Handling AZ Coupling and Node Availability
+
+**Context:**
+EBS volumes are zonal resources. A pod using an EBS volume in AZ C *must* be scheduled on a node in AZ C. If a node in AZ C fails and the replacement node is provisioned in AZ D, the pod will remain in a `Pending` state indefinitely (AZ Coupling).
+
+**Mitigation Strategies:**
+
+1. **Separate Node Groups per AZ (Recommended for Option 1):**
+    - **Strategy:** Create distinct Node Groups / Auto Scaling Groups for each Availability Zone (e.g., `stateful-us-east-1a`, `stateful-us-east-1b`, etc.).
+    - **Why:** This guarantees that if a node in Group C fails, the replacement is forced to be created in AZ C, as that is the only subnet configured for that specific group.
+    - **Trade-off:** Higher management overhead (managing N groups instead of 1), but provides deterministic recovery for static pools.
+
+2. **Karpenter (Alternative Approach):**
+    - **Strategy:** Use Karpenter-provisioned nodes (Option 3) instead of static pools.
+    - **Why:** Karpenter natively solves this by inspecting the pending pod's volume affinity and explicitly calling the AWS APIs to provision a node in the required zone.
+    - **Note:** If sticking to Option 1 (Static Pools), this automatic zone-matching capability is lost, reinforcing the need for "Separate Node Groups per AZ" to ensure reliability.
