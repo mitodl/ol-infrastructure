@@ -12,7 +12,7 @@ config:
     secure: v1:C6kSQ0x/E2q9yf+C:1BS59SvECNdYkFelQxTQPGbzII+msTL4OXGXP3Mag0/mDRWgwcmnpHaLVbMCksB+ZEbcOA==
   heroku_app:vars:
     ALLOWED_HOSTS: '["micromasters-rc.odl.mit.edu"]'
-    AWS_STORAGE_BUCKET_NAME: "ol-micromasters-app-rc"
+    AWS_STORAGE_BUCKET_NAME: "ol-micromasters-app-qa"
     CLOUDFRONT_DIST: "d2brhhtqco8biz"
     CYBERSOURCE_REFERENCE_PREFIX: "rc"
     CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
