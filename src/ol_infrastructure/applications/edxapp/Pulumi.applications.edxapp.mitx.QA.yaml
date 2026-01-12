@@ -74,12 +74,8 @@ config:
   edxapp:google_analytics_id: ""
   edxapp:move_db: true
   edxapp:mail_domain: edxapp-mail-qa.mitx.mit.edu
-  edxapp:min_web_nodes: "1"
-  edxapp:min_worker_nodes: "1"
   edxapp:sender_email_address: mitx-support+qa@mit.edu
   edxapp:target_vpc: residential_mitx_vpc
-  edxapp:web_node_capacity: "2"
-  edxapp:worker_node_capacity: "1"
   edxapp:framework: "earthly"
   edxapp:enable_xqueue: true
   edxapp:xqueue_domain: xqueue.mitx.qa.odl.mit.edu

@@ -86,10 +86,6 @@ config:
   edxapp:xqueue_domain: xqueue.mitxonline.odl.mit.edu
   edxapp:framework: "earthly"
   edxapp:web_instance_type: m7a.2xlarge
-  edxapp:web_node_capacity: "2"
-  edxapp:min_web_nodes: 0
-  edxapp:worker_node_capacity: "0"
-  edxapp:min_worker_nodes: 0
   edxapp:worker_instance_type: "r7a.large"
   edxapp:backend_lms_domain: courses-backend.learn.mit.edu
   edxapp:backend_studio_domain: studio-backend.learn.mit.edu

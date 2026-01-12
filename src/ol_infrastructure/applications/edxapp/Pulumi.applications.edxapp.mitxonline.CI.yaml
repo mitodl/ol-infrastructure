@@ -91,10 +91,6 @@ config:
   edxapp:xqueue_domain: xqueue.mitxonline.ci.odl.mit.edu
   edxapp:enable_auto_language_selection: true
   edxapp:framework: "earthly"
-  edxapp:min_web_nodes: "1"
-  edxapp:min_worker_nodes: "1"
-  edxapp:web_node_capacity: "2"
-  edxapp:worker_node_capacity: "1"
   edxapp:autoscaling_lms_requests_threshold: "20"
   edxapp:autoscaling_lms_latency_threshold: "2000"
   edxapp:autoscaling_lms_cpu_threshold: "70"
