@@ -84,7 +84,6 @@ config:
   edxapp:bulk_email_default_from_email: no-reply@edxapp-mail.learn.mit.edu
   edxapp:enable_xqueue: true
   edxapp:xqueue_domain: xqueue.mitxonline.odl.mit.edu
-  edxapp:framework: "earthly"
   edxapp:web_instance_type: m7a.2xlarge
   edxapp:worker_instance_type: "r7a.large"
   edxapp:backend_lms_domain: courses-backend.learn.mit.edu

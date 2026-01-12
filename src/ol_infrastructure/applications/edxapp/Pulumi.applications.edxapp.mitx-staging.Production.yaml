@@ -64,7 +64,6 @@ config:
   edxapp:mail_domain: edxapp-mail-staging-production.mitx.mit.edu
   edxapp:sender_email_address: support@edxapp-mail-staging-production.mitx.mit.edu
   edxapp:target_vpc: residential_mitx_staging_vpc
-  edxapp:framework: "earthly"
   edxapp:enable_xqueue: true
   edxapp:xqueue_domain: xqueue.mitx-staging-prod.odl.mit.edu
   edxapp:web_instance_type: general_purpose_xlarge

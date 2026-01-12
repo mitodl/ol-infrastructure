@@ -78,7 +78,6 @@ config:
   edxapp:web_instance_type: general_purpose_xlarge
   edxapp:worker_disk_size: "50"
   edxapp:worker_instance_type: "m7a.xlarge"
-  edxapp:framework: "earthly"
   edxapp:enable_xqueue: true
   edxapp:xqueue_domain: xqueue.mitx.odl.mit.edu
   mongodb:atlas_project_id: 61b728704656cb4747e589a0

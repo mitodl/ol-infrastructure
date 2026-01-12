@@ -75,7 +75,6 @@ config:
   edxapp:move_db: true
   edxapp:sender_email_address: mitx-support+ci@mit.edu
   edxapp:target_vpc: residential_mitx_vpc
-  edxapp:framework: "earthly"
   edxapp:enable_xqueue: true
   edxapp:xqueue_domain: xqueue.mitx.ci.odl.mit.edu
   mongodb:atlas_project_id: 617858f961f3016e0ade73e7

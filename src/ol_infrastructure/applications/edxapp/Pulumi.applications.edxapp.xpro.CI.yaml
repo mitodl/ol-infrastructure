@@ -61,7 +61,6 @@ config:
   edxapp:mail_domain: edxapp-mail-ci.xpro.mit.edu
   edxapp:sender_email_address: support@edxapp-mail-ci.xpro.mit.edu
   edxapp:enable_xqueue: false
-  edxapp:framework: "earthly"
   edxapp:k8s_replicas:
     webapp:
       cms:

@@ -65,7 +65,6 @@ config:
   edxapp:mail_domain: edxapp-mail-staging-qa.mitx.mit.edu
   edxapp:sender_email_address: support@edxapp-mail-staging-qa.mitx.mit.edu
   edxapp:target_vpc: residential_mitx_staging_vpc
-  edxapp:framework: "earthly"
   edxapp:enable_xqueue: true
   edxapp:xqueue_domain: xqueue.mitx-staging-qa.odl.mit.edu
   mongodb:atlas_project_id: 61a8fc35438c21331e5773f6
