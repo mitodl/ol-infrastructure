@@ -1255,7 +1255,7 @@ def create_k8s_resources(  # noqa: C901
                                 "100",
                                 "--queues=edx.cms.core.default",
                                 "--exclude-queues=edx.lms.core.default",
-                                "--prefetch-multiplier=1"
+                                "--prefetch-multiplier=1",
                                 "--concurrency=2",  # Don't try to use all cores on node
                             ],
                             env=[
