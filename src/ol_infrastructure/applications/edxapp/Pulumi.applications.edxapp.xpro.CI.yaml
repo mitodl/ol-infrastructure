@@ -100,9 +100,6 @@ config:
         cpu_limit: "500m"
         memory_request: "1Gi"
         memory_limit: "2Gi"
-  edxapp:k8s_deployment: true
-  edxapp:k8s_cutover: true
-  edxapp:disable_ec2_deployment: true
   mongodb:atlas_project_id: 619395b5ab3fc40d5942a23c
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci

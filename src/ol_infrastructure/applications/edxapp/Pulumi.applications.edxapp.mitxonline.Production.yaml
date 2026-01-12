@@ -133,9 +133,6 @@ config:
         cpu_request: "250m"
         memory_request: "4Gi"
         memory_limit: "6Gi"
-  edxapp:k8s_deployment: true
-  edxapp:k8s_cutover: true
-  edxapp:disable_ec2_deployment: true
   mongodb:atlas_project_id: 61f0a63f8bc1f86a073a7148
   redis:instance_type: cache.r7g.2xlarge
   vault:address: https://vault-production.odl.mit.edu
