@@ -84,12 +84,7 @@ config:
   edxapp:bulk_email_default_from_email: no-reply@edxapp-mail.learn.mit.edu
   edxapp:enable_xqueue: true
   edxapp:xqueue_domain: xqueue.mitxonline.odl.mit.edu
-  edxapp:framework: "earthly"
   edxapp:web_instance_type: m7a.2xlarge
-  edxapp:web_node_capacity: "2"
-  edxapp:min_web_nodes: 0
-  edxapp:worker_node_capacity: "0"
-  edxapp:min_worker_nodes: 0
   edxapp:worker_instance_type: "r7a.large"
   edxapp:backend_lms_domain: courses-backend.learn.mit.edu
   edxapp:backend_studio_domain: studio-backend.learn.mit.edu
@@ -133,9 +128,6 @@ config:
         cpu_request: "250m"
         memory_request: "4Gi"
         memory_limit: "6Gi"
-  edxapp:k8s_deployment: true
-  edxapp:k8s_cutover: true
-  edxapp:disable_ec2_deployment: true
   mongodb:atlas_project_id: 61f0a63f8bc1f86a073a7148
   redis:instance_type: cache.r7g.2xlarge
   vault:address: https://vault-production.odl.mit.edu

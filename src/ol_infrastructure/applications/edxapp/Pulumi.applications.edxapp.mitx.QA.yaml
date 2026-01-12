@@ -74,13 +74,8 @@ config:
   edxapp:google_analytics_id: ""
   edxapp:move_db: true
   edxapp:mail_domain: edxapp-mail-qa.mitx.mit.edu
-  edxapp:min_web_nodes: "1"
-  edxapp:min_worker_nodes: "1"
   edxapp:sender_email_address: mitx-support+qa@mit.edu
   edxapp:target_vpc: residential_mitx_vpc
-  edxapp:web_node_capacity: "2"
-  edxapp:worker_node_capacity: "1"
-  edxapp:framework: "earthly"
   edxapp:enable_xqueue: true
   edxapp:xqueue_domain: xqueue.mitx.qa.odl.mit.edu
   mongodb:atlas_project_id: 61a8f2d2c263e144f50f13b4
@@ -128,7 +123,4 @@ config:
         cpu_request: "250m"
         memory_request: "2Gi"
         memory_limit: "2Gi"
-  edxapp:k8s_deployment: true
-  edxapp:k8s_cutover: true
-  edxapp:disable_ec2_deployment: true
   edxapp:k8s_vpc: residential_mitx_vpc

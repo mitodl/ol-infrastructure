@@ -62,16 +62,11 @@ config:
   edxapp:google_analytics_id: ""
   edxapp:move_db: true
   edxapp:mail_domain: edxapp-mail-staging-production.mitx.mit.edu
-  edxapp:min_web_nodes: "1"
-  edxapp:min_worker_nodes: 0
   edxapp:sender_email_address: support@edxapp-mail-staging-production.mitx.mit.edu
   edxapp:target_vpc: residential_mitx_staging_vpc
-  edxapp:framework: "earthly"
   edxapp:enable_xqueue: true
   edxapp:xqueue_domain: xqueue.mitx-staging-prod.odl.mit.edu
   edxapp:web_instance_type: general_purpose_xlarge
-  edxapp:web_node_capacity: "1"
-  edxapp:worker_node_capacity: "0"
   edxapp:worker_instance_type: "m7a.xlarge"
   mongodb:atlas_project_id: 61b72cf6148de8714e671440
   vault:address: https://vault-production.odl.mit.edu
@@ -118,8 +113,5 @@ config:
         cpu_request: "250m"
         memory_request: "2Gi"
         memory_limit: "4Gi"
-  edxapp:k8s_deployment: true
-  edxapp:k8s_cutover: true
-  edxapp:disable_ec2_deployment: true
   edxapp:k8s_vpc: residential_mitx_vpc
   edxapp:canvas_base_url: https://canvas.mit.edu

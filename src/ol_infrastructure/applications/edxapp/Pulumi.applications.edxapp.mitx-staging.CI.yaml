@@ -59,16 +59,11 @@ config:
     learner_dashboard: dashboard
     learning: learn
     ora_grading: ora-grading
-  edxapp:framework: "earthly"
   edxapp:google_analytics_id: ""
   edxapp:mail_domain: edxapp-mail-staging-ci.mitx.mit.edu
-  edxapp:min_web_nodes: "1"
-  edxapp:min_worker_nodes: "1"
   edxapp:move_db: true
   edxapp:sender_email_address: support@edxapp-mail-staging-ci.mitx.mit.edu
   edxapp:target_vpc: residential_mitx_staging_vpc
-  edxapp:web_node_capacity: "1"
-  edxapp:worker_node_capacity: "1"
   edxapp:enable_xqueue: true
   edxapp:xqueue_domain: xqueue.mitx-staging-ci.odl.mit.edu
   mongodb:atlas_project_id: 6193f02d576a70760e8bcb02
@@ -116,7 +111,4 @@ config:
         cpu_request: "250m"
         memory_request: "1Gi"
         memory_limit: "2Gi"
-  edxapp:k8s_deployment: true
-  edxapp:k8s_cutover: true
-  edxapp:disable_ec2_deployment: true
   edxapp:k8s_vpc: residential_mitx_vpc

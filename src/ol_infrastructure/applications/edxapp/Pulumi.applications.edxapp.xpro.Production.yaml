@@ -53,13 +53,8 @@ config:
     ora_grading: ora-grading
   edxapp:google_analytics_id: UA-5145472-38
   edxapp:enable_xqueue: false
-  edxapp:framework: "earthly"
   edxapp:mail_domain: edxapp-mail-production.xpro.mit.edu
-  edxapp:min_web_nodes: "1"
-  edxapp:min_worker_nodes: "0"
   edxapp:sender_email_address: support@xpro.mit.edu
-  edxapp:web_node_capacity: "2"
-  edxapp:worker_node_capacity: "0"
   edxapp:worker_instance_type: "m7a.medium"
   mongodb:atlas_project_id: 61b727c6b5bd11656741308b
   vault:address: https://vault-production.odl.mit.edu
@@ -104,7 +99,4 @@ config:
         cpu_request: "250m"
         memory_request: "3Gi"
         memory_limit: "4Gi"
-  edxapp:k8s_deployment: true
-  edxapp:k8s_cutover: true
-  edxapp:disable_ec2_deployment: true
   edxapp:k8s_vpc: applications_vpc
