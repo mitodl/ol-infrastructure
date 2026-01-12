@@ -127,6 +127,25 @@ def create_k8s_resources(  # noqa: C901
         stack=stack_info,
     ).model_dump()
 
+    celery_stability_env_vars = [
+        kubernetes.core.v1.EnvVarArgs(
+            name="CELERY_TASK_REJECT_ON_WORKER_LOST",
+            value="True",
+        ),
+        kubernetes.core.v1.EnvVarArgs(
+            name="CELERY_WORKER_PREFETCH_MULTIPLIER",
+            value="1",
+        ),
+        kubernetes.core.v1.EnvVarArgs(
+            name="CELERY_TASK_ACKS_LATE",
+            value="True",
+        ),
+        kubernetes.core.v1.EnvVarArgs(
+            name="CELERY_WORKER_ENABLE_SOFT_SHUTDOWN_ON_IDLE",
+            value="True",
+        ),
+    ]
+
     # Create ConfigMap for Vector configuration
     vector_config_path = Path(__file__).parent / "files/vector/edxapp_tracking_log.yaml"
     with vector_config_path.open() as f:
@@ -812,18 +831,7 @@ def create_k8s_resources(  # noqa: C901
                                     name="DJANGO_SETTINGS_MODULE",
                                     value="lms.envs.production",
                                 ),
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="CELERY_TASK_REJECT_ON_WORKER_LOST",
-                                    value="True",
-                                ),
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="CELERY_WORKER_PREFETCH_MULTIPLIER",
-                                    value="1",
-                                ),
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="CELERY_TASK_ACKS_LATE",
-                                    value="True",
-                                ),
+                                *celery_stability_env_vars,
                             ],
                             resources=_get_resources_requests_limits("celery", "lms"),
                             volume_mounts=common_volume_mounts,
@@ -1278,18 +1286,7 @@ def create_k8s_resources(  # noqa: C901
                                     name="DJANGO_SETTINGS_MODULE",
                                     value="cms.envs.production",
                                 ),
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="CELERY_TASK_REJECT_ON_WORKER_LOST",
-                                    value="True",
-                                ),
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="CELERY_WORKER_DISABLE_PREFETCH",
-                                    value="True",
-                                ),
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="CELERY_TASK_ACKS_LATE",
-                                    value="True",
-                                ),
+                                *celery_stability_env_vars,
                             ],
                             resources=_get_resources_requests_limits("celery", "cms"),
                             volume_mounts=common_volume_mounts,
