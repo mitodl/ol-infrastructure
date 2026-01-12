@@ -127,27 +127,6 @@ def create_k8s_resources(  # noqa: C901
         stack=stack_info,
     ).model_dump()
 
-    celery_stability_env_vars = [
-        kubernetes.core.v1.EnvVarArgs(
-            name="CELERY_TASK_REJECT_ON_WORKER_LOST",
-            value="True",
-        ),
-        kubernetes.core.v1.EnvVarArgs(
-            name="CELERY_WORKER_PREFETCH_MULTIPLIER",
-            value="1",
-        ),
-        # (TMM 2026-01-12) The acks_late behavior is incompatible with the usage of
-        # eta/countdown parameters that are hardcoded in the edx-platform code.
-        # kubernetes.core.v1.EnvVarArgs(
-        #     name="CELERY_TASK_ACKS_LATE",  # noqa: ERA001
-        #     value="True",  # noqa: ERA001
-        # ),
-        kubernetes.core.v1.EnvVarArgs(
-            name="CELERY_WORKER_ENABLE_SOFT_SHUTDOWN_ON_IDLE",
-            value="True",
-        ),
-    ]
-
     # Create ConfigMap for Vector configuration
     vector_config_path = Path(__file__).parent / "files/vector/edxapp_tracking_log.yaml"
     with vector_config_path.open() as f:
@@ -822,8 +801,8 @@ def create_k8s_resources(  # noqa: C901
                                 "100",
                                 "--queues=edx.lms.core.default,edx.lms.core.high,edx.lms.core.high_mem",
                                 "--exclude-queues=edx.cms.core.default",
-                                "-Ofair",
                                 "--concurrency=2",  # Don't try to use all cores on node
+                                "--prefetch-multiplier=1",
                             ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
@@ -833,7 +812,6 @@ def create_k8s_resources(  # noqa: C901
                                     name="DJANGO_SETTINGS_MODULE",
                                     value="lms.envs.production",
                                 ),
-                                *celery_stability_env_vars,
                             ],
                             resources=_get_resources_requests_limits("celery", "lms"),
                             volume_mounts=common_volume_mounts,
@@ -1277,7 +1255,7 @@ def create_k8s_resources(  # noqa: C901
                                 "100",
                                 "--queues=edx.cms.core.default",
                                 "--exclude-queues=edx.lms.core.default",
-                                "-Ofair",
+                                "--prefetch-multiplier=1"
                                 "--concurrency=2",  # Don't try to use all cores on node
                             ],
                             env=[
@@ -1288,7 +1266,6 @@ def create_k8s_resources(  # noqa: C901
                                     name="DJANGO_SETTINGS_MODULE",
                                     value="cms.envs.production",
                                 ),
-                                *celery_stability_env_vars,
                             ],
                             resources=_get_resources_requests_limits("celery", "cms"),
                             volume_mounts=common_volume_mounts,
