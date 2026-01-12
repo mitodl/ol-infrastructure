@@ -812,10 +812,10 @@ def create_k8s_resources(  # noqa: C901
                                     name="DJANGO_SETTINGS_MODULE",
                                     value="lms.envs.production",
                                 ),
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="CELERY_TASK_REJECT_ON_WORKER_LOST",
-                                    value="True",
-                                ),
+                                # kubernetes.core.v1.EnvVarArgs(
+                                #     name="CELERY_TASK_REJECT_ON_WORKER_LOST",  # noqa: ERA001
+                                #     value="True",  # noqa: ERA001
+                                # ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="CELERY_WORKER_DISABLE_PREFETCH",
                                     value="True",
