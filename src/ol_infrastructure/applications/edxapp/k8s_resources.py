@@ -136,10 +136,12 @@ def create_k8s_resources(  # noqa: C901
             name="CELERY_WORKER_PREFETCH_MULTIPLIER",
             value="1",
         ),
-        kubernetes.core.v1.EnvVarArgs(
-            name="CELERY_TASK_ACKS_LATE",
-            value="True",
-        ),
+        # (TMM 2026-01-12) The acks_late behavior is incompatible with the usage of
+        # eta/countdown parameters that are hardcoded in the edx-platform code.
+        # kubernetes.core.v1.EnvVarArgs(
+        #     name="CELERY_TASK_ACKS_LATE",  # noqa: ERA001
+        #     value="True",  # noqa: ERA001
+        # ),
         kubernetes.core.v1.EnvVarArgs(
             name="CELERY_WORKER_ENABLE_SOFT_SHUTDOWN_ON_IDLE",
             value="True",
