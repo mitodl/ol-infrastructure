@@ -17,3 +17,6 @@ config:
   keycloak:target_vpc: operations_vpc
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
+  keycloak:posthog_api_host: "https://ph.ol.mit.edu"
+  keycloak:posthog_api_key:
+    secure: <key-here>
