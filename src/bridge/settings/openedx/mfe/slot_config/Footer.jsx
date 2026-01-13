@@ -161,30 +161,49 @@ const AutoSelectLanguage = () => {
     const match = document.cookie.match(new RegExp(`(^| )${safeName}=([^;]+)`));
     return match ? decodeURIComponent(match[2]) : null;
   };
-  const setCookie = (name, value, days = 1, domain = null) => {
+  const setCookie = (name, value, days = 1, domainAttr = null) => {
     const expires = new Date(Date.now() + days * 864e5).toUTCString();
-    const domainAttr = domain ? `; domain=${domain}` : '';
     document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/${domainAttr};`;
   };
-  const removeCookie = (name, domain = null) => {
-    const domainAttr = domain ? `; domain=${domain}` : '';
+  const removeCookie = (name, domainAttr = null) => {
     document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/${domainAttr};`;
   };
 
-  // Helper to extract hostname from URL
-  const getHostnameFromUrl = (url) => {
-    // Remove subdomain 'studio.' if present e.g., studio.courses.learn.mit.edu -> courses.learn.mit.edu
+  /**
+   * Returns cookie domain attribute string:
+   *   "; Domain=example.com"
+   * or "" if unable to determine domain.
+   *
+   * Rules:
+   * - If URL contains `lmsBaseURL`, use hostname from `lmsBaseURL` as-is
+   * - Otherwise, remove ONLY the first subdomain from the URL hostname
+   */
+  const getReloadCookieDomainAttr = (url) => {
     try {
-      const hostname = new URL(url).hostname;
-      if (hostname.startsWith("studio.")) {
-        return hostname.replace(/^studio\./, "");
+      // Case 1: Prefer domain from lmsBaseURL when contained
+      if (lmsBaseURL && url.includes(lmsBaseURL)) {
+        const lmsHostname = new URL(lmsBaseURL).hostname;
+        return lmsHostname ? `; Domain=${lmsHostname}` : "";
       }
-      return hostname;
+
+      // Case 2: Fallback → remove first subdomain
+      const hostname = new URL(url).hostname;
+      const parts = hostname.split(".");
+
+      // If hostname has <= 2 labels, nothing to strip
+      if (parts.length <= 2) {
+        return `; Domain=${hostname}`;
+      }
+
+      // Remove ONLY the first subdomain
+      const withoutFirstSubdomain = parts.slice(1).join(".");
+
+      return `; Domain=${withoutFirstSubdomain}`;
     } catch (error) {
       if (process.env.NODE_ENV === DEVELOPMENT_ENVIRONMENT) {
         console.error("Failed to parse URL:", error);
       }
-      return null;
+      return "";
     }
   };
 
@@ -231,8 +250,8 @@ const AutoSelectLanguage = () => {
         try {
           const updated = await setLanguage(studioBaseURL, ENGLISH_LANG_CODE);
           if (updated) {
-            const studioDomain = getHostnameFromUrl(studioBaseURL);
-            setCookie(reloadCookieName, "true", 1, studioDomain);
+            const cookieDomainAttr = getReloadCookieDomainAttr(studioBaseURL);
+            setCookie(reloadCookieName, "true", 1, cookieDomainAttr);
             window.location.reload();
           }
         } catch (error) {
@@ -257,8 +276,8 @@ const AutoSelectLanguage = () => {
       ) {
         const updated = await setLanguage(lmsBaseURL, courseLang);
         if (updated) {
-          const lmsDomain = getHostnameFromUrl(lmsBaseURL);
-          removeCookie(reloadCookieName, lmsDomain); // Remove after setting in learning MFE
+          const cookieDomainAttr = getReloadCookieDomainAttr(lmsBaseURL);
+          removeCookie(reloadCookieName, cookieDomainAttr); // Remove after setting in learning MFE
           window.location.reload();
         }
       }
