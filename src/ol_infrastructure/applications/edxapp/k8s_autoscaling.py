@@ -1,11 +1,11 @@
-# ruff: noqa: E501, PLR0913
+# ruff: noqa: E501, PLR0913, ERA001, ARG001
 from typing import Any
 
 import pulumi
 import pulumi_kubernetes as kubernetes
 from pulumi import ResourceOptions
 
-from bridge.lib.magic_numbers import DEFAULT_REDIS_PORT
+# from bridge.lib.magic_numbers import DEFAULT_REDIS_PORT
 from ol_infrastructure.components.aws.cache import OLAmazonCache
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
@@ -222,50 +222,50 @@ def create_autoscaling_resources(
         ),
     )
 
-    lms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
-        f"ol-{stack_info.env_prefix}-edxapp-lms-celery-scaledobject-{stack_info.env_suffix}",
-        api_version="keda.sh/v1alpha1",
-        kind="ScaledObject",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=f"{lms_celery_deployment_name}-scaledobject",
-            namespace=namespace,
-            labels=lms_celery_labels,
-        ),
-        spec={
-            "scaleTargetRef": {
-                "kind": "Deployment",
-                "name": lms_celery_deployment_name,
-            },
-            "pollingInterval": 60,
-            "cooldownPeriod": 300,
-            "minReplicaCount": replicas_dict["celery"]["lms"]["min"],
-            "maxReplicaCount": replicas_dict["celery"]["lms"]["max"],
-            "advanced": {
-                "horizontalPodAutoscalerConfig": {
-                    "behavior": {
-                        "scaleUp": {"stabilizationWindowSeconds": 300},
-                    }
-                }
-            },
-            "triggers": [
-                {
-                    "type": "redis",
-                    "metadata": {
-                        "address": edxapp_cache.address.apply(
-                            lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
-                        ),
-                        "username": "default",
-                        "databaseIndex": "1",
-                        "password": edxapp_cache.cache_cluster.auth_token,
-                        "listName": "edx.lms.core.default",
-                        "listLength": "10",
-                        "enableTLS": "true",
-                    },
-                }
-            ],
-        },
-        opts=pulumi.ResourceOptions(depends_on=[lms_celery_deployment]),
-    )
+    # lms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
+    #     f"ol-{stack_info.env_prefix}-edxapp-lms-celery-scaledobject-{stack_info.env_suffix}",
+    #     api_version="keda.sh/v1alpha1",
+    #     kind="ScaledObject",
+    #     metadata=kubernetes.meta.v1.ObjectMetaArgs(
+    #         name=f"{lms_celery_deployment_name}-scaledobject",
+    #         namespace=namespace,
+    #         labels=lms_celery_labels,
+    #     ),
+    #     spec={
+    #         "scaleTargetRef": {
+    #             "kind": "Deployment",
+    #             "name": lms_celery_deployment_name,
+    #         },
+    #         "pollingInterval": 60,
+    #         "cooldownPeriod": 300,
+    #         "minReplicaCount": replicas_dict["celery"]["lms"]["min"],
+    #         "maxReplicaCount": replicas_dict["celery"]["lms"]["max"],
+    #         "advanced": {
+    #             "horizontalPodAutoscalerConfig": {
+    #                 "behavior": {
+    #                     "scaleUp": {"stabilizationWindowSeconds": 300},
+    #                 }
+    #             }
+    #         },
+    #         "triggers": [
+    #             {
+    #                 "type": "redis",
+    #                 "metadata": {
+    #                     "address": edxapp_cache.address.apply(
+    #                         lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
+    #                     ),
+    #                     "username": "default",
+    #                     "databaseIndex": "1",
+    #                     "password": edxapp_cache.cache_cluster.auth_token,
+    #                     "listName": "edx.lms.core.default",
+    #                     "listLength": "10",
+    #                     "enableTLS": "true",
+    #                 },
+    #             }
+    #         ],
+    #     },
+    #     opts=pulumi.ResourceOptions(depends_on=[lms_celery_deployment]),
+    # )
 
     # Create KEDA ScaledObject for CMS deployment
     # This will scale the CMS deployment based on Prometheus metrics
@@ -332,49 +332,49 @@ def create_autoscaling_resources(
         ),
     )
 
-    cms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
-        f"ol-{stack_info.env_prefix}-edxapp-cms-celery-scaledobject-{stack_info.env_suffix}",
-        api_version="keda.sh/v1alpha1",
-        kind="ScaledObject",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=f"{cms_celery_deployment_name}-scaledobject",
-            namespace=namespace,
-            labels=cms_celery_labels,
-        ),
-        spec={
-            "scaleTargetRef": {
-                "kind": "Deployment",
-                "name": cms_celery_deployment_name,
-            },
-            "pollingInterval": 60,
-            "cooldownPeriod": 300,
-            "minReplicaCount": replicas_dict["celery"]["cms"]["min"],
-            "maxReplicaCount": replicas_dict["celery"]["cms"]["max"],
-            "triggers": [
-                {
-                    "type": "redis",
-                    "metadata": {
-                        "address": edxapp_cache.address.apply(
-                            lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
-                        ),
-                        "username": "default",
-                        "databaseIndex": "1",
-                        "password": edxapp_cache.cache_cluster.auth_token,
-                        "listName": "edx.cms.core.default",
-                        "listLength": "10",
-                        "enableTLS": "true",
-                    },
-                }
-            ],
-        },
-        opts=pulumi.ResourceOptions(depends_on=[cms_celery_deployment]),
-    )
+    # cms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
+    #     f"ol-{stack_info.env_prefix}-edxapp-cms-celery-scaledobject-{stack_info.env_suffix}",
+    #     api_version="keda.sh/v1alpha1",
+    #     kind="ScaledObject",
+    #     metadata=kubernetes.meta.v1.ObjectMetaArgs(
+    #         name=f"{cms_celery_deployment_name}-scaledobject",
+    #         namespace=namespace,
+    #         labels=cms_celery_labels,
+    #     ),
+    #     spec={
+    #         "scaleTargetRef": {
+    #             "kind": "Deployment",
+    #             "name": cms_celery_deployment_name,
+    #         },
+    #         "pollingInterval": 60,
+    #         "cooldownPeriod": 300,
+    #         "minReplicaCount": replicas_dict["celery"]["cms"]["min"],
+    #         "maxReplicaCount": replicas_dict["celery"]["cms"]["max"],
+    #         "triggers": [
+    #             {
+    #                 "type": "redis",
+    #                 "metadata": {
+    #                     "address": edxapp_cache.address.apply(
+    #                         lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
+    #                     ),
+    #                     "username": "default",
+    #                     "databaseIndex": "1",
+    #                     "password": edxapp_cache.cache_cluster.auth_token,
+    #                     "listName": "edx.cms.core.default",
+    #                     "listLength": "10",
+    #                     "enableTLS": "true",
+    #                 },
+    #             }
+    #         ],
+    #     },
+    #     opts=pulumi.ResourceOptions(depends_on=[cms_celery_deployment]),
+    # )
 
     return {
         "webapp_prometheus_auth_secret": webapp_prometheus_auth_secret,
         "webapp_prometheus_trigger_auth": webapp_prometheus_trigger_auth,
         "lms_webapp_scaledobject": lms_webapp_scaledobject,
-        "lms_celery_scaledobject": lms_celery_scaledobject,
+        # "lms_celery_scaledobject": lms_celery_scaledobject,
         "cms_webapp_scaledobject": cms_webapp_scaledobject,
-        "cms_celery_scaledobject": cms_celery_scaledobject,
+        # "cms_celery_scaledobject": cms_celery_scaledobject,
     }
