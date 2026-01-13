@@ -209,7 +209,8 @@
   width: 30rem;
   margin: 0;
   flex-shrink: 0;
-  height: fit-content;
+  height: 100vh;
+  max-height: 100vh;
   align-self: flex-start;
   overflow: visible;
 
@@ -263,8 +264,8 @@
   padding: 0;
   box-sizing: border-box;
 
-  // Scrolling
-  overflow-y: auto;
+  // Don't scroll here - the SlotContainer is the scrollElement
+  overflow: hidden;
 
   transform: translateZ(0);
 
@@ -276,6 +277,15 @@
     background: white;
     border: 1px solid var(--pgn-color-light-400, #d7d3d1);
     border-radius: 4px;
+  }
+  [data-smoot-version] {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 
   .ai-drawer-wrapper-fullscreen & {
