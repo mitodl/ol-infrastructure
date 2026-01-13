@@ -158,6 +158,7 @@ def build_base_general_config() -> ConfigDict:
         "EMAIL_PORT": 587,
         "EMAIL_USE_TLS": True,
         "ENABLE_COMPREHENSIVE_THEMING": True,
+        "ENABLE_MAX_FAILED_LOGIN_ATTEMPTS": False,
         "EVENT_TRACKING_SEGMENTIO_EMIT_WHITELIST": [],
         "EXTRA_MIDDLEWARE_CLASSES": [],
         "FACEBOOK_API_VERSION": "v2.1",
