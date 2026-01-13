@@ -161,12 +161,50 @@ const AutoSelectLanguage = () => {
     const match = document.cookie.match(new RegExp(`(^| )${safeName}=([^;]+)`));
     return match ? decodeURIComponent(match[2]) : null;
   };
-  const setCookie = (name, value, days = 1) => {
+  const setCookie = (name, value, days = 1, domainAttr = null) => {
     const expires = new Date(Date.now() + days * 864e5).toUTCString();
-    document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/`;
+    document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/${domainAttr};`;
   };
-  const removeCookie = (name) => {
-    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+  const removeCookie = (name, domainAttr = null) => {
+    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/${domainAttr};`;
+  };
+
+  /**
+   * Returns cookie domain attribute string:
+   *   "; Domain=example.com"
+   * or "" if unable to determine domain.
+   *
+   * Rules:
+   * - If URL contains `lmsBaseURL`, use hostname from `lmsBaseURL` as-is
+   * - Otherwise, remove ONLY the first subdomain from the URL hostname
+   */
+  const getReloadCookieDomainAttr = (url) => {
+    try {
+      // Case 1: Prefer domain from lmsBaseURL when contained
+      if (lmsBaseURL && url.includes(lmsBaseURL)) {
+        const lmsHostname = new URL(lmsBaseURL).hostname;
+        return lmsHostname ? `; Domain=${lmsHostname}` : "";
+      }
+
+      // Case 2: Fallback → remove first subdomain
+      const hostname = new URL(url).hostname;
+      const parts = hostname.split(".");
+
+      // If hostname has <= 2 labels, nothing to strip
+      if (parts.length <= 2) {
+        return `; Domain=${hostname}`;
+      }
+
+      // Remove ONLY the first subdomain
+      const withoutFirstSubdomain = parts.slice(1).join(".");
+
+      return `; Domain=${withoutFirstSubdomain}`;
+    } catch (error) {
+      if (process.env.NODE_ENV === DEVELOPMENT_ENVIRONMENT) {
+        console.error("Failed to parse URL:", error);
+      }
+      return "";
+    }
   };
 
   async function setLanguage(baseURL, language) {
@@ -212,7 +250,8 @@ const AutoSelectLanguage = () => {
         try {
           const updated = await setLanguage(studioBaseURL, ENGLISH_LANG_CODE);
           if (updated) {
-            setCookie(reloadCookieName, "true");
+            const cookieDomainAttr = getReloadCookieDomainAttr(studioBaseURL);
+            setCookie(reloadCookieName, "true", 1, cookieDomainAttr);
             window.location.reload();
           }
         } catch (error) {
@@ -237,7 +276,8 @@ const AutoSelectLanguage = () => {
       ) {
         const updated = await setLanguage(lmsBaseURL, courseLang);
         if (updated) {
-          removeCookie(reloadCookieName); // Remove after setting in learning MFE
+          const cookieDomainAttr = getReloadCookieDomainAttr(lmsBaseURL);
+          removeCookie(reloadCookieName, cookieDomainAttr); // Remove after setting in learning MFE
           window.location.reload();
         }
       }
