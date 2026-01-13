@@ -276,14 +276,8 @@ def _build_interpolated_config_dict(
                         "api_key": "",
                         "default_model": "gpt-5.2",
                     },
-                    "gemini": {
-                        "api_key": "",
-                        "default_model": "gemini-3-pro-preview"
-                    },
-                    "mistral": {
-                        "api_key": "",
-                        "default_model": "mistral-large-latest"
-                    },
+                    "gemini": {"api_key": "", "default_model": "gemini-3-pro-preview"},
+                    "mistral": {"api_key": "", "default_model": "mistral-large-latest"},
                 },
                 "IDA_LOGOUT_URI_LIST": [
                     f"https://{marketing_domain}/logout",
