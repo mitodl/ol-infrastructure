@@ -483,7 +483,7 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
         "tracing": {
             "enabled": True,
             "endpoint": "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4317",
-            "samplerRatio": 0.2,
+            "samplerRatio": 1.0,
         },
         "hostname": {
             "hostname": keycloak_domain,
