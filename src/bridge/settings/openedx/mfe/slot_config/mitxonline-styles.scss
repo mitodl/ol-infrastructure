@@ -289,4 +289,42 @@
       background: white;
     }
   }
+
+  // Stack conversation starter cards vertically in narrow sidebar
+  // Only apply on screens greater than 1024px where the sidebar is constrained
+  // Below 1024px, the component works fine in full-screen mode
+  @media (min-width: 1025px) {
+    form {
+      // Target the Starters div which contains conversation starter buttons
+      // Using :has() to identify the container with multiple button children
+      // This selector works in modern browsers (Chrome 105+, Safari 15.4+, Firefox 121+)
+      > div:has(> button + button) {
+        flex-direction: column !important;
+        gap: 12px !important;
+
+        // Ensure conversation starter buttons take full width when stacked
+        > button {
+          flex: 1 1 100% !important;
+          width: 100% !important;
+          min-width: 0 !important;
+        }
+      }
+
+      // Fallback for browsers that don't support :has()
+      // Target the last div before the form ends (which is typically the Starters container)
+      // This is less precise but provides broader browser support
+      @supports not selector(:has(*)) {
+        > div:last-of-type {
+          flex-direction: column !important;
+          gap: 12px !important;
+
+          > button {
+            flex: 1 1 100% !important;
+            width: 100% !important;
+            min-width: 0 !important;
+          }
+        }
+      }
+    }
+  }
 }
