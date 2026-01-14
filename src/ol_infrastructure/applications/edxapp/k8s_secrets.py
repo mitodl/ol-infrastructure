@@ -48,6 +48,7 @@ class EdxappSecrets:
     cms_oauth: OLVaultK8SSecret
     lms_oauth: OLVaultK8SSecret | None
     git_export_ssh_key: OLVaultK8SSecret
+    translations_providers: OLVaultK8SSecret | None
 
     db_creds_secret_name: str
     db_connections_secret_name: str
@@ -60,6 +61,7 @@ class EdxappSecrets:
     cms_oauth_secret_name: str
     lms_oauth_secret_name: str | None
     git_export_ssh_key_secret_name: str
+    translations_providers_secret_name: str | None
 
 
 def create_k8s_secrets(
@@ -118,6 +120,9 @@ def create_k8s_secrets(
     cms_oauth_secret_name = "70-cms-oauth-credentials-yaml"  # pragma: allowlist secret
     lms_oauth_secret_name = "80-lms-oauth-credentials-yaml"  # pragma: allowlist secret
     git_export_ssh_key_secret_name = "git-export-ssh-key"  # pragma: allowlist secret
+    translations_providers_secret_name = (
+        "14-translations-providers-yaml"  # pragma: allowlist secret
+    )
 
     # Database credentials secret (dynamic - depends on DB outputs)
     db_creds_secret = Output.all(
@@ -355,6 +360,36 @@ def create_k8s_secrets(
         },
     )
 
+    # Translations providers secret (conditional - only for mitxonline)
+    if stack_info.env_prefix == "mitxonline":
+        translations_providers_secret = builder.create_static(
+            name="translations-providers",
+            resource_name="translations-providers-secret",
+            secret_name=translations_providers_secret_name,
+            mount=f"secret-{stack_info.env_prefix}",
+            path="edxapp",
+            templates={
+                "14-translations-providers-secrets.yaml": textwrap.dedent("""
+                    TRANSLATIONS_GITHUB_TOKEN: {{ get .Secrets "translations_github_token" }}
+                    TRANSLATIONS_PROVIDERS:
+                      default_provider: mistral
+                      deepl:
+                        api_key: {{ get .Secrets "deepl_api_key" }}
+                      openai:
+                        api_key: {{ get .Secrets "openai_api_key" }}
+                        default_model: gpt-5.2
+                      gemini:
+                        api_key: {{ get .Secrets "gemini_api_key" }}
+                        default_model: gemini-3-pro-preview
+                      mistral:
+                        api_key: {{ get .Secrets "mistral_api_key" }}
+                        default_model: mistral-large-latest
+                """),
+            },
+        )
+    else:
+        translations_providers_secret = None
+
     # Return dataclass with all secrets
     return EdxappSecrets(
         db_creds=db_creds_secret,
@@ -368,6 +403,7 @@ def create_k8s_secrets(
         cms_oauth=cms_oauth_secret,
         lms_oauth=lms_oauth_secret,
         git_export_ssh_key=git_export_ssh_key_secret,
+        translations_providers=translations_providers_secret,
         db_creds_secret_name=db_creds_secret_name,
         db_connections_secret_name=db_connections_secret_name,
         mongo_db_creds_secret_name=mongo_db_creds_secret_name,
@@ -379,4 +415,7 @@ def create_k8s_secrets(
         cms_oauth_secret_name=cms_oauth_secret_name,
         lms_oauth_secret_name=lms_oauth_secret_name,
         git_export_ssh_key_secret_name=git_export_ssh_key_secret_name,
+        translations_providers_secret_name=translations_providers_secret_name
+        if stack_info.env_prefix == "mitxonline"
+        else None,
     )
