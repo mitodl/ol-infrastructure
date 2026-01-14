@@ -4,7 +4,7 @@ encryptedkey: AQICAHi7xhTkB8tf1ObyPMxDhODJja4Mn4jyIo32zZVlOiZPFgHt3EmKiORMnsrUqO
 config:
   aws:region: us-east-1
   consul:address: https://consul-operations-qa.odl.mit.edu
-  keycloak:replicas: 2
+  keycloak:replicas: "2"
   keycloak:memory_request: 1Gi
   keycloak:memory_limit: 2Gi
   keycloak:cpu_request: 1000m
@@ -19,4 +19,4 @@ config:
   vault_server:env_namespace: operations.qa
   keycloak:posthog_api_host: "https://ph.ol.mit.edu"
   keycloak:posthog_api_key:
-    secure: <key-here>
+    secure: v1:tXju/lJP+kCuxdEy:pPJceWi4YomKBh8yMwj3WCxczIQNyFIOgVry9qYCa0a/9qcR+d9dMmCkWMuMaYEJAYkjSIB1ao9mjF5MKeVU
