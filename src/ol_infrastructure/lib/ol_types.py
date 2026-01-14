@@ -74,6 +74,7 @@ class Services(str, Enum):
     ocw_build = "ocw-build"
     odl_video_service = "ovs"
     open_metadata = "open-metadata"
+    starrocks = "starrocks"
     redash = "redash"
     tika = "tika"
     vector_log_proxy = "vector-log-proxy"
