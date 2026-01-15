@@ -209,8 +209,7 @@
   width: 30rem;
   margin: 0;
   flex-shrink: 0;
-  height: 100vh;
-  max-height: 100vh;
+  height: fit-content;
   align-self: flex-start;
   overflow: visible;
 
@@ -278,6 +277,9 @@
     border: 1px solid var(--pgn-color-light-400, #d7d3d1);
     border-radius: 4px;
   }
+
+  // Make the SlotContainer (with data-smoot-version) the scrollable element
+  // This is the element that gets the scrollElement ref in AiDrawer
   [data-smoot-version] {
     display: flex;
     flex-direction: column;
@@ -286,6 +288,17 @@
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
+  }
+
+  // Reduce height to 74vh on screens greater than 1024px
+  @media (min-width: 1025px) {
+    height: 74vh;
+    max-height: 74vh;
+
+    [data-smoot-version] {
+      height: 74vh;
+      max-height: 74vh;
+    }
   }
 
   .ai-drawer-wrapper-fullscreen & {
