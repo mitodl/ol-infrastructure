@@ -415,7 +415,7 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
     """
     # Shared configuration for mitx and mitx-staging
     mitx_shared_config = {
-        "DEFAULT_SITE_THEME": "mitx",
+        "DEFAULT_SITE_THEME": env_prefix,  # "mitx" or "mitx-staging"
         "PLATFORM_NAME": "MITx Residential",
         "PLATFORM_DESCRIPTION": "MITx Residential",
         "PRESS_EMAIL": "support@mitx.mit.edu",
