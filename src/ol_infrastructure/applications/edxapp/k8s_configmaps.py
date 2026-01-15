@@ -265,7 +265,7 @@ def _build_interpolated_config_dict(
                 )
                 or False,
                 "TRANSLATIONS_GITHUB_TOKEN": "",
-                "TRANSLATIONS_REPO_PATH": "",
+                "TRANSLATIONS_REPO_PATH": "/openedx/data/mitxonline-translations",
                 "TRANSLATIONS_REPO_URL": "https://github.com/mitodl/mitxonline-translations.git",
                 "IDA_LOGOUT_URI_LIST": [
                     f"https://{marketing_domain}/logout",
