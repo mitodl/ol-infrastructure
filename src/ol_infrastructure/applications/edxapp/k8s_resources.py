@@ -461,6 +461,10 @@ def create_k8s_resources(  # noqa: C901
         lms_edxapp_config_sources[secrets.xqueue_secret_name] = secrets.xqueue
     if secrets.lms_oauth:
         lms_edxapp_config_sources[secrets.lms_oauth_secret_name] = secrets.lms_oauth
+    if secrets.translations_providers:
+        lms_edxapp_config_sources[secrets.translations_providers_secret_name] = (
+            secrets.translations_providers
+        )
     lms_edxapp_secret_names = [
         secrets.db_creds_secret_name,
         secrets.db_connections_secret_name,
@@ -475,6 +479,8 @@ def create_k8s_resources(  # noqa: C901
         lms_edxapp_secret_names.append(secrets.xqueue_secret_name)
     if secrets.lms_oauth:
         lms_edxapp_secret_names.append(secrets.lms_oauth_secret_name)
+    if secrets.translations_providers:
+        lms_edxapp_secret_names.append(secrets.translations_providers_secret_name)
     lms_edxapp_configmap_names = [
         configmaps.general_config_name,
         configmaps.interpolated_config_name,
@@ -914,6 +920,10 @@ def create_k8s_resources(  # noqa: C901
     }
     if secrets.xqueue:
         cms_edxapp_config_sources[secrets.xqueue_secret_name] = secrets.xqueue
+    if secrets.translations_providers:
+        cms_edxapp_config_sources[secrets.translations_providers_secret_name] = (
+            secrets.translations_providers
+        )
     cms_edxapp_secret_names = [
         secrets.db_creds_secret_name,
         secrets.db_connections_secret_name,
@@ -928,6 +938,8 @@ def create_k8s_resources(  # noqa: C901
     ]
     if secrets.xqueue:
         cms_edxapp_secret_names.append(secrets.xqueue_secret_name)
+    if secrets.translations_providers:
+        cms_edxapp_secret_names.append(secrets.translations_providers_secret_name)
     cms_edxapp_configmap_names = [
         configmaps.general_config_name,
         configmaps.interpolated_config_name,
