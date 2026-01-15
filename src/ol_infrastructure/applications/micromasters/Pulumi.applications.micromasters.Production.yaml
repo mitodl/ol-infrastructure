@@ -24,18 +24,13 @@ config:
     MAILGUN_FROM_EMAIL: "no-reply@micromasters.odl.mit.edu"
     MAILGUN_URL: "https://api.mailgun.net/v3/micromasters.odl.mit.edu"
     MICROMASTERS_BASE_URL: "https://micromasters.mit.edu"
-    MICROMASTERS_CORS_ORIGIN_WHITELIST: '["open.mit.edu"]'
+    MICROMASTERS_CORS_ORIGIN_WHITELIST: '[]'
     MICROMASTERS_ENVIRONMENT: "production"
     MICROMASTERS_LOG_LEVEL: "INFO"
     MIDDLEWARE_FEATURE_FLAG_QS_PREFIX: "XIQ"
     MITXONLINE_BASE_URL: "https://courses.learn.mit.edu"
     MITXONLINE_CALLBACK_URL: "https://courses.learn.mit.edu"
     MITXONLINE_URL: "https://mitxonline.mit.edu/"
-    OPEN_DISCUSSIONS_API_USERNAME: "od_mm_prod_api"
-    OPEN_DISCUSSIONS_BASE_URL: "https://open.mit.edu"
-    OPEN_DISCUSSIONS_COOKIE_DOMAIN: "mit.edu"
-    OPEN_DISCUSSIONS_COOKIE_NAME: "discussionsprod"
-    OPEN_DISCUSSIONS_REDIRECT_URL: "https://open.mit.edu/"
     PGBOUNCER_DEFAULT_POOL_SIZE: 20
     PGBOUNCER_MAX_CLIENT_CONN: 500
   micromasters:db_password:

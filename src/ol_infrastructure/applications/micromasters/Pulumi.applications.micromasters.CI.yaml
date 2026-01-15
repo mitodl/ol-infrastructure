@@ -22,18 +22,13 @@ config:
     MAILGUN_FROM_EMAIL: "no-reply@micromasters-rc-mail.odl.mit.edu"
     MAILGUN_URL: "https://api.mailgun.net/v3/micromasters-rc-mail.odl.mit.edu"
     MICROMASTERS_BASE_URL: "https://micromasters-ci.odl.mit.edu"
-    MICROMASTERS_CORS_ORIGIN_WHITELIST: "['discussions-ci.odl.mit.edu']"
+    MICROMASTERS_CORS_ORIGIN_WHITELIST: "[]"
     MICROMASTERS_ENVIRONMENT: "ci"
     MICROMASTERS_LOG_LEVEL: "DEBUG"
     MIDDLEWARE_FEATURE_FLAG_QS_PREFIX: ""
     MITXONLINE_BASE_URL: ""
     MITXONLINE_CALLBACK_URL: ""
     MITXONLINE_URL: ""
-    OPEN_DISCUSSIONS_API_USERNAME: "od_mm_ci_api"
-    OPEN_DISCUSSIONS_BASE_URL: "https://discussions-ci.odl.mit.edu/"
-    OPEN_DISCUSSIONS_COOKIE_DOMAIN: "odl.mit.edu"
-    OPEN_DISCUSSIONS_COOKIE_NAME: "discussionsci"
-    OPEN_DISCUSSIONS_REDIRECT_URL: "https://discussions-ci.odl.mit.edu/"
     PGBOUNCER_DEFAULT_POOL_SIZE: 50
     PGBOUNCER_MAX_CLIENT_CONN: 1000
   micromasters:db_password:
