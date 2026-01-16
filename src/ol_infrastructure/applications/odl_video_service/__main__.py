@@ -9,7 +9,15 @@ from pathlib import Path
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
-from pulumi import Alias, Config, Output, ResourceOptions, StackReference, export
+from pulumi import (
+    ROOT_STACK_RESOURCE,
+    Alias,
+    Config,
+    Output,
+    ResourceOptions,
+    StackReference,
+    export,
+)
 from pulumi_aws import ec2, get_caller_identity, iam, route53
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
@@ -36,6 +44,7 @@ from ol_infrastructure.components.aws.mediaconvert import (
     MediaConvertConfig,
     OLMediaConvert,
 )
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
@@ -84,6 +93,138 @@ aws_config = AWSBase(
 consul_provider = get_consul_provider(stack_info)
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+
+# S3 Buckets for ODL Video Service
+# Get bucket names from configuration
+s3_bucket_name = ovs_config.require("s3_bucket_name")
+s3_subtitle_bucket_name = ovs_config.require("s3_subtitle_bucket_name")
+s3_thumbnail_bucket_name = ovs_config.require("s3_thumbnail_bucket_name")
+s3_transcode_bucket_name = ovs_config.require("s3_transcode_bucket_name")
+s3_watch_bucket_name = ovs_config.require("s3_watch_bucket_name")
+
+# Main S3 bucket (video files)
+ovs_main_bucket_config = S3BucketConfig(
+    bucket_name=s3_bucket_name,
+    versioning_enabled=False,
+    server_side_encryption_enabled=True,
+    intelligent_tiering_enabled=True,
+    intelligent_tiering_days=90,
+    tags=aws_config.merged_tags(
+        {"Name": s3_bucket_name, "Application": "odl-video-service"}
+    ),
+)
+ovs_main_bucket = OLBucket(
+    "ovs-main-bucket",
+    ovs_main_bucket_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name="ovs-main-bucket-bucket",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+        ]
+    ),
+)
+
+# Subtitles bucket
+ovs_subtitles_bucket_config = S3BucketConfig(
+    bucket_name=s3_subtitle_bucket_name,
+    versioning_enabled=False,
+    server_side_encryption_enabled=True,
+    intelligent_tiering_enabled=True,
+    intelligent_tiering_days=90,
+    tags=aws_config.merged_tags(
+        {"Name": s3_subtitle_bucket_name, "Application": "odl-video-service"}
+    ),
+)
+ovs_subtitles_bucket = OLBucket(
+    "ovs-subtitles-bucket",
+    ovs_subtitles_bucket_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name="ovs-subtitles-bucket-bucket",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+        ]
+    ),
+)
+
+# Thumbnails bucket
+ovs_thumbnails_bucket_config = S3BucketConfig(
+    bucket_name=s3_thumbnail_bucket_name,
+    versioning_enabled=False,
+    server_side_encryption_enabled=True,
+    intelligent_tiering_enabled=True,
+    intelligent_tiering_days=90,
+    tags=aws_config.merged_tags(
+        {"Name": s3_thumbnail_bucket_name, "Application": "odl-video-service"}
+    ),
+)
+ovs_thumbnails_bucket = OLBucket(
+    "ovs-thumbnails-bucket",
+    ovs_thumbnails_bucket_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name="ovs-thumbnails-bucket-bucket",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+        ]
+    ),
+)
+
+# Transcoded bucket (allows public access for CloudFront)
+ovs_transcoded_bucket_config = S3BucketConfig(
+    bucket_name=s3_transcode_bucket_name,
+    versioning_enabled=False,
+    server_side_encryption_enabled=True,
+    intelligent_tiering_enabled=True,
+    intelligent_tiering_days=90,
+    block_public_acls=False,
+    block_public_policy=False,
+    ignore_public_acls=False,
+    restrict_public_buckets=False,
+    tags=aws_config.merged_tags(
+        {"Name": s3_transcode_bucket_name, "Application": "odl-video-service"}
+    ),
+)
+ovs_transcoded_bucket = OLBucket(
+    "ovs-transcoded-bucket",
+    ovs_transcoded_bucket_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name="ovs-transcoded-bucket-bucket",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+        ]
+    ),
+)
+
+# Uploaded bucket (user uploads)
+ovs_uploaded_bucket_config = S3BucketConfig(
+    bucket_name=s3_watch_bucket_name,
+    versioning_enabled=False,
+    server_side_encryption_enabled=True,
+    intelligent_tiering_enabled=True,
+    intelligent_tiering_days=90,
+    tags=aws_config.merged_tags(
+        {"Name": s3_watch_bucket_name, "Application": "odl-video-service"}
+    ),
+)
+ovs_uploaded_bucket = OLBucket(
+    "ovs-uploaded-bucket",
+    ovs_uploaded_bucket_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name="ovs-uploaded-bucket-bucket",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+        ]
+    ),
+)
 
 # IAM and instance profile
 
