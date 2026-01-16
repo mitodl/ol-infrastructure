@@ -687,8 +687,8 @@ for purpose in ("draft", "live", "test"):
 
     # Read robots.txt content and prepare VCL snippet with injected content
     robots_content = snippets_dir.joinpath(robots_file).read_text()
-    # Escape quotes and newlines for VCL synthetic response
-    robots_content_escaped = robots_content.replace('"', '\\"').replace('\n', '\\n')
+    # Escape only quotes for VCL synthetic response (newlines will be literal)
+    robots_content_escaped = robots_content.replace('"', '\\"')
     robots_error_handler_vcl = (
         snippets_dir.joinpath("robots_txt_error_handler.vcl")
         .read_text()
