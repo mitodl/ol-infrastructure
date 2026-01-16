@@ -10,6 +10,13 @@ RECOMMENDED_TAGS = {"Application", "Owner"}
 
 
 @unique
+class Product(str, Enum):
+    mitlearn = "mit-learn"
+    infrastructure = "infrastructure"
+    data = "data"
+
+
+@unique
 class BusinessUnit(str, Enum):
     """Canonical source of truth for defining valid OU tags.
 
@@ -65,6 +72,7 @@ class Services(str, Enum):
     keycloak = "keycloak"
     kubewatch = "kubewatch"
     micromasters = "micromasters"
+    open_edx = "open-edx"
     mit_learn = "mit-learn"
     mit_open = "open"
     mitx_edx = "mitx-edx"
@@ -79,6 +87,44 @@ class Services(str, Enum):
     vector_log_proxy = "vector-log-proxy"
     xpro = "xpro"
     xqueue = "xqueue"
+
+
+@unique
+class Application(str, Enum):
+    airbyte = "airbyte"
+    superset = "superset"
+    bootcamps = "bootcamps"
+    celery_monitoring = "celery-monitoring"
+    codejail = "codejail"
+    dagster = "dagster"
+    digital_credentials = "digital-credentials"
+    ecommerce = "unified-ecommerce"
+    edx_notes = "edx-notes"
+    edxapp = "edxapp"
+    jupyterhub = "jupyterhub"
+    keycloak = "keycloak"
+    kubewatch = "kubewatch"
+    micromasters = "micromasters"
+    mit_learn = "mit-learn"
+    mit_open = "open"
+    mitx_edx = "mitx-edx"
+    mitxonline = "mitxonline"
+    mitxonline_edx = "mitxonline-edx"
+    mitxpro_edx = "xpro-edx"
+    ocw_build = "ocw-build"
+    odl_video_service = "ovs"
+    open_metadata = "open-metadata"
+    redash = "redash"
+    tika = "tika"
+    vector_log_proxy = "vector-log-proxy"
+    xpro = "xpro"
+    xqueue = "xqueue"
+
+
+@unique
+class Component(str, Enum):
+    celery = "celery"
+    webapp = "webapp"
 
 
 @unique
@@ -118,6 +164,15 @@ class K8sGlobalLabels(BaseModel):
         new_dict["ol.mit.edu/environment"] = self.stack.env_suffix
         new_dict["ol.mit.edu/application"] = self.stack.env_prefix
         return new_dict
+
+
+class K8sAppLabels(K8sGlobalLabels):
+    product: Product
+    application: Application
+    component: Component
+    source_repository: str
+    commit_sha: str | None
+    release_tag: str | None
 
 
 class AWSBase(BaseModel):
