@@ -4,8 +4,25 @@ This module provides common fixtures and utilities for testing Pulumi
 infrastructure code across the ol-infrastructure repository.
 """
 
+import os
+
 import pulumi
 import pytest
+
+
+@pytest.fixture(scope="session", autouse=True)
+def set_aws_env_vars():
+    """Set AWS environment variables for testing.
+
+    This fixture automatically sets required AWS environment variables
+    to avoid boto3 errors during test collection and execution.
+    """
+    os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
+    os.environ["AWS_REGION"] = "us-east-1"
+    os.environ["AWS_ACCESS_KEY_ID"] = "testing"
+    os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
+    os.environ["AWS_SECURITY_TOKEN"] = "testing"
+    os.environ["AWS_SESSION_TOKEN"] = "testing"
 
 
 @pytest.fixture(scope="session")
