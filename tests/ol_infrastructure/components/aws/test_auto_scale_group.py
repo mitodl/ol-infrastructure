@@ -14,16 +14,17 @@ from unittest import mock
 os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
 os.environ["AWS_REGION"] = "us-east-1"
 os.environ["AWS_ACCESS_KEY_ID"] = "testing"
-os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
+# pragma: allowlist secret
+os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"  # noqa: S105
 
-# Mock the is_valid_instance_type function globally to avoid AWS API calls during tests
+# Mock the is_valid_instance_type function globally to avoid AWS API calls
 _mock_patcher = mock.patch(
     "ol_infrastructure.lib.aws.ec2_helper.is_valid_instance_type", return_value=True
 )
 _mock_patcher.start()
 
-import pulumi
-from pulumi_aws import ec2
+import pulumi  # noqa: E402
+from pulumi_aws import ec2  # noqa: E402
 
 # Python 3.14+ compatibility: ensure event loop exists for set_mocks()
 try:
@@ -45,38 +46,54 @@ class AutoScaleGroupMocks(pulumi.runtime.Mocks):
                 **args.inputs,
                 "id": f"{args.name}_id",
                 "latestVersion": 1,
-                "arn": f"arn:aws:ec2:us-east-1:123456789012:launch-template/{args.name}",
+                "arn": (
+                    f"arn:aws:ec2:us-east-1:123456789012:launch-template/{args.name}"
+                ),
             }
         elif args.typ == "aws:autoscaling/group:Group":
             outputs = {
                 **args.inputs,
                 "id": f"{args.name}_id",
-                "arn": f"arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:{args.name}",
+                "arn": (
+                    f"arn:aws:autoscaling:us-east-1:123456789012:"
+                    f"autoScalingGroup:{args.name}"
+                ),
             }
         elif args.typ == "aws:lb/targetGroup:TargetGroup":
             outputs = {
                 **args.inputs,
                 "id": f"{args.name}_id",
-                "arn": f"arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/{args.name}/50dc6c495c0c9188",
+                "arn": (
+                    f"arn:aws:elasticloadbalancing:us-east-1:123456789012:"
+                    f"targetgroup/{args.name}/50dc6c495c0c9188"
+                ),
             }
         elif args.typ == "aws:lb/loadBalancer:LoadBalancer":
             outputs = {
                 **args.inputs,
                 "id": f"{args.name}_id",
-                "arn": f"arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/{args.name}/50dc6c495c0c9188",
+                "arn": (
+                    f"arn:aws:elasticloadbalancing:us-east-1:123456789012:"
+                    f"loadbalancer/app/{args.name}/50dc6c495c0c9188"
+                ),
                 "dnsName": f"{args.name}.us-east-1.elb.amazonaws.com",
             }
         elif args.typ == "aws:lb/listener:Listener":
             outputs = {
                 **args.inputs,
                 "id": f"{args.name}_id",
-                "arn": f"arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/{args.name}/50dc6c495c0c9188/f2f7dc8efc522ab2",
+                "arn": (
+                    f"arn:aws:elasticloadbalancing:us-east-1:123456789012:"
+                    f"listener/app/{args.name}/50dc6c495c0c9188/f2f7dc8efc522ab2"
+                ),
             }
         elif args.typ == "aws:ec2/securityGroup:SecurityGroup":
             outputs = {
                 **args.inputs,
                 "id": f"{args.name}_id",
-                "arn": f"arn:aws:ec2:us-east-1:123456789012:security-group/{args.name}",
+                "arn": (
+                    f"arn:aws:ec2:us-east-1:123456789012:security-group/{args.name}"
+                ),
             }
 
         return [args.name + "_id", outputs]
@@ -85,13 +102,19 @@ class AutoScaleGroupMocks(pulumi.runtime.Mocks):
         """Mock data source calls."""
         if args.token == "aws:acm/getCertificate:getCertificate":  # noqa: S105
             return {
-                "arn": "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+                "arn": (
+                    "arn:aws:acm:us-east-1:123456789012:certificate/"
+                    "12345678-1234-1234-1234-123456789012"
+                )
             }
         if args.token == "pulumi:pulumi:StackReference":  # noqa: S105
             return {
                 "outputs": {
                     "kms_ec2_ebs_key": {
-                        "arn": "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+                        "arn": (
+                            "arn:aws:kms:us-east-1:123456789012:key/"
+                            "12345678-1234-1234-1234-123456789012"
+                        )
                     }
                 }
             }
@@ -102,7 +125,7 @@ class AutoScaleGroupMocks(pulumi.runtime.Mocks):
 pulumi.runtime.set_mocks(AutoScaleGroupMocks())
 
 # Now import the component
-from ol_infrastructure.components.aws.auto_scale_group import (
+from ol_infrastructure.components.aws.auto_scale_group import (  # noqa: E402
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,
     OLAutoScaling,
@@ -377,8 +400,11 @@ def test_spot_asg_with_load_balancer():
 
     def check_spot_with_lb(args):
         urn, target_group_arns = args
-        assert target_group_arns is not None and len(target_group_arns) > 0, (
+        assert target_group_arns is not None, (
             f"Spot instance ASG {urn} should be associated with target group"
+        )
+        assert len(target_group_arns) > 0, (
+            f"Spot instance ASG {urn} should have at least one target group"
         )
 
     return pulumi.Output.all(

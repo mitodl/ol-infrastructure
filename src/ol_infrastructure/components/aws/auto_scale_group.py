@@ -243,7 +243,7 @@ class OLAutoScaling(pulumi.ComponentResource):
     auto_scale_group: Group = None
     launch_template: LaunchTemplate = None
 
-    def __init__(  # noqa: C901, PLR0912
+    def __init__(  # noqa: C901, PLR0912, PLR0915
         self,
         asg_config: OLAutoScaleGroupConfig,
         lt_config: OLLaunchTemplateConfig,
@@ -455,7 +455,9 @@ class OLAutoScaling(pulumi.ComponentResource):
             spot_options_config = lt_config.spot_options or SpotInstanceOptions()
             spot_options_kwargs = {
                 "spot_instance_type": spot_options_config.spot_instance_type,
-                "instance_interruption_behavior": spot_options_config.instance_interruption_behavior,
+                "instance_interruption_behavior": (
+                    spot_options_config.instance_interruption_behavior
+                ),
             }
             # Only set max_price if explicitly provided (None means use on-demand price)
             if spot_options_config.max_price is not None:
