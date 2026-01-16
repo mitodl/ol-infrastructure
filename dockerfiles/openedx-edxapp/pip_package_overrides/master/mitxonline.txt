@@ -11,3 +11,7 @@ celery==5.6.0
 # Fix dependencies for ol-openedx-course-translations package
 # https://github.com/openedx/edx-platform/issues/35268
 openai==2.15.0
+
+# Experimental Plugins for Translations feature
+# install at the end to override any dependency issues
+ol-openedx-course-translations
