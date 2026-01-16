@@ -453,7 +453,7 @@ class OLAutoScaling(pulumi.ComponentResource):
         # Configure spot instances if requested
         if lt_config.use_spot_instances:
             spot_options_config = lt_config.spot_options or SpotInstanceOptions()
-            spot_options_kwargs = {
+            spot_options_kwargs: dict[str, str] = {
                 "spot_instance_type": spot_options_config.spot_instance_type,
                 "instance_interruption_behavior": (
                     spot_options_config.instance_interruption_behavior
