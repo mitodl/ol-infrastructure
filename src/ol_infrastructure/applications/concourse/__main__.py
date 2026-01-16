@@ -33,6 +33,7 @@ from ol_infrastructure.components.aws.auto_scale_group import (
     OLLaunchTemplateConfig,
     OLLoadBalancerConfig,
     OLTargetGroupConfig,
+    SpotInstanceOptions,
     TagSpecification,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
@@ -651,6 +652,19 @@ for worker_def in concourse_config.get_object("workers") or []:
 
     worker_name_tag = f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}"
 
+    # Configure spot instances for Concourse workers (enabled by default)
+    use_spot_instances = worker_def.get("use_spot_instances", True)
+    spot_options_config = None
+    if use_spot_instances and "spot_options" in worker_def:
+        spot_config = worker_def["spot_options"]
+        spot_options_config = SpotInstanceOptions(
+            max_price=spot_config.get("max_price"),
+            spot_instance_type=spot_config.get("spot_instance_type", "one-time"),
+            instance_interruption_behavior=spot_config.get(
+                "instance_interruption_behavior", "terminate"
+            ),
+        )
+
     ol_worker_launch_config = OLLaunchTemplateConfig(
         block_device_mappings=[
             BlockDeviceMapping(
@@ -684,6 +698,8 @@ for worker_def in concourse_config.get_object("workers") or []:
             ),
         ],
         user_data=consul_datacenter.apply(build_worker_user_data_partial),
+        use_spot_instances=use_spot_instances,
+        spot_options=spot_options_config,
     )
 
     # We will create a 'fake' lb, targetgroup and lblistener to make use of
