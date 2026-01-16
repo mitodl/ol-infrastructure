@@ -62,7 +62,7 @@ config:
   edxapp:google_analytics_id: ""
   edxapp:move_db: true
   edxapp:mail_domain: edxapp-mail-staging-production.mitx.mit.edu
-  edxapp:sender_email_address: support@edxapp-mail-staging-production.mitx.mit.edu
+  edxapp:sender_email_address: mitx-support+staging@mit.edu
   edxapp:target_vpc: residential_mitx_staging_vpc
   edxapp:enable_xqueue: true
   edxapp:xqueue_domain: xqueue.mitx-staging-prod.odl.mit.edu
