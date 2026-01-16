@@ -479,6 +479,7 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
                 "name": "spi-theme-welcome-theme",
                 "value": "scim",
             },
+            {"name": "spi-login--provider", "value": "ol-freemarker"},
         ],
         "tracing": {
             "enabled": stack_info.name != "CI",
