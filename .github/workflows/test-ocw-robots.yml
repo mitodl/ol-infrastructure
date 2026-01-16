@@ -1,0 +1,115 @@
+---
+name: Test OCW Robots.txt
+
+on:
+  schedule:
+    # Run daily at 9 AM UTC
+    - cron: '0 9 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  test-production-robots:
+    name: Test Production robots.txt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test ocw.mit.edu robots.txt
+        run: |
+          echo "Testing https://ocw.mit.edu/robots.txt"
+          RESPONSE=$(curl -s -w "\n%{http_code}" https://ocw.mit.edu/robots.txt)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          CONTENT=$(echo "$RESPONSE" | head -n -1)
+          
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "ERROR: Expected HTTP 200, got $HTTP_CODE"
+            exit 1
+          fi
+          
+          if ! echo "$CONTENT" | grep -q "Allow: /"; then
+            echo "ERROR: robots.txt does not contain 'Allow: /'"
+            echo "Content: $CONTENT"
+            exit 1
+          fi
+          
+          if ! echo "$CONTENT" | grep -q "Sitemap: https://ocw.mit.edu/sitemap.xml"; then
+            echo "ERROR: robots.txt does not contain 'Sitemap: https://ocw.mit.edu/sitemap.xml'"
+            echo "Content: $CONTENT"
+            exit 1
+          fi
+          
+          echo "✓ ocw.mit.edu robots.txt is correct"
+          echo "Content:"
+          echo "$CONTENT"
+
+  test-qa-robots:
+    name: Test QA robots.txt (Disallow All)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test live-qa.ocw.mit.edu robots.txt
+        run: |
+          echo "Testing https://live-qa.ocw.mit.edu/robots.txt"
+          RESPONSE=$(curl -s -w "\n%{http_code}" https://live-qa.ocw.mit.edu/robots.txt)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          CONTENT=$(echo "$RESPONSE" | head -n -1)
+          
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "ERROR: Expected HTTP 200, got $HTTP_CODE"
+            exit 1
+          fi
+          
+          if ! echo "$CONTENT" | grep -q "Disallow: /"; then
+            echo "ERROR: robots.txt does not contain 'Disallow: /'"
+            echo "Content: $CONTENT"
+            exit 1
+          fi
+          
+          echo "✓ live-qa.ocw.mit.edu robots.txt is correct"
+          echo "Content:"
+          echo "$CONTENT"
+
+      - name: Test draft-qa.ocw.mit.edu robots.txt
+        run: |
+          echo "Testing https://draft-qa.ocw.mit.edu/robots.txt"
+          RESPONSE=$(curl -s -w "\n%{http_code}" https://draft-qa.ocw.mit.edu/robots.txt)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          CONTENT=$(echo "$RESPONSE" | head -n -1)
+          
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "ERROR: Expected HTTP 200, got $HTTP_CODE"
+            exit 1
+          fi
+          
+          if ! echo "$CONTENT" | grep -q "Disallow: /"; then
+            echo "ERROR: robots.txt does not contain 'Disallow: /'"
+            echo "Content: $CONTENT"
+            exit 1
+          fi
+          
+          echo "✓ draft-qa.ocw.mit.edu robots.txt is correct"
+          echo "Content:"
+          echo "$CONTENT"
+
+  test-production-draft-robots:
+    name: Test Production Draft robots.txt (Disallow All)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test draft.ocw.mit.edu robots.txt
+        run: |
+          echo "Testing https://draft.ocw.mit.edu/robots.txt"
+          RESPONSE=$(curl -s -w "\n%{http_code}" https://draft.ocw.mit.edu/robots.txt)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          CONTENT=$(echo "$RESPONSE" | head -n -1)
+          
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "ERROR: Expected HTTP 200, got $HTTP_CODE"
+            exit 1
+          fi
+          
+          if ! echo "$CONTENT" | grep -q "Disallow: /"; then
+            echo "ERROR: robots.txt does not contain 'Disallow: /'"
+            echo "Content: $CONTENT"
+            exit 1
+          fi
+          
+          echo "✓ draft.ocw.mit.edu robots.txt is correct"
+          echo "Content:"
+          echo "$CONTENT"
