@@ -437,7 +437,7 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
                 "memory": keycloak_config.get("memory_limit") or "1Gi",
             },
         },
-        "startOptimized": True,
+        "startOptimized": stack_info.name != "CI",
         "http": {
             "tlsSecret": star_ol_mit_edu_secret_name,
         },
