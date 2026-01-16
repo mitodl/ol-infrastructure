@@ -24,9 +24,6 @@ ol-openedx-chat-xblock
 # Plugin for LTI related utilities
 ol-openedx-lti-utilities
 
-# Experimental Plugins for Translations feature
-ol-openedx-course-translations
-
 # Allow for copying courses to children to support UAI
 ol-openedx-course-sync
 
