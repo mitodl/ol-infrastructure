@@ -14,6 +14,8 @@ from pulumi_aws.ec2 import (
     LaunchTemplateBlockDeviceMappingArgs,
     LaunchTemplateBlockDeviceMappingEbsArgs,
     LaunchTemplateIamInstanceProfileArgs,
+    LaunchTemplateInstanceMarketOptionsArgs,
+    LaunchTemplateInstanceMarketOptionsSpotOptionsArgs,
     LaunchTemplateMetadataOptionsArgs,
     LaunchTemplateTagSpecificationArgs,
     SecurityGroup,
@@ -64,6 +66,37 @@ class TagSpecification(BaseModel):
     resource_type: str
     tags: pulumi.Output[dict[str, str]] | dict[str, str]
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+
+class SpotInstanceOptions(BaseModel):
+    """Container for describing spot instance configuration for a launch template."""
+
+    max_price: str | None = (
+        None  # Maximum price per hour. If None, uses on-demand price
+    )
+    spot_instance_type: Literal["one-time", "persistent"] = "one-time"
+    instance_interruption_behavior: Literal["hibernate", "stop", "terminate"] = (
+        "terminate"
+    )
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @field_validator("spot_instance_type")
+    @classmethod
+    def is_valid_spot_instance_type(cls, spot_instance_type: str) -> str:
+        """Validate spot instance type is one of the accepted values."""
+        if spot_instance_type not in ["one-time", "persistent"]:
+            msg = f"spot_instance_type: {spot_instance_type} is not valid. Only 'one-time' or 'persistent' are accepted."  # noqa: E501
+            raise ValueError(msg)
+        return spot_instance_type
+
+    @field_validator("instance_interruption_behavior")
+    @classmethod
+    def is_valid_interruption_behavior(cls, behavior: str) -> str:
+        """Validate instance interruption behavior is one of the accepted values."""
+        if behavior not in ["hibernate", "stop", "terminate"]:
+            msg = f"instance_interruption_behavior: {behavior} is not valid. Only 'hibernate', 'stop', or 'terminate' are accepted."  # noqa: E501
+            raise ValueError(msg)
+        return behavior
 
 
 class OLTargetGroupConfig(AWSBase):
@@ -146,6 +179,8 @@ class OLLaunchTemplateConfig(AWSBase):
     security_groups: list[SecurityGroup | pulumi.Output]
     tag_specifications: list[TagSpecification]
     user_data: str | pulumi.Output[str] | None
+    use_spot_instances: bool = False
+    spot_options: SpotInstanceOptions | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("instance_type")
@@ -208,7 +243,7 @@ class OLAutoScaling(pulumi.ComponentResource):
     auto_scale_group: Group = None
     launch_template: LaunchTemplate = None
 
-    def __init__(  # noqa: C901, PLR0912
+    def __init__(  # noqa: C901, PLR0912, PLR0915
         self,
         asg_config: OLAutoScaleGroupConfig,
         lt_config: OLLaunchTemplateConfig,
@@ -393,27 +428,53 @@ class OLAutoScaling(pulumi.ComponentResource):
         )
 
         # Construct the launch template
-        self.launch_template = LaunchTemplate(
-            f"{resource_name_prefix}launch-template",
-            name_prefix=resource_name_prefix,
-            block_device_mappings=block_device_mappings,
-            iam_instance_profile=LaunchTemplateIamInstanceProfileArgs(
+        launch_template_kwargs = {
+            "name_prefix": resource_name_prefix,
+            "block_device_mappings": block_device_mappings,
+            "iam_instance_profile": LaunchTemplateIamInstanceProfileArgs(
                 arn=lt_config.instance_profile_arn,
             ),
-            image_id=lt_config.image_id,
-            instance_type=lt_config.instance_type,
-            key_name=lt_config.key_name,
-            tag_specifications=tag_specifications,
-            tags=lt_config.tags,
-            user_data=lt_config.user_data,
-            vpc_security_group_ids=lt_config.security_groups,
-            metadata_options=LaunchTemplateMetadataOptionsArgs(
+            "image_id": lt_config.image_id,
+            "instance_type": lt_config.instance_type,
+            "key_name": lt_config.key_name,
+            "tag_specifications": tag_specifications,
+            "tags": lt_config.tags,
+            "user_data": lt_config.user_data,
+            "vpc_security_group_ids": lt_config.security_groups,
+            "metadata_options": LaunchTemplateMetadataOptionsArgs(
                 http_endpoint="enabled",
                 http_tokens="optional",
                 http_put_response_hop_limit=5,
                 instance_metadata_tags="enabled",
             ),
-            opts=resource_options,
+            "opts": resource_options,
+        }
+
+        # Configure spot instances if requested
+        if lt_config.use_spot_instances:
+            spot_options_config = lt_config.spot_options or SpotInstanceOptions()
+            spot_options_kwargs: dict[str, str] = {
+                "spot_instance_type": spot_options_config.spot_instance_type,
+                "instance_interruption_behavior": (
+                    spot_options_config.instance_interruption_behavior
+                ),
+            }
+            # Only set max_price if explicitly provided (None means use on-demand price)
+            if spot_options_config.max_price is not None:
+                spot_options_kwargs["max_price"] = spot_options_config.max_price
+
+            launch_template_kwargs["instance_market_options"] = (
+                LaunchTemplateInstanceMarketOptionsArgs(
+                    market_type="spot",
+                    spot_options=LaunchTemplateInstanceMarketOptionsSpotOptionsArgs(
+                        **spot_options_kwargs
+                    ),
+                )
+            )
+
+        self.launch_template = LaunchTemplate(
+            f"{resource_name_prefix}launch-template",
+            **launch_template_kwargs,
         )
 
         # Loop through the tags to populate to asg instances
