@@ -69,6 +69,7 @@ from ol_infrastructure.lib.fastly import (
     get_fastly_provider,
 )
 from ol_infrastructure.lib.ol_types import (
+    Application,
     AWSBase,
     BusinessUnit,
     K8sGlobalLabels,
@@ -131,6 +132,8 @@ k8s_global_labels = K8sGlobalLabels(
     service=Services.mit_learn,
     ou=BusinessUnit.mit_learn,
     stack=stack_info,
+    application=Application.mit_learn_api,
+    source_repository="https://github.com/mitodl/mit-learn",
 ).model_dump()
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
