@@ -508,6 +508,21 @@ const addDesktopMainMenuSlotOverride = (config) => {
   }
 }
 
+const removeScheduleAndDetailsPageBannerDefaultContents = (config) => {
+  config.pluginSlots = {
+    ...config.pluginSlots,
+    'org.openedx.frontend.authoring.page_banner.v1': {
+      plugins: [
+        {
+          op: PLUGIN_OPERATIONS.Hide,
+          widgetId: 'default_contents',
+        },
+      ],
+    },
+  };
+  return config;
+}
+
 
 let config = {
   ...process.env,
@@ -525,6 +540,7 @@ config = addLogoSlotOverride(config);
 config = addLearningHelpSlotOverride(config);
 config = addSecondaryMenuSlotOverride(config);
 config = addDesktopMainMenuSlotOverride(config);
+config = removeScheduleAndDetailsPageBannerDefaultContents(config);
 config = addEnvOverrides(config);
 
 export default config;
