@@ -2,6 +2,7 @@ import { useContext } from "react";
 import { AppContext } from '@edx/frontend-platform/react';
 import { PLUGIN_OPERATIONS, DIRECT_PLUGIN } from '@openedx/frontend-plugin-framework';
 import { getConfig } from '@edx/frontend-platform';
+import { FormattedMessage } from '@edx/frontend-platform/i18n';
 
 import Footer, { Logo, MenuLinks, CopyrightNotice } from './Footer.jsx';
 import './mitxonline-styles.scss';
@@ -184,11 +185,12 @@ const isMobile = () => {
 };
 
 const getUserMenu = ({ includeDashboard = false } = {}) => {
-  const userMenuLinkTitles = {
-    profile: 'Profile',
-    account: 'Settings',
-    logout: 'Sign Out',
-    dashboard: 'Dashboard',
+  // Use translation message IDs
+  const userMenuLinkMessages = {
+    profile: 'header.user.menu.profile',
+    account: 'header.user.menu.account.setting',  // Custom key for MITx Online - "Settings" instead of "Account"
+    logout: 'header.user.menu.signout', // Custom key for MITx Online - "Sign Out" instead of "Logout"
+    dashboard: 'header.user.menu.dashboard',
   };
 
   // Build dashboard URL consistently with SecondaryMenu logic
@@ -201,27 +203,27 @@ const getUserMenu = ({ includeDashboard = false } = {}) => {
     const baseMenu = [
       {
         url: `${configData.LMS_BASE_URL}/logout`,
-        title: userMenuLinkTitles.logout,
+        message: userMenuLinkMessages.logout,
       },
     ];
-    return includeDashboard ? [{ url: dashboardURL, title: userMenuLinkTitles.dashboard }, ...baseMenu] : baseMenu;
+    return includeDashboard ? [{ url: dashboardURL, message: userMenuLinkMessages.dashboard }, ...baseMenu] : baseMenu;
   }
 
   const baseMenu = [
     {
       url: `${configData.MARKETING_SITE_BASE_URL}/profile/`,
-      title: userMenuLinkTitles.profile,
+      message: userMenuLinkMessages.profile,
     },
     {
       url: `${configData.MARKETING_SITE_BASE_URL}/account-settings/`,
-      title: userMenuLinkTitles.account,
+      message: userMenuLinkMessages.account,
     },
     {
       url: `${configData.LMS_BASE_URL}/logout`,
-      title: userMenuLinkTitles.logout,
+      message: userMenuLinkMessages.logout,
     },
   ];
-  return includeDashboard ? [{ url: dashboardURL, title: userMenuLinkTitles.dashboard }, ...baseMenu] : baseMenu;
+  return includeDashboard ? [{ url: dashboardURL, message: userMenuLinkMessages.dashboard }, ...baseMenu] : baseMenu;
 };
 
 const DesktopHeaderUserMenu = (widget) => {
@@ -231,7 +233,7 @@ const DesktopHeaderUserMenu = (widget) => {
       items: userMenu.map((item) => ({
         type: 'item',
         href: item.url,
-        content: item.title,
+        content: item.message,
       })),
     },
   ];
@@ -242,7 +244,7 @@ const LearningHeaderUserMenu = (widget) => {
   const userMenu = getUserMenu({ includeDashboard: isMobile() });
   widget.content.items = userMenu.map((item) => ({
     href: item.url,
-    message: item.title,
+    message: item.message,
   }))
   return widget;
 };
@@ -412,7 +414,10 @@ const SecondaryMenu = () => {
         href={dashboardURL}
         className="dashboard-btn"
       >
-        Dashboard
+        <FormattedMessage
+          id="header.menu.dashboard.label"
+          defaultMessage="Dashboard"
+        />
       </a>
     </div>
   );
