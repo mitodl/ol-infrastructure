@@ -43,7 +43,6 @@ const addFooterSubSlotsOverride = (config) => {
   const accessibilityURL = process.env.ACCESSIBILITY_URL || 'https://accessibility.mit.edu/';
   const contactUsURL = process.env.CONTACT_URL || 'mailto:mitlearn-support@mit.edu';
   const copyRightText = 'Massachusetts Institute of Technology';
-  const copyRightMessageId = 'footer.copyright.organization';
   const supportURL = process.env.SUPPORT_URL || 'https://mitxonline.zendesk.com/hc/en-us';
   const footerLogo = <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={process.env.MIT_BASE_URL} />;
 
@@ -119,8 +118,7 @@ const addFooterSubSlotsOverride = (config) => {
             type: DIRECT_PLUGIN,
             RenderWidget: () => (
               <CopyrightNotice
-                copyrightText={`© {year} ${copyRightText}`}
-                copyrightMessageId={copyRightMessageId}
+                copyrightText={`© ${currentYear} ${copyRightText}`}
                 trademarkMessageId="footer.trademark.notice"
                 currentYear={currentYear}
               />
