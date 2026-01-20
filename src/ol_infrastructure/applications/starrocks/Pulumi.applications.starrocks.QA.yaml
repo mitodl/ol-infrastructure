@@ -3,5 +3,8 @@ secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHjZAY5LtmRWGljev0oiDGn0jR5cRwD4IVXCn50TW5i0qQHqLsmHNj9a7oigOF8iW40wAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMShZGt0FydCARRsDCAgEQgDt44kBxujxExbgJyZI1E/XUV4BuNlPFAUOxotR9ZZzluwhssD0NESC7eS7XfnnZXRxkLclqzzcTZN9ibg==
 config:
   aws:region: us-east-1
+  starrocks:shared_data: "true"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
+  starrocks:root_password:
+    secure: v1:eArWJPUhW2tm7NQg:FpVkh0j71QQq0cakrLOiD/E/JwBecuSojQ1MLkOltRE8rWgaYeRc3w3kpBoPIopCDQ+FfB6MQQgGTwCeCG2X3Km4bCWOXrTHaCsB7fqZT8w=

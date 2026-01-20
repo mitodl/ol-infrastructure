@@ -3,5 +3,8 @@ secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAGN4Rd6MlCg8vu9xXgsTx+zAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM+YTbOzqZjtX6LGrPAgEQgDsp004tU4Fc+h/yIiTcdXOC9wBTNL6MALWHuqSLSg3EHoq1QSwvH05Cflh9mR439O44zJPbnMRtP0P6qw==
 config:
   aws:region: us-east-1
+  starrocks:shared_data: "true"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
+  starrocks:root_password:
+    secure: v1:ojL7d6uAr3rmFefP:AbauCCHKlWC9j+m7owdfOtUjmj6LO+RY92MKran/k7SCtUQ1sk3ds9so+wdyYmq/RYVmkZWrIZzLYvrASM9m2tMdgLi8UQqr0aD/9mS8YLk=
