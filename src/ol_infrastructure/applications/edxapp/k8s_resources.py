@@ -119,6 +119,16 @@ def create_k8s_resources(  # noqa: C901
     )
     opensearch_hostname = opensearch_stack.require_output("cluster")["endpoint"]
 
+    celery_env_vars = [
+        kubernetes.core.v1.EnvVarArgs(
+            name="CELERY_TASK_ACKS_LATE",
+            value="True",
+        ),
+        kubernetes.core.v1.EnvVarArgs(
+            name="CELERY_TASK_REJECT_ON_WORKER_LOST",
+            value="True",
+        ),
+    ]
     # Configure reusable global labels
     ou = BusinessUnit(edxapp_config.require("business_unit"))
     k8s_global_labels = K8sGlobalLabels(
@@ -818,6 +828,7 @@ def create_k8s_resources(  # noqa: C901
                                     name="DJANGO_SETTINGS_MODULE",
                                     value="lms.envs.production",
                                 ),
+                                *celery_env_vars,
                             ],
                             resources=_get_resources_requests_limits("celery", "lms"),
                             volume_mounts=common_volume_mounts,
@@ -1278,6 +1289,7 @@ def create_k8s_resources(  # noqa: C901
                                     name="DJANGO_SETTINGS_MODULE",
                                     value="cms.envs.production",
                                 ),
+                                *celery_env_vars,
                             ],
                             resources=_get_resources_requests_limits("celery", "cms"),
                             volume_mounts=common_volume_mounts,
