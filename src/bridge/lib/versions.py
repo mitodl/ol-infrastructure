@@ -56,7 +56,7 @@ KEDA_CHART_VERSION = "2.17.1"
 KUBE_STATE_METRICS_CHART_VERSION = "5.1.0"
 # renovate: datasource=helm depName=kubewatch packageName=kubewatch registryUrl=https://robusta-charts.storage.googleapis.com
 KUBEWATCH_CHART_VERSION = "3.5.0"
-# renovate: datasource=helm depName=operator packageName=starrocks/operator registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
+# renovate: datasource=helm depName=kube-starrocks packageName=kube-starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
 STARROCKS_OPERATOR_CHART_VERSION = "1.11.3"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
 TRAEFIK_CHART_VERSION = "38.0.2"

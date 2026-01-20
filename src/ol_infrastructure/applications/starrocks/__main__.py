@@ -1,5 +1,10 @@
-"""Install the StarRocks operator via Pulumi."""
+"""Deploy StarRocks data warehouse to EKS with Pulumi and Helm.
 
+This module installs the StarRocks operator, configures IAM roles and trust
+relationships for the StarRocks service account, manages Kubernetes secrets
+(including the root password), and provisions the StarRocks cluster
+configuration on the target EKS cluster.
+"""
 # ruff: noqa: E501
 
 from typing import Any
@@ -97,7 +102,9 @@ kube_starrocks_helm_values: dict[str, Any] = {
                 "create": True,
                 "serviceAccount": {
                     "name": starrocks_serviceaccount_name,
-                    "annotations": {},
+                    "annotations": {
+                        "eks.amazonaws.com/role-arn": starrocks_trust_role.role.arn,
+                    },
                     "labels": {},
                 },
             },
