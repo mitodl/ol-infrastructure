@@ -198,10 +198,10 @@ const isMobile = () => {
 const getUserMenu = ({ includeDashboard = false } = {}) => {
   // Use translation message IDs
   const userMenuLinkMessages = {
-    profile: 'header.user.menu.profile',
-    account: 'header.user.menu.account.setting',  // Custom key for MITx Online - "Settings" instead of "Account"
-    logout: 'header.user.menu.signout', // Custom key for MITx Online - "Sign Out" instead of "Logout"
-    dashboard: 'header.user.menu.dashboard',
+    profile: { id: 'header.user.menu.profile', defaultMessage: 'Profile' },
+    account: { id: 'header.user.menu.account.setting', defaultMessage: 'Settings' }, // Custom key for MITx Online
+    logout: { id: 'header.user.menu.signout', defaultMessage: 'Sign out' }, // Custom key for MITx Online
+    dashboard: { id: 'header.user.menu.dashboard', defaultMessage: 'Dashboard' },
   };
 
   // Build dashboard URL consistently with SecondaryMenu logic
@@ -214,27 +214,63 @@ const getUserMenu = ({ includeDashboard = false } = {}) => {
     const baseMenu = [
       {
         url: `${configData.LMS_BASE_URL}/logout`,
-        message: userMenuLinkMessages.logout,
+        message: (
+          <FormattedMessage
+            id={userMenuLinkMessages.logout.id}
+            defaultMessage={userMenuLinkMessages.logout.defaultMessage}
+          />
+        ),
       },
     ];
-    return includeDashboard ? [{ url: dashboardURL, message: userMenuLinkMessages.dashboard }, ...baseMenu] : baseMenu;
+    return includeDashboard ? [{
+      url: dashboardURL,
+      message: (
+        <FormattedMessage
+          id={userMenuLinkMessages.dashboard.id}
+          defaultMessage={userMenuLinkMessages.dashboard.defaultMessage}
+        />
+      ),
+    }, ...baseMenu] : baseMenu;
   }
 
   const baseMenu = [
     {
       url: `${configData.MARKETING_SITE_BASE_URL}/profile/`,
-      message: userMenuLinkMessages.profile,
+      message: (
+        <FormattedMessage
+          id={userMenuLinkMessages.profile.id}
+          defaultMessage={userMenuLinkMessages.profile.defaultMessage}
+        />
+      ),
     },
     {
       url: `${configData.MARKETING_SITE_BASE_URL}/account-settings/`,
-      message: userMenuLinkMessages.account,
+      message: (
+        <FormattedMessage
+          id={userMenuLinkMessages.account.id}
+          defaultMessage={userMenuLinkMessages.account.defaultMessage}
+        />
+      ),
     },
     {
       url: `${configData.LMS_BASE_URL}/logout`,
-      message: userMenuLinkMessages.logout,
+      message: (
+        <FormattedMessage
+          id={userMenuLinkMessages.logout.id}
+          defaultMessage={userMenuLinkMessages.logout.defaultMessage}
+        />
+      ),
     },
   ];
-  return includeDashboard ? [{ url: dashboardURL, message: userMenuLinkMessages.dashboard }, ...baseMenu] : baseMenu;
+  return includeDashboard ? [{
+    url: dashboardURL,
+    message: (
+      <FormattedMessage
+        id={userMenuLinkMessages.dashboard.id}
+        defaultMessage={userMenuLinkMessages.dashboard.defaultMessage}
+      />
+    ),
+  }, ...baseMenu] : baseMenu;
 };
 
 const DesktopHeaderUserMenu = (widget) => {
