@@ -97,7 +97,9 @@ kube_starrocks_helm_values: dict[str, Any] = {
                 "create": True,
                 "serviceAccount": {
                     "name": starrocks_serviceaccount_name,
-                    "annotations": {},
+                    "annotations": {
+                        "eks.amazonaws.com/role-arn": starrocks_trust_role.role.arn,
+                    },
                     "labels": {},
                 },
             },
