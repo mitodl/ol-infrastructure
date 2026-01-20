@@ -9,7 +9,7 @@ import pulumi_kubernetes as kubernetes
 from pulumi import Config, StackReference, export
 from pulumi_aws import get_caller_identity, iam
 
-from bridge.lib.versions import STARROCKS_OPERATOR_CHART_VERSION
+from bridge.lib.versions import STARROCKS_OPERATOR_CHART_VERSION, STARROCKS_VERSION
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
@@ -143,10 +143,7 @@ kube_starrocks_helm_values: dict[str, Any] = {
         # Frontend (FE) - Query coordinator and metadata service
         "starrocksFESpec": {
             "replicas": 3,
-            "image": {
-                "repository": "starrocks/fe-ubuntu",
-                "tag": "3.5-latest",
-            },
+            "image": {"repository": "starrocks/fe-ubuntu", "tag": STARROCKS_VERSION},
             "imagePullPolicy": "IfNotPresent",
             "runAsNonRoot": False,
             "service": {
@@ -179,7 +176,7 @@ sys_log_level = INFO
             "replicas": 3,
             "image": {
                 "repository": "starrocks/be-ubuntu",
-                "tag": "3.5-latest",
+                "tag": STARROCKS_VERSION,
             },
             "imagePullPolicy": "IfNotPresent",
             "runAsNonRoot": False,
@@ -209,7 +206,7 @@ brpc_port = 8060
             "replicas": 3,
             "image": {
                 "repository": "starrocks/cn-ubuntu",
-                "tag": "3.5-latest",
+                "tag": STARROCKS_VERSION,
             },
             "imagePullPolicy": "IfNotPresent",
             "runAsNonRoot": False,
