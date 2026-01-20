@@ -96,4 +96,4 @@ config:
     secure: v1:JyjseV72WDGhqdIj:l4p+LgmMz3HY7myVHusGBKXPkP7nXsSMoQ1jpU31bHDSzik4DWYfKhaNjvEzebdpdiWMjWaAwS5mmoDPBoHw9LLBDA+qcQYr8w==
   vault:address: "https://vault-ci.odl.mit.edu"
   vault_server:env_namespace: operations.ci
-  mitlearn:zendesk_help_url: "https://mitlearn.zendesk.com"
+  mitlearn:zendesk_help_url: "mitlearn.zendesk.com"
