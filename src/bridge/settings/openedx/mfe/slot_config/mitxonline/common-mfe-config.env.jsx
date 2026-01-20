@@ -43,6 +43,7 @@ const addFooterSubSlotsOverride = (config) => {
   const accessibilityURL = process.env.ACCESSIBILITY_URL || 'https://accessibility.mit.edu/';
   const contactUsURL = process.env.CONTACT_URL || 'mailto:mitlearn-support@mit.edu';
   const copyRightText = 'Massachusetts Institute of Technology';
+  const copyRightMessageId = 'footer.copyright.organization';
   const supportURL = process.env.SUPPORT_URL || 'https://mitxonline.zendesk.com/hc/en-us';
   const footerLogo = <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={process.env.MIT_BASE_URL} />;
 
@@ -50,18 +51,22 @@ const addFooterSubSlotsOverride = (config) => {
     {
       url: `${process.env.MIT_LEARN_BASE_URL}/about`,
       title: 'About Us',
+      messageId: 'footer.links.about.us',
     },
     {
       url: `${process.env.MIT_LEARN_BASE_URL}/terms`,
       title: 'Terms of Service',
+      messageId: 'footer.links.terms.of.service',
     },
     {
       url: accessibilityURL,
       title: 'Accessibility',
+      messageId: 'footer.links.accessibility',
     },
     {
       url: contactUsURL,
       title: 'Contact Us',
+      messageId: 'footer.links.contact.us',
     },
   ]
 
@@ -70,6 +75,7 @@ const addFooterSubSlotsOverride = (config) => {
       {
         url: supportURL,
         title: 'Help',
+        messageId: 'footer.links.help',
       }
     );
   }
@@ -112,7 +118,12 @@ const addFooterSubSlotsOverride = (config) => {
             id: 'custom_legal_notice',
             type: DIRECT_PLUGIN,
             RenderWidget: () => (
-              <CopyrightNotice copyrightText={`© ${currentYear} ${copyRightText}`} />
+              <CopyrightNotice
+                copyrightText={`© {year} ${copyRightText}`}
+                copyrightMessageId={copyRightMessageId}
+                trademarkMessageId="footer.trademark.notice"
+                currentYear={currentYear}
+              />
             ),
           },
         },
