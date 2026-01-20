@@ -967,7 +967,7 @@ route53.Record(
 )
 route53.Record(
     "ol-mitopen-zendesk-url",
-    name=mitlearn_config.require("mitlearn_support_url"),
+    name=mitlearn_config.require("support_url"),
     type="CNAME",
     ttl=five_minutes,
     records=[mitlearn_config.require("zendesk_help_url")],
