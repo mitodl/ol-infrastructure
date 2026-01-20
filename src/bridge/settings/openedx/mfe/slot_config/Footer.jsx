@@ -54,8 +54,8 @@ export function CopyrightNotice({copyrightText, copyrightMessageId, trademarkMes
         <div className="d-flex flex-column justify-content-center mb-3">
         <div className="text-center x-small">
           {copyrightMessageId ? (
-            <FormattedMessage 
-              id={copyrightMessageId} 
+            <FormattedMessage
+              id={copyrightMessageId}
               defaultMessage={copyrightText || copyrightMessageId}
               values={{ year: currentYear }}
             />
@@ -64,9 +64,9 @@ export function CopyrightNotice({copyrightText, copyrightMessageId, trademarkMes
           )}
         </div>
         <div className="text-center x-small">
-          <FormattedMessage 
-            id={trademarkMessageId || 'footer.trademark.notice'} 
-            defaultMessage="edX and Open edX are registered trademarks of edX LLC." 
+          <FormattedMessage
+            id={trademarkMessageId || 'footer.trademark.notice'}
+            defaultMessage="edX and Open edX are registered trademarks of edX LLC."
           />
         </div>
         </div>
