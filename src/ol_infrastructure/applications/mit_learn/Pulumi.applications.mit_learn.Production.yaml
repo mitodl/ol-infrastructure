@@ -43,6 +43,7 @@ config:
   mitlearn:max_replicas: 30
   mitlearn:nextjs_heroku_domain: "next.learn.mit.edu"
   mitlearn:posthog_proxy: "ph.ol.mit.edu"
+  mitlearn:support_url: "https://support.learn.mit.edu"
   mitlearn:use_granian: true
   mitlearn:vars:
     AI_MIT_SYLLABUS_URL: "https://api.learn.mit.edu/api/v0/vector_content_files_search/"
@@ -105,6 +106,7 @@ config:
     TIKA_SERVER_ENDPOINT: "https://tika-production.ol.mit.edu"
     UWSGI_THREADS: 15
     UWSGI_WORKERS: 3
+  mitlearn:zendesk_help_url: "https://mitlearn.zendesk.com"
   redis:password:
     secure: v1:xdJFi6D7NpeVwYrg:C0GQl3mctDO1+ehHcFAPdeJDuhk9PbuNdNGtghRNMlzP6GC/GCOyGS1V0ViUXwiO7JhAFD6zrstWmhg0X/yHQLnK8KA=
   vault:address: https://vault-production.odl.mit.edu

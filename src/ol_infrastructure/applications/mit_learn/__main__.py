@@ -965,6 +965,15 @@ route53.Record(
     zone_id=mitodl_zone_id,
     opts=ResourceOptions(delete_before_replace=True),
 )
+route53.Record(
+    "ol-mitopen-zendesk-url",
+    name=mitlearn_config.require("mitlearn_support_url"),
+    type="CNAME",
+    ttl=five_minutes,
+    records=[mitlearn_config.require("zendesk_help_url")],
+    zone_id=mitodl_zone_id,
+    opts=ResourceOptions(delete_before_replace=True),
+)
 
 # ci, rc, or production
 env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
