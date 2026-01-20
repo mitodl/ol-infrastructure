@@ -40,6 +40,7 @@ config:
   mit_learn:min_replicas: 4
   mitlearn:nextjs_heroku_domain: "next.rc.learn.mit.edu"
   mitlearn:posthog_proxy: "ph.ol.mit.edu"
+  mitlearn:support_url: "support.qa.learn.mit.edu"
   mitlearn:use_granian: true
   mitlearn:vars:
     AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
@@ -102,6 +103,7 @@ config:
     TIKA_SERVER_ENDPOINT: "https://tika-qa.ol.mit.edu"
     UWSGI_THREADS: 15
     UWSGI_WORKERS: 3
+  mitlearn:zendesk_help_url: "mitlearn.zendesk.com"
   redis:password:
     secure: v1:eRydfkAj/y5E7anM:QZ33gRMPZ7DDG3TrvAbuZk+6zliItTLKf4zuBgwEzpliRDnnxA/FoKMjRf4IB1uFLDH4Bb/n5sUxUj+s4fXlRuZt/jxA66eNBg==
   redis:instance_type: "cache.m6g.large"
