@@ -40,7 +40,7 @@ config:
   mit_learn:min_replicas: 4
   mitlearn:nextjs_heroku_domain: "next.rc.learn.mit.edu"
   mitlearn:posthog_proxy: "ph.ol.mit.edu"
-  mitlearn:support_url: "https://support.qa.learn.mit.edu"
+  mitlearn:support_url: "support.qa.learn.mit.edu"
   mitlearn:use_granian: true
   mitlearn:vars:
     AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
