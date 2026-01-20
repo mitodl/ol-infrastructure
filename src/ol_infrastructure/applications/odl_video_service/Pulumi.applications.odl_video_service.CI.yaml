@@ -19,9 +19,9 @@ config:
   - video-ci.odl.mit.edu
   ovs:s3_bucket_name: odl-video-service-ci
   ovs:s3_subtitle_bucket_name: odl-video-service-subtitles-ci
-  ovs:s3_thumbnail_bucket_name: odl-video-service-thumbnail-ci
-  ovs:s3_transcode_bucket_name: odl-video-service-transcode-ci
-  ovs:s3_watch_bucket_name: odl-video-service-watch-ci
+  ovs:s3_thumbnail_bucket_name: odl-video-service-thumbnails-ci
+  ovs:s3_transcode_bucket_name: odl-video-service-transcoded-ci
+  ovs:s3_watch_bucket_name: odl-video-service-uploaded-ci
   ovs:target_vpc: applications_vpc
   ovs:use_shibboleth: "False"
   redis:max_connections: "30"
