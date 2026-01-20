@@ -4,13 +4,13 @@ encryptedkey: AQICAHiiGjYUolrtj8PCnScLM7oLAdMl8nJrLjQjnqyl1LykYgF8ItwPuXAW1jH6lq
 config:
   aws:region: us-east-1
   consul:address: https://consul-operations-production.odl.mit.edu
-  keycloak:replicas: 3
+  keycloak:replicas: "3"
   keycloak:memory_request: 2Gi
   keycloak:memory_limit: 4Gi
   keycloak:cpu_request: 1000m
   keycloak:cpu_limit: 2000m
   keycloak:db_capacity: "100"
-  keycloak:db_use_blue_green: true
+  keycloak:db_use_blue_green: "true"
   keycloak:domain: sso.ol.mit.edu
   keycloak:instance_type: general_purpose_large
   keycloak:rds_password:
@@ -18,3 +18,6 @@ config:
   keycloak:target_vpc: operations_vpc
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
+  keycloak:posthog_api_host: "https://ph.ol.mit.edu"
+  keycloak:posthog_api_key:
+    secure: v1:hLctIYMkf8zliVwK:OTaEvl/naISMFkzOug1wH0cL+Mzb+HRh/XGwTj+OC4yE786gxI/nm/QJCaVwIe1lAvDDjVitzBD0lQb9RcZq

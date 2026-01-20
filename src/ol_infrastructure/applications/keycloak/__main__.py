@@ -396,6 +396,9 @@ if "KEYCLOAK_DOCKER_DIGEST" not in os.environ:
     raise OSError(msg)
 KEYCLOAK_DOCKER_DIGEST = os.getenv("KEYCLOAK_DOCKER_DIGEST")
 
+posthog_api_key = keycloak_config.get("posthog_api_key") or ""
+posthog_api_host = keycloak_config.get("posthog_api_host") or "https://app.posthog.com"
+
 keycloak_resource_name = f"keycloak-{stack_info.env_suffix}"
 keycloak_resource = kubernetes.apiextensions.CustomResource(
     f"{env_name}-keycloak",
@@ -454,6 +457,14 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
                                 {
                                     "name": "QUARKUS_HTTP_LIMITS_MAX_HEADER_LIST_SIZE",
                                     "value": "32768",
+                                },
+                                {
+                                    "name": "POSTHOG_API_KEY",
+                                    "value": posthog_api_key,
+                                },
+                                {
+                                    "name": "POSTHOG_API_HOST",
+                                    "value": posthog_api_host,
                                 },
                             ]
                         }
