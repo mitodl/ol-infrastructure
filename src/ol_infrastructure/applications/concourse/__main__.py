@@ -12,6 +12,7 @@ import json
 import textwrap
 from functools import partial
 from pathlib import Path
+from string import Template
 
 import pulumi_vault as vault
 import yaml
@@ -50,7 +51,7 @@ from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
-from ol_infrastructure.lib.vault import setup_vault_provider
+from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 
 ##################################
 #     Setup + Config Retrival    #
@@ -407,6 +408,30 @@ concourse_db_config = OLPostgresDBConfig(
     **rds_defaults,
 )
 concourse_db = OLAmazonDB(concourse_db_config)
+
+concourse_role_statements = postgres_role_statements.copy()
+concourse_role_statements["app"]["create"].append(
+    Template(
+        """
+        DO
+        $$do$$
+        BEGIN
+           IF EXISTS (
+              SELECT FROM pg_catalog.pg_extension
+              WHERE  extname = 'pgcrypto') THEN
+                  RAISE NOTICE 'Extension "pgcrypto" already exists. Skipping.';
+           ELSE
+              BEGIN   -- nested block
+                 CREATE EXTENSION pgcrypto;
+              EXCEPTION
+                 WHEN duplicate_object THEN
+                    RAISE NOTICE 'Extension "pgcrypto" was just created by a concurrent transaction. Skipping.';
+              END;
+           END IF;
+        END
+        $$do$$;"""  # noqa: E501
+    )
+)
 
 concourse_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=concourse_db_config.db_name,
