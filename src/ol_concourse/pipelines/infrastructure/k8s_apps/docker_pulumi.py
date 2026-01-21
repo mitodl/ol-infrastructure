@@ -73,6 +73,7 @@ pipeline_params = {
         purge_fastly_cache=True,
         fastly_service_prefix="learn_",
     ),
+    "xpro": AppPipelineParams(app_name="xpro", repo_name="mitxpro"),
 }
 
 

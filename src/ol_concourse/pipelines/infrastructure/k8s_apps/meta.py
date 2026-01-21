@@ -120,6 +120,8 @@ if __name__ == "__main__":
         "mit-learn",
         "mitxonline",
         "mit-learn-nextjs",
+        "xpro",
+        "ocw-studio",
     ]
 
     with open("definition.json", "w") as definition:  # noqa: PTH123
