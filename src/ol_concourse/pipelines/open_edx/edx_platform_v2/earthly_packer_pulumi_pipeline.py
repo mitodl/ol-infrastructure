@@ -84,7 +84,11 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
             )
             edx_platform_git_resources.append(edx_platform_git_resource)
             edx_platform_get_steps.append(
-                GetStep(get=edx_platform_git_resource.name, depth=1, trigger=True)
+                GetStep(
+                    get=edx_platform_git_resource.name,
+                    trigger=True,
+                    params={"depth": 1},
+                )
             )
 
             node_version = edx_platform.release.node_version
@@ -132,7 +136,9 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                         + edx_platform_get_steps
                         + [
                             GetStep(
-                                get=earthly_git_resource.name, depth=1, trigger=True
+                                get=earthly_git_resource.name,
+                                trigger=True,
+                                params={"depth": 1},
                             ),
                             GetStep(get=nodejs_github_release.name, trigger=False),
                         ]
