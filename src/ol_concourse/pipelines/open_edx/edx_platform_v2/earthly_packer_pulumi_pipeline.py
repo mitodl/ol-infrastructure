@@ -38,8 +38,8 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
         name=Identifier("ol-infrastructure-docker"),
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
-        depth=1,
         check_every="10m",
+        depth=1,
         paths=[
             "dockerfiles/openedx-edxapp/",
         ],
@@ -79,12 +79,12 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                 name=Identifier(f"{release_name}-{deployment_name}-edx-platform"),
                 uri=edx_platform.git_origin,
                 branch=edx_platform.release_branch,
-                depth=1,
                 check_every="24h",
+                depth=1,
             )
             edx_platform_git_resources.append(edx_platform_git_resource)
             edx_platform_get_steps.append(
-                GetStep(get=edx_platform_git_resource.name, trigger=True)
+                GetStep(get=edx_platform_git_resource.name, depth=1, trigger=True)
             )
 
             node_version = edx_platform.release.node_version
@@ -131,7 +131,9 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                         in_parallel=theme_get_steps
                         + edx_platform_get_steps
                         + [
-                            GetStep(get=earthly_git_resource.name, trigger=True),
+                            GetStep(
+                                get=earthly_git_resource.name, depth=1, trigger=True
+                            ),
                             GetStep(get=nodejs_github_release.name, trigger=False),
                         ]
                     ),
