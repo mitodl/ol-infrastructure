@@ -359,6 +359,7 @@ def pulumi_job(  # noqa: PLR0913
                 ),
             ),
             PutStep(
+                inputs=["all"],
                 put=pulumi_resource.name,
                 get_params={"skip_implicit_get": True},
                 params={
