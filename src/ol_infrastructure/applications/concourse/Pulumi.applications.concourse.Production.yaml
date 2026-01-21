@@ -71,6 +71,7 @@ config:
     - operations
     instance_type: m7a.xlarge
     name: generic
+    use_spot_instances: false
   consul:address: https://consul-operations-production.odl.mit.edu
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
