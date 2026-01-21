@@ -4,6 +4,7 @@ encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAGN4Rd6MlCg8vu9xX
 config:
   aws:region: us-east-1
   starrocks:shared_data: "true"
+  starrocks:frontend_domain: starrocks.ol.mit.edu
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   starrocks:root_password:

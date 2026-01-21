@@ -16,6 +16,14 @@ from pulumi_aws import get_caller_identity, iam
 
 from bridge.lib.versions import STARROCKS_OPERATOR_CHART_VERSION, STARROCKS_VERSION
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
+from ol_infrastructure.components.services.apisix_gateway_api import (
+    OLApisixHTTPRoute,
+    OLApisixHTTPRouteConfig,
+)
+from ol_infrastructure.components.services.cert_manager import (
+    OLCertManagerCert,
+    OLCertManagerCertConfig,
+)
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
@@ -256,4 +264,35 @@ kube_starrocks_release = kubernetes.helm.v3.Release(
         values=kube_starrocks_helm_values,
     ),
     opts=pulumi.ResourceOptions(depends_on=[starrocks_password_secret]),
+)
+
+# Apisix ingress with TLS
+tls_secret_name = "starrocks-tls-pair"  # pragma: allowlist secret  # noqa: S105
+cert_manager_certificate = OLCertManagerCert(
+    f"ol-{stack_info.env_prefix}-starrocks-tls-cert-{stack_info.env_suffix}",
+    cert_config=OLCertManagerCertConfig(
+        application_name="starrocks",
+        k8s_namespace=namespace,
+        k8s_labels=k8s_global_labels,
+        create_apisixtls_resource=True,
+        dest_secret_name=tls_secret_name,
+        dns_names=[starrocks_config.require("frontend_domain")],
+    ),
+)
+
+starrocks_apisix_httproute = OLApisixHTTPRoute(
+    f"starrocks-apisix-httproute-{stack_info.env_suffix}",
+    route_configs=[
+        OLApisixHTTPRouteConfig(
+            route_name="starrocks",
+            hosts=[starrocks_config.require("frontend_domain")],
+            paths=["/*"],
+            backend_service_name="ol-starrocks-fe-service",
+            backend_service_port=8030,
+            plugins=[],
+        ),
+    ],
+    k8s_namespace=namespace,
+    k8s_labels=k8s_global_labels,
+    opts=pulumi.ResourceOptions(depends_on=[kube_starrocks_release]),
 )
