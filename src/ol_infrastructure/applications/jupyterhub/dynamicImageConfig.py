@@ -46,6 +46,7 @@ KNOWN_COURSES.extend(
             "pm1",
             "se1",
             "haim1",
+            "edm1",
         ]
     ]
 )
