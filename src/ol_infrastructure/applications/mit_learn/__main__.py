@@ -971,7 +971,7 @@ route53.Record(
     type="CNAME",
     ttl=five_minutes,
     records=[mitlearn_config.require("zendesk_help_url")],
-    zone_id=mitodl_zone_id,
+    zone_id=learn_zone_id,
     opts=ResourceOptions(delete_before_replace=True),
 )
 
