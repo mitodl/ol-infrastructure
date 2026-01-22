@@ -54,6 +54,10 @@ class AppPipelineParams(BaseModel):
     fastly_service_prefix: str | None = None
     purge_fastly_cache: bool = False
     repo_name: str | None = None
+    repo_main_branch: str = "main"
+    repo_rc_branch: str = "release-candidate"
+    repo_release_branch: str = "release"
+    ol_infra_branch: str = "main"
 
     @model_validator(mode="after")
     def set_repo_name(self) -> "AppPipelineParams":
@@ -73,32 +77,38 @@ pipeline_params = {
         purge_fastly_cache=True,
         fastly_service_prefix="learn_",
     ),
-    "xpro": AppPipelineParams(app_name="xpro", repo_name="mitxpro"),
+    "xpro": AppPipelineParams(
+        app_name="xpro", repo_name="mitxpro", repo_main_branch="master"
+    ),
 }
 
 
 def _define_git_resources(
     app_name: str,
     repo_name: str | None,
+    repo_main_branch: str,
+    repo_rc_branch: str,
+    repo_release_branch: str,
+    ol_infra_branch: str,
 ) -> tuple[Resource, Resource, Resource, Resource]:
     """Define the git resources needed for the pipeline."""
     main_repo = git_repo(
-        name=Identifier(f"{app_name}-main"),
+        name=Identifier(f"{app_name}-{repo_main_branch}"),
         uri=f"https://github.com/mitodl/{repo_name}",
-        branch="main",
+        branch=repo_main_branch,
     )
 
     release_candidate_repo = git_repo(
-        name=Identifier(f"{app_name}-release-candidate"),
+        name=Identifier(f"{app_name}-{repo_rc_branch}"),
         uri=f"https://github.com/mitodl/{repo_name}",
-        branch="release-candidate",
+        branch=repo_rc_branch,
         fetch_tags=True,
     )
 
     release_repo = git_repo(
-        name=Identifier(f"{app_name}-release"),
+        name=Identifier(f"{app_name}-{repo_release_branch}"),
         uri=f"http://github.com/mitodl/{repo_name}",
-        branch="release",
+        branch=repo_release_branch,
         fetch_tags=True,
         tag_regex=r"v[0-9]+\.[0-9]+\.[0-9]+",  # examples v0.24.0, v0.26.3
     )
@@ -106,7 +116,7 @@ def _define_git_resources(
     ol_infra_repo = git_repo(
         Identifier(f"ol-infra-{app_name}"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        branch="main",
+        branch=ol_infra_branch,
         paths=[
             f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}",
             *PULUMI_WATCHED_PATHS,
@@ -315,7 +325,14 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         release_candidate_repo,
         release_repo,
         ol_infra_repo,
-    ) = _define_git_resources(app_name, pipeline_parameters.repo_name)
+    ) = _define_git_resources(
+        app_name=app_name,
+        repo_name=pipeline_parameters.repo_name,
+        repo_main_branch=pipeline_parameters.repo_main_branch,
+        repo_rc_branch=pipeline_parameters.repo_rc_branch,
+        repo_release_branch=pipeline_parameters.repo_release_branch,
+        ol_infra_branch=pipeline_parameters.ol_infra_branch,
+    )
     (
         docker_ci_image,
         docker_rc_image,
