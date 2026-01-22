@@ -80,6 +80,7 @@ pipeline_params = {
     "xpro": AppPipelineParams(
         app_name="xpro", repo_name="mitxpro", repo_main_branch="master"
     ),
+    "ocw-studio": AppPipelineParams(app_name="ocw-studio", repo_main_branch="master"),
 }
 
 
