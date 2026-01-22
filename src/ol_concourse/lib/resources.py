@@ -24,7 +24,7 @@ def git_repo(  # noqa: PLR0913
             uri=uri,
             branch=branch,
             paths=paths,
-            verion_depth=depth,
+            version_depth=depth,
             fetch_tags=fetch_tags,
             tag_regex=tag_regex,
         ).model_dump(exclude_none=True),
