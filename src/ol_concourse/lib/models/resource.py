@@ -11,5 +11,5 @@ class Git(BaseModel):
     ignore_paths: list[Path] | None = None
     fetch_tags: bool = False
     tag_regex: str | None = None
-    depth: int | None = None
+    version_depth: int | None = None
     model_config = ConfigDict(extra="allow")
