@@ -13,7 +13,6 @@ config:
   heroku_app:vars:
     ALLOWED_HOSTS: '["micromasters-rc.odl.mit.edu"]'
     AWS_STORAGE_BUCKET_NAME: "ol-micromasters-app-qa"
-    CLOUDFRONT_DIST: "d2brhhtqco8biz"
     CYBERSOURCE_REFERENCE_PREFIX: "rc"
     CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
     EDXORG_BASE_URL: "https://courses.stage.edx.org"
