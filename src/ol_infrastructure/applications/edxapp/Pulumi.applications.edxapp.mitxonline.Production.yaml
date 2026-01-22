@@ -114,7 +114,7 @@ config:
       lms:
         cpu_request: "250m"
         memory_request: "2Gi"
-        memory_limit: "2Gi"
+        memory_limit: "3Gi"
       cms:
         cpu_request: "250m"
         memory_request: "2Gi"
