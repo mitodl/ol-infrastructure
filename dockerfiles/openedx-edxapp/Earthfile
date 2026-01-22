@@ -187,6 +187,8 @@ docker-image:
   ARG --required DEPLOYMENT_NAME
   ARG --required RELEASE_NAME
   ENV DJANGO_SETTINGS_MODULE="invalid"
+  # Byte-compile Python files for faster startup
+  RUN python -m compileall -q /openedx/edx-platform /openedx/.local
   RUN mkdir /openedx/.ssh \
     && chown app:app /openedx/.ssh \
     && chmod 0700 /openedx/.ssh \
