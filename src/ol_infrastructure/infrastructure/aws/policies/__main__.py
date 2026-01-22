@@ -17,8 +17,6 @@ default_instance_policy_document = {
             "Effect": "Allow",
             "Action": [
                 "ec2:DescribeInstances",
-                "ecr:CreateRepository",
-                "ecr:BatchImportUpstreamImage",
                 "ecr:GetAuthorizationToken",
             ],
             "Resource": "*",
@@ -26,6 +24,8 @@ default_instance_policy_document = {
         {
             "Effect": "Allow",
             "Action": [
+                "ecr:CreateRepository",
+                "ecr:BatchImportUpstreamImage",
                 "ecr:BatchCheckLayerAvailability",
                 "ecr:GetDownloadUrlForLayer",
                 "ecr:GetRepositoryPolicy",
