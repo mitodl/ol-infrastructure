@@ -4,7 +4,6 @@ encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEGccCx6w+aU1z9VN
 config:
   aws:region: us-east-1
   consul:address: https://consul-data-production.odl.mit.edu
-
   dagster:db_password:
     secure: v1:CmsJwtIantGcm5j1:DL2TQs80PEYe2iZIvWKFA/oSy3Lh3uSdzVcYPDR28EmvCYsNGzUxrLpb2k0oZ5NTOu2pniwF
   dagster:domain: pipelines.odl.mit.edu
@@ -23,7 +22,5 @@ config:
   dagster:edx_pipeline_xpro_edx_bucket_name: dagster-data-production
   dagster:edx_pipeline_xpro_edx_course_bucket_name: xpro-production-edxapp-courses
   dagster:edx_pipeline_xpro_edx_xpro_purpose: mitx-etl-xpro-production
-  dagster:instance_type: m7a.8xlarge
-  dagster:disk_size_gb: 2000
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

@@ -372,6 +372,9 @@ rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["monitoring_profile_name"] = "disabled"
 rds_defaults["use_blue_green"] = False
 rds_defaults["read_replica"] = None
+rds_defaults["instance_size"] = (
+    dagster_config.get("db_instance_type") or rds_defaults["instance_size"]
+)
 dagster_db_config = OLPostgresDBConfig(
     db_name="dagster",
     instance_name=f"ol-etl-db-{stack_info.env_suffix}",
