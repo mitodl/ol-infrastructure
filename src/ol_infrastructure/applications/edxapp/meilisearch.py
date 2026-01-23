@@ -34,7 +34,7 @@ def create_meilisearch_resources(
         "environment": {
             "MEILI_NO_ANALYTICS": True,
             "MEILI_ENV": "production",
-            "MEILI_MASTER_KEY": meilisearch_config.require("master_key"),
+            "MEILI_MASTER_KEY": meilisearch_config.require_secret("master_key"),
         },
         "persistence": {
             "enabled": True,
