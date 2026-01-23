@@ -1330,7 +1330,7 @@ def create_k8s_resources(  # noqa: C901
     )
 
     # Meilisearch
-    meilisearch_helm_release = create_meilisearch_resources(stack_info, namespace)
+    _meilisearch_helm_release = create_meilisearch_resources(stack_info, namespace)
 
     # APISIX ingress configuration and setup
     apisix_ingress_class = edxapp_config.get("apisix_ingress_class") or "apisix"
