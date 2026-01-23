@@ -27,7 +27,7 @@ def create_meilisearch_resources(
         return None
 
     meilisearch_values: dict[str, Any] = {
-        "replicaCount": 1,  # Horizontial scaling not supported yet
+        "replicaCount": meilisearch_config.get_int("replica_count") or 1,  # Default to 1 replica
         "image": {
             "pullPolicy": "IfNotPresent",
         },
