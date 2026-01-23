@@ -73,7 +73,7 @@ from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
     K8sGlobalLabels,
-    Services,
+    Services, Component,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
@@ -130,9 +130,10 @@ app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
 
 k8s_global_labels = K8sGlobalLabels(
     service=Services.mit_learn,
+    components=[Component.keycloak, Component.webapp, Component.cekery]
     ou=BusinessUnit.mit_learn,
     stack=stack_info,
-    application=Application.mit_learn_api,
+    application=Application.mit_learn,
     source_repository="https://github.com/mitodl/mit-learn",
 ).model_dump()
 

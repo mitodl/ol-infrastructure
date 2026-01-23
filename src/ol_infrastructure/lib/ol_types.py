@@ -125,6 +125,7 @@ class Application(str, Enum):
 class Component(str, Enum):
     celery = "celery"
     webapp = "webapp"
+    keycloak = "keycloak"
 
 
 @unique
@@ -150,8 +151,12 @@ class K8sGlobalLabels(BaseModel):
     """Base class for Kubernetes resource labels."""
 
     ou: BusinessUnit
+    application: Application
     service: Services
+    components: list[Component]
     stack: StackInfo
+    source_repository: str
+
 
     def model_dump(self, *args, **kwargs):
         kwargs["exclude_none"] = True
@@ -162,6 +167,8 @@ class K8sGlobalLabels(BaseModel):
             new_dict[f"ol.mit.edu/{key}"] = model_dict[key]
         new_dict["ol.mit.edu/stack"] = self.stack.full_name
         new_dict["ol.mit.edu/environment"] = self.stack.env_suffix
+        new_dict["ol.mit.edu/services"] = self.service
+        new_dict["ol.mit.edu/components"] = self.components
         new_dict["ol.mit.edu/application"] = self.stack.env_prefix
         return new_dict
 
