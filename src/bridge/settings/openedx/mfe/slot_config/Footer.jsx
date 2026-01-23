@@ -7,6 +7,7 @@ import { getLoginRedirectUrl } from '@edx/frontend-platform/auth';
 import { AppContext } from '@edx/frontend-platform/react';
 import { useLocation } from 'react-router-dom';
 import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+import { FormattedMessage } from '@edx/frontend-platform/i18n';
 
 function RevealLinks({ label, children }) {
 
@@ -48,11 +49,26 @@ function PoweredBy() {
     );
   }
 
-export function CopyrightNotice({copyrightText}){
+export function CopyrightNotice({copyrightText, copyrightMessageId, trademarkMessageId, currentYear}){
     return (
         <div className="d-flex flex-column justify-content-center mb-3">
-        <div className="text-center x-small">{copyrightText}</div>
-        <div className="text-center x-small">{"edX and Open edX are registered trademarks of edX LLC."}</div>
+        <div className="text-center x-small">
+          {copyrightMessageId ? (
+            <FormattedMessage
+              id={copyrightMessageId}
+              defaultMessage={copyrightText || copyrightMessageId}
+              values={{ year: currentYear }}
+            />
+          ) : (
+            copyrightText
+          )}
+        </div>
+        <div className="text-center x-small">
+          <FormattedMessage
+            id={trademarkMessageId || 'footer.trademark.notice'}
+            defaultMessage="edX and Open edX are registered trademarks of edX LLC."
+          />
+        </div>
         </div>
     );
 }
@@ -61,7 +77,17 @@ export function MenuLinks({ menuItems }) {
   return (
     <ul className="d-flex flex-column flex-md-row flex-wrap list-unstyled gap-3 gap-md-4 menu-links align-items-center justify-content-center">
       {
-        menuItems.map((item) => <li className="mx-2"><Hyperlink destination={ item.url }>{item.title}</Hyperlink></li>)
+        menuItems.map((item, index) => (
+          <li key={index} className="mx-2">
+            <Hyperlink destination={item.url}>
+              {item.messageId ? (
+                <FormattedMessage id={item.messageId} defaultMessage={item.title || item.messageId} />
+              ) : (
+                item.title
+              )}
+            </Hyperlink>
+          </li>
+        ))
       }
     </ul>
   );
