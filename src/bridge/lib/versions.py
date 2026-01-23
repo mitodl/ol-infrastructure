@@ -55,6 +55,8 @@ KEDA_CHART_VERSION = "2.17.1"
 KUBE_STATE_METRICS_CHART_VERSION = "5.1.0"
 # renovate: datasource=helm depName=kubewatch packageName=kubewatch registryUrl=https://robusta-charts.storage.googleapis.com
 KUBEWATCH_CHART_VERSION = "3.5.0"
+# renovate: datasource=helm depName=meilisearch packageName=meilisearch-kubernetes registryUrl=https://meilisearch.github.io/meilisearch-kubernetes
+MEILISEARCH_CHART_VERSION = "0.23.0"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
 TRAEFIK_CHART_VERSION = "38.0.2"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
