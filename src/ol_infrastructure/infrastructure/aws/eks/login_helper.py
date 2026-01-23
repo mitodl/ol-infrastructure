@@ -327,6 +327,9 @@ current_clusters = {
     "operations-ci": ci_vault_client,
     "operations-production": production_vault_client,
     "operations-qa": qa_vault_client,
+    "residential-ci": ci_vault_client,
+    "residential-production": production_vault_client,
+    "residential-qa": qa_vault_client,
 }
 
 if production_vault_client.is_authenticated():
