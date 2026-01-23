@@ -114,7 +114,6 @@ def build_dagster_docker_pipeline() -> Pipeline:
                 GetStep(
                     get=repo.name,
                     trigger=True,
-                    params={"skip_download": True},
                 ),
                 container_build_task(
                     inputs=[Input(name=repo.name)],
