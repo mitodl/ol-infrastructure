@@ -4,12 +4,10 @@ encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEGccCx6w+aU1z9VN
 config:
   aws:region: us-east-1
   consul:address: https://consul-data-qa.odl.mit.edu
-
   dagster:db_password:
     secure: v1:XI74KBKUpbjHPTtE:3ZRZk+kvQ9w92TJPRRC4qw6kdK3etaumBDAgnySVagHjzYgRPfr8MhSeag==
   dagster:domain: pipelines-qa.odl.mit.edu
-  dagster:docker_repo_name: mitodl/mono-dagster
-  dagster:docker_image_tag: latest
+  dagster:db_instance_type: db.m7g.large
   dagster:edx_pipeline_gcs_courses_bucket_name: edxorg-qa-edxapp-courses
   dagster:edx_pipeline_micromasters_bucket_name: ol-data-lake-mit-open-qa
   dagster:edx_pipeline_micromasters_postgres_db_hostname: micromasters-db-read-replica.cbnm7ajau6mi.us-east-1.rds.amazonaws.com
@@ -25,7 +23,5 @@ config:
   dagster:edx_pipeline_xpro_edx_bucket_name: dagster-data-qa
   dagster:edx_pipeline_xpro_edx_course_bucket_name: xpro-qa-edxapp-courses
   dagster:edx_pipeline_xpro_edx_xpro_purpose: mitx-etl-xpro-qa
-  dagster:instance_type: m6a.xlarge
-  dagster:disk_size_gb: 2000
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa

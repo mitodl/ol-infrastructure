@@ -2,6 +2,7 @@ import { useContext } from "react";
 import { AppContext } from '@edx/frontend-platform/react';
 import { PLUGIN_OPERATIONS, DIRECT_PLUGIN } from '@openedx/frontend-plugin-framework';
 import { getConfig } from '@edx/frontend-platform';
+import { FormattedMessage } from '@edx/frontend-platform/i18n';
 
 import Footer, { Logo, MenuLinks, CopyrightNotice } from './Footer.jsx';
 import './mitxonline-styles.scss';
@@ -49,18 +50,22 @@ const addFooterSubSlotsOverride = (config) => {
     {
       url: `${process.env.MIT_LEARN_BASE_URL}/about`,
       title: 'About Us',
+      messageId: 'footer.links.about.us',
     },
     {
       url: `${process.env.MIT_LEARN_BASE_URL}/terms`,
       title: 'Terms of Service',
+      messageId: 'footer.links.terms.of.service',
     },
     {
       url: accessibilityURL,
       title: 'Accessibility',
+      messageId: 'footer.links.accessibility',
     },
     {
       url: contactUsURL,
       title: 'Contact Us',
+      messageId: 'footer.links.contact.us',
     },
   ]
 
@@ -69,6 +74,7 @@ const addFooterSubSlotsOverride = (config) => {
       {
         url: supportURL,
         title: 'Help',
+        messageId: 'footer.links.help',
       }
     );
   }
@@ -111,7 +117,11 @@ const addFooterSubSlotsOverride = (config) => {
             id: 'custom_legal_notice',
             type: DIRECT_PLUGIN,
             RenderWidget: () => (
-              <CopyrightNotice copyrightText={`© ${currentYear} ${copyRightText}`} />
+              <CopyrightNotice
+                copyrightText={`© ${currentYear} ${copyRightText}`}
+                trademarkMessageId="footer.trademark.notice"
+                currentYear={currentYear}
+              />
             ),
           },
         },
@@ -184,11 +194,12 @@ const isMobile = () => {
 };
 
 const getUserMenu = ({ includeDashboard = false } = {}) => {
-  const userMenuLinkTitles = {
-    profile: 'Profile',
-    account: 'Settings',
-    logout: 'Sign Out',
-    dashboard: 'Dashboard',
+  // Use translation message IDs
+  const userMenuLinkMessages = {
+    profile: { id: 'header.user.menu.profile', defaultMessage: 'Profile' },
+    account: { id: 'header.user.menu.account.setting', defaultMessage: 'Settings' }, // Custom key for MITx Online
+    logout: { id: 'header.user.menu.signout', defaultMessage: 'Sign out' }, // Custom key for MITx Online
+    dashboard: { id: 'header.user.menu.dashboard', defaultMessage: 'Dashboard' },
   };
 
   // Build dashboard URL consistently with SecondaryMenu logic
@@ -201,27 +212,63 @@ const getUserMenu = ({ includeDashboard = false } = {}) => {
     const baseMenu = [
       {
         url: `${configData.LMS_BASE_URL}/logout`,
-        title: userMenuLinkTitles.logout,
+        message: (
+          <FormattedMessage
+            id={userMenuLinkMessages.logout.id}
+            defaultMessage={userMenuLinkMessages.logout.defaultMessage}
+          />
+        ),
       },
     ];
-    return includeDashboard ? [{ url: dashboardURL, title: userMenuLinkTitles.dashboard }, ...baseMenu] : baseMenu;
+    return includeDashboard ? [{
+      url: dashboardURL,
+      message: (
+        <FormattedMessage
+          id={userMenuLinkMessages.dashboard.id}
+          defaultMessage={userMenuLinkMessages.dashboard.defaultMessage}
+        />
+      ),
+    }, ...baseMenu] : baseMenu;
   }
 
   const baseMenu = [
     {
       url: `${configData.MARKETING_SITE_BASE_URL}/profile/`,
-      title: userMenuLinkTitles.profile,
+      message: (
+        <FormattedMessage
+          id={userMenuLinkMessages.profile.id}
+          defaultMessage={userMenuLinkMessages.profile.defaultMessage}
+        />
+      ),
     },
     {
       url: `${configData.MARKETING_SITE_BASE_URL}/account-settings/`,
-      title: userMenuLinkTitles.account,
+      message: (
+        <FormattedMessage
+          id={userMenuLinkMessages.account.id}
+          defaultMessage={userMenuLinkMessages.account.defaultMessage}
+        />
+      ),
     },
     {
       url: `${configData.LMS_BASE_URL}/logout`,
-      title: userMenuLinkTitles.logout,
+      message: (
+        <FormattedMessage
+          id={userMenuLinkMessages.logout.id}
+          defaultMessage={userMenuLinkMessages.logout.defaultMessage}
+        />
+      ),
     },
   ];
-  return includeDashboard ? [{ url: dashboardURL, title: userMenuLinkTitles.dashboard }, ...baseMenu] : baseMenu;
+  return includeDashboard ? [{
+    url: dashboardURL,
+    message: (
+      <FormattedMessage
+        id={userMenuLinkMessages.dashboard.id}
+        defaultMessage={userMenuLinkMessages.dashboard.defaultMessage}
+      />
+    ),
+  }, ...baseMenu] : baseMenu;
 };
 
 const DesktopHeaderUserMenu = (widget) => {
@@ -231,7 +278,7 @@ const DesktopHeaderUserMenu = (widget) => {
       items: userMenu.map((item) => ({
         type: 'item',
         href: item.url,
-        content: item.title,
+        content: item.message,
       })),
     },
   ];
@@ -242,7 +289,7 @@ const LearningHeaderUserMenu = (widget) => {
   const userMenu = getUserMenu({ includeDashboard: isMobile() });
   widget.content.items = userMenu.map((item) => ({
     href: item.url,
-    message: item.title,
+    message: item.message,
   }))
   return widget;
 };
@@ -412,7 +459,10 @@ const SecondaryMenu = () => {
         href={dashboardURL}
         className="dashboard-btn"
       >
-        Dashboard
+        <FormattedMessage
+          id="header.menu.dashboard.label"
+          defaultMessage="Dashboard"
+        />
       </a>
     </div>
   );
