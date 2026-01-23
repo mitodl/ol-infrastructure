@@ -72,6 +72,7 @@ class Services(str, Enum):
     mitxonline_edx = "mitxonline-edx"
     mitxpro_edx = "xpro-edx"
     ocw_build = "ocw-build"
+    ocw_studio = "ocw-studio"
     odl_video_service = "ovs"
     open_metadata = "open-metadata"
     redash = "redash"

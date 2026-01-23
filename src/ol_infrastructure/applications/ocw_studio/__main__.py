@@ -35,9 +35,18 @@ from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib.aws.eks_helper import (
+    check_cluster_namespace,
+    setup_k8s_provider,
+)
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.heroku import setup_heroku_provider
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.ol_types import (
+    AWSBase,
+    BusinessUnit,
+    K8sGlobalLabels,
+    Services,
+)
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -52,6 +61,10 @@ github_provider = github.Provider(
 github_options = ResourceOptions(provider=github_provider)
 ocw_studio_config = Config("ocw_studio")
 stack_info = parse_stack()
+cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+cluster_substructure_stack = StackReference(
+    f"substructure.aws.eks.applications.{stack_info.name}"
+)
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
@@ -68,6 +81,19 @@ heroku_app_config = Config("heroku_app")
 
 # AWS Account Information
 aws_account = get_caller_identity()
+
+# Setup k8s stuff
+k8s_global_labels = K8sGlobalLabels(
+    service=Services.ocw_studio,
+    ou=BusinessUnit.ocw,
+    stack=stack_info,
+).model_dump()
+
+setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
+ocw_studio_namespace = "ocw-studio"
+cluster_stack.require_output("namespaces").apply(
+    lambda ns: check_cluster_namespace(ocw_studio_namespace, ns)
+)
 
 # Create S3 buckets
 
@@ -378,7 +404,6 @@ heroku_vars = {
     "VIDEO_S3_TRANSCODE_PREFIX": "aws_mediaconvert_transcodes",
     "VIDEO_TRANSCODE_QUEUE": ocw_studio_mediaconvert.queue.name,
 }
-
 heroku_vars.update(**heroku_app_config.get_object("vars"))
 
 auth_aws_mitx_creds_ocw_studio_app_env = vault.generic.get_secret_output(
@@ -386,22 +411,17 @@ auth_aws_mitx_creds_ocw_studio_app_env = vault.generic.get_secret_output(
     with_lease_start_time=False,
     opts=InvokeOptions(parent=ocw_studio_secrets),
 )
-
-
 secret_global_mailgun_api_key = vault.generic.get_secret_output(
     path="secret-global/mailgun",
     opts=InvokeOptions(parent=ocw_studio_secrets),
 )
-
 secret_concourse_ocw_api_bearer_token = vault.generic.get_secret_output(
     path="secret-concourse/ocw/api-bearer-token",
     opts=InvokeOptions(parent=ocw_studio_secrets),
 )
-
 secret_concourse_web = vault.generic.get_secret_output(
     path="secret-concourse/web", opts=InvokeOptions(parent=ocw_studio_secrets)
 )
-
 sensitive_heroku_vars = {
     "AWS_ACCESS_KEY_ID": auth_aws_mitx_creds_ocw_studio_app_env.data.apply(
         lambda data: "{}".format(data["access_key"])
