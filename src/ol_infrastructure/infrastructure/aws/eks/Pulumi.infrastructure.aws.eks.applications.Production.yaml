@@ -53,8 +53,10 @@ config:
   - mitlearn
   - mitxonline
   - mitxonline-openedx
+  - ocw-studio
   - odl-video-service
   - tika
+  - xpro
   - xpro-openedx
   eks:nodegroups:
     worker-xlarge:
