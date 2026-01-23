@@ -49,6 +49,7 @@ config:
     APPZI_URL: ""
     CELERY_WORKER_CONCURRENCY: 1
     CSRF_COOKIE_NAME: "learn_ci_csrftoken"
+    COURSE_ARCHIVE_BUCKET_NAME: "ol-data-lake-landing-zone-qa"
     DEBUG: "false"
     EDX_LEARNING_COURSE_BUCKET_NAME: "edxorg-qa-edxapp-courses" # Points to QA on purpose
     ENABLE_INFINITE_CORRIDOR: "true"
