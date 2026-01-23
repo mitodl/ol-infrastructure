@@ -606,6 +606,11 @@ code_locations: list[dict[str, str | int]] = [
         "module": "b2b_organization.definitions",
         "port": 4007,
     },
+    {
+        "name": "student_risk_probability",
+        "module": "student_risk_probability.definitions",
+        "port": 4008,
+    },
 ]
 
 # Build deployments list for user code
