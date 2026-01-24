@@ -74,4 +74,4 @@ GRAFANA_K8S_MONITORING_CHART_VERSION = "3.7.3"
 # renovate: datasource=helm depName=dcgm-exporter packageName=dcgm-exporter registryUrl=https://nvidia.github.io/dcgm-exporter/helm-charts
 NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.7.1"
 # renovate: datasource=helm depName=nvidia-device-plugin packageName=nvidia-device-plugin registryUrl=https://nvidia.github.io/k8s-device-plugin
-NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION = "0.18.0"
+NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION = "0.18.2"
