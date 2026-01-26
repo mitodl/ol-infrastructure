@@ -8,7 +8,6 @@ import os
 import textwrap
 from pathlib import Path
 
-import pulumi_consul as consul
 import pulumi_fastly as fastly
 import pulumi_github as github
 import pulumi_kubernetes as kubernetes
@@ -66,7 +65,6 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
-from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
@@ -1251,140 +1249,6 @@ gh_workflow_s3_bucket_name_env_secret = github.ActionsVariable(
     variable_name=f"AWS_S3_BUCKET_NAME_{env_var_suffix}",  # pragma: allowlist secret
     value=learn_ai_app_storage_bucket_name,
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-
-frontend_vars = learn_ai_config.require_object("frontend_vars")
-# Variables for frontend app build
-gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"learn-ai-gh-workflow-api-base-env-variablet-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"API_BASE_{env_var_suffix}",  # pragma: allowlist secret
-    value=f"https://{learn_api_domain}/ai",
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"learn-ai-gh-workflow-ai-csrf-cookie-name-env-variablet-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"AI_CSRF_COOKIE_NAME_{env_var_suffix}",  # pragma: allowlist secret
-    value="csrftoken",
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"learn-ai-gh-workflow-learn-mit-ai-login-url-env-variablet-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"MIT_LEARN_AI_LOGIN_URL_{env_var_suffix}",  # pragma: allowlist secret
-    value=f"https://{learn_api_domain}/ai/http/login/",
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"learn-ai-gh-workflow-mit-learn-api-base-url-variablet-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"MIT_LEARN_API_BASE_URL_{env_var_suffix}",  # pragma: allowlist secret
-    value=f"https://{learn_api_domain}/learn/",
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"learn-ai-gh-workflow-mit-learn-app-base-url-variablet-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"MIT_LEARN_APP_BASE_URL_{env_var_suffix}",  # pragma: allowlist secret
-    value=frontend_vars["MIT_LEARN_APP_BASE_URL"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"learn-ai-gh-workflow-openedx-api-base-url-variablet-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"OPENEDX_API_BASE_URL_{env_var_suffix}",  # pragma: allowlist secret
-    value=frontend_vars["OPENEDX_API_BASE_URL"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"learn-ai-gh-workflow-openedx-login-url-variablet-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"OPENEDX_LOGIN_URL_{env_var_suffix}",  # pragma: allowlist secret
-    value=frontend_vars["OPENEDX_LOGIN_URL"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"learn-ai-gh-workflow-ai-elasticsearch-url-variablet-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"MIT_SEARCH_ELASTIC_URL_{env_var_suffix}",  # pragma: allowlist secret
-    value=frontend_vars["MIT_SEARCH_ELASTIC_URL"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"learn-ai-gh-workflow-ai-vectorsearch-url-variablet-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"MIT_SEARCH_VECTOR_URL_{env_var_suffix}",  # pragma: allowlist secret
-    value=frontend_vars["MIT_SEARCH_VECTOR_URL"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-
-xpro_consul_opts = get_consul_provider(
-    stack_info=stack_info,
-    consul_address=f"https://consul-xpro-{stack_info.env_suffix}.odl.mit.edu",
-    provider_name=f"consul-provider-xpro-{stack_info.env_suffix}",
-)
-consul.Keys(
-    f"learn-api-domain-consul-key-for-xpro-openedx-{stack_info.env_suffix}",
-    keys=[
-        consul.KeysKeyArgs(
-            path="edxapp/learn-ai-frontend-domain",
-            delete=False,
-            value=learn_ai_frontend_domain,
-        )
-    ],
-    opts=xpro_consul_opts,
-)
-
-mitxonline_consul_opts = get_consul_provider(
-    stack_info,
-    consul_address=f"https://consul-mitxonline-{stack_info.env_suffix}.odl.mit.edu",
-    provider_name=f"consul-provider-mitxonline-{stack_info.env_suffix}",
-)
-consul.Keys(
-    "learn-api-domain-consul-key-for-mitxonline-openedx",
-    keys=[
-        consul.KeysKeyArgs(
-            path="edxapp/learn-ai-frontend-domain",
-            delete=False,
-            value=learn_ai_frontend_domain,
-        )
-    ],
-    opts=mitxonline_consul_opts,
-)
-
-mitx_consul_opts = get_consul_provider(
-    stack_info,
-    consul_address=f"https://consul-mitx-{stack_info.env_suffix}.odl.mit.edu",
-    provider_name=f"consul-provider-mitx-{stack_info.env_suffix}",
-)
-consul.Keys(
-    "learn-api-domain-consul-key-for-mitx-openedx",
-    keys=[
-        consul.KeysKeyArgs(
-            path="edxapp/learn-ai-frontend-domain",
-            delete=False,
-            value=learn_ai_frontend_domain,
-        )
-    ],
-    opts=mitx_consul_opts,
-)
-
-mitx_staging_consul_opts = get_consul_provider(
-    stack_info,
-    consul_address=f"https://consul-mitx-staging-{stack_info.env_suffix}.odl.mit.edu",
-    provider_name=f"consul-provider-mitx-staging-{stack_info.env_suffix}",
-)
-consul.Keys(
-    "learn-api-domain-consul-key-for-mitx-staging-openedx",
-    keys=[
-        consul.KeysKeyArgs(
-            path="edxapp/learn-ai-frontend-domain",
-            delete=False,
-            value=learn_ai_frontend_domain,
-        )
-    ],
-    opts=mitx_staging_consul_opts,
 )
 
 if stack_info.env_suffix != "ci":
