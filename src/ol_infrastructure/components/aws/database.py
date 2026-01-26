@@ -33,8 +33,8 @@ from ol_infrastructure.lib.aws.rds_helper import (
     DBInstanceTypes,
     db_engines,
     engine_major_version,
-    get_parameter_group_parameters,
     get_rds_instance,
+    has_static_parameter_changes,
     max_minor_version,
     parameter_group_family,
     turn_off_deletion_protection,
@@ -306,46 +306,21 @@ class OLAmazonDB(pulumi.ComponentResource):
                 {"name": "hot_standby_feedback", "value": 1}
             )
 
-        # Remove rds.logical_replication from parameter overrides if updating an
-        # existing parameter group that doesn't have it explicitly configured.
-        # The parameter exists in all Postgres parameter groups, but we only care
-        # if it was user-modified (not at default value). This parameter requires
-        # a reboot, so we only apply it to:
-        # - New instances (no current_db_state)
-        # - Major version upgrades (new parameter group with different family)
-        # - Existing instances where it's already user-configured
-        if (
-            db_config.engine == "postgres"
-            and current_db_state
-            and "rds.logical_replication"
-            in [p["name"] for p in db_config.parameter_overrides]
-        ):
-            # Check if we're using the same parameter group
-            # (not a major version upgrade)
-            current_engine_version = current_db_state.get("EngineVersion")
-            if current_engine_version:
-                current_parameter_group_family = parameter_group_family(
-                    db_config.engine, current_engine_version
-                )
-                if current_parameter_group_family == primary_parameter_group_family:
-                    # Same parameter group - check if it's been user-configured
-                    current_param_group_name = current_db_state.get(
-                        "DBParameterGroups", [{}]
-                    )[0].get("DBParameterGroupName")
-                    if current_param_group_name:
-                        existing_params = get_parameter_group_parameters(
-                            current_param_group_name
-                        )
-                        if not any(
-                            p["ParameterName"] == "rds.logical_replication"
-                            for p in existing_params
-                        ):
-                            # Not user-configured - remove to avoid reboot
-                            db_config.parameter_overrides = [
-                                p
-                                for p in db_config.parameter_overrides
-                                if p["name"] != "rds.logical_replication"
-                            ]
+        # Check if we're modifying static parameters that require a reboot.
+        # Static parameters (like rds.logical_replication) cannot be applied with
+        # apply_immediately=True and must be scheduled during maintenance window.
+        apply_immediately = True
+        if current_db_state:
+            current_param_group_name = current_db_state.get("DBParameterGroups", [{}])[
+                0
+            ].get("DBParameterGroupName")
+            if has_static_parameter_changes(
+                db_config.engine,
+                db_config.engine_version,
+                db_config.parameter_overrides,
+                current_param_group_name,
+            ):
+                apply_immediately = False
 
         self.parameter_group = primary_parameter_group = rds.ParameterGroup(
             f"{db_config.instance_name}-{db_config.engine}-parameter-group",
@@ -361,7 +336,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             allocated_storage=db_config.storage,
             allow_major_version_upgrade=True,
             auto_minor_version_upgrade=True,
-            apply_immediately=True,
+            apply_immediately=apply_immediately,
             backup_retention_period=db_config.backup_days,
             blue_green_update={"enabled": db_config.use_blue_green},
             copy_tags_to_snapshot=True,

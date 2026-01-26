@@ -128,6 +128,64 @@ def get_parameter_group_parameters(parameter_group_name: str) -> list[dict[str, 
     return parameters
 
 
+def has_static_parameter_changes(
+    engine: str,
+    engine_version: str,
+    new_parameters: list[dict[str, str | bool | int | float]],
+    current_parameter_group_name: str | None = None,
+) -> bool:
+    """Check if any parameter changes involve static parameters requiring a reboot.
+
+    :param engine: Database engine (e.g., 'postgres')
+    :type engine: str
+
+    :param engine_version: Database engine version
+    :type engine_version: str
+
+    :param new_parameters: List of parameters being applied
+    :type new_parameters: list[dict[str, str | bool | int | float]]
+
+    :param current_parameter_group_name: Name of current parameter group (optional)
+    :type current_parameter_group_name: str | None
+
+    :returns: True if any static parameters are being changed
+    :rtype: bool
+    """
+    # Get current parameter values if parameter group exists
+    current_params = {}
+    if current_parameter_group_name:
+        for param in get_parameter_group_parameters(current_parameter_group_name):
+            current_params[param["ParameterName"]] = param["ParameterValue"]
+
+    # Get parameter metadata to check apply_type
+    try:
+        family = parameter_group_family(engine, engine_version)
+        paginator = rds_client.get_paginator("describe_db_parameters")
+
+        for page in paginator.paginate(DBParameterGroupName=f"default.{family}"):
+            for param in page.get("Parameters", []):
+                param_name = param["ParameterName"]
+                apply_method = param.get("ApplyMethod", "")
+
+                # Check if this parameter is in our new_parameters list
+                for new_param in new_parameters:
+                    if new_param["name"] == param_name:
+                        # Check if it's a static parameter
+                        if apply_method == "pending-reboot":
+                            # Check if value is actually changing
+                            new_value = str(new_param["value"])
+                            current_value = current_params.get(
+                                param_name, param.get("ParameterValue", "")
+                            )
+                            if str(current_value) != new_value:
+                                return True
+    except Exception:
+        # If we can't determine, assume no static changes
+        pass
+
+    return False
+
+
 def turn_off_deletion_protection(db_identifier: str):
     """Disable deletion protection for the specified RDS database instance.
 
