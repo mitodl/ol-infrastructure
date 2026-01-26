@@ -853,7 +853,10 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 # Override the SSO URL from metadata
                 single_sign_on_service_url="https://login.ntua.gr/idp/profile/SAML2/Redirect/SSO",
                 want_assertions_encrypted=True,
-                want_assertions_signed=True,
+                want_assertions_signed=False,
+                login_hint=False,
+                post_binding_authn_request=False,
+                authn_context_comparison_type="exact",
             )
         )
         onboard_saml_org(
