@@ -1,11 +1,9 @@
-# ruff: noqa: FIX002
 from pathlib import Path
 from re import findall, sub
 from urllib.parse import parse_qs, urlparse
 
 import pulumi
 import pulumi_aws as aws
-import pulumi_consul as consul
 import pulumi_mongodbatlas as atlas
 
 from bridge.lib.magic_numbers import DEFAULT_MONGODB_PORT
@@ -171,45 +169,6 @@ if data_vpc_access_config.get_bool("create_privatelink_to_datavpc"):
         opts=atlas_provider,
     )
 
-    data_vpc_consul_address = (
-        data_vpc_access_config.get("consul_address")
-        or f"https://consul-data-{stack_info.name}.odl.mit.edu"
-    )
-
-    # The private endpoint data doesn't show up in the cluster resource
-    # until the second run. This will put an empty list into consul
-    # in the meantime.
-    private_endpoint_list = atlas_cluster.connection_strings.apply(
-        lambda cs: "{}".format(cs[0]["private_endpoints"])
-    )
-    consul.Keys(
-        "set-mongo-connection-info-in-data-vpc-consul",
-        keys=[
-            consul.KeysKeyArgs(
-                path=f"mongodb/{environment_name}/private-endpoints",
-                delete=True,
-                value=private_endpoint_list,
-            ),
-        ],
-        opts=pulumi.ResourceOptions(
-            provider=consul.Provider(
-                "consul-provider-data-vpc",
-                address=data_vpc_consul_address,
-                scheme="https",
-                http_auth="pulumi:{}".format(
-                    read_yaml_secrets(
-                        Path(f"pulumi/consul.{stack_info.env_suffix}.yaml")
-                    )["basic_auth_password"]
-                ),
-            ),
-            depends_on=[
-                privatelink_endpoint_service,
-                atlas_cluster,
-                data_vpc_endpoint,
-                privatelink_endpoint,
-            ],
-        ),
-    )
 
 # It is necessary to manually go to the Mongo Atlas UI and fetch the IP CIDR for adding
 # to the VPC route table
@@ -279,46 +238,6 @@ privatized_mongo_uri_with_options = atlas_cluster.mongo_uri_with_options.apply(
     privatize_mongo_uri
 )
 
-if atlas_config.get_bool("ready_for_traffic"):
-    # TODO(Mike): Export these keys below into as stack outputs
-    consul.Keys(
-        "set-mongo-connection-info-in-consul",
-        keys=[
-            consul.KeysKeyArgs(
-                path="mongodb/host",
-                delete=True,
-                value=privatized_mongo_uri.apply(lambda uri: urlparse(uri).netloc),
-            ),
-            consul.KeysKeyArgs(
-                path="mongodb/use-ssl",
-                delete=True,
-                value=privatized_mongo_uri_with_options.apply(
-                    lambda uri: parse_qs(urlparse(uri).query)["ssl"][0]
-                ),
-            ),
-            consul.KeysKeyArgs(
-                path="mongodb/replica-set",
-                delete=True,
-                value=privatized_mongo_uri_with_options.apply(
-                    lambda uri: parse_qs(urlparse(uri).query)["replicaSet"][0]
-                ),
-            ),
-            consul.KeysKeyArgs(path="mongodb/auth-source", delete=True, value="admin"),
-        ],
-        opts=pulumi.ResourceOptions(
-            provider=consul.Provider(
-                "consul-provider",
-                address=pulumi.Config("consul").require("address"),
-                scheme="https",
-                http_auth="pulumi:{}".format(
-                    read_yaml_secrets(
-                        Path(f"pulumi/consul.{stack_info.env_suffix}.yaml")
-                    )["basic_auth_password"]
-                ),
-            )
-        ),
-    )
-
 ########################
 # Data Pipeline Access #
 ########################
@@ -334,50 +253,6 @@ dagster_ips.apply(
         )
         for dagster_ip in ips
     ]
-)
-
-consul.Keys(
-    "set-mongo-connection-info-in-consul-for-data-pipelines",
-    keys=[
-        consul.KeysKeyArgs(
-            path=f"{stack_info.env_prefix}/mongodb/host",
-            delete=True,
-            value=atlas_cluster.mongo_uri.apply(lambda uri: urlparse(uri).netloc),
-        ),
-        consul.KeysKeyArgs(
-            path=f"{stack_info.env_prefix}/mongodb/use-ssl",
-            delete=True,
-            value=atlas_cluster.mongo_uri_with_options.apply(
-                lambda uri: parse_qs(urlparse(uri).query)["ssl"][0]
-            ),
-        ),
-        consul.KeysKeyArgs(
-            path=f"{stack_info.env_prefix}/mongodb/replica-set",
-            delete=True,
-            value=atlas_cluster.mongo_uri_with_options.apply(
-                lambda uri: parse_qs(urlparse(uri).query)["replicaSet"][0]
-            ),
-        ),
-        consul.KeysKeyArgs(
-            path=f"{stack_info.env_prefix}/mongodb/connection-string",
-            delete=True,
-            value=atlas_cluster.mongo_uri_with_options,
-        ),
-        consul.KeysKeyArgs(path="mongodb/auth-source", delete=True, value="admin"),
-    ],
-    opts=pulumi.ResourceOptions(
-        provider=consul.Provider(
-            "consul-operations-provider",
-            # Writing to the operations Consul so that Salt can template the values
-            address=f"https://consul-operations-{stack_info.env_suffix}.odl.mit.edu",
-            scheme="https",
-            http_auth="pulumi:{}".format(
-                read_yaml_secrets(Path(f"pulumi/consul.{stack_info.env_suffix}.yaml"))[
-                    "basic_auth_password"
-                ]
-            ),
-        )
-    ),
 )
 
 pulumi.export(
