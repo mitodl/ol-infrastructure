@@ -61,6 +61,13 @@ class SamlIdpConfig(OrgConfig):
     signing_certificate: str | None = None  # Override signing certificate from metadata
     want_assertions_encrypted: bool = False
     want_assertions_signed: bool | None = None  # Optional, no default
+    post_binding_authn_request: bool = (
+        True  # Use POST binding for auth requests by default
+    )
+    login_hint: bool = True  # Optional, no default
+    authn_context_comparison_type: str | None = (
+        None  # Optional, comparison type for authn context
+    )
 
     @model_validator(mode="after")
     def ensure_principal_types(self):
@@ -102,7 +109,7 @@ def create_org_for_learn(org_config: OrgConfig) -> keycloak.Organization:
     )
 
 
-def onboard_saml_org(  # noqa: C901
+def onboard_saml_org(  # noqa: C901, PLR0912
     saml_config: SamlIdpConfig,
 ) -> None:
     org = create_org_for_learn(saml_config)
@@ -157,12 +164,12 @@ def onboard_saml_org(  # noqa: C901
         "org_domain": "ANY",
         "org_redirect_mode_email_matches": True,
         "organization_id": org.id,
-        "post_binding_authn_request": True,
+        "post_binding_authn_request": saml_config.post_binding_authn_request,
         "post_binding_response": True,
         "principal_type": saml_config.principal_type,
         "principal_attribute": saml_config.principal_attribute,
         "realm": saml_config.realm_id,
-        "login_hint": True,
+        "login_hint": saml_config.login_hint,
         "sync_mode": "FORCE",
         "trust_email": True,
         "validate_signature": True,
@@ -175,6 +182,14 @@ def onboard_saml_org(  # noqa: C901
     # Only add want_assertions_signed if explicitly set
     if saml_config.want_assertions_signed is not None:
         idp_kwargs["want_assertions_signed"] = saml_config.want_assertions_signed
+
+    if saml_config.login_hint is not None:
+        idp_kwargs["login_hint"] = saml_config.login_hint
+
+    if saml_config.authn_context_comparison_type is not None:
+        idp_kwargs["authn_context_comparison_type"] = (
+            saml_config.authn_context_comparison_type
+        )
 
     org_idp = keycloak.saml.IdentityProvider(
         f"ol-apps-{saml_config.org_alias}-saml-idp",
@@ -231,6 +246,7 @@ def onboard_oidc_org(
     oidc_idp_arg_map["extra_config"] = {
         "jwtX509HeadersEnabled": True,
     } | oidc_idp_arg_map.get("extra_config", {})
+    oidc_idp_arg_map["login_hint"] = True  # Preserve existing login_hint configuration
     keycloak.oidc.IdentityProvider(
         f"ol-apps-{oidc_config.org_alias}-oidc-idp",
         alias=oidc_config.org_alias.lower(),
@@ -239,7 +255,6 @@ def onboard_oidc_org(
         realm=oidc_config.realm_id,
         display_name=oidc_config.org_name,
         enabled=True,
-        login_hint=True,
         sync_mode="FORCE",
         hide_on_login_page=True,
         org_domain="ANY",

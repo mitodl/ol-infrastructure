@@ -33,7 +33,7 @@ def create_organization_scope(
             "claim.name": "organization",
             "id.token.claim": "true",
             "introspection.token.claim": "true",
-            "jsonType.label": "String",
+            "jsonType.label": "JSON",
             "lightweight.claim": "false",
             "multivalued": "true",
             "userinfo.token.claim": "true",
