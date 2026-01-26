@@ -34,7 +34,6 @@ from ol_infrastructure.lib.aws.rds_helper import (
     db_engines,
     engine_major_version,
     get_rds_instance,
-    has_static_parameter_changes,
     max_minor_version,
     parameter_group_family,
     turn_off_deletion_protection,
@@ -161,7 +160,11 @@ class OLPostgresDBConfig(OLDBConfig):
         {"name": "autovacuum", "value": 1},
         {"name": "client_encoding", "value": "UTF-8"},
         {"name": "rds.force_ssl", "value": 1},
-        {"name": "rds.logical_replication", "value": 1},
+        {
+            "name": "rds.logical_replication",
+            "value": 1,
+            "apply_method": "pending-reboot",
+        },
         {"name": "timezone", "value": "UTC"},
         {"name": "rds.blue_green_replication_type", "value": "logical"},
     ]
@@ -306,22 +309,6 @@ class OLAmazonDB(pulumi.ComponentResource):
                 {"name": "hot_standby_feedback", "value": 1}
             )
 
-        # Check if we're modifying static parameters that require a reboot.
-        # Static parameters (like rds.logical_replication) cannot be applied with
-        # apply_immediately=True and must be scheduled during maintenance window.
-        apply_immediately = True
-        if current_db_state:
-            current_param_group_name = current_db_state.get("DBParameterGroups", [{}])[
-                0
-            ].get("DBParameterGroupName")
-            if has_static_parameter_changes(
-                db_config.engine,
-                db_config.engine_version,
-                db_config.parameter_overrides,
-                current_param_group_name,
-            ):
-                apply_immediately = False
-
         self.parameter_group = primary_parameter_group = rds.ParameterGroup(
             f"{db_config.instance_name}-{db_config.engine}-parameter-group",
             family=primary_parameter_group_family,
@@ -336,7 +323,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             allocated_storage=db_config.storage,
             allow_major_version_upgrade=True,
             auto_minor_version_upgrade=True,
-            apply_immediately=apply_immediately,
+            apply_immediately=True,
             backup_retention_period=db_config.backup_days,
             blue_green_update={"enabled": db_config.use_blue_green},
             copy_tags_to_snapshot=True,
