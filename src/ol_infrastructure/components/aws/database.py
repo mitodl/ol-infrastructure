@@ -165,6 +165,17 @@ class OLPostgresDBConfig(OLDBConfig):
             "value": 1,
             "apply_method": "pending-reboot",
         },
+        # WAL settings for logical replication
+        # max_wal_senders: Maximum concurrent WAL sender processes
+        # Recommended: replicas + logical replication slots + 2
+        {"name": "max_wal_senders", "value": 10, "apply_method": "pending-reboot"},
+        # max_replication_slots: Maximum replication slots
+        # Each logical replication connection needs one slot
+        {
+            "name": "max_replication_slots",
+            "value": 10,
+            "apply_method": "pending-reboot",
+        },
         {"name": "timezone", "value": "UTC"},
         {"name": "rds.blue_green_replication_type", "value": "logical"},
     ]
