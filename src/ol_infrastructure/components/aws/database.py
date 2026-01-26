@@ -33,6 +33,7 @@ from ol_infrastructure.lib.aws.rds_helper import (
     DBInstanceTypes,
     db_engines,
     engine_major_version,
+    get_parameter_group_parameters,
     get_rds_instance,
     max_minor_version,
     parameter_group_family,
@@ -160,9 +161,7 @@ class OLPostgresDBConfig(OLDBConfig):
         {"name": "autovacuum", "value": 1},
         {"name": "client_encoding", "value": "UTF-8"},
         {"name": "rds.force_ssl", "value": 1},
-        # TMM 2025-08-20: This should be true, but will require manual intervention
-        # across our fleet of instances to get configured.
-        # {"name": "rds.logical_replication", "value": 1},  # noqa: ERA001
+        {"name": "rds.logical_replication", "value": 1},
         {"name": "timezone", "value": "UTC"},
         {"name": "rds.blue_green_replication_type", "value": "logical"},
     ]
@@ -306,6 +305,47 @@ class OLAmazonDB(pulumi.ComponentResource):
             db_config.parameter_overrides.append(
                 {"name": "hot_standby_feedback", "value": 1}
             )
+
+        # Remove rds.logical_replication from parameter overrides if updating an
+        # existing parameter group that doesn't have it explicitly configured.
+        # The parameter exists in all Postgres parameter groups, but we only care
+        # if it was user-modified (not at default value). This parameter requires
+        # a reboot, so we only apply it to:
+        # - New instances (no current_db_state)
+        # - Major version upgrades (new parameter group with different family)
+        # - Existing instances where it's already user-configured
+        if (
+            db_config.engine == "postgres"
+            and current_db_state
+            and "rds.logical_replication"
+            in [p["name"] for p in db_config.parameter_overrides]
+        ):
+            # Check if we're using the same parameter group
+            # (not a major version upgrade)
+            current_engine_version = current_db_state.get("EngineVersion")
+            if current_engine_version:
+                current_parameter_group_family = parameter_group_family(
+                    db_config.engine, current_engine_version
+                )
+                if current_parameter_group_family == primary_parameter_group_family:
+                    # Same parameter group - check if it's been user-configured
+                    current_param_group_name = current_db_state.get(
+                        "DBParameterGroups", [{}]
+                    )[0].get("DBParameterGroupName")
+                    if current_param_group_name:
+                        existing_params = get_parameter_group_parameters(
+                            current_param_group_name
+                        )
+                        if not any(
+                            p["ParameterName"] == "rds.logical_replication"
+                            for p in existing_params
+                        ):
+                            # Not user-configured - remove to avoid reboot
+                            db_config.parameter_overrides = [
+                                p
+                                for p in db_config.parameter_overrides
+                                if p["name"] != "rds.logical_replication"
+                            ]
 
         self.parameter_group = primary_parameter_group = rds.ParameterGroup(
             f"{db_config.instance_name}-{db_config.engine}-parameter-group",

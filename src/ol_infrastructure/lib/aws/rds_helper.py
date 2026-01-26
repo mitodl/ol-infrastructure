@@ -101,6 +101,33 @@ def get_rds_instance(instance_name: str) -> dict[str, str]:
     return db_instance
 
 
+def get_parameter_group_parameters(parameter_group_name: str) -> list[dict[str, str]]:
+    """Get the parameters configured in an RDS parameter group.
+
+    :param parameter_group_name: The name of the parameter group.
+    :type parameter_group_name: str
+
+    :returns: List of parameter dictionaries with 'ParameterName' and 'ParameterValue'
+    :rtype: list[dict[str, str]]
+    """
+    parameters = []
+    try:
+        paginator = rds_client.get_paginator("describe_db_parameters")
+        for page in paginator.paginate(DBParameterGroupName=parameter_group_name):
+            for param in page.get("Parameters", []):
+                # Only include user-modified parameters (not defaults)
+                if param.get("Source") == "user":
+                    parameters.append(
+                        {
+                            "ParameterName": param["ParameterName"],
+                            "ParameterValue": param.get("ParameterValue", ""),
+                        }
+                    )
+    except rds_client.exceptions.DBParameterGroupNotFoundFault:
+        pass
+    return parameters
+
+
 def turn_off_deletion_protection(db_identifier: str):
     """Disable deletion protection for the specified RDS database instance.
 
