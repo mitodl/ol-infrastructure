@@ -296,6 +296,10 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                                 "memory": "64Mi",
                             },
                         },
+                        "pdb": {"enabled": True},
+                        "extraEnv": {
+                            "NODE_OPTIONS": f"--max-http-header-size={32 * 1024}"
+                        },
                     },
                 },
                 "scheduling": {
@@ -352,6 +356,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                             "memory": "256Mi",
                         },
                     },
+                    "pdb": {"enabled": True},
                 },
                 "prePuller": get_prepuller_config_for_images(extra_images_list),
                 "singleuser": {
