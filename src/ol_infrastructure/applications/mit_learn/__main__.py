@@ -13,7 +13,14 @@ import pulumi_fastly as fastly
 import pulumi_github as github
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Alias, Config, InvokeOptions, ResourceOptions, StackReference, export
+from pulumi import (
+    Alias,
+    Config,
+    InvokeOptions,
+    ResourceOptions,
+    StackReference,
+    export,
+)
 from pulumi.output import Output
 from pulumi_aws import ec2, iam, route53, s3
 
@@ -69,9 +76,11 @@ from ol_infrastructure.lib.fastly import (
     get_fastly_provider,
 )
 from ol_infrastructure.lib.ol_types import (
+    Application,
     AWSBase,
     BusinessUnit,
     K8sGlobalLabels,
+    Product,
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -130,8 +139,12 @@ app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
 k8s_global_labels = K8sGlobalLabels(
     service=Services.mit_learn,
     ou=BusinessUnit.mit_learn,
+    product=Product.mitlearn,
     stack=stack_info,
+    application=Application.mit_learn,
+    source_repository="https://github.com/mitodl/mit-learn",
 ).model_dump()
+
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 learn_namespace = "mitlearn"
@@ -1202,7 +1215,7 @@ gh_repo = github.get_repository(
 
 
 application_labels = k8s_global_labels | {
-    "ol.mit.edu/application": "learn",
+    "ol.mit.edu/application": Application.mit_learn,
     "ol.mit.edu/pod-security-group": "learn",
 }
 

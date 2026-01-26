@@ -19,7 +19,12 @@ from ol_infrastructure.lib.aws.eks_helper import (
     ecr_image_uri,
     setup_k8s_provider,
 )
-from ol_infrastructure.lib.ol_types import BusinessUnit, K8sGlobalLabels, Services
+from ol_infrastructure.lib.ol_types import (
+    Application,
+    BusinessUnit,
+    K8sGlobalLabels,
+    Services,
+)
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 stack_info = parse_stack()
@@ -34,7 +39,11 @@ MIT_LEARN_NEXTJS_DOCKER_TAG = os.environ["MIT_LEARN_NEXTJS_DOCKER_TAG"]
 app_image = ecr_image_uri(f"mitodl/mit-learn-nextjs-app:{MIT_LEARN_NEXTJS_DOCKER_TAG}")
 
 k8s_global_labels = K8sGlobalLabels(
-    service=Services.mit_learn, ou=BusinessUnit.mit_learn, stack=stack_info
+    service=Services.mit_learn,
+    application=Application.mit_learn,
+    ou=BusinessUnit.mit_learn,
+    source_repository="https://github.com/mitodl/mit_learn",
+    stack=stack_info,
 ).model_dump()
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
@@ -161,7 +170,8 @@ for k, v in raw_env_vars.items():
     )
 
 application_labels = k8s_global_labels | {
-    "ol.mit.edu/service": "nextjs",
+    "ol.mit.edu.application": Application.mit_learn,
+    "ol.mit.edu.source_repository": "https://github.com/mitodl/mit-learn",
 }
 
 
