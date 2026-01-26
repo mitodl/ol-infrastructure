@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pulumi
 import pulumi_aws as aws
-import pulumi_consul as consul
 
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from bridge.secrets.sops import read_yaml_secrets
@@ -27,22 +26,6 @@ search_config = pulumi.Config("opensearch")
 env_config = pulumi.Config("environment")
 stack_info = parse_stack()
 
-if stack_info.env_prefix in ["open", "mitopen", "mitlearn"]:
-    consul_stack = pulumi.StackReference(
-        f"infrastructure.consul.apps.{stack_info.name}"
-    )
-elif stack_info.env_prefix == "celery_monitoring":
-    consul_stack = pulumi.StackReference(
-        f"infrastructure.consul.operations.{stack_info.name}"
-    )
-elif stack_info.env_prefix == "open_metadata":
-    consul_stack = pulumi.StackReference(
-        f"infrastructure.consul.data.{stack_info.name}"
-    )
-else:
-    consul_stack = pulumi.StackReference(
-        f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
-    )
 network_stack = pulumi.StackReference(f"infrastructure.aws.network.{stack_info.name}")
 vault_stack = pulumi.StackReference(
     f"infrastructure.vault.operations.{stack_info.name}"
@@ -67,10 +50,6 @@ disk_size = search_config.get_int("disk_size_gb") or 30
 is_public_web = search_config.get_bool("public_web") or False
 is_secured_cluster = search_config.get_bool("secured_cluster") or False
 openai_connector_setup = search_config.get_bool("openai_connector_enabled") or False
-
-consul_service_name = (
-    search_config.get("consul_service_name") or "elasticsearch"
-)  # Default is for legacy compatability
 
 # If there are additional_trusted_subnets specified,
 # verify they are from our VPCs and not the internet
@@ -239,61 +218,6 @@ search_domain_policy = aws.opensearch.DomainPolicy(
         )
     ),
 )
-
-if not search_config.get("disable_consul_components"):
-    consul_config = pulumi.Config("consul")
-    consul_provider = consul.Provider(
-        "consul-provider",
-        address=consul_config.require("address"),
-        scheme="https",
-        http_auth="pulumi:{}".format(
-            read_yaml_secrets(Path(f"pulumi/consul.{stack_info.env_suffix}.yaml"))[
-                "basic_auth_password"
-            ]
-        ),
-    )
-    opensearch_node = consul.Node(
-        "aws-opensearch-consul-node",
-        address=search_domain.endpoint,
-        name=consul_service_name,
-        opts=pulumi.ResourceOptions(provider=consul_provider),
-    )
-    opensearch_service = consul.Service(
-        "aws-opensearch-consul-service",
-        node=opensearch_node.name,
-        name=consul_service_name,
-        port=DEFAULT_HTTPS_PORT,
-        meta={
-            "external-node": True,
-            "external-probe": True,
-        },
-        checks=[
-            consul.ServiceCheckArgs(
-                check_id=consul_service_name,
-                interval="10s",
-                name=consul_service_name,
-                timeout="1m0s",
-                status="passing",
-                tcp=pulumi.Output.all(
-                    address=search_domain.endpoint, port=DEFAULT_HTTPS_PORT
-                ).apply(lambda es: "{address}:{port}".format(**es)),
-            )
-        ],
-        opts=pulumi.ResourceOptions(provider=consul_provider),
-    )
-
-    consul.Keys(
-        "elasticsearch",
-        keys=[
-            consul.KeysKeyArgs(
-                path="elasticsearch/host",
-                delete=True,
-                value=search_domain.endpoint,
-            ),
-        ],
-        opts=pulumi.ResourceOptions(provider=consul_provider),
-    )
-
 
 # This only support MITLearn environments for right now
 if openai_connector_setup:
