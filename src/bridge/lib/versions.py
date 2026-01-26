@@ -14,6 +14,7 @@ LEEK_VERSION = "0.7.5"
 OPEN_METADATA_VERSION = "1.11.6"
 OVS_VERSION = "v0.65.1-3-g2630021"
 REDASH_VERSION = "9d273e4"
+STARROCKS_VERSION = "4.0.4"
 # renovate: datasource=github-releases depName=traefik packageName=traefik/traefik
 TRAEFIK_VERSION = "3.6.7"
 TUTOR_PERMISSIONS_VERSION = "15.3.4"
@@ -55,6 +56,8 @@ KEDA_CHART_VERSION = "2.17.1"
 KUBE_STATE_METRICS_CHART_VERSION = "5.1.0"
 # renovate: datasource=helm depName=kubewatch packageName=kubewatch registryUrl=https://robusta-charts.storage.googleapis.com
 KUBEWATCH_CHART_VERSION = "3.5.0"
+# renovate: datasource=helm depName=kube-starrocks packageName=kube-starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
+STARROCKS_OPERATOR_CHART_VERSION = "1.11.3"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
 TRAEFIK_CHART_VERSION = "38.0.2"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
