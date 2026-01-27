@@ -77,16 +77,16 @@ config:
     learning: learn
     ora_grading: ora-grading
   edxapp:github_org_api_url: https://github.mit.edu/api/v3/orgs/mitxonline-rc
-  edxapp:move_db: true
+  edxapp:move_db: "true"
   edxapp:google_analytics_id: UA-5145472-46
   edxapp:mail_domain: edxapp-mail.rc.learn.mit.edu
   edxapp:proctortrack_url: "https://preproduction.verificient.com"
   edxapp:sender_email_address: mitlearn-support+rc@mit.edu
   edxapp:email_use_course_id_from_for_bulk: "True"
   edxapp:bulk_email_default_from_email: no-reply@edxapp-mail.rc.learn.mit.edu
-  edxapp:enable_xqueue: true
+  edxapp:enable_xqueue: "true"
   edxapp:xqueue_domain: xqueue.mitxonline.qa.odl.mit.edu
-  edxapp:enable_auto_language_selection: true
+  edxapp:enable_auto_language_selection: "true"
   edxapp:autoscaling_lms_requests_threshold: "20"
   edxapp:autoscaling_lms_latency_threshold: "2000"
   edxapp:autoscaling_lms_cpu_threshold: "70"
@@ -137,3 +137,11 @@ config:
   edxapp:edx_xqueue_secrets:
     secure: v1:968LG3OeHgn0GLl3:jqXqyqgWXGThSNiqEpqZeEuAZwVTCZdh1KbmExlITfC+4ImSDC+55gIpiLOST9vWciDK2wF5ZMJQrM9eY/c2SwaLH5EhoRsGcPAExuFDrxXE8eZGYb60AYXGWjOpxy2peQyPYiydnjBQGQGI+QgqG7v8ylk/YjiWEURpENwvGIUwr1w9SodgugeNL8WexzBiUiXiHUgQJg==
   edxapp:k8s_vpc: applications_vpc
+  meilisearch:enabled: "true"
+  meilisearch:replica_count: 1
+  meilisearch:pv_size: 10Gi
+  meilisearch:cpu_request: "250m"
+  meilisearch:memory_request: "512Mi"
+  meilisearch:memory_limit: "512Mi"
+  meilisearch:master_key:
+    secure: v1:fybZw5cse3Uv3xxI:jYE+BuQePHsWt+3xL/9MmCD2latqANrQY5EHljDY0a7rj16DePvZYB/VdTxkbR7PIEP8XbyTK//gQkdv2X3SSzta4uA+lQesujeZUPEX8J8=
