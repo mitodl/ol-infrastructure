@@ -190,7 +190,7 @@ mitxonline = [
         enable_video_upload_page_link_in_content_dropdown="true",
         enable_jumpnav="true",
         appzi_url="https://w.appzi.io/w.js?token=Q2pSI",
-        enable_auto_language_selection="false",
+        enable_auto_language_selection="true",
     ),
 ]
 
