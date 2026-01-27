@@ -167,12 +167,13 @@ def create_autoscaling_resources(
                             ],
                         },
                         "scaleDown": {
-                            "stabilizationWindowSeconds": 300,
+                            # Wait 15 minutes before checking again
+                            "stabilizationWindowSeconds": 300 * 5,
                             "policies": [
                                 {
                                     "type": "Percent",
                                     "value": 10,  # Conservative: 10% decrease
-                                    "periodSeconds": 300,
+                                    "periodSeconds": 300 * 5,  # 15 minutes
                                 }
                             ],
                         },
