@@ -162,7 +162,7 @@ def create_autoscaling_resources(
                                 {
                                     "type": "Percent",
                                     "value": 50,  # Aggressive: 50% capacity increase
-                                    "periodSeconds": 15,
+                                    "periodSeconds": 60,
                                 }
                             ],
                         },
@@ -172,7 +172,7 @@ def create_autoscaling_resources(
                                 {
                                     "type": "Percent",
                                     "value": 10,  # Conservative: 10% decrease
-                                    "periodSeconds": 60,
+                                    "periodSeconds": 300,
                                 }
                             ],
                         },
