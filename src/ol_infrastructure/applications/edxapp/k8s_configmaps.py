@@ -259,6 +259,7 @@ def _build_interpolated_config_dict(
         config["CSRF_TRUSTED_ORIGINS"] = [f"https://{domains['lms']}"]
         config.update(
             {
+                "COURSE_ABOUT_VISIBILITY_PERMISSION": "see_about_page",
                 "MITXONLINE_BASE_URL": f"https://{marketing_domain}/",
                 "ENABLE_AUTO_LANGUAGE_SELECTION": edxapp_config.get_bool(
                     "enable_auto_language_selection"
