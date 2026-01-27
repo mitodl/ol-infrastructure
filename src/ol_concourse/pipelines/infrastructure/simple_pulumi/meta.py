@@ -149,18 +149,19 @@ def meta_pipeline(app_names: list[str]) -> Pipeline:
 if __name__ == "__main__":
     # List of applications using the simple Pulumi-only pattern
     app_names = [
-        "fastly-redirector",
-        "tika",
         "airbyte",
-        "kubewatch",
         "digital-credentials",
-        "open-metadata",
-        "xpro-partner-dns",
+        "fastly-redirector",
+        "kubewatch",
+        "micromasters",
         "mongodb-atlas",
-        "vector-log-proxy",
         "ocw-studio",
         "open-discussions",
-        "micromasters",
+        "open-metadata",
+        "opensearch",
+        "tika",
+        "vector-log-proxy",
+        "xpro-partner-dns",
     ]
 
     with open("definition.json", "w") as definition:  # noqa: PTH123

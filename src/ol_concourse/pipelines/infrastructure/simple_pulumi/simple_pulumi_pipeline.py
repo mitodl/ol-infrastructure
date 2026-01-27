@@ -109,42 +109,33 @@ def discover_pulumi_stacks(
 
 # Pipeline parameter configurations for each app
 pipeline_params: dict[str, SimplePulumiParams] = {
-    "fastly-redirector": SimplePulumiParams(
-        app_name="fastly-redirector",
-        pulumi_project_path="applications/fastly_redirector/",
-        stack_prefix="applications.fastly_redirector",
-        pulumi_project_name="ol-infrastructure-fastly-redirector",
-    ),
-    "tika": SimplePulumiParams(
-        app_name="tika",
-        pulumi_project_path="applications/tika/",
-        stack_prefix="applications.tika",
-        pulumi_project_name="ol-infrastructure-tika-server",
-    ),
     "airbyte": SimplePulumiParams(
         app_name="airbyte",
         pulumi_project_path="applications/airbyte/",
         stack_prefix="applications.airbyte",
-    ),
-    "kubewatch": SimplePulumiParams(
-        app_name="kubewatch",
-        pulumi_project_path="applications/kubewatch/",
-        stack_prefix="applications.kubewatch",
     ),
     "digital-credentials": SimplePulumiParams(
         app_name="digital-credentials",
         pulumi_project_path="applications/digital_credentials/",
         stack_prefix="applications.digital_credentials",
     ),
-    "open-metadata": SimplePulumiParams(
-        app_name="open-metadata",
-        pulumi_project_path="applications/open_metadata/",
-        stack_prefix="applications.open_metadata",
+    "fastly-redirector": SimplePulumiParams(
+        app_name="fastly-redirector",
+        pulumi_project_path="applications/fastly_redirector/",
+        stack_prefix="applications.fastly_redirector",
+        pulumi_project_name="ol-infrastructure-fastly-redirector",
     ),
-    "xpro-partner-dns": SimplePulumiParams(
-        app_name="xpro-partner-dns",
-        pulumi_project_path="applications/xpro_partner_dns/",
-        stack_prefix="applications.xpro_partner_dns",
+    "kubewatch": SimplePulumiParams(
+        app_name="kubewatch",
+        pulumi_project_path="applications/kubewatch/",
+        stack_prefix="applications.kubewatch",
+    ),
+    "micromasters": SimplePulumiParams(
+        app_name="micromasters",
+        pulumi_project_path="applications/micromasters/",
+        stack_prefix="applications.micromasters",
+        pulumi_project_name="ol-infrastructure-micromasters-application",
+        additional_watched_paths=["src/bridge/lib/"],
     ),
     "mongodb-atlas": SimplePulumiParams(
         app_name="mongodb-atlas",
@@ -152,11 +143,6 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         stack_prefix="infrastructure.mongodb_atlas",
         deployment_groups=["mitx", "mitx-staging", "mitxonline", "xpro"],
         auto_discover_stacks=True,
-    ),
-    "vector-log-proxy": SimplePulumiParams(
-        app_name="vector-log-proxy",
-        pulumi_project_path="applications/vector_log_proxy/",
-        stack_prefix="applications.vector_log_proxy",
     ),
     "ocw-studio": SimplePulumiParams(
         app_name="ocw-studio",
@@ -173,12 +159,44 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         stages=["QA", "Production"],
         additional_watched_paths=["src/bridge/secrets/open_discussions/"],
     ),
-    "micromasters": SimplePulumiParams(
-        app_name="micromasters",
-        pulumi_project_path="applications/micromasters/",
-        stack_prefix="applications.micromasters",
-        pulumi_project_name="ol-infrastructure-micromasters-application",
-        additional_watched_paths=["src/bridge/lib/"],
+    "open-metadata": SimplePulumiParams(
+        app_name="open-metadata",
+        pulumi_project_path="applications/open_metadata/",
+        stack_prefix="applications.open_metadata",
+    ),
+    "opensearch": SimplePulumiParams(
+        app_name="open-metadata",
+        pulumi_project_path="infrastructure/aws/opensearch/",
+        stack_prefix="infrastructure.aws.opensearch",
+        deployment_groups=[
+            "apps",
+            "celery_monitoring",
+            "mitlearn",
+            "mitopen",
+            "mitx",
+            "mitxonline",
+            "mitx-staging",
+            "open",
+            "open_metadata",
+            "xpro",
+        ],
+        auto_discover_stacks=True,
+    ),
+    "tika": SimplePulumiParams(
+        app_name="tika",
+        pulumi_project_path="applications/tika/",
+        stack_prefix="applications.tika",
+        pulumi_project_name="ol-infrastructure-tika-server",
+    ),
+    "vector-log-proxy": SimplePulumiParams(
+        app_name="vector-log-proxy",
+        pulumi_project_path="applications/vector_log_proxy/",
+        stack_prefix="applications.vector_log_proxy",
+    ),
+    "xpro-partner-dns": SimplePulumiParams(
+        app_name="xpro-partner-dns",
+        pulumi_project_path="applications/xpro_partner_dns/",
+        stack_prefix="applications.xpro_partner_dns",
     ),
 }
 
