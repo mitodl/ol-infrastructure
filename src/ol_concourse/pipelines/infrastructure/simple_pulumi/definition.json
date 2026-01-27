@@ -1,0 +1,356 @@
+{
+  "jobs": [
+    {
+      "max_in_flight": 1.0,
+      "name": "deploy-ol-infrastructure-tika-server-applications.tika.ci",
+      "on_success": {
+        "params": {
+          "labels": [
+            "product:infrastructure",
+            "DevOps",
+            "pipeline-workflow",
+            "promotion-to-qa"
+          ],
+          "assignees": [
+            "tmacey",
+            "cpatti",
+            "mas48",
+            "shaidar"
+          ]
+        },
+        "put": "github-issues-applications.tika.ci-post"
+      },
+      "plan": [
+        {
+          "trigger": true,
+          "get": "ol-infrastructure-pulumi-tika"
+        },
+        {
+          "config": {
+            "image_resource": {
+              "source": {
+                "repository": "amazon/aws-cli",
+                "tag": "latest"
+              },
+              "type": "registry-image"
+            },
+            "run": {
+              "path": "ol-infrastructure-pulumi-tika/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh"
+            },
+            "inputs": [
+              {
+                "name": "ol-infrastructure-pulumi-tika"
+              }
+            ],
+            "platform": "linux",
+            "outputs": [
+              {
+                "name": "aws_creds"
+              }
+            ]
+          },
+          "task": "set-aws-creds"
+        },
+        {
+          "params": {
+            "env_os": {
+              "AWS_DEFAULT_REGION": "us-east-1",
+              "PYTHONPATH": "/usr/lib/:/tmp/build/put/ol-infrastructure-pulumi-tika/src/",
+              "GITHUB_TOKEN": "((github.public_repo_access_token))"
+            },
+            "stack_name": "applications.tika.CI",
+            "env_vars_from_files": {}
+          },
+          "get_params": {
+            "skip_implicit_get": true
+          },
+          "put": "pulumi-ol-infrastructure-tika-server",
+          "inputs": "all"
+        }
+      ]
+    },
+    {
+      "max_in_flight": 1.0,
+      "name": "deploy-ol-infrastructure-tika-server-applications.tika.qa",
+      "on_success": {
+        "params": {
+          "labels": [
+            "product:infrastructure",
+            "DevOps",
+            "pipeline-workflow",
+            "promotion-to-production"
+          ],
+          "assignees": [
+            "tmacey",
+            "cpatti",
+            "mas48",
+            "shaidar"
+          ]
+        },
+        "put": "github-issues-applications.tika.qa-post"
+      },
+      "plan": [
+        {
+          "trigger": true,
+          "get": "github-issues-applications.tika.ci-trigger"
+        },
+        {
+          "passed": [
+            "deploy-ol-infrastructure-tika-server-applications.tika.ci"
+          ],
+          "trigger": false,
+          "get": "ol-infrastructure-pulumi-tika"
+        },
+        {
+          "config": {
+            "image_resource": {
+              "source": {
+                "repository": "amazon/aws-cli",
+                "tag": "latest"
+              },
+              "type": "registry-image"
+            },
+            "run": {
+              "path": "ol-infrastructure-pulumi-tika/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh"
+            },
+            "inputs": [
+              {
+                "name": "ol-infrastructure-pulumi-tika"
+              }
+            ],
+            "platform": "linux",
+            "outputs": [
+              {
+                "name": "aws_creds"
+              }
+            ]
+          },
+          "task": "set-aws-creds"
+        },
+        {
+          "params": {
+            "env_os": {
+              "AWS_DEFAULT_REGION": "us-east-1",
+              "PYTHONPATH": "/usr/lib/:/tmp/build/put/ol-infrastructure-pulumi-tika/src/",
+              "GITHUB_TOKEN": "((github.public_repo_access_token))"
+            },
+            "stack_name": "applications.tika.QA",
+            "env_vars_from_files": {}
+          },
+          "get_params": {
+            "skip_implicit_get": true
+          },
+          "put": "pulumi-ol-infrastructure-tika-server",
+          "inputs": "all"
+        }
+      ]
+    },
+    {
+      "max_in_flight": 1.0,
+      "name": "deploy-ol-infrastructure-tika-server-applications.tika.production",
+      "on_success": {
+        "params": {
+          "labels": [
+            "product:infrastructure",
+            "DevOps",
+            "pipeline-workflow",
+            "finalized-deployment"
+          ],
+          "assignees": [
+            "tmacey",
+            "cpatti",
+            "mas48",
+            "shaidar"
+          ]
+        },
+        "put": "github-issues-applications.tika.production-post"
+      },
+      "plan": [
+        {
+          "trigger": true,
+          "get": "github-issues-applications.tika.qa-trigger"
+        },
+        {
+          "passed": [
+            "deploy-ol-infrastructure-tika-server-applications.tika.qa"
+          ],
+          "trigger": false,
+          "get": "ol-infrastructure-pulumi-tika"
+        },
+        {
+          "config": {
+            "image_resource": {
+              "source": {
+                "repository": "amazon/aws-cli",
+                "tag": "latest"
+              },
+              "type": "registry-image"
+            },
+            "run": {
+              "path": "ol-infrastructure-pulumi-tika/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh"
+            },
+            "inputs": [
+              {
+                "name": "ol-infrastructure-pulumi-tika"
+              }
+            ],
+            "platform": "linux",
+            "outputs": [
+              {
+                "name": "aws_creds"
+              }
+            ]
+          },
+          "task": "set-aws-creds"
+        },
+        {
+          "params": {
+            "env_os": {
+              "AWS_DEFAULT_REGION": "us-east-1",
+              "PYTHONPATH": "/usr/lib/:/tmp/build/put/ol-infrastructure-pulumi-tika/src/",
+              "GITHUB_TOKEN": "((github.public_repo_access_token))"
+            },
+            "stack_name": "applications.tika.Production",
+            "env_vars_from_files": {}
+          },
+          "get_params": {
+            "skip_implicit_get": true
+          },
+          "put": "pulumi-ol-infrastructure-tika-server",
+          "inputs": "all"
+        }
+      ]
+    }
+  ],
+  "resource_types": [
+    {
+      "source": {
+        "repository": "mitodl/ol-concourse-github-issues",
+        "tag": "latest"
+      },
+      "type": "registry-image",
+      "name": "github-issues"
+    },
+    {
+      "source": {
+        "repository": "mitodl/concourse-pulumi-resource-provisioner",
+        "tag": "latest"
+      },
+      "type": "registry-image",
+      "name": "pulumi-provisioner"
+    }
+  ],
+  "resources": [
+    {
+      "name": "github-issues-applications.tika.ci-post",
+      "source": {
+        "auth_method": "token",
+        "issue_prefix": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.CI deployed.",
+        "issue_state": "open",
+        "issue_title_template": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.CI deployed.",
+        "repository": "ol-platform-eng/concourse-workflow",
+        "gh_host": "https://github.mit.edu/api/v3",
+        "access_token": "((github.issues_resource_access_token))"
+      },
+      "expose_build_created_by": true,
+      "check_every": "60m",
+      "icon": "github",
+      "type": "github-issues"
+    },
+    {
+      "name": "pulumi-ol-infrastructure-tika-server",
+      "source": {
+        "env_pulumi": {
+          "AWS_SHARED_CREDENTIALS_FILE": "aws_creds/credentials"
+        },
+        "action": "update",
+        "project_name": "ol-infrastructure-tika-server",
+        "source_dir": "ol-infrastructure-pulumi-tika/src/ol_infrastructure/applications/tika"
+      },
+      "icon": "cloud-braces",
+      "type": "pulumi-provisioner"
+    },
+    {
+      "name": "github-issues-applications.tika.ci-trigger",
+      "source": {
+        "auth_method": "token",
+        "issue_prefix": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.CI deployed.",
+        "issue_state": "closed",
+        "issue_title_template": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.CI deployed.",
+        "repository": "ol-platform-eng/concourse-workflow",
+        "gh_host": "https://github.mit.edu/api/v3",
+        "access_token": "((github.issues_resource_access_token))"
+      },
+      "expose_build_created_by": true,
+      "check_every": "15m",
+      "icon": "github",
+      "type": "github-issues"
+    },
+    {
+      "name": "github-issues-applications.tika.qa-post",
+      "source": {
+        "auth_method": "token",
+        "issue_prefix": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.QA deployed.",
+        "issue_state": "open",
+        "issue_title_template": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.QA deployed.",
+        "repository": "ol-platform-eng/concourse-workflow",
+        "gh_host": "https://github.mit.edu/api/v3",
+        "access_token": "((github.issues_resource_access_token))"
+      },
+      "expose_build_created_by": true,
+      "check_every": "60m",
+      "icon": "github",
+      "type": "github-issues"
+    },
+    {
+      "name": "github-issues-applications.tika.qa-trigger",
+      "source": {
+        "auth_method": "token",
+        "issue_prefix": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.QA deployed.",
+        "issue_state": "closed",
+        "issue_title_template": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.QA deployed.",
+        "repository": "ol-platform-eng/concourse-workflow",
+        "gh_host": "https://github.mit.edu/api/v3",
+        "access_token": "((github.issues_resource_access_token))"
+      },
+      "expose_build_created_by": true,
+      "check_every": "15m",
+      "icon": "github",
+      "type": "github-issues"
+    },
+    {
+      "name": "github-issues-applications.tika.production-post",
+      "source": {
+        "auth_method": "token",
+        "issue_prefix": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.Production deployed.",
+        "issue_state": "open",
+        "issue_title_template": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.Production deployed.",
+        "repository": "ol-platform-eng/concourse-workflow",
+        "gh_host": "https://github.mit.edu/api/v3",
+        "access_token": "((github.issues_resource_access_token))"
+      },
+      "expose_build_created_by": true,
+      "check_every": "60m",
+      "icon": "github",
+      "type": "github-issues"
+    },
+    {
+      "name": "ol-infrastructure-pulumi-tika",
+      "source": {
+        "uri": "https://github.com/mitodl/ol-infrastructure",
+        "branch": "main",
+        "paths": [
+          "src/ol_infrastructure/lib",
+          "src/ol_infrastructure/components",
+          "pipelines/infrastructure/scripts",
+          "src/bridge/secrets",
+          "src/ol_infrastructure/applications/tika"
+        ],
+        "fetch_tags": false
+      },
+      "check_every": "60s",
+      "icon": "git",
+      "type": "git"
+    }
+  ]
+}

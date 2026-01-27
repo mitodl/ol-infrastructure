@@ -1,0 +1,176 @@
+"""Generate Concourse pipeline definitions for simple Pulumi-only deployments.
+
+This template is for applications/services that only need Pulumi infrastructure
+deployment across CI, QA, and Production stages without any build steps.
+"""
+
+import sys
+
+from pydantic import BaseModel
+
+from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
+from ol_concourse.lib.models.fragment import PipelineFragment
+from ol_concourse.lib.models.pipeline import Identifier, Pipeline
+from ol_concourse.lib.resources import git_repo
+from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
+
+
+class SimplePulumiParams(BaseModel):
+    """Parameters for simple Pulumi-only pipeline.
+
+    Attributes:
+        app_name: The name of the application/service.
+        pulumi_project_path: Path to Pulumi project relative to src/ol_infrastructure/.
+        stack_prefix: Prefix for Pulumi stack names (e.g., "applications.tika").
+        pulumi_project_name: Name of the Pulumi project.
+        stages: List of deployment stages (default: ["CI", "QA", "Production"]).
+        additional_watched_paths: Additional paths to watch beyond PULUMI_WATCHED_PATHS.
+        branch: Git branch to watch (default: "main").
+    """
+
+    app_name: str
+    pulumi_project_path: str
+    stack_prefix: str
+    pulumi_project_name: str
+    stages: list[str] = ["CI", "QA", "Production"]
+    additional_watched_paths: list[str] = []
+    branch: str = "main"
+
+    def __init__(self, **data):
+        """Initialize with auto-generated project name if not provided."""
+        if "pulumi_project_name" not in data or data["pulumi_project_name"] is None:
+            data["pulumi_project_name"] = f"ol-infrastructure-{data['app_name']}"
+        super().__init__(**data)
+
+
+# Pipeline parameter configurations for each app
+pipeline_params: dict[str, SimplePulumiParams] = {
+    "fastly-redirector": SimplePulumiParams(
+        app_name="fastly-redirector",
+        pulumi_project_path="applications/fastly_redirector/",
+        stack_prefix="applications.fastly_redirector",
+        pulumi_project_name="ol-infrastructure-fastly-redirector",
+    ),
+    "tika": SimplePulumiParams(
+        app_name="tika",
+        pulumi_project_path="applications/tika/",
+        stack_prefix="applications.tika",
+        pulumi_project_name="ol-infrastructure-tika-server",
+    ),
+    "airbyte": SimplePulumiParams(
+        app_name="airbyte",
+        pulumi_project_path="applications/airbyte/",
+        stack_prefix="applications.airbyte",
+    ),
+    "kubewatch": SimplePulumiParams(
+        app_name="kubewatch",
+        pulumi_project_path="applications/kubewatch/",
+        stack_prefix="applications.kubewatch",
+    ),
+    "digital-credentials": SimplePulumiParams(
+        app_name="digital-credentials",
+        pulumi_project_path="applications/digital_credentials/",
+        stack_prefix="applications.digital_credentials",
+    ),
+    "open-metadata": SimplePulumiParams(
+        app_name="open-metadata",
+        pulumi_project_path="applications/open_metadata/",
+        stack_prefix="applications.open_metadata",
+    ),
+    "xpro-partner-dns": SimplePulumiParams(
+        app_name="xpro-partner-dns",
+        pulumi_project_path="applications/xpro_partner_dns/",
+        stack_prefix="applications.xpro_partner_dns",
+    ),
+    "mongodb-atlas": SimplePulumiParams(
+        app_name="mongodb-atlas",
+        pulumi_project_path="infrastructure/mongodb_atlas/",
+        stack_prefix="infrastructure.mongodb_atlas",
+    ),
+    "vector-log-proxy": SimplePulumiParams(
+        app_name="vector-log-proxy",
+        pulumi_project_path="applications/vector_log_proxy/",
+        stack_prefix="applications.vector_log_proxy",
+    ),
+}
+
+
+def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
+    """Generate a simple Pulumi-only pipeline for a given application.
+
+    Args:
+        app_name: The name of the application to generate a pipeline for.
+
+    Returns:
+        A complete Concourse Pipeline object.
+
+    Raises:
+        ValueError: If app_name is not found in pipeline_params.
+    """
+    params = pipeline_params.get(
+        app_name,
+        SimplePulumiParams(app_name=app_name, pulumi_project_path="", stack_prefix=""),
+    )
+
+    if not params.pulumi_project_path:
+        msg = (
+            f"Application '{app_name}' not found in pipeline_params. "
+            f"Available apps: {', '.join(pipeline_params.keys())}"
+        )
+        raise ValueError(msg)
+
+    # Define git resource for Pulumi code
+    pulumi_code = git_repo(
+        name=Identifier(f"ol-infrastructure-pulumi-{app_name}"),
+        uri="https://github.com/mitodl/ol-infrastructure",
+        branch=params.branch,
+        paths=[
+            *PULUMI_WATCHED_PATHS,
+            str(PULUMI_CODE_PATH.joinpath(params.pulumi_project_path)),
+            *params.additional_watched_paths,
+        ],
+    )
+
+    # Generate Pulumi deployment jobs
+    pulumi_fragment = pulumi_jobs_chain(
+        pulumi_code,
+        project_name=params.pulumi_project_name,
+        stack_names=[f"{params.stack_prefix}.{stage}" for stage in params.stages],
+        project_source_path=PULUMI_CODE_PATH.joinpath(params.pulumi_project_path),
+        dependencies=[],
+    )
+
+    # Combine into pipeline
+    combined_fragment = PipelineFragment(
+        resource_types=pulumi_fragment.resource_types,
+        resources=[
+            *pulumi_fragment.resources,
+            pulumi_code,
+        ],
+        jobs=pulumi_fragment.jobs,
+    )
+
+    return combined_fragment.to_pipeline()
+
+
+if __name__ == "__main__":
+    min_args = 2
+    if len(sys.argv) < min_args:
+        msg = (
+            "Please provide an app name as a command line argument.\n"
+            f"Available apps: {', '.join(pipeline_params.keys())}"
+        )
+        raise ValueError(msg)
+
+    app_name = sys.argv[1]
+
+    try:
+        pipeline = build_simple_pulumi_pipeline(app_name)
+        with open("definition.json", "w") as definition:  # noqa: PTH123
+            definition.write(pipeline.model_dump_json(indent=2))
+        sys.stdout.write(pipeline.model_dump_json(indent=2))
+        print()  # noqa: T201
+        print(f"fly -t pr-inf sp -p pulumi-{app_name} -c definition.json")  # noqa: T201
+    except ValueError as e:
+        sys.stderr.write(f"Error: {e}\n")
+        sys.exit(1)
