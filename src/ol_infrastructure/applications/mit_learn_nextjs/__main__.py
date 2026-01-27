@@ -170,8 +170,8 @@ for k, v in raw_env_vars.items():
     )
 
 application_labels = k8s_global_labels | {
-    "ol.mit.edu.application": Application.mit_learn,
-    "ol.mit.edu.source_repository": "https://github.com/mitodl/mit-learn",
+    "ol.mit.edu/application": Application.mit_learn,
+    "ol.mit.edu/source_repository": "https://github.com/mitodl/mit-learn",
 }
 
 
