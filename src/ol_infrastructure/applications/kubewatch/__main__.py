@@ -16,13 +16,13 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.ol_types import (
+    Application,
     AWSBase,
     BusinessUnit,
     Environment,
     K8sGlobalLabels,
     Product,
     Services,
-    Application,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider

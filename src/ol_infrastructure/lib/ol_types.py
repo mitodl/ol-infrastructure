@@ -73,7 +73,7 @@ class Services(str, Enum):
     kubewatch = "kubewatch"
     micromasters = "micromasters"
     open_edx = "open-edx"
-    learn_ai = "learn-ai",
+    learn_ai = ("learn-ai",)
     mit_learn = "mit-learn"
     mit_open = "open"
     mitx_edx = "mitx-edx"

@@ -84,7 +84,8 @@ keycloak_domain = (
 k8s_global_labels = K8sGlobalLabels(
     application=Application.keycloak,
     product=Product.infrastructure,
-    ou=BusinessUnit.operations, service=Services.keycloak,
+    ou=BusinessUnit.operations,
+    service=Services.keycloak,
     stack=stack_info,
     source_repository="https://github.com/mitodl/ol-infrastructure",
 ).model_dump()

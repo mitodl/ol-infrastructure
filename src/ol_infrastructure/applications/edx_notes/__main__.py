@@ -103,7 +103,6 @@ k8s_global_labels = K8sGlobalLabels(
     application=Application.edx_notes,
     product=Product.mitlearn,
     service=Services.edx_notes,
-
     ou=notes_config.require("business_unit"),
     source_repository="https://github.com/edx_notes",
     stack=stack_info,
