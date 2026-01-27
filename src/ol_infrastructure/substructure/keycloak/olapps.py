@@ -978,7 +978,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         )
         onboard_oidc_org(
             OIDCIdpConfig(
-                org_domains=["upgrad.com"],
+                org_domains=[""],
                 org_name="upGrad",
                 org_alias="UPGRAD",
                 learn_domain=mitlearn_domain,
