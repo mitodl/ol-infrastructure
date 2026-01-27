@@ -1,350 +1,601 @@
 {
   "jobs": [
     {
-      "max_in_flight": 1.0,
-      "name": "deploy-ol-infrastructure-tika-server-applications.tika.ci",
-      "on_success": {
-        "params": {
-          "labels": [
-            "product:infrastructure",
-            "DevOps",
-            "pipeline-workflow",
-            "promotion-to-qa"
-          ],
-          "assignees": [
-            "tmacey",
-            "cpatti",
-            "mas48",
-            "shaidar"
-          ]
-        },
-        "put": "github-issues-applications.tika.ci-post"
-      },
+      "name": "create-fastly-redirector-pipeline",
       "plan": [
         {
           "trigger": true,
-          "get": "ol-infrastructure-pulumi-tika"
+          "get": "simple-pulumi-pipeline-definitions"
         },
         {
           "config": {
             "image_resource": {
               "source": {
-                "repository": "amazon/aws-cli",
+                "repository": "mitodl/ol-infrastructure",
                 "tag": "latest"
               },
               "type": "registry-image"
             },
             "run": {
-              "path": "ol-infrastructure-pulumi-tika/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh"
+              "args": [
+                "../simple-pulumi-pipeline-definitions/src/ol_concourse/pipelines/infrastructure/simple_pulumi/simple_pulumi_pipeline.py",
+                "fastly-redirector"
+              ],
+              "user": "root",
+              "path": "python",
+              "dir": "pipeline"
             },
             "inputs": [
               {
-                "name": "ol-infrastructure-pulumi-tika"
+                "name": "simple-pulumi-pipeline-definitions"
               }
             ],
             "platform": "linux",
             "outputs": [
               {
-                "name": "aws_creds"
+                "name": "pipeline"
               }
             ]
           },
-          "task": "set-aws-creds"
+          "task": "generate-fastly-redirector-pipeline-file"
         },
         {
-          "params": {
-            "env_os": {
-              "AWS_DEFAULT_REGION": "us-east-1",
-              "PYTHONPATH": "/usr/lib/:/tmp/build/put/ol-infrastructure-pulumi-tika/src/",
-              "GITHUB_TOKEN": "((github.public_repo_access_token))"
-            },
-            "stack_name": "applications.tika.CI",
-            "env_vars_from_files": {}
-          },
-          "get_params": {
-            "skip_implicit_get": true
-          },
-          "put": "pulumi-ol-infrastructure-tika-server",
-          "inputs": "all"
+          "set_pipeline": "pulumi-fastly-redirector",
+          "file": "pipeline/definition.json"
         }
       ]
     },
     {
-      "max_in_flight": 1.0,
-      "name": "deploy-ol-infrastructure-tika-server-applications.tika.qa",
-      "on_success": {
-        "params": {
-          "labels": [
-            "product:infrastructure",
-            "DevOps",
-            "pipeline-workflow",
-            "promotion-to-production"
-          ],
-          "assignees": [
-            "tmacey",
-            "cpatti",
-            "mas48",
-            "shaidar"
-          ]
-        },
-        "put": "github-issues-applications.tika.qa-post"
-      },
+      "name": "create-tika-pipeline",
       "plan": [
         {
           "trigger": true,
-          "get": "github-issues-applications.tika.ci-trigger"
-        },
-        {
-          "passed": [
-            "deploy-ol-infrastructure-tika-server-applications.tika.ci"
-          ],
-          "trigger": false,
-          "get": "ol-infrastructure-pulumi-tika"
+          "get": "simple-pulumi-pipeline-definitions"
         },
         {
           "config": {
             "image_resource": {
               "source": {
-                "repository": "amazon/aws-cli",
+                "repository": "mitodl/ol-infrastructure",
                 "tag": "latest"
               },
               "type": "registry-image"
             },
             "run": {
-              "path": "ol-infrastructure-pulumi-tika/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh"
+              "args": [
+                "../simple-pulumi-pipeline-definitions/src/ol_concourse/pipelines/infrastructure/simple_pulumi/simple_pulumi_pipeline.py",
+                "tika"
+              ],
+              "user": "root",
+              "path": "python",
+              "dir": "pipeline"
             },
             "inputs": [
               {
-                "name": "ol-infrastructure-pulumi-tika"
+                "name": "simple-pulumi-pipeline-definitions"
               }
             ],
             "platform": "linux",
             "outputs": [
               {
-                "name": "aws_creds"
+                "name": "pipeline"
               }
             ]
           },
-          "task": "set-aws-creds"
+          "task": "generate-tika-pipeline-file"
         },
         {
-          "params": {
-            "env_os": {
-              "AWS_DEFAULT_REGION": "us-east-1",
-              "PYTHONPATH": "/usr/lib/:/tmp/build/put/ol-infrastructure-pulumi-tika/src/",
-              "GITHUB_TOKEN": "((github.public_repo_access_token))"
-            },
-            "stack_name": "applications.tika.QA",
-            "env_vars_from_files": {}
-          },
-          "get_params": {
-            "skip_implicit_get": true
-          },
-          "put": "pulumi-ol-infrastructure-tika-server",
-          "inputs": "all"
+          "set_pipeline": "pulumi-tika",
+          "file": "pipeline/definition.json"
         }
       ]
     },
     {
-      "max_in_flight": 1.0,
-      "name": "deploy-ol-infrastructure-tika-server-applications.tika.production",
-      "on_success": {
-        "params": {
-          "labels": [
-            "product:infrastructure",
-            "DevOps",
-            "pipeline-workflow",
-            "finalized-deployment"
-          ],
-          "assignees": [
-            "tmacey",
-            "cpatti",
-            "mas48",
-            "shaidar"
-          ]
-        },
-        "put": "github-issues-applications.tika.production-post"
-      },
+      "name": "create-airbyte-pipeline",
       "plan": [
         {
           "trigger": true,
-          "get": "github-issues-applications.tika.qa-trigger"
-        },
-        {
-          "passed": [
-            "deploy-ol-infrastructure-tika-server-applications.tika.qa"
-          ],
-          "trigger": false,
-          "get": "ol-infrastructure-pulumi-tika"
+          "get": "simple-pulumi-pipeline-definitions"
         },
         {
           "config": {
             "image_resource": {
               "source": {
-                "repository": "amazon/aws-cli",
+                "repository": "mitodl/ol-infrastructure",
                 "tag": "latest"
               },
               "type": "registry-image"
             },
             "run": {
-              "path": "ol-infrastructure-pulumi-tika/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh"
+              "args": [
+                "../simple-pulumi-pipeline-definitions/src/ol_concourse/pipelines/infrastructure/simple_pulumi/simple_pulumi_pipeline.py",
+                "airbyte"
+              ],
+              "user": "root",
+              "path": "python",
+              "dir": "pipeline"
             },
             "inputs": [
               {
-                "name": "ol-infrastructure-pulumi-tika"
+                "name": "simple-pulumi-pipeline-definitions"
               }
             ],
             "platform": "linux",
             "outputs": [
               {
-                "name": "aws_creds"
+                "name": "pipeline"
               }
             ]
           },
-          "task": "set-aws-creds"
+          "task": "generate-airbyte-pipeline-file"
         },
         {
-          "params": {
-            "env_os": {
-              "AWS_DEFAULT_REGION": "us-east-1",
-              "PYTHONPATH": "/usr/lib/:/tmp/build/put/ol-infrastructure-pulumi-tika/src/",
-              "GITHUB_TOKEN": "((github.public_repo_access_token))"
-            },
-            "stack_name": "applications.tika.Production",
-            "env_vars_from_files": {}
-          },
-          "get_params": {
-            "skip_implicit_get": true
-          },
-          "put": "pulumi-ol-infrastructure-tika-server",
-          "inputs": "all"
+          "set_pipeline": "pulumi-airbyte",
+          "file": "pipeline/definition.json"
         }
       ]
-    }
-  ],
-  "resource_types": [
-    {
-      "source": {
-        "repository": "mitodl/ol-concourse-github-issues",
-        "tag": "latest"
-      },
-      "type": "registry-image",
-      "name": "github-issues"
     },
     {
-      "source": {
-        "repository": "mitodl/concourse-pulumi-resource-provisioner",
-        "tag": "latest"
-      },
-      "type": "registry-image",
-      "name": "pulumi-provisioner"
+      "name": "create-kubewatch-pipeline",
+      "plan": [
+        {
+          "trigger": true,
+          "get": "simple-pulumi-pipeline-definitions"
+        },
+        {
+          "config": {
+            "image_resource": {
+              "source": {
+                "repository": "mitodl/ol-infrastructure",
+                "tag": "latest"
+              },
+              "type": "registry-image"
+            },
+            "run": {
+              "args": [
+                "../simple-pulumi-pipeline-definitions/src/ol_concourse/pipelines/infrastructure/simple_pulumi/simple_pulumi_pipeline.py",
+                "kubewatch"
+              ],
+              "user": "root",
+              "path": "python",
+              "dir": "pipeline"
+            },
+            "inputs": [
+              {
+                "name": "simple-pulumi-pipeline-definitions"
+              }
+            ],
+            "platform": "linux",
+            "outputs": [
+              {
+                "name": "pipeline"
+              }
+            ]
+          },
+          "task": "generate-kubewatch-pipeline-file"
+        },
+        {
+          "set_pipeline": "pulumi-kubewatch",
+          "file": "pipeline/definition.json"
+        }
+      ]
+    },
+    {
+      "name": "create-digital-credentials-pipeline",
+      "plan": [
+        {
+          "trigger": true,
+          "get": "simple-pulumi-pipeline-definitions"
+        },
+        {
+          "config": {
+            "image_resource": {
+              "source": {
+                "repository": "mitodl/ol-infrastructure",
+                "tag": "latest"
+              },
+              "type": "registry-image"
+            },
+            "run": {
+              "args": [
+                "../simple-pulumi-pipeline-definitions/src/ol_concourse/pipelines/infrastructure/simple_pulumi/simple_pulumi_pipeline.py",
+                "digital-credentials"
+              ],
+              "user": "root",
+              "path": "python",
+              "dir": "pipeline"
+            },
+            "inputs": [
+              {
+                "name": "simple-pulumi-pipeline-definitions"
+              }
+            ],
+            "platform": "linux",
+            "outputs": [
+              {
+                "name": "pipeline"
+              }
+            ]
+          },
+          "task": "generate-digital-credentials-pipeline-file"
+        },
+        {
+          "set_pipeline": "pulumi-digital-credentials",
+          "file": "pipeline/definition.json"
+        }
+      ]
+    },
+    {
+      "name": "create-open-metadata-pipeline",
+      "plan": [
+        {
+          "trigger": true,
+          "get": "simple-pulumi-pipeline-definitions"
+        },
+        {
+          "config": {
+            "image_resource": {
+              "source": {
+                "repository": "mitodl/ol-infrastructure",
+                "tag": "latest"
+              },
+              "type": "registry-image"
+            },
+            "run": {
+              "args": [
+                "../simple-pulumi-pipeline-definitions/src/ol_concourse/pipelines/infrastructure/simple_pulumi/simple_pulumi_pipeline.py",
+                "open-metadata"
+              ],
+              "user": "root",
+              "path": "python",
+              "dir": "pipeline"
+            },
+            "inputs": [
+              {
+                "name": "simple-pulumi-pipeline-definitions"
+              }
+            ],
+            "platform": "linux",
+            "outputs": [
+              {
+                "name": "pipeline"
+              }
+            ]
+          },
+          "task": "generate-open-metadata-pipeline-file"
+        },
+        {
+          "set_pipeline": "pulumi-open-metadata",
+          "file": "pipeline/definition.json"
+        }
+      ]
+    },
+    {
+      "name": "create-xpro-partner-dns-pipeline",
+      "plan": [
+        {
+          "trigger": true,
+          "get": "simple-pulumi-pipeline-definitions"
+        },
+        {
+          "config": {
+            "image_resource": {
+              "source": {
+                "repository": "mitodl/ol-infrastructure",
+                "tag": "latest"
+              },
+              "type": "registry-image"
+            },
+            "run": {
+              "args": [
+                "../simple-pulumi-pipeline-definitions/src/ol_concourse/pipelines/infrastructure/simple_pulumi/simple_pulumi_pipeline.py",
+                "xpro-partner-dns"
+              ],
+              "user": "root",
+              "path": "python",
+              "dir": "pipeline"
+            },
+            "inputs": [
+              {
+                "name": "simple-pulumi-pipeline-definitions"
+              }
+            ],
+            "platform": "linux",
+            "outputs": [
+              {
+                "name": "pipeline"
+              }
+            ]
+          },
+          "task": "generate-xpro-partner-dns-pipeline-file"
+        },
+        {
+          "set_pipeline": "pulumi-xpro-partner-dns",
+          "file": "pipeline/definition.json"
+        }
+      ]
+    },
+    {
+      "name": "create-mongodb-atlas-pipeline",
+      "plan": [
+        {
+          "trigger": true,
+          "get": "simple-pulumi-pipeline-definitions"
+        },
+        {
+          "config": {
+            "image_resource": {
+              "source": {
+                "repository": "mitodl/ol-infrastructure",
+                "tag": "latest"
+              },
+              "type": "registry-image"
+            },
+            "run": {
+              "args": [
+                "../simple-pulumi-pipeline-definitions/src/ol_concourse/pipelines/infrastructure/simple_pulumi/simple_pulumi_pipeline.py",
+                "mongodb-atlas"
+              ],
+              "user": "root",
+              "path": "python",
+              "dir": "pipeline"
+            },
+            "inputs": [
+              {
+                "name": "simple-pulumi-pipeline-definitions"
+              }
+            ],
+            "platform": "linux",
+            "outputs": [
+              {
+                "name": "pipeline"
+              }
+            ]
+          },
+          "task": "generate-mongodb-atlas-pipeline-file"
+        },
+        {
+          "set_pipeline": "pulumi-mongodb-atlas",
+          "file": "pipeline/definition.json"
+        }
+      ]
+    },
+    {
+      "name": "create-vector-log-proxy-pipeline",
+      "plan": [
+        {
+          "trigger": true,
+          "get": "simple-pulumi-pipeline-definitions"
+        },
+        {
+          "config": {
+            "image_resource": {
+              "source": {
+                "repository": "mitodl/ol-infrastructure",
+                "tag": "latest"
+              },
+              "type": "registry-image"
+            },
+            "run": {
+              "args": [
+                "../simple-pulumi-pipeline-definitions/src/ol_concourse/pipelines/infrastructure/simple_pulumi/simple_pulumi_pipeline.py",
+                "vector-log-proxy"
+              ],
+              "user": "root",
+              "path": "python",
+              "dir": "pipeline"
+            },
+            "inputs": [
+              {
+                "name": "simple-pulumi-pipeline-definitions"
+              }
+            ],
+            "platform": "linux",
+            "outputs": [
+              {
+                "name": "pipeline"
+              }
+            ]
+          },
+          "task": "generate-vector-log-proxy-pipeline-file"
+        },
+        {
+          "set_pipeline": "pulumi-vector-log-proxy",
+          "file": "pipeline/definition.json"
+        }
+      ]
+    },
+    {
+      "name": "create-ocw-studio-pipeline",
+      "plan": [
+        {
+          "trigger": true,
+          "get": "simple-pulumi-pipeline-definitions"
+        },
+        {
+          "config": {
+            "image_resource": {
+              "source": {
+                "repository": "mitodl/ol-infrastructure",
+                "tag": "latest"
+              },
+              "type": "registry-image"
+            },
+            "run": {
+              "args": [
+                "../simple-pulumi-pipeline-definitions/src/ol_concourse/pipelines/infrastructure/simple_pulumi/simple_pulumi_pipeline.py",
+                "ocw-studio"
+              ],
+              "user": "root",
+              "path": "python",
+              "dir": "pipeline"
+            },
+            "inputs": [
+              {
+                "name": "simple-pulumi-pipeline-definitions"
+              }
+            ],
+            "platform": "linux",
+            "outputs": [
+              {
+                "name": "pipeline"
+              }
+            ]
+          },
+          "task": "generate-ocw-studio-pipeline-file"
+        },
+        {
+          "set_pipeline": "pulumi-ocw-studio",
+          "file": "pipeline/definition.json"
+        }
+      ]
+    },
+    {
+      "name": "create-open-discussions-pipeline",
+      "plan": [
+        {
+          "trigger": true,
+          "get": "simple-pulumi-pipeline-definitions"
+        },
+        {
+          "config": {
+            "image_resource": {
+              "source": {
+                "repository": "mitodl/ol-infrastructure",
+                "tag": "latest"
+              },
+              "type": "registry-image"
+            },
+            "run": {
+              "args": [
+                "../simple-pulumi-pipeline-definitions/src/ol_concourse/pipelines/infrastructure/simple_pulumi/simple_pulumi_pipeline.py",
+                "open-discussions"
+              ],
+              "user": "root",
+              "path": "python",
+              "dir": "pipeline"
+            },
+            "inputs": [
+              {
+                "name": "simple-pulumi-pipeline-definitions"
+              }
+            ],
+            "platform": "linux",
+            "outputs": [
+              {
+                "name": "pipeline"
+              }
+            ]
+          },
+          "task": "generate-open-discussions-pipeline-file"
+        },
+        {
+          "set_pipeline": "pulumi-open-discussions",
+          "file": "pipeline/definition.json"
+        }
+      ]
+    },
+    {
+      "name": "create-micromasters-pipeline",
+      "plan": [
+        {
+          "trigger": true,
+          "get": "simple-pulumi-pipeline-definitions"
+        },
+        {
+          "config": {
+            "image_resource": {
+              "source": {
+                "repository": "mitodl/ol-infrastructure",
+                "tag": "latest"
+              },
+              "type": "registry-image"
+            },
+            "run": {
+              "args": [
+                "../simple-pulumi-pipeline-definitions/src/ol_concourse/pipelines/infrastructure/simple_pulumi/simple_pulumi_pipeline.py",
+                "micromasters"
+              ],
+              "user": "root",
+              "path": "python",
+              "dir": "pipeline"
+            },
+            "inputs": [
+              {
+                "name": "simple-pulumi-pipeline-definitions"
+              }
+            ],
+            "platform": "linux",
+            "outputs": [
+              {
+                "name": "pipeline"
+              }
+            ]
+          },
+          "task": "generate-micromasters-pipeline-file"
+        },
+        {
+          "set_pipeline": "pulumi-micromasters",
+          "file": "pipeline/definition.json"
+        }
+      ]
+    },
+    {
+      "name": "set-simple-pulumi-meta-pipeline",
+      "plan": [
+        {
+          "trigger": true,
+          "get": "simple-pulumi-pipeline-definitions"
+        },
+        {
+          "config": {
+            "image_resource": {
+              "source": {
+                "repository": "mitodl/ol-infrastructure",
+                "tag": "latest"
+              },
+              "type": "registry-image"
+            },
+            "run": {
+              "args": [
+                "../simple-pulumi-pipeline-definitions/src/ol_concourse/pipelines/infrastructure/simple_pulumi/meta.py",
+                "['fastly-redirector', 'tika', 'airbyte', 'kubewatch', 'digital-credentials', 'open-metadata', 'xpro-partner-dns', 'mongodb-atlas', 'vector-log-proxy', 'ocw-studio', 'open-discussions', 'micromasters']"
+              ],
+              "user": "root",
+              "path": "python",
+              "dir": "pipeline"
+            },
+            "inputs": [
+              {
+                "name": "simple-pulumi-pipeline-definitions"
+              }
+            ],
+            "platform": "linux",
+            "outputs": [
+              {
+                "name": "pipeline"
+              }
+            ]
+          },
+          "task": "generate-simple-pulumi-meta-pipeline-file"
+        },
+        {
+          "set_pipeline": "self",
+          "file": "pipeline/definition.json"
+        }
+      ]
     }
   ],
   "resources": [
     {
-      "name": "github-issues-applications.tika.ci-post",
-      "source": {
-        "auth_method": "token",
-        "issue_prefix": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.CI deployed.",
-        "issue_state": "open",
-        "issue_title_template": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.CI deployed.",
-        "repository": "ol-platform-eng/concourse-workflow",
-        "gh_host": "https://github.mit.edu/api/v3",
-        "access_token": "((github.issues_resource_access_token))"
-      },
-      "expose_build_created_by": true,
-      "check_every": "60m",
-      "icon": "github",
-      "type": "github-issues"
-    },
-    {
-      "name": "pulumi-ol-infrastructure-tika-server",
-      "source": {
-        "env_pulumi": {
-          "AWS_SHARED_CREDENTIALS_FILE": "aws_creds/credentials"
-        },
-        "action": "update",
-        "project_name": "ol-infrastructure-tika-server",
-        "source_dir": "ol-infrastructure-pulumi-tika/src/ol_infrastructure/applications/tika"
-      },
-      "icon": "cloud-braces",
-      "type": "pulumi-provisioner"
-    },
-    {
-      "name": "github-issues-applications.tika.ci-trigger",
-      "source": {
-        "auth_method": "token",
-        "issue_prefix": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.CI deployed.",
-        "issue_state": "closed",
-        "issue_title_template": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.CI deployed.",
-        "repository": "ol-platform-eng/concourse-workflow",
-        "gh_host": "https://github.mit.edu/api/v3",
-        "access_token": "((github.issues_resource_access_token))"
-      },
-      "expose_build_created_by": true,
-      "check_every": "15m",
-      "icon": "github",
-      "type": "github-issues"
-    },
-    {
-      "name": "github-issues-applications.tika.qa-post",
-      "source": {
-        "auth_method": "token",
-        "issue_prefix": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.QA deployed.",
-        "issue_state": "open",
-        "issue_title_template": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.QA deployed.",
-        "repository": "ol-platform-eng/concourse-workflow",
-        "gh_host": "https://github.mit.edu/api/v3",
-        "access_token": "((github.issues_resource_access_token))"
-      },
-      "expose_build_created_by": true,
-      "check_every": "60m",
-      "icon": "github",
-      "type": "github-issues"
-    },
-    {
-      "name": "github-issues-applications.tika.qa-trigger",
-      "source": {
-        "auth_method": "token",
-        "issue_prefix": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.QA deployed.",
-        "issue_state": "closed",
-        "issue_title_template": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.QA deployed.",
-        "repository": "ol-platform-eng/concourse-workflow",
-        "gh_host": "https://github.mit.edu/api/v3",
-        "access_token": "((github.issues_resource_access_token))"
-      },
-      "expose_build_created_by": true,
-      "check_every": "15m",
-      "icon": "github",
-      "type": "github-issues"
-    },
-    {
-      "name": "github-issues-applications.tika.production-post",
-      "source": {
-        "auth_method": "token",
-        "issue_prefix": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.Production deployed.",
-        "issue_state": "open",
-        "issue_title_template": "[bot] Pulumi ol-infrastructure-tika-server applications.tika.Production deployed.",
-        "repository": "ol-platform-eng/concourse-workflow",
-        "gh_host": "https://github.mit.edu/api/v3",
-        "access_token": "((github.issues_resource_access_token))"
-      },
-      "expose_build_created_by": true,
-      "check_every": "60m",
-      "icon": "github",
-      "type": "github-issues"
-    },
-    {
-      "name": "ol-infrastructure-pulumi-tika",
+      "name": "simple-pulumi-pipeline-definitions",
       "source": {
         "uri": "https://github.com/mitodl/ol-infrastructure",
         "branch": "main",
         "paths": [
-          "src/ol_infrastructure/lib",
-          "src/ol_infrastructure/components",
-          "pipelines/infrastructure/scripts",
-          "src/bridge/secrets",
-          "src/ol_infrastructure/applications/tika"
+          "src/ol_concourse/pipelines/infrastructure/simple_pulumi",
+          "src/ol_concourse/lib",
+          "src/ol_concourse/pipelines/constants.py"
         ],
         "fetch_tags": false
       },

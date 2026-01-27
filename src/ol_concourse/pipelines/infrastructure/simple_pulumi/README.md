@@ -23,6 +23,9 @@ The following applications are currently managed by this meta pipeline:
 7. **xpro-partner-dns** - xPRO partner DNS configuration
 8. **mongodb-atlas** - MongoDB Atlas infrastructure
 9. **vector-log-proxy** - Vector log proxy service
+10. **ocw-studio** - OCW Studio content management (Pulumi-only)
+11. **open-discussions** - Open Discussions platform (Pulumi-only, QA/Production only)
+12. **micromasters** - MicroMasters application (Pulumi-only)
 
 ## Files
 
@@ -180,7 +183,41 @@ If you're migrating an existing pipeline to this pattern:
 ),
 ```
 
+### Additional Watched Paths
+
+Some apps need to watch additional directories beyond standard Pulumi paths:
+
+```python
+"ocw-studio": SimplePulumiParams(
+    app_name="ocw-studio",
+    pulumi_project_path="applications/ocw_studio/",
+    stack_prefix="applications.ocw_studio",
+    additional_watched_paths=["src/bridge/secrets/ocw_studio/"],
+),
+```
+
 ### Custom Configuration
+
+```python
+"mongodb-atlas": SimplePulumiParams(
+    app_name="mongodb-atlas",
+    pulumi_project_path="infrastructure/mongodb_atlas/",
+    stack_prefix="infrastructure.mongodb_atlas",
+),
+```
+
+### Custom Stages Configuration
+
+Some applications don't deploy to all standard environments:
+
+```python
+"open-discussions": SimplePulumiParams(
+    app_name="open-discussions",
+    pulumi_project_path="applications/open_discussions/",
+    stack_prefix="applications.open_discussions",
+    stages=["QA", "Production"],  # No CI environment
+),
+```
 
 ```python
 "custom-app": SimplePulumiParams(

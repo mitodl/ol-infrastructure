@@ -92,6 +92,28 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_path="applications/vector_log_proxy/",
         stack_prefix="applications.vector_log_proxy",
     ),
+    "ocw-studio": SimplePulumiParams(
+        app_name="ocw-studio",
+        pulumi_project_path="applications/ocw_studio/",
+        stack_prefix="applications.ocw_studio",
+        pulumi_project_name="ol-infrastructure-ocw_studio-application",
+        additional_watched_paths=["src/bridge/secrets/ocw_studio/"],
+    ),
+    "open-discussions": SimplePulumiParams(
+        app_name="open-discussions",
+        pulumi_project_path="applications/open_discussions/",
+        stack_prefix="applications.open_discussions",
+        pulumi_project_name="ol-infrastructure-open_discussions-application",
+        stages=["QA", "Production"],
+        additional_watched_paths=["src/bridge/secrets/open_discussions/"],
+    ),
+    "micromasters": SimplePulumiParams(
+        app_name="micromasters",
+        pulumi_project_path="applications/micromasters/",
+        stack_prefix="applications.micromasters",
+        pulumi_project_name="ol-infrastructure-micromasters-application",
+        additional_watched_paths=["src/bridge/lib/"],
+    ),
 }
 
 

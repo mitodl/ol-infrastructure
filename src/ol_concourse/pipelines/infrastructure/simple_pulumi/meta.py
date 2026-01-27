@@ -158,6 +158,9 @@ if __name__ == "__main__":
         "xpro-partner-dns",
         "mongodb-atlas",
         "vector-log-proxy",
+        "ocw-studio",
+        "open-discussions",
+        "micromasters",
     ]
 
     with open("definition.json", "w") as definition:  # noqa: PTH123
