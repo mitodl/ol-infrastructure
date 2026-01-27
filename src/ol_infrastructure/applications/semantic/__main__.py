@@ -34,7 +34,7 @@ dns_stack = StackReference("infrastructure.aws.dns")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
-consul_stack = StackReference(f"infrastructure.consul.applications.{stack_info.name}")
+consul_stack = StackReference(f"infrastructure.consul.apps.{stack_info.name}")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 apps_vpc = network_stack.require_output("applications_vpc")
 semantic_environment = f"operations-{stack_info.env_suffix}"
@@ -271,7 +271,6 @@ semantic_instance = ec2.Instance(
 semantic_elastic_ip = ec2.Eip(
     "semantic-instance-elastic-ip",
     instance=semantic_instance.id,
-    vpc=True,
 )
 
 fifteen_minutes = 60 * 15
