@@ -35,7 +35,6 @@ config:
     "--everyone"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
-  - ["legacy_studio.certificates", "--create", "--everyone"]
   edxapp:business_unit: residential-staging
   edxapp:canvas_base_url: https://mit.test.instructure.com
   edxapp:db_password:
