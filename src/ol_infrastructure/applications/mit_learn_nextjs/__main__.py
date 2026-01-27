@@ -42,7 +42,7 @@ k8s_global_labels = K8sGlobalLabels(
     service=Services.mit_learn,
     application=Application.mit_learn,
     ou=BusinessUnit.mit_learn,
-    source_repository="https://github.com/mitodl/mit_learn",
+    source_repository="https://github.com/mitodl/mit-learn",
     stack=stack_info,
 ).model_dump()
 
