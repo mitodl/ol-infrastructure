@@ -183,7 +183,6 @@ class K8sGlobalLabels(BaseModel):
         new_dict["ol.mit.edu/stack"] = self.stack.full_name
         new_dict["ol.mit.edu/environment"] = self.stack.env_suffix
         new_dict["ol.mit.edu/service"] = self.service
-        new_dict["ol.mit.edu/application"] = self.stack.env_prefix
         return new_dict
 
 
