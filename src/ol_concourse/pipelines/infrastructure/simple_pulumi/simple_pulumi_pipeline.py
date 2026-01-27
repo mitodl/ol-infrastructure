@@ -5,6 +5,7 @@ deployment across CI, QA, and Production stages without any build steps.
 """
 
 import sys
+from pathlib import Path
 
 from pydantic import BaseModel
 
@@ -24,6 +25,11 @@ class SimplePulumiParams(BaseModel):
         stack_prefix: Prefix for Pulumi stack names (e.g., "applications.tika").
         pulumi_project_name: Name of the Pulumi project.
         stages: List of deployment stages (default: ["CI", "QA", "Production"]).
+        deployment_groups: List of deployment group names for multi-group deployments
+                          (e.g., ["mitx", "mitxonline", "xpro"] for mongodb_atlas).
+                          If specified, auto_discover_stacks will be used.
+        auto_discover_stacks: If True, automatically discover stacks from repo
+                             (default: False unless deployment_groups is set).
         additional_watched_paths: Additional paths to watch beyond PULUMI_WATCHED_PATHS.
         branch: Git branch to watch (default: "main").
     """
@@ -33,6 +39,8 @@ class SimplePulumiParams(BaseModel):
     stack_prefix: str
     pulumi_project_name: str
     stages: list[str] = ["CI", "QA", "Production"]
+    deployment_groups: list[str] | None = None
+    auto_discover_stacks: bool = False
     additional_watched_paths: list[str] = []
     branch: str = "main"
 
@@ -40,7 +48,56 @@ class SimplePulumiParams(BaseModel):
         """Initialize with auto-generated project name if not provided."""
         if "pulumi_project_name" not in data or data["pulumi_project_name"] is None:
             data["pulumi_project_name"] = f"ol-infrastructure-{data['app_name']}"
+        # Auto-enable stack discovery if deployment_groups is specified
+        if data.get("deployment_groups") and not data.get("auto_discover_stacks"):
+            data["auto_discover_stacks"] = True
         super().__init__(**data)
+
+
+def discover_pulumi_stacks(
+    project_path: Path, stack_prefix: str, deployment_groups: list[str] | None = None
+) -> list[str]:
+    """Discover Pulumi stacks from the filesystem.
+
+    Args:
+        project_path: Path to the Pulumi project directory.
+        stack_prefix: Stack prefix to match (e.g., "infrastructure.mongodb_atlas").
+        deployment_groups: Optional list of deployment groups to discover.
+
+    Returns:
+        List of full stack names sorted by stage order (CI, QA, Production).
+    """
+    stack_files = list(project_path.glob(f"Pulumi.{stack_prefix}.*.yaml"))
+
+    stacks = []
+    for stack_file in stack_files:
+        # Extract stack name from filename: Pulumi.{stack_name}.yaml
+        stack_name = stack_file.stem.replace("Pulumi.", "")
+        stacks.append(stack_name)
+
+    # If deployment groups specified, filter to only those groups
+    if deployment_groups:
+        filtered_stacks = []
+        for stack in stacks:
+            # Check if stack matches pattern: {stack_prefix}.{group}.{stage}
+            for group in deployment_groups:
+                if stack.startswith(f"{stack_prefix}.{group}."):
+                    filtered_stacks.append(stack)
+                    break
+        stacks = filtered_stacks
+
+    # Sort stacks by stage priority: CI, QA, Production
+    stage_priority = {"CI": 0, "QA": 1, "Production": 2}
+
+    def get_stage_priority(stack_name: str) -> int:
+        """Extract stage from stack name and return priority."""
+        for stage, priority in stage_priority.items():
+            if stack_name.endswith(f".{stage}"):
+                return priority
+        return 999  # Unknown stages go last
+
+    stacks.sort(key=lambda s: (s.rsplit(".", 1)[0], get_stage_priority(s)))
+    return stacks
 
 
 # Pipeline parameter configurations for each app
@@ -86,6 +143,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="mongodb-atlas",
         pulumi_project_path="infrastructure/mongodb_atlas/",
         stack_prefix="infrastructure.mongodb_atlas",
+        deployment_groups=["mitx", "mitx-staging", "mitxonline", "xpro"],
+        auto_discover_stacks=True,
     ),
     "vector-log-proxy": SimplePulumiParams(
         app_name="vector-log-proxy",
@@ -153,11 +212,33 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
         ],
     )
 
+    # Determine stack names to use
+    if params.auto_discover_stacks:
+        # Auto-discover stacks from the repository
+        # Use absolute path from repository root
+        repo_root = Path(__file__).parent.parent.parent.parent.parent.parent
+        project_full_path = (
+            repo_root / "src/ol_infrastructure" / params.pulumi_project_path
+        )
+        discovered_stacks = discover_pulumi_stacks(
+            project_full_path, params.stack_prefix, params.deployment_groups
+        )
+        if not discovered_stacks:
+            msg = (
+                f"No stacks discovered for {app_name} at {project_full_path} "
+                f"with prefix {params.stack_prefix}"
+            )
+            raise ValueError(msg)
+        stack_names = discovered_stacks
+    else:
+        # Use explicitly configured stages
+        stack_names = [f"{params.stack_prefix}.{stage}" for stage in params.stages]
+
     # Generate Pulumi deployment jobs
     pulumi_fragment = pulumi_jobs_chain(
         pulumi_code,
         project_name=params.pulumi_project_name,
-        stack_names=[f"{params.stack_prefix}.{stage}" for stage in params.stages],
+        stack_names=stack_names,
         project_source_path=PULUMI_CODE_PATH.joinpath(params.pulumi_project_path),
         dependencies=[],
     )

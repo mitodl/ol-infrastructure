@@ -96,11 +96,15 @@ class SimplePulumiParams(BaseModel):
     app_name: str                           # Application name (required)
     pulumi_project_path: str                # Path relative to src/ol_infrastructure/ (required)
     stack_prefix: str                       # Pulumi stack prefix (required)
-    pulumi_project_name: str | None         # Defaults to "ol-infrastructure-{app_name}"
+    pulumi_project_name: str                # Defaults to "ol-infrastructure-{app_name}"
     stages: list[str]                       # Defaults to ["CI", "QA", "Production"]
+    deployment_groups: list[str] | None     # Deployment groups for multi-group projects
+    auto_discover_stacks: bool              # Auto-discover stacks from filesystem
     additional_watched_paths: list[str]     # Extra paths to watch (default: [])
     branch: str                             # Git branch (default: "main")
 ```
+
+**Note**: Setting `deployment_groups` automatically enables `auto_discover_stacks`.
 
 ## How It Works
 
@@ -218,6 +222,30 @@ Some applications don't deploy to all standard environments:
     stages=["QA", "Production"],  # No CI environment
 ),
 ```
+
+### Auto-Discovery of Stacks
+
+For projects with multiple deployment groups (like mongodb_atlas with mitx, mitxonline, xpro, etc.),
+you can use auto-discovery to automatically find all stacks:
+
+```python
+"mongodb-atlas": SimplePulumiParams(
+    app_name="mongodb-atlas",
+    pulumi_project_path="infrastructure/mongodb_atlas/",
+    stack_prefix="infrastructure.mongodb_atlas",
+    deployment_groups=["mitx", "mitx-staging", "mitxonline", "xpro"],
+    auto_discover_stacks=True,  # Automatically enabled when deployment_groups is set
+),
+```
+
+This will:
+1. Scan the Pulumi project directory for stack files
+2. Match stacks with the pattern: `{stack_prefix}.{group}.{stage}`
+3. Filter to only the specified deployment groups
+4. Sequence them as CI → QA → Production (if they exist)
+5. Generate jobs for all discovered stacks
+
+Example: mongodb_atlas will generate 12 jobs (4 groups × 3 stages each)
 
 ```python
 "custom-app": SimplePulumiParams(
