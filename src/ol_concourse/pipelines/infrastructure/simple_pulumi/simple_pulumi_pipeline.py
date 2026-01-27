@@ -159,7 +159,6 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         stack_prefix="applications.open_discussions",
         pulumi_project_name="ol-infrastructure-open_discussions-application",
         stages=["QA", "Production"],
-        additional_watched_paths=["src/bridge/secrets/open_discussions/"],
     ),
     "open-metadata": SimplePulumiParams(
         app_name="open-metadata",
@@ -167,7 +166,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         stack_prefix="applications.open_metadata",
     ),
     "opensearch": SimplePulumiParams(
-        app_name="open-metadata",
+        app_name="opensearch",
         pulumi_project_path="infrastructure/aws/opensearch/",
         stack_prefix="infrastructure.aws.opensearch",
         deployment_groups=[
@@ -182,7 +181,6 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             "open_metadata",
             "xpro",
         ],
-        auto_discover_stacks=True,
     ),
     "tika": SimplePulumiParams(
         app_name="tika",
@@ -192,13 +190,13 @@ pipeline_params: dict[str, SimplePulumiParams] = {
     ),
     "vector-log-proxy": SimplePulumiParams(
         app_name="vector-log-proxy",
-        pulumi_project_path="applications/vector_log_proxy/",
-        stack_prefix="applications.vector_log_proxy",
+        pulumi_project_path="infrastructure/vector_log_proxy/",
+        stack_prefix="infrastructure.vector_log_proxy.operations",
     ),
     "xpro-partner-dns": SimplePulumiParams(
         app_name="xpro-partner-dns",
-        pulumi_project_path="applications/xpro_partner_dns/",
-        stack_prefix="applications.xpro_partner_dns",
+        pulumi_project_path="substructure/xpro_partner_dns/",
+        stack_prefix="substructure.xpro_partner_dns",
     ),
 }
 
@@ -215,17 +213,14 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
     Raises:
         ValueError: If app_name is not found in pipeline_params.
     """
-    params = pipeline_params.get(
-        app_name,
-        SimplePulumiParams(app_name=app_name, pulumi_project_path="", stack_prefix=""),
-    )
-
-    if not params.pulumi_project_path:
+    if app_name not in pipeline_params:
         msg = (
             f"Application '{app_name}' not found in pipeline_params. "
             f"Available apps: {', '.join(pipeline_params.keys())}"
         )
         raise ValueError(msg)
+
+    params = pipeline_params[app_name]
 
     # Define git resource for Pulumi code
     pulumi_code = git_repo(
@@ -242,8 +237,13 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
     # Determine stack names to use
     if params.auto_discover_stacks:
         # Auto-discover stacks from the repository
-        # Use absolute path from repository root
-        repo_root = Path(__file__).parent.parent.parent.parent.parent.parent
+        # Find repository root by looking for .git directory
+        repo_root = Path(__file__).resolve()
+        while repo_root.parent != repo_root:
+            if (repo_root / ".git").exists():
+                break
+            repo_root = repo_root.parent
+
         project_full_path = (
             repo_root / "src/ol_infrastructure" / params.pulumi_project_path
         )
@@ -263,22 +263,11 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             all_resources = []
             all_jobs = []
 
+            # Share a single git resource across all deployment groups
             for group, group_stacks in discovered_stacks.items():
-                # Create a git resource for this deployment group
-                group_pulumi_code = git_repo(
-                    name=Identifier(f"ol-infrastructure-pulumi-{app_name}-{group}"),
-                    uri="https://github.com/mitodl/ol-infrastructure",
-                    branch=params.branch,
-                    paths=[
-                        *PULUMI_WATCHED_PATHS,
-                        str(PULUMI_CODE_PATH.joinpath(params.pulumi_project_path)),
-                        *params.additional_watched_paths,
-                    ],
-                )
-
                 # Create a job chain for this deployment group
                 group_fragment = pulumi_jobs_chain(
-                    group_pulumi_code,
+                    pulumi_code,
                     project_name=f"{params.pulumi_project_name}-{group}",
                     stack_names=group_stacks,
                     project_source_path=PULUMI_CODE_PATH.joinpath(
@@ -289,7 +278,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
 
                 # Collect resources and jobs
                 all_resource_types.extend(group_fragment.resource_types)
-                all_resources.extend([group_pulumi_code, *group_fragment.resources])
+                all_resources.extend(group_fragment.resources)
                 all_jobs.extend(group_fragment.jobs)
 
             # Combine all fragments

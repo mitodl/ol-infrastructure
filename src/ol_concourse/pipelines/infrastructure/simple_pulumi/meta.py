@@ -5,6 +5,7 @@ applications that follow the simple Pulumi-only pattern (no build steps, just
 infrastructure deployment across CI/QA/Production).
 """
 
+import json
 import sys
 
 from ol_concourse.lib.models.pipeline import (
@@ -122,12 +123,16 @@ def meta_pipeline(app_names: list[str]) -> Pipeline:
                         ],
                         outputs=[Output(name=Identifier("pipeline"))],
                         run=Command(
-                            path="python",
+                            path="sh",
                             dir="pipeline",
                             user="root",
                             args=[
-                                "../simple-pulumi-pipeline-definitions/src/ol_concourse/pipelines/infrastructure/simple_pulumi/meta.py",
-                                repr(app_names),
+                                "-c",
+                                (
+                                    "python ../simple-pulumi-pipeline-definitions/src/"
+                                    "ol_concourse/pipelines/infrastructure/simple_pulumi/"
+                                    f"meta.py '{json.dumps(app_names)}'"
+                                ),
                             ],
                         ),
                     ),
@@ -147,12 +152,12 @@ def meta_pipeline(app_names: list[str]) -> Pipeline:
 
 
 if __name__ == "__main__":
-    import ast
+    import json
 
     # Check if app_names was passed as a command line argument (for self-update)
     if len(sys.argv) > 1:
         # Parse the app_names list from the command line argument
-        app_names = ast.literal_eval(sys.argv[1])
+        app_names = json.loads(sys.argv[1])
     else:
         # Use the default list of applications
         app_names = [
@@ -171,8 +176,9 @@ if __name__ == "__main__":
             "xpro-partner-dns",
         ]
 
+    pipeline_json = meta_pipeline(app_names).model_dump_json(indent=2)
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(meta_pipeline(app_names).model_dump_json(indent=2))
-    sys.stdout.write(meta_pipeline(app_names).model_dump_json(indent=2))
+        definition.write(pipeline_json)
+    sys.stdout.write(pipeline_json)
     print()  # noqa: T201
     print("fly -t pr-inf sp -p simple-pulumi-meta -c definition.json")  # noqa: T201
