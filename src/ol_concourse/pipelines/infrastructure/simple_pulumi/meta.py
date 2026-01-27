@@ -147,22 +147,29 @@ def meta_pipeline(app_names: list[str]) -> Pipeline:
 
 
 if __name__ == "__main__":
-    # List of applications using the simple Pulumi-only pattern
-    app_names = [
-        "airbyte",
-        "digital-credentials",
-        "fastly-redirector",
-        "kubewatch",
-        "micromasters",
-        "mongodb-atlas",
-        "ocw-studio",
-        "open-discussions",
-        "open-metadata",
-        "opensearch",
-        "tika",
-        "vector-log-proxy",
-        "xpro-partner-dns",
-    ]
+    import ast
+
+    # Check if app_names was passed as a command line argument (for self-update)
+    if len(sys.argv) > 1:
+        # Parse the app_names list from the command line argument
+        app_names = ast.literal_eval(sys.argv[1])
+    else:
+        # Use the default list of applications
+        app_names = [
+            "airbyte",
+            "digital-credentials",
+            "fastly-redirector",
+            "kubewatch",
+            "micromasters",
+            "mongodb-atlas",
+            "ocw-studio",
+            "open-discussions",
+            "open-metadata",
+            "opensearch",
+            "tika",
+            "vector-log-proxy",
+            "xpro-partner-dns",
+        ]
 
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(meta_pipeline(app_names).model_dump_json(indent=2))

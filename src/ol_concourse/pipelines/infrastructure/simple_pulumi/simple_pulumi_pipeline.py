@@ -6,8 +6,9 @@ deployment across CI, QA, and Production stages without any build steps.
 
 import sys
 from pathlib import Path
+from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
@@ -37,21 +38,23 @@ class SimplePulumiParams(BaseModel):
     app_name: str
     pulumi_project_path: str
     stack_prefix: str
-    pulumi_project_name: str
+    pulumi_project_name: str = ""  # Auto-generated in validator if not provided
     stages: list[str] = ["CI", "QA", "Production"]
     deployment_groups: list[str] | None = None
     auto_discover_stacks: bool = False
     additional_watched_paths: list[str] = []
     branch: str = "main"
 
-    def __init__(self, **data):
-        """Initialize with auto-generated project name if not provided."""
-        if "pulumi_project_name" not in data or data["pulumi_project_name"] is None:
+    @model_validator(mode="before")
+    @classmethod
+    def set_defaults(cls, data: dict[str, Any]) -> dict[str, Any]:
+        """Set default values for optional fields."""
+        if "pulumi_project_name" not in data or not data.get("pulumi_project_name"):
             data["pulumi_project_name"] = f"ol-infrastructure-{data['app_name']}"
         # Auto-enable stack discovery if deployment_groups is specified
         if data.get("deployment_groups") and not data.get("auto_discover_stacks"):
             data["auto_discover_stacks"] = True
-        super().__init__(**data)
+        return data
 
 
 def discover_pulumi_stacks(
@@ -142,7 +145,6 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_path="infrastructure/mongodb_atlas/",
         stack_prefix="infrastructure.mongodb_atlas",
         deployment_groups=["mitx", "mitx-staging", "mitxonline", "xpro"],
-        auto_discover_stacks=True,
     ),
     "ocw-studio": SimplePulumiParams(
         app_name="ocw-studio",

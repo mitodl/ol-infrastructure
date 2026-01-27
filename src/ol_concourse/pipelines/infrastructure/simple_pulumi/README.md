@@ -30,6 +30,7 @@ The following applications are currently managed by this meta pipeline:
 ## Files
 
 - **`meta.py`**: Meta pipeline generator that creates/updates individual app pipelines
+- **`definition.json`**: Generated pipeline definition for the meta-pipeline
 - **`simple_pulumi_pipeline.py`**: Template for generating individual app pipelines
 - **`__init__.py`**: Package initialization
 
@@ -39,7 +40,7 @@ The following applications are currently managed by this meta pipeline:
 
 ```bash
 cd src/ol_concourse/pipelines/infrastructure/simple_pulumi/
-python meta.py > definition.json
+python meta.py
 fly -t pr-inf sp -p simple-pulumi-meta -c definition.json
 ```
 
@@ -73,7 +74,7 @@ app_names = [
 3. Regenerate and deploy the meta pipeline (which will create the new app pipeline):
 
 ```bash
-python meta.py > definition.json
+python meta.py
 fly -t pr-inf sp -p simple-pulumi-meta -c definition.json
 ```
 
@@ -131,7 +132,7 @@ Each generated app pipeline:
 - **Maintainability**: Update once, applies to all apps
 - **Easy Onboarding**: Add new app by updating two lists
 - **Self-Updating**: Meta pipeline updates itself and all app pipelines
-- **Reduced Duplication**: Single template instead of 9+ individual pipeline files
+- **Reduced Duplication**: Single template instead of multiple individual pipeline files
 
 ## Migration from Old Pipelines
 
@@ -197,16 +198,6 @@ Some apps need to watch additional directories beyond standard Pulumi paths:
     pulumi_project_path="applications/ocw_studio/",
     stack_prefix="applications.ocw_studio",
     additional_watched_paths=["src/bridge/secrets/ocw_studio/"],
-),
-```
-
-### Custom Configuration
-
-```python
-"mongodb-atlas": SimplePulumiParams(
-    app_name="mongodb-atlas",
-    pulumi_project_path="infrastructure/mongodb_atlas/",
-    stack_prefix="infrastructure.mongodb_atlas",
 ),
 ```
 
