@@ -39,7 +39,6 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
         check_every="10m",
-        depth=1,
         paths=[
             "dockerfiles/openedx-edxapp/",
         ],
@@ -80,7 +79,6 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                 uri=edx_platform.git_origin,
                 branch=edx_platform.release_branch,
                 check_every="24h",
-                depth=1,
             )
             edx_platform_git_resources.append(edx_platform_git_resource)
             edx_platform_get_steps.append(
