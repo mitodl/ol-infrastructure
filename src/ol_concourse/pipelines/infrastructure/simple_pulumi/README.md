@@ -242,10 +242,19 @@ This will:
 1. Scan the Pulumi project directory for stack files
 2. Match stacks with the pattern: `{stack_prefix}.{group}.{stage}`
 3. Filter to only the specified deployment groups
-4. Sequence them as CI → QA → Production (if they exist)
-5. Generate jobs for all discovered stacks
+4. For each group, sequence stages as CI → QA → Production (if they exist)
+5. Create **independent parallel job chains** for each deployment group
 
-Example: mongodb_atlas will generate 12 jobs (4 groups × 3 stages each)
+**Parallel Execution**: Each deployment group runs independently:
+```
+mitx:          CI → QA → Production
+mitx-staging:  CI → QA → Production  } All groups run in parallel
+mitxonline:    CI → QA → Production
+xpro:          CI → QA → Production
+```
+
+Example: mongodb_atlas generates 12 jobs (4 groups × 3 stages) organized as 4 parallel chains.
+All CI jobs can run simultaneously, then all QA jobs, then all Production jobs.
 
 ```python
 "custom-app": SimplePulumiParams(

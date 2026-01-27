@@ -56,7 +56,7 @@ class SimplePulumiParams(BaseModel):
 
 def discover_pulumi_stacks(
     project_path: Path, stack_prefix: str, deployment_groups: list[str] | None = None
-) -> list[str]:
+) -> dict[str, list[str]] | list[str]:
     """Discover Pulumi stacks from the filesystem.
 
     Args:
@@ -65,7 +65,9 @@ def discover_pulumi_stacks(
         deployment_groups: Optional list of deployment groups to discover.
 
     Returns:
-        List of full stack names sorted by stage order (CI, QA, Production).
+        If deployment_groups is specified: Dict mapping group names to list of
+        stack names for that group (sorted by stage: CI → QA → Production).
+        If deployment_groups is None: List of stack names sorted by stage.
     """
     stack_files = list(project_path.glob(f"Pulumi.{stack_prefix}.*.yaml"))
 
@@ -75,18 +77,7 @@ def discover_pulumi_stacks(
         stack_name = stack_file.stem.replace("Pulumi.", "")
         stacks.append(stack_name)
 
-    # If deployment groups specified, filter to only those groups
-    if deployment_groups:
-        filtered_stacks = []
-        for stack in stacks:
-            # Check if stack matches pattern: {stack_prefix}.{group}.{stage}
-            for group in deployment_groups:
-                if stack.startswith(f"{stack_prefix}.{group}."):
-                    filtered_stacks.append(stack)
-                    break
-        stacks = filtered_stacks
-
-    # Sort stacks by stage priority: CI, QA, Production
+    # Stage priority for sorting
     stage_priority = {"CI": 0, "QA": 1, "Production": 2}
 
     def get_stage_priority(stack_name: str) -> int:
@@ -96,8 +87,24 @@ def discover_pulumi_stacks(
                 return priority
         return 999  # Unknown stages go last
 
-    stacks.sort(key=lambda s: (s.rsplit(".", 1)[0], get_stage_priority(s)))
-    return stacks
+    # If deployment groups specified, return grouped dict
+    if deployment_groups:
+        grouped_stacks: dict[str, list[str]] = {}
+        for group in deployment_groups:
+            group_stacks = [
+                stack
+                for stack in stacks
+                if stack.startswith(f"{stack_prefix}.{group}.")
+            ]
+            # Sort by stage priority within group
+            group_stacks.sort(key=get_stage_priority)
+            if group_stacks:
+                grouped_stacks[group] = group_stacks
+        return grouped_stacks
+    else:
+        # No deployment groups - return simple list sorted by stage
+        stacks.sort(key=get_stage_priority)
+        return stacks
 
 
 # Pipeline parameter configurations for each app
@@ -229,29 +236,88 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 f"with prefix {params.stack_prefix}"
             )
             raise ValueError(msg)
-        stack_names = discovered_stacks
+
+        # If deployment groups are used, create separate chains for parallel execution
+        if isinstance(discovered_stacks, dict):
+            all_resource_types = []
+            all_resources = []
+            all_jobs = []
+
+            for group, group_stacks in discovered_stacks.items():
+                # Create a git resource for this deployment group
+                group_pulumi_code = git_repo(
+                    name=Identifier(f"ol-infrastructure-pulumi-{app_name}-{group}"),
+                    uri="https://github.com/mitodl/ol-infrastructure",
+                    branch=params.branch,
+                    paths=[
+                        *PULUMI_WATCHED_PATHS,
+                        str(PULUMI_CODE_PATH.joinpath(params.pulumi_project_path)),
+                        *params.additional_watched_paths,
+                    ],
+                )
+
+                # Create a job chain for this deployment group
+                group_fragment = pulumi_jobs_chain(
+                    group_pulumi_code,
+                    project_name=f"{params.pulumi_project_name}-{group}",
+                    stack_names=group_stacks,
+                    project_source_path=PULUMI_CODE_PATH.joinpath(
+                        params.pulumi_project_path
+                    ),
+                    dependencies=[],
+                )
+
+                # Collect resources and jobs
+                all_resource_types.extend(group_fragment.resource_types)
+                all_resources.extend([group_pulumi_code, *group_fragment.resources])
+                all_jobs.extend(group_fragment.jobs)
+
+            # Combine all fragments
+            combined_fragment = PipelineFragment(
+                resource_types=all_resource_types,
+                resources=all_resources,
+                jobs=all_jobs,
+            )
+        else:
+            # Single chain for simple discovered stacks
+            pulumi_fragment = pulumi_jobs_chain(
+                pulumi_code,
+                project_name=params.pulumi_project_name,
+                stack_names=discovered_stacks,
+                project_source_path=PULUMI_CODE_PATH.joinpath(
+                    params.pulumi_project_path
+                ),
+                dependencies=[],
+            )
+
+            combined_fragment = PipelineFragment(
+                resource_types=pulumi_fragment.resource_types,
+                resources=[
+                    pulumi_code,
+                    *pulumi_fragment.resources,
+                ],
+                jobs=pulumi_fragment.jobs,
+            )
     else:
-        # Use explicitly configured stages
+        # Use explicitly configured stages - single chain
         stack_names = [f"{params.stack_prefix}.{stage}" for stage in params.stages]
 
-    # Generate Pulumi deployment jobs
-    pulumi_fragment = pulumi_jobs_chain(
-        pulumi_code,
-        project_name=params.pulumi_project_name,
-        stack_names=stack_names,
-        project_source_path=PULUMI_CODE_PATH.joinpath(params.pulumi_project_path),
-        dependencies=[],
-    )
-
-    # Combine into pipeline
-    combined_fragment = PipelineFragment(
-        resource_types=pulumi_fragment.resource_types,
-        resources=[
-            *pulumi_fragment.resources,
+        pulumi_fragment = pulumi_jobs_chain(
             pulumi_code,
-        ],
-        jobs=pulumi_fragment.jobs,
-    )
+            project_name=params.pulumi_project_name,
+            stack_names=stack_names,
+            project_source_path=PULUMI_CODE_PATH.joinpath(params.pulumi_project_path),
+            dependencies=[],
+        )
+
+        combined_fragment = PipelineFragment(
+            resource_types=pulumi_fragment.resource_types,
+            resources=[
+                pulumi_code,
+                *pulumi_fragment.resources,
+            ],
+            jobs=pulumi_fragment.jobs,
+        )
 
     return combined_fragment.to_pipeline()
 
