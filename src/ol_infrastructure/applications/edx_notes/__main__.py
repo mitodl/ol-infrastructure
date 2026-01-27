@@ -36,8 +36,10 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.ol_types import (
+    Application,
     AWSBase,
     K8sGlobalLabels,
+    Product,
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -98,8 +100,12 @@ vault.generic.Secret(
 )
 
 k8s_global_labels = K8sGlobalLabels(
+    application=Application.edx_notes,
+    product=Product.mitlearn,
     service=Services.edx_notes,
+
     ou=notes_config.require("business_unit"),
+    source_repository="https://github.com/edx_notes",
     stack=stack_info,
 )
 

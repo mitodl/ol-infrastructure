@@ -23,6 +23,7 @@ from ol_infrastructure.lib.ol_types import (
     Application,
     BusinessUnit,
     K8sGlobalLabels,
+    Product,
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -39,6 +40,7 @@ MIT_LEARN_NEXTJS_DOCKER_TAG = os.environ["MIT_LEARN_NEXTJS_DOCKER_TAG"]
 app_image = ecr_image_uri(f"mitodl/mit-learn-nextjs-app:{MIT_LEARN_NEXTJS_DOCKER_TAG}")
 
 k8s_global_labels = K8sGlobalLabels(
+    product=Product.mitlearn,
     service=Services.mit_learn,
     application=Application.mit_learn,
     ou=BusinessUnit.mit_learn,

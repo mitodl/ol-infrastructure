@@ -25,8 +25,10 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.ol_types import (
+    Application,
     BusinessUnit,
     K8sGlobalLabels,
+    Product,
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -70,8 +72,11 @@ cluster_stack.require_output("namespaces").apply(
 
 # K8s labels for Tika
 k8s_global_labels = K8sGlobalLabels(
+    application=Application.tika,
     service=Services.tika,
+    product=Product.data,
     ou=BusinessUnit.operations,
+    source_repository="https://apache.jfrog.io/artifactory/tika",
     stack=stack_info,
 ).model_dump()
 

@@ -68,9 +68,11 @@ from ol_infrastructure.lib.aws.route53_helper import (
 )
 from ol_infrastructure.lib.fastly import get_fastly_provider
 from ol_infrastructure.lib.ol_types import (
+    Application,
     AWSBase,
     BusinessUnit,
     K8sGlobalLabels,
+    Product,
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -107,8 +109,11 @@ aws_config = AWSBase(
 )
 
 k8s_global_labels = K8sGlobalLabels(
+    application=Application.mitxonline,
+    product=Product.mitlearn,
     service=Services.mitxonline,
     ou=BusinessUnit.mitx_online,
+    source_repository="https://github.com/mitodl/mitxonline",
     stack=stack_info,
 ).model_dump()
 

@@ -20,7 +20,9 @@ from ol_infrastructure.lib.ol_types import (
     BusinessUnit,
     Environment,
     K8sGlobalLabels,
+    Product,
     Services,
+    Application,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -49,8 +51,11 @@ aws_config = AWSBase(
 kubewatch_namespace = "kubewatch"
 
 k8s_global_labels = K8sGlobalLabels(
+    application=Application.kubewatch,
+    product=Product.infrastructure,
     service=Services.kubewatch,
     ou=BusinessUnit.operations,
+    source_repository="https://github.com/robusta-dev/kubewatch",
     stack=stack_info,
 ).model_dump()
 

@@ -73,6 +73,7 @@ class Services(str, Enum):
     kubewatch = "kubewatch"
     micromasters = "micromasters"
     open_edx = "open-edx"
+    learn_ai = "learn-ai",
     mit_learn = "mit-learn"
     mit_open = "open"
     mitx_edx = "mitx-edx"
@@ -151,6 +152,8 @@ class K8sGlobalLabels(BaseModel):
     """Base class for Kubernetes resource labels."""
 
     ou: BusinessUnit
+    # There are projects that may not be attached to a product -
+    # like data platform e.g. airbyte
     product: Product
     application: Application
     service: Services
