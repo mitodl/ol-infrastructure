@@ -18,7 +18,7 @@ meilisearch_master_key: <See below>
 meilisearch_api_key: <See below>
 ```
 
-For the `meilisearch_master_key` I just use a random string from a shell alias I have: `pwgen -s -B -1 64 4`. Anything will work as long at it is at least 16 bytes. More is better, of course.
+For the `meilisearch_master_key` I just use a random string from a shell alias I have: `pwgen -s -B -1 64 4`. Anything will work as long as it is at least 16 bytes. More is better, of course.
 
 This is a pain but there isn't a way around it. For `meilisearch_api_key`, you first need to provision the meilisearch instance and have it up and running. Firstly, shell into the running meilisearch-0 pod:
 ```bash
