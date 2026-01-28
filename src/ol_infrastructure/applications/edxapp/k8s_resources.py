@@ -1,4 +1,4 @@
-# ruff: noqa: F841, E501, PLR0913, PLR0915
+# ruff: noqa: F841, E501, PLR0912, PLR0913, PLR0915
 import os
 from pathlib import Path
 
@@ -945,6 +945,8 @@ def create_k8s_resources(  # noqa: C901
         cms_edxapp_config_sources[secrets.translations_providers_secret_name] = (
             secrets.translations_providers
         )
+    if secrets.meilisearch:
+        cms_edxapp_config_sources[secrets.meilisearch_secret_name] = secrets.meilisearch
     cms_edxapp_secret_names = [
         secrets.db_creds_secret_name,
         secrets.db_connections_secret_name,
@@ -961,6 +963,8 @@ def create_k8s_resources(  # noqa: C901
         cms_edxapp_secret_names.append(secrets.xqueue_secret_name)
     if secrets.translations_providers:
         cms_edxapp_secret_names.append(secrets.translations_providers_secret_name)
+    if secrets.meilisearch:
+        cms_edxapp_secret_names.append(secrets.meilisearch_secret_name)
     cms_edxapp_configmap_names = [
         configmaps.general_config_name,
         configmaps.interpolated_config_name,
@@ -1344,7 +1348,11 @@ def create_k8s_resources(  # noqa: C901
     )
 
     # Meilisearch
-    _meilisearch_helm_release = create_meilisearch_resources(stack_info, namespace)
+    _meilisearch_helm_release = create_meilisearch_resources(
+        stack_info=stack_info,
+        namespace=namespace,
+        k8s_global_labels=k8s_global_labels,
+    )
 
     # APISIX ingress configuration and setup
     apisix_ingress_class = edxapp_config.get("apisix_ingress_class") or "apisix"
