@@ -185,6 +185,10 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             "mitx-staging",
             "mitxonline",
             "xpro",
+            "mitopen",
+            "mitlearn",
+            "celery_monitoring",
+            "open_metadata",
         ],
     ),
     "tika": SimplePulumiParams(
