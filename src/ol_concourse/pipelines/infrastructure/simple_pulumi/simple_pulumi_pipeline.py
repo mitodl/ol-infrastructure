@@ -12,7 +12,7 @@ from pydantic import BaseModel, model_validator
 
 from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
-from ol_concourse.lib.models.pipeline import GetStep, Identifier, LoadVarStep, Pipeline
+from ol_concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
 from ol_concourse.lib.resources import git_repo, registry_image
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 
@@ -250,7 +250,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_name="ol-infrastructure-celery-monitoring-server",
         docker_image=DockerImageConfig(
             image_repository="kodhive/leek",
-            image_tag="latest",
+            image_tag="0.7.5",  # Must match LEEK_VERSION in bridge.lib.versions
         ),
     ),
 }
