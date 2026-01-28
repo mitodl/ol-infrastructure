@@ -38,7 +38,7 @@ class SimplePulumiParams(BaseModel):
     app_name: str
     pulumi_project_path: str
     stack_prefix: str
-    pulumi_project_name: str = ""  # Auto-generated in validator if not provided
+    pulumi_project_name: str | None = None
     stages: list[str] = ["CI", "QA", "Production"]
     deployment_groups: list[str] | None = None
     auto_discover_stacks: bool = False
@@ -49,7 +49,7 @@ class SimplePulumiParams(BaseModel):
     @classmethod
     def set_defaults(cls, data: dict[str, Any]) -> dict[str, Any]:
         """Set default values for optional fields."""
-        if "pulumi_project_name" not in data or not data.get("pulumi_project_name"):
+        if not data.get("pulumi_project_name"):
             data["pulumi_project_name"] = f"ol-infrastructure-{data['app_name']}"
         # Auto-enable stack discovery if deployment_groups is specified
         if data.get("deployment_groups") and not data.get("auto_discover_stacks"):

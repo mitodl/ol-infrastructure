@@ -172,6 +172,7 @@ if __name__ == "__main__":
             "opensearch",
             "tika",
             "vector-log-proxy",
+            "xpro",
             "xpro-partner-dns",
         ]
 

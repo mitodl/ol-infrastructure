@@ -27,7 +27,8 @@ The following applications are currently managed by this meta pipeline:
 11. **opensearch** - OpenSearch search and analytics cluster
 12. **tika** - Apache Tika document processing service
 13. **vector-log-proxy** - Vector log proxy service
-14. **xpro-partner-dns** - xPRO partner DNS configuration
+14. **xpro** - xPRO application
+15. **xpro-partner-dns** - xPRO partner DNS configuration
 
 ## Files
 
