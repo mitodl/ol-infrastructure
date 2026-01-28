@@ -751,6 +751,8 @@ if learn_ai_config.get_bool("use_granian"):
         f"{DEFAULT_WSGI_PORT}",
         "--workers",
         "1",
+        "--runtime-threads",
+        "2",
         "--log-level",
         "debug",
         "main.asgi:application",
