@@ -22,7 +22,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
 from ol_infrastructure.lib.ol_types import (
     Application,
     BusinessUnit,
-    K8sGlobalLabels,
+    K8sAppLabels,
     Product,
     Services,
 )
@@ -39,7 +39,7 @@ MIT_LEARN_NEXTJS_DOCKER_TAG = os.environ["MIT_LEARN_NEXTJS_DOCKER_TAG"]
 
 app_image = ecr_image_uri(f"mitodl/mit-learn-nextjs-app:{MIT_LEARN_NEXTJS_DOCKER_TAG}")
 
-k8s_global_labels = K8sGlobalLabels(
+k8s_app_labels = K8sAppLabels(
     product=Product.mitlearn,
     service=Services.mit_learn,
     application=Application.mit_learn,
@@ -171,11 +171,7 @@ for k, v in raw_env_vars.items():
         )
     )
 
-application_labels = k8s_global_labels | {
-    "ol.mit.edu/application": Application.mit_learn,
-    "ol.mit.edu/source_repository": "https://github.com/mitodl/mit-learn",
-}
-
+application_labels = k8s_app_labels
 
 # Create separate PVCs for blue and green deployments
 def create_pvc_for_color(color: str) -> kubernetes.core.v1.PersistentVolumeClaim:
@@ -441,7 +437,7 @@ gateway = OLEKSGateway(
         cert_issuer="letsencrypt-production",
         cert_issuer_class="cluster-issuer",
         gateway_name="mit-learn-nextjs-gateway",
-        labels=k8s_global_labels,
+        labels=k8s_app_labels,
         namespace=learn_namespace,
         listeners=[
             OLEKSGatewayListenerConfig(

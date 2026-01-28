@@ -75,7 +75,7 @@ from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
     BusinessUnit,
-    K8sGlobalLabels,
+    K8sAppLabels,
     KubernetesServiceAppProtocol,
     Product,
     Services,
@@ -123,8 +123,8 @@ github_provider = github.Provider(
     token=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["token"],
 )
 
-k8s_global_labels = K8sGlobalLabels(
-    application=Application.mit_learn,
+k8s_app_labels = K8sAppLabels(
+    application=Application.learn_ai,
     product=Product.mitlearn,
     service=Services.learn_ai,
     source_repository="https://github.com/mitodl/learn_ai",
@@ -283,7 +283,7 @@ learn_ai_service_account = kubernetes.core.v1.ServiceAccount(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=learn_ai_service_account_name,
         namespace=learn_ai_namespace,
-        labels=k8s_global_labels,
+        labels=k8s_app_labels,
         annotations={
             "eks.amazonaws.com/role-arn": learn_ai_trust_role.role.arn,
         },
@@ -640,7 +640,7 @@ learn_ai_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
 vault_k8s_resources_config = OLVaultK8SResourcesConfig(
     application_name="learn-ai",
     namespace=learn_ai_namespace,
-    labels=k8s_global_labels,
+    labels=k8s_app_labels,
     vault_address=vault_config.require("address"),
     vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
     vault_auth_role_name=learn_ai_vault_auth_backend_role.role_name,
@@ -666,9 +666,9 @@ db_creds_secret = Output.all(
         OLVaultK8SDynamicSecretConfig(
             name="learn-ai-db-creds",
             namespace=learn_ai_namespace,
-            dest_secret_labels=k8s_global_labels,
+            dest_secret_labels=k8s_app_labels,
             dest_secret_name=db_creds_secret_name,
-            labels=k8s_global_labels,
+            labels=k8s_app_labels,
             mount=learn_ai_db.app_db_vault_backend.db_mount.path,
             path="creds/app",
             restart_target_kind="Deployment",
@@ -693,7 +693,7 @@ redis_creds = kubernetes.core.v1.Secret(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=redis_creds_secret_name,
         namespace=learn_ai_namespace,
-        labels=k8s_global_labels,
+        labels=k8s_app_labels,
     ),
     string_data=redis_cache.address.apply(
         lambda address: {
@@ -718,9 +718,9 @@ static_secrets = OLVaultK8SSecret(
     resource_config=OLVaultK8SStaticSecretConfig(
         name="learn-ai-static-secrets",
         namespace=learn_ai_namespace,
-        labels=k8s_global_labels,
+        labels=k8s_app_labels,
         dest_secret_name=static_secrets_name,
-        dest_secret_labels=k8s_global_labels,
+        dest_secret_labels=k8s_app_labels,
         mount="secret-learn-ai",
         mount_type="kv-v2",
         path="secrets",
@@ -742,7 +742,7 @@ learn_ai_nginx_configmap = kubernetes.core.v1.ConfigMap(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="nginx-config",
         namespace=learn_ai_namespace,
-        labels=k8s_global_labels,
+        labels=k8s_app_labels,
     ),
     data={
         "web.conf": Path(__file__).parent.joinpath("files/web.conf").read_text(),
@@ -787,7 +787,7 @@ learn_ai_app_k8s = OLApplicationK8s(
         application_lb_service_name="learn-ai-webapp",
         application_lb_service_port_name="http",
         application_lb_service_app_protocol=KubernetesServiceAppProtocol.WS,
-        k8s_global_labels=k8s_global_labels,
+        k8s_global_labels=k8s_app_labels,
         env_from_secret_names=[
             db_creds_secret_name,
             redis_creds_secret_name,
@@ -913,7 +913,7 @@ learn_ai_shared_plugins = OLApisixSharedPlugins(
         application_name="learn-ai",
         resource_suffix="ol-shared-plugins",
         k8s_namespace=learn_ai_namespace,
-        k8s_labels=k8s_global_labels,
+        k8s_labels=k8s_app_labels,
         enable_defaults=True,
     ),
     opts=ResourceOptions(delete_before_replace=True),
@@ -924,7 +924,7 @@ learn_ai_oidc_resources = OLApisixOIDCResources(
     f"learn-ai-{stack_info.env_suffix}-oidc-resources",
     oidc_config=OLApisixOIDCConfig(
         application_name="learn-ai",
-        k8s_labels=k8s_global_labels,
+        k8s_labels=k8s_app_labels,
         k8s_namespace=learn_ai_namespace,
         oidc_scope="openid profile email",  # Default scope from component
         oidc_introspection_endpoint_auth_method="client_secret_basic",  # Default
@@ -965,7 +965,7 @@ proxy_rewrite_plugin = OLApisixPluginConfig(
 mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
     f"mit-learn-learn-ai-{stack_info.env_suffix}-https-olapisixroute",
     k8s_namespace=learn_ai_namespace,
-    k8s_labels=k8s_global_labels,
+    k8s_labels=k8s_app_labels,
     route_configs=[
         # Protected route for canvas syllabus agent - requires canvas_token header
         OLApisixRouteConfig(
@@ -1080,7 +1080,7 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
 learn_ai_https_apisix_route = OLApisixRoute(
     f"learn-ai-{stack_info.env_suffix}-https-olapisixroute",
     k8s_namespace=learn_ai_namespace,
-    k8s_labels=k8s_global_labels,
+    k8s_labels=k8s_app_labels,
     route_configs=[
         # Protected route for canvas syllabus agent - requires canvas_token header
         OLApisixRouteConfig(
@@ -1188,7 +1188,7 @@ learn_ai_https_cert = OLCertManagerCert(
     cert_config=OLCertManagerCertConfig(
         application_name="learn-ai",
         k8s_namespace=learn_ai_namespace,
-        k8s_labels=k8s_global_labels,
+        k8s_labels=k8s_app_labels,
         create_apisixtls_resource=True,
         apisixtls_ingress_class="apache-apisix",
         dest_secret_name="learn-ai-https-cert",  # noqa: S106  # pragma: allowlist secret
@@ -1202,7 +1202,7 @@ learn_ai_https_apisix_consumer = kubernetes.apiextensions.CustomResource(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="canvas-agent",
         namespace=learn_ai_namespace,
-        labels=k8s_global_labels,
+        labels=k8s_app_labels,
     ),
     spec={
         "ingressClassName": "apache-apisix",

@@ -106,7 +106,9 @@ class Application(str, Enum):
     keycloak = "keycloak"
     kubewatch = "kubewatch"
     micromasters = "micromasters"
+    learn_ai = "learn-ai"
     mit_learn = "mit-learn"
+    mit_learn_nextjs = "mit-learn-nextjs"
     mit_open = "open"
     mitx_edx = "mitx-edx"
     mitxonline = "mitxonline"
@@ -192,10 +194,10 @@ class K8sGlobalLabels(BaseModel):
 class K8sAppLabels(K8sGlobalLabels):
     product: Product
     application: Application
-    component: Component
+    component: Component | None = None
     source_repository: str
-    commit_sha: str | None
-    release_tag: str | None
+    commit_sha: str | None = None
+    release_tag: str | None = None
 
 
 class AWSBase(BaseModel):

@@ -71,7 +71,7 @@ from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
     BusinessUnit,
-    K8sGlobalLabels,
+    K8sAppLabels,
     Product,
     Services,
 )
@@ -108,7 +108,7 @@ aws_config = AWSBase(
     }
 )
 
-k8s_global_labels = K8sGlobalLabels(
+k8s_app_labels = K8sAppLabels(
     application=Application.mitxonline,
     product=Product.mitlearn,
     service=Services.mitxonline,
@@ -391,7 +391,7 @@ vault_k8s_resources = OLVaultK8SResources(
     resource_config=OLVaultK8SResourcesConfig(
         application_name=Services.mitxonline,
         namespace=mitxonline_namespace,
-        labels=k8s_global_labels,
+        labels=k8s_app_labels,
         vault_address=vault_config.require("address"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
         vault_auth_role_name=mitxonline_vault_k8s_auth_backend_role.role_name,
@@ -469,7 +469,7 @@ redis_cache = OLAmazonCache(
 secret_names, secret_resources = create_mitxonline_k8s_secrets(
     stack_info=stack_info,
     mitxonline_namespace=mitxonline_namespace,
-    k8s_global_labels=k8s_global_labels,
+    k8s_global_labels=k8s_app_labels,
     vault_k8s_resources=vault_k8s_resources,
     db_config=mitxonline_vault_backend,  # Pass the Vault DB backend config
     rds_endpoint=rds_endpoint,
@@ -514,7 +514,7 @@ mitxonline_k8s_app = OLApplicationK8s(
         application_lb_service_name="mitxonline-webapp",
         application_lb_service_port_name="http",
         application_min_replicas=mitxonline_config.get_int("min_replicas") or 2,
-        k8s_global_labels=k8s_global_labels,
+        k8s_global_labels=k8s_app_labels,
         # Use the secret names returned by create_mitxonline_k8s_secrets
         env_from_secret_names=secret_names,
         application_security_group_id=mitxonline_app_security_group.id,
@@ -589,13 +589,13 @@ cert_manager_certificate = OLCertManagerCert(
     cert_config=OLCertManagerCertConfig(
         application_name="mitxonline",
         k8s_namespace=mitxonline_namespace,
-        k8s_labels=k8s_global_labels,
+        k8s_labels=k8s_app_labels,
         create_apisixtls_resource=True,
         dest_secret_name=frontend_tls_secret_name,
         dns_names=[api_domain, frontend_domain],
     ),
 )
-application_labels = k8s_global_labels | {
+application_labels = k8s_app_labels | {
     "ol.mit.edu/application": "mitxonline",
     "ol.mit.edu/pod-security-group": "mitxonline",
 }
@@ -666,7 +666,7 @@ response_rewrite_plugin_config = OLApisixPluginConfig(
 mitxonline_apisix_route_direct = OLApisixRoute(
     name=f"mitxonline-apisix-route-direct-{stack_info.env_suffix}",
     k8s_namespace=mitxonline_namespace,
-    k8s_labels=k8s_global_labels,
+    k8s_labels=k8s_app_labels,
     route_configs=[
         OLApisixRouteConfig(
             route_name="passauth",
@@ -722,7 +722,7 @@ learn_api_domain = mitxonline_config.require("learn_backend_domain")  # New doma
 mitxonline_apisix_route_prefix = OLApisixRoute(
     name=f"mitxonline-apisix-route-prefixed-{stack_info.env_suffix}",
     k8s_namespace=mitxonline_namespace,
-    k8s_labels=k8s_global_labels,
+    k8s_labels=k8s_app_labels,
     route_configs=[
         OLApisixRouteConfig(
             route_name="passauth",

@@ -79,7 +79,7 @@ from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
     BusinessUnit,
-    K8sGlobalLabels,
+    K8sAppLabels,
     Product,
     Services,
 )
@@ -136,7 +136,7 @@ app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
     stack_info.env_suffix
 ]
 
-k8s_global_labels = K8sGlobalLabels(
+k8s_app_labels = K8sAppLabels(
     service=Services.mit_learn,
     ou=BusinessUnit.mit_learn,
     product=Product.mitlearn,
@@ -445,7 +445,7 @@ mitlearn_vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
 vault_k8s_resources_config = OLVaultK8SResourcesConfig(
     application_name="mitlearn",
     namespace=learn_namespace,
-    labels=k8s_global_labels,
+    labels=k8s_app_labels,
     vault_address=vault_config.require("address"),
     vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
     vault_auth_role_name=mitlearn_vault_k8s_auth_backend_role.role_name,
@@ -1214,7 +1214,7 @@ gh_repo = github.get_repository(
 )
 
 
-application_labels = k8s_global_labels | {
+application_labels = k8s_app_labels | {
     "ol.mit.edu/application": Application.mit_learn,
     "ol.mit.edu/pod-security-group": "learn",
 }
@@ -1399,7 +1399,7 @@ redis_cache = OLAmazonCache(
 secret_names, secret_resources = create_mitlearn_k8s_secrets(
     stack_info=stack_info,
     mitlearn_namespace=learn_namespace,
-    k8s_global_labels=k8s_global_labels,
+    k8s_global_labels=k8s_app_labels,
     vault_k8s_resources=vault_k8s_resources,
     mitlearn_vault_mount=mitlearn_vault_mount,
     db_config=mitlearn_vault_backend,  # Use the original DB config object
@@ -1444,7 +1444,7 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_namespace=learn_namespace,
         application_lb_service_name="mitlearn-webapp",
         application_lb_service_port_name="http",
-        k8s_global_labels=k8s_global_labels,
+        k8s_global_labels=k8s_app_labels,
         # Reference all Kubernetes secrets containing environment variables
         env_from_secret_names=secret_names,
         application_min_replicas=mitlearn_config.get_int("min_replicas") or 2,
