@@ -138,10 +138,9 @@ config:
     secure: v1:dh6OMi07yWRUJk/B:uoUEEYflcgbAADKASHNMkuuyocGFon9KU/bwQj7hcfKXlv3iXYqyTcwD5D2rCRxKnWPvckSAvA4JR9sqhJ0DbIIH/4BkFApJ5XrBKjhUD6S7iACp/pLwjymlaXF5/OhAKdyNcByi2VdrB800oHww3BfhvltrD+2CW5pgGnYv/7+HEMtC7HvzWO2Npe/rZQQebBKK0yGvtg==
   edxapp:k8s_vpc: applications_vpc
   meilisearch:enabled: "true"
+  meilisearch:domain: meilisearch.ci.learn.mit.edu
   meilisearch:replica_count: 1
   meilisearch:pv_size: 10Gi
   meilisearch:cpu_request: "250m"
-  meilisearch:memory_request: "512Mi"
-  meilisearch:memory_limit: "512Mi"
-  meilisearch:master_key:
-    secure: v1:LBA5oodgLrOEr9dj:3KYLWV/FmG5jCUXW7ppcInr9CBv94083FFjINMp9onFBR0v+Qa+nlQVuhoZJkor92GZAkP7kVKbMrXMrUUvgeRP58I6r/yTSwKkR92LO5ZY=
+  meilisearch:memory_request: "1Gi"
+  meilisearch:memory_limit: "1Gi"

@@ -49,6 +49,7 @@ class EdxappSecrets:
     lms_oauth: OLVaultK8SSecret | None
     git_export_ssh_key: OLVaultK8SSecret
     translations_providers: OLVaultK8SSecret | None
+    meilisearch: OLVaultK8SSecret | None
 
     db_creds_secret_name: str
     db_connections_secret_name: str
@@ -62,6 +63,7 @@ class EdxappSecrets:
     lms_oauth_secret_name: str | None
     git_export_ssh_key_secret_name: str
     translations_providers_secret_name: str | None
+    meilisearch_secret_name: str | None
 
 
 def create_k8s_secrets(
@@ -123,6 +125,7 @@ def create_k8s_secrets(
     translations_providers_secret_name = (
         "14-translations-providers-yaml"  # pragma: allowlist secret
     )
+    meilisearch_secret_name = "15-meilisearch-yaml"  # pragma: allowlist secret
 
     # Database credentials secret (dynamic - depends on DB outputs)
     db_creds_secret = Output.all(
@@ -390,6 +393,24 @@ def create_k8s_secrets(
     else:
         translations_providers_secret = None
 
+    meilisearch_config = Config("meilisearch")
+    if meilisearch_config.get_bool("enabled"):
+        meilisearch_secret = builder.create_static(
+            name="meilisearch",
+            resource_name="meilisearch-secret",
+            secret_name=meilisearch_secret_name,
+            mount=f"secret-{stack_info.env_prefix}",
+            path="edxapp",
+            templates={
+                "15-meilisearch-secrets.yaml": textwrap.dedent("""
+                    MEILISEARCH_MASTER_KEY: {{ get .Secrets "meilisearch_master_key" }}
+                    MEILISEARCH_API_KEY: {{ get .Secrets "meilisearch_api_key" }}
+                """),
+            },
+        )
+    else:
+        meilisearch_secret = None
+
     # Return dataclass with all secrets
     return EdxappSecrets(
         db_creds=db_creds_secret,
@@ -404,6 +425,7 @@ def create_k8s_secrets(
         lms_oauth=lms_oauth_secret,
         git_export_ssh_key=git_export_ssh_key_secret,
         translations_providers=translations_providers_secret,
+        meilisearch=meilisearch_secret,
         db_creds_secret_name=db_creds_secret_name,
         db_connections_secret_name=db_connections_secret_name,
         mongo_db_creds_secret_name=mongo_db_creds_secret_name,
@@ -416,6 +438,9 @@ def create_k8s_secrets(
         lms_oauth_secret_name=lms_oauth_secret_name,
         git_export_ssh_key_secret_name=git_export_ssh_key_secret_name,
         translations_providers_secret_name=translations_providers_secret_name
+        if stack_info.env_prefix == "mitxonline"
+        else None,
+        meilisearch_secret_name=meilisearch_secret_name
         if stack_info.env_prefix == "mitxonline"
         else None,
     )
