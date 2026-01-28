@@ -133,11 +133,6 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         stack_prefix="applications.fastly_redirector",
         pulumi_project_name="ol-infrastructure-fastly-redirector",
     ),
-    "kubewatch": SimplePulumiParams(
-        app_name="kubewatch",
-        pulumi_project_path="applications/kubewatch/",
-        stack_prefix="applications.kubewatch",
-    ),
     "micromasters": SimplePulumiParams(
         app_name="micromasters",
         pulumi_project_path="applications/micromasters/",
