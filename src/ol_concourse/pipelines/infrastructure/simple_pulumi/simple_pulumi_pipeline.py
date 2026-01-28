@@ -188,7 +188,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
     "open-metadata": SimplePulumiParams(
         app_name="open-metadata",
         pulumi_project_path="applications/open_metadata/",
-        pulumi_project_name=" ol-infrastructure-open_metadata-application",
+        pulumi_project_name="ol-infrastructure-open_metadata-application",
         stack_prefix="applications.open_metadata",
         additional_watched_paths=[
             "src/bridge/secrets/open_metadata/",
@@ -202,14 +202,14 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_name="ol-infrastructure-opensearch",
         deployment_groups=[
             "apps",
+            "celery_monitoring",
+            "mitlearn",
             "mitx",
             "mitx-staging",
             "mitxonline",
-            "xpro",
-            "mitopen",
-            "mitlearn",
-            "celery_monitoring",
+            "open",
             "open_metadata",
+            "xpro",
         ],
     ),
     "tika": SimplePulumiParams(
