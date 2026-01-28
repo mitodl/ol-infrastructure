@@ -14,18 +14,20 @@ The Simple Pulumi-Only pattern is for applications/services that:
 
 The following applications are currently managed by this meta pipeline:
 
-1. **fastly-redirector** - Fastly redirector service
-2. **tika** - Apache Tika document processing service
-3. **airbyte** - Airbyte data integration platform
-4. **kubewatch** - Kubernetes cluster monitoring
-5. **digital-credentials** - Digital credentials service
-6. **open-metadata** - OpenMetadata data catalog
-7. **xpro-partner-dns** - xPRO partner DNS configuration
-8. **mongodb-atlas** - MongoDB Atlas infrastructure
-9. **vector-log-proxy** - Vector log proxy service
-10. **ocw-studio** - OCW Studio content management (Pulumi-only)
-11. **open-discussions** - Open Discussions platform (Pulumi-only, QA/Production only)
-12. **micromasters** - MicroMasters application (Pulumi-only)
+1. **airbyte** - Airbyte data integration platform
+2. **bootcamps** - Bootcamps application
+3. **digital-credentials** - Digital credentials service
+4. **fastly-redirector** - Fastly redirector service
+5. **kubewatch** - Kubernetes cluster monitoring
+6. **micromasters** - MicroMasters application (Pulumi-only)
+7. **mongodb-atlas** - MongoDB Atlas infrastructure
+8. **ocw-studio** - OCW Studio content management (Pulumi-only)
+9. **open-discussions** - Open Discussions platform (Pulumi-only, QA/Production only)
+10. **open-metadata** - OpenMetadata data catalog
+11. **opensearch** - OpenSearch search and analytics cluster
+12. **tika** - Apache Tika document processing service
+13. **vector-log-proxy** - Vector log proxy service
+14. **xpro-partner-dns** - xPRO partner DNS configuration
 
 ## Files
 

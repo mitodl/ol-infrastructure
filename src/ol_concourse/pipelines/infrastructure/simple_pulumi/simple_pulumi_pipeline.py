@@ -116,11 +116,16 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="airbyte",
         pulumi_project_path="applications/airbyte/",
         stack_prefix="applications.airbyte",
+        additional_watched_paths=[
+            "src/bridge/secrets/airbyte/",
+            "src/bridge/lib/versions.py",
+        ],
     ),
     "digital-credentials": SimplePulumiParams(
         app_name="digital-credentials",
         pulumi_project_path="applications/digital_credentials/",
         stack_prefix="applications.digital_credentials",
+        additional_watched_paths=["src/bridge/secrets/digital_credentials/"],
     ),
     "fastly-redirector": SimplePulumiParams(
         app_name="fastly-redirector",
@@ -164,21 +169,21 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="open-metadata",
         pulumi_project_path="applications/open_metadata/",
         stack_prefix="applications.open_metadata",
+        additional_watched_paths=[
+            "src/bridge/secrets/open_metadata/",
+            "src/bridge/lib/versions.py",
+        ],
     ),
     "opensearch": SimplePulumiParams(
         app_name="opensearch",
         pulumi_project_path="infrastructure/aws/opensearch/",
         stack_prefix="infrastructure.aws.opensearch",
+        pulumi_project_name="ol-infrastructure-opensearch",
         deployment_groups=[
             "apps",
-            "celery_monitoring",
-            "mitlearn",
-            "mitopen",
             "mitx",
-            "mitxonline",
             "mitx-staging",
-            "open",
-            "open_metadata",
+            "mitxonline",
             "xpro",
         ],
     ),
@@ -204,6 +209,15 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="xpro-partner-dns",
         pulumi_project_path="substructure/xpro_partner_dns/",
         stack_prefix="substructure.xpro_partner_dns",
+        pulumi_project_name="ol-infrastructure-substructure-xpro-partner-dns",
+        stages=[""],
+    ),
+    "bootcamps": SimplePulumiParams(
+        app_name="bootcamps",
+        pulumi_project_path="applications/bootcamps/",
+        stack_prefix="applications.bootcamps",
+        pulumi_project_name="ol-infrastructure-bootcamps-application",
+        additional_watched_paths=["src/bridge/lib/"],
     ),
 }
 
@@ -271,11 +285,11 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             all_jobs = []
 
             # Share a single git resource across all deployment groups
-            for group, group_stacks in discovered_stacks.items():
+            for group_stacks in discovered_stacks.values():
                 # Create a job chain for this deployment group
                 group_fragment = pulumi_jobs_chain(
                     pulumi_code,
-                    project_name=f"{params.pulumi_project_name}-{group}",
+                    project_name=params.pulumi_project_name,
                     stack_names=group_stacks,
                     project_source_path=PULUMI_CODE_PATH.joinpath(
                         params.pulumi_project_path
@@ -291,7 +305,10 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             # Combine all fragments
             combined_fragment = PipelineFragment(
                 resource_types=all_resource_types,
-                resources=all_resources,
+                resources=[
+                    pulumi_code,
+                    *all_resources,
+                ],
                 jobs=all_jobs,
             )
         else:
@@ -316,7 +333,10 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             )
     else:
         # Use explicitly configured stages - single chain
-        stack_names = [f"{params.stack_prefix}.{stage}" for stage in params.stages]
+        stack_names = [
+            params.stack_prefix if stage == "" else f"{params.stack_prefix}.{stage}"
+            for stage in params.stages
+        ]
 
         pulumi_fragment = pulumi_jobs_chain(
             pulumi_code,

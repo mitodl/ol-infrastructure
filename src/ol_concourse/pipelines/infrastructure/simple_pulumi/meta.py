@@ -152,8 +152,6 @@ def meta_pipeline(app_names: list[str]) -> Pipeline:
 
 
 if __name__ == "__main__":
-    import json
-
     # Check if app_names was passed as a command line argument (for self-update)
     if len(sys.argv) > 1:
         # Parse the app_names list from the command line argument
@@ -162,6 +160,7 @@ if __name__ == "__main__":
         # Use the default list of applications
         app_names = [
             "airbyte",
+            "bootcamps",
             "digital-credentials",
             "fastly-redirector",
             "kubewatch",
