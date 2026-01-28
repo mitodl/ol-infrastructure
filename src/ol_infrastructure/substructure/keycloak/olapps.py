@@ -74,6 +74,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 failure_reset_time_seconds=43200,
                 max_failure_wait_seconds=3600,
                 max_login_failures=10,
+                max_temporary_lockouts=1,
                 minimum_quick_login_wait_seconds=60,
                 permanent_lockout=True,
                 quick_login_check_milli_seconds=700,
