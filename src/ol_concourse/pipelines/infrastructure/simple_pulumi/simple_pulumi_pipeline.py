@@ -186,7 +186,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
     "open-metadata": SimplePulumiParams(
         app_name="open-metadata",
         pulumi_project_path="applications/open_metadata/",
-        pulumi_project_name="ol-infrastructure-open-metadata",
+        pulumi_project_name=" ol-infrastructure-open_metadata-application",
         stack_prefix="applications.open_metadata",
         additional_watched_paths=[
             "src/bridge/secrets/open_metadata/",
