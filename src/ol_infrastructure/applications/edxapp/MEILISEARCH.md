@@ -10,9 +10,6 @@
   meilisearch:cpu_request: "250m"
   meilisearch:memory_request: "4Gi"
   meilisearch:memory_limit: "4Gi"
-```
-### Requests and Limits
-You want at least 4Gi of memory in production, you can get away with less in lower envrionments. For storage, go bigger because once it is provisioned it cannot be grown without reloading all the data.
 
 ## SOPS secrets
 
