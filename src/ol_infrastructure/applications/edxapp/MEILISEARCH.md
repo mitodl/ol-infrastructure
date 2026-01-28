@@ -10,24 +10,21 @@
   meilisearch:cpu_request: "250m"
   meilisearch:memory_request: "4Gi"
   meilisearch:memory_limit: "4Gi"
-```
-### Requests and Limits
-You want at least 4Gi of memory in production, you can get away with less in lower envrionments. For storage, go bigger because once it is provisioned it cannot be grown without reloading all the data.
 
 ## SOPS secrets
 
 ```yaml
-meilisearch_master_kay: <See below>
+meilisearch_master_key: <See below>
 meilisearch_api_key: <See below>
 ```
 
-For the `meilisearch_master_key` I just use a random string from a shell alias I have: `pwgen -s -B -1 64 4`. Anything will work as long at it is at least 16 bytes. More is better, of course.
+For the `meilisearch_master_key` I just use a random string from a shell alias I have: `pwgen -s -B -1 64 4`. Anything will work as long as it is at least 16 bytes. More is better, of course.
 
 This is a pain but there isn't a way around it. For `meilisearch_api_key`, you first need to provision the meilisearch instance and have it up and running. Firstly, shell into the running meilisearch-0 pod:
 ```bash
 kubectl exec -it -n mitxonline-openedx meilisearch-0 -- sh
 ```
-Then you need to curl localhost using the `meilisearch_master_key` that you generated earlier, and pull down the a short list of default keys that the meilisearch instance provisioned for itself on the first startup. The data is JSON.
+Then you need to curl localhost using the `meilisearch_master_key` that you generated earlier, and pull down a short list of default keys that the meilisearch instance provisioned for itself on the first startup. The data is JSON.
 ```
 curl -X GET http://localhost:7700/keys  -H "Authorization: Bearer <YOUR MASTER KEY>" -H "Content-Type: application/json"
 <A bunch of JSON>
