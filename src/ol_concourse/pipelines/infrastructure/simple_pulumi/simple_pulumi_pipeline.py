@@ -1,3 +1,4 @@
+# ruff: noqa: PLR0915, PLR0912, C901
 """Generate Concourse pipeline definitions for simple Pulumi-only deployments.
 
 This template is for applications/services that only need Pulumi infrastructure
@@ -138,6 +139,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
     "airbyte": SimplePulumiParams(
         app_name="airbyte",
         pulumi_project_path="applications/airbyte/",
+        pulumi_project_name="ol-infrastructure-airbyte-server",
         stack_prefix="applications.airbyte",
         additional_watched_paths=[
             "src/bridge/secrets/airbyte/",
