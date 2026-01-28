@@ -163,7 +163,6 @@ if __name__ == "__main__":
             "bootcamps",
             "digital-credentials",
             "fastly-redirector",
-            "kubewatch",
             "micromasters",
             "mongodb-atlas",
             "ocw-studio",
