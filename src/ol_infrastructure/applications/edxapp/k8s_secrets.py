@@ -394,7 +394,7 @@ def create_k8s_secrets(
         translations_providers_secret = None
 
     meilisearch_config = Config("meilisearch")
-    if stack_info.env_prefix == "mitxonline" and meilisearch_config.get_bool("enabled"):
+    if meilisearch_config.get_bool("enabled"):
         meilisearch_secret = builder.create_static(
             name="meilisearch",
             resource_name="meilisearch-secret",
