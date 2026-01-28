@@ -402,7 +402,7 @@ deployment_state_configmap = kubernetes.core.v1.ConfigMap(
 # With auto_toggle enabled, this automatically routes to the new deployment
 mit_learn_nextjs_service_name = "mit-learn-nextjs"
 active_deployment_labels = active_color.apply(
-    lambda color: k8_app_labels | {"deployment-color": color}
+    lambda color: k8s_app_labels | {"deployment-color": color}
 )
 
 mit_learn_nextjs_service = kubernetes.core.v1.Service(
