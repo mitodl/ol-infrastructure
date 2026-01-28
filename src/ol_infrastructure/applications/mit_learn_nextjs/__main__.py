@@ -19,7 +19,13 @@ from ol_infrastructure.lib.aws.eks_helper import (
     ecr_image_uri,
     setup_k8s_provider,
 )
-from ol_infrastructure.lib.ol_types import BusinessUnit, K8sGlobalLabels, Services
+from ol_infrastructure.lib.ol_types import (
+    Application,
+    BusinessUnit,
+    K8sAppLabels,
+    Product,
+    Services,
+)
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 stack_info = parse_stack()
@@ -33,8 +39,13 @@ MIT_LEARN_NEXTJS_DOCKER_TAG = os.environ["MIT_LEARN_NEXTJS_DOCKER_TAG"]
 
 app_image = ecr_image_uri(f"mitodl/mit-learn-nextjs-app:{MIT_LEARN_NEXTJS_DOCKER_TAG}")
 
-k8s_global_labels = K8sGlobalLabels(
-    service=Services.mit_learn, ou=BusinessUnit.mit_learn, stack=stack_info
+k8s_app_labels = K8sAppLabels(
+    product=Product.mitlearn,
+    service=Services.mit_learn,
+    application=Application.mit_learn,
+    ou=BusinessUnit.mit_learn,
+    source_repository="https://github.com/mitodl/mit-learn",
+    stack=stack_info,
 ).model_dump()
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
@@ -160,16 +171,12 @@ for k, v in raw_env_vars.items():
         )
     )
 
-application_labels = k8s_global_labels | {
-    "ol.mit.edu/service": "nextjs",
-}
-
 
 # Create separate PVCs for blue and green deployments
 def create_pvc_for_color(color: str) -> kubernetes.core.v1.PersistentVolumeClaim:
     """Create a PVC for the specified color deployment."""
     pvc_name = f"nextjs-build-cache-efs-{color}"
-    color_labels = application_labels | {"deployment-color": color}
+    color_labels = k8s_app_labels | {"deployment-color": color}
     return kubernetes.core.v1.PersistentVolumeClaim(
         f"mit-learn-nextjs-{stack_info.name}-pvc-{color}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -198,7 +205,7 @@ mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
         lambda c: kubernetes.meta.v1.ObjectMetaArgs(
             name=f"mit-learn-nextjs-build-{c}",
             namespace=learn_namespace,
-            labels=application_labels | {"deployment-color": c},
+            labels=k8s_app_labels | {"deployment-color": c},
         )
     ),
     spec=new_color.apply(
@@ -208,7 +215,7 @@ mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
             active_deadline_seconds=1200,
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=application_labels | {"deployment-color": c}
+                    labels=k8s_app_labels | {"deployment-color": c}
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     restart_policy="OnFailure",
@@ -253,7 +260,7 @@ mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
 # Helper function to create a deployment for a specific color
 def create_deployment_for_color(color: str) -> kubernetes.apps.v1.Deployment:
     """Create a blue or green deployment."""
-    color_labels = application_labels | {"deployment-color": color}
+    color_labels = k8s_app_labels | {"deployment-color": color}
     pvc_name = f"nextjs-build-cache-efs-{color}"
 
     volume = kubernetes.core.v1.VolumeArgs(
@@ -379,7 +386,7 @@ deployment_state_configmap = kubernetes.core.v1.ConfigMap(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="mit-learn-nextjs-deployment-state",
         namespace=learn_namespace,
-        labels=application_labels,
+        labels=k8s_app_labels,
     ),
     data={
         "last_active": active_color,
@@ -395,7 +402,7 @@ deployment_state_configmap = kubernetes.core.v1.ConfigMap(
 # With auto_toggle enabled, this automatically routes to the new deployment
 mit_learn_nextjs_service_name = "mit-learn-nextjs"
 active_deployment_labels = active_color.apply(
-    lambda color: application_labels | {"deployment-color": color}
+    lambda color: k8s_app_labels | {"deployment-color": color}
 )
 
 mit_learn_nextjs_service = kubernetes.core.v1.Service(
@@ -403,7 +410,7 @@ mit_learn_nextjs_service = kubernetes.core.v1.Service(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="mit-learn-nextjs",
         namespace=learn_namespace,
-        labels=application_labels,
+        labels=k8s_app_labels,
         annotations={"pulumi.com/patchForce": "true"},
     ),
     spec=kubernetes.core.v1.ServiceSpecArgs(
@@ -429,7 +436,7 @@ gateway = OLEKSGateway(
         cert_issuer="letsencrypt-production",
         cert_issuer_class="cluster-issuer",
         gateway_name="mit-learn-nextjs-gateway",
-        labels=k8s_global_labels,
+        labels=k8s_app_labels,
         namespace=learn_namespace,
         listeners=[
             OLEKSGatewayListenerConfig(

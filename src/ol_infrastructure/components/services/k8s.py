@@ -32,7 +32,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SStaticSecretConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import cached_image_uri, ecr_image_uri
-from ol_infrastructure.lib.ol_types import KubernetesServiceAppProtocol
+from ol_infrastructure.lib.ol_types import Component, KubernetesServiceAppProtocol
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
@@ -865,7 +865,7 @@ class OLApplicationK8s(ComponentResource):
 
         for celery_worker_config in ol_app_k8s_config.celery_worker_configs:
             celery_labels = ol_app_k8s_config.k8s_global_labels | {
-                "ol.mit.edu/process": "celery",
+                "ol.mit.edu/component": str(Component.celery),
                 "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
                 "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
                     truncate_k8s_metanames

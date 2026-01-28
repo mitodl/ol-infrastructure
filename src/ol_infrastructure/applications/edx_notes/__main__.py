@@ -1,4 +1,6 @@
-# Create the resources needed to run an edxnotes server
+"""
+Create the resources needed to run an edxnotes server
+"""
 
 import json
 import os
@@ -36,8 +38,10 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.ol_types import (
+    Application,
     AWSBase,
-    K8sGlobalLabels,
+    K8sAppLabels,
+    Product,
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -97,9 +101,12 @@ vault.generic.Secret(
     data_json=json.dumps(secrets),
 )
 
-k8s_global_labels = K8sGlobalLabels(
+k8s_app_labels = K8sAppLabels(
+    application=Application.edx_notes,
+    product=Product.mitlearn,
     service=Services.edx_notes,
     ou=notes_config.require("business_unit"),
+    source_repository="https://github.com/openedx/edx-notes-api",
     stack=stack_info,
 )
 
@@ -175,7 +182,7 @@ notes_app = OLEKSAuthBinding(
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
         irsa_service_account_name="edx-notes",
         vault_sync_service_account_names=f"edx-notes-{stack_info.env_prefix}-vault",
-        k8s_labels=k8s_global_labels,
+        k8s_labels=k8s_app_labels,
     )
 )
 
@@ -192,9 +199,9 @@ notes_static_secret = Output.all(
         OLVaultK8SStaticSecretConfig(
             name="edx-notes-static-secrets",
             namespace=namespace,
-            dest_secret_labels=k8s_global_labels.model_dump(),
+            dest_secret_labels=k8s_app_labels.model_dump(),
             dest_secret_name=static_secret_name,
-            labels=k8s_global_labels.model_dump(),
+            labels=k8s_app_labels.model_dump(),
             mount=f"secret-{stack_info.env_prefix}",
             mount_type="kv-v1",
             path="edx-notes",
@@ -222,9 +229,9 @@ db_creds_secret = OLVaultK8SSecret(
     OLVaultK8SDynamicSecretConfig(
         name="edx-notes-db-creds",
         namespace=namespace,
-        dest_secret_labels=k8s_global_labels.model_dump(),
+        dest_secret_labels=k8s_app_labels.model_dump(),
         dest_secret_name=db_creds_secret_name,
-        labels=k8s_global_labels.model_dump(),
+        labels=k8s_app_labels.model_dump(),
         mount=f"mariadb-{stack_info.env_prefix}",
         path="creds/notes",
         restart_target_kind="Deployment",
@@ -258,7 +265,7 @@ ol_app_k8s_config = OLApplicationK8sConfig(
     application_min_replicas=notes_config.get_int("min_replicas") or 1,
     application_max_replicas=notes_config.get_int("max_replicas") or 3,
     application_deployment_use_anti_affinity=True,
-    k8s_global_labels=k8s_global_labels.model_dump(),
+    k8s_global_labels=k8s_app_labels.model_dump(),
     env_from_secret_names=["edx-notes-secrets", db_creds_secret_name],
     application_security_group_id=notes_app_security_group.id,
     application_security_group_name=notes_app_security_group.name,
@@ -325,7 +332,7 @@ gateway_config = OLEKSGatewayConfig(
     cert_issuer_class="cluster-issuer",
     gateway_name="edx-notes",
     namespace=namespace,
-    labels=k8s_global_labels.model_dump(),
+    labels=k8s_app_labels.model_dump(),
     listeners=[
         OLEKSGatewayListenerConfig(
             name="https-web",
