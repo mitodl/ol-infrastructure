@@ -138,9 +138,9 @@ config:
   edxapp:k8s_vpc: applications_vpc
   meilisearch:enabled: "true"
   meilisearch:replica_count: 1
-  meilisearch:pv_size: 10Gi
+  meilisearch:pv_size: 100Gi
   meilisearch:cpu_request: "250m"
-  meilisearch:memory_request: "512Mi"
-  meilisearch:memory_limit: "512Mi"
+  meilisearch:memory_request: "4Gi"
+  meilisearch:memory_limit: "4Gi"
   meilisearch:master_key:
     secure: v1:Qcjoq44ixHBhzI3f:Wb443dzQJTIh1mdiIk+DpqG8iU1WyhciZ12foK0kY5n2r6qq8uscnfetdeS4GQ8JgtEnSs0WcfVhPmMVy+xyXFUmzsp5jtOb2tWaZPdeVBA=
