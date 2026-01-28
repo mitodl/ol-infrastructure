@@ -87,7 +87,7 @@ k8s_global_labels = K8sGlobalLabels(
     ou=BusinessUnit.operations,
     service=Services.keycloak,
     stack=stack_info,
-    source_repository="https://github.com/mitodl/ol-infrastructure",
+    source_repository="https://github.com/keycloak/keycloak",
 ).model_dump()
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 keycloak_namespace = "keycloak"
