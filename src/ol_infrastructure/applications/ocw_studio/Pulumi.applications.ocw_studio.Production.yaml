@@ -24,9 +24,10 @@ config:
     MAILGUN_FROM_EMAIL: 'MIT OCW <no-reply@ocw.mail.odl.mit.edu'
     MAILGUN_SENDER_DOMAIN: 'ocw.mail.odl.mit.edu'
     MAILGUN_URL: https://api.mailgun.net/v3/ocw.mail.odl.mit.edu
-    MIT_LEARN_BASE_URL: https://learn.mit.edu
     MIT_LEARN_API_BASE_URL: https://api.learn.mit.edu
+    MIT_LEARN_BASE_URL: https://learn.mit.edu
     OCW_COURSE_STARTER_SLUG: ocw-course-v2
+    OCW_EXTRA_COURSE_THEMES: ''
     OCW_GTM_ACCOUNT_ID: GTM-NMQZ25T
     OCW_HUGO_THEMES_SENTRY_DSN: 'https://eee58f41dda54d2b814296e12dced4b7@o48788.ingest.sentry.io/5304953'
     OCW_IMPORT_STARTER_SLUG: ocw-course
@@ -38,17 +39,17 @@ config:
     OCW_STUDIO_LOG_LEVEL: INFO
     OCW_STUDIO_SUPPORT_EMAIL: 'ocw-studio-support@mit.edu'
     OPEN_CATALOG_URLS: 'https://open.mit.edu/api/v0/ocw_next_webhook/,https://api.learn.mit.edu/api/v1/ocw_next_webhook/'
-    PUBLISH_POSTHOG_ENABLED: 'true'
+    POST_TRANSCODE_ACTIONS: 'videos.api.update_video_job'
     PUBLISH_POSTHOG_API_HOST: https://ph.ol.mit.edu
+    PUBLISH_POSTHOG_ENABLED: 'true'
     SEARCH_API_URL: 'https://open.mit.edu/api/v0/search/'
     SENTRY_LOG_LEVEL: 'WARN'
     SITEMAP_DOMAIN: 'ocw.mit.edu'
     SOCIAL_AUTH_SAML_SP_ENTITY_ID: 'https://ocw-studio.odl.mit.edu/saml/metadata'
     STATIC_API_BASE_URL_TEST: 'https://test.ocw.mit.edu/'
-    YT_PROJECT_ID: 'ocw-studio-qa'
-    POST_TRANSCODE_ACTIONS: 'videos.api.update_video_job'
-    VIDEO_S3_UPLOAD_PREFIX: 'gdrive_uploads'
     TRANSCODE_JOB_TEMPLATE: './videos/config/mediaconvert.json'
+    VIDEO_S3_UPLOAD_PREFIX: 'gdrive_uploads'
+    YT_PROJECT_ID: 'ocw-studio-qa'
   ocw_studio:app_domain: ocw-studio.odl.mit.edu
   ocw_studio:db_password:
     secure: v1:KkTvlMKkKDXJiaQM:W+vNsxirVQXnvf1FvsokCi49hercEQP+1nmCGvhuOfQZYEqYvPW/Y+eraoQ71t2THGB3xtvwf55DmHVqD87Gf+CvZCPnSMEYGIRmouZZ6xlnXRK1Ph0e/rbO
