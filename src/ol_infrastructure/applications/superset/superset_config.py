@@ -112,13 +112,150 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
             "role_keys": data.get("role_keys", []),
         }
 
+    def _get_roles_from_keycloak_roles(self, role_keys: list[str]) -> list[object]:
+        """Map Keycloak role_keys to Superset roles.
+
+        Handles special case for service accounts that need Alpha role
+        for API access but don't have role_keys in their JWT.
+
+        Args:
+            role_keys: List of Keycloak role keys from JWT token
+
+        Returns:
+            List of Superset role objects
+        """
+        roles = []
+
+        # Default to Public role if no role_keys provided
+        if not role_keys:
+            public_role = self.find_role("Public")
+            if public_role:
+                roles.append(public_role)
+
+        # Map Keycloak roles to Superset roles
+        for role_key in role_keys:
+            superset_role = self.find_role(role_key)
+            if superset_role:
+                roles.append(superset_role)
+
+        return roles
+
+    def _create_user_from_jwt(self, jwt_data: dict[str, object]) -> object | None:
+        """Create new Superset user from JWT claims (dynamic provisioning).
+
+        This method is called when a valid JWT is received but the user does not
+        yet exist in the Superset database. It automatically creates the user
+        with roles derived from the JWT's role_keys claim.
+
+        Args:
+            jwt_data: Decoded JWT token data
+
+        Returns:
+            The newly created user object, or None if creation failed
+        """
+        username = str(jwt_data.get("preferred_username", ""))
+        email = str(jwt_data.get("email", ""))
+        first_name = str(jwt_data.get("given_name", ""))
+        last_name = str(jwt_data.get("family_name", ""))
+        role_keys_obj = jwt_data.get("role_keys", [])
+        role_keys = list(role_keys_obj) if isinstance(role_keys_obj, list) else []
+
+        if not username:
+            logging.error("Cannot create user: JWT missing 'preferred_username' claim")
+            return None
+
+        try:
+            # Service accounts don't have role_keys
+            # Assign Alpha role for API access
+            if username.startswith("service-account-"):
+                logging.info(
+                    "Detected service account: %s, assigning Alpha role",
+                    username,
+                )
+                roles = [self.find_role("Alpha")]
+            else:
+                # Get roles from Keycloak role_keys claim
+                roles = self._get_roles_from_keycloak_roles(role_keys)
+
+            # Ensure at least one role
+            if not roles:
+                logging.warning(
+                    "User '%s' has no roles from JWT, assigning Public role", username
+                )
+                roles = [self.find_role("Public")]
+
+            # Create the user
+            logging.info(
+                "Creating new user from JWT: username=%s, email=%s, roles=%s",
+                username,
+                email,
+                [r.name for r in roles if r],
+            )
+
+            user = self.add_user(
+                username=username,
+                first_name=first_name or username,
+                last_name=last_name or "",
+                email=email or f"{username}@example.com",
+                role=roles,
+            )
+
+            if not user:
+                return None
+
+            logging.info("Successfully created user '%s'", username)
+            return user  # noqa: TRY300
+
+        except Exception:
+            logging.exception(
+                "Failed to auto-create user '%s' from JWT",
+                username,
+            )
+            return None
+
     def load_user_jwt(self, _jwt_header, jwt_data):
-        username = jwt_data["preferred_username"]
+        """
+        Load or create user from JWT token claims.
+
+        This method is called when API access uses JWT tokens. It:
+        1. Looks up the user in Superset database by preferred_username
+        2. If user doesn't exist, automatically creates them from JWT claims
+        3. Maps Keycloak roles to Superset permissions via role_keys claim
+        4. Returns the user if active, None otherwise
+
+        Args:
+            _jwt_header: JWT header (unused)
+            jwt_data: Decoded JWT token data
+
+        Returns:
+            The user object if found/created and active, None otherwise
+        """
+        username = jwt_data.get("preferred_username")
+
+        if not username:
+            logging.error("JWT missing 'preferred_username' claim")
+            return None
+
+        # Try to find existing user
         user = self.find_user(username=username)
-        if user.is_active:
+
+        # If user doesn't exist, create them dynamically from JWT claims
+        if user is None:
+            logging.info(
+                "User '%s' not found in database; attempting to create from JWT",
+                username,
+            )
+            user = self._create_user_from_jwt(jwt_data)
+
+        # Return user if found/created and active
+        if user and user.is_active:
             # Set flask g.user to JWT user, we can't do it on before request
             g.user = user
             return user
+
+        if user and not user.is_active:
+            logging.warning("User '%s' found but is inactive", username)
+
         return None
 
 

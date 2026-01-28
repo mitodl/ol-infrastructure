@@ -43,7 +43,9 @@ config:
   - "ol_researcher"
   keycloak_realm:ol-data-platform-superset-client-secret:
     secure: v1:Ow95HN9yKnXBg5jX:CUoA/qBSeUF2w0FNYlEnC5OyvP8sg7S3efyvrX8J10Q8T16oxlO3MF3ROByGk12G
-  keycloak_realm:ol-data-platform-superset-redirect-uris: ["https://bi-ci.ol.mit.edu/*"]
+  keycloak_realm:ol-data-platform-superset-redirect-uris:
+  - "https://bi-ci.ol.mit.edu/*"
+  - "http://localhost:8080/callback"
   keycloak_realm:ol-platform-engineering-airbyte-client-secret:
     secure: v1:RN2SKGo+MKCkI9OY:tP05EhbUMuyqGY4OmVsNIGefmYeqoHVX85z6ZyEhmzs9Jcp7fVaslk/R6FSbNd2Z
   keycloak_realm:ol-platform-engineering-airbyte-redirect-uris: ["https://airbyte-ci.odl.mit.edu/*"]

@@ -4,10 +4,10 @@ import json
 
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions
+from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 
-def create_ol_data_platform_realm(  # noqa: PLR0913
+def create_ol_data_platform_realm(  # noqa: PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     env_name: str,
@@ -102,7 +102,7 @@ def create_ol_data_platform_realm(  # noqa: PLR0913
     )
 
     keycloak.RealmEvents(
-        "ol-data-platforme-realm-events",
+        "ol-data-platform-realm-events",
         realm_id=ol_data_platform_realm.realm,
         events_enabled=True,
         events_expiration=604800,
@@ -125,7 +125,7 @@ def create_ol_data_platform_realm(  # noqa: PLR0913
     ol_data_platform_superset_client = keycloak.openid.Client(
         "ol-data-platform-superset-client",
         name="ol-data-platform-superset-client",
-        realm_id="ol-data-platform",
+        realm_id=ol_data_platform_realm.id,
         client_id="ol-superset-client",
         client_secret=keycloak_realm_config.get(
             "ol-data-platform-superset-client-secret"
@@ -150,7 +150,7 @@ def create_ol_data_platform_realm(  # noqa: PLR0913
         role_ref = keycloak.Role(
             f"ol-data-platform-superset-client-{role}",
             name=role,
-            realm_id="ol-data-platform",
+            realm_id=ol_data_platform_realm.id,
             client_id=ol_data_platform_superset_client.id,
             opts=resource_options,
         )
@@ -175,6 +175,50 @@ def create_ol_data_platform_realm(  # noqa: PLR0913
                 lambda realm_id: fetch_realm_public_key_partial(realm_id)
             ),
         ).apply(json.dumps),
+    )
+
+    # Provision service account with necessary roles for API operations
+    # This enables users calling the Superset API to have their tokens validated
+    # and user details looked up via Keycloak admin API
+    realm_mgmt_client = keycloak.openid.get_client(
+        realm_id="ol-data-platform",
+        client_id="realm-management",
+        opts=InvokeOptions(provider=keycloak_provider),
+    )
+
+    for resource_name, role in [
+        ("ol-superset-service-account-view-realm", "view-realm"),
+        ("ol-superset-service-account-view-users", "view-users"),
+    ]:
+        keycloak.openid.ClientServiceAccountRole(
+            resource_name,
+            realm_id=ol_data_platform_realm.id,
+            service_account_user_id=ol_data_platform_superset_client.service_account_user_id,
+            client_id=realm_mgmt_client.id,
+            role=role,
+            opts=resource_options,
+        )
+
+    # Create public client for CLI/interactive OAuth flows (no client secret needed)
+    # This allows tools like superset-sup to use browser-based auth without secrets
+    keycloak.openid.Client(
+        "ol-data-platform-superset-cli-client",
+        name="ol-data-platform-superset-cli-client",
+        realm_id=ol_data_platform_realm.id,
+        client_id="ol-superset-cli",
+        enabled=True,
+        access_type="PUBLIC",  # Public client - no secret required
+        standard_flow_enabled=True,  # Authorization code flow
+        implicit_flow_enabled=False,
+        direct_access_grants_enabled=False,
+        service_accounts_enabled=False,
+        valid_redirect_uris=[
+            "http://localhost:8080/callback",  # CLI callback
+            "http://localhost:*/callback",  # Allow any localhost port
+            "http://127.0.0.1:8080/callback",
+        ],
+        web_origins=["+"],  # Allow all origins for CORS (CLI use)
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
     # Create realm roles for ol-data-platform
@@ -274,11 +318,12 @@ def create_ol_data_platform_realm(  # noqa: PLR0913
         client_scope_id=ol_data_platform_role_keys_openid_client_scope.id,
         multivalued=True,
         name="role_keys",
+        opts=resource_options,
     )
 
     keycloak.openid.ClientDefaultScopes(
         "ol-data-platform-superset-client-default-scopes",
-        realm_id="ol-data-platform",
+        realm_id=ol_data_platform_realm.id,
         client_id=ol_data_platform_superset_client.id,
         default_scopes=[
             "acr",
@@ -290,6 +335,7 @@ def create_ol_data_platform_realm(  # noqa: PLR0913
             "roles",
             "web-origins",
         ],
+        opts=resource_options,
     )
 
     # SUPERSET [END] # noqa: ERA001

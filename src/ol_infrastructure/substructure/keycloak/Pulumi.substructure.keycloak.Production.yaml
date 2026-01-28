@@ -70,7 +70,9 @@ config:
   keycloak_realm:ol-platform-engineering-jupyterhub-redirect-uris:
   - "https://nb.ol.mit.edu/*"
   - "https://binder.ol.mit.edu/*"
-  keycloak_realm:ol-data-platform-superset-redirect-uris: ["https://bi.ol.mit.edu/*"]
+  keycloak_realm:ol-data-platform-superset-redirect-uris:
+  - "https://bi.ol.mit.edu/*"
+  - "http://localhost:8080/callback"
   keycloak_realm:ol-data-platform-superset-client-roles:
   - "ol_platform_admin"
   - "ol_data_engineer"
