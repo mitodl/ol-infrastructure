@@ -595,15 +595,11 @@ cert_manager_certificate = OLCertManagerCert(
         dns_names=[api_domain, frontend_domain],
     ),
 )
-application_labels = k8s_app_labels | {
-    "ol.mit.edu/application": "mitxonline",
-    "ol.mit.edu/pod-security-group": "mitxonline",
-}
 mitxonline_direct_oidc = OLApisixOIDCResources(
     f"ol-mitxonline-k8s-olapisixoidcresources-no-prefix-{stack_info.env_suffix}",
     oidc_config=OLApisixOIDCConfig(
         application_name="mitxonline-k8s-no-prefix",
-        k8s_labels=application_labels,
+        k8s_labels=k8s_app_labels,
         k8s_namespace=mitxonline_namespace,
         oidc_logout_path="/logout/oidc",
         oidc_post_logout_redirect_uri=f"https://{api_domain}/logout/",
@@ -620,7 +616,7 @@ mitxonline_prefixed_oidc_resources = OLApisixOIDCResources(
     f"ol-mitxonline-k8s-olapisixoidcresources-{stack_info.env_suffix}",
     oidc_config=OLApisixOIDCConfig(
         application_name="mitxonline-k8s",
-        k8s_labels=application_labels,
+        k8s_labels=k8s_app_labels,
         k8s_namespace=mitxonline_namespace,
         oidc_logout_path=f"/{api_path_prefix}/logout/oidc",
         oidc_post_logout_redirect_uri=f"https://{api_domain}/{api_path_prefix}/logout/",
@@ -638,7 +634,7 @@ mitxonline_shared_plugins = OLApisixSharedPlugins(
         application_name="mitxonline",
         resource_suffix="ol-shared-plugins",
         k8s_namespace=mitxonline_namespace,
-        k8s_labels=application_labels,
+        k8s_labels=k8s_app_labels,
         enable_defaults=True,
     ),
 )

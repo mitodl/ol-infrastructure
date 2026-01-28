@@ -171,13 +171,11 @@ for k, v in raw_env_vars.items():
         )
     )
 
-application_labels = k8s_app_labels
-
 # Create separate PVCs for blue and green deployments
 def create_pvc_for_color(color: str) -> kubernetes.core.v1.PersistentVolumeClaim:
     """Create a PVC for the specified color deployment."""
     pvc_name = f"nextjs-build-cache-efs-{color}"
-    color_labels = application_labels | {"deployment-color": color}
+    color_labels = k8s_app_labels | {"deployment-color": color}
     return kubernetes.core.v1.PersistentVolumeClaim(
         f"mit-learn-nextjs-{stack_info.name}-pvc-{color}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -206,7 +204,7 @@ mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
         lambda c: kubernetes.meta.v1.ObjectMetaArgs(
             name=f"mit-learn-nextjs-build-{c}",
             namespace=learn_namespace,
-            labels=application_labels | {"deployment-color": c},
+            labels=k8s_app_labels | {"deployment-color": c},
         )
     ),
     spec=new_color.apply(
@@ -216,7 +214,7 @@ mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
             active_deadline_seconds=1200,
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=application_labels | {"deployment-color": c}
+                    labels=k8s_app_labels | {"deployment-color": c}
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     restart_policy="OnFailure",
@@ -261,7 +259,7 @@ mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
 # Helper function to create a deployment for a specific color
 def create_deployment_for_color(color: str) -> kubernetes.apps.v1.Deployment:
     """Create a blue or green deployment."""
-    color_labels = application_labels | {"deployment-color": color}
+    color_labels = k8s_app_labels | {"deployment-color": color}
     pvc_name = f"nextjs-build-cache-efs-{color}"
 
     volume = kubernetes.core.v1.VolumeArgs(
@@ -387,7 +385,7 @@ deployment_state_configmap = kubernetes.core.v1.ConfigMap(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="mit-learn-nextjs-deployment-state",
         namespace=learn_namespace,
-        labels=application_labels,
+        labels=k8s_app_labels,
     ),
     data={
         "last_active": active_color,
@@ -403,7 +401,7 @@ deployment_state_configmap = kubernetes.core.v1.ConfigMap(
 # With auto_toggle enabled, this automatically routes to the new deployment
 mit_learn_nextjs_service_name = "mit-learn-nextjs"
 active_deployment_labels = active_color.apply(
-    lambda color: application_labels | {"deployment-color": color}
+    lambda color: k8_app_labels | {"deployment-color": color}
 )
 
 mit_learn_nextjs_service = kubernetes.core.v1.Service(
@@ -411,7 +409,7 @@ mit_learn_nextjs_service = kubernetes.core.v1.Service(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="mit-learn-nextjs",
         namespace=learn_namespace,
-        labels=application_labels,
+        labels=k8s_app_labels,
         annotations={"pulumi.com/patchForce": "true"},
     ),
     spec=kubernetes.core.v1.ServiceSpecArgs(
