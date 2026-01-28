@@ -668,7 +668,14 @@ def create_k8s_resources(  # noqa: C901
                                 "--port",
                                 "8000",
                                 "--workers",
-                                "1",
+                                "2",  # allow 2 workers
+                                "--no-ws",
+                                "--runtime-mode",
+                                "mt",  # explicitly use multi-threading
+                                "--runtime-threads",
+                                "2",  # use 2 runtime threads
+                                "--backlog",
+                                "128",
                                 "--log-level",
                                 edxapp_config.get("log_level") or "warn",
                                 "--static-path-mount",
@@ -1134,7 +1141,14 @@ def create_k8s_resources(  # noqa: C901
                                 "--port",
                                 "8000",
                                 "--workers",
-                                "1",
+                                "2",  # allow 2 workers
+                                "--no-ws",
+                                "--runtime-mode",
+                                "mt",  # explicitly use multi-threading
+                                "--runtime-threads",
+                                "2",  # use 2 runtime threads
+                                "--backlog",
+                                "128",
                                 "--log-level",
                                 edxapp_config.get("log_level") or "warn",
                                 "--static-path-mount",

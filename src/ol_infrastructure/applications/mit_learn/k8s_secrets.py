@@ -169,6 +169,8 @@ def create_mitlearn_k8s_secrets(
         mount_type="kv-v2",  # This mount is kv-v2
         path="secrets",
         templates={
+            "FASTLY_API_KEY": '{{ index .Secrets "fastly" "api_key" }}',
+            "FASTLY_SERVICE_ID": '{{ index .Secrets "fastly" "service_id" }}',
             # Nested keys require `index .Secrets "parent" "child"` syntax
             "CKEDITOR_ENVIRONMENT_ID": '{{ index .Secrets "ckeditor" "environment_id" }}',
             "CKEDITOR_SECRET_KEY": '{{ index .Secrets "ckeditor" "secret_key" }}',
