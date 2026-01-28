@@ -171,6 +171,7 @@ for k, v in raw_env_vars.items():
         )
     )
 
+
 # Create separate PVCs for blue and green deployments
 def create_pvc_for_color(color: str) -> kubernetes.core.v1.PersistentVolumeClaim:
     """Create a PVC for the specified color deployment."""
