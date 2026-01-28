@@ -95,7 +95,7 @@ k8s_global_labels = K8sGlobalLabels(
     product=Product.data,
     service=Services.airbyte,
     ou=BusinessUnit.data,
-    source_repository="https://airbytehq.github.io",
+    source_repository="https://github.com/airbytehq/airbyte",
     stack=stack_info,
 ).model_dump()
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
