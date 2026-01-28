@@ -14,7 +14,7 @@
 ## SOPS secrets
 
 ```yaml
-meilisearch_master_kay: <See below>
+meilisearch_master_key: <See below>
 meilisearch_api_key: <See below>
 ```
 
