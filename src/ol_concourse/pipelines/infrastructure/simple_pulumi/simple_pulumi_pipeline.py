@@ -12,9 +12,29 @@ from pydantic import BaseModel, model_validator
 
 from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
-from ol_concourse.lib.models.pipeline import Identifier, Pipeline
-from ol_concourse.lib.resources import git_repo
+from ol_concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
+from ol_concourse.lib.resources import git_repo, registry_image
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
+
+
+class DockerImageConfig(BaseModel):
+    """Configuration for a Docker image input.
+
+    Attributes:
+        image_repository: Docker image repository (e.g., "kodhive/leek").
+        image_tag: Optional tag to watch (default: "latest").
+        username: Optional Docker registry username.
+        password: Optional Docker registry password.
+        env_var_for_digest: Optional environment variable name to pass digest to Pulumi.
+        env_var_for_tag: Optional environment variable name to pass tag to Pulumi.
+    """
+
+    image_repository: str
+    image_tag: str | None = "latest"
+    username: str | None = None
+    password: str | None = None
+    env_var_for_digest: str | None = None
+    env_var_for_tag: str | None = None
 
 
 class SimplePulumiParams(BaseModel):
@@ -33,6 +53,8 @@ class SimplePulumiParams(BaseModel):
                              (default: False unless deployment_groups is set).
         additional_watched_paths: Additional paths to watch beyond PULUMI_WATCHED_PATHS.
         branch: Git branch to watch (default: "main").
+        docker_image: Optional Docker image configuration for apps that depend on
+                     external Docker images.
     """
 
     app_name: str
@@ -44,6 +66,7 @@ class SimplePulumiParams(BaseModel):
     auto_discover_stacks: bool = False
     additional_watched_paths: list[str] = []
     branch: str = "main"
+    docker_image: DockerImageConfig | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -220,6 +243,16 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_name="ol-infrastructure-bootcamps-application",
         additional_watched_paths=["src/bridge/lib/"],
     ),
+    "celery-monitoring": SimplePulumiParams(
+        app_name="celery-monitoring",
+        pulumi_project_path="applications/celery_monitoring/",
+        stack_prefix="applications.celery_monitoring",
+        pulumi_project_name="ol-infrastructure-celery-monitoring-server",
+        docker_image=DockerImageConfig(
+            image_repository="kodhive/leek",
+            image_tag="0.7.5",  # Must match LEEK_VERSION in bridge.lib.versions
+        ),
+    ),
 }
 
 
@@ -255,6 +288,33 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             *params.additional_watched_paths,
         ],
     )
+
+    # Set up Docker image resource if configured
+    docker_image_resource = None
+    docker_dependencies = []
+    docker_env_vars_from_files = {}
+
+    if params.docker_image:
+        docker_image_resource = registry_image(
+            name=Identifier(f"{app_name}-docker-image"),
+            image_repository=params.docker_image.image_repository,
+            image_tag=params.docker_image.image_tag,
+            username=params.docker_image.username,
+            password=params.docker_image.password,
+        )
+        docker_dependencies.append(
+            GetStep(get=docker_image_resource.name, trigger=True)
+        )
+
+        # Set up environment variables from docker image files if configured
+        if params.docker_image.env_var_for_digest:
+            docker_env_vars_from_files[params.docker_image.env_var_for_digest] = (
+                f"{docker_image_resource.name}/digest"
+            )
+        if params.docker_image.env_var_for_tag:
+            docker_env_vars_from_files[params.docker_image.env_var_for_tag] = (
+                f"{docker_image_resource.name}/tag"
+            )
 
     # Determine stack names to use
     if params.auto_discover_stacks:
@@ -295,7 +355,8 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                     project_source_path=PULUMI_CODE_PATH.joinpath(
                         params.pulumi_project_path
                     ),
-                    dependencies=[],
+                    dependencies=docker_dependencies,
+                    env_vars_from_files=docker_env_vars_from_files or None,
                 )
 
                 # Collect resources and jobs
@@ -304,12 +365,13 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 all_jobs.extend(group_fragment.jobs)
 
             # Combine all fragments
+            all_pipeline_resources = [pulumi_code, *all_resources]
+            if docker_image_resource:
+                all_pipeline_resources.append(docker_image_resource)
+
             combined_fragment = PipelineFragment(
                 resource_types=all_resource_types,
-                resources=[
-                    pulumi_code,
-                    *all_resources,
-                ],
+                resources=all_pipeline_resources,
                 jobs=all_jobs,
             )
         else:
@@ -321,15 +383,17 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 project_source_path=PULUMI_CODE_PATH.joinpath(
                     params.pulumi_project_path
                 ),
-                dependencies=[],
+                dependencies=docker_dependencies,
+                env_vars_from_files=docker_env_vars_from_files or None,
             )
+
+            all_pipeline_resources = [pulumi_code, *pulumi_fragment.resources]
+            if docker_image_resource:
+                all_pipeline_resources.append(docker_image_resource)
 
             combined_fragment = PipelineFragment(
                 resource_types=pulumi_fragment.resource_types,
-                resources=[
-                    pulumi_code,
-                    *pulumi_fragment.resources,
-                ],
+                resources=all_pipeline_resources,
                 jobs=pulumi_fragment.jobs,
             )
     else:
@@ -344,15 +408,17 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             project_name=params.pulumi_project_name,
             stack_names=stack_names,
             project_source_path=PULUMI_CODE_PATH.joinpath(params.pulumi_project_path),
-            dependencies=[],
+            dependencies=docker_dependencies,
+            env_vars_from_files=docker_env_vars_from_files or None,
         )
+
+        all_pipeline_resources = [pulumi_code, *pulumi_fragment.resources]
+        if docker_image_resource:
+            all_pipeline_resources.append(docker_image_resource)
 
         combined_fragment = PipelineFragment(
             resource_types=pulumi_fragment.resource_types,
-            resources=[
-                pulumi_code,
-                *pulumi_fragment.resources,
-            ],
+            resources=all_pipeline_resources,
             jobs=pulumi_fragment.jobs,
         )
 
