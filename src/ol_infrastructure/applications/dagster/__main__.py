@@ -107,7 +107,7 @@ k8s_global_labels = K8sGlobalLabels(
     application=Application.dagster,
     product=Product.data,
     service=Services.dagster,
-    source_repository="https://dagster-io.github.io",
+    source_repository="https://github.com/dagster-io/dagster",
     ou=BusinessUnit.data,
     stack=stack_info,
 )
