@@ -27,7 +27,7 @@ This is a pain but there isn't a way around it. For `meilisearch_api_key`, you f
 ```bash
 kubectl exec -it -n mitxonline-openedx meilisearch-0 -- sh
 ```
-Then you need to curl localhost using the `meilisearch_master_key` that you generated earlier, and pull down the a short list of default keys that the meilisearch instance provisioned for itself on the first startup. The data is JSON.
+Then you need to curl localhost using the `meilisearch_master_key` that you generated earlier, and pull down a short list of default keys that the meilisearch instance provisioned for itself on the first startup. The data is JSON.
 ```
 curl -X GET http://localhost:7700/keys  -H "Authorization: Bearer <YOUR MASTER KEY>" -H "Content-Type: application/json"
 <A bunch of JSON>
