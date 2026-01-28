@@ -161,6 +161,7 @@ if __name__ == "__main__":
         app_names = [
             "airbyte",
             "bootcamps",
+            "celery-monitoring",
             "digital-credentials",
             "fastly-redirector",
             "micromasters",
