@@ -8,7 +8,7 @@ import Footer, { Logo, MenuLinks, CopyrightNotice } from './Footer.jsx';
 import './mitxonline-styles.scss';
 
 const configData = getConfig();
-const UAI_COURSE_KEYS = ['course-v1:uai_'];
+const UAI_COURSE_KEYS = ['course-v1:uai_', 'course-v1:mitxt+ctl.scx_wm+1t2026'];
 const MOBILE_BREAKPOINT = 991; // px
 const AUTHORING_APP_ID = 'authoring';
 const LEARNING_APPS = ['learning', 'discussions', 'ora-grading', 'communications'];

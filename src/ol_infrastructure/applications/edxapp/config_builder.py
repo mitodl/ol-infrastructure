@@ -551,6 +551,7 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
             "MIT_LEARN_SUPPORT_SITE_LINK": "mailto:mitlearn-support@mit.edu",
             "UAI_COURSE_KEY_FORMATS": [
                 "course-v1:uai_",
+                "course-v1:mitxt+ctl.scx_wm+1t2026",
             ],
             "OL_OPENEDX_COURSE_SYNC_SERVICE_WORKER_USERNAME": "studio_worker",
             "ORA2_FILE_PREFIX": "mitxonline/ora2",
