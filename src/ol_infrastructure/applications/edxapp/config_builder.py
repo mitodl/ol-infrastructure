@@ -443,7 +443,7 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
             "COMPLETE",
         ],
         # Module-level settings overrides for residential
-        "DISABLE_START_DATES": True,
+        "DISABLE_START_DATES": False,
         "ENABLE_MKTG_SITE": False,  # Extracted to module-level
         # FEATURES overrides for residential (only non-module-level flags)
         "FEATURES": {
