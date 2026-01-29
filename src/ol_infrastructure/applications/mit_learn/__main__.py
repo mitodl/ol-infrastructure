@@ -1320,7 +1320,14 @@ if mitlearn_config.get_bool("use_granian"):
         "--port",
         f"{DEFAULT_WSGI_PORT}",
         "--workers",
-        "1",
+        "2",
+        "--no-ws",
+        "--runtime-mode",
+        "mt",  # explicitly use multi-threading
+        "--runtime-threads",
+        "2",  # use 2 runtime threads
+        "--backlog",
+        "128",
         "--log-level",
         "warning",
         "main.wsgi:application",
