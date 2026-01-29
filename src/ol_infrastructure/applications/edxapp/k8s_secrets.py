@@ -440,7 +440,5 @@ def create_k8s_secrets(
         translations_providers_secret_name=translations_providers_secret_name
         if stack_info.env_prefix == "mitxonline"
         else None,
-        meilisearch_secret_name=meilisearch_secret_name
-        if stack_info.env_prefix == "mitxonline"
-        else None,
+        meilisearch_secret_name=meilisearch_secret_name,
     )
