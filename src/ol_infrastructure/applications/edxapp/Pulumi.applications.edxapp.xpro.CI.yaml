@@ -103,3 +103,11 @@ config:
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
   edxapp:k8s_vpc: applications_vpc
+  meilisearch:deploy: "true"
+  meilisearch:enabled: "true"
+  meilisearch:domain: meilisearch-ci.xpro.mit.edu
+  meilisearch:replica_count: 1
+  meilisearch:pv_size: 10Gi
+  meilisearch:cpu_request: "250m"
+  meilisearch:memory_request: "1Gi"
+  meilisearch:memory_limit: "1Gi"

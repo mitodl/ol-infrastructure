@@ -100,3 +100,11 @@ config:
         memory_request: "3Gi"
         memory_limit: "4Gi"
   edxapp:k8s_vpc: applications_vpc
+  meilisearch:deploy: "true"
+  meilisearch:enabled: "false"
+  meilisearch:domain: meilisearch.xpro.mit.edu
+  meilisearch:replica_count: 1
+  meilisearch:pv_size: 100Gi
+  meilisearch:cpu_request: "250m"
+  meilisearch:memory_request: "4Gi"
+  meilisearch:memory_limit: "4Gi"

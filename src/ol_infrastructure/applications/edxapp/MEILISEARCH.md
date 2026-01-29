@@ -3,6 +3,7 @@
 ## Pulumi Configs
 
 ```yaml
+  meilisearch:deploy: "true"
   meilisearch:enabled: "true"
   meilisearch:domain: <A public domain that makes sense for the env>
   meilisearch:replica_count: 1 # must be 1
@@ -10,6 +11,9 @@
   meilisearch:cpu_request: "250m"
   meilisearch:memory_request: "4Gi"
   meilisearch:memory_limit: "4Gi"
+```
+
+The difference between `deploy` and `enabled`. Deploy means "deploy the helm chart" whereas enabled means "enable meilisearch integration in the Open edX platform". You can deploy the chart but not enable it in Open edX if you want to test things out first.
 
 ## SOPS secrets
 
@@ -32,8 +36,8 @@ curl -X GET http://localhost:7700/keys  -H "Authorization: Bearer <YOUR MASTER K
 Run that JSON through `jq` to make it readable and you should see an entry in the `results: []` list like this:
 ```
     {
-      "name": "Default Search API Key",
-      "description": "Use it to search from the frontend",
+      "name": "Default Admin API Key",
+      "description": "Use it for anything that is not a search operation. Caution! Do not expose it on a public frontend",
       "key": "<Big long hex number>",
       "uid": "b96ad989-66cb-49ca-ae15-475fd7f9a676",
       "actions": [
@@ -47,7 +51,7 @@ Run that JSON through `jq` to make it readable and you should see an entry in th
       "updatedAt": "2026-01-27T14:50:39.011505326Z"
     },
 ```
-It is important that you use "Default Search API Key" and not some other API key that is listed. This one has the right permissions. Copy the `key` and that is the value for `meilisearch_api_key` in the SOPS secrets.
+It is important that you use "Default Admin API Key" and not some other API key that is listed. This one has the right permissions. Copy the `key` and that is the value for `meilisearch_api_key` in the SOPS secrets.
 
 ## Reindex Data
 After you have the meilisearch instance up and running, you need to reindex all the data from the Open edX platform. This is done by running a management command on the CMS. You can do this by shelling into the CMS pod and running the command like so:
