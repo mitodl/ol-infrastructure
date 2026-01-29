@@ -456,6 +456,15 @@ def create_k8s_configmaps(  # noqa: PLR0915
         cms_interpolated_config["GITHUB_ORG_API_URL"] = edxapp_config.require(
             "github_org_api_url"
         )
+        # Right now meilisearch is only for mitxonline
+        # and we only want it enabled on the CMS side of things, NOT LMS
+        meilisearch_config = Config("meilisearch")
+        if meilisearch_config.get_bool("enabled"):
+            cms_interpolated_config["MEILISEARCH_ENABLED"] = True
+            cms_interpolated_config["MEILISEARCH_URL"] = "http://meilisearch:7700"
+            cms_interpolated_config["MEILISEARCH_PUBLIC_URL"] = (
+                f"https://{meilisearch_config.require('domain')}"
+            )
 
     cms_interpolated_config_map = kubernetes.core.v1.ConfigMap(
         f"ol-{stack_info.env_prefix}-edxapp-cms-interpolated-config-{stack_info.env_suffix}",
