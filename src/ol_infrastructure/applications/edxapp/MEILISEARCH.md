@@ -3,7 +3,7 @@
 ## Pulumi Configs
 
 ```yaml
-  meilisearch:enabled: "true"
+  meilisearch:deploy: "true"
   meilisearch:enabled: "true"
   meilisearch:domain: <A public domain that makes sense for the env>
   meilisearch:replica_count: 1 # must be 1
