@@ -1,6 +1,16 @@
-from pulumi import Alias, Config, ResourceOptions, StackReference, export
-from pulumi_aws import iam, s3, sns
+"""Monitoring infrastructure resources including SNS topics and S3 buckets."""
 
+from pulumi import (
+    ROOT_STACK_RESOURCE,
+    Alias,
+    Config,
+    ResourceOptions,
+    StackReference,
+    export,
+)
+from pulumi_aws import iam, sns
+
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -54,44 +64,55 @@ export(
 ### Fastly Logs shippting to S3
 fastly_logging_bucket_name = monitoring_config.get("fastly_logging_bucket_name")
 
-fastly_logging_bucket = s3.Bucket(
-    f"monitoring-{fastly_logging_bucket_name}",
-    bucket=fastly_logging_bucket_name,
-    acl="private",
-    server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
-        rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
-                sse_algorithm="aws:kms",
-                kms_master_key_id=kms_s3_key["id"],
-            ),
-            bucket_key_enabled=True,
-        )
-    ),
+fastly_logging_bucket_config = S3BucketConfig(
+    bucket_name=fastly_logging_bucket_name,
+    versioning_enabled=False,
+    ownership_controls="BucketOwnerEnforced",
+    server_side_encryption_enabled=True,
+    kms_key_id=kms_s3_key["id"],
+    bucket_key_enabled=True,
     tags=aws_config.merged_tags(
         {"OU": "operations", "Name": fastly_logging_bucket_name}
     ),
-    # Renamed this resource but we don't want pulumi to destroy the existing bucket.
-    opts=ResourceOptions(
-        aliases=[
-            Alias(name=f"{fastly_logging_bucket_name}-production"),
-            Alias(name=f"monitoring-{fastly_logging_bucket_name}-production"),
-        ],
-        protect=True,
-    ),
 )
 
-s3.BucketPublicAccessBlock(
-    f"monitoring-{fastly_logging_bucket_name}_block_public_access",
-    bucket=fastly_logging_bucket.bucket,
-    block_public_acls=True,
-    block_public_policy=True,
-    # Renamed this resource but we don't want pulumi to destroy the
-    # existing configuration
+fastly_logging_bucket = OLBucket(
+    f"monitoring-{fastly_logging_bucket_name}",
+    config=fastly_logging_bucket_config,
     opts=ResourceOptions(
         aliases=[
-            Alias(name=f"{fastly_logging_bucket_name}-production_block_public_access"),
+            # Old bucket resource aliases (existing)
+            Alias(
+                name=f"{fastly_logging_bucket_name}-production",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name=f"monitoring-{fastly_logging_bucket_name}-production",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            # Current bucket resource alias
+            Alias(
+                name=f"monitoring-{fastly_logging_bucket_name}",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            # Public access block aliases (existing)
+            Alias(
+                name=f"{fastly_logging_bucket_name}-production_block_public_access",
+                parent=ROOT_STACK_RESOURCE,
+            ),
             Alias(
                 name=f"monitoring-{fastly_logging_bucket_name}-production_block_public_access",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            # Current public access block alias
+            Alias(
+                name=f"monitoring-{fastly_logging_bucket_name}_block_public_access",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            # Encryption alias (was inline)
+            Alias(
+                name=f"monitoring-{fastly_logging_bucket_name}-encryption",
+                parent=ROOT_STACK_RESOURCE,
             ),
         ],
         protect=True,
@@ -148,7 +169,7 @@ export(
     "fastly_access_logging_bucket",
     {
         "bucket_name": fastly_logging_bucket_name,
-        "bucket_arn": fastly_logging_bucket.arn,
+        "bucket_arn": fastly_logging_bucket.bucket_v2.arn,
     },
 )
 export(
