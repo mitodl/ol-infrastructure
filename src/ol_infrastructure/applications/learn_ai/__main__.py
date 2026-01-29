@@ -8,7 +8,6 @@ import os
 import textwrap
 from pathlib import Path
 
-import pulumi_consul as consul
 import pulumi_fastly as fastly
 import pulumi_github as github
 import pulumi_kubernetes as kubernetes
@@ -66,18 +65,15 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
-from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
 )
 from ol_infrastructure.lib.ol_types import (
-    Application,
     AWSBase,
     BusinessUnit,
-    K8sAppLabels,
+    K8sGlobalLabels,
     KubernetesServiceAppProtocol,
-    Product,
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -123,13 +119,8 @@ github_provider = github.Provider(
     token=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["token"],
 )
 
-k8s_app_labels = K8sAppLabels(
-    application=Application.learn_ai,
-    product=Product.mitlearn,
-    service=Services.learn_ai,
-    source_repository="https://github.com/mitodl/learn_ai",
-    ou=BusinessUnit.mit_learn,
-    stack=stack_info,
+k8s_global_labels = K8sGlobalLabels(
+    ou=BusinessUnit.mit_learn, service=Services.mit_learn, stack=stack_info
 ).model_dump()
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
@@ -283,7 +274,7 @@ learn_ai_service_account = kubernetes.core.v1.ServiceAccount(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=learn_ai_service_account_name,
         namespace=learn_ai_namespace,
-        labels=k8s_app_labels,
+        labels=k8s_global_labels,
         annotations={
             "eks.amazonaws.com/role-arn": learn_ai_trust_role.role.arn,
         },
@@ -640,7 +631,7 @@ learn_ai_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
 vault_k8s_resources_config = OLVaultK8SResourcesConfig(
     application_name="learn-ai",
     namespace=learn_ai_namespace,
-    labels=k8s_app_labels,
+    labels=k8s_global_labels,
     vault_address=vault_config.require("address"),
     vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
     vault_auth_role_name=learn_ai_vault_auth_backend_role.role_name,
@@ -666,9 +657,9 @@ db_creds_secret = Output.all(
         OLVaultK8SDynamicSecretConfig(
             name="learn-ai-db-creds",
             namespace=learn_ai_namespace,
-            dest_secret_labels=k8s_app_labels,
+            dest_secret_labels=k8s_global_labels,
             dest_secret_name=db_creds_secret_name,
-            labels=k8s_app_labels,
+            labels=k8s_global_labels,
             mount=learn_ai_db.app_db_vault_backend.db_mount.path,
             path="creds/app",
             restart_target_kind="Deployment",
@@ -693,7 +684,7 @@ redis_creds = kubernetes.core.v1.Secret(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=redis_creds_secret_name,
         namespace=learn_ai_namespace,
-        labels=k8s_app_labels,
+        labels=k8s_global_labels,
     ),
     string_data=redis_cache.address.apply(
         lambda address: {
@@ -718,9 +709,9 @@ static_secrets = OLVaultK8SSecret(
     resource_config=OLVaultK8SStaticSecretConfig(
         name="learn-ai-static-secrets",
         namespace=learn_ai_namespace,
-        labels=k8s_app_labels,
+        labels=k8s_global_labels,
         dest_secret_name=static_secrets_name,
-        dest_secret_labels=k8s_app_labels,
+        dest_secret_labels=k8s_global_labels,
         mount="secret-learn-ai",
         mount_type="kv-v2",
         path="secrets",
@@ -742,7 +733,7 @@ learn_ai_nginx_configmap = kubernetes.core.v1.ConfigMap(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="nginx-config",
         namespace=learn_ai_namespace,
-        labels=k8s_app_labels,
+        labels=k8s_global_labels,
     ),
     data={
         "web.conf": Path(__file__).parent.joinpath("files/web.conf").read_text(),
@@ -787,7 +778,7 @@ learn_ai_app_k8s = OLApplicationK8s(
         application_lb_service_name="learn-ai-webapp",
         application_lb_service_port_name="http",
         application_lb_service_app_protocol=KubernetesServiceAppProtocol.WS,
-        k8s_global_labels=k8s_app_labels,
+        k8s_global_labels=k8s_global_labels,
         env_from_secret_names=[
             db_creds_secret_name,
             redis_creds_secret_name,
@@ -913,7 +904,7 @@ learn_ai_shared_plugins = OLApisixSharedPlugins(
         application_name="learn-ai",
         resource_suffix="ol-shared-plugins",
         k8s_namespace=learn_ai_namespace,
-        k8s_labels=k8s_app_labels,
+        k8s_labels=k8s_global_labels,
         enable_defaults=True,
     ),
     opts=ResourceOptions(delete_before_replace=True),
@@ -924,7 +915,7 @@ learn_ai_oidc_resources = OLApisixOIDCResources(
     f"learn-ai-{stack_info.env_suffix}-oidc-resources",
     oidc_config=OLApisixOIDCConfig(
         application_name="learn-ai",
-        k8s_labels=k8s_app_labels,
+        k8s_labels=k8s_global_labels,
         k8s_namespace=learn_ai_namespace,
         oidc_scope="openid profile email",  # Default scope from component
         oidc_introspection_endpoint_auth_method="client_secret_basic",  # Default
@@ -965,7 +956,7 @@ proxy_rewrite_plugin = OLApisixPluginConfig(
 mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
     f"mit-learn-learn-ai-{stack_info.env_suffix}-https-olapisixroute",
     k8s_namespace=learn_ai_namespace,
-    k8s_labels=k8s_app_labels,
+    k8s_labels=k8s_global_labels,
     route_configs=[
         # Protected route for canvas syllabus agent - requires canvas_token header
         OLApisixRouteConfig(
@@ -1080,7 +1071,7 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
 learn_ai_https_apisix_route = OLApisixRoute(
     f"learn-ai-{stack_info.env_suffix}-https-olapisixroute",
     k8s_namespace=learn_ai_namespace,
-    k8s_labels=k8s_app_labels,
+    k8s_labels=k8s_global_labels,
     route_configs=[
         # Protected route for canvas syllabus agent - requires canvas_token header
         OLApisixRouteConfig(
@@ -1188,7 +1179,7 @@ learn_ai_https_cert = OLCertManagerCert(
     cert_config=OLCertManagerCertConfig(
         application_name="learn-ai",
         k8s_namespace=learn_ai_namespace,
-        k8s_labels=k8s_app_labels,
+        k8s_labels=k8s_global_labels,
         create_apisixtls_resource=True,
         apisixtls_ingress_class="apache-apisix",
         dest_secret_name="learn-ai-https-cert",  # noqa: S106  # pragma: allowlist secret
@@ -1202,7 +1193,7 @@ learn_ai_https_apisix_consumer = kubernetes.apiextensions.CustomResource(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="canvas-agent",
         namespace=learn_ai_namespace,
-        labels=k8s_app_labels,
+        labels=k8s_global_labels,
     ),
     spec={
         "ingressClassName": "apache-apisix",
@@ -1258,140 +1249,6 @@ gh_workflow_s3_bucket_name_env_secret = github.ActionsVariable(
     variable_name=f"AWS_S3_BUCKET_NAME_{env_var_suffix}",  # pragma: allowlist secret
     value=learn_ai_app_storage_bucket_name,
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-
-frontend_vars = learn_ai_config.require_object("frontend_vars")
-# Variables for frontend app build
-gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"learn-ai-gh-workflow-api-base-env-variablet-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"API_BASE_{env_var_suffix}",  # pragma: allowlist secret
-    value=f"https://{learn_api_domain}/ai",
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"learn-ai-gh-workflow-ai-csrf-cookie-name-env-variablet-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"AI_CSRF_COOKIE_NAME_{env_var_suffix}",  # pragma: allowlist secret
-    value="csrftoken",
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"learn-ai-gh-workflow-learn-mit-ai-login-url-env-variablet-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"MIT_LEARN_AI_LOGIN_URL_{env_var_suffix}",  # pragma: allowlist secret
-    value=f"https://{learn_api_domain}/ai/http/login/",
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"learn-ai-gh-workflow-mit-learn-api-base-url-variablet-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"MIT_LEARN_API_BASE_URL_{env_var_suffix}",  # pragma: allowlist secret
-    value=f"https://{learn_api_domain}/learn/",
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"learn-ai-gh-workflow-mit-learn-app-base-url-variablet-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"MIT_LEARN_APP_BASE_URL_{env_var_suffix}",  # pragma: allowlist secret
-    value=frontend_vars["MIT_LEARN_APP_BASE_URL"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"learn-ai-gh-workflow-openedx-api-base-url-variablet-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"OPENEDX_API_BASE_URL_{env_var_suffix}",  # pragma: allowlist secret
-    value=frontend_vars["OPENEDX_API_BASE_URL"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"learn-ai-gh-workflow-openedx-login-url-variablet-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"OPENEDX_LOGIN_URL_{env_var_suffix}",  # pragma: allowlist secret
-    value=frontend_vars["OPENEDX_LOGIN_URL"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"learn-ai-gh-workflow-ai-elasticsearch-url-variablet-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"MIT_SEARCH_ELASTIC_URL_{env_var_suffix}",  # pragma: allowlist secret
-    value=frontend_vars["MIT_SEARCH_ELASTIC_URL"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"learn-ai-gh-workflow-ai-vectorsearch-url-variablet-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"MIT_SEARCH_VECTOR_URL_{env_var_suffix}",  # pragma: allowlist secret
-    value=frontend_vars["MIT_SEARCH_VECTOR_URL"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-
-xpro_consul_opts = get_consul_provider(
-    stack_info=stack_info,
-    consul_address=f"https://consul-xpro-{stack_info.env_suffix}.odl.mit.edu",
-    provider_name=f"consul-provider-xpro-{stack_info.env_suffix}",
-)
-consul.Keys(
-    f"learn-api-domain-consul-key-for-xpro-openedx-{stack_info.env_suffix}",
-    keys=[
-        consul.KeysKeyArgs(
-            path="edxapp/learn-ai-frontend-domain",
-            delete=False,
-            value=learn_ai_frontend_domain,
-        )
-    ],
-    opts=xpro_consul_opts,
-)
-
-mitxonline_consul_opts = get_consul_provider(
-    stack_info,
-    consul_address=f"https://consul-mitxonline-{stack_info.env_suffix}.odl.mit.edu",
-    provider_name=f"consul-provider-mitxonline-{stack_info.env_suffix}",
-)
-consul.Keys(
-    "learn-api-domain-consul-key-for-mitxonline-openedx",
-    keys=[
-        consul.KeysKeyArgs(
-            path="edxapp/learn-ai-frontend-domain",
-            delete=False,
-            value=learn_ai_frontend_domain,
-        )
-    ],
-    opts=mitxonline_consul_opts,
-)
-
-mitx_consul_opts = get_consul_provider(
-    stack_info,
-    consul_address=f"https://consul-mitx-{stack_info.env_suffix}.odl.mit.edu",
-    provider_name=f"consul-provider-mitx-{stack_info.env_suffix}",
-)
-consul.Keys(
-    "learn-api-domain-consul-key-for-mitx-openedx",
-    keys=[
-        consul.KeysKeyArgs(
-            path="edxapp/learn-ai-frontend-domain",
-            delete=False,
-            value=learn_ai_frontend_domain,
-        )
-    ],
-    opts=mitx_consul_opts,
-)
-
-mitx_staging_consul_opts = get_consul_provider(
-    stack_info,
-    consul_address=f"https://consul-mitx-staging-{stack_info.env_suffix}.odl.mit.edu",
-    provider_name=f"consul-provider-mitx-staging-{stack_info.env_suffix}",
-)
-consul.Keys(
-    "learn-api-domain-consul-key-for-mitx-staging-openedx",
-    keys=[
-        consul.KeysKeyArgs(
-            path="edxapp/learn-ai-frontend-domain",
-            delete=False,
-            value=learn_ai_frontend_domain,
-        )
-    ],
-    opts=mitx_staging_consul_opts,
 )
 
 if stack_info.env_suffix != "ci":

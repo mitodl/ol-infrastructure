@@ -156,11 +156,8 @@ class K8sGlobalLabels(BaseModel):
     ou: BusinessUnit
     # There are projects that may not be attached to a product -
     # like data platform e.g. airbyte
-    product: Product
-    application: Application
     service: Services
     stack: StackInfo
-    source_repository: str
 
     @staticmethod
     def _sanitize_label_value(value: str) -> str:
