@@ -46,7 +46,7 @@ from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
     BusinessUnit,
-    K8sGlobalLabels,
+    K8sAppLabels,
     Product,
     Services,
 )
@@ -81,7 +81,7 @@ keycloak_domain = (
     keycloak_config.get("domain") or f"sso-{stack_info.env_suffix}.ol.mit.edu"
 )
 
-k8s_global_labels = K8sGlobalLabels(
+k8s_global_labels = K8sAppLabels(
     application=Application.keycloak,
     product=Product.infrastructure,
     ou=BusinessUnit.operations,

@@ -45,7 +45,7 @@ from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
     BusinessUnit,
-    K8sGlobalLabels,
+    K8sAppLabels,
     Product,
     Services,
 )
@@ -83,7 +83,7 @@ cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(superset_namespace, ns)
 )
 # Use a valid, existing service enum for labels
-k8s_labels = K8sGlobalLabels(
+k8s_labels = K8sAppLabels(
     application=Application.superset,
     product=Product.data,
     service=Services.superset,

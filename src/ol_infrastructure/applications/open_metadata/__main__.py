@@ -37,7 +37,7 @@ from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
     BusinessUnit,
-    K8sGlobalLabels,
+    K8sAppLabels,
     Product,
     Services,
 )
@@ -71,7 +71,7 @@ vault_config = Config("vault")
 
 setup_vault_provider(stack_info)
 
-k8s_global_labels = K8sGlobalLabels(
+k8s_global_labels = K8sAppLabels(
     application=Application.open_metadata,
     product=Product.data,
     service=Services.open_metadata,

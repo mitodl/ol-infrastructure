@@ -27,7 +27,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
 from ol_infrastructure.lib.ol_types import (
     Application,
     BusinessUnit,
-    K8sGlobalLabels,
+    K8sAppLabels,
     Product,
     Services,
 )
@@ -71,7 +71,7 @@ cluster_stack.require_output("namespaces").apply(
 )
 
 # K8s labels for Tika
-k8s_global_labels = K8sGlobalLabels(
+k8s_global_labels = K8sAppLabels(
     application=Application.tika,
     service=Services.tika,
     product=Product.data,
