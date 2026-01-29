@@ -16,7 +16,14 @@ import pulumi
 import pulumi_fastly as fastly
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Alias, Config, ResourceOptions, StackReference, export
+from pulumi import (
+    ROOT_STACK_RESOURCE,
+    Alias,
+    Config,
+    ResourceOptions,
+    StackReference,
+    export,
+)
 from pulumi_aws import ec2, iam, s3
 
 from bridge.lib.magic_numbers import (
@@ -33,6 +40,7 @@ from ol_infrastructure.components.aws.cache import (
     OLAmazonRedisConfig,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
@@ -122,35 +130,46 @@ cluster_stack.require_output("namespaces").apply(
 
 # Bucket used to store files from MITx Online app.
 mitxonline_bucket_name = f"ol-mitxonline-app-{stack_info.env_suffix}"
-mitxonline_bucket = s3.Bucket(
-    f"mitxonline-{stack_info.env_suffix}",
-    bucket=mitxonline_bucket_name,
-    tags=aws_config.tags,
-)
-mitxonline_bucket_ownership_controls = s3.BucketOwnershipControls(
-    f"mitxonline-{stack_info.env_suffix}-ownership-controls",
-    bucket=mitxonline_bucket.id,
-    rule=s3.BucketOwnershipControlsRuleArgs(
-        object_ownership="BucketOwnerPreferred",
-    ),
-)
-mitxonline_bucket_versioning = s3.BucketVersioning(
-    f"mitxonline-{stack_info.env_suffix}-versioning",
-    bucket=mitxonline_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Enabled",
-    ),
-)
-mitxonline_bucket_public_access = s3.BucketPublicAccessBlock(
-    f"mitxonline-{stack_info.env_suffix}-public-access-block",
-    bucket=mitxonline_bucket.id,
+
+mitxonline_bucket_config = S3BucketConfig(
+    bucket_name=mitxonline_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerPreferred",
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
+    restrict_public_buckets=False,
+    tags=aws_config.tags,
 )
+
+mitxonline_bucket = OLBucket(
+    f"mitxonline-{stack_info.env_suffix}",
+    config=mitxonline_bucket_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"mitxonline-{stack_info.env_suffix}",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name=f"mitxonline-{stack_info.env_suffix}-ownership-controls",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name=f"mitxonline-{stack_info.env_suffix}-versioning",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name=f"mitxonline-{stack_info.env_suffix}-public-access-block",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+        ]
+    ),
+)
+
 mitxonline_bucket_policy = s3.BucketPolicy(
     f"mitxonline-{stack_info.env_suffix}-bucket-policy",
-    bucket=mitxonline_bucket.id,
+    bucket=mitxonline_bucket.bucket_v2.id,
     policy=iam.get_policy_document(
         statements=[
             iam.GetPolicyDocumentStatementArgs(
@@ -162,7 +181,7 @@ mitxonline_bucket_policy = s3.BucketPolicy(
                     )
                 ],
                 actions=["s3:GetObject"],
-                resources=[mitxonline_bucket.arn.apply("{}/*".format)],
+                resources=[mitxonline_bucket.bucket_v2.arn.apply("{}/*".format)],
             ),
         ]
     ).json,
