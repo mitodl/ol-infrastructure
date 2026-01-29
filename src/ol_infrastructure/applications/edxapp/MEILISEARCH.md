@@ -4,12 +4,16 @@
 
 ```yaml
   meilisearch:enabled: "true"
+  meilisearch:enabled: "true"
   meilisearch:domain: <A public domain that makes sense for the env>
   meilisearch:replica_count: 1 # must be 1
   meilisearch:pv_size: 100Gi
   meilisearch:cpu_request: "250m"
   meilisearch:memory_request: "4Gi"
   meilisearch:memory_limit: "4Gi"
+```
+
+The difference between `deploy` and `enabled`. Deploy means "deploy the helm chart" whereas enabled means "enable meilisearch integration in the Open edX platform". You can deploy the chart but not enable it in Open edX if you want to test things out first.
 
 ## SOPS secrets
 
