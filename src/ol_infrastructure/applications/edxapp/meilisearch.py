@@ -34,7 +34,7 @@ def create_meilisearch_resources(
         Meilisearch Helm release resource, or None if not enabled
     """
     meilisearch_config = Config("meilisearch")
-    if not meilisearch_config.get_bool("enabled"):
+    if not meilisearch_config.get_bool("deploy"):
         return None
 
     tls_secret_name = "meilisearch-tls-pair"  # pragma: allowlist secret  # noqa: S105

@@ -112,3 +112,11 @@ config:
         memory_request: "1Gi"
         memory_limit: "2Gi"
   edxapp:k8s_vpc: residential_mitx_vpc
+  meilisearch:deploy: "true"
+  meilisearch:enabled: "true"
+  meilisearch:domain: meilisearch-staging-ci.mitx.mit.edu
+  meilisearch:replica_count: 1
+  meilisearch:pv_size: 10Gi
+  meilisearch:cpu_request: "250m"
+  meilisearch:memory_request: "1Gi"
+  meilisearch:memory_limit: "1Gi"

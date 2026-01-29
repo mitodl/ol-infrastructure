@@ -137,6 +137,7 @@ config:
   edxapp:edx_xqueue_secrets:
     secure: v1:968LG3OeHgn0GLl3:jqXqyqgWXGThSNiqEpqZeEuAZwVTCZdh1KbmExlITfC+4ImSDC+55gIpiLOST9vWciDK2wF5ZMJQrM9eY/c2SwaLH5EhoRsGcPAExuFDrxXE8eZGYb60AYXGWjOpxy2peQyPYiydnjBQGQGI+QgqG7v8ylk/YjiWEURpENwvGIUwr1w9SodgugeNL8WexzBiUiXiHUgQJg==
   edxapp:k8s_vpc: applications_vpc
+  meilisearch:deploy: "true"
   meilisearch:enabled: "true"
   meilisearch:domain: meilisearch.courses.rc.learn.mit.edu
   meilisearch:replica_count: 1
