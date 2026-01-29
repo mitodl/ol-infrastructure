@@ -110,6 +110,7 @@ aws_config = AWSBase(
 
 k8s_app_labels = K8sAppLabels(
     application=Application.mitxonline,
+    pod_security_group="mitxonline",
     product=Product.mitlearn,
     service=Services.mitxonline,
     ou=BusinessUnit.mitx_online,

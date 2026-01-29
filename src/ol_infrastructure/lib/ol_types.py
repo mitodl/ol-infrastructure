@@ -194,6 +194,7 @@ class K8sAppLabels(K8sGlobalLabels):
     product: Product
     application: Application
     component: Component | None = None
+    pod_security_group: str | None = None
     source_repository: str
     commit_sha: str | None = None
     release_tag: str | None = None
