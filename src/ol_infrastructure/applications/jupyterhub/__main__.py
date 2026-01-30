@@ -199,6 +199,7 @@ COURSE_NAMES.extend(
             11,
             12,
             13,
+            15,
             "st1",
             "mltl1",
             "pm1",
