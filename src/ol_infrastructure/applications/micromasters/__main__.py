@@ -7,11 +7,20 @@ MicroMasters application.
 
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
-from pulumi import Config, InvokeOptions, StackReference, export
+from pulumi import (
+    ROOT_STACK_RESOURCE,
+    Alias,
+    Config,
+    InvokeOptions,
+    ResourceOptions,
+    StackReference,
+    export,
+)
 from pulumi_aws import ec2, iam, s3
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
@@ -47,15 +56,31 @@ aws_config = AWSBase(
 # Bucket used to store files from MicroMasters app.
 micromasters_bucket_name = f"ol-micromasters-app-{stack_info.env_suffix}"
 micromasters_audit_bucket_name = f"odl-micromasters-audit-{stack_info.env_suffix}"
-micromasters_bucket = s3.Bucket(
-    f"micromasters-{stack_info.env_suffix}",
-    bucket=micromasters_bucket_name,
-    versioning=s3.BucketVersioningArgs(
-        enabled=True,
-    ),
+
+micromasters_bucket_config = S3BucketConfig(
+    bucket_name=micromasters_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerEnforced",
+    cors_rules=[
+        s3.BucketCorsConfigurationCorsRuleArgs(
+            allowed_methods=["GET", "HEAD"],
+            allowed_origins=["*"],
+        )
+    ],
     tags=aws_config.tags,
-    acl="private",
-    cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
+)
+
+micromasters_bucket = OLBucket(
+    f"micromasters-{stack_info.env_suffix}",
+    config=micromasters_bucket_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"micromasters-{stack_info.env_suffix}",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+        ]
+    ),
 )
 
 
