@@ -423,7 +423,6 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
         "EMAIL_HOST": "outgoing.mit.edu",
         "EMAIL_PORT": 587,
         "EMAIL_USE_TLS": True,
-        "COURSES_INVITE_ONLY": False,
         "COURSE_MODE_DEFAULTS": {
             "name": "Honor",
             "android_sku": None,
@@ -467,6 +466,7 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
     mitx.update(
         {
             "COURSE_CATALOG_VISIBILITY_PERMISSION": "staff",
+            "COURSES_INVITE_ONLY": False,
         }
     )
 
