@@ -2,11 +2,19 @@
 
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
-from pulumi import Config, InvokeOptions, export
+from pulumi import (
+    ROOT_STACK_RESOURCE,
+    Alias,
+    Config,
+    InvokeOptions,
+    ResourceOptions,
+    export,
+)
 from pulumi.output import Output
 from pulumi_aws import iam, s3
 from pulumi_vault import aws
 
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.heroku import setup_heroku_provider
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -32,20 +40,35 @@ app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
 ]
 
 app_storage_bucket_name = f"mit-open-app-storage-{app_env_suffix}"
-application_storage_bucket = s3.Bucket(
-    f"mit_open_learning_application_storage_bucket_{stack_info.env_suffix}",
-    bucket=app_storage_bucket_name,
-    versioning=s3.BucketVersioningArgs(enabled=True),
+
+application_storage_bucket_config = S3BucketConfig(
+    bucket_name=app_storage_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerEnforced",
     tags=aws_config.tags,
 )
 
+application_storage_bucket = OLBucket(
+    f"mit_open_learning_application_storage_bucket_{stack_info.env_suffix}",
+    config=application_storage_bucket_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"mit_open_learning_application_storage_bucket_{stack_info.env_suffix}",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+        ]
+    ),
+)
+
 FIVE_MINUTES = 300
-course_data_bucket = s3.Bucket(
-    f"mit-open-learning-course-data-{stack_info.env_suffix}",
-    bucket=f"open-learning-course-data-{app_env_suffix}",
-    versioning=s3.BucketVersioningArgs(enabled=True),
+
+course_data_bucket_config = S3BucketConfig(
+    bucket_name=f"open-learning-course-data-{app_env_suffix}",
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerEnforced",
     cors_rules=[
-        s3.BucketCorsRuleArgs(
+        s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_methods=["GET"],
             allowed_headers=["*"],
             allowed_origins=["*"],
@@ -53,6 +76,19 @@ course_data_bucket = s3.Bucket(
         )
     ],
     tags=aws_config.tags,
+)
+
+course_data_bucket = OLBucket(
+    f"mit-open-learning-course-data-{stack_info.env_suffix}",
+    config=course_data_bucket_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"mit-open-learning-course-data-{stack_info.env_suffix}",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+        ]
+    ),
 )
 
 parliament_config = {
