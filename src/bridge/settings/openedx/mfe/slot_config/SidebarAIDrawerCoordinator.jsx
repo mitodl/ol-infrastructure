@@ -93,7 +93,7 @@ const SidebarAIDrawerCoordinator = ({ courseId }) => {
         <>
             {currentSidebar !== null && (isNewDiscussionSidebarViewEnabled ? <NewSidebar /> : <Sidebar />)}
             <div
-                className={`ai-drawer-wrapper ml-0 ml-xl-4 h-auto align-top zindex-0 ${
+                className={`ai-drawer-wrapper ml-0 ml-xl-4 align-top ${
                     shouldDisplayFullScreen ? 'ai-drawer-wrapper-fullscreen' : ''
                 } ${showAIDrawer ? '' : 'd-none'}`}
                 aria-hidden={!showAIDrawer}
