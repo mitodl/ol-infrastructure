@@ -1,0 +1,27 @@
+--- a/schedulers.py
++++ b/schedulers.py
+@@ -120,16 +120,17 @@ class RedBeatSchedulerEntry:
+     @property
+     def due_at(self):
+-        # never run => due now
++        # Never run => due now
+         if self.last_run_at is None:
+             return self._default_now()
+
+-        delta = self.schedule.remaining_estimate(self.last_run_at)
+-        # if no delta, means no more events after the last_run_at.
++        # Fix for RedBeat Issue #307: remaining_estimate calculates from NOW, not from ref_time
++        now = self._default_now()
++        delta = self.schedule.remaining_estimate(now)
++        # If no delta, means no more events
+         if delta is None:
+             return None
+
+-        # overdue => due now
++        # Overdue => due now
+         if delta.total_seconds() < 0:
+-            return self._default_now()
++            return now
+
+-        return self.last_run_at + delta
++        return now + delta
