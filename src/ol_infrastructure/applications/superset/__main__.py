@@ -42,9 +42,11 @@ from ol_infrastructure.lib.aws.eks_helper import (
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 from ol_infrastructure.lib.ol_types import (
+    Application,
     AWSBase,
     BusinessUnit,
-    K8sGlobalLabels,
+    K8sAppLabels,
+    Product,
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -81,8 +83,11 @@ cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(superset_namespace, ns)
 )
 # Use a valid, existing service enum for labels
-k8s_labels = K8sGlobalLabels(
+k8s_labels = K8sAppLabels(
+    application=Application.superset,
+    product=Product.data,
     service=Services.superset,
+    source_repository="https://apache.github.io/superset",
     ou=BusinessUnit.data,
     stack=stack_info,
 )

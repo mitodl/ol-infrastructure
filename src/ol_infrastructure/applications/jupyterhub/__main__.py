@@ -20,9 +20,11 @@ from ol_infrastructure.lib.aws.eks_helper import (
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import (
+    Application,
     AWSBase,
     BusinessUnit,
     K8sGlobalLabels,
+    Product,
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -53,7 +55,10 @@ aws_config = AWSBase(
 
 # Kubernetes labels
 k8s_global_labels = K8sGlobalLabels(
+    application=Application.jupyterhub,
+    product=Product.mitlearn,
     service=Services.jupyterhub,
+    source_repository="https://github.com/jupyterhub",
     ou=BusinessUnit.mit_learn,
     stack=stack_info,
 ).model_dump()

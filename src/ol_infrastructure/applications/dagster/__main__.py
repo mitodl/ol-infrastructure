@@ -61,9 +61,11 @@ from ol_infrastructure.lib.aws.eks_helper import (
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 from ol_infrastructure.lib.ol_types import (
+    Application,
     AWSBase,
     BusinessUnit,
     K8sGlobalLabels,
+    Product,
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -102,7 +104,10 @@ aws_config = AWSBase(
 
 # Kubernetes labels
 k8s_global_labels = K8sGlobalLabels(
+    application=Application.dagster,
+    product=Product.data,
     service=Services.dagster,
+    source_repository="https://github.com/dagster-io/dagster",
     ou=BusinessUnit.data,
     stack=stack_info,
 )

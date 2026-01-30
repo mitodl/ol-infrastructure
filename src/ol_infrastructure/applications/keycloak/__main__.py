@@ -43,9 +43,11 @@ from ol_infrastructure.lib.aws.eks_helper import (
 )
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.ol_types import (
+    Application,
     AWSBase,
     BusinessUnit,
-    K8sGlobalLabels,
+    K8sAppLabels,
+    Product,
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -79,8 +81,13 @@ keycloak_domain = (
     keycloak_config.get("domain") or f"sso-{stack_info.env_suffix}.ol.mit.edu"
 )
 
-k8s_global_labels = K8sGlobalLabels(
-    ou=BusinessUnit.operations, service=Services.keycloak, stack=stack_info
+k8s_global_labels = K8sAppLabels(
+    application=Application.keycloak,
+    product=Product.infrastructure,
+    ou=BusinessUnit.operations,
+    service=Services.keycloak,
+    stack=stack_info,
+    source_repository="https://github.com/keycloak/keycloak",
 ).model_dump()
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 keycloak_namespace = "keycloak"

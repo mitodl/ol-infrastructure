@@ -58,9 +58,11 @@ from ol_infrastructure.lib.aws.iam_helper import (
     lint_iam_policy,
 )
 from ol_infrastructure.lib.ol_types import (
+    Application,
     AWSBase,
     BusinessUnit,
     K8sGlobalLabels,
+    Product,
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -98,8 +100,11 @@ aws_config = AWSBase(
 )
 
 k8s_global_labels = K8sGlobalLabels(
+    application=Application.airbyte,
+    product=Product.data,
     service=Services.airbyte,
     ou=BusinessUnit.data,
+    source_repository="https://github.com/airbytehq/airbyte",
     stack=stack_info,
 ).model_dump()
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))

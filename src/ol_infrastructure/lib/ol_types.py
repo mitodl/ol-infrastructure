@@ -10,6 +10,13 @@ RECOMMENDED_TAGS = {"Application", "Owner"}
 
 
 @unique
+class Product(str, Enum):
+    mitlearn = "mit-learn"
+    infrastructure = "infrastructure"
+    data = "data"
+
+
+@unique
 class BusinessUnit(str, Enum):
     """Canonical source of truth for defining valid OU tags.
 
@@ -65,6 +72,8 @@ class Services(str, Enum):
     keycloak = "keycloak"
     kubewatch = "kubewatch"
     micromasters = "micromasters"
+    open_edx = "open-edx"
+    learn_ai = ("learn-ai",)
     mit_learn = "mit-learn"
     mit_open = "open"
     mitx_edx = "mitx-edx"
@@ -79,6 +88,47 @@ class Services(str, Enum):
     vector_log_proxy = "vector-log-proxy"
     xpro = "xpro"
     xqueue = "xqueue"
+
+
+@unique
+class Application(str, Enum):
+    airbyte = "airbyte"
+    superset = "superset"
+    bootcamps = "bootcamps"
+    celery_monitoring = "celery-monitoring"
+    codejail = "codejail"
+    dagster = "dagster"
+    digital_credentials = "digital-credentials"
+    ecommerce = "unified-ecommerce"
+    edx_notes = "edx-notes"
+    edxapp = "edxapp"
+    jupyterhub = "jupyterhub"
+    keycloak = "keycloak"
+    kubewatch = "kubewatch"
+    micromasters = "micromasters"
+    learn_ai = "learn-ai"
+    mit_learn = "mit-learn"
+    mit_learn_nextjs = "mit-learn-nextjs"
+    mit_open = "open"
+    mitx_edx = "mitx-edx"
+    mitxonline = "mitxonline"
+    mitxonline_edx = "mitxonline-edx"
+    mitxpro_edx = "xpro-edx"
+    ocw_build = "ocw-build"
+    odl_video_service = "ovs"
+    open_metadata = "open-metadata"
+    redash = "redash"
+    tika = "tika"
+    vector_log_proxy = "vector-log-proxy"
+    xpro = "xpro"
+    xqueue = "xqueue"
+
+
+@unique
+class Component(str, Enum):
+    celery = "celery"
+    webapp = "webapp"
+    keycloak = "keycloak"
 
 
 @unique
@@ -104,8 +154,23 @@ class K8sGlobalLabels(BaseModel):
     """Base class for Kubernetes resource labels."""
 
     ou: BusinessUnit
+    # There are projects that may not be attached to a product -
+    # like data platform e.g. airbyte
     service: Services
     stack: StackInfo
+
+    @staticmethod
+    def _sanitize_label_value(value: str) -> str:
+        """Sanitize a string to be a valid Kubernetes label value.
+
+        Kubernetes label values must be 63 characters or less, consist of
+        alphanumeric characters, '-', '_' or '.', and must start and end
+        with an alphanumeric character.
+        """
+        sanitized = value.replace("https://", "").replace("http://", "")
+        sanitized = sanitized.replace("/", "_").replace(":", "-")
+        sanitized = sanitized[:63]
+        return sanitized.strip("-_.") or "unknown"
 
     def model_dump(self, *args, **kwargs):
         kwargs["exclude_none"] = True
@@ -113,11 +178,23 @@ class K8sGlobalLabels(BaseModel):
         model_dict = super().model_dump(*args, **kwargs)
         new_dict = {}
         for key in model_dict:
-            new_dict[f"ol.mit.edu/{key}"] = model_dict[key]
+            value = model_dict[key]
+            if key == "source_repository" and isinstance(value, str):
+                value = self._sanitize_label_value(value)
+            new_dict[f"ol.mit.edu/{key}"] = value
         new_dict["ol.mit.edu/stack"] = self.stack.full_name
         new_dict["ol.mit.edu/environment"] = self.stack.env_suffix
-        new_dict["ol.mit.edu/application"] = self.stack.env_prefix
         return new_dict
+
+
+class K8sAppLabels(K8sGlobalLabels):
+    product: Product
+    application: Application
+    component: Component | None = None
+    pod_security_group: str | None = None
+    source_repository: str
+    commit_sha: str | None = None
+    release_tag: str | None = None
 
 
 class AWSBase(BaseModel):

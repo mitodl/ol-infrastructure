@@ -34,9 +34,11 @@ from ol_infrastructure.lib.aws.eks_helper import (
 )
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.ol_types import (
+    Application,
     AWSBase,
     BusinessUnit,
-    K8sGlobalLabels,
+    K8sAppLabels,
+    Product,
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -69,9 +71,12 @@ vault_config = Config("vault")
 
 setup_vault_provider(stack_info)
 
-k8s_global_labels = K8sGlobalLabels(
+k8s_global_labels = K8sAppLabels(
+    application=Application.open_metadata,
+    product=Product.data,
     service=Services.open_metadata,
     ou=BusinessUnit.data,
+    source_repository="https://github.com/open-metadata/OpenMetadata",
     stack=stack_info,
 ).model_dump()
 
