@@ -7,8 +7,16 @@ from string import Template
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, get_caller_identity, iam, s3
+from pulumi import (
+    ROOT_STACK_RESOURCE,
+    Alias,
+    Config,
+    Output,
+    ResourceOptions,
+    StackReference,
+    export,
+)
+from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
@@ -22,6 +30,7 @@ from ol_infrastructure.components.aws.eks import (
     OLEKSTrustRole,
     OLEKSTrustRoleConfig,
 )
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
@@ -110,10 +119,25 @@ VERSIONS = {
 
 # S3 State Storage for Airbyte logs and system state
 airbyte_bucket_name = f"ol-airbyte-{stack_info.env_suffix}"
-s3.Bucket(
-    "airbyte-state-storage-bucket",
-    bucket=airbyte_bucket_name,
+
+airbyte_bucket_config = S3BucketConfig(
+    bucket_name=airbyte_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerEnforced",
     tags=aws_config.tags,
+)
+
+airbyte_bucket = OLBucket(
+    "airbyte-state-storage-bucket",
+    config=airbyte_bucket_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name="airbyte-state-storage-bucket",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+        ]
+    ),
 )
 
 # IAM and instance profile
