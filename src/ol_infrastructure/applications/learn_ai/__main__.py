@@ -34,6 +34,7 @@ from bridge.lib.magic_numbers import (
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services import appdb
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -151,40 +152,46 @@ ol_zone_id = dns_stack.require_output("ol")["id"]
 # Frontend storage bucket
 learn_ai_app_storage_bucket_name = f"ol-mit-learn-ai-{stack_info.env_suffix}"
 
-learn_ai_app_storage_bucket = s3.Bucket(
-    f"learn-ai-app-storage-bucket-{stack_info.env_suffix}",
-    bucket=learn_ai_app_storage_bucket_name,
-    tags=aws_config.tags,
-)
-
-s3.BucketVersioning(
-    f"learn-ai-app-storage-bucket-versioning-{stack_info.env_suffix}",
-    bucket=learn_ai_app_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Enabled",
-    ),
-)
-
-learn_ai_app_storage_bucket_ownership_controls = s3.BucketOwnershipControls(
-    f"learn-ai-app-storage-bucket-ownership-controls-{stack_info.env_suffix}",
-    bucket=learn_ai_app_storage_bucket.id,
-    rule=s3.BucketOwnershipControlsRuleArgs(
-        object_ownership="BucketOwnerPreferred",
-    ),
-)
-
-learn_ai_app_storage_bucket_public_access = s3.BucketPublicAccessBlock(
-    f"learn-ai-app-storage-bucket-public-access-{stack_info.env_suffix}",
-    bucket=learn_ai_app_storage_bucket.id,
+learn_ai_app_storage_bucket_config = S3BucketConfig(
+    bucket_name=learn_ai_app_storage_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerPreferred",
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
+    restrict_public_buckets=True,
+    tags=aws_config.tags,
+)
+
+learn_ai_app_storage_bucket = OLBucket(
+    f"learn-ai-app-storage-bucket-{stack_info.env_suffix}",
+    config=learn_ai_app_storage_bucket_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"learn-ai-app-storage-bucket-{stack_info.env_suffix}",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name=f"learn-ai-app-storage-bucket-versioning-{stack_info.env_suffix}",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name=f"learn-ai-app-storage-bucket-ownership-controls-{stack_info.env_suffix}",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name=f"learn-ai-app-storage-bucket-public-access-{stack_info.env_suffix}",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+        ]
+    ),
 )
 
 learn_ai_app_storage_bucket_policy = s3.BucketPolicy(
     f"learn-ai-app-storage-bucket-policy-{stack_info.env_suffix}",
-    bucket=learn_ai_app_storage_bucket.id,
-    policy=learn_ai_app_storage_bucket.arn.apply(
+    bucket=learn_ai_app_storage_bucket.bucket_v2.id,
+    policy=learn_ai_app_storage_bucket.bucket_v2.arn.apply(
         lambda arn: json.dumps(
             {
                 "Version": "2012-10-17",
@@ -199,12 +206,6 @@ learn_ai_app_storage_bucket_policy = s3.BucketPolicy(
                 ],
             }
         )
-    ),
-    opts=ResourceOptions(
-        depends_on=[
-            learn_ai_app_storage_bucket_public_access,
-            learn_ai_app_storage_bucket_ownership_controls,
-        ]
     ),
 )
 
@@ -384,12 +385,12 @@ learn_ai_fastly_service = fastly.ServiceVcl(
     comment="Managed by Pulumi",
     backends=[
         fastly.ServiceVclBackendArgs(
-            address=learn_ai_app_storage_bucket.bucket_domain_name,
+            address=learn_ai_app_storage_bucket.bucket_v2.bucket_domain_name,
             name="learn-ai",
-            override_host=learn_ai_app_storage_bucket.bucket_domain_name,
+            override_host=learn_ai_app_storage_bucket.bucket_v2.bucket_domain_name,
             port=DEFAULT_HTTPS_PORT,
-            ssl_cert_hostname=learn_ai_app_storage_bucket.bucket_domain_name,
-            ssl_sni_hostname=learn_ai_app_storage_bucket.bucket_domain_name,
+            ssl_cert_hostname=learn_ai_app_storage_bucket.bucket_v2.bucket_domain_name,
+            ssl_sni_hostname=learn_ai_app_storage_bucket.bucket_v2.bucket_domain_name,
             use_ssl=True,
         ),
     ],
