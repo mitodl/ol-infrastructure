@@ -159,7 +159,7 @@ learn_ai_app_storage_bucket_config = S3BucketConfig(
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
-    restrict_public_buckets=True,
+    restrict_public_buckets=False,
     tags=aws_config.tags,
 )
 
