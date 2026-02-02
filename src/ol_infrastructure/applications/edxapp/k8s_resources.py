@@ -285,6 +285,7 @@ def create_k8s_resources(  # noqa: C901
                 requests={"storage": "5Gi"}
             ),
         ),
+        opts=pulumi.ResourceOptions(ignore_changes=["metadata.labels"]),
     )
 
     # Lookup environment vars needed for the deployment
