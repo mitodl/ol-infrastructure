@@ -1,0 +1,16 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHjZAY5LtmRWGljev0oiDGn0jR5cRwD4IVXCn50TW5i0qQEp5rDV1Xt292ZOwEYBjPPZAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMCYAzgyvjp1yrnTXaAgEQgDvLQeSWM1NtmuxpFFxK56snChBFG1+yJI3P6vWleHohESCz8RGFLc2Xjx61xd2KvKOisYfPtEs+HDgVhg==
+config:
+  starrocks:root_password:
+    secure: v1:IBmxL0ibUx/t/yPf:rgmpR1MHcJ95I8exxEk0VBQGw1PrZqM+HHuBpLPcv4kzErS53rmyjgO1JQPt6xhK7wXzM6DiB53hx1O0u6Xdiz+3RQ5fKdOiXNu/SnA+fUI=
+  starrocks:fe_replicas: 3
+  starrocks:use_be: true
+  starrocks:be_config:
+    replicas: 3
+    cpu_request: 1000m
+    memory_request: 8Gi
+    memory_limit: 8Gi
+    storage: 1Ti
+    log_storage: 20Gi
+  starrocks:use_cn: false
