@@ -4,3 +4,4 @@ encryptedkey: AQICAHjmo6C0sCNz3fdkFlhbu0tdBZxnHmPYSnqtmocvGiuNygHMwER9MKPw3/xJQz
 config:
   environment:business_unit: data
   environment:target_vpc: data_vpc
+  starrocks:enable_operator: true

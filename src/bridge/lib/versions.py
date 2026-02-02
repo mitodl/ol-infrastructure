@@ -57,6 +57,8 @@ KUBE_STATE_METRICS_CHART_VERSION = "5.1.0"
 KUBEWATCH_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=meilisearch packageName=meilisearch-kubernetes registryUrl=https://meilisearch.github.io/meilisearch-kubernetes
 MEILISEARCH_CHART_VERSION = "0.23.0"
+# renovate: datasource=helm depName=operator packageName=starrocks/operator registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
+STARROCKS_OPERATOR_CHART_VERSION = "1.11.4"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
 TRAEFIK_CHART_VERSION = "38.0.2"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
