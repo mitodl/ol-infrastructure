@@ -1321,16 +1321,16 @@ wheels = [
 
 [[package]]
 name = "pulumi-aws-native"
-version = "1.50.0"
+version = "1.51.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "parver" },
     { name = "pulumi" },
     { name = "semver" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/bb/76/14d7bc121a77ac35875ef6eb7304ae0a7d49a5619b7ade0481f5a9a26aae/pulumi_aws_native-1.50.0.tar.gz", hash = "sha256:f56c9b82f3bdcbe9afde468e07f28864b63a04e529c89fd380779d2209b8078b", size = 8249361, upload-time = "2026-01-26T07:11:12.758Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5c/de/5296e30bdeffb11d20bd298753f27684df9e5bc5808b689b67bd15ae55a8/pulumi_aws_native-1.51.0.tar.gz", hash = "sha256:59da9dac3a20c2d1518a623cbe5fdc9acb2d08b2ca5ed51ccf1ad2b120129b2f", size = 8272884, upload-time = "2026-02-02T08:10:56.877Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5a/7f/b574c852754ac9c3cf6cca5966ab4f4bcf3b8b390bfe8aaf47f265a5bf01/pulumi_aws_native-1.50.0-py3-none-any.whl", hash = "sha256:bcaa70f693f31985e2a9103605c413d13f08ff8a5dc8dbd9591cde162b97afbe", size = 11641613, upload-time = "2026-01-26T07:11:10.411Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/30/f5a44df6a6d99144da730b9543eeb46fbaaee68c90cb52cc0deed8985689/pulumi_aws_native-1.51.0-py3-none-any.whl", hash = "sha256:d447e85f7ed68a2d9cae4d707c551666634c58a9c0325869e418b9699cc8b14d", size = 11672484, upload-time = "2026-02-02T08:10:54.218Z" },
 ]
 
 [[package]]
@@ -1623,7 +1623,7 @@ wheels = [
 
 [[package]]
 name = "pyinfra"
-version = "3.6"
+version = "3.6.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -1636,9 +1636,9 @@ dependencies = [
     { name = "python-dateutil" },
     { name = "typeguard" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6e/f1/9113db11d625d7d20f78304a8fe1680d1a8782ce0ef2510707beb875e8db/pyinfra-3.6.tar.gz", hash = "sha256:4ce84ec94c8d8915eaad108f183aa4eabf58687679f14f78aad44414bc79a4cd", size = 493500, upload-time = "2026-01-05T09:58:11.829Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/dc/36/7a5d4663dca48be0db267c7755a5de863a9f06fa238e066d0ae35c823ad5/pyinfra-3.6.1.tar.gz", hash = "sha256:03b56633fcd80226f454e47de6b0dfa42314ee88d6b2c1c5c31e30b009e9bd31", size = 569142, upload-time = "2026-02-02T13:47:09.375Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0a/b0/979bea9fb10d3f717266eef90786499b212eac896f26fa7b8fbbbed864e7/pyinfra-3.6-py3-none-any.whl", hash = "sha256:b17ad60de2eeb37e61e34c6d77aafe5f66d90f7439d5299ac89121333fb5b54b", size = 262629, upload-time = "2026-01-05T09:58:13.097Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/4a/204ec36f1f9ef924580e0dcef8968c53e5b43ba1c0d25a914b10f309ad6f/pyinfra-3.6.1-py3-none-any.whl", hash = "sha256:618c999cfc0db32b944077f76cb77f4696f01d3104e64d5c1719987f172582cc", size = 263493, upload-time = "2026-02-02T13:47:07.384Z" },
 ]
 
 [[package]]
