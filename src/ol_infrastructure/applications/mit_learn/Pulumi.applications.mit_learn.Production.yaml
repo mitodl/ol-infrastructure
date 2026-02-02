@@ -55,6 +55,7 @@ config:
     DEBUG: "false"
     EDX_LEARNING_COURSE_BUCKET_NAME: "edxorg-production-edxapp-courses"
     ENABLE_INFINITE_CORRIDOR: "true"
+    FEATURE_SYNC_ON_DASHBOARD_LOAD: "True"
     GA_G_TRACKING_ID: "" # Missing?
     GA_TRACKING_ID: "" # Missing?
     INDEXING_API_USERNAME: "od_mm_prod_api"

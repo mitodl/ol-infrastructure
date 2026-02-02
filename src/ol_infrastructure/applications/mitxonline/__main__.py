@@ -317,7 +317,6 @@ mitxonline_vault_backend = OLVaultDatabaseBackend(mitxonline_vault_backend_confi
 env_vars = {
     "CRON_COURSERUN_SYNC_HOURS": "*",
     "FEATURE_IGNORE_EDX_FAILURES": "True",
-    "FEATURE_SYNC_ON_DASHBOARD_LOAD": "True",
     "HUBSPOT_PIPELINE_ID": "19817792",
     "MITOL_GOOGLE_SHEETS_REFUNDS_COMPLETED_DATE_COL": "12",
     "MITOL_GOOGLE_SHEETS_REFUNDS_ERROR_COL": "13",
