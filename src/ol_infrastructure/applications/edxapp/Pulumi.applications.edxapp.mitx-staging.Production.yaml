@@ -4,6 +4,7 @@ encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgEgvt/Jaq3CayTQkS
 config:
   aws:region: us-east-1
   consul:address: https://consul-mitx-staging-production.odl.mit.edu
+  edxapp:product: residential
   edxapp:waffle_flags:
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
   - ["course_home.course_home_mfe_progress_tab", "--create", "--everyone"]

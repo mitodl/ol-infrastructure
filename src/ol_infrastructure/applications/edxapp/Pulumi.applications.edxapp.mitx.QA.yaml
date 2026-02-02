@@ -53,6 +53,7 @@ config:
     secure: v1:xglzNDR1j+CDTk3s:4TyRALK3e/ncPRhuFTUQQqRBSTwyrCWWcTn/Y6G9XjG+ms/biXjoKbleFdMo0omPC83nGiI5mBc=
   edxapp:db_storage_gb: "200"
   edxapp:dns_zone: mitx
+  edxapp:product: residential
   edxapp:domains:
     lms: mitx-qa.mitx.mit.edu
     preview: preview-mitx-qa.mitx.mit.edu

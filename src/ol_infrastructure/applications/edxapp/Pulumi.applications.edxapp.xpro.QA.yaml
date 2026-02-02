@@ -52,6 +52,7 @@ config:
     learning: learn
     ora_grading: ora-grading
   edxapp:google_analytics_id: ""
+  edxapp:product: xpro
   edxapp:mail_domain: edxapp-mail-qa.xpro.mit.edu
   edxapp:sender_email_address: support@edxapp-mail-qa.xpro.mit.edu
   edxapp:enable_xqueue: false

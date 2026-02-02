@@ -4,6 +4,7 @@ encryptedkey: "AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQH3lrWmSrfJ6OGoy
 config:
   aws:region: us-east-1
   consul:address: https://consul-mitx-staging-ci.odl.mit.edu
+  edxapp:product: residential
   edxapp:waffle_flags:
   - ["contentstore.new_studio_mfe.use_new_advanced_settings_page", "--create", "--superusers",
     "--everyone"]

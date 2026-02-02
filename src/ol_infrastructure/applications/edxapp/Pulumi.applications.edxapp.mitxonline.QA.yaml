@@ -54,6 +54,7 @@ config:
   edxapp:db_password:
     secure: v1:xHUw5WC3aN02zuAj:0BozwDxrtF0OA7wkYuv4R4CCnSHYdgXt+vi6/3eP9zwJgHgQO20+8sQfg7rXPC9SIUobEA==
   edxapp:dns_zone: learn
+  edxapp:product: mitlearn
   edxapp:mit_learn_domain: rc.learn.mit.edu
   edxapp:mit_learn_api_domain: api.rc.learn.mit.edu
   edxapp:learn_ai_frontend_domain: "learn-ai-qa.ol.mit.edu"

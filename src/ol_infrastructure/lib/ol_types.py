@@ -11,9 +11,11 @@ RECOMMENDED_TAGS = {"Application", "Owner"}
 
 @unique
 class Product(str, Enum):
-    mitlearn = "mit-learn"
-    infrastructure = "infrastructure"
     data = "data"
+    infrastructure = "infrastructure"
+    mitlearn = "mit-learn"
+    residential = "residential"
+    xpro = "mitxpro"
 
 
 @unique
@@ -83,6 +85,7 @@ class Services(str, Enum):
     ocw_build = "ocw-build"
     odl_video_service = "ovs"
     open_metadata = "open-metadata"
+    openedx = "openedx"
     redash = "redash"
     tika = "tika"
     vector_log_proxy = "vector-log-proxy"
@@ -116,6 +119,7 @@ class Application(str, Enum):
     mitxpro_edx = "xpro-edx"
     ocw_build = "ocw-build"
     odl_video_service = "ovs"
+    openedx_platform = "openedx-platform"
     open_metadata = "open-metadata"
     redash = "redash"
     tika = "tika"

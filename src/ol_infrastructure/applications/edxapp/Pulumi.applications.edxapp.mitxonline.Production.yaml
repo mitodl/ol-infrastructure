@@ -56,6 +56,7 @@ config:
   edxapp:db_use_blue_green: "true"
   edxapp:db_instance_size: db.r7g.xlarge
   edxapp:dns_zone: learn
+  edxapp:product: mitlearn
   edxapp:domains:
     lms: courses.learn.mit.edu
     preview: preview.courses.learn.mit.edu

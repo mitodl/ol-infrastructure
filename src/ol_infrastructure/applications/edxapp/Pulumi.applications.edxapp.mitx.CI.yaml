@@ -52,6 +52,7 @@ config:
   edxapp:db_password:
     secure: v1:Q1uI9EWaIrq2z2sY:pTBVK/vatuCQXgO3Z2ItArDb4P1QLpN/lP/jT9690boozaKjjJudoQZOyWjkbCFwGLieh+L9auw=
   edxapp:dns_zone: mitx
+  edxapp:product: residential
   edxapp:domains:
     lms: lms-ci.mitx.mit.edu
     preview: preview-ci.mitx.mit.edu

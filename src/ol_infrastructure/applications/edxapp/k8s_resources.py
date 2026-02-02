@@ -48,9 +48,11 @@ from ol_infrastructure.lib.aws.eks_helper import (
     get_default_psg_ingress_args,
 )
 from ol_infrastructure.lib.ol_types import (
+    Application,
     AWSBase,
     BusinessUnit,
-    K8sGlobalLabels,
+    K8sAppLabels,
+    Product,
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
@@ -134,10 +136,13 @@ def create_k8s_resources(  # noqa: C901
     ]
     # Configure reusable global labels
     ou = BusinessUnit(edxapp_config.require("business_unit"))
-    k8s_global_labels = K8sGlobalLabels(
-        service=Services.edxapp,
+    k8s_global_labels = K8sAppLabels(
+        product=Product[edxapp_config.require("product")],
+        service=Services.openedx,
+        application=Application.openedx_platform,
         ou=ou,
         stack=stack_info,
+        source_repository="https://github.com/openedx/openedx-platform",
     ).model_dump()
 
     # Create ConfigMap for Vector configuration
