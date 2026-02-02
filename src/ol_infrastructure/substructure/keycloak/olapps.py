@@ -884,6 +884,28 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 },
             )
         )
+        onboard_saml_org(
+            SamlIdpConfig(
+                org_domains=["seu.edu.ge"],
+                org_name="Georgian National University Seu",
+                org_alias="SEU",
+                org_saml_metadata_url="https://emis1.seu.edu.ge/saml/metadata",
+                principal_type="ATTRIBUTE",
+                principal_attribute="Email",
+                name_id_format=NameIdFormat.unspecified,
+                keycloak_url=keycloak_url,
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                attribute_map={
+                    "email": "Email",
+                    "firstName": "Given Name",
+                    "lastName": "Surname",
+                    "fullName": "Display Name",
+                },
+            )
+        )
         create_org_for_learn(
             OrgConfig(
                 org_domains=["ttt-mit.edu"],
