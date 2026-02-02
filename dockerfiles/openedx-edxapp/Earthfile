@@ -57,8 +57,7 @@ install-deps:
   # Fix RedBeat Issue #307: due_at calculates incorrect next run time
   # https://github.com/sibson/redbeat/issues/307
   COPY redbeat-issue-307.patch /tmp/redbeat-issue-307.patch
-  RUN python -c "try: import redbeat.schedulers; except ImportError: exit(0)" && \
-      REDBEAT_PATH=$(python -c "import redbeat.schedulers as rb; import os; print(os.path.dirname(rb.__file__))") && \
+  RUN REDBEAT_PATH=$(python -c "import redbeat.schedulers as rb; import os; print(os.path.dirname(rb.__file__))") && \
       patch -p1 -d "$REDBEAT_PATH" < /tmp/redbeat-issue-307.patch && \
       grep -q "now = self._default_now()" "$REDBEAT_PATH/schedulers.py" || (echo "RedBeat patch verification failed" && exit 1) && \
       rm /tmp/redbeat-issue-307.patch
