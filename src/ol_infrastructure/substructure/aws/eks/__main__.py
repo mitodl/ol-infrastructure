@@ -25,6 +25,7 @@ from ol_infrastructure.substructure.aws.eks.grafana import setup_grafana
 from ol_infrastructure.substructure.aws.eks.karpenter import setup_karpenter
 from ol_infrastructure.substructure.aws.eks.keda import setup_keda
 from ol_infrastructure.substructure.aws.eks.nvidia import setup_nvidia
+from ol_infrastructure.substructure.aws.eks.starrocks import setup_starrocks
 
 env_config = Config("environment")
 
@@ -299,4 +300,11 @@ setup_nvidia(
     k8s_provider=k8s_provider,
     nvidia_dcgm_exporter_version=VERSIONS["NVIDIA_DCGM_EXPORTER_VERSION"],
     nvidia_k8s_device_plugin_version=VERSIONS["NVIDIA_K8S_DEVICE_PLUGIN_VERSION"],
+)
+
+# Setup StarRocks operator
+setup_starrocks(
+    cluster_name=cluster_name,
+    cluster_stack=cluster_stack,
+    k8s_provider=k8s_provider,
 )
