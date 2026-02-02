@@ -95,27 +95,7 @@ starrocks_release = kubernetes.helm.v3.Release(
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://starrocks.github.io/starrocks-kubernetes-operator",
         ),
-        values={
-            "nameOverride": f"{stack_info.env_prefix}-starrocks",
-            "initPassword": {
-                "enabled": True,
-                "passwordSecret": starrocks_root_password_secret_name,
-            },
-            "timeZone": "UTC",
-            "metrics": {
-                "serviceMonitor": {
-                    "enabled": False,
-                },
-            },
-            "starrocksFESpec": {
-                "image": ecr_image_uri("starrocks/fe-ubuntu:latest"),
-                "replicas": starrocks_config.get_int("fe_replicas") or 3,
-                "runAsNonRoot": True,
-                "service": {
-                    "type": "ClusterIP",
-                },
-            },
-        },
+        values=starrocks_values,
     ),
     opts=ResourceOptions(
         delete_before_replace=True, depends_on=[starrocks_root_password_secret]
