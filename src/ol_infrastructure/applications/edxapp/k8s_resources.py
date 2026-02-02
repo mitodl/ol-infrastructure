@@ -52,6 +52,7 @@ from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
     K8sAppLabels,
+    K8sGlobalLabels,
     Product,
     Services,
 )
@@ -276,7 +277,13 @@ def create_k8s_resources(  # noqa: C901
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=f"{env_name}-openedx-data-pvc",
             namespace=namespace,
-            labels=k8s_global_labels,
+            labels=K8sGlobalLabels(
+                service=Services.edxapp,
+                application=stack_info.env_prefix,
+                ou=ou,
+                stack=stack_info,
+                source_repository="https://github.com/openedx/openedx-platform",
+            ).model_dump(),
         ),
         spec=kubernetes.core.v1.PersistentVolumeClaimSpecArgs(
             access_modes=["ReadWriteMany"],
