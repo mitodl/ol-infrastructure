@@ -65,5 +65,5 @@ def setup_starrocks(
                 },
             },
         ),
-        opts=ResourceOptions(provider=k8s_provider),
+        opts=ResourceOptions(provider=k8s_provider, delete_before_replace=True),
     )
