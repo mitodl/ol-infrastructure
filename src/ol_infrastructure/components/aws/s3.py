@@ -288,9 +288,7 @@ class OLBucket(pulumi.ComponentResource):
         # Conditionally create BucketServerSideEncryptionConfiguration
         if config.server_side_encryption_enabled:
             # Build encryption configuration based on algorithm
-            default_args_type = (
-                s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs
-            )
+            default_args_type = s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs
             encryption_args = default_args_type(
                 sse_algorithm=config.sse_algorithm,
             )
