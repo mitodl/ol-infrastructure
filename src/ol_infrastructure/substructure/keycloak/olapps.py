@@ -1057,6 +1057,23 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 client_id="MIT-Learn-sso",
             )
         )
+        onboard_oidc_org(
+            OIDCIdpConfig(
+                org_domains=[
+                    "usek.edu.lb",
+                    "net.usek.edu.lb",
+                ],
+                org_name="Holy Spirit University of Kaslik",
+                org_alias="USEK",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                keycloak_url=keycloak_url,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                org_oidc_metadata_url="https://login.microsoftonline.com/06d0a2c4-59b9-4cf8-a36a-9190f22cd1f6/v2.0/.well-known/openid-configuration",
+                client_id="52ef5b83-479c-4bd6-9979-ee56e0aeaa15",
+            )
+        )
 
     # B2B Organizations [END]
 
