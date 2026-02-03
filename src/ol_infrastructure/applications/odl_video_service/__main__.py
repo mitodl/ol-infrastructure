@@ -155,6 +155,7 @@ ovs_thumbnails_bucket_config = S3BucketConfig(
     bucket_name=s3_thumbnail_bucket_name,
     versioning_enabled=False,
     server_side_encryption_enabled=True,
+    sse_algorithm="AES256",  # Use SSE-S3 for CloudFront compatibility
     intelligent_tiering_enabled=True,
     intelligent_tiering_days=90,
     tags=aws_config.merged_tags(
