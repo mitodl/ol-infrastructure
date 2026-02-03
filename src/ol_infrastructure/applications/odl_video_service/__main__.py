@@ -175,10 +175,13 @@ ovs_thumbnails_bucket = OLBucket(
 )
 
 # Transcoded bucket (allows public access for CloudFront)
+# Uses SSE-S3 (AES256) instead of KMS because CloudFront cannot access KMS-encrypted
+# objects without explicit KMS key policy permissions
 ovs_transcoded_bucket_config = S3BucketConfig(
     bucket_name=s3_transcode_bucket_name,
     versioning_enabled=False,
     server_side_encryption_enabled=True,
+    sse_algorithm="AES256",  # Use SSE-S3 for CloudFront compatibility
     intelligent_tiering_enabled=True,
     intelligent_tiering_days=90,
     block_public_acls=False,

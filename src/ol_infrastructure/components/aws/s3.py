@@ -89,12 +89,21 @@ class S3BucketConfig(AWSBase):
         default=False,
         description="Whether server-side encryption is enabled for the bucket.",
     )
+    sse_algorithm: str = Field(
+        default="aws:kms",
+        description=(
+            "The server-side encryption algorithm to use. "
+            "Valid values: 'AES256' (SSE-S3) or 'aws:kms' (SSE-KMS). "
+            "Default is 'aws:kms'."
+        ),
+    )
     kms_key_id: str | Output[str] | None = Field(
         default=None,
         description=(
             "The KMS key ID to use for server-side encryption. "
             "Can be a string or Pulumi Output[str]. "
-            "If not provided, uses AWS-managed key."
+            "Only used when sse_algorithm is 'aws:kms'. "
+            "If not provided with aws:kms, uses AWS-managed KMS key."
         ),
     )
     bucket_key_enabled: bool | None = Field(
@@ -167,7 +176,17 @@ class S3BucketConfig(AWSBase):
         Note: When server_side_encryption_enabled is True but kms_key_id is None,
         AWS uses its default managed key for encryption (valid configuration).
         """
-        # No validation needed - both AWS-managed and customer-managed keys are valid
+        if self.sse_algorithm not in ["AES256", "aws:kms"]:
+            error_message = (
+                "sse_algorithm must be either 'AES256' (SSE-S3) or 'aws:kms' (SSE-KMS)"
+            )
+            raise ValueError(error_message)
+        if self.sse_algorithm == "AES256" and self.kms_key_id:
+            error_message = (
+                "kms_key_id cannot be specified when sse_algorithm is 'AES256'. "
+                "SSE-S3 does not use KMS keys."
+            )
+            raise ValueError(error_message)
         return self
 
 
@@ -268,15 +287,23 @@ class OLBucket(pulumi.ComponentResource):
 
         # Conditionally create BucketServerSideEncryptionConfiguration
         if config.server_side_encryption_enabled:
+            # Build encryption configuration based on algorithm
+            default_args_type = (
+                s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs
+            )
+            encryption_args = default_args_type(
+                sse_algorithm=config.sse_algorithm,
+            )
+            # Only set KMS key ID if using KMS encryption
+            if config.sse_algorithm == "aws:kms":
+                encryption_args.kms_master_key_id = config.kms_key_id
+
             self.bucket_encryption = s3.BucketServerSideEncryptionConfiguration(
                 f"{name}-encryption",
                 bucket=self.bucket_v2.id,
                 rules=[
                     s3.BucketServerSideEncryptionConfigurationRuleArgs(
-                        apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
-                            sse_algorithm="aws:kms",
-                            kms_master_key_id=config.kms_key_id,
-                        ),
+                        apply_server_side_encryption_by_default=encryption_args,
                         bucket_key_enabled=config.bucket_key_enabled,
                     )
                 ],
