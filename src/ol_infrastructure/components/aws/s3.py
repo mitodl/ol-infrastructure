@@ -219,7 +219,7 @@ class OLBucket(pulumi.ComponentResource):
     bucket_ownership_controls: s3.BucketOwnershipControls | None = None
     bucket_policy: s3.BucketPolicy | None = None
 
-    def __init__(
+    def __init__(  # noqa: C901
         self,
         name: str,
         config: S3BucketConfig,
@@ -288,7 +288,7 @@ class OLBucket(pulumi.ComponentResource):
         # Conditionally create BucketServerSideEncryptionConfiguration
         if config.server_side_encryption_enabled:
             # Build encryption configuration based on algorithm
-            default_args_type = s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs
+            default_args_type = s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs  # noqa: E501
             encryption_args = default_args_type(
                 sse_algorithm=config.sse_algorithm,
             )
