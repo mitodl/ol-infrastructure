@@ -5,7 +5,7 @@ dogstatsd-python==0.5.6
 gitdb==4.0.12
 GitPython==3.1.46
 idna==3.11
-newrelic==8.11.0
+newrelic==11.4.0
 numpy==1.26.4
 path==16.16.0
 path.py==12.5.0
