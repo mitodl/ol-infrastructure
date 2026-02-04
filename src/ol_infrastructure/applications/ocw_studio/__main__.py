@@ -351,7 +351,6 @@ heroku_vars = {
     "MITOL_MAIL_REPLY_TO_ADDRESS": "ocw-prod-support@mit.edu",
     "OCW_COURSE_TEST_SLUG": "ocw-ci-test-course",
     "OCW_DEFAULT_COURSE_THEME": "ocw-course-v2",
-    "OCW_EXTRA_COURSE_THEMES": "ocw-course-v3",
     "OCW_STUDIO_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
     "OCW_STUDIO_DB_CONN_MAX_AGE": 0,
     "OCW_STUDIO_DB_DISABLE_SSL": "True",
