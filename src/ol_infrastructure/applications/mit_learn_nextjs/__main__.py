@@ -232,7 +232,7 @@ mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
                         kubernetes.core.v1.ContainerArgs(
                             name="nextjs-build",
                             image=app_image,
-                            command=["yarn", "build", "--no-lint"],
+                            command=["yarn", "build"],
                             env=env_vars,
                             volume_mounts=[
                                 kubernetes.core.v1.VolumeMountArgs(
