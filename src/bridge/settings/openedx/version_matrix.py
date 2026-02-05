@@ -207,13 +207,6 @@ ReleaseMap: dict[
                 application_type="IDA",
                 release="ulmo",
             ),
-            OpenEdxApplicationVersion(
-                application="xqwatcher",
-                application_type="IDA",
-                branch_override="master",
-                origin_override="https://github.com/mitodl/xqueue-watcher",
-                release="ulmo",
-            ),
         ],
         "xpro": [
             OpenEdxApplicationVersion(
