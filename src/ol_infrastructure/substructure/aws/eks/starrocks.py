@@ -28,6 +28,10 @@ def setup_starrocks(
         cluster_name: The name of the EKS cluster.
         cluster_stack: A StackReference to the EKS cluster stack.
         k8s_provider: The Pulumi Kubernetes provider instance.
+        stack_info: Information about the current Pulumi stack, including the stack
+            name used to construct related stack references.
+        aws_config: AWS account configuration, including common tags and other
+            AWS-related metadata to apply to created resources.
     """
     aws_account = get_caller_identity()
 
