@@ -132,6 +132,7 @@ class Application(str, Enum):
 class Component(str, Enum):
     celery = "celery"
     webapp = "webapp"
+    frontend = "frontend"
     keycloak = "keycloak"
 
 
@@ -194,7 +195,7 @@ class K8sGlobalLabels(BaseModel):
 class K8sAppLabels(K8sGlobalLabels):
     product: Product
     application: Application
-    component: Component | None = None
+    component: Component | str | None = None
     pod_security_group: str | None = None
     source_repository: str
     commit_sha: str | None = None

@@ -43,6 +43,7 @@ k8s_app_labels = K8sAppLabels(
     product=Product.mitlearn,
     service=Services.mit_learn,
     application=Application.mit_learn,
+    component="frontend",
     ou=BusinessUnit.mit_learn,
     source_repository="https://github.com/mitodl/mit-learn",
     stack=stack_info,
