@@ -5,6 +5,8 @@ from pathlib import Path
 import httpx
 import pulumi_fastly as fastly
 from pulumi import (
+    ROOT_STACK_RESOURCE,
+    Alias,
     Config,
     InvokeOptions,
     Output,
@@ -12,7 +14,7 @@ from pulumi import (
     StackReference,
     export,
 )
-from pulumi_aws import iam, route53, s3
+from pulumi_aws import get_caller_identity, iam, route53, s3
 
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
@@ -23,6 +25,7 @@ from bridge.lib.magic_numbers import (
     SECONDS_IN_ONE_DAY,
 )
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.aws.route53_helper import (
     fastly_certificate_validation_records,
@@ -70,6 +73,70 @@ fastly_access_logging_iam_role = monitoring_stack.require_output(
     "fastly_access_logging_iam_role"
 )
 
+# Get AWS account ID for audit logging configuration
+aws_account = get_caller_identity()
+
+# Create dedicated S3 audit logging bucket for OCW site buckets
+audit_log_bucket_name = f"ocw-site-audit-logs-{stack_info.env_suffix}"
+audit_log_bucket_config = S3BucketConfig(
+    bucket_name=audit_log_bucket_name,
+    versioning_enabled=True,
+    server_side_encryption_enabled=True,
+    sse_algorithm="aws:kms",
+    lifecycle_rules=[
+        s3.BucketLifecycleConfigurationRuleArgs(
+            id="transition-old-audit-logs",
+            status="Enabled",
+            transitions=[
+                s3.BucketLifecycleConfigurationRuleTransitionArgs(
+                    days=90,
+                    storage_class="GLACIER",
+                ),
+                s3.BucketLifecycleConfigurationRuleTransitionArgs(
+                    days=365,
+                    storage_class="DEEP_ARCHIVE",
+                ),
+            ],
+            expiration=s3.BucketLifecycleConfigurationRuleExpirationArgs(
+                days=2555,  # ~7 years retention
+            ),
+        )
+    ],
+    tags=aws_config.tags,
+)
+
+audit_log_bucket = OLBucket(
+    "ocw-site-audit-logs-bucket",
+    config=audit_log_bucket_config,
+)
+
+# Add bucket policy for S3 logging service
+audit_log_bucket_policy = s3.BucketPolicy(
+    "ocw-site-audit-logs-bucket-policy",
+    bucket=audit_log_bucket.bucket_v2.id,
+    policy=Output.all(account_id=aws_account.account_id).apply(
+        lambda args: json.dumps(
+            {
+                "Version": IAM_POLICY_VERSION,
+                "Statement": [
+                    {
+                        "Sid": "S3ServerAccessLogsPolicy",
+                        "Effect": "Allow",
+                        "Principal": {"Service": "logging.s3.amazonaws.com"},
+                        "Action": "s3:PutObject",
+                        "Resource": f"arn:aws:s3:::{audit_log_bucket_name}/*",
+                        "Condition": {
+                            "StringEquals": {
+                                "aws:SourceAccount": args["account_id"],
+                            }
+                        },
+                    }
+                ],
+            }
+        )
+    ),
+)
+
 # Create S3 buckets
 # There are two buckets for each environment (QA, Production):
 # One for the that environment's draft site (where authors test content
@@ -96,47 +163,21 @@ test_offline_bucket_name = f"ocw-content-offline-test-{stack_info.env_suffix}"
 test_offline_bucket_arn = f"arn:aws:s3:::{test_offline_bucket_name}"
 
 # Draft bucket
-draft_bucket = s3.Bucket(
-    draft_bucket_name,
-    bucket=draft_bucket_name,
-    tags=aws_config.tags,
-)
-draft_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "ol-draft-bucket-ownership-controls",
-    bucket=draft_bucket.id,
-    rule=s3.BucketOwnershipControlsRuleArgs(
-        object_ownership="BucketOwnerPreferred",
-    ),
-)
-s3.BucketVersioning(
-    "ol-draft-bucket-versioning",
-    bucket=draft_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Enabled"
-    ),
-)
-
-draft_bucket_cors = s3.BucketCorsConfiguration(
-    "ol-draft-bucket-cors",
-    bucket=draft_bucket_name,
+draft_bucket_config = S3BucketConfig(
+    bucket_name=draft_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerPreferred",
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_methods=["GET", "HEAD"],
             allowed_origins=["*"],
         )
     ],
-)
-draft_bucket_public_access = s3.BucketPublicAccessBlock(
-    "ol-draft-bucket-public-access",
-    bucket=draft_bucket.id,
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
-)
-s3.BucketPolicy(
-    "ol-draft-bucket-policy",
-    bucket=draft_bucket.id,
-    policy=json.dumps(
+    restrict_public_buckets=False,
+    bucket_policy_document=json.dumps(
         {
             "Version": "2012-10-17",
             "Statement": [
@@ -152,55 +193,52 @@ s3.BucketPolicy(
             ],
         }
     ),
+    logging_target_bucket=audit_log_bucket_name,
+    logging_target_prefix=f"ocw-site/{draft_bucket_name}/",
+    logging_target_object_key_format=s3.BucketLoggingTargetObjectKeyFormatArgs(
+        partitioned_prefix=s3.BucketLoggingTargetObjectKeyFormatPartitionedPrefixArgs(
+            partition_date_source="EventTime"
+        )
+    ),
+    logging_expected_bucket_owner=aws_account.account_id,
+    tags=aws_config.tags,
+)
+
+draft_bucket = OLBucket(
+    "ocw-content-draft-bucket",
+    config=draft_bucket_config,
     opts=ResourceOptions(
-        depends_on=[
-            draft_bucket_public_access,
-            draft_bucket_ownership_controls,
-        ]
+        aliases=[
+            Alias(name=draft_bucket_name, parent=ROOT_STACK_RESOURCE),
+            Alias(
+                name="ol-draft-bucket-ownership-controls",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(name="ol-draft-bucket-versioning", parent=ROOT_STACK_RESOURCE),
+            Alias(name="ol-draft-bucket-cors", parent=ROOT_STACK_RESOURCE),
+            Alias(name="ol-draft-bucket-public-access", parent=ROOT_STACK_RESOURCE),
+            Alias(name="ol-draft-bucket-policy", parent=ROOT_STACK_RESOURCE),
+        ],
+        depends_on=[audit_log_bucket],
     ),
 )
 
 # test bucket
-test_bucket = s3.Bucket(
-    test_bucket_name,
-    bucket=test_bucket_name,
-    tags=aws_config.tags,
-)
-test_bucket_cors = s3.BucketCorsConfiguration(
-    "ol-test-bucket-cors",
-    bucket=test_bucket_name,
+test_bucket_config = S3BucketConfig(
+    bucket_name=test_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerPreferred",
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_methods=["GET", "HEAD"],
             allowed_origins=["*"],
         )
     ],
-)
-test_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "ol-test-bucket-ownership-controls",
-    bucket=test_bucket.id,
-    rule=s3.BucketOwnershipControlsRuleArgs(
-        object_ownership="BucketOwnerPreferred",
-    ),
-)
-s3.BucketVersioning(
-    "ol-test-bucket-versioning",
-    bucket=test_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Enabled"
-    ),
-)
-test_bucket_public_access = s3.BucketPublicAccessBlock(
-    "ol-test-bucket-public-access",
-    bucket=test_bucket.id,
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
-)
-s3.BucketPolicy(
-    "ol-test-bucket-policy",
-    bucket=test_bucket.id,
-    policy=json.dumps(
+    restrict_public_buckets=False,
+    bucket_policy_document=json.dumps(
         {
             "Version": IAM_POLICY_VERSION,
             "Statement": [
@@ -215,55 +253,49 @@ s3.BucketPolicy(
             ],
         }
     ),
+    logging_target_bucket=audit_log_bucket_name,
+    logging_target_prefix=f"ocw-site/{test_bucket_name}/",
+    logging_target_object_key_format=s3.BucketLoggingTargetObjectKeyFormatArgs(
+        partitioned_prefix=s3.BucketLoggingTargetObjectKeyFormatPartitionedPrefixArgs(
+            partition_date_source="EventTime"
+        )
+    ),
+    logging_expected_bucket_owner=aws_account.account_id,
+    tags=aws_config.tags,
+)
+
+test_bucket = OLBucket(
+    "ocw-content-test-bucket",
+    config=test_bucket_config,
     opts=ResourceOptions(
-        depends_on=[
-            test_bucket_public_access,
-            test_bucket_ownership_controls,
-        ]
+        aliases=[
+            Alias(name=test_bucket_name, parent=ROOT_STACK_RESOURCE),
+            Alias(name="ol-test-bucket-cors", parent=ROOT_STACK_RESOURCE),
+            Alias(name="ol-test-bucket-ownership-controls", parent=ROOT_STACK_RESOURCE),
+            Alias(name="ol-test-bucket-versioning", parent=ROOT_STACK_RESOURCE),
+            Alias(name="ol-test-bucket-public-access", parent=ROOT_STACK_RESOURCE),
+            Alias(name="ol-test-bucket-policy", parent=ROOT_STACK_RESOURCE),
+        ],
+        depends_on=[audit_log_bucket],
     ),
 )
 
 # live bucket
-live_bucket = s3.Bucket(
-    live_bucket_name,
-    bucket=live_bucket_name,
-    tags=aws_config.tags,
-)
-live_bucket_cors = s3.BucketCorsConfiguration(
-    "ol-live-bucket-cors",
-    bucket=live_bucket_name,
+live_bucket_config = S3BucketConfig(
+    bucket_name=live_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerPreferred",
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_methods=["GET", "HEAD"],
             allowed_origins=["*"],
         )
     ],
-)
-live_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "ol-live-bucket-ownership-controls",
-    bucket=live_bucket.id,
-    rule=s3.BucketOwnershipControlsRuleArgs(
-        object_ownership="BucketOwnerPreferred",
-    ),
-)
-s3.BucketVersioning(
-    "ol-live-bucket-versioning",
-    bucket=live_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Enabled"
-    ),
-)
-live_bucket_public_access = s3.BucketPublicAccessBlock(
-    "ol-live-bucket-public-access",
-    bucket=live_bucket.id,
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
-)
-s3.BucketPolicy(
-    "ol-live-bucket-policy",
-    bucket=live_bucket.id,
-    policy=json.dumps(
+    restrict_public_buckets=False,
+    bucket_policy_document=json.dumps(
         {
             "Version": IAM_POLICY_VERSION,
             "Statement": [
@@ -278,55 +310,49 @@ s3.BucketPolicy(
             ],
         }
     ),
+    logging_target_bucket=audit_log_bucket_name,
+    logging_target_prefix=f"ocw-site/{live_bucket_name}/",
+    logging_target_object_key_format=s3.BucketLoggingTargetObjectKeyFormatArgs(
+        partitioned_prefix=s3.BucketLoggingTargetObjectKeyFormatPartitionedPrefixArgs(
+            partition_date_source="EventTime"
+        )
+    ),
+    logging_expected_bucket_owner=aws_account.account_id,
+    tags=aws_config.tags,
+)
+
+live_bucket = OLBucket(
+    "ocw-content-live-bucket",
+    config=live_bucket_config,
     opts=ResourceOptions(
-        depends_on=[
-            live_bucket_public_access,
-            live_bucket_ownership_controls,
-        ]
+        aliases=[
+            Alias(name=live_bucket_name, parent=ROOT_STACK_RESOURCE),
+            Alias(name="ol-live-bucket-cors", parent=ROOT_STACK_RESOURCE),
+            Alias(name="ol-live-bucket-ownership-controls", parent=ROOT_STACK_RESOURCE),
+            Alias(name="ol-live-bucket-versioning", parent=ROOT_STACK_RESOURCE),
+            Alias(name="ol-live-bucket-public-access", parent=ROOT_STACK_RESOURCE),
+            Alias(name="ol-live-bucket-policy", parent=ROOT_STACK_RESOURCE),
+        ],
+        depends_on=[audit_log_bucket],
     ),
 )
 
 # draft_backup bucket
-draft_backup_bucket = s3.Bucket(
-    draft_backup_bucket_name,
-    bucket=draft_backup_bucket_name,
-    tags=aws_config.tags,
-)
-draft_backup_bucket_cors = s3.BucketCorsConfiguration(
-    "ol-draft-backup-bucket-cors",
-    bucket=draft_backup_bucket_name,
+draft_backup_bucket_config = S3BucketConfig(
+    bucket_name=draft_backup_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerPreferred",
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_methods=["GET", "HEAD"],
             allowed_origins=["*"],
         )
     ],
-)
-draft_backup_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "ol-draft-backup-bucket-ownership-controls",
-    bucket=draft_backup_bucket.id,
-    rule=s3.BucketOwnershipControlsRuleArgs(
-        object_ownership="BucketOwnerPreferred",
-    ),
-)
-s3.BucketVersioning(
-    "ol-draft-backup-bucket-versioning",
-    bucket=draft_backup_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Enabled"
-    ),
-)
-draft_backup_bucket_public_access = s3.BucketPublicAccessBlock(
-    "ol-draft-backup-bucket-public-access",
-    bucket=draft_backup_bucket.id,
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
-)
-s3.BucketPolicy(
-    "ol-draft-backup-bucket-policy",
-    bucket=draft_backup_bucket.id,
-    policy=json.dumps(
+    restrict_public_buckets=False,
+    bucket_policy_document=json.dumps(
         {
             "Version": IAM_POLICY_VERSION,
             "Statement": [
@@ -341,55 +367,54 @@ s3.BucketPolicy(
             ],
         }
     ),
+    logging_target_bucket=audit_log_bucket_name,
+    logging_target_prefix=f"ocw-site/{draft_backup_bucket_name}/",
+    logging_target_object_key_format=s3.BucketLoggingTargetObjectKeyFormatArgs(
+        partitioned_prefix=s3.BucketLoggingTargetObjectKeyFormatPartitionedPrefixArgs(
+            partition_date_source="EventTime"
+        )
+    ),
+    logging_expected_bucket_owner=aws_account.account_id,
+    tags=aws_config.tags,
+)
+
+draft_backup_bucket = OLBucket(
+    "ocw-content-backup-draft-bucket",
+    config=draft_backup_bucket_config,
     opts=ResourceOptions(
-        depends_on=[
-            draft_backup_bucket_public_access,
-            draft_backup_bucket_ownership_controls,
-        ]
+        aliases=[
+            Alias(name=draft_backup_bucket_name, parent=ROOT_STACK_RESOURCE),
+            Alias(name="ol-draft-backup-bucket-cors", parent=ROOT_STACK_RESOURCE),
+            Alias(
+                name="ol-draft-backup-bucket-ownership-controls",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(name="ol-draft-backup-bucket-versioning", parent=ROOT_STACK_RESOURCE),
+            Alias(
+                name="ol-draft-backup-bucket-public-access", parent=ROOT_STACK_RESOURCE
+            ),
+            Alias(name="ol-draft-backup-bucket-policy", parent=ROOT_STACK_RESOURCE),
+        ],
+        depends_on=[audit_log_bucket],
     ),
 )
 
 # live_backup bucket
-live_backup_bucket = s3.Bucket(
-    live_backup_bucket_name,
-    bucket=live_backup_bucket_name,
-    tags=aws_config.tags,
-)
-live_backup_bucket_cors = s3.BucketCorsConfiguration(
-    "ol-live-backup-bucket-cors",
-    bucket=live_backup_bucket_name,
+live_backup_bucket_config = S3BucketConfig(
+    bucket_name=live_backup_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerPreferred",
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_methods=["GET", "HEAD"],
             allowed_origins=["*"],
         )
     ],
-)
-live_backup_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "ol-live-backup-bucket-ownership-controls",
-    bucket=live_backup_bucket.id,
-    rule=s3.BucketOwnershipControlsRuleArgs(
-        object_ownership="BucketOwnerPreferred",
-    ),
-)
-s3.BucketVersioning(
-    "ol-live-backup-bucket-versioning",
-    bucket=live_backup_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Enabled"
-    ),
-)
-live_backup_bucket_public_access = s3.BucketPublicAccessBlock(
-    "ol-live-backup-bucket-public-access",
-    bucket=live_backup_bucket.id,
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
-)
-s3.BucketPolicy(
-    "ol-live-backup-bucket-policy",
-    bucket=live_backup_bucket.id,
-    policy=json.dumps(
+    restrict_public_buckets=False,
+    bucket_policy_document=json.dumps(
         {
             "Version": IAM_POLICY_VERSION,
             "Statement": [
@@ -404,66 +429,63 @@ s3.BucketPolicy(
             ],
         }
     ),
+    logging_target_bucket=audit_log_bucket_name,
+    logging_target_prefix=f"ocw-site/{live_backup_bucket_name}/",
+    logging_target_object_key_format=s3.BucketLoggingTargetObjectKeyFormatArgs(
+        partitioned_prefix=s3.BucketLoggingTargetObjectKeyFormatPartitionedPrefixArgs(
+            partition_date_source="EventTime"
+        )
+    ),
+    logging_expected_bucket_owner=aws_account.account_id,
+    tags=aws_config.tags,
+)
+
+live_backup_bucket = OLBucket(
+    "ocw-content-backup-live-bucket",
+    config=live_backup_bucket_config,
     opts=ResourceOptions(
-        depends_on=[
-            live_backup_bucket_public_access,
-            live_backup_bucket_ownership_controls,
-        ]
+        aliases=[
+            Alias(name=live_backup_bucket_name, parent=ROOT_STACK_RESOURCE),
+            Alias(name="ol-live-backup-bucket-cors", parent=ROOT_STACK_RESOURCE),
+            Alias(
+                name="ol-live-backup-bucket-ownership-controls",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(name="ol-live-backup-bucket-versioning", parent=ROOT_STACK_RESOURCE),
+            Alias(
+                name="ol-live-backup-bucket-public-access", parent=ROOT_STACK_RESOURCE
+            ),
+            Alias(name="ol-live-backup-bucket-policy", parent=ROOT_STACK_RESOURCE),
+        ],
+        depends_on=[audit_log_bucket],
     ),
 )
 
-# draft_backup bucket
-draft_offline_bucket = s3.Bucket(
-    draft_offline_bucket_name,
-    bucket=draft_offline_bucket_name,
-    tags=aws_config.tags,
-)
-draft_offline_bucket_cors = s3.BucketCorsConfiguration(
-    "ol-draft-offline-bucket-cors",
-    bucket=draft_offline_bucket_name,
+# draft_offline bucket
+draft_offline_bucket_config = S3BucketConfig(
+    bucket_name=draft_offline_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerPreferred",
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_methods=["GET", "HEAD"],
             allowed_origins=["*"],
         )
     ],
-)
-draft_offline_bucket_website = s3.BucketWebsiteConfiguration(
-    "draft-offline-website",
-    bucket=draft_offline_bucket_name,
-    index_document=s3.BucketWebsiteConfigurationIndexDocumentArgs(
-        suffix="index.html",
+    website_configuration=s3.BucketWebsiteConfigurationArgs(
+        bucket=draft_offline_bucket_name,
+        index_document=s3.BucketWebsiteConfigurationIndexDocumentArgs(
+            suffix="index.html",
+        ),
+        error_document=s3.BucketWebsiteConfigurationErrorDocumentArgs(
+            key="error.html",
+        ),
     ),
-    error_document=s3.BucketWebsiteConfigurationErrorDocumentArgs(
-        key="error.html",
-    ),
-)
-
-draft_offline_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "ol-offline-backup-bucket-ownership-controls",
-    bucket=draft_offline_bucket.id,
-    rule=s3.BucketOwnershipControlsRuleArgs(
-        object_ownership="BucketOwnerPreferred",
-    ),
-)
-s3.BucketVersioning(
-    "ol-offline-backup-bucket-versioning",
-    bucket=draft_offline_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Enabled"
-    ),
-)
-draft_offline_bucket_public_access = s3.BucketPublicAccessBlock(
-    "ol-offline-backup-bucket-public-access",
-    bucket=draft_offline_bucket.id,
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
-)
-s3.BucketPolicy(
-    "ol-offline-backup-bucket-policy",
-    bucket=draft_offline_bucket.id,
-    policy=json.dumps(
+    restrict_public_buckets=False,
+    bucket_policy_document=json.dumps(
         {
             "Version": IAM_POLICY_VERSION,
             "Statement": [
@@ -478,66 +500,67 @@ s3.BucketPolicy(
             ],
         }
     ),
-    opts=ResourceOptions(
-        depends_on=[
-            draft_offline_bucket_public_access,
-            draft_offline_bucket_ownership_controls,
-        ]
+    logging_target_bucket=audit_log_bucket_name,
+    logging_target_prefix=f"ocw-site/{draft_offline_bucket_name}/",
+    logging_target_object_key_format=s3.BucketLoggingTargetObjectKeyFormatArgs(
+        partitioned_prefix=s3.BucketLoggingTargetObjectKeyFormatPartitionedPrefixArgs(
+            partition_date_source="EventTime"
+        )
     ),
-)
-
-# live_backup bucket
-live_offline_bucket = s3.Bucket(
-    live_offline_bucket_name,
-    bucket=live_offline_bucket_name,
+    logging_expected_bucket_owner=aws_account.account_id,
     tags=aws_config.tags,
 )
-live_offline_bucket_website = s3.BucketWebsiteConfiguration(
-    "live-offline-website",
-    bucket=live_offline_bucket_name,
-    index_document=s3.BucketWebsiteConfigurationIndexDocumentArgs(
-        suffix="index.html",
-    ),
-    error_document=s3.BucketWebsiteConfigurationErrorDocumentArgs(
-        key="error.html",
+
+draft_offline_bucket = OLBucket(
+    "ocw-content-offline-draft-bucket",
+    config=draft_offline_bucket_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(name=draft_offline_bucket_name, parent=ROOT_STACK_RESOURCE),
+            Alias(name="ol-draft-offline-bucket-cors", parent=ROOT_STACK_RESOURCE),
+            Alias(name="draft-offline-website", parent=ROOT_STACK_RESOURCE),
+            Alias(
+                name="ol-offline-backup-bucket-ownership-controls",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="ol-offline-backup-bucket-versioning", parent=ROOT_STACK_RESOURCE
+            ),
+            Alias(
+                name="ol-offline-backup-bucket-public-access",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(name="ol-offline-backup-bucket-policy", parent=ROOT_STACK_RESOURCE),
+        ],
+        depends_on=[audit_log_bucket],
     ),
 )
 
-live_offline_bucket_cors = s3.BucketCorsConfiguration(
-    "ol-live-offline-bucket-cors",
-    bucket=live_offline_bucket_name,
+# live_offline bucket
+live_offline_bucket_config = S3BucketConfig(
+    bucket_name=live_offline_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerPreferred",
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_methods=["GET", "HEAD"],
             allowed_origins=["*"],
         )
     ],
-)
-live_offline_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "ol-live-offline-bucket-ownership-controls",
-    bucket=live_offline_bucket.id,
-    rule=s3.BucketOwnershipControlsRuleArgs(
-        object_ownership="BucketOwnerPreferred",
+    website_configuration=s3.BucketWebsiteConfigurationArgs(
+        bucket=live_offline_bucket_name,
+        index_document=s3.BucketWebsiteConfigurationIndexDocumentArgs(
+            suffix="index.html",
+        ),
+        error_document=s3.BucketWebsiteConfigurationErrorDocumentArgs(
+            key="error.html",
+        ),
     ),
-)
-s3.BucketVersioning(
-    "ol-live-offline-bucket-versioning",
-    bucket=live_offline_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Enabled"
-    ),
-)
-live_offline_bucket_public_access = s3.BucketPublicAccessBlock(
-    "ol-live-offline-bucket-public-access",
-    bucket=live_offline_bucket.id,
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
-)
-s3.BucketPolicy(
-    "ol-live-offline-bucket-policy",
-    bucket=live_offline_bucket.id,
-    policy=json.dumps(
+    restrict_public_buckets=False,
+    bucket_policy_document=json.dumps(
         {
             "Version": IAM_POLICY_VERSION,
             "Statement": [
@@ -552,55 +575,55 @@ s3.BucketPolicy(
             ],
         }
     ),
+    logging_target_bucket=audit_log_bucket_name,
+    logging_target_prefix=f"ocw-site/{live_offline_bucket_name}/",
+    logging_target_object_key_format=s3.BucketLoggingTargetObjectKeyFormatArgs(
+        partitioned_prefix=s3.BucketLoggingTargetObjectKeyFormatPartitionedPrefixArgs(
+            partition_date_source="EventTime"
+        )
+    ),
+    logging_expected_bucket_owner=aws_account.account_id,
+    tags=aws_config.tags,
+)
+
+live_offline_bucket = OLBucket(
+    "ocw-content-offline-live-bucket",
+    config=live_offline_bucket_config,
     opts=ResourceOptions(
-        depends_on=[
-            live_offline_bucket_public_access,
-            live_offline_bucket_ownership_controls,
-        ]
+        aliases=[
+            Alias(name=live_offline_bucket_name, parent=ROOT_STACK_RESOURCE),
+            Alias(name="live-offline-website", parent=ROOT_STACK_RESOURCE),
+            Alias(name="ol-live-offline-bucket-cors", parent=ROOT_STACK_RESOURCE),
+            Alias(
+                name="ol-live-offline-bucket-ownership-controls",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(name="ol-live-offline-bucket-versioning", parent=ROOT_STACK_RESOURCE),
+            Alias(
+                name="ol-live-offline-bucket-public-access", parent=ROOT_STACK_RESOURCE
+            ),
+            Alias(name="ol-live-offline-bucket-policy", parent=ROOT_STACK_RESOURCE),
+        ],
+        depends_on=[audit_log_bucket],
     ),
 )
 
-# test_backup bucket
-test_offline_bucket = s3.Bucket(
-    test_offline_bucket_name,
-    bucket=test_offline_bucket_name,
-    tags=aws_config.tags,
-)
-test_offline_bucket_cors = s3.BucketCorsConfiguration(
-    "ol-test-offline-bucket-cors",
-    bucket=test_offline_bucket_name,
+# test_offline bucket
+test_offline_bucket_config = S3BucketConfig(
+    bucket_name=test_offline_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerPreferred",
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_methods=["GET", "HEAD"],
             allowed_origins=["*"],
         )
     ],
-)
-test_offline_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "ol-test-offline-bucket-ownership-controls",
-    bucket=test_offline_bucket.id,
-    rule=s3.BucketOwnershipControlsRuleArgs(
-        object_ownership="BucketOwnerPreferred",
-    ),
-)
-s3.BucketVersioning(
-    "ol-test-offline-bucket-versioning",
-    bucket=test_offline_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Enabled"
-    ),
-)
-test_offline_bucket_public_access = s3.BucketPublicAccessBlock(
-    "ol-test-offline-bucket-public-access",
-    bucket=test_offline_bucket.id,
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
-)
-s3.BucketPolicy(
-    "ol-test-offline-bucket-policy",
-    bucket=test_offline_bucket.id,
-    policy=json.dumps(
+    restrict_public_buckets=False,
+    bucket_policy_document=json.dumps(
         {
             "Version": IAM_POLICY_VERSION,
             "Statement": [
@@ -615,11 +638,35 @@ s3.BucketPolicy(
             ],
         }
     ),
+    logging_target_bucket=audit_log_bucket_name,
+    logging_target_prefix=f"ocw-site/{test_offline_bucket_name}/",
+    logging_target_object_key_format=s3.BucketLoggingTargetObjectKeyFormatArgs(
+        partitioned_prefix=s3.BucketLoggingTargetObjectKeyFormatPartitionedPrefixArgs(
+            partition_date_source="EventTime"
+        )
+    ),
+    logging_expected_bucket_owner=aws_account.account_id,
+    tags=aws_config.tags,
+)
+
+test_offline_bucket = OLBucket(
+    "ocw-content-offline-test-bucket",
+    config=test_offline_bucket_config,
     opts=ResourceOptions(
-        depends_on=[
-            test_offline_bucket_public_access,
-            test_offline_bucket_ownership_controls,
-        ]
+        aliases=[
+            Alias(name=test_offline_bucket_name, parent=ROOT_STACK_RESOURCE),
+            Alias(name="ol-test-offline-bucket-cors", parent=ROOT_STACK_RESOURCE),
+            Alias(
+                name="ol-test-offline-bucket-ownership-controls",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(name="ol-test-offline-bucket-versioning", parent=ROOT_STACK_RESOURCE),
+            Alias(
+                name="ol-test-offline-bucket-public-access", parent=ROOT_STACK_RESOURCE
+            ),
+            Alias(name="ol-test-offline-bucket-policy", parent=ROOT_STACK_RESOURCE),
+        ],
+        depends_on=[audit_log_bucket],
     ),
 )
 
