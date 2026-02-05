@@ -191,6 +191,7 @@ def create_pvc_for_color(color: str) -> kubernetes.core.v1.PersistentVolumeClaim
             ),
             storage_class_name="efs-sc",
         ),
+        opts=ResourceOptions(ignore_changes=["metadata.labels"]),
     )
 
 
