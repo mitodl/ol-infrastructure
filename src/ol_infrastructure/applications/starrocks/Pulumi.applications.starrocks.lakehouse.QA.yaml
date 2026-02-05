@@ -2,15 +2,29 @@
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHjZAY5LtmRWGljev0oiDGn0jR5cRwD4IVXCn50TW5i0qQEp5rDV1Xt292ZOwEYBjPPZAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMCYAzgyvjp1yrnTXaAgEQgDvLQeSWM1NtmuxpFFxK56snChBFG1+yJI3P6vWleHohESCz8RGFLc2Xjx61xd2KvKOisYfPtEs+HDgVhg==
 config:
+  starrocks:domain: lakehouse.qa.starrocks.ol.mit.edu
   starrocks:root_password:
     secure: v1:IBmxL0ibUx/t/yPf:rgmpR1MHcJ95I8exxEk0VBQGw1PrZqM+HHuBpLPcv4kzErS53rmyjgO1JQPt6xhK7wXzM6DiB53hx1O0u6Xdiz+3RQ5fKdOiXNu/SnA+fUI=
-  starrocks:fe_replicas: 3
-  starrocks:use_be: true
+  starrocks:fe_config:
+    replicas: 3
+    cpu_request: 1000m
+    memory_request: 8Gi
+    memory_limit: 8Gi
+    storage: 100Gi
+    log_storage: 100Gi
+  starrocks:use_be: false
   starrocks:be_config:
     replicas: 3
     cpu_request: 1000m
     memory_request: 8Gi
     memory_limit: 8Gi
     storage: 1Ti
-    log_storage: 20Gi
-  starrocks:use_cn: false
+    log_storage: 100Gi
+  starrocks:use_cn: true
+  starrocks:cn_config:
+    min_replicas: 1
+    max_replicas: 10
+    cpu_target_utilization_percentage: 80
+    cpu_request: 1000m
+    memory_request: 8Gi
+    memory_limit: 8Gi

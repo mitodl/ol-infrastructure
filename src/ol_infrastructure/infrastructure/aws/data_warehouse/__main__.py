@@ -148,7 +148,8 @@ export(
 )
 
 parliament_config: dict[str, Any] = {
-    "RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []}
+    "RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []},
+    "RESOURCE_MISMATCH": {"ignore_locations": []},
 }
 
 query_engine_permissions: list[dict[str, str | list[str]]] = [
@@ -249,6 +250,8 @@ query_engine_iam_policy = iam.Policy(
     ),
     description="Policy for granting access to Glue and S3 to data lake query engine",
 )
+
+export("data_lake_query_engine_iam_policy_arn", query_engine_iam_policy.arn)
 
 query_engine_aws_account_id = data_lake_query_engine_config.require("aws-account-id")
 query_engine_aws_external_id = data_lake_query_engine_config.require("aws-external-id")
