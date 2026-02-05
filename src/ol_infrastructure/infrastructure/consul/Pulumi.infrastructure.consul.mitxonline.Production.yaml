@@ -1,8 +1,0 @@
----
-secretsprovider: awskms://alias/infrastructure-secrets-production
-encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgFaKB+aTRel+p2kwxeyRD05AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMamxz6Z6D7IQNIMc8AgEQgDuFSfJ0HpZ+yVtgG/aBkAVul9w6z7qyGc0kQnX/xBklw7Ge1Her7bauO6Nm/VUzoWJBcv7wAf2J60mzuw==
-config:
-  aws:region: us-east-1
-  consul:instance_count: "5"
-  environment:business_unit: mitxonline
-  environment:vpc_reference: mitxonline_vpc
