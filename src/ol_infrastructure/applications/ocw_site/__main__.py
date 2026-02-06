@@ -102,6 +102,7 @@ audit_log_bucket_config = S3BucketConfig(
             ),
         )
     ],
+    intelligent_tiering_enabled=False,
     tags=aws_config.tags,
 )
 
