@@ -6,6 +6,7 @@ import pulumi
 import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
+from kubernetes.utils.quantity import parse_quantity
 from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import iam
 
@@ -1162,6 +1163,24 @@ def create_k8s_resources(  # noqa: C901
                                 "2",  # use 2 runtime threads
                                 "--backlog",
                                 "128",
+                                "--workers-max-rss",
+                                # Limit worker memory to 90% of half of the limit in megabytes
+                                str(
+                                    int(
+                                        int(
+                                            parse_quantity(
+                                                _get_resources_requests_limits(
+                                                    "webapp", "cms"
+                                                ).limits["memory"]
+                                            )
+                                            / 2
+                                        )
+                                        * 0.9
+                                    )
+                                    // 1024
+                                    // 1024
+                                ),
+                                "--respawn-failed-workers",
                                 "--log-level",
                                 edxapp_config.get("log_level") or "warn",
                                 "--static-path-mount",

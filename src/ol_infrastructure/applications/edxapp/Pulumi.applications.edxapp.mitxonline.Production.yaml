@@ -103,7 +103,7 @@ config:
         min: 4
       cms:
         max: 10
-        min: 2
+        min: 3
     celery:
       lms:
         max: 20
@@ -120,7 +120,7 @@ config:
       cms:
         cpu_request: "250m"
         memory_request: "2Gi"
-        memory_limit: "2Gi"
+        memory_limit: "4Gi"
     celery:
       lms:
         cpu_request: "250m"
