@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-starrocks-application
+runtime: python
+description: Pulumi project for managing Starrocks deployments
+backend:
+  url: s3://mitol-pulumi-state/
