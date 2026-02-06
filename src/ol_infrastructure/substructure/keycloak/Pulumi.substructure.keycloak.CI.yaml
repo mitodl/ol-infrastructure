@@ -55,6 +55,8 @@ config:
   keycloak_realm:ol-platform-engineering-leek-client-secret:
     secure: v1:xf9mFeIyIWLQbIYk:IY+XjdVmc6Va8WGTwrEN+t3jsyuJJ2b1fD83n2MiDSfUBNxeBoP1Xwd+KGskOLOX
   keycloak_realm:ol-platform-engineering-leek-redirect-uris: ["https://celery-monitoring-ci.odl.mit.edu/*"]
+  keycloak_realm:ol-platform-engineering-grafana-redirect-uris: ["https://mitolci.grafana.net/login/generic_oauth"]
+  keycloak_realm:ol-platform-engineering-grafana-web-origins: ["https://mitolci.grafana.net"]
   keycloak_realm:ol-platform-engineering-vault-redirect-uris: ["https://vault-ci.odl.mit.edu/ui/vault/auth/oidc/oidc/callback",
     "http://localhost:8250/oidc/callback"]
   keycloak_realm:ol-platform-engineering-jupyterhub-redirect-uris:
@@ -106,3 +108,5 @@ config:
   vault_server:env_namespace: operations.ci
   keycloak_realm:session_secret:
     secure: v1:SKlByHIh5fj/2MlA:1hzqRgIoqGowunYEVMMhdzPPBPUGucSUjlcOUDuuPL7JIg+Mpp2nGu8sHGfSMtfeAFOKNlQ6bmMF2oQ=
+  keycloak_realm:ol-platform-engineering-grafana-client-secret:
+    secure: v1:rAIQutctJKUBe/rV:VV0DhdOXs5U+zCqXE/bOTjqe98nBvo/Kkdfnf0JJjzFwI9gxOIBXwSmwoyP2XsIi7+VVVLVzfCHVcvay

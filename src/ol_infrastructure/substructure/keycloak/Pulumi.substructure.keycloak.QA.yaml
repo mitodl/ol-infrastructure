@@ -101,6 +101,10 @@ config:
     secure: v1:1fMzXwbZ0vUU1lLG:xfQvxCldwuHT1SKt622uz62qVAZsuHNnq+/C8WTkd0p4ntC4IDr0s5BDA8CwK6Tp
   keycloak_realm:ol-platform-engineering-leek-client-secret:
     secure: v1:Ork7nqqaLiH7LtjR:sXrent5knH9tHsdW91HAQLKOYct6xZNzwmLB32L9dRNeoCaSC6bXdQIjV40+BEMp
+  keycloak_realm:ol-platform-engineering-grafana-client-secret:
+    secure: v1:ZTyNlZjdB/k/qMns:QNw5/PzevRDbZr71k3uCITuh6iWHztdWlZ78r372mPTZf+s+3CyTCgumLkbyRBYRDjIATthTXMXm+1fivwqeoYQFUd4AWDh3SUzZtepTScI=
+  keycloak_realm:ol-platform-engineering-grafana-redirect-uris: ["https://mitolqa.grafana.net/login/generic_oauth"]
+  keycloak_realm:ol-platform-engineering-grafana-web-origins: ["https://mitolqa.grafana.net"]
   keycloak_realm:ol-platform-engineering-vault-client-secret:
     secure: v1:1G2J8kD4DrOtBOEO:K1wWu8mjGE0QUS4npZxvHc3O7bZPH8GdXBmnPhEMhW67HvjQq20TmWK3lrtsYFaN
   keycloak_realm:ol-data-platform-superset-client-secret:
