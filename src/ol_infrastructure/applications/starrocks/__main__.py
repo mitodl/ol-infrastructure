@@ -1,6 +1,7 @@
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, ResourceOptions, StackReference
 
+from bridge.lib.versions import STARROCKS_CHART_VERSION
 from ol_infrastructure.components.services.apisix_gateway_api import (
     OLApisixHTTPRoute,
     OLApisixHTTPRouteConfig,
@@ -61,6 +62,13 @@ if starrocks_config.get_bool("use_be") and starrocks_config.get_bool("use_cn"):
     )
     raise ValueError(msg)
 
+if not starrocks_config.get_bool("use_be") and not starrocks_config.get_bool("use_cn"):
+    msg = (
+        "StarRocks can be deployed in either shared-nothing (BE) or shared-storage (CN)"
+        " mode. At least one must be specified."
+    )
+    raise ValueError(msg)
+
 # Ref: https://github.com/StarRocks/starrocks-kubernetes-operator/blob/main/helm-charts/charts/kube-starrocks/charts/starrocks/values.yaml
 fe_config = starrocks_config.get_object("fe_config") or {}
 starrocks_values = {
@@ -81,6 +89,7 @@ starrocks_values = {
     },
     "starrocksFESpec": {
         "replicas": fe_config.get("replicas", 3),
+        "serviceAccount": "starrocks",
         "runAsNonRoot": True,
         "service": {
             "type": "ClusterIP",
@@ -107,6 +116,7 @@ if starrocks_config.get_bool("use_be"):
     starrocks_values["starrocksBeSpec"] = {
         "replicas": be_config.get("replicas", 3),
         "imagePullPolicy": "IfNotPresent",
+        "serviceAccount": "starrocks",
         "runAsNonRoot": True,
         "resources": {
             "requests": {
@@ -118,7 +128,7 @@ if starrocks_config.get_bool("use_be"):
         "storageSpec": {
             "name": f"{stack_info.env_prefix}-be-storage",
             "storageClassName": "ebs-gp3-sc",
-            "storageSize": be_config.get("storage_size", "1Ti"),
+            "storageSize": be_config.get("storage", "1Ti"),
             "logStorageSize": be_config.get("log_storage", "100Gi"),
         },
     }
@@ -128,6 +138,7 @@ if starrocks_config.get_bool("use_cn"):
     cn_config = starrocks_config.get_object("cn_config") or {}
     starrocks_values["starrocksCnSpec"] = {
         "imagePullPolicy": "IfNotPresent",
+        "serviceAccount": "starrocks",
         "runAsNonRoot": True,
         "resources": {
             "requests": {
@@ -163,7 +174,7 @@ starrocks_release = kubernetes.helm.v3.Release(
     kubernetes.helm.v3.ReleaseArgs(
         name=f"{stack_info.env_prefix}-starrocks",
         chart="starrocks",
-        version="",
+        version=STARROCKS_CHART_VERSION,
         namespace=namespace,
         cleanup_on_fail=True,
         skip_await=True,
