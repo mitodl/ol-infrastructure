@@ -334,6 +334,130 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913
 
     # VAULT [END] # noqa: ERA001
 
+    # GRAFANA [START] # noqa: ERA001
+    ol_platform_engineering_grafana_client = keycloak.openid.Client(
+        "ol-platform-engineering-grafana-client",
+        name="ol-platform-engineering-grafana-client",
+        realm_id="ol-platform-engineering",
+        client_id="ol-grafana-client",
+        client_secret=keycloak_realm_config.get(
+            "ol-platform-engineering-grafana-client-secret"
+        ),
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        direct_access_grants_enabled=True,
+        service_accounts_enabled=False,
+        pkce_code_challenge_method="S256",
+        valid_redirect_uris=keycloak_realm_config.get_object(
+            "ol-platform-engineering-grafana-redirect-uris"
+        ),
+        web_origins=keycloak_realm_config.get_object(
+            "ol-platform-engineering-grafana-web-origins"
+        ),
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+
+    # Add Role Mapper for Grafana role-based access control (client roles)
+    keycloak.openid.UserClientRoleProtocolMapper(
+        "ol-platform-engineering-grafana-role-mapper",
+        realm_id=ol_platform_engineering_realm.id,
+        client_id=ol_platform_engineering_grafana_client.id,
+        name="Role Mapper",
+        claim_name="roles",
+        client_id_for_role_mappings=ol_platform_engineering_grafana_client.client_id,
+        multivalued=True,
+        add_to_id_token=True,
+        add_to_access_token=True,
+        add_to_userinfo=True,
+        opts=resource_options,
+    )
+
+    # Add Group Mapper for Grafana team sync
+    keycloak.openid.GroupMembershipProtocolMapper(
+        "ol-platform-engineering-grafana-group-mapper",
+        realm_id=ol_platform_engineering_realm.id,
+        client_id=ol_platform_engineering_grafana_client.id,
+        name="Group Mapper",
+        claim_name="groups",
+        full_path=False,
+        add_to_id_token=True,
+        add_to_access_token=False,
+        add_to_userinfo=True,
+        opts=resource_options,
+    )
+
+    # Create Grafana-specific client roles (using names Grafana expects)
+    keycloak.Role(
+        "ol-platform-engineering-grafana-admin-role",
+        realm_id=ol_platform_engineering_realm.id,
+        client_id=ol_platform_engineering_grafana_client.id,
+        name="admin",
+        description="Grafana Administrator role",
+        opts=resource_options,
+    )
+
+    keycloak.Role(
+        "ol-platform-engineering-grafana-editor-role",
+        realm_id=ol_platform_engineering_realm.id,
+        client_id=ol_platform_engineering_grafana_client.id,
+        name="editor",
+        description="Grafana Editor role",
+        opts=resource_options,
+    )
+
+    keycloak.Role(
+        "ol-platform-engineering-grafana-viewer-role",
+        realm_id=ol_platform_engineering_realm.id,
+        client_id=ol_platform_engineering_grafana_client.id,
+        name="viewer",
+        description="Grafana Viewer role",
+        opts=resource_options,
+    )
+
+    vault.generic.Secret(
+        "ol-platform-engineering-grafana-client-vault-oidc-credentials",
+        path="secret-operations/sso/grafana",
+        data_json=Output.all(
+            url=ol_platform_engineering_grafana_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
+            auth_url=ol_platform_engineering_grafana_client.realm_id.apply(
+                lambda realm_id: (
+                    f"{keycloak_url}/realms/{realm_id}/protocol/openid-connect/auth"
+                )
+            ),
+            token_url=ol_platform_engineering_grafana_client.realm_id.apply(
+                lambda realm_id: (
+                    f"{keycloak_url}/realms/{realm_id}/protocol/openid-connect/token"
+                )
+            ),
+            api_url=ol_platform_engineering_grafana_client.realm_id.apply(
+                lambda realm_id: (
+                    f"{keycloak_url}/realms/{realm_id}/protocol/openid-connect/userinfo"
+                )
+            ),
+            signout_redirect_url=ol_platform_engineering_grafana_client.realm_id.apply(
+                lambda realm_id: (
+                    f"{keycloak_url}/realms/{realm_id}/protocol/openid-connect/logout"
+                )
+            ),
+            client_id=ol_platform_engineering_grafana_client.client_id,
+            client_secret=ol_platform_engineering_grafana_client.client_secret,
+            # This is included for the case where we are using traefik-forward-auth.
+            # It requires a random secret value to be present which is independent
+            # of the OAuth credentials.
+            secret=session_secret,
+            realm_id=ol_platform_engineering_grafana_client.realm_id,
+            realm_name="ol-platform-engineering",
+            realm_public_key=ol_platform_engineering_grafana_client.realm_id.apply(
+                lambda realm_id: fetch_realm_public_key_partial(realm_id)
+            ),
+        ).apply(json.dumps),
+    )
+    # GRAFANA [END] # noqa: ERA001
+
     # OL Platform Engineering Realm - Authentication Flows[START]
     # OL - browser flow [START]
     # username-form -> ol-auth-username-password-form

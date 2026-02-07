@@ -98,6 +98,10 @@ config:
     secure: v1:r4drRDC08ppZP7oF:LIYIGuIWCRKyCAG0mcaVU4Te1LpN/MtylDiO2FYfYR1Iq8OcahRcoT2hU5CzvO8Y
   keycloak_realm:ol-platform-engineering-leek-client-secret:
     secure: v1:q+CCXORqwpNWS3PZ:7JaJVv9GrEnLVR+dnRg1Y7RGJtVTKz1Q5zWNAZ5x44012mdmZm0C4Lr+P2a4mcxT
+  keycloak_realm:ol-platform-engineering-grafana-client-secret:
+    secure: v1:kErvIIMewm7v72cy:cmFt1ef2WtHj0cGlcCVK/NcayMscYiowTPIUuudj3eWNfnVFECXy2A5ff2vNbdlKsqwqGKmHx9x3UHiD0aTLFaD4mlzzax98wnlIPWknkL0=
+  keycloak_realm:ol-platform-engineering-grafana-redirect-uris: ["https://mitolproduction.grafana.net/login/generic_oauth"]
+  keycloak_realm:ol-platform-engineering-grafana-web-origins: ["https://mitolproduction.grafana.net"]
   keycloak_realm:ol-data-platform-superset-client-secret:
     secure: v1:LTpB1a4pNAAm04uf:1IqPnuHcO78FzzwhML/wLgP2IzoW2GEvmjipQtm5fXGW2qV9Snw9CUYP9qFGfdMZ
   keycloak_realm:ol-data-platform-openmetadata-client-secret:
