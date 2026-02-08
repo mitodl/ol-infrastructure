@@ -591,6 +591,8 @@ api_domain = mitxonline_config.require("backend_domain")
 frontend_domain = mitxonline_config.require("frontend_domain")
 api_path_prefix = "mitxonline"
 frontend_tls_secret_name = "mitxonline-tls-pair"  # noqa: S105  # pragma: allowlist secret
+# Note: frontend_domain (rc.mitxonline.mit.edu) uses Fastly for TLS termination,
+# so cert-manager should only request a certificate for the backend API domain
 cert_manager_certificate = OLCertManagerCert(
     f"mitxonline-cert-manager-certificate-{stack_info.env_suffix}",
     cert_config=OLCertManagerCertConfig(
@@ -599,7 +601,7 @@ cert_manager_certificate = OLCertManagerCert(
         k8s_labels=k8s_app_labels,
         create_apisixtls_resource=True,
         dest_secret_name=frontend_tls_secret_name,
-        dns_names=[api_domain, frontend_domain],
+        dns_names=[api_domain],
     ),
 )
 mitxonline_direct_oidc = OLApisixOIDCResources(
