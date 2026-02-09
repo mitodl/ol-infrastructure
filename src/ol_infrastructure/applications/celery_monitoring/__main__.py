@@ -308,7 +308,7 @@ leek_deployment = kubernetes.apps.v1.Deployment(
                             ),
                             kubernetes.core.v1.EnvVarArgs(
                                 name="LEEK_API_URL",
-                                value=f"https://{celery_monitoring_domain}/",
+                                value=f"https://{celery_monitoring_domain}",
                             ),
                             kubernetes.core.v1.EnvVarArgs(
                                 name="LEEK_AGENT_API_SECRET",
