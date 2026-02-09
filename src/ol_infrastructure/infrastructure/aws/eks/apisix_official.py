@@ -268,6 +268,7 @@ def setup_apisix(
                         "name": "apache-apisix-ingress-controller",
                     },
                     "config": {
+                        "execADCTimeout": "60s",  # Increase from default 15s for large config syncs
                         "provider": {
                             "type": "apisix-standalone",
                         },
