@@ -1,3 +1,5 @@
+"""Celery Monitoring application deployment with APISIX routing."""
+
 import json
 import re
 from pathlib import Path
@@ -12,10 +14,6 @@ from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
 )
-from ol_infrastructure.components.services.apisix_gateway_api import (
-    OLApisixHTTPRoute,
-    OLApisixHTTPRouteConfig,
-)
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
@@ -24,6 +22,8 @@ from ol_infrastructure.components.services.k8s import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixPluginConfig,
+    OLApisixRoute,
+    OLApisixRouteConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
@@ -420,12 +420,15 @@ oidc_plugin = OLApisixPluginConfig(
     **celery_monitoring_oidc_resources.get_full_oidc_plugin_config(unauth_action="auth")
 )
 
-leek_http_route = OLApisixHTTPRoute(
-    name=f"celery-monitoring-httproute-{stack_info.env_suffix}",
+# Create ApisixRoute with embedded OIDC plugin configuration
+# Uses native APISIX CRD (apisix.apache.org/v2) instead of Gateway API HTTPRoute
+# Workaround for ingress controller 2.0.1 ExtensionRef limitations
+leek_apisix_route = OLApisixRoute(
+    name=f"celery-monitoring-apisixroute-{stack_info.env_suffix}",
     k8s_namespace=celery_monitoring_namespace,
     k8s_labels=application_labels,
     route_configs=[
-        OLApisixHTTPRouteConfig(
+        OLApisixRouteConfig(
             route_name="web",
             priority=10,
             plugins=[
@@ -436,7 +439,7 @@ leek_http_route = OLApisixHTTPRoute(
             backend_service_name="celery-monitoring",
             backend_service_port=8000,
         ),
-        OLApisixHTTPRouteConfig(
+        OLApisixRouteConfig(
             route_name="api",
             priority=0,
             plugins=[
@@ -451,5 +454,5 @@ leek_http_route = OLApisixHTTPRoute(
 )
 
 
-# DNS is automatically managed by external-dns via HTTPRoute.spec.hostnames
+# DNS is automatically managed by APISIX external-dns integration
 # No manual EKS stack configuration needed!
