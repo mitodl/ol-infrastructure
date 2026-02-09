@@ -303,10 +303,11 @@ setup_nvidia(
 )
 
 # Setup StarRocks operator
-setup_starrocks(
-    cluster_name=cluster_name,
-    cluster_stack=cluster_stack,
-    k8s_provider=k8s_provider,
-    stack_info=stack_info,
-    aws_config=aws_config,
-)
+if stack_info.env_suffix != "ci" and stack_info.env_prefix == "data":
+    setup_starrocks(
+        cluster_name=cluster_name,
+        cluster_stack=cluster_stack,
+        k8s_provider=k8s_provider,
+        stack_info=stack_info,
+        aws_config=aws_config,
+    )
