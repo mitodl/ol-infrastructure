@@ -959,6 +959,13 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             .read_text(),
             type="error",
         ),
+        fastly.ServiceVclSnippetArgs(
+            name="Set proper Content-Type for media files",
+            content=Path(__file__)
+            .parent.joinpath("snippets/set_media_content_type.vcl")
+            .read_text(),
+            type="fetch",
+        ),
     ],
     logging_https=[
         fastly.ServiceVclLoggingHttpArgs(
