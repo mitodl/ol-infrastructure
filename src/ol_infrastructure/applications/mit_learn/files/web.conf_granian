@@ -28,21 +28,7 @@ server {
     location ~* /media/(.*$) {
         expires max;
         add_header Access-Control-Allow-Origin *;
-
-        # Set Content-Type for video files to enable inline playback
-        location ~* \.mp4$ {
-            add_header Content-Type video/mp4;
-            add_header Access-Control-Allow-Origin *;
-        }
-        location ~* \.webm$ {
-            add_header Content-Type video/webm;
-            add_header Access-Control-Allow-Origin *;
-        }
-        location ~* \.mov$ {
-            add_header Content-Type video/quicktime;
-            add_header Access-Control-Allow-Origin *;
-        }
-
+        # Content-Type is automatically set by nginx using mime.types
         # Serve media files directly if they exist, otherwise return 404
         try_files $uri $uri/ /django_media/$1 /django_media/$1/ =404;
     }
