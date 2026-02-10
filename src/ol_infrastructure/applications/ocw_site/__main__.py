@@ -102,6 +102,25 @@ audit_log_bucket_config = S3BucketConfig(
             ),
         )
     ],
+    bucket_policy_document=json.dumps(
+        {
+            "Version": IAM_POLICY_VERSION,
+            "Statement": [
+                {
+                    "Sid": "S3ServerAccessLogsPolicy",
+                    "Effect": "Allow",
+                    "Principal": {"Service": "logging.s3.amazonaws.com"},
+                    "Action": "s3:PutObject",
+                    "Resource": f"arn:aws:s3:::{audit_log_bucket_name}/*",
+                    "Condition": {
+                        "StringEquals": {
+                            "aws:SourceAccount": aws_account.account_id,
+                        }
+                    },
+                }
+            ],
+        }
+    ),
     intelligent_tiering_enabled=False,
     tags=aws_config.tags,
 )
@@ -109,33 +128,6 @@ audit_log_bucket_config = S3BucketConfig(
 audit_log_bucket = OLBucket(
     "ocw-site-audit-logs-bucket",
     config=audit_log_bucket_config,
-)
-
-# Add bucket policy for S3 logging service
-audit_log_bucket_policy = s3.BucketPolicy(
-    "ocw-site-audit-logs-bucket-policy",
-    bucket=audit_log_bucket.bucket_v2.id,
-    policy=Output.all(account_id=aws_account.account_id).apply(
-        lambda args: json.dumps(
-            {
-                "Version": IAM_POLICY_VERSION,
-                "Statement": [
-                    {
-                        "Sid": "S3ServerAccessLogsPolicy",
-                        "Effect": "Allow",
-                        "Principal": {"Service": "logging.s3.amazonaws.com"},
-                        "Action": "s3:PutObject",
-                        "Resource": f"arn:aws:s3:::{audit_log_bucket_name}/*",
-                        "Condition": {
-                            "StringEquals": {
-                                "aws:SourceAccount": args["account_id"],
-                            }
-                        },
-                    }
-                ],
-            }
-        )
-    ),
 )
 
 # Create S3 buckets
