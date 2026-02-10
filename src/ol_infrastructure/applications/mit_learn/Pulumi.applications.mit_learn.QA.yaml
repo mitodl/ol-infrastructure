@@ -47,6 +47,7 @@ config:
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     APPZI_URL: ""
     AWS_S3_CUSTOM_DOMAIN: "rc.learn.mit.edu"
+    AWS_S3_PREFIX: "media"
     CANVAS_COURSE_BUCKET_NAME: "ol-data-lake-landing-zone-production"
     COURSE_ARCHIVE_BUCKET_NAME: "ol-data-lake-landing-zone-qa"
     CELERY_WORKER_CONCURRENCY: 1
