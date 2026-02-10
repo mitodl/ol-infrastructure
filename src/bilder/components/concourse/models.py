@@ -1,6 +1,6 @@
 import secrets
 from collections.abc import Generator
-from enum import Enum
+from enum import StrEnum
 from functools import partial
 from ipaddress import IPv4Address, IPv6Address
 from pathlib import Path
@@ -24,7 +24,7 @@ from bridge.lib.magic_numbers import (
 CONCOURSE_ENCRYPTION_KEY_REQUIRED_LENGTH = 32
 
 
-class IframeOptions(str, Enum):
+class IframeOptions(StrEnum):
     deny = "deny"
     same_origin = "sameorigin"
 

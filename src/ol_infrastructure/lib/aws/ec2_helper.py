@@ -1,6 +1,6 @@
 """Helper functions for working with EC2 resources."""
 
-from enum import Enum, unique
+from enum import StrEnum, unique
 from functools import lru_cache
 from ipaddress import IPv4Network
 from types import FunctionType
@@ -33,7 +33,7 @@ def is_valid_instance_type(instance_type):
 
 
 @unique
-class InstanceClasses(str, Enum):
+class InstanceClasses(StrEnum):
     general_purpose_amd = "m7a"
     general_purpose_intel = "m7i"
     memory_optimized_amd = "r7a"
@@ -43,7 +43,7 @@ class InstanceClasses(str, Enum):
 
 
 @unique
-class InstanceTypes(str, Enum):
+class InstanceTypes(StrEnum):
     burstable_nano = "t3a.nano"
     burstable_micro = "t3a.micro"
     burstable_small = "t3a.small"
@@ -78,7 +78,7 @@ class InstanceTypes(str, Enum):
 
 
 @unique
-class DiskTypes(str, Enum):
+class DiskTypes(StrEnum):
     magnetic = "standard"
     legacy_ssd = "gp2"
     ssd = "gp3"

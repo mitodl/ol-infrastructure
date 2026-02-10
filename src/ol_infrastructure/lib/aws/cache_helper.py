@@ -1,8 +1,8 @@
-from enum import Enum, unique
+from enum import StrEnum, unique
 
 
 @unique
-class CacheInstanceTypes(str, Enum):
+class CacheInstanceTypes(StrEnum):
     micro = "cache.t4g.micro"
     small = "cache.t4g.small"
     medium = "cache.t4g.medium"

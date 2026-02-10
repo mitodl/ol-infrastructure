@@ -10,7 +10,7 @@ This includes:
 
 import json
 import textwrap
-from enum import Enum
+from enum import StrEnum
 from string import Template
 from typing import Any, Literal
 
@@ -48,12 +48,12 @@ CERTIFICATE_CONFIG = {
 }
 
 
-class DBEngines(str, Enum):
+class DBEngines(StrEnum):
     """Constraints for valid engine types that are supported by this component."""
 
     postgres = "postgresql"
     mariadb = "mysql"
-    mysql = "mysql"  # noqa: PIE796
+    mysql = "mysql"
     mysql_rds = "mysql_rds"
     mongodb = "mongodb"
     mongodb_atlas = "mongodbatlas"

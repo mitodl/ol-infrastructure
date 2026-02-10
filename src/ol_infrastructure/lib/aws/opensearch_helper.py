@@ -1,8 +1,8 @@
-from enum import Enum, unique
+from enum import StrEnum, unique
 
 
 @unique
-class SearchInstanceTypes(str, Enum):
+class SearchInstanceTypes(StrEnum):
     small = "t3.small.search"
     medium = "t3.medium.search"
     general_purpose_large = "m7g.large.search"

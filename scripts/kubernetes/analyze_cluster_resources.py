@@ -1396,9 +1396,7 @@ def print_report(
         )
 
     print("\n### WORKLOAD BREAKDOWN ###\n")
-    workload_by_type: dict[str, ResourceRequest] = defaultdict(
-        lambda: ResourceRequest()
-    )
+    workload_by_type: dict[str, ResourceRequest] = defaultdict(ResourceRequest)
     for wl in workloads:
         workload_by_type[wl.kind] += wl.total_requests()
 

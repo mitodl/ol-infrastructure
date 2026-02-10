@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated, Any, Literal
 
 from pydantic import (
@@ -93,7 +93,7 @@ class Cache(BaseModel):
     )
 
 
-class Format(str, Enum):
+class Format(StrEnum):
     """The format of the file's content.
 
     If unset, Concourse will try to detect the format from the file  extension. If the
@@ -148,7 +148,7 @@ class Format(str, Enum):
     raw = "raw"
 
 
-class Platform(str, Enum):
+class Platform(StrEnum):
     """
     The platform the task should run on. This determines the pool of workers
     that the task can run against. Technically any string value is allowed so

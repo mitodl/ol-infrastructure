@@ -302,8 +302,10 @@ sensitive_heroku_vars = {
         lambda data: "{}".format(data["security_key"])
     ),
     "DATABASE_URL": postgres_micromasters_creds_app.data.apply(
-        lambda data: "postgres://{}:{}@micromasters-{}-app-db.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/micromasters".format(
-            data["username"], data["password"], stack_info.env_suffix.lower()
+        lambda data: (
+            "postgres://{}:{}@micromasters-{}-app-db.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/micromasters".format(
+                data["username"], data["password"], stack_info.env_suffix.lower()
+            )
         )
     ),
     "MAILGUN_KEY": secret_mailgun.data.apply(lambda data: "{}".format(data["api_key"])),

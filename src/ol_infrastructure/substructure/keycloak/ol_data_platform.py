@@ -172,7 +172,7 @@ def create_ol_data_platform_realm(  # noqa: PLR0913, PLR0915
             realm_id=ol_data_platform_superset_client.realm_id,
             realm_name="ol-data-platform",
             realm_public_key=ol_data_platform_superset_client.realm_id.apply(
-                lambda realm_id: fetch_realm_public_key_partial(realm_id)
+                fetch_realm_public_key_partial
             ),
         ).apply(json.dumps),
     )
@@ -387,7 +387,7 @@ def create_ol_data_platform_realm(  # noqa: PLR0913, PLR0915
             realm_id=ol_data_platform_openmetadata_client.realm_id,
             realm_name="ol-data-platform",
             realm_public_key=ol_data_platform_openmetadata_client.realm_id.apply(
-                lambda realm_id: fetch_realm_public_key_partial(realm_id)
+                fetch_realm_public_key_partial
             ),
         ).apply(json.dumps),
     )

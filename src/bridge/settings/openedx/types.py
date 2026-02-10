@@ -1,4 +1,4 @@
-from enum import Enum, EnumMeta
+from enum import EnumMeta, StrEnum
 from typing import Literal, NamedTuple
 
 from pydantic import BaseModel
@@ -13,7 +13,7 @@ class EnumInvertedLookupMeta(EnumMeta):
             return inverse_map[item]
 
 
-class OpenEdxApplication(str, Enum):
+class OpenEdxApplication(StrEnum):
     repository: str
 
     def __new__(cls, app: str, repository: str):
@@ -31,7 +31,7 @@ class OpenEdxApplication(str, Enum):
     xqwatcher = ("xqwatcher", "https://github.com/openedx/xqueue-watcher")
 
 
-class OpenEdxMicroFrontend(str, Enum, metaclass=EnumInvertedLookupMeta):
+class OpenEdxMicroFrontend(StrEnum, metaclass=EnumInvertedLookupMeta):
     repository: str
     path: str
 
@@ -82,7 +82,7 @@ OpenEdxApplicationType = Literal["MFE", "IDA"]
 OpenEdxDeploymentName = Literal["mitx", "mitx-staging", "mitxonline", "xpro"]
 
 
-class OpenEdxSupportedRelease(str, Enum):
+class OpenEdxSupportedRelease(StrEnum):
     branch: str
     python_version: str
     node_version: str

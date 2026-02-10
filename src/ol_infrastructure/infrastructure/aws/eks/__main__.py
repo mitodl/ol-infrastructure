@@ -380,9 +380,7 @@ def __create_apiserver_security_group_rules(pod_subnet_cidrs):
         )
 
 
-pod_ip_blocks.apply(
-    lambda pod_subnet_cidrs: __create_apiserver_security_group_rules(pod_subnet_cidrs)
-)
+pod_ip_blocks.apply(__create_apiserver_security_group_rules)
 
 export("cluster_name", cluster_name)
 export("kube_config", cluster.kubeconfig)
@@ -845,7 +843,7 @@ if eks_config.get_bool("efs_csi_provisioner"):
                 opts=ResourceOptions(parent=efs_filesystem),
             )
 
-    pod_subnet_ids.apply(lambda pod_subnet_ids: __create_mountpoints(pod_subnet_ids))
+    pod_subnet_ids.apply(__create_mountpoints)
 
     kubernetes.storage.v1.StorageClass(
         resource_name=f"{cluster_name}-efs-storageclass",

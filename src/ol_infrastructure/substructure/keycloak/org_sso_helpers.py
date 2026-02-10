@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 import pulumi
@@ -16,14 +16,14 @@ from ol_infrastructure.substructure.keycloak.saml_helpers import (
 )
 
 
-class NameIdFormat(str, Enum):
+class NameIdFormat(StrEnum):
     unspecified = "Unspecified"
     email = "Email"
     persistent = "Persistent"
     transient = "Transient"
 
 
-class AttributeFormat(str, Enum):
+class AttributeFormat(StrEnum):
     basic = "ATTRIBUTE_FORMAT_BASIC"
     uri = "ATTRIBUTE_FORMAT_URI"
 

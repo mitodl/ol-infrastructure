@@ -1,4 +1,4 @@
-from enum import Enum, unique
+from enum import StrEnum, unique
 
 from pydantic import BaseModel, field_validator
 
@@ -10,7 +10,7 @@ RECOMMENDED_TAGS = {"Application", "Owner"}
 
 
 @unique
-class Product(str, Enum):
+class Product(StrEnum):
     data = "data"
     infrastructure = "infrastructure"
     mitlearn = "mit-learn"
@@ -19,7 +19,7 @@ class Product(str, Enum):
 
 
 @unique
-class BusinessUnit(str, Enum):
+class BusinessUnit(StrEnum):
     """Canonical source of truth for defining valid OU tags.
 
     We rely on tagging AWS resources with a valid OU to allow for cost allocation to
@@ -44,7 +44,7 @@ class BusinessUnit(str, Enum):
 
 
 @unique
-class Environment(str, Enum):
+class Environment(StrEnum):
     """Canonical reference for valid environment names."""
 
     applications = "applications"
@@ -57,7 +57,7 @@ class Environment(str, Enum):
 
 
 @unique
-class Services(str, Enum):
+class Services(StrEnum):
     """Canonical source of truth for defining apps."""
 
     airbyte = "airbyte"
@@ -95,7 +95,7 @@ class Services(str, Enum):
 
 
 @unique
-class Application(str, Enum):
+class Application(StrEnum):
     airbyte = "airbyte"
     superset = "superset"
     bootcamps = "bootcamps"
@@ -131,7 +131,7 @@ class Application(str, Enum):
 
 
 @unique
-class Component(str, Enum):
+class Component(StrEnum):
     celery = "celery"
     webapp = "webapp"
     frontend = "frontend"
@@ -139,7 +139,7 @@ class Component(str, Enum):
 
 
 @unique
-class KubernetesServiceAppProtocol(str, Enum):
+class KubernetesServiceAppProtocol(StrEnum):
     """Kubernetes Standard Application Protocols for Service appProtocol field.
 
     These constants are defined in KEP-3726 and supported by Gateway API v1.2+.

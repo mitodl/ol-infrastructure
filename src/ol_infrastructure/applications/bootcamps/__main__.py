@@ -313,8 +313,10 @@ auth_postgres_bootcamps_creds_app = vault.generic.get_secret_output(
 )
 
 sensitive_heroku_vars["DATABASE_URL"] = auth_postgres_bootcamps_creds_app.data.apply(
-    lambda data: "postgres://{}:{}@bootcamps-db-applications-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/bootcamps".format(
-        data["username"], data["password"], stack_info.env_suffix
+    lambda data: (
+        "postgres://{}:{}@bootcamps-db-applications-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/bootcamps".format(
+            data["username"], data["password"], stack_info.env_suffix
+        )
     )
 )
 

@@ -7,7 +7,7 @@ configuration for a typical application. Special snowflakes should continue
 to use the OLDatabase components available in `aws/database.py`.
 """
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pulumi import Alias, ComponentResource, Output, ResourceOptions, StackReference
@@ -35,7 +35,7 @@ stack_info = parse_stack()
 # Network and vault stack references are defined in-situ for uniqueness.
 
 
-class AliasKey(str, Enum):
+class AliasKey(StrEnum):
     secgroup = "secgroup"
     db = "database"
     vault = "vault"

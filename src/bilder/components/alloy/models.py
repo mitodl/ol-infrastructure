@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 from pydantic_settings import SettingsConfigDict
@@ -7,7 +7,7 @@ from bilder.lib.model_helpers import OLBaseSettings
 
 
 # Other options may someday include 'docker'
-class AlloyInstallMethod(str, Enum):
+class AlloyInstallMethod(StrEnum):
     method = "apt"
 
 

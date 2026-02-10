@@ -17,7 +17,7 @@ Required On Input:
 - Subnets (Implicit)
 """
 
-from enum import Enum, unique
+from enum import StrEnum, unique
 
 import pulumi
 from pulumi.resource import ResourceOptions
@@ -54,13 +54,13 @@ from ol_infrastructure.lib.ol_types import AWSBase
 
 
 @unique
-class Protocol(str, Enum):
+class Protocol(StrEnum):
     http = "HTTP"
     https = "HTTPS"
 
 
 @unique
-class Route53RecordType(str, Enum):
+class Route53RecordType(StrEnum):
     alias = "ALIAS"
     cname = "CNAME"
     none = "NONE"

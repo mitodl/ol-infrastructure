@@ -21,7 +21,7 @@ Required On Input:
 """
 
 import json
-from enum import Enum, unique
+from enum import StrEnum, unique
 
 import pulumi
 from pulumi_aws.ec2 import SecurityGroup, get_subnet_ids
@@ -45,14 +45,14 @@ from ol_infrastructure.lib.ol_types import AWSBase
 
 
 @unique
-class DeploymentControllerTypes(str, Enum):
+class DeploymentControllerTypes(StrEnum):
     ecs = "ECS"
     code_deploy = "CODE_DEPLOY"
     external = "EXTERNAL"
 
 
 @unique
-class LaunchTypes(str, Enum):
+class LaunchTypes(StrEnum):
     fargate = "FARGATE"
     ec2 = "EC2"
     external = "EXTERNAL"

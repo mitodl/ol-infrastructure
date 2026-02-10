@@ -556,8 +556,10 @@ if env_name != "ci":
     )
     sensitive_heroku_vars["DATABASE_URL"] = (
         auth_postgres_env_opendiscussions.data.apply(
-            lambda data: "postgres://{}:{}@{}-rds-postgresql-opendiscussions.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/opendiscussions".format(
-                data["username"], data["password"], vault_env_path
+            lambda data: (
+                "postgres://{}:{}@{}-rds-postgresql-opendiscussions.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/opendiscussions".format(
+                    data["username"], data["password"], vault_env_path
+                )
             )
         )
     )

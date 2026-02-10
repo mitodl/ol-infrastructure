@@ -361,7 +361,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
             realm_id=olapps_unified_ecommerce_client.realm_id,
             realm_name="olapps",
             realm_public_key=olapps_unified_ecommerce_client.realm_id.apply(
-                lambda realm_id: fetch_realm_public_key_partial(realm_id)
+                fetch_realm_public_key_partial
             ),
         ).apply(json.dumps),
     )
@@ -426,7 +426,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
             realm_id=olapps_learn_ai_client.realm_id,
             realm_name="olapps",
             realm_public_key=olapps_learn_ai_client.realm_id.apply(
-                lambda realm_id: fetch_realm_public_key_partial(realm_id)
+                fetch_realm_public_key_partial
             ),
         ).apply(json.dumps),
     )
@@ -494,7 +494,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 realm_id=olapps_mitlearn_client.realm_id,
                 realm_name="olapps",
                 realm_public_key=olapps_mitlearn_client.realm_id.apply(
-                    lambda realm_id: fetch_realm_public_key_partial(realm_id)
+                    fetch_realm_public_key_partial
                 ),
             ).apply(json.dumps),
         )
@@ -535,7 +535,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
             realm_id=olapps_open_discussions_client.realm_id,
             realm_name="olapps",
             realm_public_key=olapps_open_discussions_client.realm_id.apply(
-                lambda realm_id: fetch_realm_public_key_partial(realm_id)
+                fetch_realm_public_key_partial
             ),
         ).apply(json.dumps),
     )
@@ -574,7 +574,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
             realm_id=olapps_mitxonline_client.realm_id,
             realm_name="olapps",
             realm_public_key=olapps_mitxonline_client.realm_id.apply(
-                lambda realm_id: fetch_realm_public_key_partial(realm_id)
+                fetch_realm_public_key_partial
             ),
         ).apply(json.dumps),
     )

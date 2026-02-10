@@ -444,8 +444,10 @@ auth_postgres_ocw_studio_applications_env_creds_app = vault.generic.get_secret_o
 )
 sensitive_heroku_vars["DATABASE_URL"] = (
     auth_postgres_ocw_studio_applications_env_creds_app.data.apply(
-        lambda data: "postgres://{}:{}@ocw-studio-db-applications-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/ocw_studio".format(
-            data["username"], data["password"], stack_info.env_suffix
+        lambda data: (
+            "postgres://{}:{}@ocw-studio-db-applications-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/ocw_studio".format(
+                data["username"], data["password"], stack_info.env_suffix
+            )
         )
     )
 )

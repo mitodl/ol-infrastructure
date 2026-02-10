@@ -1,7 +1,7 @@
 """Module for creating and managing static websites hosted in S3 and delivered through Cloudfront."""  # noqa: E501
 
 import json
-from enum import Enum
+from enum import StrEnum
 
 from pulumi import ComponentResource, ResourceOptions
 from pulumi_aws import cloudfront, s3
@@ -10,7 +10,7 @@ from ol_infrastructure.components.aws.acm import ACMCertificate, ACMCertificateC
 from ol_infrastructure.lib.ol_types import AWSBase
 
 
-class CloudfrontPriceClass(str, Enum):
+class CloudfrontPriceClass(StrEnum):
     """Valid price classes for CloudFront to control tradeoffs of price vs. latency for global visitors."""  # noqa: E501
 
     # For more details on price class refer to below link and search for PriceClass

@@ -295,7 +295,9 @@ def setup_karpenter(  # noqa: PLR0913
 
     # Construct the SSM parameter name dynamically
     ssm_parameter_name = cluster_version.apply(
-        lambda version: f"/aws/service/eks/optimized-ami/{version}/amazon-linux-2023/x86_64/standard/recommended/image_id"
+        lambda version: (
+            f"/aws/service/eks/optimized-ami/{version}/amazon-linux-2023/x86_64/standard/recommended/image_id"
+        )
     )
 
     # Get the recommended AMI ID from SSM Parameter Store as an Output

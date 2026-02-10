@@ -1,5 +1,5 @@
 from collections import defaultdict
-from enum import Enum, unique
+from enum import StrEnum, unique
 from functools import lru_cache
 
 import boto3
@@ -8,7 +8,7 @@ rds_client = boto3.client("rds")
 
 
 @unique
-class DBInstanceTypes(str, Enum):
+class DBInstanceTypes(StrEnum):
     small = "db.t4g.small"
     medium = "db.t4g.medium"
     large = "db.t4g.large"

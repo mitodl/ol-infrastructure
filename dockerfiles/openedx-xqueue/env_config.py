@@ -1,4 +1,3 @@
-# ruff: noqa: INP001
 """
 Django settings module for xqueue that loads configuration from
 environment variables. This replaces the yaml_config.py settings module

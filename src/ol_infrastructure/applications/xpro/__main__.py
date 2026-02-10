@@ -400,8 +400,10 @@ sensitive_heroku_vars = {
         lambda data: "{}".format(data["secret_key"])
     ),
     "DATABASE_URL": auth_postgres_xpro_creds_app.data.apply(
-        lambda data: "postgres://{}:{}@xpro-db-applications-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/xpro".format(
-            data["username"], data["password"], stack_info.name.lower()
+        lambda data: (
+            "postgres://{}:{}@xpro-db-applications-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/xpro".format(
+                data["username"], data["password"], stack_info.name.lower()
+            )
         )
     ),
     # Static secrets that require something more involved

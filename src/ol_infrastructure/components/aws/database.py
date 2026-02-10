@@ -9,7 +9,7 @@ This includes:
 - Create DB instance
 """  # noqa: E501
 
-from enum import Enum
+from enum import StrEnum
 
 import pulumi
 from pulumi_aws import rds
@@ -43,7 +43,7 @@ from ol_infrastructure.lib.ol_types import AWSBase
 MAX_BACKUP_DAYS = 35
 
 
-class StorageType(str, Enum):
+class StorageType(StrEnum):
     """Container for constraining available selection of storage types."""
 
     magnetic = "standard"

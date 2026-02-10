@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -7,7 +7,7 @@ from pydantic_settings import SettingsConfigDict
 from bilder.lib.model_helpers import OLBaseSettings
 
 
-class VectorInstallMethod(str, Enum):
+class VectorInstallMethod(StrEnum):
     package = "package"
 
 
