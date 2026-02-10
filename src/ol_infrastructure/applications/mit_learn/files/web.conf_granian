@@ -4,10 +4,6 @@ server {
     server_name _;
     large_client_header_buffers 4 32k; # Added based on learn_ai example
 
-    # Include MIME types for proper content type handling
-    include /etc/nginx/mime.types;
-    default_type application/octet-stream;
-
     root /src;
     location = /.well-known/dnt-policy.txt {
         return 204;
@@ -28,7 +24,6 @@ server {
     location ~* /media/(.*$) {
         expires max;
         add_header Access-Control-Allow-Origin *;
-        # Content-Type is automatically set by nginx using mime.types
         # Serve media files directly if they exist, otherwise return 404
         try_files $uri $uri/ /django_media/$1 /django_media/$1/ =404;
     }
