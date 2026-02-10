@@ -824,9 +824,9 @@ edxapp_ses_event_destintations = ses.EventDestination(
     ],
     cloudwatch_destinations=[
         ses.EventDestinationCloudwatchDestinationArgs(
-            default_value="default",
-            dimension_name=f"edxapp-{env_name}",
-            value_source="emailHeader",
+            default_value=f"edxapp-{stack_info.env_prefix}",
+            dimension_name=f"edxapp-{stack_info.env_prefix}",
+            value_source="messageTag",
         )
     ],
 )

@@ -532,6 +532,7 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
             },
         },
         "mitxonline": {
+            "AWS_SES_SEND_MESSAGE_TAGS": {"edxapp-mitxonline": "true"},
             "DEFAULT_SITE_THEME": "mitxonline",
             "PLATFORM_NAME": "MIT Learn",
             "PLATFORM_DESCRIPTION": "MIT Learn",
