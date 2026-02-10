@@ -34,7 +34,10 @@ config:
     VIDEO_S3_UPLOAD_PREFIX: 'gdrive_uploads'
     TRANSCODE_JOB_TEMPLATE: './videos/config/mediaconvert.json'
   ocw_studio:app_domain: ocw-studio-ci.odl.mit.edu
+  ocw_studio:k8s_deploy: "true"
   ocw_studio:db_password:
     secure: v1:PMhnJY0c/38fxcK/:HwHpoUXfP5YTzXq/3cyZUj4eRjCmNkdScLTGca863qCG/U1Py2BHwJXHiM8KPXx9NJufyVDzNtf79Ss7UTEcKOmM+M+8NXFE6I8UCapuui3yi52KFOWk7o6X
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
+  redis:password:
+    secure: v1:RoiGKrOlnqIsp8nb:388ZZ/xuvxVJ4DiHlUQRkdAlRiCqWucphQ7KWxWFxnZtOGle/KpHzC/ZmRtU04ENQFVsqDBopkr8
