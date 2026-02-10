@@ -49,6 +49,8 @@ config:
     AI_MIT_SYLLABUS_URL: "https://api.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.learn.mit.edu/api/v0/vector_content_files_search/"
     APPZI_URL: "https://w.appzi.io/w.js?token=Q2pSI"
+    AWS_S3_CUSTOM_DOMAIN: "learn.mit.edu"
+    AWS_S3_PREFIX: "media"
     CANVAS_COURSE_BUCKET_NAME: "ol-data-lake-landing-zone-production"
     CELERY_WORKER_CONCURRENCY: 1
     CSRF_COOKIE_NAME: "learn_csrftoken"
