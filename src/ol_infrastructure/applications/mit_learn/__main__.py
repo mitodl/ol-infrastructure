@@ -907,7 +907,6 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             set var.is_media_request = false;
             if( req.url ~ "^/media" ) {
               set var.is_media_request = true;
-              set req.url = regsub(req.url, "^/media/(.*)$", "/\1");
               unset req.http.Cookie;
             }"""),
             name="Route media requests to S3",
