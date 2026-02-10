@@ -50,8 +50,11 @@ config:
     VIDEO_S3_UPLOAD_PREFIX: 'gdrive_uploads'
     YT_PROJECT_ID: 'ocw-studio-qa'
   ocw_studio:app_domain: ocw-studio.odl.mit.edu
+  ocw_studio:k8s_deploy: "false"
   ocw_studio:db_password:
     secure: v1:KkTvlMKkKDXJiaQM:W+vNsxirVQXnvf1FvsokCi49hercEQP+1nmCGvhuOfQZYEqYvPW/Y+eraoQ71t2THGB3xtvwf55DmHVqD87Gf+CvZCPnSMEYGIRmouZZ6xlnXRK1Ph0e/rbO
-  ocw_studio:db_use_blue_green: false
+  ocw_studio:db_use_blue_green: "false"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
+  redis:password:
+    secure: v1:rpf/+ovQO9psWzcD:NLFJcXaCM0RxfgMh87TBLZzSUVs6hxPmVtJ+dfYkUaAbVX5/ZaMKeVvciM/UJL3AlXLFRplgBhPC/wuUJg==
