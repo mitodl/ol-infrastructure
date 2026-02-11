@@ -2,11 +2,13 @@
 
 import base64
 import json
+import os
 import textwrap
 from itertools import chain
 from pathlib import Path
 
 import pulumi_consul as consul
+import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 import yaml
 from pulumi import (
@@ -29,6 +31,10 @@ from bridge.lib.magic_numbers import (
     DEFAULT_REDIS_PORT,
 )
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.components.applications.eks import (
+    OLEKSAuthBinding,
+    OLEKSAuthBindingConfig,
+)
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,
@@ -45,22 +51,49 @@ from ol_infrastructure.components.aws.mediaconvert import (
     OLMediaConvert,
 )
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.components.services.k8s import (
+    OLApplicationK8s,
+    OLApplicationK8sCeleryWorkerConfig,
+    OLApplicationK8sConfig,
+)
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
+    OLVaultK8SDynamicSecretConfig,
+    OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
+from ol_infrastructure.lib.aws.eks_helper import (
+    check_cluster_namespace,
+    setup_k8s_provider,
+)
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.consul import consul_key_helper, get_consul_provider
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.ol_types import (
+    Application,
+    AWSBase,
+    BusinessUnit,
+    K8sAppLabels,
+    Product,
+    Services,
+)
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
+
+# Docker image tag from environment variable (required for K8s deployments)
+if "ODL_VIDEO_DOCKER_TAG" not in os.environ:
+    msg = "ODL_VIDEO_DOCKER_TAG environment variable must be set"
+    raise ValueError(msg)
+ODL_VIDEO_DOCKER_TAG = os.environ["ODL_VIDEO_DOCKER_TAG"]
 
 # Configuration items and initialziations
 if Config("vault_server").get("env_namespace"):
     setup_vault_provider()
 ovs_config = Config("ovs")
+vault_config = Config("vault")
+redis_config = Config("redis")
 stack_info = parse_stack()
 
 aws_account = get_caller_identity()
@@ -598,7 +631,6 @@ ovs_db_consul_service = Service(
 )
 
 redis_auth_token = secrets["redis"]["auth_token"]
-redis_config = Config("redis")
 
 ovs_server_redis_config = OLAmazonRedisConfig(
     encrypt_transit=True,
@@ -681,7 +713,7 @@ ovs_tg_config = OLTargetGroupConfig(
     vpc_id=target_vpc["id"],
     target_group_healthcheck=False,
     health_check_interval=60,
-    health_check_matcher="404",  # TODO Figure out a real endpoint for this  # noqa: E501, FIX002, TD002, TD004
+    health_check_matcher="404",  # TODO Figure out a real endpoint  # noqa: FIX002, TD002, TD004
     health_check_path="/ping",
     stickiness="lb_cookie",
     tags=instance_tags,
@@ -773,13 +805,552 @@ autoscale_setup = OLAutoScaling(
     lb_config=ovs_lb_config,
 )
 
-# Vault policy definition
+# Configuration variables needed for both EC2 and K8s deployments
+enabled_annotations = ovs_config.get_bool("feature_annotations")
+use_shibboleth = ovs_config.get_bool("use_shibboleth")
+
+# MediaConvert setup (shared by both EC2 and K8s)
+ovs_mediaconvert_config = MediaConvertConfig(
+    service_name="odl-video",
+    env_suffix=stack_info.env_suffix,
+    tags=aws_config.tags,
+    policy_arn=ovs_server_policy.arn,
+    host=ovs_config.get("default_domain"),
+)
+ovs_mediaconvert = OLMediaConvert(ovs_mediaconvert_config)
+
+# Kubernetes Deployment (optional, based on configuration)
+deploy_to_k8s = ovs_config.get_bool("deploy_to_k8s")
+
+if deploy_to_k8s:
+    # Setup K8s provider and get cluster information
+    k8s_cluster_name = "applications"
+    k8s_namespace = "odl-video-service"
+
+    eks_stack = StackReference(
+        f"infrastructure.aws.eks.{k8s_cluster_name}.{stack_info.name}"
+    )
+
+    k8s_provider = setup_k8s_provider(
+        kubeconfig=eks_stack.require_output("kube_config")
+    )
+
+    eks_stack.require_output("namespaces").apply(
+        lambda ns: check_cluster_namespace(k8s_namespace, ns)
+    )
+
+    # Create K8s labels
+    k8s_app_labels = K8sAppLabels(
+        application=Application.odl_video_service,
+        stack=stack_info,
+        ou=BusinessUnit.ovs,
+        service=Services.odl_video_service,
+        product=Product.infrastructure,
+        source_repository="https://github.com/mitodl/odl-video-service",
+    )
+
+    # Read and prepare Vault policy text
+    vault_policy_text = (
+        Path(__file__)
+        .parent.joinpath("odl_video_service_server_policy.hcl")
+        .read_text()
+    )
+
+    # Setup IAM and Vault auth using OLEKSAuthBinding
+    ovs_auth_binding = OLEKSAuthBinding(
+        OLEKSAuthBindingConfig(
+            application_name=f"odl-video-service-{stack_info.env_suffix}",
+            namespace=k8s_namespace,
+            stack_info=stack_info,
+            aws_config=aws_config,
+            iam_policy_document=ovs_server_policy_document,
+            vault_policy_text=vault_policy_text,
+            cluster_name=eks_stack.require_output("cluster_name"),
+            cluster_identities=eks_stack.require_output("cluster_identities"),
+            vault_auth_endpoint=eks_stack.require_output("vault_auth_endpoint"),
+            irsa_service_account_name="odl-video-service",
+            vault_sync_service_account_names="odl-video-service-vault",
+            k8s_labels=k8s_app_labels,
+            parliament_config=parliament_config,
+        )
+    )
+
+    # Get vault_k8s_resources from the auth binding
+    vault_k8s_resources = ovs_auth_binding.vault_k8s_resources
+
+    # Create VaultDynamicSecret for database credentials
+    db_creds_secret = OLVaultK8SSecret(
+        f"odl-video-service-{stack_info.env_suffix}-db-creds",
+        resource_config=OLVaultK8SDynamicSecretConfig(
+            name="odl-video-db-creds",
+            namespace=k8s_namespace,
+            labels=k8s_app_labels.model_dump(),
+            dest_secret_name="odl-video-db-creds",  # noqa: S106 # pragma: allowlist secret
+            dest_secret_labels=k8s_app_labels.model_dump(),
+            mount=f"postgres-{stack_info.env_prefix}",
+            path="creds/ovs-app",
+            excludes=[".*"],
+            exclude_raw=True,
+            templates={
+                "DB_USER": "{{ .Secrets.username }}",
+                "DB_PASSWORD": "{{ .Secrets.password }}",
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+            restart_target_kind="Deployment",
+            restart_target_name="odl-video-service",
+        ),
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=vault_k8s_resources,
+        ),
+    )
+
+    # Create VaultDynamicSecret for AWS credentials
+    aws_creds_secret = OLVaultK8SSecret(
+        f"odl-video-service-{stack_info.env_suffix}-aws-creds",
+        resource_config=OLVaultK8SDynamicSecretConfig(
+            name="odl-video-aws-creds",
+            namespace=k8s_namespace,
+            labels=k8s_app_labels.model_dump(),
+            dest_secret_name="odl-video-aws-creds",  # noqa: S106 # pragma: allowlist secret
+            dest_secret_labels=k8s_app_labels.model_dump(),
+            mount="aws-mitx",
+            path="creds/ovs-server",
+            excludes=[".*"],
+            exclude_raw=True,
+            templates={
+                "AWS_ACCESS_KEY_ID": "{{ .Secrets.access_key }}",
+                "AWS_SECRET_ACCESS_KEY": "{{ .Secrets.secret_key }}",
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+            restart_target_kind="Deployment",
+            restart_target_name="odl-video-service",
+        ),
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=vault_k8s_resources,
+        ),
+    )
+
+    # Create VaultStaticSecret for global CloudFront key
+    cloudfront_secret = OLVaultK8SSecret(
+        f"odl-video-service-{stack_info.env_suffix}-cloudfront",
+        resource_config=OLVaultK8SStaticSecretConfig(
+            name="odl-video-cloudfront",
+            namespace=k8s_namespace,
+            labels=k8s_app_labels.model_dump(),
+            dest_secret_name="odl-video-cloudfront",  # noqa: S106 # pragma: allowlist secret
+            dest_secret_labels=k8s_app_labels.model_dump(),
+            mount="secret-operations",
+            mount_type="kv-v2",
+            path="global/cloudfront-private-key",
+            excludes=[".*"],
+            exclude_raw=True,
+            templates={
+                "CLOUDFRONT_KEY_ID": '{{ index .Secrets "data" "id" }}',
+                "CLOUDFRONT_PRIVATE_KEY": '{{ index .Secrets "data" "value" }}',
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+            refresh_after="1h",
+        ),
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=vault_k8s_resources,
+        ),
+    )
+
+    # Create VaultStaticSecret for global Mailgun key
+    mailgun_secret = OLVaultK8SSecret(
+        f"odl-video-service-{stack_info.env_suffix}-mailgun",
+        resource_config=OLVaultK8SStaticSecretConfig(
+            name="odl-video-mailgun",
+            namespace=k8s_namespace,
+            labels=k8s_app_labels.model_dump(),
+            dest_secret_name="odl-video-mailgun",  # noqa: S106 # pragma: allowlist secret
+            dest_secret_labels=k8s_app_labels.model_dump(),
+            mount="secret-operations",
+            mount_type="kv-v2",
+            path="global/mailgun-api-key",
+            excludes=[".*"],
+            exclude_raw=True,
+            templates={
+                "MAILGUN_KEY": '{{ index .Secrets "data" "value" }}',
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+            refresh_after="1h",
+        ),
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=vault_k8s_resources,
+        ),
+    )
+
+    # Create VaultStaticSecret for application secrets
+    app_static_secret = OLVaultK8SSecret(
+        f"odl-video-service-{stack_info.env_suffix}-static-secret",
+        resource_config=OLVaultK8SStaticSecretConfig(
+            name="odl-video-static-secrets",
+            namespace=k8s_namespace,
+            labels=k8s_app_labels.model_dump(),
+            dest_secret_name="odl-video-static-secrets",  # noqa: S106 # pragma: allowlist secret
+            dest_secret_labels=k8s_app_labels.model_dump(),
+            mount="secret-odl-video-service",
+            mount_type="kv-v2",
+            path="ovs-secrets",
+            excludes=[".*"],
+            exclude_raw=True,
+            templates={
+                # Django secrets
+                "SECRET_KEY": '{{ index .Secrets "data" "misc" "secret_key" }}',
+                "FIELD_ENCRYPTION_KEY": (
+                    '{{ index .Secrets "data" "misc" "field_encryption_key" }}'
+                ),
+                # MIT Web Services
+                "MIT_WS_CERTIFICATE": (
+                    '{{ index .Secrets "data" "misc" "mit_ws_certificate" }}'
+                ),
+                "MIT_WS_PRIVATE_KEY": (
+                    '{{ index .Secrets "data" "misc" "mit_ws_private_key" }}'
+                ),
+                "ET_PIPELINE_ID": '{{ index .Secrets "data" "misc" "et_pipeline_id" }}',
+                # Mailgun
+                "MAILGUN_URL": '{{ index .Secrets "data" "mailgun" "url" }}',
+                # OpenEdX
+                "OPENEDX_API_CLIENT_ID": (
+                    '{{ index .Secrets "data" "openedx" "api_client_id" }}'
+                ),
+                "OPENEDX_API_CLIENT_SECRET": (
+                    '{{ index .Secrets "data" "openedx" "api_client_secret" }}'
+                ),
+                # Sentry
+                "SENTRY_DSN": '{{ index .Secrets "data" "sentry" "dsn" }}',
+                # Google Analytics (note: using GA_ prefix to match .env.tmpl)
+                "GA_VIEW_ID": '{{ index .Secrets "data" "google_analytics" "id" }}',
+                "GA_KEYFILE_JSON": (
+                    '{{ index .Secrets "data" "google_analytics" "json" }}'
+                ),
+                "GA_TRACKING_ID": (
+                    '{{ index .Secrets "data" "google_analytics" "tracking_id" }}'
+                ),
+                # YouTube (note: using YT_ prefix to match .env.tmpl)
+                "YT_ACCESS_TOKEN": (
+                    '{{ index .Secrets "data" "youtube" "access_token" }}'
+                ),
+                "YT_CLIENT_ID": '{{ index .Secrets "data" "youtube" "client_id" }}',
+                "YT_CLIENT_SECRET": (
+                    '{{ index .Secrets "data" "youtube" "client_secret" }}'
+                ),
+                "YT_PROJECT_ID": '{{ index .Secrets "data" "youtube" "project_id" }}',
+                "YT_REFRESH_TOKEN": (
+                    '{{ index .Secrets "data" "youtube" "refresh_token" }}'
+                ),
+                # Dropbox
+                "DROPBOX_KEY": '{{ index .Secrets "data" "dropbox" "key" }}',
+                "DROPBOX_TOKEN": '{{ index .Secrets "data" "dropbox" "token" }}',
+                # CloudFront
+                "VIDEO_CLOUDFRONT_DIST": (
+                    '{{ index .Secrets "data" "cloudfront" "subdomain" }}'
+                ),
+                # Redis (note: auth_token is used for CELERY_BROKER_URL/REDIS_URL construction)
+                "REDIS_AUTH_TOKEN": '{{ index .Secrets "data" "redis" "auth_token" }}',
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+            refresh_after="1h",
+        ),
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=vault_k8s_resources,
+        ),
+    )
+
+    # Create Shibboleth ConfigMap (if Shibboleth is enabled)
+    if use_shibboleth:
+        shibboleth_config = kubernetes.core.v1.ConfigMap(
+            "odl-video-shibboleth-config",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name="odl-video-shibboleth-config",
+                namespace=k8s_namespace,
+                labels=k8s_app_labels.model_dump(),
+            ),
+            data={
+                # ruff: noqa: E501
+                "shibboleth2.xml": textwrap.dedent(f"""\
+                    <SPConfig xmlns="urn:mace:shibboleth:3.0:native:sp:config"
+                              xmlns:conf="urn:mace:shibboleth:3.0:native:sp:config">
+                        <ApplicationDefaults entityID="https://{ovs_config.get("default_domain")}/shibboleth">
+                            <Sessions lifetime="28800" timeout="3600" relayState="ss:mem"
+                                      checkAddress="false" handlerSSL="true" cookieProps="https">
+                                <SSO entityID="https://idp.mit.edu/shibboleth">
+                                    SAML2
+                                </SSO>
+                                <Logout>SAML2 Local</Logout>
+                                <Handler type="MetadataGenerator" Location="/Metadata" signing="false"/>
+                                <Handler type="Status" Location="/Status" acl="127.0.0.1 ::1"/>
+                                <Handler type="Session" Location="/Session" showAttributeValues="false"/>
+                            </Sessions>
+                            <Errors supportContact="mitx-devops@mit.edu"
+                                    helpLocation="/about.html"
+                                    styleSheet="/shibboleth-sp/main.css"/>
+                            <MetadataProvider type="XML" validate="true"
+                                              path="/etc/shibboleth/mit-metadata.xml"/>
+                            <AttributeExtractor type="XML" validate="true" reloadChanges="false"
+                                                path="/etc/shibboleth/attribute-map.xml"/>
+                            <AttributeResolver type="Query" subjectMatch="true"/>
+                            <AttributeFilter type="XML" validate="true"
+                                             path="/etc/shibboleth/attribute-policy.xml"/>
+                            <CredentialResolver type="File" use="signing"
+                                                key="/etc/shibboleth/sp-key.pem"
+                                                certificate="/etc/shibboleth/sp-cert.pem"/>
+                            <CredentialResolver type="File" use="encryption"
+                                                key="/etc/shibboleth/sp-key.pem"
+                                                certificate="/etc/shibboleth/sp-cert.pem"/>
+                        </ApplicationDefaults>
+                        <SecurityPolicyProvider type="XML" validate="true" path="/etc/shibboleth/security-policy.xml"/>
+                        <ProtocolProvider type="XML" validate="true" reloadChanges="false" path="/etc/shibboleth/protocols.xml"/>
+                    </SPConfig>
+                    """),
+                "attribute-map.xml": textwrap.dedent("""\
+                    <Attributes xmlns="urn:mace:shibboleth:2.0:attribute-map" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                        <Attribute name="urn:oid:1.3.6.1.4.1.5923.1.1.1.6" id="eppn">
+                            <AttributeDecoder xsi:type="ScopedAttributeDecoder" caseSensitive="false"/>
+                        </Attribute>
+                        <Attribute name="urn:oid:1.3.6.1.4.1.5923.1.1.1.9" id="affiliation">
+                            <AttributeDecoder xsi:type="ScopedAttributeDecoder" caseSensitive="false"/>
+                        </Attribute>
+                        <Attribute name="urn:oid:2.5.4.3" id="cn"/>
+                        <Attribute name="urn:oid:0.9.2342.19200300.100.1.1" id="uid"/>
+                        <Attribute name="urn:oid:2.5.4.42" id="givenName"/>
+                        <Attribute name="urn:oid:2.5.4.4" id="sn"/>
+                        <Attribute name="urn:oid:0.9.2342.19200300.100.1.3" id="mail"/>
+                    </Attributes>
+                    """),
+            },
+            opts=ResourceOptions(
+                provider=k8s_provider,
+                parent=vault_k8s_resources,
+            ),
+        )
+
+        # Create Shibboleth Secrets (certs and keys)
+        shibboleth_certs_secret = kubernetes.core.v1.Secret(
+            "odl-video-shibboleth-certs",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name="odl-video-shibboleth-certs",
+                namespace=k8s_namespace,
+                labels=k8s_app_labels.model_dump(),
+            ),
+            string_data={
+                "sp-cert.pem": secrets["shibboleth"]["sp_cert"],
+                "sp-key.pem": secrets["shibboleth"]["sp_key"],
+                "mit-md-cert.pem": secrets["shibboleth"]["mit_md_cert"],
+            },
+            opts=ResourceOptions(
+                provider=k8s_provider,
+                parent=vault_k8s_resources,
+            ),
+        )
+
+    # Prepare environment variables for the application
+    ovs_env_vars = Output.all(
+        db_address=db_address,
+        redis_address=ovs_server_redis_cluster.address,
+        redis_auth_token=redis_auth_token,
+        mediaconvert_sns_topic=ovs_mediaconvert.sns_topic.arn,
+        mediaconvert_queue=ovs_mediaconvert.queue.name,
+        mediaconvert_role=ovs_mediaconvert.role.name,
+    ).apply(
+        lambda args: {
+            # Database connection (credentials from VaultDynamicSecret)
+            "DATABASE_HOST": args["db_address"],
+            "DATABASE_PORT": str(DEFAULT_POSTGRES_PORT),
+            "DATABASE_NAME": "odlvideo",
+            # Redis/Celery configuration (using rediss:// for TLS)
+            "CELERY_BROKER_URL": f"rediss://default:{args['redis_auth_token']}@{args['redis_address']}:6379/0?ssl_cert_reqs=required",
+            "REDIS_URL": f"rediss://default:{args['redis_auth_token']}@{args['redis_address']}:6379/0?ssl_cert_reqs=CERT_REQUIRED",
+            # Application configuration
+            "DJANGO_LOG_LEVEL": ovs_config.get("log_level") or "INFO",
+            "ODL_VIDEO_LOG_LEVEL": ovs_config.get("log_level") or "INFO",
+            "ODL_VIDEO_ENVIRONMENT": stack_info.env_suffix,
+            "ODL_VIDEO_BASE_URL": f"https://{ovs_config.get('default_domain')}",
+            "EDX_BASE_URL": ovs_config.get("edx_base_url"),
+            "NGINX_CONFIG_FILE_PATH": ovs_config.get("nginx_config_file_path")
+            or "/etc/nginx/conf.d/odl-video.conf",
+            "STATUS_TOKEN": stack_info.env_suffix,
+            # AWS configuration
+            "AWS_REGION": aws_config.region,
+            "AWS_ACCOUNT_ID": aws_account.account_id,
+            "AWS_ROLE_NAME": args["mediaconvert_role"],
+            "AWS_S3_DOMAIN": "s3.amazonaws.com",
+            # S3 bucket configuration (using VIDEO_S3_* to match .env.tmpl)
+            "VIDEO_S3_BUCKET": ovs_config.get("s3_bucket_name"),
+            "VIDEO_S3_SUBTITLE_BUCKET": ovs_config.get("s3_subtitle_bucket_name"),
+            "VIDEO_S3_THUMBNAIL_BUCKET": ovs_config.get("s3_thumbnail_bucket_name"),
+            "VIDEO_S3_TRANSCODE_BUCKET": ovs_config.get("s3_transcode_bucket_name"),
+            "VIDEO_S3_WATCH_BUCKET": ovs_config.get("s3_watch_bucket_name"),
+            "VIDEO_S3_UPLOAD_PREFIX": ovs_config.get("video_s3_upload_prefix") or "",
+            "VIDEO_S3_TRANSCODE_PREFIX": ovs_config.get("video_s3_transcode_prefix")
+            or "transcoded",
+            "VIDEO_S3_THUMBNAIL_PREFIX": ovs_config.get("video_s3_thumbnail_prefix")
+            or "thumbnails",
+            "VIDEO_S3_TRANSCODE_ENDPOINT": ovs_config.get(
+                "video_s3_transcode_endpoint"
+            ),
+            # MediaConvert/Transcode configuration
+            "POST_TRANSCODE_ACTIONS": ovs_config.get("post_transcode_actions")
+            or "cloudsync_api_process_transcode_results",
+            "TRANSCODE_JOB_TEMPLATE": ovs_config.get("transcode_job_template")
+            or "./config/mediaconvert.json",
+            "VIDEO_TRANSCODE_QUEUE": args["mediaconvert_queue"],
+            # Elastic Transcoder legacy presets
+            "ET_MP4_PRESET_ID": "1669811490975-riqq25",
+            "ET_PRESET_IDS": "1504127981921-c2jlwt,1504127981867-06dkm6,1504127981819-v44xlx,1504127981769-6cnqhq,1351620000001-200040,1351620000001-200050",
+            # Redis configuration
+            "REDIS_MAX_CONNECTIONS": ovs_config.get("redis_max_connections") or "10",
+            # Feature flags
+            "USE_SHIBBOLETH": "True" if use_shibboleth else "False",
+            "FEATURE_VIDEOJS_ANNOTATIONS": "True" if enabled_annotations else "False",
+            "FEATURE_RETRANSCODE_ENABLED": "True",
+            "ENABLE_VIDEO_PERMISSIONS": "True",
+            # Video processing configuration
+            "VIDEO_STATUS_UPDATE_FREQUENCY": "60",
+            "VIDEO_WATCH_BUCKET_FREQUENCY": "600",
+            # Dropbox configuration
+            "DROPBOX_FOLDER": "/Captions",
+            # Google Analytics configuration
+            "GA_DIMENSION_CAMERA": "dimension1",
+            # Email configuration
+            "LECTURE_CAPTURE_USER": "emello@mit.edu",
+            "ODL_VIDEO_ADMIN_EMAIL": "cuddle_bunnies@mit.edu",
+            "ODL_VIDEO_FROM_EMAIL": "MIT ODL Video <ol-engineering-support@mit.edu>",
+            "ODL_VIDEO_SUPPORT_EMAIL": "MIT ODL Video <ol-engineering-support@mit.edu>",
+            "ODL_VIDEO_LOG_FILE": "/var/log/odl-video/django.log",
+            # Application runtime configuration
+            "PORT": "8087",
+            "NODE_ENV": "production",
+            "DEV_ENV": "False",
+        }
+    )
+
+    # Create main application configuration Secret
+    ovs_k8s_config_secret = kubernetes.core.v1.Secret(
+        "odl-video-service-config",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="odl-video-config",
+            namespace=k8s_namespace,
+            labels=k8s_app_labels.model_dump(),
+        ),
+        string_data=ovs_env_vars,
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=vault_k8s_resources,
+        ),
+    )
+
+    # Collect all secret names for env injection
+    secret_names = [
+        "odl-video-config",
+        "odl-video-db-creds",
+        "odl-video-aws-creds",
+        "odl-video-cloudfront",
+        "odl-video-mailgun",
+        "odl-video-static-secrets",
+    ]
+
+    # Create K8s-safe security group name (replace underscores with hyphens)
+    k8s_safe_sg_name = ovs_server_security_group.name.apply(
+        lambda name: name.replace("_", "-")
+    )
+
+    # Configure OLApplicationK8s
+    ovs_k8s_config = OLApplicationK8sConfig(
+        project_root=Path(__file__).parent,
+        application_config={},  # Use env_from_secret_names instead
+        application_name="odl-video-service",
+        application_namespace=k8s_namespace,
+        application_lb_service_name="odl-video-service",
+        application_lb_service_port_name="http",
+        application_min_replicas=ovs_config.get_int("web_min_replicas") or 2,
+        application_max_replicas=ovs_config.get_int("web_max_replicas") or 10,
+        k8s_global_labels=k8s_app_labels.model_dump(),
+        env_from_secret_names=secret_names,
+        application_security_group_id=ovs_server_security_group.id,
+        application_security_group_name=k8s_safe_sg_name,
+        application_service_account_name=vault_k8s_resources.service_account_name,
+        application_image_repository="dockerhub/mitodl/ovs-app",  # From docker-compose.yaml.tmpl
+        application_docker_tag=ODL_VIDEO_DOCKER_TAG,  # From environment variable
+        application_cmd_array=["uwsgi"],
+        application_arg_array=["uwsgi.ini"],
+        vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
+        registry="ecr",
+        import_nginx_config=True,
+        import_uwsgi_config=False,  # uwsgi.ini is already in the Docker image
+        init_migrations=True,
+        init_collectstatic=True,
+        resource_requests={
+            "cpu": ovs_config.get("web_cpu_request") or "500m",
+            "memory": ovs_config.get("web_memory_request") or "1Gi",
+        },
+        resource_limits={
+            "memory": ovs_config.get("web_memory_limit") or "4Gi",
+        },
+        celery_worker_configs=[
+            OLApplicationK8sCeleryWorkerConfig(
+                queue_name="default",
+                queues=["default"],
+                min_replicas=ovs_config.get_int("celery_min_replicas") or 1,
+                max_replicas=ovs_config.get_int("celery_max_replicas") or 5,
+                redis_host=ovs_server_redis_cluster.address,
+                redis_password=redis_auth_token,
+                resource_requests={
+                    "cpu": ovs_config.get("celery_cpu_request") or "250m",
+                    "memory": ovs_config.get("celery_memory_request") or "512Mi",
+                },
+                resource_limits={
+                    "memory": ovs_config.get("celery_memory_limit") or "2Gi",
+                },
+            ),
+        ],
+    )
+
+    # Deploy the application to K8s
+    depends_on_list = [
+        vault_k8s_resources,
+        db_creds_secret,
+        app_static_secret,
+        ovs_k8s_config_secret,
+    ]
+    if use_shibboleth:
+        depends_on_list.extend([shibboleth_config, shibboleth_certs_secret])
+
+    ovs_k8s_app = OLApplicationK8s(
+        ol_app_k8s_config=ovs_k8s_config,
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            depends_on=depends_on_list,
+        ),
+    )
+
+    export(
+        "odl_video_service_k8s",
+        {
+            "namespace": k8s_namespace,
+            "service_name": "odl-video-service",
+            "vault_auth_role": ovs_auth_binding.vault_k8s_resources.auth_name,
+            "irsa_role_arn": ovs_auth_binding.irsa_role.arn,
+        },
+    )
+
+# Vault policy definition for EC2 instances
+vault_policy_template_text = (
+    Path(__file__).parent.joinpath("odl_video_service_server_policy.hcl").read_text()
+)
+ec2_vault_policy_text = vault_policy_template_text.replace(
+    "DEPLOYMENT", stack_info.env_prefix
+)
 ovs_server_vault_policy = vault.Policy(
     "ovs-server-vault-policy",
     name="odl-video-service-server",
-    policy=Path(__file__)
-    .parent.joinpath("odl_video_service_server_policy.hcl")
-    .read_text(),
+    policy=ec2_vault_policy_text,
 )
 
 vault.aws.AuthBackendRole(
@@ -814,8 +1385,8 @@ ovs_server_secrets = vault.generic.Secret(
     path=ovs_server_vault_mount.path.apply("{}/ovs-secrets".format),
     data_json=json.dumps(secrets),
 )
-enabled_annotations = ovs_config.get_bool("feature_annotations")
-use_shibboleth = ovs_config.get_bool("use_shibboleth")
+
+# These variables are already defined earlier, before K8s deployment
 if use_shibboleth:
     nginx_config_file_path = "/etc/nginx/nginx_with_shib.conf"
 else:
@@ -834,16 +1405,6 @@ for domain in ovs_config.get_object("route53_managed_domains"):
         records=[autoscale_setup.load_balancer.dns_name],
         zone_id=mitodl_zone_id,
     )
-
-ovs_mediaconvert_config = MediaConvertConfig(
-    service_name="odl-video",
-    env_suffix=stack_info.env_suffix,
-    tags=aws_config.tags,
-    policy_arn=ovs_server_policy.arn,
-    host=ovs_config.get("default_domain"),
-)
-
-ovs_mediaconvert = OLMediaConvert(ovs_mediaconvert_config)
 
 consul_keys = {
     "ovs/database_endpoint": db_address,
