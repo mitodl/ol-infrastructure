@@ -755,6 +755,16 @@ for location in code_locations:
         deployment["env"].append(
             {"name": "AWS_CONFIG_FILE", "value": "/etc/aws/config"}
         )
+        # Give more memory for processing edxorg archives
+        deployment["resources"] = {
+            "requests": {
+                "cpu": "1000m",
+                "memory": "2Gi",
+            },
+            "limits": {
+                "memory": "16Gi",
+            },
+        }
     deployments.append(deployment)
 
 # Custom Dagster instance ConfigMap with dynamic credentials support
