@@ -404,8 +404,8 @@ def create_ol_data_platform_realm(  # noqa: PLR0913, PLR0915
         ),
         enabled=True,
         access_type="CONFIDENTIAL",
-        # Enable direct grants for service account access
-        direct_access_grants_enabled=True,
+        # Standard flow for browser-based auth, service accounts for API access
+        direct_access_grants_enabled=False,
         standard_flow_enabled=True,
         implicit_flow_enabled=False,
         service_accounts_enabled=True,
