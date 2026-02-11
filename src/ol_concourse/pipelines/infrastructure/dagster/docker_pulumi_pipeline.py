@@ -30,6 +30,7 @@ def build_dagster_docker_pipeline() -> Pipeline:
     # Define all code location images based on docker-compose.yaml
     code_locations = [
         {"name": "canvas", "module": "canvas.definitions"},
+        {"name": "data_loading", "module": "data_loading.definitions"},
         {"name": "data_platform", "module": "data_platform.definitions"},
         {"name": "edxorg", "module": "edxorg.definitions"},
         {"name": "lakehouse", "module": "lakehouse.definitions"},

@@ -599,6 +599,7 @@ edxorg_gcp_secret = OLVaultK8SSecret(
 # Define all code locations based on ol-data-platform structure
 code_locations: list[dict[str, str | int]] = [
     {"name": "canvas", "module": "canvas.definitions", "port": 4000},
+    {"name": "data_loading", "module": "data_loading.definitions", "port": 4000},
     {"name": "data_platform", "module": "data_platform.definitions", "port": 4001},
     {"name": "edxorg", "module": "edxorg.definitions", "port": 4002},
     {"name": "lakehouse", "module": "lakehouse.definitions", "port": 4003},
