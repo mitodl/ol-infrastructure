@@ -71,7 +71,7 @@ config:
     learner_dashboard: dashboard
     learning: learn
     ora_grading: ora-grading
-  edxapp:github_org_api_url: https://github.mit.edu/api/v3/orgs/MITx-Studio2LMS-rc  # Need to confirm if this is correct organization
+  edxapp:github_org_api_url: https://github.mit.edu/api/v3/orgs/MITx-Studio2LMS-ci
   edxapp:google_analytics_id: ""
   edxapp:mail_domain: edxapp-mail-ci.mitx.mit.edu
   edxapp:move_db: true
