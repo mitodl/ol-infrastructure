@@ -47,7 +47,6 @@ config:
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["studio.library_authoring_mfe", "--deactivate"]
-  - ["legacy_studio.certificates", "--create", "--everyone"]
   edxapp:business_unit: residential
   edxapp:db_instance_size: "db.m7g.xlarge"
   edxapp:db_max_storage_gb: "1500"
