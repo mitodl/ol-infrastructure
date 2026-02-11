@@ -156,31 +156,35 @@ def setup_traefik(
                             "default": True,
                         },
                         "exposedPort": 80,
-                        "redirections": {
-                            "entryPoint": {
-                                "to": "websecure",
-                                "scheme": "https",
-                                "permanent": True,
-                            }
+                        "http": {
+                            "redirections": {
+                                "entryPoint": {
+                                    "to": "websecure",
+                                    "scheme": "https",
+                                    "permanent": True,
+                                }
+                            },
                         },
                     },
                     "websecure": {
-                        "forwardedHeaders": {
-                            "trustedIPs": Output.all(
-                                fastly.get_fastly_ip_ranges(
-                                    opts=InvokeOptions(provider=fastly_provider)
-                                ).cidr_blocks,
-                                fastly.get_fastly_ip_ranges(
-                                    opts=InvokeOptions(provider=fastly_provider)
-                                ).ipv6_cidr_blocks,
-                            ).apply(lambda blocks: [*blocks[0], *blocks[1]]),
-                            "insecure": False,
-                        },
                         "port": 8443,
                         "expose": {
                             "default": True,
                         },
                         "exposedPort": 443,
+                        "http": {
+                            "forwardedHeaders": {
+                                "trustedIPs": Output.all(
+                                    fastly.get_fastly_ip_ranges(
+                                        opts=InvokeOptions(provider=fastly_provider)
+                                    ).cidr_blocks,
+                                    fastly.get_fastly_ip_ranges(
+                                        opts=InvokeOptions(provider=fastly_provider)
+                                    ).ipv6_cidr_blocks,
+                                ).apply(lambda blocks: [*blocks[0], *blocks[1]]),
+                                "insecure": False,
+                            },
+                        },
                     },
                 },
                 "logs": {
