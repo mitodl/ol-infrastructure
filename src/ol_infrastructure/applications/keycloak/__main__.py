@@ -32,7 +32,6 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
     OLVaultK8SSecret,
-    OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
@@ -365,37 +364,9 @@ db_creds_secret = Output.all(
     )
 )
 
-# We need a duplicate of this in the keycloak namespace because we can't
-# reference the one in the operation namespace
-star_ol_mit_edu_secret_name = (
-    "ol-wildcard-cert"  # pragma: allowlist secret #  noqa: S105
-)
-star_ol_mit_edu_static_secret = OLVaultK8SSecret(
-    f"keycloak-star-ol-mit.edu-wildcard-static-secret-{stack_info.env_suffix}",
-    resource_config=OLVaultK8SStaticSecretConfig(
-        name="vault-kv-global-ol-wildcard",
-        namespace=keycloak_namespace,
-        labels=k8s_global_labels,
-        dest_secret_labels=k8s_global_labels,
-        dest_secret_name=star_ol_mit_edu_secret_name,
-        dest_secret_type="kubernetes.io/tls",  # noqa: S106  # pragma: allowlist secret
-        mount="secret-global",
-        mount_type="kv-v2",
-        path="ol-wildcard",
-        templates={
-            "tls.key": '{{ get .Secrets "key_with_proper_newlines" }}',
-            "tls.crt": '{{ get .Secrets "cert_with_proper_newlines" }}',
-            # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_tls/
-            "key": '{{ get .Secrets "key_with_proper_newlines" }}',
-            "cert": '{{ get .Secrets "cert_with_proper_newlines" }}',
-        },
-        refresh_after="1h",
-        vaultauth=vault_k8s_resources.auth_name,
-    ),
-    opts=ResourceOptions(
-        delete_before_replace=True,
-    ),
-)
+# Certificate will be automatically created by cert-manager via Gateway annotation
+# The OLEKSGateway component handles this through the cert_issuer config
+keycloak_tls_secret_name = "keycloak-tls-cert"  # pragma: allowlist secret #  noqa: S105
 
 # Fail hard if LEARN_AI_DOCKER_TAG is not set
 if "KEYCLOAK_DOCKER_DIGEST" not in os.environ:
@@ -449,7 +420,7 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
         },
         "startOptimized": stack_info.name != "CI",
         "http": {
-            "tlsSecret": star_ol_mit_edu_secret_name,
+            "tlsSecret": keycloak_tls_secret_name,
         },
         "unsupported": {
             "podTemplate": {
@@ -564,7 +535,7 @@ gateway_config = OLEKSGatewayConfig(
             hostname=keycloak_domain,
             port=8443,
             tls_mode="Terminate",
-            certificate_secret_name=star_ol_mit_edu_secret_name,
+            certificate_secret_name=keycloak_tls_secret_name,
             certificate_secret_namespace=keycloak_namespace,
         ),
     ],
