@@ -1,4 +1,7 @@
+from pathlib import Path
+
 import pulumi_kubernetes as kubernetes
+import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference
 
 from bridge.lib.versions import STARROCKS_CHART_VERSION
@@ -9,6 +12,12 @@ from ol_infrastructure.components.services.apisix_gateway_api import (
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
+)
+from ol_infrastructure.components.services.vault import (
+    OLVaultK8SResources,
+    OLVaultK8SResourcesConfig,
+    OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
@@ -25,6 +34,7 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 stack_info = parse_stack()
 starrocks_config = Config("starrocks")
+vault_config = Config("vault")
 
 cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
 setup_k8s_provider(cluster_stack.require_output("kube_config"))
@@ -53,6 +63,69 @@ starrocks_root_password_secret = kubernetes.core.v1.Secret(
     ),
     string_data={"password": starrocks_config.require("root_password")},
 )
+
+# Configure Vault integration for OIDC credentials
+starrocks_vault_policy = vault.Policy(
+    "starrocks-vault-policy",
+    name="starrocks",
+    policy=Path(__file__).parent.joinpath("starrocks_policy.hcl").read_text(),
+)
+
+starrocks_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
+    "starrocks-vault-k8s-auth-backend-role",
+    role_name="starrocks",
+    backend=cluster_stack.require_output("vault_auth_endpoint"),
+    bound_service_account_names=["*"],
+    bound_service_account_namespaces=[namespace],
+    token_policies=[starrocks_vault_policy.name],
+)
+
+vault_k8s_resources_config = OLVaultK8SResourcesConfig(
+    application_name="starrocks",
+    namespace=namespace,
+    labels=k8s_app_labels,
+    vault_address=vault_config.require("address"),
+    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+    vault_auth_role_name=starrocks_vault_auth_backend_role.role_name,
+)
+vault_k8s_resources = OLVaultK8SResources(
+    resource_config=vault_k8s_resources_config,
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[starrocks_vault_auth_backend_role],
+    ),
+)
+
+# Create OIDC configuration secret if enabled
+if starrocks_config.get_bool("oidc_enabled"):
+    oidc_config_secret_name = f"{stack_info.env_prefix}-starrocks-oidc-config"
+    oidc_config_secret_config = OLVaultK8SStaticSecretConfig(
+        name="starrocks-oidc-config",
+        namespace=namespace,
+        dest_secret_labels=k8s_app_labels,
+        dest_secret_name=oidc_config_secret_name,
+        labels=k8s_app_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/starrocks",
+        restart_target_kind="StatefulSet",
+        restart_target_name=f"{stack_info.env_prefix}-starrocks-fe",
+        templates={
+            "OIDC_ISSUER_URL": '{{ get .Secrets "url" }}',
+            "OIDC_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+            "OIDC_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+            "OIDC_JWKS_URI": '{{ get .Secrets "url" }}/protocol/openid-connect/certs',
+        },
+        vaultauth=vault_k8s_resources.auth_name,
+    )
+    oidc_config_secret = OLVaultK8SSecret(
+        f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-oidc-config-secret",
+        oidc_config_secret_config,
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            parent=vault_k8s_resources,
+        ),
+    )
 
 
 if starrocks_config.get_bool("use_be") and starrocks_config.get_bool("use_cn"):
