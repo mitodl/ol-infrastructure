@@ -13,6 +13,7 @@ import pulumi_github as github
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import (
+    ROOT_STACK_RESOURCE,
     Alias,
     Config,
     InvokeOptions,
@@ -40,6 +41,7 @@ from ol_infrastructure.components.aws.cache import (
     OLAmazonRedisConfig,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
@@ -154,37 +156,46 @@ cluster_stack.require_output("namespaces").apply(
 # begin legacy block - app bucket config
 #######################################################
 legacy_app_storage_bucket_name = f"ol-mitopen-app-storage-{app_env_suffix}"
-legacy_application_storage_bucket = s3.Bucket(
-    f"ol_mitopen_app_storage_bucket_{stack_info.env_suffix}",
-    bucket=legacy_app_storage_bucket_name,
-    tags=aws_config.tags,
-)
 
-s3.BucketVersioning(
-    "ol-mitopen-bucket-versioning",
-    bucket=legacy_application_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Enabled"
-    ),
-)
-legacy_app_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "ol-mitopen-bucket-ownership-controls",
-    bucket=legacy_application_storage_bucket.id,
-    rule=s3.BucketOwnershipControlsRuleArgs(
-        object_ownership="BucketOwnerPreferred",
-    ),
-)
-legacy_app_bucket_public_access = s3.BucketPublicAccessBlock(
-    "ol-mitopen-bucket-public-access",
-    bucket=legacy_application_storage_bucket.id,
+legacy_application_storage_bucket_config = S3BucketConfig(
+    bucket_name=legacy_app_storage_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerPreferred",
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
+    restrict_public_buckets=False,
+    tags=aws_config.tags,
+)
+
+legacy_application_storage_bucket = OLBucket(
+    f"ol_mitopen_app_storage_bucket_{stack_info.env_suffix}",
+    config=legacy_application_storage_bucket_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"ol_mitopen_app_storage_bucket_{stack_info.env_suffix}",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="ol-mitopen-bucket-versioning",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="ol-mitopen-bucket-ownership-controls",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="ol-mitopen-bucket-public-access",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+        ]
+    ),
 )
 
 s3.BucketPolicy(
     "ol-mitopen-bucket-policy",
-    bucket=legacy_application_storage_bucket.id,
+    bucket=legacy_application_storage_bucket.bucket_v2.id,
     policy=json.dumps(
         {
             "Version": "2012-10-17",
@@ -199,49 +210,52 @@ s3.BucketPolicy(
             ],
         }
     ),
-    opts=ResourceOptions(
-        depends_on=[
-            legacy_app_bucket_public_access,
-            legacy_app_bucket_ownership_controls,
-        ]
-    ),
 )
 #######################################################
 # end legacy block - app bucket config
 #######################################################
 
 mitlearn_app_storage_bucket_name = f"ol-mitlearn-app-storage-{app_env_suffix}"
-mitlearn_application_storage_bucket = s3.Bucket(
-    f"ol_mitlearn_app_storage_bucket_{stack_info.env_suffix}",
-    bucket=mitlearn_app_storage_bucket_name,
-    tags=aws_config.tags,
-)
 
-s3.BucketVersioning(
-    "ol-mitlearn-bucket-versioning",
-    bucket=mitlearn_application_storage_bucket.id,
-    versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
-        status="Enabled"
-    ),
-)
-app_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "ol-mitlearn-bucket-ownership-controls",
-    bucket=mitlearn_application_storage_bucket.id,
-    rule=s3.BucketOwnershipControlsRuleArgs(
-        object_ownership="BucketOwnerPreferred",
-    ),
-)
-app_bucket_public_access = s3.BucketPublicAccessBlock(
-    "ol-mitlearn-bucket-public-access",
-    bucket=mitlearn_application_storage_bucket.id,
+mitlearn_application_storage_bucket_config = S3BucketConfig(
+    bucket_name=mitlearn_app_storage_bucket_name,
+    versioning_enabled=True,
+    ownership_controls="BucketOwnerPreferred",
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
+    restrict_public_buckets=False,
+    tags=aws_config.tags,
+)
+
+mitlearn_application_storage_bucket = OLBucket(
+    f"ol_mitlearn_app_storage_bucket_{stack_info.env_suffix}",
+    config=mitlearn_application_storage_bucket_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"ol_mitlearn_app_storage_bucket_{stack_info.env_suffix}",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="ol-mitlearn-bucket-versioning",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="ol-mitlearn-bucket-ownership-controls",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="ol-mitlearn-bucket-public-access",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+        ]
+    ),
 )
 
 s3.BucketPolicy(
     "ol-mitlearn-bucket-policy",
-    bucket=mitlearn_application_storage_bucket.id,
+    bucket=mitlearn_application_storage_bucket.bucket_v2.id,
     policy=json.dumps(
         {
             "Version": "2012-10-17",
@@ -255,12 +269,6 @@ s3.BucketPolicy(
                 }
             ],
         }
-    ),
-    opts=ResourceOptions(
-        depends_on=[
-            app_bucket_public_access,
-            app_bucket_ownership_controls,
-        ]
     ),
 )
 
