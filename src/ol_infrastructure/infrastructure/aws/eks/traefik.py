@@ -126,10 +126,6 @@ def setup_traefik(
                 "additionalVolumeMounts": [
                     {"name": "plugins", "mountPath": "/plugins-storage"},
                 ],
-                # Not supporting legacy ingress resources
-                "kubernetesIngress": {
-                    "enabled": False,
-                },
                 # Do not create a default gateway
                 "gateway": {
                     "enabled": False,
@@ -138,6 +134,10 @@ def setup_traefik(
                     "enabled": True,
                 },
                 "providers": {
+                    # Not supporting legacy ingress resources
+                    "kubernetesIngress": {
+                        "enabled": False,
+                    },
                     "kubernetesGateway": {
                         "enabled": True,
                     },
