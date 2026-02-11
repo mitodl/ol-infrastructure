@@ -24,6 +24,19 @@ config:
   ovs:s3_watch_bucket_name: odl-video-service-uploaded-ci
   ovs:target_vpc: applications_vpc
   ovs:use_shibboleth: "False"
+  ovs:deploy_to_k8s: true
+  ovs:web_min_replicas: 2
+  ovs:web_max_replicas: 10
+  ovs:web_cpu_request: "500m"
+  ovs:web_cpu_limit: "2000m"
+  ovs:web_memory_request: "1Gi"
+  ovs:web_memory_limit: "4Gi"
+  ovs:celery_min_replicas: 1
+  ovs:celery_max_replicas: 5
+  ovs:celery_cpu_request: "250m"
+  ovs:celery_cpu_limit: "1000m"
+  ovs:celery_memory_request: "512Mi"
+  ovs:celery_memory_limit: "2Gi"
   redis:max_connections: "30"
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
