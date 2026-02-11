@@ -146,6 +146,12 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             "src/bridge/lib/versions.py",
         ],
     ),
+    "data_warehouse": SimplePulumiParams(
+        app_name="data_warehouse",
+        pulumi_project_path="infrastructure/aws/data_warehouse/",
+        stack_prefix="infrastructure.aws.data_warehouse",
+        pulumi_project_name="ol-infrastructure-data_warehouse",
+    ),
     "digital-credentials": SimplePulumiParams(
         app_name="digital-credentials",
         pulumi_project_path="applications/digital_credentials/",
@@ -210,6 +216,15 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             "open",
             "open_metadata",
             "xpro",
+        ],
+    ),
+    "starrocks": SimplePulumiParams(
+        app_name="starrocks",
+        pulumi_project_path="applications/starrocks/",
+        stack_prefix="applications.starrocks",
+        pulumi_project_name="ol-infrastructure-starrocks-application",
+        deployment_groups=[
+            "lakehouse",
         ],
     ),
     "tika": SimplePulumiParams(
