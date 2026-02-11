@@ -366,14 +366,6 @@ draft_backup_bucket_config = S3BucketConfig(
             ],
         }
     ),
-    logging_target_bucket=audit_log_bucket_name,
-    logging_target_prefix=f"ocw-site/{draft_backup_bucket_name}/",
-    logging_target_object_key_format=s3.BucketLoggingTargetObjectKeyFormatArgs(
-        partitioned_prefix=s3.BucketLoggingTargetObjectKeyFormatPartitionedPrefixArgs(
-            partition_date_source="EventTime"
-        )
-    ),
-    logging_expected_bucket_owner=aws_account.account_id,
     tags=aws_config.tags,
 )
 
