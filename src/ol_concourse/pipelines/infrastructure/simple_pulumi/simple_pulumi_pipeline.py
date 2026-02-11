@@ -151,6 +151,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_path="infrastructure/aws/data_warehouse/",
         stack_prefix="infrastructure.aws.data_warehouse",
         pulumi_project_name="ol-infrastructure-data_warehouse",
+        stages=["QA", "Production"],
     ),
     "digital-credentials": SimplePulumiParams(
         app_name="digital-credentials",
@@ -226,6 +227,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         deployment_groups=[
             "lakehouse",
         ],
+        stages=["QA", "Production"],
     ),
     "tika": SimplePulumiParams(
         app_name="tika",
