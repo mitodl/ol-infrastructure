@@ -61,6 +61,7 @@ config:
     learner_dashboard: dashboard
     learning: learn
     ora_grading: ora-grading
+  edxapp:github_org_api_url: https://github.mit.edu/api/v3/orgs/{actual_org}
   edxapp:google_analytics_id: ""
   edxapp:move_db: true
   edxapp:mail_domain: edxapp-mail-staging-qa.mitx.mit.edu

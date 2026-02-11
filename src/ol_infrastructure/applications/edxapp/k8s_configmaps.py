@@ -452,10 +452,9 @@ def create_k8s_configmaps(  # noqa: PLR0915
         "SESSION_COOKIE_NAME": f"{env_name}-edx-studio-sessionid",
     }
 
-    if stack_info.env_prefix == "mitxonline":
-        cms_interpolated_config["GITHUB_ORG_API_URL"] = edxapp_config.require(
-            "github_org_api_url"
-        )
+    cms_interpolated_config["GITHUB_ORG_API_URL"] = edxapp_config.require(
+        "github_org_api_url"
+    )
 
     # We only want meilisearch enabled on the CMS side of things, NOT LMS
     meilisearch_config = Config("meilisearch")
