@@ -98,6 +98,11 @@ def setup_karpenter(  # noqa: PLR0913
     )
 
     # EventBridge Rules targeting the interruption queue
+    # Note: Rebalance recommendations are NOT included because Karpenter v1.9.0
+    # does not properly handle them - it cordons nodes but doesn't drain/terminate,
+    # leaving nodes indefinitely unschedulable. Only actual interruption warnings
+    # (2-minute notice) are properly handled.
+    # See: https://github.com/aws/karpenter-provider-aws/issues/2813
     event_patterns = {
         "scheduled-change": {
             "source": ["aws.health"],
@@ -106,10 +111,6 @@ def setup_karpenter(  # noqa: PLR0913
         "spot-interruption": {
             "source": ["aws.ec2"],
             "detail-type": ["EC2 Spot Instance Interruption Warning"],
-        },
-        "rebalance": {
-            "source": ["aws.ec2"],
-            "detail-type": ["EC2 Instance Rebalance Recommendation"],
         },
         "instance-state-change": {
             "source": ["aws.ec2"],
