@@ -1,7 +1,6 @@
 # -*- mode: yaml -*-
 # ALTERNATE_WORKER_QUEUES: lms  # Already has a sane default in the code
 COURSE_AUTHORING_MICROFRONTEND_URL: /authoring
-GITHUB_ORG_API_URL: {{ key "edxapp/github-auto-export-org-api-url" }}
 GIT_REPO_EXPORT_DIR: /openedx/data/export_course_repos
 GIT_EXPORT_DEFAULT_IDENT:
   name: MIT xPRO
@@ -11,7 +10,6 @@ PARSE_KEYS: {}
 REDBEAT_KEY_PREFIX: redbeat_cms  # ADDED - RedBeat key prefix to separate LMS and CMS schedules
 SITE_NAME: {{ key "edxapp/studio-domain" }}  # MODIFIED
 {{ with secret "secret-xpro/edxapp" }}
-GITHUB_ACCESS_TOKEN: {{ .Data.github_access_token }}
 SOCIAL_AUTH_EDX_OAUTH2_KEY: {{ .Data.studio_oauth_client.id }}
 SOCIAL_AUTH_EDX_OAUTH2_SECRET: {{ .Data.studio_oauth_client.secret }}
 {{ end }}
