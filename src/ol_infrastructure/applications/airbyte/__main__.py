@@ -31,6 +31,10 @@ from ol_infrastructure.components.aws.eks import (
     OLEKSTrustRoleConfig,
 )
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.components.services.apisix_gateway_api import (
+    OLApisixHTTPRoute,
+    OLApisixHTTPRouteConfig,
+)
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
@@ -39,8 +43,6 @@ from ol_infrastructure.components.services.k8s import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixPluginConfig,
-    OLApisixRoute,
-    OLApisixRouteConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -913,13 +915,12 @@ airbyte_basic_auth_consumer = kubernetes.apiextensions.CustomResource(
 )
 
 # APISix route configuration
-airbyte_apisix_route = OLApisixRoute(
-    f"airbyte-apisix-route-{stack_info.env_suffix}",
+airbyte_apisix_httproute = OLApisixHTTPRoute(
+    f"airbyte-apisix-httproute-{stack_info.env_suffix}",
     route_configs=[
         # Web interface with OIDC authentication
-        OLApisixRouteConfig(
+        OLApisixHTTPRouteConfig(
             route_name="airbyte-web",
-            priority=10,
             hosts=[airbyte_web_domain],
             paths=["/*"],
             backend_service_name="airbyte-airbyte-server-svc",
@@ -933,9 +934,8 @@ airbyte_apisix_route = OLApisixRoute(
             ],
         ),
         # API interface with basic auth (for Dagster)
-        OLApisixRouteConfig(
+        OLApisixHTTPRouteConfig(
             route_name="airbyte-api",
-            priority=10,
             hosts=[airbyte_api_domain],
             paths=["/*"],
             backend_service_name="airbyte-airbyte-server-svc",
