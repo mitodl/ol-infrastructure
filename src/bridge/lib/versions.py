@@ -9,7 +9,7 @@ JUPYTERHUB_VERSION = "5.4.3"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
 KEYCLOAK_VERSION = "26.5.3"
 # renovate: datasource=docker depName=leek packageName=kodhive/leek
-LEEK_VERSION = "0.7.5"
+LEEK_VERSION = "0.7.7"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
 OPEN_METADATA_VERSION = "1.11.8"
 OVS_VERSION = "v0.65.1-3-g2630021"
