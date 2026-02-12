@@ -6,7 +6,6 @@ config:
   starrocks:root_password:
     secure: v1:IBmxL0ibUx/t/yPf:rgmpR1MHcJ95I8exxEk0VBQGw1PrZqM+HHuBpLPcv4kzErS53rmyjgO1JQPt6xhK7wXzM6DiB53hx1O0u6Xdiz+3RQ5fKdOiXNu/SnA+fUI=
   starrocks:oidc_enabled: true
-  vault:address: https://vault-qa.odl.mit.edu
   starrocks:fe_config:
     replicas: 3
     cpu_request: 1000m
