@@ -10,7 +10,3 @@ openai==2.15.0
 # Experimental Plugins for Translations feature
 # install at the end to override any dependency issues
 ol-openedx-course-translations
-
-# We need to keep this pinned until a string of dependencies terminating on
-# PyFilesystem2 gets updated - https://github.com/PyFilesystem/pyfilesystem2/pull/589
-setuptools==81.0.0
