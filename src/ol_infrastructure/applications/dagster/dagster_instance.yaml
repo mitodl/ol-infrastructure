@@ -28,6 +28,9 @@ schedule_storage:
       db_name:
         env: DAGSTER_PG_DB
       port: 5432
+      params:
+        connect_timeout: 30
+        options: "-c statement_timeout=600000 -c idle_in_transaction_session_timeout=300000"
 
 run_launcher:
   module: dagster_k8s
@@ -63,6 +66,9 @@ run_storage:
       db_name:
         env: DAGSTER_PG_DB
       port: 5432
+      params:
+        connect_timeout: 30
+        options: "-c statement_timeout=600000 -c idle_in_transaction_session_timeout=300000"
 
 # Opt in to run monitoring
 run_monitoring:
@@ -91,6 +97,9 @@ event_log_storage:
       db_name:
         env: DAGSTER_PG_DB
       port: 5432
+      params:
+        connect_timeout: 30
+        options: "-c statement_timeout=600000 -c idle_in_transaction_session_timeout=300000"
 
 run_coordinator:
   module: dagster.core.run_coordinator
