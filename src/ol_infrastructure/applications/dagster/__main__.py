@@ -662,6 +662,13 @@ for location in code_locations:
             "timeoutSeconds": 3,
             "failureThreshold": 60,
         },
+        "livenessProbe": {
+            "enabled": True,
+            "periodSeconds": 30,
+            "timeoutSeconds": 10,
+            "failureThreshold": 3,
+            "initialDelaySeconds": 60,
+        },
         "annotations": dagster_auth_binding.irsa_role.arn.apply(
             lambda arn: {
                 "eks.amazonaws.com/role-arn": arn,
