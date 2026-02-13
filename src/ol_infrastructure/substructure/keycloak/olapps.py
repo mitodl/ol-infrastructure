@@ -904,6 +904,8 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                     "lastName": "Surname",
                     "fullName": "Display Name",
                 },
+                want_assertions_encrypted=True,
+                want_assertions_signed=True,
             )
         )
         create_org_for_learn(
