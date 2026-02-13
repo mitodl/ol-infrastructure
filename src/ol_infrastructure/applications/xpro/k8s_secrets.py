@@ -216,7 +216,7 @@ def create_xpro_k8s_secrets(
     secret_names.append(redis_creds_secret_name)
     secret_resources.append(redis_creds)
 
-    # 4. Static secrets from 'secret-xpro' KV-v2 mount (per-path secrets)
+    # 4. Static secrets from 'secret-xpro' KV-v1 mount (per-path secrets)
     xpro_secrets_configs: list[dict[str, Any]] = [
         {
             "base_name": "cybersource",
