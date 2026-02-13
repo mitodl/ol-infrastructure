@@ -695,11 +695,11 @@ for location in code_locations:
             },
             {
                 "name": "DAGSTER_GRPC_MAX_SEND_BYTES",
-                "value": "268435456",
+                "value": "536870912",
             },
             {
                 "name": "DAGSTER_GRPC_MAX_RX_BYTES",
-                "value": "268435456",
+                "value": "536870912",
             },
             {"name": "DAGSTER_PG_HOST", "value": dagster_db.db_instance.address},
             {"name": "DAGSTER_PG_DB", "value": "dagster"},
@@ -853,11 +853,11 @@ dagster_helm_values = {
             },
             {
                 "name": "DAGSTER_GRPC_MAX_SEND_BYTES",
-                "value": "268435456",
+                "value": "536870912",
             },
             {
                 "name": "DAGSTER_GRPC_MAX_RX_BYTES",
-                "value": "268435456",
+                "value": "536870912",
             },
             {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
         ],
@@ -886,11 +886,11 @@ dagster_helm_values = {
             },
             {
                 "name": "DAGSTER_GRPC_MAX_SEND_BYTES",
-                "value": "268435456",
+                "value": "536870912",
             },
             {
                 "name": "DAGSTER_GRPC_MAX_RX_BYTES",
-                "value": "268435456",
+                "value": "536870912",
             },
             {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
         ],
