@@ -41,7 +41,7 @@ config:
     OPEN_CATALOG_URLS: 'https://discussions-rc.odl.mit.edu/api/v0/ocw_next_webhook/,https://api.rc.learn.mit.edu/api/v1/ocw_next_webhook/'
     PUBLISH_POSTHOG_ENABLED: 'true'
     PUBLISH_POSTHOG_API_HOST: https://ph.ol.mit.edu
-    PUBLISH_POSTHOG_PROJECT_API_KEY: 'phc_Ci6X3XFSc1mj8chO0BO0qfSnJ5cJEVUGT0cyQ5CIE6x'  # pragma: allowlist secret
+    PUBLISH_POSTHOG_PROJECT_API_KEY: 'phc_Ci6X3XFSc1mj8chO0BO0qfSnJ5cJEVUGT0cyQ5CIE6x' # pragma: allowlist secret
     SEARCH_API_URL: 'https://discussions-rc.odl.mit.edu/api/v0/search/'
     SENTRY_LOG_LEVEL: 'WARN'
     SITEMAP_DOMAIN: 'live-qa.ocw.mit.edu'
@@ -52,7 +52,10 @@ config:
     VIDEO_S3_UPLOAD_PREFIX: 'gdrive_uploads'
     TRANSCODE_JOB_TEMPLATE: './videos/config/mediaconvert.json'
   ocw_studio:app_domain: ocw-studio-rc.odl.mit.edu
+  ocw_studio:k8s_deploy: "false"
   ocw_studio:db_password:
     secure: v1:lSm4Y1lRKps+MvKl:sUdOgCFDFuFa5/3mrrVB8KdWc1/fagKJqgV/dPbBybsKulWq4qW2zKU+LZQirRMJaQZMAD9QPiBdcIKXknY4n1aO1Fo/Bv6JkNhANj1EI5RqBQiVtDJ6CSrA
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
+  redis:password:
+    secure: v1:iKEHx4nXr6sMTpkG:w0l+vKaMHVvvbTC0/kG7wXguQE8MdnB5xmPiZp0JdyyESJTscuz6ciwdwyQstm84F4FpHGP9MTdj8f3BlRzmsQ==
