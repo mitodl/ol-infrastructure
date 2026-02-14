@@ -42,6 +42,7 @@ def truncate_k8s_metanames(name: str) -> str:
 
 class OLApplicationK8sCeleryWorkerConfig(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
+    application_name: str = "main.celery:app"
     queue_name: str
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "FATAL"] = (
         "INFO"
@@ -912,7 +913,7 @@ class OLApplicationK8s(ComponentResource):
                                     command=[
                                         "celery",
                                         "-A",  # Application name
-                                        "main.celery:app",
+                                        celery_worker_config.application_name,
                                         "worker",  # COMMAND
                                         "-E",  # send task-related events for monitoring
                                         "-Q",  # queue name
