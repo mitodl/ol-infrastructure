@@ -28,9 +28,10 @@ schedule_storage:
       db_name:
         env: DAGSTER_PG_DB
       port: 5432
-    pool_size: 10
-    max_overflow: 20
-    pool_recycle: 3600
+    pool_size: 20
+    max_overflow: 40
+    pool_recycle: 1800
+    pool_timeout: 60
 
 run_launcher:
   module: dagster_k8s
@@ -66,9 +67,10 @@ run_storage:
       db_name:
         env: DAGSTER_PG_DB
       port: 5432
-    pool_size: 10
-    max_overflow: 20
-    pool_recycle: 3600
+    pool_size: 20
+    max_overflow: 40
+    pool_recycle: 1800
+    pool_timeout: 60
 
 # Opt in to run monitoring
 run_monitoring:
@@ -97,9 +99,10 @@ event_log_storage:
       db_name:
         env: DAGSTER_PG_DB
       port: 5432
-    pool_size: 10
-    max_overflow: 20
-    pool_recycle: 3600
+    pool_size: 20
+    max_overflow: 40
+    pool_recycle: 1800
+    pool_timeout: 60
 
 run_coordinator:
   module: dagster.core.run_coordinator
