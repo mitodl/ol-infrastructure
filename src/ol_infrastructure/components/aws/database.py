@@ -1,4 +1,5 @@
-"""This module defines a Pulumi component resource for encapsulating our best practices for building RDS instances.
+"""This module defines a Pulumi component resource for encapsulating our best practices
+for building RDS instances.
 
 This includes:
 
@@ -7,7 +8,8 @@ This includes:
 - Manage the root user password
 - Create relevant security groups
 - Create DB instance
-"""  # noqa: E501
+
+"""
 
 from enum import StrEnum
 
@@ -34,6 +36,7 @@ from ol_infrastructure.lib.aws.rds_helper import (
     db_engines,
     engine_major_version,
     get_rds_instance,
+    is_minor_version_change,
     max_minor_version,
     parameter_group_family,
     turn_off_deletion_protection,
@@ -201,9 +204,9 @@ class OLMariaDBConfig(OLDBConfig):
 
 
 class OLAmazonDB(pulumi.ComponentResource):
-    """Component to create an RDS instance with sane defaults and manage associated resources."""  # noqa: E501
+    """Create an RDS instance with sane defaults and manage associated resources."""
 
-    def __init__(
+    def __init__(  # noqa: C901
         self, db_config: OLDBConfig, opts: pulumi.ResourceOptions | None = None
     ):
         """Create an RDS instance, parameter group, and optionally read replica.
@@ -238,6 +241,23 @@ class OLAmazonDB(pulumi.ComponentResource):
         current_db_state = get_rds_instance(db_config.instance_name)
         deletion_protection_for_primary = db_config.prevent_delete
 
+        # Check if we should ignore minor version changes and rely on
+        # auto_minor_version_upgrade. This only applies when the configured version is a
+        # minor version ahead of the current version
+        if current_db_state and current_db_state.get("EngineVersion"):
+            current_version = current_db_state["EngineVersion"]
+            if is_minor_version_change(current_version, db_config.engine_version):
+                # Add ignore_changes for engine_version to let
+                # auto_minor_version_upgrade handle it
+                resource_options = pulumi.ResourceOptions.merge(
+                    resource_options,
+                    pulumi.ResourceOptions(ignore_changes=["engine_version"]),
+                )
+                replica_options = pulumi.ResourceOptions.merge(
+                    replica_options,
+                    pulumi.ResourceOptions(ignore_changes=["engine_version"]),
+                )
+
         # There are a handful of cases that will trigger a blue/green update when that
         # is enabled. Those include:
         # - DB Engine Version: Upgrading or downgrading the major or minor version of
@@ -264,7 +284,13 @@ class OLAmazonDB(pulumi.ComponentResource):
             and current_db_state
             and any(
                 (
-                    db_config.engine_version != current_db_state.get("EngineVersion"),
+                    (
+                        db_config.engine_version
+                        != current_db_state.get("EngineVersion")
+                        and not is_minor_version_change(
+                            current_version, db_config.engine_version
+                        )
+                    ),
                     db_config.multi_az != current_db_state.get("MultiAZ"),
                     db_config.storage_type != current_db_state.get("StorageType"),
                     db_config.instance_size != current_db_state.get("DBInstanceClass"),

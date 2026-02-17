@@ -40,6 +40,24 @@ def engine_major_version(engine_version: str) -> str:
     return engine_version.split(".", maxsplit=1)[0]
 
 
+def is_minor_version_change(current_version: str, desired_version: str) -> bool:
+    """Determine if the version change is only a minor/patch version change.
+
+    A minor version change is when only the patch/minor version differs,
+    but the major version remains the same.
+
+    :param current_version: The current engine version (e.g., "18.1")
+    :param desired_version: The desired engine version (e.g., "18.2")
+
+    :returns: True if the change is only a minor/patch version change, False otherwise
+
+    :rtype: bool
+    """
+    return engine_major_version(current_version) == engine_major_version(
+        desired_version
+    )
+
+
 def max_minor_version(engine: str, major_version: int | str) -> str:
     """
     Given a database egine and the major version, determine the current maximum minor
