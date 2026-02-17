@@ -452,7 +452,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913
             realm_id=ol_platform_engineering_grafana_client.realm_id,
             realm_name="ol-platform-engineering",
             realm_public_key=ol_platform_engineering_grafana_client.realm_id.apply(
-                lambda realm_id: fetch_realm_public_key_partial(realm_id)
+                fetch_realm_public_key_partial
             ),
         ).apply(json.dumps),
     )
