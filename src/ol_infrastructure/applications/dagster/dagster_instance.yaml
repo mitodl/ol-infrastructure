@@ -15,8 +15,8 @@ compute_logs:
     prefix: compute-logs/
 
 schedule_storage:
-  module: dagster_postgres.schedule_storage
-  class: PostgresScheduleStorage
+  module: ol_orchestrate.lib.postgres
+  class: PooledPostgresScheduleStorage
   config:
     postgres_db:
       username:
@@ -28,9 +28,9 @@ schedule_storage:
       db_name:
         env: DAGSTER_PG_DB
       port: 5432
-      params:
-        connect_timeout: 30
-        options: "-c statement_timeout=600000 -c idle_in_transaction_session_timeout=300000"
+      pool_size: 10
+      max_overflow: 20
+      pool_recycle: 3600
 
 run_launcher:
   module: dagster_k8s
@@ -53,8 +53,8 @@ run_launcher:
     - dagster-postgresql-secret
 
 run_storage:
-  module: dagster_postgres.run_storage
-  class: PostgresRunStorage
+  module: ol_orchestrate.lib.postgres
+  class: PooledPostgresRunStorage
   config:
     postgres_db:
       username:
@@ -66,9 +66,9 @@ run_storage:
       db_name:
         env: DAGSTER_PG_DB
       port: 5432
-      params:
-        connect_timeout: 30
-        options: "-c statement_timeout=600000 -c idle_in_transaction_session_timeout=300000"
+      pool_size: 10
+      max_overflow: 20
+      pool_recycle: 3600
 
 # Opt in to run monitoring
 run_monitoring:
@@ -84,8 +84,8 @@ run_retries:
   max_retries: 3
 
 event_log_storage:
-  module: dagster_postgres.event_log
-  class: PostgresEventLogStorage
+  module: ol_orchestrate.lib.postgres
+  class: PooledPostgresEventLogStorage
   config:
     postgres_db:
       username:
@@ -97,9 +97,9 @@ event_log_storage:
       db_name:
         env: DAGSTER_PG_DB
       port: 5432
-      params:
-        connect_timeout: 30
-        options: "-c statement_timeout=600000 -c idle_in_transaction_session_timeout=300000"
+      pool_size: 10
+      max_overflow: 20
+      pool_recycle: 3600
 
 run_coordinator:
   module: dagster.core.run_coordinator

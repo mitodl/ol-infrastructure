@@ -42,19 +42,27 @@ def build_dagster_docker_pipeline() -> Pipeline:
             "name": "student_risk_probability",
             "module": "student_risk_probability.definitions",
         },
+        {"name": "k8s", "module": None},  # dagster-k8s base image
     ]
 
     # Create git resources for each code location with specific path filters
     code_location_repos = {}
     for location in code_locations:
-        name = location["name"]
-        paths = [
-            f"dg_projects/{name}/",
-            "packages/ol-orchestrate-lib/",
-        ]
-        # Lakehouse also needs the dbt project
-        if name == "lakehouse":
-            paths.append("src/ol_dbt/")
+        name: str = location["name"]  # type: ignore[index]
+        # dagster-k8s is the base image, not a code location
+        if name == "k8s":
+            paths = [
+                "dg_deployments/Dockerfile.dagster-k8s",
+                "packages/ol-orchestrate-lib/",
+            ]
+        else:
+            paths = [
+                f"dg_projects/{name}/",
+                "packages/ol-orchestrate-lib/",
+            ]
+            # Lakehouse also needs the dbt project
+            if name == "lakehouse":
+                paths.append("src/ol_dbt/")
 
         code_location_repos[name] = git_repo(
             name=Identifier(f"ol-data-platform-{name}"),
@@ -66,10 +74,10 @@ def build_dagster_docker_pipeline() -> Pipeline:
     # Create registry image resources for each code location
     code_location_images = {}
     for location in code_locations:
-        name = location["name"]
-        code_location_images[name] = registry_image(
-            name=Identifier(f"dagster-{name}-image"),
-            image_repository=f"mitodl/dagster-{name}",
+        location_name: str = location["name"]  # type: ignore[index]
+        code_location_images[location_name] = registry_image(
+            name=Identifier(f"dagster-{location_name}-image"),
+            image_repository=f"mitodl/dagster-{location_name}",
             image_tag=None,
             # While check_every=never, defining tag_regex helps Concourse UI understand
             # resource versions
@@ -93,16 +101,22 @@ def build_dagster_docker_pipeline() -> Pipeline:
     # Create build jobs for each code location
     docker_build_jobs = []
     for location in code_locations:
-        name = location["name"]
-        repo = code_location_repos[name]
-        image = code_location_images[name]
+        build_name: str = location["name"]  # type: ignore[index]
+        repo = code_location_repos[build_name]
+        image = code_location_images[build_name]
 
         # Determine if this location needs DBT secrets (lakehouse requires it)
-        needs_dbt_secrets = name == "lakehouse"
+        needs_dbt_secrets = build_name == "lakehouse"
+
+        # dagster-k8s uses a different Dockerfile path
+        if build_name == "k8s":
+            dockerfile_path = f"{repo.name}/dg_deployments/Dockerfile.dagster-k8s"
+        else:
+            dockerfile_path = f"{repo.name}/dg_projects/{build_name}/Dockerfile"
 
         build_params = {
             "CONTEXT": repo.name,
-            "DOCKERFILE": f"{repo.name}/dg_projects/{name}/Dockerfile",
+            "DOCKERFILE": dockerfile_path,
         }
 
         if needs_dbt_secrets:
@@ -114,7 +128,7 @@ def build_dagster_docker_pipeline() -> Pipeline:
             )
 
         docker_build_job = Job(
-            name=f"build-dagster-{name}-image",
+            name=f"build-dagster-{build_name}-image",
             plan=[
                 GetStep(
                     get=repo.name,
@@ -186,9 +200,9 @@ def build_dagster_docker_pipeline() -> Pipeline:
     # Collect env vars from all code location images for Pulumi
     pulumi_env_vars = {}
     for location in code_locations:
-        name = location["name"]
-        image = code_location_images[name]
-        env_var_name = f"DAGSTER_{name.upper()}_IMAGE_TAG"
+        img_name: str = location["name"]  # type: ignore[index]
+        image = code_location_images[img_name]
+        env_var_name = f"DAGSTER_{img_name.upper()}_IMAGE_TAG"
         pulumi_env_vars[env_var_name] = f"{image.name}/tag"
 
     # Get dependencies - trigger Pulumi when all images are built
@@ -196,9 +210,9 @@ def build_dagster_docker_pipeline() -> Pipeline:
         GetStep(
             get=image.name,
             trigger=True,
-            passed=[f"build-dagster-{name}-image"],
+            passed=[f"build-dagster-{loc_name}-image"],
         )
-        for name, image in code_location_images.items()
+        for loc_name, image in code_location_images.items()
     ]
 
     pulumi_fragment = pulumi_jobs_chain(

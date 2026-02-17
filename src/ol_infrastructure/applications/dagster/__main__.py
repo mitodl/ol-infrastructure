@@ -778,6 +778,20 @@ dagster_instance_yaml = (
     Path(__file__).parent.joinpath("dagster_instance.yaml").read_text()
 )
 
+# Get dagster-k8s image tag from environment variable (set by Concourse)
+dagster_k8s_image_tag = os.environ.get("DAGSTER_K8S_IMAGE_TAG")
+if dagster_k8s_image_tag:
+    dagster_k8s_image_tag_or_digest = dagster_k8s_image_tag
+else:
+    # Fallback to tag-based reference
+    dagster_k8s_image_tag_or_digest = dagster_config.get("docker_image_tag") or "latest"
+
+dagster_k8s_image_config = {
+    "repository": ecr_image_uri("mitodl/dagster-k8s"),
+    "tag": dagster_k8s_image_tag_or_digest,
+    "pullPolicy": "IfNotPresent",
+}
+
 # Dagster Helm chart values
 dagster_helm_values = {
     "global": {
@@ -794,6 +808,7 @@ dagster_helm_values = {
     },
     # Dagster webserver (UI)
     "dagsterWebserver": {
+        "image": dagster_k8s_image_config,
         "workspace": {
             "enabled": True,
             "servers": [
@@ -869,6 +884,7 @@ dagster_helm_values = {
     },
     # Dagster daemon (background job scheduler)
     "dagsterDaemon": {
+        "image": dagster_k8s_image_config,
         "env": [
             {"name": "DAGSTER_PG_HOST", "value": dagster_db.db_instance.address},
             {"name": "DAGSTER_PG_DB", "value": "dagster"},
