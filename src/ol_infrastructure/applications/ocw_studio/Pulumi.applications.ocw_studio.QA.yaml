@@ -6,6 +6,8 @@ config:
   heroku:app_id:
     secure: v1:E4q9VpR9KB5D3KAt:VVTgctKXg3tucJ2TzGVIlq+6EilZ7dMGThGt82yZvWFJnosXeYxnKtRsVuG2/TpNq0UzBQ==
   heroku_app:vars:
+    # Only want this in RC. Should be left blank in production.
+    AWS_IMPORT_STORAGE_BUCKET_NAME: ol-ocw-studio-app-production
     CONCOURSE_URL: https://cicd-qa.odl.mit.edu
     CONTENT_FILE_SEARCH_API_URL: 'https://mitopen.odl.mit.edu/api/v1/content_file_search/'
     COURSE_SEARCH_API_URL: 'https://mitopen.odl.mit.edu/api/v1/learning_resources_search/'
