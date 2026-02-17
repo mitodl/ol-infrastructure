@@ -38,7 +38,7 @@ config:
     - ocw
     instance_type: m7a.2xlarge
     name: ocw
-    use_spot_instances: false
+    use_spot_instances: true
   - auto_scale:
       desired: 4
       max: 10
@@ -57,7 +57,7 @@ config:
     - cloud_custodian
     instance_type: m7a.4xlarge
     name: infra
-    use_spot_instances: false
+    use_spot_instances: true
   - auto_scale:
       desired: 4
       max: 6
@@ -71,7 +71,7 @@ config:
     - operations
     instance_type: m7a.xlarge
     name: generic
-    use_spot_instances: false
+    use_spot_instances: true
   consul:address: https://consul-operations-production.odl.mit.edu
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
