@@ -55,7 +55,6 @@ from ol_infrastructure.components.services.vault import (
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     ecr_image_uri,
-    ghcr_image_uri,
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
@@ -588,9 +587,7 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
                 init_containers=[
                     kubernetes.core.v1.ContainerArgs(
                         name="render-config",
-                        image=ghcr_image_uri(
-                            f"cloudnative-pg/pgbouncer:{PGBOUNCER_VERSION}"
-                        ),
+                        image=f"ghcr.io/cloudnative-pg/pgbouncer:{PGBOUNCER_VERSION}",
                         command=[
                             "/bin/sh",
                             "-c",
@@ -636,9 +633,7 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
                 containers=[
                     kubernetes.core.v1.ContainerArgs(
                         name="pgbouncer",
-                        image=ghcr_image_uri(
-                            f"cloudnative-pg/pgbouncer:{PGBOUNCER_VERSION}"
-                        ),
+                        image=f"ghcr.io/cloudnative-pg/pgbouncer:{PGBOUNCER_VERSION}",
                         ports=[
                             kubernetes.core.v1.ContainerPortArgs(
                                 name="pgbouncer",
