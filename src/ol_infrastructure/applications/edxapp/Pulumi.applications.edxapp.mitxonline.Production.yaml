@@ -110,7 +110,7 @@ config:
         max: 20
         min: 1
       cms:
-        max: 10
+        max: 20
         min: 1
   edxapp:k8s_resources:
     webapp:
