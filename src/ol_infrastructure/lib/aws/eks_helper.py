@@ -132,6 +132,10 @@ def cached_image_uri(
     return f"{aws_account_id}.dkr.ecr.us-east-1.amazonaws.com/dockerhub/{image_repo}"
 
 
+def ghcr_image_uri(image_repo: str, aws_account_id: str | int = "610119931565") -> str:
+    return f"{aws_account_id}.dkr.ecr.us-east-1.amazonaws.com/ghcr/{image_repo}"
+
+
 def ecr_image_uri(image_repo: str, aws_account_id: str | int = "610119931565") -> str:
     return f"{aws_account_id}.dkr.ecr.us-east-1.amazonaws.com/{image_repo}"
 

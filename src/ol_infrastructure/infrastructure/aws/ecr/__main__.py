@@ -83,6 +83,12 @@ aws.ecr.PullThroughCacheRule(
     ecr_repository_prefix="ecr-public",
 )
 
+aws.ecr.PullThroughCacheRule(
+    "aws-ecr-ghcr-pull-through-cache-rule",
+    upstream_registry_url="ghcr.io",
+    ecr_repository_prefix="ghcr",
+)
+
 
 dockerhub_credential = aws.secretsmanager.Secret(
     "dockerhub-credentials",

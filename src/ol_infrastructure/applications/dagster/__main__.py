@@ -27,7 +27,7 @@ from pulumi.config import get_config
 from pulumi_aws import ec2, get_caller_identity
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
-from bridge.lib.versions import DAGSTER_CHART_VERSION
+from bridge.lib.versions import DAGSTER_CHART_VERSION, PGBOUNCER_VERSION
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
@@ -53,9 +53,9 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
-    cached_image_uri,
     check_cluster_namespace,
     ecr_image_uri,
+    ghcr_image_uri,
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
@@ -513,14 +513,53 @@ dagster_db_secret = OLVaultK8SSecret(
 # ============================================================================
 # Standalone PgBouncer for RDS connection pooling
 # ============================================================================
-# Uses bitnami/pgbouncer which is fully configured via environment variables —
-# no ConfigMap or init container needed. Credentials are sourced directly from
-# the Vault-managed dagster-postgresql-secret.
+# Uses ghcr.io/cloudnative-pg/pgbouncer which reads /etc/pgbouncer/pgbouncer.ini.
+# An init container renders the config template by substituting credentials from the
+# Vault-managed dagster-postgresql-secret before PgBouncer starts.
 #
 # auth_type=any: PgBouncer accepts all inbound connections without client auth.
 # This is safe because the Service is ClusterIP (namespace-internal only) and
-# real scram-sha-256 auth is enforced on the backend connection to RDS using
-# the POSTGRESQL_USERNAME / POSTGRESQL_PASSWORD env vars.
+# real scram-sha-256 auth is enforced on the backend connection to RDS via the
+# user/password embedded in the [databases] DSN.
+
+# ConfigMap containing the pgbouncer.ini template; ${PGUSER} and ${PGPASSWORD}
+# placeholders are substituted at pod start time by the init container.
+pgbouncer_config = kubernetes.core.v1.ConfigMap(
+    f"dagster-pgbouncer-config-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-pgbouncer-config",
+        namespace=dagster_namespace,
+        labels=k8s_global_labels.model_dump(),
+    ),
+    data={
+        "pgbouncer.ini.template": dagster_db.db_instance.address.apply(
+            lambda addr: "\n".join(
+                [
+                    "[databases]",
+                    f"dagster = host={addr} port={DEFAULT_POSTGRES_PORT}"
+                    " dbname=dagster user=${PGUSER} password=${PGPASSWORD}",
+                    "",
+                    "[pgbouncer]",
+                    "listen_addr = 0.0.0.0",
+                    "listen_port = 6432",
+                    "auth_type = any",
+                    "pool_mode = session",
+                    "max_client_conn = 800",
+                    "default_pool_size = 200",
+                    "min_pool_size = 50",
+                    "reserve_pool_size = 100",
+                    "max_prepared_statements = 0",
+                    "server_connect_timeout = 15",
+                    "log_connections = 1",
+                    "log_disconnections = 1",
+                    "application_name_add_host = 1",
+                    "",
+                ]
+            )
+        )
+    },
+    opts=ResourceOptions(depends_on=[dagster_db_secret]),
+)
 
 # PgBouncer Deployment with 2 replicas for HA
 pgbouncer_deployment = kubernetes.apps.v1.Deployment(
@@ -546,28 +585,24 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
                 },
             ),
             spec=kubernetes.core.v1.PodSpecArgs(
-                containers=[
+                init_containers=[
                     kubernetes.core.v1.ContainerArgs(
-                        name="pgbouncer",
-                        image=cached_image_uri("bitnami/pgbouncer"),
-                        ports=[
-                            kubernetes.core.v1.ContainerPortArgs(
-                                name="pgbouncer",
-                                container_port=6432,
-                                protocol="TCP",
-                            ),
+                        name="render-config",
+                        image=ghcr_image_uri(
+                            f"cloudnative-pg/pgbouncer:{PGBOUNCER_VERSION}"
+                        ),
+                        command=[
+                            "/bin/sh",
+                            "-c",
+                            "sed"
+                            ' -e "s/\\${PGUSER}/$PGUSER/g"'
+                            ' -e "s/\\${PGPASSWORD}/$PGPASSWORD/g"'
+                            " /config-template/pgbouncer.ini.template"
+                            " > /config-out/pgbouncer.ini",
                         ],
                         env=[
                             kubernetes.core.v1.EnvVarArgs(
-                                name="POSTGRESQL_HOST",
-                                value=dagster_db.db_instance.address,
-                            ),
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="POSTGRESQL_PORT",
-                                value=str(DEFAULT_POSTGRES_PORT),
-                            ),
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="POSTGRESQL_USERNAME",
+                                name="PGUSER",
                                 value_from=kubernetes.core.v1.EnvVarSourceArgs(
                                     secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
                                         name="dagster-postgresql-secret",
@@ -576,7 +611,7 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
                                 ),
                             ),
                             kubernetes.core.v1.EnvVarArgs(
-                                name="POSTGRESQL_PASSWORD",
+                                name="PGPASSWORD",
                                 value_from=kubernetes.core.v1.EnvVarSourceArgs(
                                     secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
                                         name="dagster-postgresql-secret",
@@ -584,37 +619,37 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
                                     ),
                                 ),
                             ),
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="PGBOUNCER_AUTH_TYPE",
-                                value="any",
+                        ],
+                        volume_mounts=[
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="config-template",
+                                mount_path="/config-template",
+                                read_only=True,
                             ),
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="PGBOUNCER_POOL_MODE",
-                                value="session",
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="config-out",
+                                mount_path="/config-out",
                             ),
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="PGBOUNCER_MAX_CLIENT_CONN",
-                                value="800",
+                        ],
+                    ),
+                ],
+                containers=[
+                    kubernetes.core.v1.ContainerArgs(
+                        name="pgbouncer",
+                        image=ghcr_image_uri(
+                            f"cloudnative-pg/pgbouncer:{PGBOUNCER_VERSION}"
+                        ),
+                        ports=[
+                            kubernetes.core.v1.ContainerPortArgs(
+                                name="pgbouncer",
+                                container_port=6432,
+                                protocol="TCP",
                             ),
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="PGBOUNCER_DEFAULT_POOL_SIZE",
-                                value="200",
-                            ),
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="PGBOUNCER_MIN_POOL_SIZE",
-                                value="50",
-                            ),
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="PGBOUNCER_RESERVE_POOL_SIZE",
-                                value="100",
-                            ),
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="PGBOUNCER_MAX_PREPARED_STATEMENTS",
-                                value="0",
-                            ),
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="PGBOUNCER_SERVER_CONNECT_TIMEOUT",
-                                value="15",
+                        ],
+                        volume_mounts=[
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="config-out",
+                                mount_path="/etc/pgbouncer",
                             ),
                         ],
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(
@@ -642,10 +677,22 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
                         ),
                     ),
                 ],
+                volumes=[
+                    kubernetes.core.v1.VolumeArgs(
+                        name="config-template",
+                        config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                            name="dagster-pgbouncer-config",
+                        ),
+                    ),
+                    kubernetes.core.v1.VolumeArgs(
+                        name="config-out",
+                        empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+                    ),
+                ],
             ),
         ),
     ),
-    opts=ResourceOptions(depends_on=[dagster_db_secret]),
+    opts=ResourceOptions(depends_on=[dagster_db_secret, pgbouncer_config]),
 )
 
 # PgBouncer Service
