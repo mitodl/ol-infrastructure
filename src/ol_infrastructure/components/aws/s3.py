@@ -1,8 +1,9 @@
 """AWS S3 bucket component for standardized bucket creation and management.
 
 This module provides a reusable Pulumi component resource for creating S3 buckets
-with common configurations including versioning, encryption, logging, lifecycle rules,
-and intelligent tiering for cost optimization.
+with common configurations including versioning, encryption, server access logging
+with advanced audit logging features, lifecycle rules, and intelligent tiering for
+cost optimization.
 """
 
 import pulumi
@@ -76,6 +77,35 @@ class S3BucketConfig(AWSBase):
     logging_target_prefix: str | None = Field(
         default=None,
         description="The prefix for the access log objects.",
+    )
+    logging_target_grants: list[s3.BucketLoggingTargetGrantArgs] | None = Field(
+        default=None,
+        description=(
+            "A list of grants for the target logging bucket. Each grant "
+            "specifies permissions (READ, WRITE, FULL_CONTROL) for a grantee "
+            "(user, group, or URI). Note: AWS recommends using bucket policies "
+            "over ACL grants for new configurations."
+        ),
+    )
+    logging_target_object_key_format: (
+        s3.BucketLoggingTargetObjectKeyFormatArgs | None
+    ) = Field(
+        default=None,
+        description=(
+            "Configuration for customizing the log file object key format in "
+            "the target bucket. Supports partitioned prefix for organizing logs "
+            "by date (EventTime or DeliveryTime). Useful for efficient log "
+            "analysis and cost optimization."
+        ),
+    )
+    logging_expected_bucket_owner: str | None = Field(
+        default=None,
+        description=(
+            "The AWS account ID of the expected bucket owner for the target "
+            "logging bucket. If specified, operations will fail if the bucket "
+            "is owned by a different account. Recommended for security to "
+            "prevent accidental writes to the wrong bucket."
+        ),
     )
     lifecycle_rules: list[s3.BucketLifecycleConfigurationRuleArgs] | None = Field(
         default=None,
@@ -197,7 +227,8 @@ class OLBucket(pulumi.ComponentResource):
     - Versioning configuration
     - Public access blocking
     - Server-side encryption
-    - Access logging
+    - Access logging with advanced audit logging features (grants, key format,
+      ownership validation)
     - Lifecycle rules with intelligent tiering for cost optimization
     - CORS configuration
     - Website hosting
@@ -315,6 +346,9 @@ class OLBucket(pulumi.ComponentResource):
                 bucket=self.bucket_v2.id,
                 target_bucket=config.logging_target_bucket,
                 target_prefix=config.logging_target_prefix,
+                target_grants=config.logging_target_grants,
+                target_object_key_format=config.logging_target_object_key_format,
+                expected_bucket_owner=config.logging_expected_bucket_owner,
                 opts=child_opts,
             )
 
