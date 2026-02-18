@@ -465,6 +465,7 @@ draft_offline_bucket_config = S3BucketConfig(
         )
     ],
     website_configuration=s3.BucketWebsiteConfigurationArgs(
+        bucket=draft_offline_bucket_name,
         index_document=s3.BucketWebsiteConfigurationIndexDocumentArgs(
             suffix="index.html",
         ),
