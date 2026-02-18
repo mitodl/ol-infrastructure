@@ -909,7 +909,10 @@ for location in code_locations:
                 "name": "DAGSTER_GRPC_MAX_RX_BYTES",
                 "value": "536870912",
             },
-            {"name": "DAGSTER_PG_HOST", "value": dagster_db.db_instance.address},
+            {
+                "name": "DAGSTER_PG_HOST",
+                "value": "dagster-pgbouncer.dagster.svc.cluster.local",
+            },
             {"name": "DAGSTER_PG_DB", "value": "dagster"},
             {"name": "DAGSTER_BUCKET_NAME", "value": dagster_bucket_name},
             {"name": "DAGSTER_ENVIRONMENT", "value": stack_info.env_suffix},
@@ -1060,7 +1063,10 @@ dagster_helm_values = {
             "failureThreshold": 3,
         },
         "env": [
-            {"name": "DAGSTER_PG_HOST", "value": dagster_db.db_instance.address},
+            {
+                "name": "DAGSTER_PG_HOST",
+                "value": "dagster-pgbouncer.dagster.svc.cluster.local",
+            },
             {"name": "DAGSTER_PG_DB", "value": "dagster"},
             {"name": "DAGSTER_BUCKET_NAME", "value": dagster_bucket_name},
             {"name": "DAGSTER_ENVIRONMENT", "value": stack_info.env_suffix},
@@ -1094,7 +1100,10 @@ dagster_helm_values = {
     "dagsterDaemon": {
         "image": dagster_k8s_image_config,
         "env": [
-            {"name": "DAGSTER_PG_HOST", "value": dagster_db.db_instance.address},
+            {
+                "name": "DAGSTER_PG_HOST",
+                "value": "dagster-pgbouncer.dagster.svc.cluster.local",
+            },
             {"name": "DAGSTER_PG_DB", "value": "dagster"},
             {"name": "DAGSTER_BUCKET_NAME", "value": dagster_bucket_name},
             {"name": "DAGSTER_ENVIRONMENT", "value": stack_info.env_suffix},
@@ -1164,15 +1173,13 @@ dagster_helm_values = {
                 "imagePullPolicy": "IfNotPresent",
                 "loadInclusterConfig": True,
                 "envConfigMaps": [],
-                "envVars": dagster_db.db_instance.address.apply(
-                    lambda db_host: [
-                        f"DAGSTER_PG_HOST={db_host}",
-                        "DAGSTER_PG_DB=dagster",
-                        f"DAGSTER_BUCKET_NAME={dagster_bucket_name}",
-                        f"DAGSTER_ENVIRONMENT={stack_info.env_suffix}",
-                        "AWS_DEFAULT_REGION=us-east-1",
-                    ]
-                ),
+                "envVars": [
+                    "DAGSTER_PG_HOST=dagster-pgbouncer.dagster.svc.cluster.local",
+                    "DAGSTER_PG_DB=dagster",
+                    f"DAGSTER_BUCKET_NAME={dagster_bucket_name}",
+                    f"DAGSTER_ENVIRONMENT={stack_info.env_suffix}",
+                    "AWS_DEFAULT_REGION=us-east-1",
+                ],
                 "envSecrets": [
                     {"name": "dagster-static-secrets"},
                     {"name": "dagster-dbt-secrets"},
