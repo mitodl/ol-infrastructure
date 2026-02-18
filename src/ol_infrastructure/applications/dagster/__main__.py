@@ -553,6 +553,10 @@ pgbouncer_config = kubernetes.core.v1.ConfigMap(
                     "reserve_pool_size = 150",
                     "max_prepared_statements = 0",
                     "server_connect_timeout = 15",
+                    # Dagster uses NullPool with AUTOCOMMIT isolation - no session
+                    # state is left between queries, so DISCARD ALL is unnecessary
+                    # and adds latency + a race-condition window on each disconnect.
+                    "server_reset_query =",
                     # Proactively recycle backend connections every 30 min to prevent
                     # stale connections accumulating (AWS NAT Gateway silently drops
                     # idle TCP after ~350s; RDS also has idle timeouts).
