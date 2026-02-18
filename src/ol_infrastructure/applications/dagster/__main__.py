@@ -27,7 +27,7 @@ from pulumi.config import get_config
 from pulumi_aws import ec2, get_caller_identity
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
-from bridge.lib.versions import DAGSTER_CHART_VERSION
+from bridge.lib.versions import DAGSTER_CHART_VERSION, PGBOUNCER_VERSION
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
@@ -53,6 +53,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
+    cached_image_uri,
     check_cluster_namespace,
     ecr_image_uri,
     setup_k8s_provider,
@@ -509,6 +510,156 @@ dagster_db_secret = OLVaultK8SSecret(
     opts=ResourceOptions(depends_on=[dagster_auth_binding]),
 )
 
+# ============================================================================
+# Standalone PgBouncer for RDS connection pooling
+# ============================================================================
+
+# PgBouncer configuration - ConfigMap with pgbouncer.ini
+pgbouncer_config = kubernetes.core.v1.ConfigMap(
+    f"dagster-pgbouncer-config-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-pgbouncer-config",
+        namespace=dagster_namespace,
+        labels=k8s_global_labels.model_dump(),
+    ),
+    data={
+        "pgbouncer.ini": dagster_db.db_instance.address.apply(
+            lambda host: (
+                f"""[databases]
+* = host={host} port={DEFAULT_POSTGRES_PORT}
+
+[pgbouncer]
+listen_addr = 0.0.0.0
+listen_port = 5432
+auth_type = scram-sha-256
+pool_mode = session
+max_client_conn = 800
+default_pool_size = 200
+min_pool_size = 50
+reserve_pool_size = 100
+max_prepared_statements = 0
+server_connect_timeout = 15
+log_connections = 1
+log_disconnections = 1
+admin_users = postgres
+stats_users = postgres
+"""
+            )
+        ),
+    },
+    opts=ResourceOptions(depends_on=[dagster_db]),
+)
+
+# PgBouncer Deployment with 2 replicas for HA
+pgbouncer_deployment = kubernetes.apps.v1.Deployment(
+    f"dagster-pgbouncer-deployment-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-pgbouncer",
+        namespace=dagster_namespace,
+        labels=k8s_global_labels.model_dump(),
+    ),
+    spec=kubernetes.apps.v1.DeploymentSpecArgs(
+        replicas=2,
+        selector=kubernetes.meta.v1.LabelSelectorArgs(
+            match_labels={
+                "component": "pgbouncer",
+                **k8s_global_labels.model_dump(),
+            },
+        ),
+        template=kubernetes.core.v1.PodTemplateSpecArgs(
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                labels={
+                    "component": "pgbouncer",
+                    **k8s_global_labels.model_dump(),
+                },
+            ),
+            spec=kubernetes.core.v1.PodSpecArgs(
+                # Main PgBouncer container
+                containers=[
+                    kubernetes.core.v1.ContainerArgs(
+                        name="pgbouncer",
+                        image=cached_image_uri(
+                            f"pgbouncer/pgbouncer:{PGBOUNCER_VERSION}"
+                        ),
+                        ports=[
+                            kubernetes.core.v1.ContainerPortArgs(
+                                name="pgbouncer",
+                                container_port=5432,
+                                protocol="TCP",
+                            ),
+                        ],
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            requests={
+                                "cpu": "100m",
+                                "memory": "128Mi",
+                            },
+                            limits={
+                                "memory": "256Mi",
+                            },
+                        ),
+                        liveness_probe=kubernetes.core.v1.ProbeArgs(
+                            tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
+                                port=5432,
+                            ),
+                            initial_delay_seconds=10,
+                            period_seconds=10,
+                        ),
+                        readiness_probe=kubernetes.core.v1.ProbeArgs(
+                            tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
+                                port=5432,
+                            ),
+                            initial_delay_seconds=5,
+                            period_seconds=5,
+                        ),
+                        volume_mounts=[
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="config",
+                                mount_path="/etc/pgbouncer/pgbouncer.ini",
+                                sub_path="pgbouncer.ini",
+                            ),
+                        ],
+                    ),
+                ],
+                volumes=[
+                    kubernetes.core.v1.VolumeArgs(
+                        name="config",
+                        config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                            name="dagster-pgbouncer-config",
+                        ),
+                    ),
+                ],
+            ),
+        ),
+    ),
+    opts=ResourceOptions(depends_on=[pgbouncer_config, dagster_db_secret]),
+)
+
+# PgBouncer Service
+pgbouncer_service = kubernetes.core.v1.Service(
+    f"dagster-pgbouncer-service-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-pgbouncer",
+        namespace=dagster_namespace,
+        labels=k8s_global_labels.model_dump(),
+    ),
+    spec=kubernetes.core.v1.ServiceSpecArgs(
+        type="ClusterIP",
+        selector={
+            "component": "pgbouncer",
+            **k8s_global_labels.model_dump(),
+        },
+        ports=[
+            kubernetes.core.v1.ServicePortArgs(
+                name="pgbouncer",
+                port=5432,
+                target_port=5432,
+                protocol="TCP",
+            ),
+        ],
+    ),
+    opts=ResourceOptions(depends_on=[pgbouncer_deployment]),
+)
+
 # APISix OIDC configuration for authentication
 dagster_oidc_resources = OLApisixOIDCResources(
     f"dagster-k8s-apisix-oidc-{stack_info.env_suffix}",
@@ -926,11 +1077,13 @@ dagster_helm_values = {
             },
         },
     },
-    # PostgreSQL configuration (using external RDS)
+    # PostgreSQL configuration (using standalone PgBouncer for connection pooling)
     "postgresql": {
-        "enabled": False,  # We're using external RDS
-        "postgresqlHost": dagster_db.db_instance.address,
+        "enabled": False,  # We're using external RDS via standalone PgBouncer
+        # Point to the PgBouncer service instead of direct RDS
+        "postgresqlHost": "dagster-pgbouncer.dagster.svc.cluster.local",
         "postgresqlDatabase": "dagster",
+        "postgresqlPort": 5432,
     },
     # Tell Dagster to use our externally-managed secret
     "generatePostgresqlPasswordSecret": False,

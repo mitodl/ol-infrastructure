@@ -12,7 +12,6 @@ KEYCLOAK_VERSION = "26.5.3"
 LEEK_VERSION = "0.7.7"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
 OPEN_METADATA_VERSION = "1.11.9"
-OVS_VERSION = "v0.65.1-3-g2630021"
 REDASH_VERSION = "9d273e4"
 # renovate: datasource=github-releases depName=traefik packageName=traefik/traefik
 TRAEFIK_VERSION = "3.6.8"
@@ -21,6 +20,8 @@ TUTOR_PERMISSIONS_VERSION = "15.3.4"
 VAULT_VERSION = "1.21.2"
 # renovate: datasource=docker depName=vector packageName=timberio/vector
 VECTOR_VERSION = "0.40.1"
+# renovate: datasource=docker depName=pgbouncer packageName=pgbouncer/pgbouncer
+PGBOUNCER_VERSION = "1.25.1"
 
 # EKS Specific Versions
 # renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/charts
