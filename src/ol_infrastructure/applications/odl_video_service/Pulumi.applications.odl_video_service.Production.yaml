@@ -15,6 +15,8 @@ config:
   - ttv.mit.edu
   ovs:edx_base_url: https://courses.xpro.mit.edu
   ovs:feature_annotations: "False"
+  ovs:k8s_deploy: false
+  ovs:k8s_cutover: false
   ovs:log_level: INFO
   ovs:rds_password:
     secure: v1:ZuLd0v6/Z6KPbt70:d6d57OUpQy6Mxk4GAEowidVhkN8tXSDRvNG9MXu4hCwMbJfvY7QmvmOie0ElGjWDh354ssuERYFOEoqWDCPD2N2yNLtcA9BB1q2UVlUyuGM=
