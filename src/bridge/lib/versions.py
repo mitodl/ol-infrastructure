@@ -21,8 +21,6 @@ TUTOR_PERMISSIONS_VERSION = "15.3.4"
 VAULT_VERSION = "1.21.2"
 # renovate: datasource=docker depName=vector packageName=timberio/vector
 VECTOR_VERSION = "0.40.1"
-# renovate: datasource=docker depName=pgbouncer packageName=pgbouncer/pgbouncer
-PGBOUNCER_VERSION = "1.25.1"
 
 # EKS Specific Versions
 # renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/charts

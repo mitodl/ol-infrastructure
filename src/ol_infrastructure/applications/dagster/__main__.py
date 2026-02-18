@@ -27,7 +27,7 @@ from pulumi.config import get_config
 from pulumi_aws import ec2, get_caller_identity
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
-from bridge.lib.versions import DAGSTER_CHART_VERSION, PGBOUNCER_VERSION
+from bridge.lib.versions import DAGSTER_CHART_VERSION
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
@@ -549,9 +549,7 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
                 containers=[
                     kubernetes.core.v1.ContainerArgs(
                         name="pgbouncer",
-                        image=cached_image_uri(
-                            f"bitnami/pgbouncer:{PGBOUNCER_VERSION}"
-                        ),
+                        image=cached_image_uri("bitnami/pgbouncer:latest"),
                         ports=[
                             kubernetes.core.v1.ContainerPortArgs(
                                 name="pgbouncer",
