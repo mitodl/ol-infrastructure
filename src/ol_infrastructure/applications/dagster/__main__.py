@@ -549,7 +549,7 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
                 containers=[
                     kubernetes.core.v1.ContainerArgs(
                         name="pgbouncer",
-                        image=cached_image_uri("bitnami/pgbouncer:latest"),
+                        image=cached_image_uri("bitnami/pgbouncer"),
                         ports=[
                             kubernetes.core.v1.ContainerPortArgs(
                                 name="pgbouncer",
