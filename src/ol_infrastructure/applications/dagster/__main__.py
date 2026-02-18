@@ -53,8 +53,8 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
-    cached_image_uri,
     check_cluster_namespace,
+    dhi_image_uri,
     ecr_image_uri,
     setup_k8s_provider,
 )
@@ -533,7 +533,7 @@ pgbouncer_config = kubernetes.core.v1.ConfigMap(
 
 [pgbouncer]
 listen_addr = 0.0.0.0
-listen_port = 5432
+listen_port = 6432
 ; auth_type=any: PgBouncer accepts all inbound connections without client auth.
 ; This is safe because the Service is ClusterIP (namespace-internal only) and
 ; real scram-sha-256 auth is enforced on the backend connection to RDS using
@@ -632,13 +632,11 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
                 containers=[
                     kubernetes.core.v1.ContainerArgs(
                         name="pgbouncer",
-                        image=cached_image_uri(
-                            f"pgbouncer/pgbouncer:{PGBOUNCER_VERSION}"
-                        ),
+                        image=dhi_image_uri(f"pgbouncer:{PGBOUNCER_VERSION}"),
                         ports=[
                             kubernetes.core.v1.ContainerPortArgs(
                                 name="pgbouncer",
-                                container_port=5432,
+                                container_port=6432,
                                 protocol="TCP",
                             ),
                         ],
@@ -653,14 +651,14 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
                         ),
                         liveness_probe=kubernetes.core.v1.ProbeArgs(
                             tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
-                                port=5432,
+                                port=6432,
                             ),
                             initial_delay_seconds=10,
                             period_seconds=10,
                         ),
                         readiness_probe=kubernetes.core.v1.ProbeArgs(
                             tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
-                                port=5432,
+                                port=6432,
                             ),
                             initial_delay_seconds=5,
                             period_seconds=5,
@@ -708,8 +706,8 @@ pgbouncer_service = kubernetes.core.v1.Service(
         ports=[
             kubernetes.core.v1.ServicePortArgs(
                 name="pgbouncer",
-                port=5432,
-                target_port=5432,
+                port=6432,
+                target_port=6432,
                 protocol="TCP",
             ),
         ],
@@ -1149,7 +1147,7 @@ dagster_helm_values = {
         # Point to the PgBouncer service instead of direct RDS
         "postgresqlHost": "dagster-pgbouncer.dagster.svc.cluster.local",
         "postgresqlDatabase": "dagster",
-        "postgresqlPort": 5432,
+        "postgresqlPort": 6432,
     },
     # Tell Dagster to use our externally-managed secret
     "generatePostgresqlPasswordSecret": False,

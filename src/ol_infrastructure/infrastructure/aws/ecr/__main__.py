@@ -109,6 +109,13 @@ aws.ecr.PullThroughCacheRule(
     credential_arn=dockerhub_credential.arn,
 )
 
+aws.ecr.PullThroughCacheRule(
+    "aws-ecr-dhi-pull-through-cache-rule",
+    upstream_registry_url="dhi.io",
+    ecr_repository_prefix="dhi",
+    credential_arn=dockerhub_credential.arn,
+)
+
 ecr_private_repository = aws.ecr.Repository(
     "aws-ecr-private-repository", name="ol-course-notebooks"
 )
