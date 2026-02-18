@@ -262,9 +262,9 @@ def create_ovs_k8s_secrets(
             mount_type="kv-v2",
             path="ovs-secrets",
             templates={
-                "sp-cert.pem": '{{ $v := get .Secrets "shibboleth" | fromJson }}{{ get $v "sp_cert" }}',
-                "sp-key.pem": '{{ $v := get .Secrets "shibboleth" | fromJson }}{{ get $v "sp_key" }}',
-                "mit-md-cert.pem": '{{ $v := get .Secrets "shibboleth" | fromJson }}{{ get $v "mit_md_cert" }}',
+                "sp-cert.pem": '{{ index .Secrets "shibboleth" "sp_cert" }}',
+                "sp-key.pem": '{{ index .Secrets "shibboleth" "sp_key" }}',
+                "mit-md-cert.pem": '{{ index .Secrets "shibboleth" "mit_md_cert" }}',
             },
             vaultauth=vaultauth,
         )
