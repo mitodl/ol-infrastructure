@@ -168,7 +168,7 @@ def create_ovs_k8s_secrets(
         string_data=redis_cluster.address.apply(
             lambda address: {
                 "CELERY_BROKER_URL": f"rediss://default:{redis_auth_token}@{address}:{DEFAULT_REDIS_PORT}/0?ssl_cert_reqs=required",
-                "REDIS_URL": f"rediss://default:{redis_auth_token}@{address}:{DEFAULT_REDIS_PORT}/0?ssl_cert_reqs=CERT_REQUIRED",
+                "REDIS_URL": f"rediss://default:{redis_auth_token}@{address}:{DEFAULT_REDIS_PORT}/0?ssl_cert_reqs=required",
             }
         ),
         opts=ResourceOptions(
