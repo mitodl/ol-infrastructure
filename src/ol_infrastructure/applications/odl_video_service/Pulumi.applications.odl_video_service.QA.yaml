@@ -27,8 +27,8 @@ config:
   ovs:target_vpc: applications_vpc
   ovs:use_shibboleth: "True"
   ovs:feature_annotations: "False"
-  ovs:k8s_deploy: false
-  ovs:k8s_cutover: false
+  ovs:k8s_deploy: true
+  ovs:k8s_cutover: true
   redis:max_connections: "30"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
