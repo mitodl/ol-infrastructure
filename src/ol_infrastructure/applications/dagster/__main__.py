@@ -560,12 +560,6 @@ pgbouncer_config = kubernetes.core.v1.ConfigMap(
                     # Release idle backend connections after 5 min to reduce RDS
                     # connection count during low-traffic periods.
                     "server_idle_timeout = 300",
-                    # TCP keepalives to detect dead connections quickly. Without
-                    # these, AWS NLB/NAT Gateway can silently drop idle connections
-                    # and PgBouncer won't know until the next query fails.
-                    "tcp_keepalives_idle = 60",
-                    "tcp_keepalives_interval = 15",
-                    "tcp_keepalives_count = 5",
                     "log_connections = 1",
                     "log_disconnections = 1",
                     "application_name_add_host = 1",
