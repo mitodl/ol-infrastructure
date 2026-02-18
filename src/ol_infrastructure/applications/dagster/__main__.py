@@ -496,6 +496,10 @@ dagster_db_secret = OLVaultK8SSecret(
         namespace=dagster_namespace,
         path="creds/app",
         refresh_after="1h",
+        # Restart PgBouncer when credentials rotate so the init container
+        # re-renders pgbouncer.ini with fresh credentials.
+        restart_target_kind="Deployment",
+        restart_target_name="dagster-pgbouncer",
         revoke_on_delete=True,
         role_name="app",
         vaultauth=dagster_auth_binding.vault_k8s_resources.auth_name,
@@ -549,6 +553,19 @@ pgbouncer_config = kubernetes.core.v1.ConfigMap(
                     "reserve_pool_size = 150",
                     "max_prepared_statements = 0",
                     "server_connect_timeout = 15",
+                    # Proactively recycle backend connections every 30 min to prevent
+                    # stale connections accumulating (AWS NAT Gateway silently drops
+                    # idle TCP after ~350s; RDS also has idle timeouts).
+                    "server_lifetime = 1800",
+                    # Release idle backend connections after 5 min to reduce RDS
+                    # connection count during low-traffic periods.
+                    "server_idle_timeout = 300",
+                    # TCP keepalives to detect dead connections quickly. Without
+                    # these, AWS NLB/NAT Gateway can silently drop idle connections
+                    # and PgBouncer won't know until the next query fails.
+                    "tcp_keepalives_idle = 60",
+                    "tcp_keepalives_interval = 15",
+                    "tcp_keepalives_count = 5",
                     "log_connections = 1",
                     "log_disconnections = 1",
                     "application_name_add_host = 1",
