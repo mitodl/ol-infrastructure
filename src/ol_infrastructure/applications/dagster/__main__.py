@@ -540,7 +540,7 @@ pgbouncer_config = kubernetes.core.v1.ConfigMap(
                     "",
                     "[pgbouncer]",
                     "listen_addr = 0.0.0.0",
-                    "listen_port = 6432",
+                    "listen_port = 5432",
                     "auth_type = any",
                     "pool_mode = session",
                     "max_client_conn = 800",
@@ -637,7 +637,7 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
                         ports=[
                             kubernetes.core.v1.ContainerPortArgs(
                                 name="pgbouncer",
-                                container_port=6432,
+                                container_port=5432,
                                 protocol="TCP",
                             ),
                         ],
@@ -658,14 +658,14 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
                         ),
                         liveness_probe=kubernetes.core.v1.ProbeArgs(
                             tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
-                                port=6432,
+                                port=5432,
                             ),
                             initial_delay_seconds=10,
                             period_seconds=10,
                         ),
                         readiness_probe=kubernetes.core.v1.ProbeArgs(
                             tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
-                                port=6432,
+                                port=5432,
                             ),
                             initial_delay_seconds=5,
                             period_seconds=5,
@@ -707,8 +707,8 @@ pgbouncer_service = kubernetes.core.v1.Service(
         ports=[
             kubernetes.core.v1.ServicePortArgs(
                 name="pgbouncer",
-                port=6432,
-                target_port=6432,
+                port=5432,
+                target_port=5432,
                 protocol="TCP",
             ),
         ],
@@ -1148,7 +1148,7 @@ dagster_helm_values = {
         # Point to the PgBouncer service instead of direct RDS
         "postgresqlHost": "dagster-pgbouncer.dagster.svc.cluster.local",
         "postgresqlDatabase": "dagster",
-        "postgresqlPort": 6432,
+        "postgresqlPort": 5432,
     },
     # Tell Dagster to use our externally-managed secret
     "generatePostgresqlPasswordSecret": False,
