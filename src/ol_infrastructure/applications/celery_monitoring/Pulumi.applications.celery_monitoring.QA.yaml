@@ -12,7 +12,6 @@ config:
   opensearch:domain_name: "celeryq"
   celery_monitoring:heroku_map:
     mitx-devops:
-    - bootcamp-ecommerce-rc
     - micromasters-rc
     - ocw-studio-rc
     - xpro-rc
