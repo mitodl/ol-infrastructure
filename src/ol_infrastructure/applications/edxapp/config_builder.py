@@ -380,6 +380,7 @@ def build_base_general_config() -> ConfigDict:
             "ENABLE_ENROLLMENT_RESET": False,
             "ENABLE_EXPORT_GIT": True,
             "ENABLE_GIT_AUTO_EXPORT": True,
+            "ENABLE_AUTO_GITHUB_REPO_CREATION": True,
             "ENABLE_GRADE_DOWNLOADS": True,
             "ENABLE_INSTRUCTOR_ANALYTICS": False,
             "ENABLE_INSTRUCTOR_EMAIL": True,
@@ -597,7 +598,6 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
             "FEATURES": {
                 "ALLOW_COURSE_STAFF_GRADE_DOWNLOADS": True,
                 "ENABLE_EXAM_SETTINGS_HTML_VIEW": True,
-                "ENABLE_AUTO_GITHUB_REPO_CREATION": True,
                 "ENABLE_FORUM_DAILY_DIGEST": True,
                 "ENABLE_LTI_PROVIDER": True,
                 "ENABLE_V2_CERT_DISPLAY_SETTINGS": True,
