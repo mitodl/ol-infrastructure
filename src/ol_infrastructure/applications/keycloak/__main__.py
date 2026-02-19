@@ -377,6 +377,15 @@ KEYCLOAK_DOCKER_DIGEST = os.getenv("KEYCLOAK_DOCKER_DIGEST")
 posthog_api_key = keycloak_config.get("posthog_api_key") or ""
 posthog_api_host = keycloak_config.get("posthog_api_host") or "https://app.posthog.com"
 
+if stack_info.name != "CI":
+    tracing_config = {
+        "enabled": True,
+        "endpoint": "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4317",
+        "samplerRatio": 1.0,
+    }
+else:
+    tracing_config = {"enabled": False}
+
 keycloak_resource_name = f"keycloak-{stack_info.env_suffix}"
 keycloak_resource = kubernetes.apiextensions.CustomResource(
     f"{env_name}-keycloak",
@@ -427,6 +436,7 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
                 "spec": {
                     "containers": [
                         {
+                            "name": "keycloak",
                             "env": [
                                 {
                                     "name": "QUARKUS_HTTP_LIMITS_MAX_HEADER_SIZE",
@@ -444,8 +454,8 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
                                     "name": "POSTHOG_API_HOST",
                                     "value": posthog_api_host,
                                 },
-                            ]
-                        }
+                            ],
+                        },
                     ]
                 }
             },
@@ -470,11 +480,7 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
             },
             {"name": "spi-login--provider", "value": "ol-freemarker"},
         ],
-        "tracing": {
-            "enabled": stack_info.name != "CI",
-            "endpoint": "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4317",
-            "samplerRatio": 1.0,
-        },
+        "tracing": tracing_config,
         "hostname": {
             "hostname": keycloak_domain,
         },
