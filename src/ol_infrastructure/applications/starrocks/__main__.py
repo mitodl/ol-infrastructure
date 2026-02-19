@@ -33,7 +33,9 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.vault import setup_vault_provider
 
+setup_vault_provider()
 stack_info = parse_stack()
 starrocks_config = Config("starrocks")
 
