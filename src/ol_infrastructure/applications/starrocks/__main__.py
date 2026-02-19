@@ -1,7 +1,13 @@
+from pathlib import Path
+
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, ResourceOptions, StackReference
 
 from bridge.lib.versions import STARROCKS_CHART_VERSION
+from ol_infrastructure.components.applications.eks import (
+    OLEKSAuthBinding,
+    OLEKSAuthBindingConfig,
+)
 from ol_infrastructure.components.services.apisix_gateway_api import (
     OLApisixHTTPRoute,
     OLApisixHTTPRouteConfig,
@@ -10,12 +16,17 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
 )
+from ol_infrastructure.components.services.vault import (
+    OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
+)
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.ol_types import (
     Application,
+    AWSBase,
     BusinessUnit,
     K8sAppLabels,
     Product,
@@ -29,6 +40,9 @@ starrocks_config = Config("starrocks")
 cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
 setup_k8s_provider(cluster_stack.require_output("kube_config"))
 
+starrocks_env = f"data-{stack_info.env_suffix}"
+aws_config = AWSBase(tags={"OU": "data", "Environment": starrocks_env})
+
 namespace = "starrocks"
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(namespace, ns)
@@ -41,7 +55,7 @@ k8s_app_labels = K8sAppLabels(
     ou=BusinessUnit.data,
     source_repository="https://github.com/StarRocks/starrocks-kubernetes-operator",
     stack=stack_info,
-).model_dump()
+)
 
 starrocks_root_password_secret_name = f"{stack_info.env_prefix}-starrocks-root-password"
 starrocks_root_password_secret = kubernetes.core.v1.Secret(
@@ -49,10 +63,58 @@ starrocks_root_password_secret = kubernetes.core.v1.Secret(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=starrocks_root_password_secret_name,
         namespace=namespace,
-        labels=k8s_app_labels,
+        labels=k8s_app_labels.model_dump(),
     ),
     string_data={"password": starrocks_config.require("root_password")},
 )
+
+# Configure Vault integration for OIDC credentials using OLEKSAuthBinding
+starrocks_auth_binding = OLEKSAuthBinding(
+    OLEKSAuthBindingConfig(
+        application_name="starrocks",
+        namespace=namespace,
+        stack_info=stack_info,
+        aws_config=aws_config,
+        vault_policy_path=Path(__file__).parent.joinpath("starrocks_policy.hcl"),
+        cluster_name=cluster_stack.require_output("cluster_name"),
+        cluster_identities=cluster_stack.require_output("cluster_identities"),
+        vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+        irsa_service_account_name="starrocks",
+        vault_sync_service_account_names=["starrocks-vault"],
+        k8s_labels=k8s_app_labels,
+    )
+)
+
+# Create OIDC configuration secret if enabled
+if starrocks_config.get_bool("oidc_enabled"):
+    oidc_config_secret_name = f"{stack_info.env_prefix}-starrocks-oidc-config"
+    oidc_config_secret_config = OLVaultK8SStaticSecretConfig(
+        name="starrocks-oidc-config",
+        namespace=namespace,
+        dest_secret_labels=k8s_app_labels.model_dump(),
+        dest_secret_name=oidc_config_secret_name,
+        labels=k8s_app_labels.model_dump(),
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/starrocks",
+        restart_target_kind="StatefulSet",
+        restart_target_name=f"{stack_info.env_prefix}-starrocks-fe",
+        templates={
+            "OIDC_ISSUER_URL": '{{ get .Secrets "url" }}',
+            "OIDC_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+            "OIDC_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+            "OIDC_JWKS_URI": '{{ get .Secrets "url" }}/protocol/openid-connect/certs',
+        },
+        vaultauth=starrocks_auth_binding.vault_k8s_resources.auth_name,
+    )
+    oidc_config_secret = OLVaultK8SSecret(
+        f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-oidc-config-secret",
+        oidc_config_secret_config,
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            parent=starrocks_auth_binding.vault_k8s_resources,
+        ),
+    )
 
 
 if starrocks_config.get_bool("use_be") and starrocks_config.get_bool("use_cn"):
@@ -194,7 +256,7 @@ cert_manager_certificate = OLCertManagerCert(
     cert_config=OLCertManagerCertConfig(
         application_name=f"{stack_info.env_prefix}-starrocks",
         k8s_namespace=namespace,
-        k8s_labels=k8s_app_labels,
+        k8s_labels=k8s_app_labels.model_dump(),
         create_apisixtls_resource=True,
         dest_secret_name=starrocks_tls_secret_name,
         dns_names=[starrocks_config.require("domain")],
@@ -214,5 +276,5 @@ starrocks_apisix_httproute = OLApisixHTTPRoute(
         ),
     ],
     k8s_namespace=namespace,
-    k8s_labels=k8s_app_labels,
+    k8s_labels=k8s_app_labels.model_dump(),
 )

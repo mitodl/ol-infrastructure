@@ -392,6 +392,115 @@ def create_ol_data_platform_realm(  # noqa: PLR0913, PLR0915
         ).apply(json.dumps),
     )
     # OPENMETADATA [END] # noqa: ERA001
+
+    # STARROCKS [START] # noqa: ERA001
+    ol_data_platform_starrocks_client = keycloak.openid.Client(
+        "ol-data-platform-starrocks-client",
+        name="ol-data-platform-starrocks-client",
+        realm_id=ol_data_platform_realm.id,
+        client_id="ol-starrocks-client",
+        client_secret=keycloak_realm_config.get(
+            "ol-data-platform-starrocks-client-secret"
+        ),
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        # Standard flow for browser-based auth, service accounts for API access
+        direct_access_grants_enabled=False,
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        service_accounts_enabled=True,
+        valid_redirect_uris=keycloak_realm_config.get_object(
+            "ol-data-platform-starrocks-redirect-uris"
+        ),
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    ol_data_platform_starrocks_client_roles = (
+        keycloak_realm_config.get_object("ol-data-platform-starrocks-client-roles")
+        or []
+    )
+    ol_data_platform_starrocks_client_role_refs = {}
+    for role in ol_data_platform_starrocks_client_roles:
+        role_ref = keycloak.Role(
+            f"ol-data-platform-starrocks-client-{role}",
+            name=role,
+            realm_id=ol_data_platform_realm.id,
+            client_id=ol_data_platform_starrocks_client.id,
+            opts=resource_options,
+        )
+        ol_data_platform_starrocks_client_role_refs[role] = role_ref
+
+    vault.generic.Secret(
+        "ol-data-platform-starrocks-client-vault-oidc-credentials",
+        path="secret-operations/sso/starrocks",
+        data_json=Output.all(
+            url=ol_data_platform_starrocks_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
+            client_id=ol_data_platform_starrocks_client.client_id,
+            client_secret=ol_data_platform_starrocks_client.client_secret,
+            # This is included for the case where we are using traefik-forward-auth.
+            # It requires a random secret value to be present which is independent
+            # of the OAuth credentials.
+            secret=session_secret,
+            realm_id=ol_data_platform_starrocks_client.realm_id,
+            realm_name="ol-data-platform",
+            realm_public_key=ol_data_platform_starrocks_client.realm_id.apply(
+                fetch_realm_public_key_partial
+            ),
+        ).apply(json.dumps),
+    )
+
+    # Provision service account with necessary roles for API operations
+    # This enables users calling the StarRocks SQL API to have their tokens validated
+    # and user details looked up via Keycloak admin API
+    for resource_name, role in [
+        ("ol-starrocks-service-account-view-realm", "view-realm"),
+        ("ol-starrocks-service-account-view-users", "view-users"),
+    ]:
+        keycloak.openid.ClientServiceAccountRole(
+            resource_name,
+            realm_id=ol_data_platform_realm.id,
+            service_account_user_id=ol_data_platform_starrocks_client.service_account_user_id,
+            client_id=realm_mgmt_client.id,
+            role=role,
+            opts=resource_options,
+        )
+
+    # Map composite realm roles to StarRocks client roles
+    keycloak.Role(
+        "ol-starrocks-platform-admin-composite",
+        realm_id=ol_data_platform_realm.id,
+        name="ol-starrocks-admin",
+        description="StarRocks administrator with full access",
+        composite_roles=[
+            ol_data_platform_starrocks_client_role_refs["ol_platform_admin"].id
+        ],
+        opts=resource_options,
+    )
+
+    keycloak.Role(
+        "ol-starrocks-data-engineer-composite",
+        realm_id=ol_data_platform_realm.id,
+        name="ol-starrocks-engineer",
+        description="StarRocks data engineer with write access",
+        composite_roles=[
+            ol_data_platform_starrocks_client_role_refs["ol_data_engineer"].id
+        ],
+        opts=resource_options,
+    )
+
+    keycloak.Role(
+        "ol-starrocks-data-analyst-composite",
+        realm_id=ol_data_platform_realm.id,
+        name="ol-starrocks-analyst",
+        description="StarRocks data analyst with read-only access",
+        composite_roles=[
+            ol_data_platform_starrocks_client_role_refs["ol_data_analyst"].id
+        ],
+        opts=resource_options,
+    )
+    # STARROCKS [END] # noqa: ERA001
+
     # OL Data Platform Realm - Authentication Flows[START]
     # OL - browser flow [START]
     # username-form -> ol-auth-username-password-form

@@ -85,6 +85,14 @@ config:
   keycloak_realm:ol-data-platform-openmetadata-client-roles:
   - "open_metadata_admin"
   - "open_metadata_user"
+  keycloak_realm:ol-data-platform-starrocks-redirect-uris:
+  - "https://lakehouse.qa.starrocks.ol.mit.edu/*"
+  - "https://lakehouse.qa.starrocks.ol.mit.edu/oauth2/callback"
+  keycloak_realm:ol-data-platform-starrocks-client-roles:
+  - "ol_platform_admin"
+  - "ol_data_engineer"
+  - "ol_data_analyst"
+  - "ol_researcher"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
   keycloak_realm:olapps-unified-ecommerce-client-secret:
@@ -111,5 +119,7 @@ config:
     secure: v1:K+vlQYO1i1DD8YOc:H6AhEu/TRhbvxvgA/R9lZiNnokYnZV51SslGM1WmLwjmlllZe1tClUYMFmVi7Aq/
   keycloak_realm:ol-data-platform-openmetadata-client-secret:
     secure: v1:kUumLXwbKKqZQU3/:IogyWYCtDjFs71I4LJW+DvOhYULDwPJ/Gbucf+0nxqhBY/Tt3vAj1AtGnQf9FHbQ
+  keycloak_realm:ol-data-platform-starrocks-client-secret:
+    secure: v1:zHo95RFS+Eoplvmf:NBtJt1ajx88FL6NMWqqmk0czTWG+2ZoUvB/nWhuERLkXffbW5LDIwJ6EhtQCUQ84Cm0CntuUXq6gTACdrjdLdNk0AINAP+0pfvvDk5+0Gus=
   keycloak_realm:session_secret:
     secure: v1:9Y54vvxTRbuuDCro:dXlzvu2/QqxZyEA1iG/elwzgP3xAQSVChqh/c5bXsLmz3j6hDzBlgBzlp9pIbxVk/+1GhYKrIgsULgU=
