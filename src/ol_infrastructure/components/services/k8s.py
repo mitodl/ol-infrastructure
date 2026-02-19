@@ -1212,6 +1212,7 @@ class OLApisixOIDCConfig(BaseModel):
         "id_token": True,
         "user": True,
     }
+    oidc_session_cookie_chunks: NonNegativeInt = 0
     oidc_session_cookie_domain: str | None = None
     oidc_session_cookie_lifetime: NonNegativeInt = 0
     oidc_ssl_verify: bool = True
@@ -1271,10 +1272,13 @@ class OLApisixOIDCResources(ComponentResource):
         )
 
         cookie_config = {}
+        _cookie: dict[str, Any] = {}
         if oidc_config.oidc_session_cookie_domain:
-            cookie_config["session"] = {
-                "cookie": {"domain": oidc_config.oidc_session_cookie_domain}
-            }
+            _cookie["domain"] = oidc_config.oidc_session_cookie_domain
+        if oidc_config.oidc_session_cookie_chunks:
+            _cookie["chunks"] = oidc_config.oidc_session_cookie_chunks
+        if _cookie:
+            cookie_config["session"] = {"cookie": _cookie}
 
         self.base_oidc_config = {
             "scope": oidc_config.oidc_scope,
