@@ -574,6 +574,16 @@ pgbouncer_config = kubernetes.core.v1.ConfigMap(
                     # terminates them, preventing zombie connections from being
                     # assigned to clients.
                     "server_idle_timeout = 120",
+                    # Disable the default 120s query_wait_timeout. During heavy RDS
+                    # checkpoint I/O, queries slow from milliseconds to seconds, which
+                    # temporarily backs up the pool. With the default of 120s, clients
+                    # that can't immediately get a server connection are disconnected
+                    # and psycopg2 sees "server closed the connection unexpectedly".
+                    # Setting to 0 disables the timeout so clients wait as long as
+                    # needed. This is safe because server_idle_timeout=120 continuously
+                    # cycles idle connections and the pool self-recovers within 1-2
+                    # minutes of I/O pressure dropping.
+                    "query_wait_timeout = 0",
                     "log_connections = 1",
                     "log_disconnections = 1",
                     "application_name_add_host = 1",
