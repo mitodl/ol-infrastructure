@@ -557,9 +557,18 @@ pgbouncer_config = kubernetes.core.v1.ConfigMap(
                     # state is left between queries, so DISCARD ALL is unnecessary
                     # and adds latency + a race-condition window on each disconnect.
                     "server_reset_query =",
+                    # PgBouncer 1.25 defaults server_check_query to empty (disabled).
+                    # Re-enable it so PgBouncer verifies server connections are alive
+                    # before assigning them to clients.
+                    # server_check_delay=0 forces the check on EVERY assignment - not
+                    # just connections idle >30s. This is critical because Dagster's
+                    # NullPool opens/closes connections per-query, so most server
+                    # connections are recently used (< 30s) and skip the check at the
+                    # default delay - silently handing dead connections to clients.
+                    "server_check_query = ;",
+                    "server_check_delay = 0",
                     # Proactively recycle backend connections every 30 min to prevent
-                    # stale connections accumulating (AWS NAT Gateway silently drops
-                    # idle TCP after ~350s; RDS also has idle timeouts).
+                    # stale connections accumulating.
                     "server_lifetime = 1800",
                     # Release idle backend connections after 5 min to reduce RDS
                     # connection count during low-traffic periods.
