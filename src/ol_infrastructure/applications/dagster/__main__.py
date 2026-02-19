@@ -559,20 +559,21 @@ pgbouncer_config = kubernetes.core.v1.ConfigMap(
                     "server_reset_query =",
                     # PgBouncer 1.25 defaults server_check_query to empty (disabled).
                     # Re-enable it so PgBouncer verifies server connections are alive
-                    # before assigning them to clients.
-                    # server_check_delay=0 forces the check on EVERY assignment - not
-                    # just connections idle >30s. This is critical because Dagster's
-                    # NullPool opens/closes connections per-query, so most server
-                    # connections are recently used (< 30s) and skip the check at the
-                    # default delay - silently handing dead connections to clients.
+                    # before assigning them to clients. server_check_delay=30 means
+                    # any connection idle >30s is health-checked before use. Note:
+                    # server_check_delay=0 DISABLES checks (PgBouncer behavior since
+                    # v1.7 when the default was changed from 0 to 30).
                     "server_check_query = ;",
-                    "server_check_delay = 0",
+                    "server_check_delay = 30",
                     # Proactively recycle backend connections every 30 min to prevent
                     # stale connections accumulating.
                     "server_lifetime = 1800",
-                    # Release idle backend connections after 5 min to reduce RDS
-                    # connection count during low-traffic periods.
-                    "server_idle_timeout = 300",
+                    # Release idle backend connections after 2 min. This is
+                    # intentionally shorter than RDS's tcp_keepalives_idle (300s) so
+                    # PgBouncer always closes idle connections before RDS silently
+                    # terminates them, preventing zombie connections from being
+                    # assigned to clients.
+                    "server_idle_timeout = 120",
                     "log_connections = 1",
                     "log_disconnections = 1",
                     "application_name_add_host = 1",
