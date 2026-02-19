@@ -73,6 +73,8 @@ config:
     MITX_ONLINE_BASE_URL: "https://rc.mitxonline.mit.edu/"
     MITX_ONLINE_COURSES_API_URL: "https://rc.mitxonline.mit.edu/api/v2/courses/"
     MITX_ONLINE_PROGRAMS_API_URL: "https://rc.mitxonline.mit.edu/api/v2/programs/"
+    XPRO_CATALOG_API_URL: "https://rc.xpro.mit.edu/api/programs/"
+    XPRO_COURSES_API_URL: "https://rc.xpro.mit.edu/api/courses/"
     MITPE_API_ENABLED: "true"
     OCW_ITERATOR_CHUNK_SIZE: 300
     OIDC_ENDPOINT: "https://sso-qa.ol.mit.edu/realms/olapps"
