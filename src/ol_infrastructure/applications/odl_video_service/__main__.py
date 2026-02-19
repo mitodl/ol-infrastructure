@@ -922,6 +922,7 @@ app_env_vars: dict[str, str | bool] = {
     "ODL_VIDEO_ENVIRONMENT": stack_info.env_suffix,
     "ODL_VIDEO_FROM_EMAIL": "MIT ODL Video <ol-engineering-support@mit.edu>",
     "ODL_VIDEO_LOG_LEVEL": ovs_config.get("log_level") or "INFO",
+    "ODL_VIDEO_SECURE_SSL_REDIRECT": "False",
     "ODL_VIDEO_SUPPORT_EMAIL": "MIT ODL Video <ol-engineering-support@mit.edu>",
     "PORT": "8087",
     "REDIS_MAX_CONNECTIONS": redis_config.get("max_connections") or "65000",
@@ -1051,46 +1052,64 @@ if k8s_deploy:
     default_domain = ovs_config.get("default_domain")
 
     nginx_with_shib_conf = f"""\
-server {{
-    server_name {server_names};
+    server {{
     listen 80 default_server;
     listen [::]:80;
+    server_name {default_domain};
+
+    # 1. Determine the 'real' scheme from the Ingress
+    set $my_scheme $http_x_forwarded_proto;
+    if ($my_scheme = "") {{ set $my_scheme $scheme; }}
+
+    # 2. Map HTTPS variable for Shibboleth/uWSGI
+    set $my_https "";
+    if ($my_scheme = "https") {{ set $my_https "on"; }}
+
     root /opt/odl-video-service/;
 
     location /shibauthorizer {{
-        internal ;
+        internal;
         include fastcgi_params;
         include shib_fastcgi_params;
+        # Tell Shibboleth the request IS secure
+        fastcgi_param HTTPS $my_https;
         fastcgi_pass unix:/opt/shibboleth/shibauthorizer.sock;
     }}
 
     location /Shibboleth.sso {{
         include fastcgi_params;
         include shib_fastcgi_params;
+        # Tell the responder the request IS secure
+        fastcgi_param HTTPS $my_https;
         fastcgi_pass unix:/opt/shibboleth/shibresponder.sock;
     }}
 
     location /login {{
         include shib_clear_headers;
+        proxy_set_header Host {default_domain};
         shib_request /shibauthorizer;
         shib_request_use_headers on;
         include shib_params;
         include uwsgi_params;
+
+        # Override uwsgi_params to reflect the Ingress scheme
+        uwsgi_param UWSGI_SCHEME $my_scheme;
+        uwsgi_param HTTPS $my_https;
+
         uwsgi_ignore_client_abort on;
         uwsgi_pass 127.0.0.1:8087;
-    }}
-
-    # Health check endpoint for Kubernetes probes (doesn't hit Django)
-    location = /nginx-health {{
-        access_log off;
-        return 200 "healthy\n";
-        add_header Content-Type text/plain;
     }}
 
     location / {{
         include uwsgi_params;
-        uwsgi_ignore_client_abort on;
+        uwsgi_param UWSGI_SCHEME $my_scheme;
+        uwsgi_param HTTPS $my_https;
         uwsgi_pass 127.0.0.1:8087;
+    }}
+
+    location = /nginx-health {{
+        access_log off;
+        return 200 "healthy\n";
     }}
 
     location /collections/letterlocking {{
@@ -1121,7 +1140,7 @@ server {{
 
     nginx_wo_shib_conf = f"""\
 server {{
-    server_name {server_names};
+    server_name {default_domain};
     listen 80 default_server;
     listen [::]:80;
     root /opt/odl-video-service/;
@@ -1176,7 +1195,7 @@ server {{
 <OutOfProcess tranLogFormat="%u|%s|%IDP|%i|%ac|%t|%attr|%n|%b|%E|%S|%SS|%L|%UA|%a" />
   <RequestMapper type="Native">
     <RequestMap>
-      <Host authType="shibboleth" name="{default_domain}" requireSession="true"/>
+      <Host authType="shibboleth" name="{default_domain}" requireSession="true" scheme="https" port="443"/>
     </RequestMap>
   </RequestMapper>
 
@@ -1185,7 +1204,7 @@ server {{
         cipherSuites="DEFAULT:!EXP:!LOW:!aNULL:!eNULL:!DES:!IDEA:!SEED:!RC4:!3DES:!kRSA:!SSLv2:!SSLv3:!TLSv1:!TLSv1.1">
 
         <Sessions lifetime="28800" timeout="3600" relayState="ss:mem"
-                  checkAddress="false" handlerSSL="true" cookieProps="https"
+                  checkAddress="false" handlerSSL="false" cookieProps="https"
                   redirectLimit="exact+whitelist"
                   redirectWhitelist="https://idp.mit.edu/ https://idp.touchstonenetwork.net/ https://idp-alum.mit.edu/">
 
@@ -1693,7 +1712,7 @@ server {{
                 k8s_labels=k8s_app_labels,
                 create_apisixtls_resource=True,
                 dest_secret_name=tls_secret_name,
-                dns_names=ovs_domains,
+                dns_names=[default_domain],
             ),
         )
 
@@ -1702,7 +1721,7 @@ server {{
             route_configs=[
                 OLApisixHTTPRouteConfig(
                     route_name="passthrough",
-                    hosts=ovs_domains,
+                    hosts=[default_domain],
                     paths=["/*"],
                     backend_service_name=ovs_service_name,
                     backend_service_port=80,
