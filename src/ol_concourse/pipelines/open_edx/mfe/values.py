@@ -17,6 +17,8 @@ mitx = [
         support_url="odl.zendesk.com/hc/en-us/requests/new",
         terms_of_service_url="https://lms-ci.mitx.mit.edu/tos",
         mit_open_learning_site_link="https://openlearning.mit.edu",
+        purge_fastly_cache=True,
+        fastly_service_prefix="mitx_",
     ),
     OpenEdxVars(
         environment="mitx-qa",
@@ -33,6 +35,8 @@ mitx = [
         support_url="odl.zendesk.com/hc/en-us/requests/new",
         terms_of_service_url="https://mitx-qa.mitx.mit.edu/tos",
         mit_open_learning_site_link="https://openlearning.mit.edu",
+        purge_fastly_cache=True,
+        fastly_service_prefix="mitx_",
     ),
     OpenEdxVars(
         environment="mitx-production",
@@ -49,6 +53,8 @@ mitx = [
         support_url="odl.zendesk.com/hc/en-us/requests/new",
         terms_of_service_url="https://lms.mitx.mit.edu/tos",
         mit_open_learning_site_link="https://openlearning.mit.edu",
+        purge_fastly_cache=True,
+        fastly_service_prefix="mitx_",
     ),
 ]
 
@@ -68,6 +74,8 @@ mitx_staging = [
         studio_domain="studio-staging-ci.mitx.mit.edu",
         support_url="odl.zendesk.com/hc/en-us/requests/new",
         terms_of_service_url="https://staging-ci.mitx.mit.edu/tos",
+        purge_fastly_cache=True,
+        fastly_service_prefix="mitx_staging_",
     ),
     OpenEdxVars(
         deployment_name="mitx-staging",
@@ -83,6 +91,8 @@ mitx_staging = [
         studio_domain="studio-mitx-qa-draft.mitx.mit.edu",
         support_url="odl.zendesk.com/hc/en-us/requests/new",
         terms_of_service_url="https://mitx-qa-draft.mitx.mit.edu/tos",
+        purge_fastly_cache=True,
+        fastly_service_prefix="mitx_staging_",
     ),
     OpenEdxVars(
         deployment_name="mitx-staging",
@@ -98,6 +108,8 @@ mitx_staging = [
         studio_domain="studio-staging.mitx.mit.edu",
         support_url="odl.zendesk.com/hc/en-us/requests/new",
         terms_of_service_url="https://staging.mitx.mit.edu/tos",
+        purge_fastly_cache=True,
+        fastly_service_prefix="mitx_staging_",
     ),
 ]
 
@@ -131,6 +143,8 @@ mitxonline = [
         enable_jumpnav="true",
         enable_ai_drawer_slot="true",
         enable_auto_language_selection="true",
+        purge_fastly_cache=True,
+        fastly_service_prefix="learn_",
     ),
     OpenEdxVars(
         about_us_url="https://rc.mitxonline.mit.edu/about-us/",
@@ -161,6 +175,8 @@ mitxonline = [
         enable_jumpnav="true",
         enable_ai_drawer_slot="true",
         enable_auto_language_selection="true",
+        purge_fastly_cache=True,
+        fastly_service_prefix="learn_",
     ),
     OpenEdxVars(
         about_us_url="https://mitxonline.mit.edu/about-us/",
@@ -191,6 +207,8 @@ mitxonline = [
         enable_jumpnav="true",
         appzi_url="https://w.appzi.io/w.js?token=Q2pSI",
         enable_auto_language_selection="true",
+        purge_fastly_cache=True,
+        fastly_service_prefix="learn_",
     ),
 ]
 
@@ -216,6 +234,8 @@ xpro = [
         trademark_text="© MIT xPRO. All rights reserved except where noted.",
         logo_trademark_url="https://courses-ci.xpro.mit.edu/static/xpro/images/mit-ol-logo.svg",
         enable_video_upload_page_link_in_content_dropdown="true",
+        purge_fastly_cache=True,
+        fastly_service_prefix="xpro_",
     ),
     OpenEdxVars(
         about_us_url="https://rc.xpro.mit.edu/about-us/",
@@ -238,6 +258,8 @@ xpro = [
         trademark_text="© MIT xPRO. All rights reserved except where noted.",
         logo_trademark_url="https://courses-rc.xpro.mit.edu/static/xpro/images/mit-ol-logo.svg",
         enable_video_upload_page_link_in_content_dropdown="true",
+        purge_fastly_cache=True,
+        fastly_service_prefix="xpro_",
     ),
     OpenEdxVars(
         about_us_url="https://xpro.mit.edu/about-us/",
@@ -260,6 +282,8 @@ xpro = [
         trademark_text="© MIT xPRO. All rights reserved except where noted.",
         logo_trademark_url="https://courses.xpro.mit.edu/static/xpro/images/mit-ol-logo.svg",
         enable_video_upload_page_link_in_content_dropdown="true",
+        purge_fastly_cache=True,
+        fastly_service_prefix="xpro_",
     ),
 ]
 
