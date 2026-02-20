@@ -1,5 +1,5 @@
 # renovate: datasource=github-releases depName=concourse packageName=concourse/concourse
-CONCOURSE_VERSION = "8.0.1"
+CONCOURSE_VERSION = "8.0.2"
 # renovate: datasource=github-releases depName=consul-template packageName=hashicorp/consul-template
 CONSUL_TEMPLATE_VERSION = "0.41.4"
 # renovate: datasource=github-releases depName=consul packageName=hashicorp/consul
