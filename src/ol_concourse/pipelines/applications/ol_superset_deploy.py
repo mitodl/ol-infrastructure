@@ -1,4 +1,4 @@
-import sys
+import sys  # noqa: INP001
 
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
@@ -26,8 +26,8 @@ ol_data_platform_repo = git_repo(
 # then runs ol-superset promote --force to deploy assets to production.
 #
 # Vault secret paths (KV v1, mount: secret-data):
-#   superset_qa_service_account   -> superset_url, service_account_username, service_account_password
-#   superset_service_account      -> superset_url, service_account_username, service_account_password
+#   superset_qa_service_account   -> superset_url, service_account_username, service_account_password  # noqa: E501
+#   superset_service_account      -> superset_url, service_account_username, service_account_password  # noqa: E501
 # These mirror the paths used by the Dagster lakehouse code location.
 _deploy_script = """\
 set -euo pipefail
@@ -74,12 +74,12 @@ deploy_pipeline = Pipeline(
                         ),
                         inputs=[Input(name=ol_data_platform_repo.name)],
                         params={
-                            "SUPERSET_QA_URL": "((superset_qa_service_account.superset_url))",
-                            "SUPERSET_QA_USERNAME": "((superset_qa_service_account.service_account_username))",
-                            "SUPERSET_QA_PASSWORD": "((superset_qa_service_account.service_account_password))",
-                            "SUPERSET_PRODUCTION_URL": "((superset_service_account.superset_url))",
-                            "SUPERSET_PRODUCTION_USERNAME": "((superset_service_account.service_account_username))",
-                            "SUPERSET_PRODUCTION_PASSWORD": "((superset_service_account.service_account_password))",
+                            "SUPERSET_QA_URL": "((superset_qa_service_account.superset_url))",  # noqa: E501
+                            "SUPERSET_QA_USERNAME": "((superset_qa_service_account.service_account_username))",  # noqa: E501
+                            "SUPERSET_QA_PASSWORD": "((superset_qa_service_account.service_account_password))",  # noqa: E501
+                            "SUPERSET_PRODUCTION_URL": "((superset_service_account.superset_url))",  # noqa: E501
+                            "SUPERSET_PRODUCTION_USERNAME": "((superset_service_account.service_account_username))",  # noqa: E501
+                            "SUPERSET_PRODUCTION_PASSWORD": "((superset_service_account.service_account_password))",  # noqa: E501
                         },
                         run=Command(
                             path="bash",
