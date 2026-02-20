@@ -60,6 +60,7 @@ micromasters_audit_bucket_name = f"odl-micromasters-audit-{stack_info.env_suffix
 micromasters_bucket_config = S3BucketConfig(
     bucket_name=micromasters_bucket_name,
     versioning_enabled=True,
+    restrict_public_buckets=False,
     ownership_controls="BucketOwnerEnforced",
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
