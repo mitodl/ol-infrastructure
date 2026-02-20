@@ -14,7 +14,7 @@ ol-openedx-logging
 ol-openedx-sentry
 ol-social-auth
 openedx-scorm-xblock
-pydantic-settings==2.13.0
+pydantic-settings==2.13.1
 ol-openedx-chat
 
 # Open Telemetry support
