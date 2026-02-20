@@ -59,6 +59,7 @@ def _build_interpolated_config_dict(
         if stack_info.env_prefix == "mitxonline"
         else edxapp_config.get("marketing_domain")
     )
+    data_platform_domain = edxapp_config.get("data_platform_domain") or "bi.ol.mit.edu"
 
     # Build base interpolated config shared across deployments
     config: dict[str, Any] = {
@@ -261,6 +262,7 @@ def _build_interpolated_config_dict(
             {
                 "COURSE_ABOUT_VISIBILITY_PERMISSION": "see_about_page",
                 "MITXONLINE_BASE_URL": f"https://{marketing_domain}/",
+                "DATAPLATFORM_CERTIFICATE_BASE_URL": f"https://{data_platform_domain}/superset/dashboard/14/",
                 "ENABLE_AUTO_LANGUAGE_SELECTION": edxapp_config.get_bool(
                     "enable_auto_language_selection"
                 )
