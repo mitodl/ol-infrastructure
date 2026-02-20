@@ -189,6 +189,7 @@ mitxonline = [
         logo_trademark_url="https://courses.learn.mit.edu/static/mitxonline/images/mit-logo.svg",
         enable_video_upload_page_link_in_content_dropdown="true",
         enable_jumpnav="true",
+        enable_ai_drawer_slot="true",
         appzi_url="https://w.appzi.io/w.js?token=Q2pSI",
         enable_auto_language_selection="true",
     ),
