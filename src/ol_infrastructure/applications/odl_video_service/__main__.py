@@ -922,6 +922,7 @@ app_env_vars: dict[str, str | bool] = {
     "ODL_VIDEO_ENVIRONMENT": stack_info.env_suffix,
     "ODL_VIDEO_FROM_EMAIL": "MIT ODL Video <ol-engineering-support@mit.edu>",
     "ODL_VIDEO_LOG_LEVEL": ovs_config.get("log_level") or "INFO",
+    "ODL_VIDEO_SECURE_SSL_REDIRECT": "False",
     "ODL_VIDEO_SUPPORT_EMAIL": "MIT ODL Video <ol-engineering-support@mit.edu>",
     "PORT": "8087",
     "REDIS_MAX_CONNECTIONS": redis_config.get("max_connections") or "65000",
@@ -1047,15 +1048,34 @@ if k8s_deploy:
 
     # NGINX configuration for K8s (HTTP only — APISIX handles TLS)
     ovs_domains = ovs_config.get_object("domains") or [ovs_config.get("default_domain")]
-    server_names = " ".join(ovs_domains)
     default_domain = ovs_config.get("default_domain")
 
     nginx_with_shib_conf = f"""\
 server {{
-    server_name {server_names};
+    server_name {default_domain};
     listen 80 default_server;
     listen [::]:80;
     root /opt/odl-video-service/;
+    return 301 https://$host$request_uri;
+}}
+server {{
+    server_name {default_domain};
+    listen 443 ssl default_server;
+    listen [::]:443 ssl;
+    root /opt/odl-video-service/;
+
+    ssl_certificate /etc/nginx/cert.pem;
+    ssl_certificate_key /etc/nginx/key.pem;
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+    # ssl_protocols TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-SHA256:DHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA256;
+    ssl_prefer_server_ciphers on;
+    resolver 1.1.1.1;
+
 
     location /shibauthorizer {{
         internal ;
@@ -1121,7 +1141,7 @@ server {{
 
     nginx_wo_shib_conf = f"""\
 server {{
-    server_name {server_names};
+    server_name {default_domain};
     listen 80 default_server;
     listen [::]:80;
     root /opt/odl-video-service/;
@@ -1185,7 +1205,7 @@ server {{
         cipherSuites="DEFAULT:!EXP:!LOW:!aNULL:!eNULL:!DES:!IDEA:!SEED:!RC4:!3DES:!kRSA:!SSLv2:!SSLv3:!TLSv1:!TLSv1.1">
 
         <Sessions lifetime="28800" timeout="3600" relayState="ss:mem"
-                  checkAddress="false" handlerSSL="true" cookieProps="https"
+                  checkAddress="false" handlerSSL="true" cookieProps="; path=/; Secure; SameSite=None"
                   redirectLimit="exact+whitelist"
                   redirectWhitelist="https://idp.mit.edu/ https://idp.touchstonenetwork.net/ https://idp-alum.mit.edu/">
 
@@ -1489,8 +1509,8 @@ server {{
         image="pennlabs/shibboleth-sp-nginx:latest",
         ports=[
             kubernetes.core.v1.ContainerPortArgs(
-                container_port=80,
-                name="http",
+                container_port=DEFAULT_HTTPS_PORT,
+                name="https",
                 protocol="TCP",
             ),
         ],
@@ -1502,7 +1522,7 @@ server {{
         liveness_probe=kubernetes.core.v1.ProbeArgs(
             http_get=kubernetes.core.v1.HTTPGetActionArgs(
                 path="/nginx-health",
-                port=80,
+                port=DEFAULT_HTTP_PORT,
             ),
             initial_delay_seconds=30,
             period_seconds=30,
@@ -1512,7 +1532,7 @@ server {{
         readiness_probe=kubernetes.core.v1.ProbeArgs(
             http_get=kubernetes.core.v1.HTTPGetActionArgs(
                 path="/nginx-health",
-                port=80,
+                port=DEFAULT_HTTP_PORT,
             ),
             initial_delay_seconds=15,
             period_seconds=15,
@@ -1522,7 +1542,7 @@ server {{
         startup_probe=kubernetes.core.v1.ProbeArgs(
             http_get=kubernetes.core.v1.HTTPGetActionArgs(
                 path="/nginx-health",
-                port=80,
+                port=DEFAULT_HTTP_PORT,
             ),
             initial_delay_seconds=10,
             period_seconds=10,
@@ -1544,7 +1564,7 @@ server {{
             },
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
-            replicas=ovs_config.get_int("k8s_replicas") or 2,
+            replicas=ovs_config.get_int("k8s_replicas") or 1,
             selector=kubernetes.meta.v1.LabelSelectorArgs(
                 match_labels={
                     "ol.mit.edu/application": Application.odl_video_service,
@@ -1611,10 +1631,11 @@ server {{
             },
             ports=[
                 kubernetes.core.v1.ServicePortArgs(
-                    name="http",
-                    port=DEFAULT_HTTP_PORT,
-                    target_port="http",
+                    name="https",
+                    port=DEFAULT_HTTPS_PORT,
+                    target_port="https",
                     protocol="TCP",
+                    app_protocol="https",  # Super important
                 ),
             ],
         ),
@@ -1693,7 +1714,7 @@ server {{
                 k8s_labels=k8s_app_labels,
                 create_apisixtls_resource=True,
                 dest_secret_name=tls_secret_name,
-                dns_names=ovs_domains,
+                dns_names=[default_domain],
             ),
         )
 
@@ -1702,10 +1723,10 @@ server {{
             route_configs=[
                 OLApisixHTTPRouteConfig(
                     route_name="passthrough",
-                    hosts=ovs_domains,
+                    hosts=[default_domain],
                     paths=["/*"],
                     backend_service_name=ovs_service_name,
-                    backend_service_port=80,
+                    backend_service_port=DEFAULT_HTTPS_PORT,
                     plugins=[],
                 ),
             ],
