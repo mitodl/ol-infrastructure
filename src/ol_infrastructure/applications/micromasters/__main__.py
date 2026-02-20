@@ -5,6 +5,8 @@ MicroMasters application.
 - Create an IAM policy to grant access to S3 and other resources
 """
 
+import json
+
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
 from pulumi import (
@@ -71,6 +73,21 @@ micromasters_bucket_config = S3BucketConfig(
             allowed_origins=["*"],
         )
     ],
+    bucket_policy_document=json.dumps(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "PublicReadStaticFiles",
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": "s3:GetObject",
+                    "Resource": "arn:aws:s3:::%s/static/*",
+                }
+            ],
+        }
+    )
+    % micromasters_bucket_name,
     tags=aws_config.tags,
 )
 
