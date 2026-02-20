@@ -147,11 +147,6 @@ def setup_external_dns(
                 ],
                 # Create a txt record to indicate provenance of the record(s)
                 "txtOwnerId": cluster_name,
-                # Need to explicitly turn off support for legacy traefik ingress services
-                # to avoid an annoying bug
-                "extraArgs": [
-                    "--traefik-disable-legacy",
-                ],
                 # Limit the dns zones that external dns knows about
                 "domainFilters": eks_config.require_object("allowed_dns_zones"),
                 "resources": {
