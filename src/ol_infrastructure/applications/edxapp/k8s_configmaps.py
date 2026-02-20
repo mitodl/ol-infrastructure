@@ -59,7 +59,7 @@ def _build_interpolated_config_dict(
         if stack_info.env_prefix == "mitxonline"
         else edxapp_config.get("marketing_domain")
     )
-
+    data_platform_domain = edxapp_config.get("data_platform_domain")
     # Build base interpolated config shared across deployments
     config: dict[str, Any] = {
         "ALLOWED_HOSTS": [
@@ -264,6 +264,7 @@ def _build_interpolated_config_dict(
                 "USE_EXTRACTED_HTML_BLOCK": edxapp_config.get_bool(
                     "use_extracted_html_block", False
                 ),
+                "DATAPLATFORM_CERTIFICATE_BASE_URL": f"https://{data_platform_domain}/superset/dashboard/da9e03d3-e1bb-45b8-981f-208deca90e7a/",
                 "ENABLE_AUTO_LANGUAGE_SELECTION": edxapp_config.get_bool(
                     "enable_auto_language_selection"
                 )
