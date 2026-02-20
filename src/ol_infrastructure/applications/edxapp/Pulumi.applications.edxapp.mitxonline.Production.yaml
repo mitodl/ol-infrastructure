@@ -50,6 +50,7 @@ config:
     "--authenticated"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["teams.enable_teams_app", "--create", "--superusers", "--staff"]
+  edxapp:use_extracted_html_block: false
   edxapp:appzi_url: "https://w.appzi.io/w.js?token=Q2pSI"
   edxapp:business_unit: mitxonline
   edxapp:db_password:
