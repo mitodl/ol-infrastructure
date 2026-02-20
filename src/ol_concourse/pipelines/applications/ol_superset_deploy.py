@@ -12,7 +12,7 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from ol_concourse.lib.resources import git_repo, registry_image
+from ol_concourse.lib.resources import git_repo
 
 ol_data_platform_repo = git_repo(
     name=Identifier("ol-data-platform-repository"),
@@ -20,12 +20,6 @@ ol_data_platform_repo = git_repo(
     branch="main",
     check_every="60s",
     paths=["src/ol_superset/assets/"],
-)
-
-ol_superset_image = registry_image(
-    name=Identifier("ol-superset-image"),
-    image_repository="mitodl/ol-superset",
-    image_tag="latest",
 )
 
 # Shell script that writes ~/.sup/config.yml from injected Vault secrets and
@@ -61,7 +55,7 @@ ol-superset promote \\
 """
 
 deploy_pipeline = Pipeline(
-    resources=[ol_data_platform_repo, ol_superset_image],
+    resources=[ol_data_platform_repo],
     jobs=[
         Job(
             name=Identifier("deploy-superset-assets-to-production"),
