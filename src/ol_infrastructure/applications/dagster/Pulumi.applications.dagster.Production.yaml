@@ -24,4 +24,4 @@ config:
   dagster:edx_pipeline_xpro_edx_xpro_purpose: mitx-etl-xpro-production
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
-  dagster:db_instance_type: db.m7g.2xlarge
+  dagster:db_instance_type: db.r7g.2xlarge
