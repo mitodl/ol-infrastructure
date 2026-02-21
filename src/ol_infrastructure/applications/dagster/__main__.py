@@ -595,7 +595,8 @@ pgbouncer_config = kubernetes.core.v1.ConfigMap(
     opts=ResourceOptions(depends_on=[dagster_db_secret]),
 )
 
-# PgBouncer Deployment with 2 replicas for HA
+# PgBouncer Deployment with configurable replica count (default 2) for HA
+pgbouncer_replica_count = dagster_config.get_int("pgbouncer_replica_count") or 2
 pgbouncer_deployment = kubernetes.apps.v1.Deployment(
     f"dagster-pgbouncer-deployment-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -604,7 +605,7 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
         labels=k8s_global_labels.model_dump(),
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
-        replicas=2,
+        replicas=pgbouncer_replica_count,
         selector=kubernetes.meta.v1.LabelSelectorArgs(
             match_labels={
                 "component": "pgbouncer",
