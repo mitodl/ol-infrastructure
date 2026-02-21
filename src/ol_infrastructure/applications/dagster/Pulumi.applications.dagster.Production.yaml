@@ -25,3 +25,4 @@ config:
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   dagster:db_instance_type: db.r7g.2xlarge
+  dagster:pgbouncer_replica_count: 4
