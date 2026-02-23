@@ -47,7 +47,7 @@ docker_pipeline = Pipeline(
                     inputs=[Input(name=ol_data_platform_repo.name)],
                     build_parameters={
                         "CONTEXT": f"{ol_data_platform_repo.name}/src/ol_superset",
-                        "DOCKERFILE": f"{ol_data_platform_repo.name}/src/ol_superset/Dockerfile",
+                        "DOCKERFILE": f"{ol_data_platform_repo.name}/src/ol_superset/Dockerfile",  # noqa: E501
                     },
                 ),
                 PutStep(
