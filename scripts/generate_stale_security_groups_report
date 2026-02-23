@@ -1,31 +1,54 @@
 #!/usr/bin/env python
-import boto3  # noqa: I001
-import itertools
 import csv
+import itertools
+from pathlib import Path
+
+import boto3
 
 ec2 = boto3.client("ec2")
 rds = boto3.client("rds")
 cache = boto3.client("elasticache")
+
 groups = ec2.describe_security_groups()
 ec2_instances = ec2.describe_instances()
 rds_instances = rds.describe_db_instances()
 cache_clusters = cache.describe_cache_clusters()
 
 active_groups = []
+
+# Collect security groups from EC2 instances
 for instance in ec2_instances["Reservations"]:
     active_groups.extend([box["SecurityGroups"] for box in instance["Instances"]])
 
+# Collect security groups from RDS instances
+active_groups.extend(
+    [{"GroupId": sg["VpcSecurityGroupId"]}]
+    for db_instance in rds_instances.get("DBInstances", [])
+    for sg in db_instance.get("VpcSecurityGroups", [])
+)
+
+# Collect security groups from ElastiCache clusters
+active_groups.extend(
+    [{"GroupId": sg["SecurityGroupId"]}]
+    for cluster in cache_clusters.get("CacheClusters", [])
+    for sg in cluster.get("SecurityGroups", [])
+)
+
 flat_groups = itertools.chain.from_iterable(active_groups)
-active_group_ids = {
-    (group["GroupId"], group["GroupName"], group.get("VpcId")) for group in flat_groups
-}
+active_group_ids = set()
+for group in flat_groups:
+    group_id = group.get("GroupId")
+    if group_id:
+        # RDS/ElastiCache only have GroupId, no GroupName or VpcId
+        active_group_ids.add((group_id, None, None))
 all_group_ids = {
     (group["GroupId"], group["GroupName"], group.get("VpcId"))
     for group in groups["SecurityGroups"]
 }
 
 stale_groups = all_group_ids - active_group_ids
-with open("stale_security_groups.csv", "w") as stale_csv:  # noqa: PTH123
+output_file = Path("stale_security_groups.csv")
+with output_file.open("w") as stale_csv:
     writer = csv.DictWriter(stale_csv, fieldnames=("Group ID", "Group Name", "VPC ID"))
     writer.writeheader()
     for group in stale_groups:
