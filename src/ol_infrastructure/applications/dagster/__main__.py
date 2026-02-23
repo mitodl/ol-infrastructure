@@ -603,6 +603,9 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
         name="dagster-pgbouncer",
         namespace=dagster_namespace,
         labels=k8s_global_labels.model_dump(),
+        annotations={
+            "pulumi.com/patchForce": "true",
+        },
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
         replicas=pgbouncer_replica_count,
