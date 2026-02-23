@@ -23,15 +23,16 @@ config:
   - api-pay-ci.ol.mit.edu
   - api.ci.learn.mit.edu
   - api.ci.mitxonline.mit.edu
+  - authoring.nb.ci.learn.mit.edu
   - ci.mitxonline.mit.edu
   - courses-backend.ci.learn.mit.edu
+  - courses-backend.ci.xpro.mit.edu
   - dcc.ci.learn.mit.edu
   - nb.ci.learn.mit.edu
-  - authoring.nb.ci.learn.mit.edu
-  - preview.courses.ci.learn.mit.edu
+  - preview-backend.ci.learn.mit.edu
+  - preview-backend.ci.xpro.mit.edu
   - studio-backend.ci.learn.mit.edu
   - studio-backend.ci.xpro.mit.edu
-  - courses-backend.ci.xpro.mit.edu
   - tika-ci.ol.mit.edu
   eks:developer_role_policy_name: AmazonEKSClusterAdminPolicy
   eks:developer_role_kubernetes_groups:
