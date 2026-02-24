@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getConfig } from '@edx/frontend-platform';
 import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+import { useIntl } from '@edx/frontend-platform/i18n';
+import { bundleMessages, wrapperMessages } from './AIDrawerMessages';
 
 const BUNDLE_PATH = process.env.AI_DRAWER_BUNDLE_PATH || '/learn/static/smoot-design/aiDrawerManager.es.js';
 
@@ -48,7 +50,20 @@ const getErrorMessage = (error, defaultMessage) => {
     return error instanceof Error ? error.message : defaultMessage;
 };
 
+/**
+ * Build a translation function for the smoot-design bundle that delegates to
+ * intl.formatMessage() at call time. This enables full ICU message format
+ * support (pluralization, select, number formatting) because formatMessage
+ * receives the actual interpolation values when the component renders.
+ */
+const buildTranslationFn = (intl) => (key, vars) => {
+    const descriptor = bundleMessages[key];
+    if (!descriptor) return key;
+    return intl.formatMessage(descriptor, vars);
+};
+
 const AIDrawerManagerSidebar = () => {
+    const intl = useIntl();
     const containerRef = useRef(null);
     const instanceRef = useRef(null);
     const [initError, setInitError] = useState(null);
@@ -79,6 +94,7 @@ const AIDrawerManagerSidebar = () => {
                             variant: 'slot',
                             transformBody: messages => ({ message: messages[messages.length - 1].content }),
                             getTrackingClient: () => getAuthenticatedHttpClient(),
+                            translations: buildTranslationFn(intl),
                         },
                         {
                             container: containerRef.current,
@@ -104,9 +120,6 @@ const AIDrawerManagerSidebar = () => {
                     setInitError(getErrorMessage(error, 'Failed to load AIDrawerManager bundle'));
                     setIsLoading(false);
                 }
-            })
-            .finally(() => {
-                loadPromise = null;
             });
 
         return () => {
@@ -120,14 +133,14 @@ const AIDrawerManagerSidebar = () => {
             }
             instanceRef.current = null;
         };
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
         <div
             ref={containerRef}
             className="ai-drawer-manager-sidebar-wrapper"
             role="region"
-            aria-label="AI Chat Sidebar"
+            aria-label={intl.formatMessage(wrapperMessages.sidebarAriaLabel)}
             aria-live="polite"
             aria-busy={isLoading}
         >
@@ -135,16 +148,16 @@ const AIDrawerManagerSidebar = () => {
                 <div
                     className="d-flex align-items-center justify-content-center p-3"
                     role="status"
-                    aria-label="Loading AI Chat"
+                    aria-label={intl.formatMessage(wrapperMessages.loadingAriaLabel)}
                 >
                     <div className="spinner-border spinner-border-sm" role="status">
-                        <span className="sr-only">Loading AI Chat...</span>
+                        <span className="sr-only">{intl.formatMessage(wrapperMessages.loadingSrOnly)}</span>
                     </div>
                 </div>
             )}
             {initError && (
                 <div className="alert alert-danger" role="alert" aria-live="assertive">
-                    <strong>Error loading AI Chat:</strong> {initError}
+                    <strong>{intl.formatMessage(wrapperMessages.errorLoadingTitle)}</strong> {initError}
                 </div>
             )}
         </div>

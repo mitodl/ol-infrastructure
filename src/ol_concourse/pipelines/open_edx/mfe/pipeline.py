@@ -229,6 +229,12 @@ def mfe_job(  # noqa: C901, PLR0915
                 f"SidebarAIDrawerCoordinator.jsx "
                 f"{mfe_build_dir.name}/SidebarAIDrawerCoordinator.jsx"
             ),
+            (
+                f"echo 'Copying AIDrawerMessages.js...' && "
+                f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+                f"AIDrawerMessages.js "
+                f"{mfe_build_dir.name}/AIDrawerMessages.js"
+            ),
         ]
 
     is_learning_mfe = mfe.application == OpenEdxMicroFrontend.learn
