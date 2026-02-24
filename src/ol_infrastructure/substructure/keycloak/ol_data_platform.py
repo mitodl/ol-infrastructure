@@ -506,7 +506,49 @@ def create_ol_data_platform_realm(  # noqa: PLR0913, PLR0915
         )
     # STARROCKS [END] # noqa: ERA001
 
-    # OL Data Platform Realm - Authentication Flows[START]
+    # LIGHTDASH [START] # noqa: ERA001
+    ol_data_platform_lightdash_client = keycloak.openid.Client(
+        "ol-data-platform-lightdash-client",
+        name="ol-data-platform-lightdash-client",
+        realm_id=ol_data_platform_realm.id,
+        client_id="ol-lightdash-client",
+        client_secret=keycloak_realm_config.get(
+            "ol-data-platform-lightdash-client-secret"
+        ),
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        direct_access_grants_enabled=False,
+        service_accounts_enabled=True,
+        valid_redirect_uris=keycloak_realm_config.get_object(
+            "ol-data-platform-lightdash-redirect-uris"
+        ),
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+
+    vault.generic.Secret(
+        "ol-data-platform-lightdash-client-vault-oidc-credentials",
+        path="secret-operations/sso/lightdash",
+        data_json=Output.all(
+            client_id=ol_data_platform_lightdash_client.client_id,
+            client_secret=ol_data_platform_lightdash_client.client_secret,
+            realm_id=ol_data_platform_lightdash_client.realm_id,
+        ).apply(
+            lambda kwargs: json.dumps(
+                {
+                    "client_id": kwargs["client_id"],
+                    "client_secret": kwargs["client_secret"],
+                    "issuer_url": f"{keycloak_url}/realms/{kwargs['realm_id']}",
+                    "domain": keycloak_url.removeprefix("https://").removeprefix(
+                        "http://"
+                    ),
+                }
+            )
+        ),
+    )
+    # LIGHTDASH [END] # noqa: ERA001
+
     # OL - browser flow [START]
     # username-form -> ol-auth-username-password-form
 

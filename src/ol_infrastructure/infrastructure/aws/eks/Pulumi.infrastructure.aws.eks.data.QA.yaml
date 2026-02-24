@@ -13,6 +13,7 @@ config:
   eks:apisix_domains:
   - airbyte-qa.odl.mit.edu
   - api-airbyte-qa.odl.mit.edu
+  - lightdash-qa.ol.mit.edu
   - pipelines-qa.odl.mit.edu
   eks:apisix_viewer_key:
     secure: v1:FXn/5LA92VaA0LDu:+M5NNNgprjafZJTssawGZoRrI9ZEoiGKbRa3oVh4YjtZO4B5MLwXgfRvfWyY1zSbT0LJxxMJT90KQtWN3MsWobIseTYXLrdnPcpcYXY9lmg=
@@ -26,6 +27,7 @@ config:
   - airbyte
   - dagster
   - kubewatch
+  - lightdash
   - open-metadata
   - qdrant
   - starrocks

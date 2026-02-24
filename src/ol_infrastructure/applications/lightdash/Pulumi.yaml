@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-lightdash-application
+runtime: python
+description: A code-driven BI system
+backend:
+  url: s3://mitol-pulumi-state/

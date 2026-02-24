@@ -46,6 +46,10 @@ config:
   keycloak_realm:ol-data-platform-superset-redirect-uris:
   - "https://bi-ci.ol.mit.edu/*"
   - "http://localhost:8080/callback"
+  keycloak_realm:ol-data-platform-lightdash-redirect-uris:
+  - "https://lightdash-ci.ol.mit.edu/*"
+  keycloak_realm:ol-data-platform-lightdash-client-secret:
+    secure: NEEDS_SOPS_ENCRYPTION  # Run: pulumi config set --secret keycloak_realm:ol-data-platform-lightdash-client-secret <value>
   keycloak_realm:ol-platform-engineering-airbyte-client-secret:
     secure: v1:RN2SKGo+MKCkI9OY:tP05EhbUMuyqGY4OmVsNIGefmYeqoHVX85z6ZyEhmzs9Jcp7fVaslk/R6FSbNd2Z
   keycloak_realm:ol-platform-engineering-airbyte-redirect-uris: ["https://airbyte-ci.odl.mit.edu/*"]

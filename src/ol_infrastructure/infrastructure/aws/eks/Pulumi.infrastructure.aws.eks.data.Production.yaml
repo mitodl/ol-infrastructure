@@ -13,6 +13,7 @@ config:
   eks:apisix_domains:
   - airbyte.odl.mit.edu
   - api-airbyte.odl.mit.edu
+  - lightdash.ol.mit.edu
   - pipelines.odl.mit.edu
   eks:apisix_min_replicas: '3'
   eks:apisix_max_replicas: '10'
@@ -26,6 +27,7 @@ config:
   - airbyte
   - dagster
   - kubewatch
+  - lightdash
   - open-metadata
   - qdrant
   - starrocks
