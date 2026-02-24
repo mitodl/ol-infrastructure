@@ -52,15 +52,11 @@ stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 dns_stack = StackReference("infrastructure.aws.dns")
 vault_infra_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
-vault_mount_stack = StackReference(
-    f"substructure.vault.static_mounts.operations.{stack_info.name}"
-)
 policy_stack = StackReference("infrastructure.aws.policies")
 cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
 
 data_vpc = network_stack.require_output("data_vpc")
 lightdash_env = f"data-{stack_info.env_suffix}"
-lightdash_vault_kv_path = vault_mount_stack.require_output("lightdash_kv")["path"]
 aws_config = AWSBase(tags={"OU": "data", "Environment": lightdash_env})
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
@@ -139,6 +135,20 @@ lightdash_bucket = OLBucket(
     "lightdash-storage-bucket",
     config=lightdash_bucket_config,
 )
+
+########################################
+# Vault KV-v2 mount                    #
+########################################
+
+lightdash_vault_mount = vault.Mount(
+    "lightdash-vault-configuration-secrets-mount",
+    path="secret-lightdash",
+    type="kv-v2",
+    options={"version": 2},
+    description="Storage of configuration secrets for Lightdash.",
+    opts=ResourceOptions(delete_before_replace=True),
+)
+lightdash_vault_kv_path = lightdash_vault_mount.path
 
 lightdash_secrets = read_yaml_secrets(
     Path(f"lightdash/data.{stack_info.env_suffix}.yaml")

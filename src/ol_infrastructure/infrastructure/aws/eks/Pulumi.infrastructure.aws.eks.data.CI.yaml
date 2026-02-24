@@ -13,7 +13,6 @@ config:
   eks:apisix_domains:
   - airbyte-ci.odl.mit.edu
   - api-airbyte-ci.odl.mit.edu
-  - lightdash-ci.ol.mit.edu
   - pipelines-ci.odl.mit.edu
   eks:apisix_viewer_key:
     secure: v1:ZFN4gG/xa7D+1wDe:qwerlKPydX7u54UjHLBvNUCT2Oha5e4EgXs5Uf+8tMOMUtf4yz/5SYy4rfpfls1HDMgroXWwRUY9U21sgKsGF+YJ5lexA+Fo9VSStrw9zPc=
