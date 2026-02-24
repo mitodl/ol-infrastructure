@@ -1,0 +1,9 @@
+---
+encryptedkey: AQICAHjZAY5LtmRWGljev0oiDGn0jR5cRwD4IVXCn50TW5i0qQHR4jvgasS96jfefNxKDxs5AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMevWSEVR6fXXQsK6mAgEQgDtk3cUyhSj4zQcspE003xJ0n439zwCn/HFCbAMpqZG9DEw+nXkhMAubc3ouz3ujPBIr6ei4a/MlihxtdA==
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+config:
+  lightdash:domain: lightdash-qa.ol.mit.edu
+  lightdash:db_password:
+    secure: v1:lrVCklQyVRAon7n/:msocufeDrl5oJ1JUSItWgO29pqsEagtNc5uiZQgh+RhTBjm7sdRWIl1aFgOCXkHNp70tggfELI4=
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa
