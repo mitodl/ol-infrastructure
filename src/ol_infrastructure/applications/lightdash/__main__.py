@@ -150,8 +150,8 @@ lightdash_vault_mount = vault.Mount(
 )
 lightdash_vault_kv_path = lightdash_vault_mount.path
 
-lightdash_secrets = read_yaml_secrets(
-    Path(f"lightdash/data.{stack_info.env_suffix}.yaml")
+lightdash_secrets = (
+    read_yaml_secrets(Path(f"lightdash/data.{stack_info.env_suffix}.yaml")) or {}
 )
 for path, data in lightdash_secrets.items():
     vault.kv.SecretV2(
