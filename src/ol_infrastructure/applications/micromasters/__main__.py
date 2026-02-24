@@ -82,12 +82,11 @@ micromasters_bucket_config = S3BucketConfig(
                     "Effect": "Allow",
                     "Principal": "*",
                     "Action": "s3:GetObject",
-                    "Resource": "arn:aws:s3:::%s/static/*",
+                    "Resource": f"arn:aws:s3:::{micromasters_bucket_name}/*",
                 }
             ],
         }
-    )
-    % micromasters_bucket_name,
+    ),
     tags=aws_config.tags,
 )
 
