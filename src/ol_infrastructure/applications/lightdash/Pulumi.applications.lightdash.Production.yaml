@@ -1,0 +1,9 @@
+---
+encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAH0yHzvFdLh4SQpls6bC2XMAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMWaI1TKm7sxPVh/Z5AgEQgDu3cMliRZMz05UgxH1rqoppbN9/Lu+fAL9lmMeDpqa5k/5DGjKCwdbAv7qbkJjnmRiF90z67tT3tSrZCg==
+secretsprovider: awskms://alias/infrastructure-secrets-production
+config:
+  lightdash:domain: lightdash.ol.mit.edu
+  lightdash:db_password:
+    secure: v1:Mobj1dR2peUnpxVb:Q66GcCANgkzmhT99NpBlcBA5Q+xPZPBbJ4yuDS4YQslMzG3xJxOu+dV21121C8a8/FvqaaJI/mo=
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production

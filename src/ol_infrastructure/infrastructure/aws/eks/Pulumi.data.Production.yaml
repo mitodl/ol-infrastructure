@@ -16,6 +16,7 @@ config:
   - airbyte.odl.mit.edu
   - api-airbyte.odl.mit.edu
   - opik.ol.mit.edu
+  - lightdash.ol.mit.edu
   - pipelines.odl.mit.edu
   - analytics.ol.mit.edu
   - analytics.learn.mit.edu
@@ -37,6 +38,7 @@ config:
   - kubewatch
   - marimo
   - ol-analytics
+  - lightdash
   - open-metadata
   - opik
   - qdrant
