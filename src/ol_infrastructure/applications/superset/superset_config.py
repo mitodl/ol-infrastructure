@@ -508,3 +508,28 @@ NL_EXPLORER_CONFIG = {
     "max_context_datasets": 20,
     "max_context_rows": 100,
 }
+
+
+def COMMON_BOOTSTRAP_OVERRIDES_FUNC(  # noqa: N802
+    _bootstrap_data: dict[str, object],
+) -> dict[str, object]:
+    """Inject NL Explorer org-level config into every page's bootstrapData.
+
+    This data is forwarded from the parent Superset frame to the NL Explorer
+    iframe via postMessage and then included in every LLM API call, allowing
+    server-controlled instructions to be appended to the system prompt without
+    embedding them in the frontend bundle.
+    """
+    _default_suffix = (
+        "You are deployed at MIT Open Learning. "
+        "Datasets follow MIT OpenLearning naming conventions. "
+        "Prefer clear, concise answers suitable for a higher-education"
+        " analytics audience."
+    )
+    return {
+        "nl_explorer": {
+            "system_prompt_suffix": os.environ.get(
+                "NL_EXPLORER_SYSTEM_PROMPT_SUFFIX", _default_suffix
+            ),
+        }
+    }
