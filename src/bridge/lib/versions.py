@@ -61,6 +61,9 @@ MEILISEARCH_CHART_VERSION = "0.23.0"
 STARROCKS_OPERATOR_CHART_VERSION = "1.11.4"
 # renovate: datasource=helm depName=operator packageName=starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
 STARROCKS_CHART_VERSION = "1.11.4"
+# Altinity ClickHouse Operator — released as tag "release-X.Y.Z" on GitHub
+# renovate: datasource=github-releases depName=clickhouse-operator packageName=Altinity/clickhouse-operator
+CLICKHOUSE_OPERATOR_VERSION = "release-0.26.0"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
 TRAEFIK_CHART_VERSION = "39.0.4"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
@@ -83,3 +86,5 @@ NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.8.1"
 NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION = "0.18.2"
 # renovate: datasource=docker depName=pgbouncer packageName=ghcr.io/cloudnative-pg/pgbouncer
 PGBOUNCER_VERSION = "1.25.1"
+# renovate: datasource=helm depName=local-path-provisioner packageName=local-path-provisioner registryUrl=https://charts.rancher.io
+LOCAL_PATH_PROVISIONER_CHART_VERSION = "0.0.31"
