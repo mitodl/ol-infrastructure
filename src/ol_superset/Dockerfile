@@ -1,10 +1,13 @@
 ARG SUPERSET_TAG=6.0.0
+ARG NL_EXPLORER_SHA=232fbb5b73c235944ccf697079bc58afbd5d91ad
 
 # Stage 1: build the NL Explorer frontend
 FROM node:20-slim AS nl-explorer-frontend
+ARG NL_EXPLORER_SHA
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git && rm -rf /var/lib/apt/lists/*
-RUN git clone --depth=1 https://github.com/mitodl/superset-nl-explorer.git /build/nl-explorer
+RUN git clone https://github.com/mitodl/superset-nl-explorer.git /build/nl-explorer && \
+    git -C /build/nl-explorer checkout "${NL_EXPLORER_SHA}"
 WORKDIR /build/nl-explorer/frontend
 RUN npm ci && npm run build
 
