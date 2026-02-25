@@ -352,6 +352,8 @@ FEATURE_FLAGS: dict[str, bool] = {
     "ENABLE_EXTENSIONS": True,
 }
 
+LOCAL_EXTENSIONS = ["/app/extensions/nl-explorer"]
+
 # Default configurator will consume the LOG_* settings below
 
 
