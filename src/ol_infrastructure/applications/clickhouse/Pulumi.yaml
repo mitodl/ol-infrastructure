@@ -1,0 +1,9 @@
+---
+name: ol-infrastructure-clickhouse-application
+runtime: python
+description: >
+  Provision and maintain the multi-tenant ClickHouse cluster used by LLMOps
+  tooling (TensorZero, OpenLit, Opik, etc.) on the data EKS cluster.
+  Implements native S3 tiered storage for bottomless-storage semantics.
+backend:
+  url: s3://mitol-pulumi-state/
