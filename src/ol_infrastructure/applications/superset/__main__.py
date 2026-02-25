@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
@@ -149,6 +150,12 @@ superset_policy_document = {
     ],
 }
 
+superset_parliament_config: dict[str, Any] = {
+    # Bedrock policy only covers foundation-model and inference-profile resource
+    # types; parliament flags unmatched resource types for InvokeModel actions.
+    "RESOURCE_MISMATCH": {},
+}
+
 superset_app = OLEKSAuthBinding(
     OLEKSAuthBindingConfig(
         application_name="superset",
@@ -156,6 +163,7 @@ superset_app = OLEKSAuthBinding(
         stack_info=stack_info,
         aws_config=aws_config,
         iam_policy_document=superset_policy_document,
+        parliament_config=superset_parliament_config,
         vault_policy_path=Path(__file__).parent.joinpath("superset_server_policy.hcl"),
         cluster_name=cluster_stack.require_output("cluster_name"),
         cluster_identities=cluster_stack.require_output("cluster_identities"),
