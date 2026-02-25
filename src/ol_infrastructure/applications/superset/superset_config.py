@@ -493,20 +493,19 @@ JINJA_CONTEXT_ADDONS = {"current_user_email": current_user_email}
 # ---------------------------------------------------
 # NL Explorer Plugin Configuration
 # ---------------------------------------------------
+# Keys must match what nl_explorer.llm_service and nl_explorer.api read:
+#   llm_service: cfg.get("model"), cfg.get("api_key"), cfg.get("api_base"),
+#                cfg.get("max_tokens"), cfg.get("streaming")
+#   api.py:      cfg.get("max_datasets_in_context")
+# AWS credentials come from IRSA; region from AWS_DEFAULT_REGION env var.
 NL_EXPLORER_CONFIG = {
-    "llm": {
-        # Uses LiteLLM's Bedrock provider; credentials come from IRSA
-        "model": os.environ.get(
-            "NL_EXPLORER_MODEL",
-            "bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0",
-        ),
-        "extra_kwargs": {
-            "aws_region_name": os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
-        },
-    },
-    "enabled": True,
-    "max_context_datasets": 20,
-    "max_context_rows": 100,
+    "model": os.environ.get(
+        "NL_EXPLORER_MODEL",
+        "bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+    ),
+    "max_tokens": 4096,
+    "streaming": True,
+    "max_datasets_in_context": 20,
 }
 
 
