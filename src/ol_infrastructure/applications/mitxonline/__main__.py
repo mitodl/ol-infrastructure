@@ -696,7 +696,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="passauth",
             priority=0,
-            hosts=[api_domain],
+            hosts=[api_domain, frontend_domain],
             paths=["/*"],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             plugins=[
@@ -711,7 +711,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="logout-redirect",
             priority=10,
-            hosts=[api_domain],
+            hosts=[api_domain, frontend_domain],
             paths=["/logout/oidc/*"],
             plugins=[
                 OLApisixPluginConfig(name="redirect", config={"uri": "/logout/oidc"}),
@@ -724,7 +724,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="reqauth",
             priority=10,
-            hosts=[api_domain],
+            hosts=[api_domain, frontend_domain],
             paths=["/login/*", "/admin/login/*", "/login*", "/login/oidc*"],
             plugins=[
                 mitxonline_direct_oidc.get_full_oidc_plugin_config(
@@ -838,7 +838,6 @@ mitxonline_service = fastly.ServiceVcl(
             ssl_cert_hostname=api_domain,
             ssl_sni_hostname=api_domain,
             use_ssl=True,
-            override_host=api_domain,
         ),
         fastly.ServiceVclBackendArgs(
             address=f"{mitxonline_bucket_name}.s3.us-east-1.amazonaws.com",
