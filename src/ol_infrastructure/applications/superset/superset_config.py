@@ -354,6 +354,17 @@ FEATURE_FLAGS: dict[str, bool] = {
 
 LOCAL_EXTENSIONS = ["/app/extensions/nl-explorer"]
 
+
+def FLASK_APP_MUTATOR(app):  # noqa: N802
+    """Register the NL Explorer plugin (Blueprint + REST API) with Superset."""
+    try:
+        from nl_explorer.entrypoint import register  # noqa: PLC0415
+
+        register(app)
+    except Exception:
+        logging.getLogger(__name__).exception("Failed to register NL Explorer plugin")
+
+
 # Default configurator will consume the LOG_* settings below
 
 
