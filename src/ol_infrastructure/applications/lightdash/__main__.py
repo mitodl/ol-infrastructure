@@ -323,7 +323,7 @@ lightdash_chart = kubernetes.helm.v3.Release(
                     "PGPORT": str(DEFAULT_POSTGRES_PORT),
                     "PGDATABASE": lightdash_db_config.db_name,
                     "PGSSL": "true",
-                    "PGSSLMODE": "require",
+                    "PGSSLMODE": "no-verify",
                     "S3_REGION": "us-east-1",
                     "S3_BUCKET": lightdash_bucket_name,
                     # Use IRSA (EKS pod identity via metadata service)
