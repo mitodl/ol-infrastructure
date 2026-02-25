@@ -133,6 +133,19 @@ superset_policy_document = {
             "Action": ["ses:GetSendQuota"],
             "Resource": "*",
         },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "bedrock:InvokeModel",
+                "bedrock:InvokeModelWithResponseStream",
+            ],
+            "Resource": [
+                # Foundation models (single-region invocation)
+                "arn:aws:bedrock:*::foundation-model/anthropic.*",
+                # Cross-region inference profiles
+                "arn:aws:bedrock:*:*:inference-profile/us.anthropic.*",
+            ],
+        },
     ],
 }
 

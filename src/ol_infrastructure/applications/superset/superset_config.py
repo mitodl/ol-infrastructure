@@ -349,6 +349,7 @@ FEATURE_FLAGS: dict[str, bool] = {
     "PLAYWRIGHT_REPORTS_AND_THUMBNAILS": False,
     # Set to True to enable Jinja templating in queries in SQL Lab and Explore
     "ENABLE_TEMPLATE_PROCESSING": True,
+    "ENABLE_EXTENSIONS": True,
 }
 
 # Default configurator will consume the LOG_* settings below
@@ -475,3 +476,22 @@ def current_user_email() -> str | None:
 
 # Adding macros to enable usage in the jinja_context for Superset
 JINJA_CONTEXT_ADDONS = {"current_user_email": current_user_email}
+
+# ---------------------------------------------------
+# NL Explorer Plugin Configuration
+# ---------------------------------------------------
+NL_EXPLORER_CONFIG = {
+    "llm": {
+        # Uses LiteLLM's Bedrock provider; credentials come from IRSA
+        "model": os.environ.get(
+            "NL_EXPLORER_MODEL",
+            "bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        ),
+        "extra_kwargs": {
+            "aws_region_name": os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
+        },
+    },
+    "enabled": True,
+    "max_context_datasets": 20,
+    "max_context_rows": 100,
+}
