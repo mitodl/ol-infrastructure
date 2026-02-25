@@ -24,7 +24,7 @@ from pulumi import (
     StackReference,
     export,
 )
-from pulumi_aws import ec2, iam, s3
+from pulumi_aws import ec2, iam, route53, s3
 
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
@@ -73,6 +73,7 @@ from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.aws.route53_helper import (
     fastly_certificate_validation_records,
+    lookup_zone_id_from_domain,
 )
 from ol_infrastructure.lib.fastly import get_fastly_provider
 from ol_infrastructure.lib.ol_types import (
@@ -695,7 +696,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="passauth",
             priority=0,
-            hosts=[api_domain, frontend_domain],
+            hosts=[api_domain],
             paths=["/*"],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             plugins=[
@@ -710,7 +711,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="logout-redirect",
             priority=10,
-            hosts=[api_domain, frontend_domain],
+            hosts=[api_domain],
             paths=["/logout/oidc/*"],
             plugins=[
                 OLApisixPluginConfig(name="redirect", config={"uri": "/logout/oidc"}),
@@ -723,7 +724,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="reqauth",
             priority=10,
-            hosts=[api_domain, frontend_domain],
+            hosts=[api_domain],
             paths=["/login/*", "/admin/login/*", "/login*", "/login/oidc*"],
             plugins=[
                 mitxonline_direct_oidc.get_full_oidc_plugin_config(
@@ -954,6 +955,20 @@ validated_tls_subscription = fastly.TlsSubscriptionValidation(
     opts=fastly_provider,
 )
 
+# Register frontend domain as pointing to Fastly
+five_minutes = 60 * 5
+route53.Record(
+    "mitxonline-fastly-dns-record",
+    name=frontend_domain,
+    type="A",
+    ttl=five_minutes,
+    records=[
+        record["record_value"]
+        for record in tls_configuration.dns_records
+        if record["record_type"] == "A"
+    ],
+    zone_id=lookup_zone_id_from_domain(frontend_domain),
+)
 
 export(
     "mitxonline",
