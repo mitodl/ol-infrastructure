@@ -252,6 +252,26 @@ lightdash_role_statements["app"]["create"] = [
         END
         $$do$$;"""
     ),
+    Template(
+        """
+        DO
+        $$do$$
+        BEGIN
+           IF EXISTS (
+              SELECT FROM pg_catalog.pg_extension
+              WHERE  extname = 'ltree') THEN
+                  RAISE NOTICE 'Extension "ltree" already exists. Skipping.';
+           ELSE
+              BEGIN
+                 CREATE EXTENSION ltree;
+              EXCEPTION
+                 WHEN duplicate_object THEN
+                    RAISE NOTICE 'Extension "ltree" already created. Skipping.';
+              END;
+           END IF;
+        END
+        $$do$$;"""
+    ),
 ]
 
 lightdash_vault_db_config = OLVaultPostgresDatabaseConfig(
