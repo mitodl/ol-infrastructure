@@ -24,7 +24,6 @@ config:
   - api.ci.learn.mit.edu
   - api.ci.mitxonline.mit.edu
   - authoring.nb.ci.learn.mit.edu
-  - ci.mitxonline.mit.edu
   - courses-backend.ci.learn.mit.edu
   - courses-backend.ci.xpro.mit.edu
   - dcc.ci.learn.mit.edu
