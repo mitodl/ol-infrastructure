@@ -467,38 +467,41 @@ def create_ol_data_platform_realm(  # noqa: PLR0913, PLR0915
         )
 
     # Map composite realm roles to StarRocks client roles
-    keycloak.Role(
-        "ol-starrocks-platform-admin-composite",
-        realm_id=ol_data_platform_realm.id,
-        name="ol-starrocks-admin",
-        description="StarRocks administrator with full access",
-        composite_roles=[
-            ol_data_platform_starrocks_client_role_refs["ol_platform_admin"].id
-        ],
-        opts=resource_options,
-    )
+    if "ol_platform_admin" in ol_data_platform_starrocks_client_role_refs:
+        keycloak.Role(
+            "ol-starrocks-platform-admin-composite",
+            realm_id=ol_data_platform_realm.id,
+            name="ol-starrocks-admin",
+            description="StarRocks administrator with full access",
+            composite_roles=[
+                ol_data_platform_starrocks_client_role_refs["ol_platform_admin"].id
+            ],
+            opts=resource_options,
+        )
 
-    keycloak.Role(
-        "ol-starrocks-data-engineer-composite",
-        realm_id=ol_data_platform_realm.id,
-        name="ol-starrocks-engineer",
-        description="StarRocks data engineer with write access",
-        composite_roles=[
-            ol_data_platform_starrocks_client_role_refs["ol_data_engineer"].id
-        ],
-        opts=resource_options,
-    )
+    if "ol_data_engineer" in ol_data_platform_starrocks_client_role_refs:
+        keycloak.Role(
+            "ol-starrocks-data-engineer-composite",
+            realm_id=ol_data_platform_realm.id,
+            name="ol-starrocks-engineer",
+            description="StarRocks data engineer with write access",
+            composite_roles=[
+                ol_data_platform_starrocks_client_role_refs["ol_data_engineer"].id
+            ],
+            opts=resource_options,
+        )
 
-    keycloak.Role(
-        "ol-starrocks-data-analyst-composite",
-        realm_id=ol_data_platform_realm.id,
-        name="ol-starrocks-analyst",
-        description="StarRocks data analyst with read-only access",
-        composite_roles=[
-            ol_data_platform_starrocks_client_role_refs["ol_data_analyst"].id
-        ],
-        opts=resource_options,
-    )
+    if "ol_data_analyst" in ol_data_platform_starrocks_client_role_refs:
+        keycloak.Role(
+            "ol-starrocks-data-analyst-composite",
+            realm_id=ol_data_platform_realm.id,
+            name="ol-starrocks-analyst",
+            description="StarRocks data analyst with read-only access",
+            composite_roles=[
+                ol_data_platform_starrocks_client_role_refs["ol_data_analyst"].id
+            ],
+            opts=resource_options,
+        )
     # STARROCKS [END] # noqa: ERA001
 
     # OL Data Platform Realm - Authentication Flows[START]
