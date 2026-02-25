@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from string import Template
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
@@ -45,7 +46,7 @@ from ol_infrastructure.lib.ol_types import (
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
-from ol_infrastructure.lib.vault import setup_vault_provider
+from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 
 setup_vault_provider()
 lightdash_config = Config("lightdash")
@@ -207,12 +208,39 @@ lightdash_db_config = OLPostgresDBConfig(
 )
 lightdash_db = OLAmazonDB(lightdash_db_config)
 
+lightdash_role_statements = postgres_role_statements.copy()
+lightdash_role_statements["app"] = postgres_role_statements["app"].copy()
+lightdash_role_statements["app"]["create"] = [
+    *postgres_role_statements["app"]["create"],
+    Template(
+        """
+        DO
+        $$do$$
+        BEGIN
+           IF EXISTS (
+              SELECT FROM pg_catalog.pg_extension
+              WHERE  extname = 'uuid-ossp') THEN
+                  RAISE NOTICE 'Extension "uuid-ossp" already exists. Skipping.';
+           ELSE
+              BEGIN
+                 CREATE EXTENSION "uuid-ossp";
+              EXCEPTION
+                 WHEN duplicate_object THEN
+                    RAISE NOTICE 'Extension "uuid-ossp" already created. Skipping.';
+              END;
+           END IF;
+        END
+        $$do$$;"""
+    ),
+]
+
 lightdash_vault_db_config = OLVaultPostgresDatabaseConfig(
     db_name=lightdash_db_config.db_name,
     mount_point=f"{lightdash_db_config.engine}-lightdash",
     db_admin_username=lightdash_db_config.username,
     db_admin_password=lightdash_config.require("db_password"),
     db_host=lightdash_db.db_instance.address,
+    role_statements=lightdash_role_statements,
 )
 lightdash_db_vault_backend = OLVaultDatabaseBackend(lightdash_vault_db_config)
 
