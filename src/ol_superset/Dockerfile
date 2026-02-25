@@ -4,5 +4,7 @@ COPY --link requirements.txt /tmp/requirements.txt
 COPY static/assets/images/ol-data-platform-logo.svg /app/superset/static/assets/images/ol-data-platform-logo.svg
 USER root
 WORKDIR /app
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 RUN uv pip install --no-cache-dir -r /tmp/requirements.txt
 USER superset
