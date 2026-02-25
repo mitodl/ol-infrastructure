@@ -968,6 +968,7 @@ route53.Record(
         if record["record_type"] == "A"
     ],
     zone_id=lookup_zone_id_from_domain(frontend_domain),
+    allow_overwrite=True,
 )
 
 export(
