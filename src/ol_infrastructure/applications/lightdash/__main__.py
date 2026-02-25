@@ -1,5 +1,6 @@
 """Deploy Lightdash to EKS."""
 
+import json
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
@@ -153,12 +154,12 @@ lightdash_vault_kv_path = lightdash_vault_mount.path
 lightdash_secrets = (
     read_yaml_secrets(Path(f"lightdash/data.{stack_info.env_suffix}.yaml")) or {}
 )
-for path, data in lightdash_secrets.items():
+if lightdash_secrets:
     vault.kv.SecretV2(
-        f"lightdash-vault-secret-{path}",
+        "lightdash-vault-secret-app",
         mount=lightdash_vault_kv_path,
-        name=path,
-        data_json=Output.json_dumps(data),
+        name="app",
+        data_json=json.dumps(lightdash_secrets),
     )
 
 ########################################
