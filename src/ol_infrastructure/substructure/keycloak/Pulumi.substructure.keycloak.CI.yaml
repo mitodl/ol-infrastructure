@@ -49,7 +49,7 @@ config:
   keycloak_realm:ol-data-platform-lightdash-redirect-uris:
   - "https://lightdash-ci.ol.mit.edu/*"
   keycloak_realm:ol-data-platform-lightdash-client-secret:
-    secure: NEEDS_SOPS_ENCRYPTION  # Run: pulumi config set --secret keycloak_realm:ol-data-platform-lightdash-client-secret <value>
+    secure: v1:9PDM8joi0HCbwIwC:ZBu/b2erxzwvZGEKgAX8ncrg2gjRaM/Ot+nKSJs8qJqeDUVej9ddbK4gzFkXON9PzQaxpA/dC4qAQW6L0sXU/IJuuHAOJUMCdqp3oLes7j2/6PT3Zin2VmJ5rPO+dwdD # Run: pulumi config set --secret keycloak_realm:ol-data-platform-lightdash-client-secret <value>
   keycloak_realm:ol-platform-engineering-airbyte-client-secret:
     secure: v1:RN2SKGo+MKCkI9OY:tP05EhbUMuyqGY4OmVsNIGefmYeqoHVX85z6ZyEhmzs9Jcp7fVaslk/R6FSbNd2Z
   keycloak_realm:ol-platform-engineering-airbyte-redirect-uris: ["https://airbyte-ci.odl.mit.edu/*"]
