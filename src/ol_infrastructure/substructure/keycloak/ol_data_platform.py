@@ -394,6 +394,10 @@ def create_ol_data_platform_realm(  # noqa: PLR0913, PLR0915
     # OPENMETADATA [END] # noqa: ERA001
 
     # STARROCKS [START] # noqa: ERA001
+    ol_data_platform_starrocks_redirect_uris = (
+        keycloak_realm_config.get_object("ol-data-platform-starrocks-redirect-uris")
+        or []
+    )
     ol_data_platform_starrocks_client = keycloak.openid.Client(
         "ol-data-platform-starrocks-client",
         name="ol-data-platform-starrocks-client",
@@ -406,12 +410,10 @@ def create_ol_data_platform_realm(  # noqa: PLR0913, PLR0915
         access_type="CONFIDENTIAL",
         # Standard flow for browser-based auth, service accounts for API access
         direct_access_grants_enabled=False,
-        standard_flow_enabled=True,
+        standard_flow_enabled=bool(ol_data_platform_starrocks_redirect_uris),
         implicit_flow_enabled=False,
         service_accounts_enabled=True,
-        valid_redirect_uris=keycloak_realm_config.get_object(
-            "ol-data-platform-starrocks-redirect-uris"
-        ),
+        valid_redirect_uris=ol_data_platform_starrocks_redirect_uris,
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
     ol_data_platform_starrocks_client_roles = (
