@@ -79,13 +79,19 @@ OAUTH_PROVIDERS = [
 JWT_ALGORITHM = "RS256"
 JWT_PUBLIC_KEY = OIDC_REALM_PUBLIC_KEY
 
-# Testing out Keycloak role mapping to Superset
+# Map Keycloak realm roles to Superset roles.
+# ol_platform_admin → built-in Admin (full privileges).
+# All other roles map to custom roles loaded from ol_governance_roles.json via
+# `flask fab import-roles` during deployment init.
+# See src/ol_concourse/pipelines/infrastructure/superset/ol_governance_roles.json
 # https://superset.apache.org/docs/installation/configuring-superset#mapping-ldap-or-oauth-groups-to-superset-roles
 AUTH_ROLES_MAPPING = {
     "ol_platform_admin": ["Admin"],
-    "ol_researcher": ["Alpha", "sql_lab"],
-    "ol_data_engineer": ["Alpha"],
-    "ol_data_analyst": ["Alpha"],
+    "ol_data_engineer": ["ol_data_engineer"],
+    "ol_data_analyst": ["ol_data_analyst"],
+    "ol_researcher": ["ol_researcher"],
+    "ol_instructor": ["ol_instructor"],
+    "ol_business_analyst": ["ol_business_analyst"],
 }
 
 # if we should replace ALL the user's roles each login, or only on registration
