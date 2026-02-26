@@ -212,6 +212,7 @@ lightdash_role_statements = postgres_role_statements.copy()
 lightdash_role_statements["app"] = postgres_role_statements["app"].copy()
 lightdash_role_statements["app"]["create"] = [
     *postgres_role_statements["app"]["create"],
+    Template("""GRANT CREATE ON DATABASE ${app_name} TO "{{name}}";"""),
     Template(
         """
         DO
