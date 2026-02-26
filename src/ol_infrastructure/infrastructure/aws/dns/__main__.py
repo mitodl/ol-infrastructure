@@ -199,31 +199,6 @@ enable_zone_dnssec("podcast", podcast_dns_zone, dnssec_kms_key.arn)
 
 
 # === New zones ===
-
-bootcamp_dns_name = "bootcamp.mit.edu"
-bootcamp_dns_zone = route53.Zone(
-    "bootcamp_subdomain",
-    name=bootcamp_dns_name,
-    comment="DNS Zone used for Bootcamp resources",
-    tags=AWSBase(
-        tags={"OU": BusinessUnit.bootcamps, "Environment": Environment.operations}
-    ).tags,
-    opts=zone_opts(bootcamp_dns_name),
-)
-enable_zone_dnssec("bootcamp", bootcamp_dns_zone, dnssec_kms_key.arn)
-
-bootcamps_dns_name = "bootcamps.mit.edu"
-bootcamps_dns_zone = route53.Zone(
-    "bootcamps_subdomain",
-    name=bootcamps_dns_name,
-    comment="DNS Zone used for Bootcamps resources",
-    tags=AWSBase(
-        tags={"OU": BusinessUnit.bootcamps, "Environment": Environment.operations}
-    ).tags,
-    opts=zone_opts(bootcamps_dns_name),
-)
-enable_zone_dnssec("bootcamps", bootcamps_dns_zone, dnssec_kms_key.arn)
-
 chalkradioblog_dns_name = "chalkradioblog.net"
 chalkradioblog_dns_zone = route53.Zone(
     "chalkradioblog_net",
@@ -277,42 +252,6 @@ chalkradiopodcast_org_dns_zone = route53.Zone(
 enable_zone_dnssec(
     "chalkradiopodcast_org", chalkradiopodcast_org_dns_zone, dnssec_kms_key.arn
 )
-
-d_mitx_dns_name = "d.mitx.mit.edu"
-d_mitx_dns_zone = route53.Zone(
-    "d_mitx_subdomain",
-    name=d_mitx_dns_name,
-    comment="DNS Zone for MITx development/staging resources",
-    tags=AWSBase(
-        tags={"OU": BusinessUnit.residential, "Environment": Environment.mitx}
-    ).tags,
-    opts=zone_opts(d_mitx_dns_name),
-)
-enable_zone_dnssec("d_mitx", d_mitx_dns_zone, dnssec_kms_key.arn)
-
-go2c_odl_dns_name = "go2c.odl.mit.edu"
-go2c_odl_dns_zone = route53.Zone(
-    "go2c_odl_subdomain",
-    name=go2c_odl_dns_name,
-    comment="DNS Zone for ODL go2c resources",
-    tags=AWSBase(
-        tags={"OU": BusinessUnit.operations, "Environment": Environment.operations}
-    ).tags,
-    opts=zone_opts(go2c_odl_dns_name),
-)
-enable_zone_dnssec("go2c_odl", go2c_odl_dns_zone, dnssec_kms_key.arn)
-
-isol_dns_name = "isol.mit.edu"
-isol_dns_zone = route53.Zone(
-    "isol_subdomain",
-    name=isol_dns_name,
-    comment="DNS Zone for ISOL resources",
-    tags=AWSBase(
-        tags={"OU": BusinessUnit.operations, "Environment": Environment.operations}
-    ).tags,
-    opts=zone_opts(isol_dns_name),
-)
-enable_zone_dnssec("isol", isol_dns_zone, dnssec_kms_key.arn)
 
 micromasters_dns_name = "micromasters.mit.edu"
 micromasters_dns_zone = route53.Zone(
@@ -488,8 +427,6 @@ export("ol", {"id": ol_dns_zone.id, "domain": ol_dns_zone.name})
 export("learn", {"id": learn_dns_zone.id, "domain": learn_dns_zone.name})
 export("podcasts", {"id": podcasts_dns_zone.id, "domain": podcasts_dns_zone.name})
 export("podcast", {"id": podcast_dns_zone.id, "domain": podcast_dns_zone.name})
-export("bootcamp", {"id": bootcamp_dns_zone.id, "domain": bootcamp_dns_zone.name})
-export("bootcamps", {"id": bootcamps_dns_zone.id, "domain": bootcamps_dns_zone.name})
 export(
     "chalkradioblog",
     {"id": chalkradioblog_dns_zone.id, "domain": chalkradioblog_dns_zone.name},
@@ -515,9 +452,6 @@ export(
         "domain": chalkradiopodcast_org_dns_zone.name,
     },
 )
-export("d_mitx", {"id": d_mitx_dns_zone.id, "domain": d_mitx_dns_zone.name})
-export("go2c_odl", {"id": go2c_odl_dns_zone.id, "domain": go2c_odl_dns_zone.name})
-export("isol", {"id": isol_dns_zone.id, "domain": isol_dns_zone.name})
 export(
     "micromasters",
     {"id": micromasters_dns_zone.id, "domain": micromasters_dns_zone.name},
