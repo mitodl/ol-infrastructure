@@ -29,6 +29,15 @@ class S3BucketConfig(AWSBase):
     versioning_enabled: bool = Field(
         default=False, description="Whether versioning is enabled for the bucket."
     )
+    versioning_status: str | None = Field(
+        default=None,
+        description=(
+            "Explicit versioning status: 'Enabled', 'Suspended', or 'Disabled'. "
+            "If set, creates a BucketVersioning resource with this status. "
+            "Overrides versioning_enabled. Use 'Suspended' when migrating from "
+            "previously versioned buckets to maintain state compatibility."
+        ),
+    )
     acl: str | None = Field(
         default=None,
         description=(
@@ -219,6 +228,21 @@ class S3BucketConfig(AWSBase):
             raise ValueError(error_message)
         return self
 
+    @model_validator(mode="after")
+    def check_versioning_config(self) -> "S3BucketConfig":
+        """Validate versioning configuration."""
+        if self.versioning_status and self.versioning_status not in (
+            "Enabled",
+            "Suspended",
+            "Disabled",
+        ):
+            error_message = (
+                f"versioning_status must be 'Enabled', 'Suspended', or 'Disabled', "
+                f"got '{self.versioning_status}'"
+            )
+            raise ValueError(error_message)
+        return self
+
 
 class OLBucket(pulumi.ComponentResource):
     """A component resource for creating and managing S3 buckets with best practices.
@@ -285,7 +309,17 @@ class OLBucket(pulumi.ComponentResource):
         )
 
         # Conditionally create BucketVersioning
-        if config.versioning_enabled:
+        # versioning_status takes precedence for explicit status control
+        if config.versioning_status:
+            self.bucket_versioning = s3.BucketVersioning(
+                f"{name}-versioning",
+                bucket=self.bucket_v2.id,
+                versioning_configuration=s3.BucketVersioningVersioningConfigurationArgs(
+                    status=config.versioning_status
+                ),
+                opts=child_opts,
+            )
+        elif config.versioning_enabled:
             self.bucket_versioning = s3.BucketVersioning(
                 f"{name}-versioning",
                 bucket=self.bucket_v2.id,

@@ -168,7 +168,7 @@ else:
 edxapp_mfe_bucket_name = f"{env_name}-edxapp-mfe"
 edxapp_mfe_bucket_config = S3BucketConfig(
     bucket_name=edxapp_mfe_bucket_name,
-    versioning_enabled=False,  # Suspended
+    versioning_status="Suspended",  # Migration: was explicitly set to Suspended
     ownership_controls="BucketOwnerPreferred",
     block_public_acls=False,
     block_public_policy=False,
@@ -304,7 +304,7 @@ edxapp_storage_bucket = OLBucket(
 course_bucket_name = f"{env_name}-edxapp-courses"
 edxapp_course_bucket_config = S3BucketConfig(
     bucket_name=course_bucket_name,
-    versioning_enabled=False,  # Suspended
+    versioning_status="Suspended",  # Migration: was explicitly set to Suspended
     tags=aws_config.tags,
 )
 edxapp_course_bucket = OLBucket(
