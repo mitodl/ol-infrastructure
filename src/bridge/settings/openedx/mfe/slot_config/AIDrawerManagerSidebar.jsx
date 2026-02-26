@@ -299,7 +299,7 @@ const AIDrawerManagerSidebar = () => {
             }
             instanceRef.current = null;
         };
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [intl]);
 
     return (
         <div
