@@ -209,12 +209,10 @@ lightdash_db_config = OLPostgresDBConfig(
 lightdash_db = OLAmazonDB(lightdash_db_config)
 
 lightdash_role_statements = postgres_role_statements.copy()
-lightdash_role_statements["admin"] = postgres_role_statements["admin"].copy()
-lightdash_role_statements["admin"]["create"] = [
-    *postgres_role_statements["admin"]["create"],
-    # Pre-create the graphile_worker schema owned by the app role so that
-    # dynamic app credentials (which inherit from the app role) can use it
-    # without requiring CREATE ON DATABASE.
+lightdash_role_statements["app"] = postgres_role_statements["app"].copy()
+lightdash_role_statements["app"]["create"] = [
+    *postgres_role_statements["app"]["create"],
+    # Ensure graphile_worker schema exists and app role has full access
     Template(
         """
         DO
@@ -241,10 +239,6 @@ lightdash_role_statements["admin"]["create"] = [
         ALTER DEFAULT PRIVILEGES FOR ROLE "${app_name}" IN SCHEMA graphile_worker
         GRANT ALL ON SEQUENCES TO "${app_name}" WITH GRANT OPTION;"""
     ),
-]
-lightdash_role_statements["app"] = postgres_role_statements["app"].copy()
-lightdash_role_statements["app"]["create"] = [
-    *postgres_role_statements["app"]["create"],
     Template(
         """
         DO
