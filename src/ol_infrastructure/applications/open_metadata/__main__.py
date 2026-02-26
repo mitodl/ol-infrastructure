@@ -354,7 +354,13 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     },
                 },
             },
-            "omjobOperator": {"enabled": True},
+            "omjobOperator": {
+                "enabled": True,
+                "image": {
+                    "repository": "docker.getcollate.io/openmetadata/omjob-operator",
+                    "tag": OPEN_METADATA_VERSION,
+                },
+            },
             "envFrom": [
                 {
                     "secretRef": {
