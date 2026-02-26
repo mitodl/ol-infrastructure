@@ -229,6 +229,7 @@ lightdash_role_statements["app"]["create"] = [
     Template(
         """GRANT ALL ON SCHEMA graphile_worker TO "${app_name}" WITH GRANT OPTION;"""
     ),
+    Template("""SET ROLE "${app_name}";"""),
     Template(
         """
         ALTER DEFAULT PRIVILEGES FOR ROLE "${app_name}" IN SCHEMA graphile_worker
@@ -239,6 +240,7 @@ lightdash_role_statements["app"]["create"] = [
         ALTER DEFAULT PRIVILEGES FOR ROLE "${app_name}" IN SCHEMA graphile_worker
         GRANT ALL ON SEQUENCES TO "${app_name}" WITH GRANT OPTION;"""
     ),
+    Template("""RESET ROLE;"""),
     Template(
         """
         DO
