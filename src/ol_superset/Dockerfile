@@ -1,5 +1,5 @@
 ARG SUPERSET_TAG=6.0.0
-ARG NL_EXPLORER_SHA=1e94d8f84cb3e5b9a81859fe5bfef90b7966bc98
+ARG NL_EXPLORER_SHA=fb4e6bba3706564f77fee695e661702dcd78bd6b
 
 # Stage 1: build the NL Explorer frontend
 FROM node:20-slim AS nl-explorer-frontend
