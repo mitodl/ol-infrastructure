@@ -209,10 +209,42 @@ lightdash_db_config = OLPostgresDBConfig(
 lightdash_db = OLAmazonDB(lightdash_db_config)
 
 lightdash_role_statements = postgres_role_statements.copy()
+lightdash_role_statements["admin"] = postgres_role_statements["admin"].copy()
+lightdash_role_statements["admin"]["create"] = [
+    *postgres_role_statements["admin"]["create"],
+    # Pre-create the graphile_worker schema owned by the app role so that
+    # dynamic app credentials (which inherit from the app role) can use it
+    # without requiring CREATE ON DATABASE.
+    Template(
+        """
+        DO
+        $$do$$
+        BEGIN
+           IF NOT EXISTS (
+              SELECT FROM pg_catalog.pg_namespace
+              WHERE nspname = 'graphile_worker') THEN
+              CREATE SCHEMA graphile_worker AUTHORIZATION "${app_name}";
+           END IF;
+        END
+        $$do$$;"""
+    ),
+    Template(
+        """GRANT ALL ON SCHEMA graphile_worker TO "${app_name}" WITH GRANT OPTION;"""
+    ),
+    Template(
+        """
+        ALTER DEFAULT PRIVILEGES FOR ROLE "${app_name}" IN SCHEMA graphile_worker
+        GRANT ALL ON TABLES TO "${app_name}" WITH GRANT OPTION;"""
+    ),
+    Template(
+        """
+        ALTER DEFAULT PRIVILEGES FOR ROLE "${app_name}" IN SCHEMA graphile_worker
+        GRANT ALL ON SEQUENCES TO "${app_name}" WITH GRANT OPTION;"""
+    ),
+]
 lightdash_role_statements["app"] = postgres_role_statements["app"].copy()
 lightdash_role_statements["app"]["create"] = [
     *postgres_role_statements["app"]["create"],
-    Template("""GRANT CREATE ON DATABASE ${app_name} TO "{{name}}";"""),
     Template(
         """
         DO
