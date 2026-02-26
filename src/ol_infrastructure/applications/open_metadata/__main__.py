@@ -322,7 +322,14 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         # authority
                         # clientId
                     },
-                    "pipelineServiceClientConfig": {"enabled": True, "type": "k8s"},
+                    "pipelineServiceClientConfig": {
+                        "enabled": True,
+                        "type": "k8s",
+                        "k8s": {
+                            "namespace": open_metadata_namespace,
+                            "enableFailureDiagnostics": True,
+                        },
+                    },
                     "elasticsearch": {
                         "host": opensearch_cluster["endpoint"],
                         "port": DEFAULT_HTTPS_PORT,
