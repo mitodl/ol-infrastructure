@@ -10,4 +10,4 @@ playwright
 psycopg2-binary
 redis
 shillelagh[all]
-superset-nl-explorer @ git+https://github.com/mitodl/superset-nl-explorer.git@d00f9aa74e2d049b0574ba45da0a3e185dda6a60
+superset-nl-explorer @ git+https://github.com/mitodl/superset-nl-explorer.git@7be2ddea33d13d265161b0caa0acaade17b358d8
