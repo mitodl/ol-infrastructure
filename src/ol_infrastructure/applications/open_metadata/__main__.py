@@ -326,7 +326,8 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         "enabled": True,
                         "type": "k8s",
                         "k8s": {
-                            "namespace": open_metadata_namespace,
+                            # The schema doesn't yet support this value (TMM 2026-02-26)
+                            # "namespace": open_metadata_namespace,  # noqa: ERA001
                             "enableFailureDiagnostics": True,
                         },
                     },
