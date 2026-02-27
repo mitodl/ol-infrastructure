@@ -70,7 +70,7 @@ const addFooterSubSlotsOverride = (config) => {
     },
   ]
 
-  if (isMitxonlineCourse()) {
+  if (isMITxOnlineCourse()) {
     footerLegalLinks.push(
       {
         url: supportURL,
@@ -195,7 +195,7 @@ const safeDecodeURIComponent = (value) => {
   }
 };
 
-const isMitxonlineCourse = () => {
+const isMITxOnlineCourse = () => {
   const href = (window.location?.href || document.URL || '').toLowerCase();
   const decodedHref = safeDecodeURIComponent(href);
   const isCourseKeyInPath = new RegExp(COURSE_KEY_REGEX, 'i').test(decodedHref);
@@ -221,11 +221,11 @@ const getUserMenu = ({ includeDashboard = false } = {}) => {
 
   // Build dashboard URL consistently with SecondaryMenu logic
   let dashboardURL = process.env.MIT_LEARN_BASE_URL ? `${process.env.MIT_LEARN_BASE_URL}/dashboard` : 'https://learn.mit.edu/dashboard';
-  if (isMitxonlineCourse()) {
+  if (isMITxOnlineCourse()) {
     dashboardURL = configData.MARKETING_SITE_BASE_URL ? `${configData.MARKETING_SITE_BASE_URL}/dashboard/` : 'https://mitxonline.mit.edu/dashboard/';
   }
 
-  if (!isMitxonlineCourse()) {
+  if (!isMITxOnlineCourse()) {
     const baseMenu = [
       {
         url: `${configData.LMS_BASE_URL}/logout`,
@@ -407,7 +407,7 @@ const addUserMenuSlotOverride = (config) => {
 }
 
 const addLearningCourseInfoSlotOverride = (config) => {
-  if (!isMitxonlineCourse()) {
+  if (!isMITxOnlineCourse()) {
   // Hiding the course org and number from the learning header in the UAI courses
     config.pluginSlots = {
       ...config.pluginSlots,
@@ -434,7 +434,7 @@ const addLearningCourseInfoSlotOverride = (config) => {
 }
 
 const modifyLogoHref = ( widget ) => {
-  if (isMitxonlineCourse()) {
+  if (isMITxOnlineCourse()) {
     widget.content.href = `${configData.MARKETING_SITE_BASE_URL}/dashboard/` || "https://mitxonline.mit.edu/dashboard/";
   } else {
     widget.content.href = `${process.env.MIT_LEARN_BASE_URL}/dashboard` || "https://learn.mit.edu/dashboard";
@@ -463,7 +463,7 @@ const addLogoSlotOverride = (config) => {
 
 const SecondaryMenu = () => {
   let dashboardURL = process.env.MIT_LEARN_BASE_URL ? `${process.env.MIT_LEARN_BASE_URL}/dashboard` : 'https://learn.mit.edu/dashboard';
-  if (isMitxonlineCourse()) {
+  if (isMITxOnlineCourse()) {
     dashboardURL = configData.MARKETING_SITE_BASE_URL ? `${configData.MARKETING_SITE_BASE_URL}/dashboard/` : 'https://mitxonline.mit.edu/dashboard/';
   }
 
@@ -544,7 +544,7 @@ const addEnvOverrides = (config) => {
       LOGO_URL: process.env.LOGO_URL.replace(/logo\.svg$/, 'old-logo.svg'),
     }
   }
-  if (!isMitxonlineCourse()) {
+  if (!isMITxOnlineCourse()) {
     return {
       ...config,
       SUPPORT_URL: process.env.CONTACT_URL || 'mailto:mitlearn-support@mit.edu',
