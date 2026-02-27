@@ -989,7 +989,11 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         )
         onboard_oidc_org(
             OIDCIdpConfig(
-                org_domains=["nust.na"],
+                org_domains=[
+                    "nust.na",
+                    "students.nust.na",
+                    "namibiaust.onmicrosoft.com",
+                ],
                 org_name="Namibia University of Science and Technology",
                 org_alias="NUST",
                 learn_domain=mitlearn_domain,
