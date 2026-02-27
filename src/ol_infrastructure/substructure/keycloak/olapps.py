@@ -939,7 +939,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                     "stu.aydin.edu.tr",
                 ],
                 org_name="Istanbul Aydin University",
-                org_alias="Istanbul Aydin",
+                org_alias="Istanbul_Aydin",
                 learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,
                 resource_options=resource_options,
@@ -947,7 +947,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         )
         onboard_saml_org(
             SamlIdpConfig(
-                idp_alias="Istanbul Aydin - Staff",
+                idp_alias="istanbul_aydin_staff",
                 idp_display_name="Istanbul Aydin University - Staff",
                 org_saml_metadata_url="https://login.microsoftonline.com/dafbbeb4-3113-49c7-bce6-faeb84139bf6/federationmetadata/2007-06/federationmetadata.xml?appid=3b4d02b1-8482-4837-b8c4-2db32d8a93ee",
                 principal_type="ATTRIBUTE",
@@ -998,7 +998,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                     "stu.cau.edu.tr",
                 ],
                 org_name="Cyprus Aydin University",
-                org_alias="Cyrpus Aydin",
+                org_alias="Cyrpus_Aydin",
                 learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,
                 resource_options=resource_options,
@@ -1006,8 +1006,8 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         )
         onboard_saml_org(
             SamlIdpConfig(
-                idp_alias="Cyprus Aydin - Staff",
-                idp_display_name="Cyrpus Aydin University - Staff",
+                idp_alias="cyprus_aydin_staff",
+                idp_display_name="Cyprus Aydin University - Staff",
                 org_saml_metadata_url="https://login.microsoftonline.com/b250b687-5037-48da-a6d7-7471164c4b43/federationmetadata/2007-06/federationmetadata.xml?appid=09b2e0c2-79e9-4498-bf8f-560a6647d53d",
                 principal_type="ATTRIBUTE",
                 principal_attribute="user.mail",
@@ -1029,7 +1029,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         )
         onboard_saml_org(
             SamlIdpConfig(
-                idp_alias="Cyprus Aydin - Students",
+                idp_alias="cyprus_aydin_students",
                 idp_display_name="Cyprus Aydin University - Students",
                 org_saml_metadata_url="https://login.microsoftonline.com/7b2d4163-41c3-478f-8911-e9117b736dfb/federationmetadata/2007-06/federationmetadata.xml?appid=59324ddf-cc35-40c2-a91b-fa7c0def6e78",
                 principal_type="ATTRIBUTE",
