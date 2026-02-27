@@ -39,11 +39,18 @@ class OrgConfig(BaseModel):
     resource_options: pulumi.ResourceOptions
 
 
-class SamlIdpConfig(OrgConfig):
-    org_saml_metadata_url: str | None = None
-    org_saml_metadata_xml: str | None = None
+class SamlIdpConfig(BaseModel):
+    """Configuration for a SAML identity provider, decoupled from org creation."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    idp_alias: str  # Keycloak alias for the IdP; also used for Pulumi resource names
+    idp_display_name: str  # Human-readable display name shown on the login page
     keycloak_url: str
     first_login_flow: keycloak.authentication.Flow
+    realm_id: str | pulumi.Output[str]
+    resource_options: pulumi.ResourceOptions
+    org_saml_metadata_url: str | None = None
+    org_saml_metadata_xml: str | None = None
     name_id_format: NameIdFormat = NameIdFormat.unspecified
     principal_type: Literal["SUBJECT", "ATTRIBUTE", "FRIENDLY_ATTRIBUTE"] = "SUBJECT"
     principal_attribute: str | None = None
@@ -111,19 +118,33 @@ def create_org_for_learn(org_config: OrgConfig) -> keycloak.Organization:
 
 def onboard_saml_org(  # noqa: C901, PLR0912
     saml_config: SamlIdpConfig,
+    org: OrgConfig | keycloak.Organization,
 ) -> None:
-    org = create_org_for_learn(saml_config)
+    """Create a SAML IdP and link it to an org.
+
+    Pass an OrgConfig to create the org, or an existing keycloak.Organization
+    to attach a second IdP to an org that was already created.
+    """
+    keycloak_org = (
+        org if isinstance(org, keycloak.Organization) else create_org_for_learn(org)
+    )
+    resource_alias = (
+        saml_config.idp_alias
+    )  # Original case; used for Pulumi resource names
+    keycloak_alias = (
+        saml_config.idp_alias.lower()
+    )  # Lowercase; used for Keycloak API alias field
 
     metadata_source = (
         saml_config.org_saml_metadata_xml or saml_config.org_saml_metadata_url
     )
     if metadata_source is None:  # Type guard, should not happen due to validation
-        pulumi.log.error(f"No metadata source configured for {saml_config.org_alias}")
+        pulumi.log.error(f"No metadata source configured for {saml_config.idp_alias}")
         return
     saml_metadata = extract_saml_metadata(metadata_source)
     if not saml_metadata:
         pulumi.log.warn(
-            f"Skipping SAML IdP creation for {saml_config.org_alias} due to "
+            f"Skipping SAML IdP creation for {saml_config.idp_alias} due to "
             f"inaccessible metadata source"
         )
         return
@@ -139,7 +160,7 @@ def onboard_saml_org(  # noqa: C901, PLR0912
 
     mappers = get_saml_attribute_mappers(
         metadata_source,
-        saml_config.org_alias.lower(),
+        keycloak_alias,
         saml_config.attribute_map,
         saml_config.attribute_name_map,
         saml_config.mapper_extra_config,
@@ -155,15 +176,15 @@ def onboard_saml_org(  # noqa: C901, PLR0912
 
     # Build kwargs conditionally to avoid passing None values
     idp_kwargs = {
-        "alias": saml_config.org_alias.lower(),
-        "display_name": saml_config.org_name,
+        "alias": keycloak_alias,
+        "display_name": saml_config.idp_display_name,
         "entity_id": f"{saml_config.keycloak_url}/realms/olapps",
         "first_broker_login_flow_alias": saml_config.first_login_flow.alias,
         "hide_on_login_page": True,
         "name_id_policy_format": saml_config.name_id_format,
         "org_domain": "ANY",
         "org_redirect_mode_email_matches": True,
-        "organization_id": org.id,
+        "organization_id": keycloak_org.id,
         "post_binding_authn_request": saml_config.post_binding_authn_request,
         "post_binding_response": True,
         "principal_type": saml_config.principal_type,
@@ -192,12 +213,12 @@ def onboard_saml_org(  # noqa: C901, PLR0912
         )
 
     org_idp = keycloak.saml.IdentityProvider(
-        f"ol-apps-{saml_config.org_alias}-saml-idp",
+        f"ol-apps-{resource_alias}-saml-idp",
         **idp_kwargs,
     )
     for attr, args in mappers.items():
         keycloak.AttributeImporterIdentityProviderMapper(
-            f"map-{saml_config.org_alias}-saml-{attr}-attribute",
+            f"map-{resource_alias}-saml-{attr}-attribute",
             realm=saml_config.realm_id,
             identity_provider_alias=org_idp.alias,
             **args,
@@ -207,7 +228,7 @@ def onboard_saml_org(  # noqa: C901, PLR0912
         for attr, friendly_names in SAML_FRIENDLY_NAMES.items():
             for friendly_name in friendly_names:
                 keycloak.AttributeImporterIdentityProviderMapper(
-                    f"map-{saml_config.org_alias}-saml-{friendly_name}-attribute",
+                    f"map-{resource_alias}-saml-{friendly_name}-attribute",
                     realm=saml_config.realm_id,
                     attribute_friendly_name=friendly_name,
                     identity_provider_alias=org_idp.alias,
@@ -220,18 +241,39 @@ def onboard_saml_org(  # noqa: C901, PLR0912
                 )
 
 
-class OIDCIdpConfig(OrgConfig):
+class OIDCIdpConfig(BaseModel):
+    """Configuration for an OIDC identity provider, decoupled from org creation."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    idp_alias: str  # Keycloak alias for the IdP; also used for Pulumi resource names
+    idp_display_name: str  # Human-readable display name shown on the login page
     org_oidc_metadata_url: str
     keycloak_url: str
     first_login_flow: keycloak.authentication.Flow
+    realm_id: str | pulumi.Output[str]
+    resource_options: pulumi.ResourceOptions
     client_id: str
     client_secret: str | None = None
 
 
 def onboard_oidc_org(
     oidc_config: OIDCIdpConfig,
+    org: OrgConfig | keycloak.Organization,
 ) -> None:
-    org = create_org_for_learn(oidc_config)
+    """Create an OIDC IdP and link it to an org.
+
+    Pass an OrgConfig to create the org, or an existing keycloak.Organization
+    to attach a second IdP to an org that was already created.
+    """
+    keycloak_org = (
+        org if isinstance(org, keycloak.Organization) else create_org_for_learn(org)
+    )
+    resource_alias = (
+        oidc_config.idp_alias
+    )  # Original case; used for Pulumi resource names
+    keycloak_alias = (
+        oidc_config.idp_alias.lower()
+    )  # Lowercase; used for Keycloak API alias field
 
     oidc_idp_arg_map = oidc_identity_provider_args_from_discovery_url(
         oidc_config.org_oidc_metadata_url,
@@ -239,7 +281,7 @@ def onboard_oidc_org(
     )
     if oidc_idp_arg_map is None:
         pulumi.log.warn(
-            f"Skipping OIDC IdP creation for {oidc_config.org_alias} due to "
+            f"Skipping OIDC IdP creation for {oidc_config.idp_alias} due to "
             f"inaccessible metadata URL"
         )
         return
@@ -248,18 +290,18 @@ def onboard_oidc_org(
     } | oidc_idp_arg_map.get("extra_config", {})
     oidc_idp_arg_map["login_hint"] = True  # Preserve existing login_hint configuration
     keycloak.oidc.IdentityProvider(
-        f"ol-apps-{oidc_config.org_alias}-oidc-idp",
-        alias=oidc_config.org_alias.lower(),
+        f"ol-apps-{resource_alias}-oidc-idp",
+        alias=keycloak_alias,
         client_id=oidc_config.client_id,
         first_broker_login_flow_alias=oidc_config.first_login_flow.alias,
         realm=oidc_config.realm_id,
-        display_name=oidc_config.org_name,
+        display_name=oidc_config.idp_display_name,
         enabled=True,
         sync_mode="FORCE",
         hide_on_login_page=True,
         org_domain="ANY",
         org_redirect_mode_email_matches=True,
-        organization_id=org.id,
+        organization_id=keycloak_org.id,
         validate_signature=True,
         trust_email=True,
         **oidc_idp_arg_map,

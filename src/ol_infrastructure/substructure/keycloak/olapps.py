@@ -812,36 +812,34 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     if stack_info.env_suffix == "production":
         onboard_saml_org(
             SamlIdpConfig(
-                org_domains=["hhchealth.org"],
-                org_name="Hartford Health Care",
-                org_alias="HHC",
+                idp_alias="HHC",
+                idp_display_name="Hartford Health Care",
                 org_saml_metadata_url="https://adfs.hhchealth.org/federationmetadata/2007-06/federationmetadata.xml",
                 keycloak_url=keycloak_url,
-                learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
                 principal_type="ATTRIBUTE",
                 principal_attribute="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
-            )
+            ),
+            org=OrgConfig(
+                org_domains=["hhchealth.org"],
+                org_name="Hartford Health Care",
+                org_alias="HHC",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
         )
         onboard_saml_org(
             SamlIdpConfig(
-                org_domains=[
-                    "ntua.gr",
-                    "mail.ntua.gr",
-                    "chemeng.ntua.gr",
-                    "cs.ntua.gr",
-                    "noc.ntua.gr",
-                ],
-                org_name="National Technical University of Athens",
-                org_alias="NTUA",
+                idp_alias="NTUA",
+                idp_display_name="National Technical University of Athens",
                 org_saml_metadata_url="https://login.ntua.gr/metadata-signed.xml",
                 principal_type="ATTRIBUTE",
                 principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
                 name_id_format=NameIdFormat.transient,
                 keycloak_url=keycloak_url,
-                learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -858,13 +856,26 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 login_hint=False,
                 post_binding_authn_request=False,
                 authn_context_comparison_type="exact",
-            )
+            ),
+            org=OrgConfig(
+                org_domains=[
+                    "ntua.gr",
+                    "mail.ntua.gr",
+                    "chemeng.ntua.gr",
+                    "cs.ntua.gr",
+                    "noc.ntua.gr",
+                ],
+                org_name="National Technical University of Athens",
+                org_alias="NTUA",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
         )
         onboard_saml_org(
             SamlIdpConfig(
-                org_domains=["ceide.unam.mx"],
-                org_name="Coordinación de Evaluación, Innovación y Desarrollo Educativos, UNAM",  # noqa: E501
-                org_alias="CEIDE",
+                idp_alias="CEIDE",
+                idp_display_name="Coordinación de Evaluación, Innovación y Desarrollo Educativos, UNAM",  # noqa: E501
                 org_saml_metadata_xml=Path(__file__)
                 .parent.joinpath("files/olapps/ceide_metadata.xml")
                 .read_text(),
@@ -872,7 +883,6 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 principal_attribute="Email",
                 name_id_format=NameIdFormat.unspecified,
                 keycloak_url=keycloak_url,
-                learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -882,19 +892,25 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                     "lastName": "Surname",
                     "fullName": "Display Name",
                 },
-            )
+            ),
+            org=OrgConfig(
+                org_domains=["ceide.unam.mx"],
+                org_name="Coordinación de Evaluación, Innovación y Desarrollo Educativos, UNAM",  # noqa: E501
+                org_alias="CEIDE",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
         )
         onboard_saml_org(
             SamlIdpConfig(
-                org_domains=["seu.edu.ge"],
-                org_name="Georgian National University Seu",
-                org_alias="SEU",
+                idp_alias="SEU",
+                idp_display_name="Georgian National University Seu",
                 org_saml_metadata_url="https://emis1.seu.edu.ge/saml/metadata",
                 principal_type="ATTRIBUTE",
                 principal_attribute="Email",
                 name_id_format=NameIdFormat.unspecified,
                 keycloak_url=keycloak_url,
-                learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -906,7 +922,133 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 },
                 want_assertions_encrypted=True,
                 want_assertions_signed=True,
+            ),
+            org=OrgConfig(
+                org_domains=["seu.edu.ge"],
+                org_name="Georgian National University Seu",
+                org_alias="SEU",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
+        istanbul_aydin_org = create_org_for_learn(
+            OrgConfig(
+                org_domains=[
+                    "aydin.edu.tr",
+                    "stu.aydin.edu.tr",
+                ],
+                org_name="Istanbul Aydin University",
+                org_alias="Istanbul Aydin",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
             )
+        )
+        onboard_saml_org(
+            SamlIdpConfig(
+                idp_alias="Istanbul Aydin - Staff",
+                idp_display_name="Istanbul Aydin University - Staff",
+                org_saml_metadata_url="https://login.microsoftonline.com/dafbbeb4-3113-49c7-bce6-faeb84139bf6/federationmetadata/2007-06/federationmetadata.xml?appid=3b4d02b1-8482-4837-b8c4-2db32d8a93ee",
+                principal_type="ATTRIBUTE",
+                principal_attribute="user.email",
+                name_id_format=NameIdFormat.unspecified,
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                attribute_map={
+                    "email": "user.email",
+                    "firstName": "user.firstname",
+                    "lastName": "user.surname",
+                    "fullName": "user.displayname",
+                },
+                want_assertions_encrypted=True,
+                want_assertions_signed=True,
+            ),
+            org=istanbul_aydin_org,
+        )
+        onboard_saml_org(
+            SamlIdpConfig(
+                idp_alias="Istanbul Aydin - Students",
+                idp_display_name="Istanbul Aydin University - Students",
+                org_saml_metadata_url="https://login.microsoftonline.com/1220f94e-b228-4761-9501-da9e83e540ac/federationmetadata/2007-06/federationmetadata.xml?appid=d134d48b-ca70-46fd-a008-ab83b9a565fe",
+                principal_type="ATTRIBUTE",
+                principal_attribute="user.email",
+                name_id_format=NameIdFormat.unspecified,
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                attribute_map={
+                    "email": "user.email",
+                    "firstName": "user.firstname",
+                    "lastName": "user.surname",
+                    "fullName": "user.displayname",
+                },
+                want_assertions_encrypted=True,
+                want_assertions_signed=True,
+            ),
+            org=istanbul_aydin_org,
+        )
+        cyprus_aydin_org = create_org_for_learn(
+            OrgConfig(
+                org_domains=[
+                    "cau.edu.tr",
+                    "stu.cau.edu.tr",
+                ],
+                org_name="Cyprus Aydin University",
+                org_alias="Cyrpus Aydin",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            )
+        )
+        onboard_saml_org(
+            SamlIdpConfig(
+                idp_alias="Cyprus Aydin - Staff",
+                idp_display_name="Cyrpus Aydin University - Staff",
+                org_saml_metadata_url="https://login.microsoftonline.com/b250b687-5037-48da-a6d7-7471164c4b43/federationmetadata/2007-06/federationmetadata.xml?appid=09b2e0c2-79e9-4498-bf8f-560a6647d53d",
+                principal_type="ATTRIBUTE",
+                principal_attribute="user.mail",
+                name_id_format=NameIdFormat.unspecified,
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                attribute_map={
+                    "email": "user.mail",
+                    "firstName": "user.givenname",
+                    "lastName": "user.surname",
+                    "fullName": "user.displayname",
+                },
+                want_assertions_encrypted=True,
+                want_assertions_signed=True,
+            ),
+            org=cyprus_aydin_org,
+        )
+        onboard_saml_org(
+            SamlIdpConfig(
+                idp_alias="Cyprus Aydin - Students",
+                idp_display_name="Cyprus Aydin University - Students",
+                org_saml_metadata_url="https://login.microsoftonline.com/7b2d4163-41c3-478f-8911-e9117b736dfb/federationmetadata/2007-06/federationmetadata.xml?appid=59324ddf-cc35-40c2-a91b-fa7c0def6e78",
+                principal_type="ATTRIBUTE",
+                principal_attribute="user.email",
+                name_id_format=NameIdFormat.unspecified,
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                attribute_map={
+                    "email": "user.mail",
+                    "firstName": "user.givenname",
+                    "lastName": "user.surname",
+                    "fullName": "user.displayname",
+                },
+                want_assertions_encrypted=True,
+                want_assertions_signed=True,
+            ),
+            org=cyprus_aydin_org,
         )
         create_org_for_learn(
             OrgConfig(
@@ -920,6 +1062,16 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         )
         onboard_oidc_org(
             OIDCIdpConfig(
+                idp_alias="DUTH",
+                idp_display_name="Democritus University of Thrace",
+                org_oidc_metadata_url="https://sso.duth.gr/realms/main/.well-known/openid-configuration",
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                client_id="mit-learn",
+            ),
+            org=OrgConfig(
                 org_domains=[
                     "duth.gr",
                     "admin.duth.gr",
@@ -966,29 +1118,41 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 org_alias="DUTH",
                 learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,
-                keycloak_url=keycloak_url,
-                first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
-                org_oidc_metadata_url="https://sso.duth.gr/realms/main/.well-known/openid-configuration",
-                client_id="mit-learn",
-            )
+            ),
         )
         onboard_oidc_org(
             OIDCIdpConfig(
+                idp_alias="HAEF",
+                idp_display_name="Hellenic American Educational Foundation",
+                org_oidc_metadata_url="https://login.microsoftonline.com/35a07f23-c5cb-4b42-81ad-10d269586c9a/v2.0/.well-known/openid-configuration",
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                client_id="1b380514-33ff-4dca-a26f-ddd0600b2f02",
+            ),
+            org=OrgConfig(
                 org_domains=["athenscollege.edu.gr"],
                 org_name="Hellenic American Educational Foundation",
                 org_alias="HAEF",
                 learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,
-                keycloak_url=keycloak_url,
-                first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
-                org_oidc_metadata_url="https://login.microsoftonline.com/35a07f23-c5cb-4b42-81ad-10d269586c9a/v2.0/.well-known/openid-configuration",
-                client_id="1b380514-33ff-4dca-a26f-ddd0600b2f02",
-            )
+            ),
         )
         onboard_oidc_org(
             OIDCIdpConfig(
+                idp_alias="NUST",
+                idp_display_name="Namibia University of Science and Technology",
+                org_oidc_metadata_url="https://login.microsoftonline.com/d5cf20c2-4a84-4902-a3e6-c4a3190ea239/v2.0/.well-known/openid-configuration",
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                client_id="a5c7a2f3-47ce-4e3c-b4ce-fe79b86660b7",
+            ),
+            org=OrgConfig(
                 org_domains=[
                     "nust.na",
                     "students.nust.na",
@@ -998,73 +1162,103 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 org_alias="NUST",
                 learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,
-                keycloak_url=keycloak_url,
-                first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
-                org_oidc_metadata_url="https://login.microsoftonline.com/d5cf20c2-4a84-4902-a3e6-c4a3190ea239/v2.0/.well-known/openid-configuration",
-                client_id="a5c7a2f3-47ce-4e3c-b4ce-fe79b86660b7",
-            )
+            ),
         )
         onboard_oidc_org(
             OIDCIdpConfig(
+                idp_alias="UPGRAD",
+                idp_display_name="upGrad",
+                org_oidc_metadata_url="https://idp.upgrad.com/realms/upgrad/.well-known/openid-configuration",
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                client_id="ira-frontend",
+            ),
+            org=OrgConfig(
                 org_domains=[""],
                 org_name="upGrad",
                 org_alias="UPGRAD",
                 learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,
-                keycloak_url=keycloak_url,
-                first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
-                org_oidc_metadata_url="https://idp.upgrad.com/realms/upgrad/.well-known/openid-configuration",
-                client_id="ira-frontend",
-            )
+            ),
         )
         onboard_oidc_org(
             OIDCIdpConfig(
+                idp_alias="DYNIDEAS",
+                idp_display_name="Dynamic Ideas, LLC.",
+                org_oidc_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                client_id="393621505200-fb5rhjqvvmdodn5jdjdv1h1fbpk6rgq7.apps.googleusercontent.com",
+                client_secret=keycloak_realm_config.require("dynideas_client_secret"),
+            ),
+            org=OrgConfig(
                 org_domains=["dynideas.com"],
                 org_name="Dynamic Ideas, LLC.",
                 org_alias="DYNIDEAS",
                 learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,
-                keycloak_url=keycloak_url,
-                first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
-                org_oidc_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-                client_id="393621505200-fb5rhjqvvmdodn5jdjdv1h1fbpk6rgq7.apps.googleusercontent.com",
-                client_secret=keycloak_realm_config.require("dynideas_client_secret"),
-            )
+            ),
         )
         onboard_oidc_org(
             OIDCIdpConfig(
+                idp_alias="VELTISTON",
+                idp_display_name="Veltiston AI",
+                org_oidc_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                client_id="393621505200-fb5rhjqvvmdodn5jdjdv1h1fbpk6rgq7.apps.googleusercontent.com",
+                client_secret=keycloak_realm_config.require("dynideas_client_secret"),
+            ),
+            org=OrgConfig(
                 org_domains=["veltiston.ai"],
                 org_name="Veltiston AI",
                 org_alias="VELTISTON",
                 learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,
-                keycloak_url=keycloak_url,
-                first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
-                org_oidc_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-                client_id="393621505200-fb5rhjqvvmdodn5jdjdv1h1fbpk6rgq7.apps.googleusercontent.com",
-                client_secret=keycloak_realm_config.require("dynideas_client_secret"),
-            )
+            ),
         )
         onboard_oidc_org(
             OIDCIdpConfig(
+                idp_alias="UCR",
+                idp_display_name="Universidad de Costa Rica",
+                org_oidc_metadata_url="https://sso.ucr.ac.cr/realms/UCR/.well-known/openid-configuration",
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                client_id="MIT-Learn-sso",
+            ),
+            org=OrgConfig(
                 org_domains=["ucr.ac.cr"],
                 org_name="Universidad de Costa Rica",
                 org_alias="UCR",
                 learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,
-                keycloak_url=keycloak_url,
-                first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
-                org_oidc_metadata_url="https://sso.ucr.ac.cr/realms/UCR/.well-known/openid-configuration",
-                client_id="MIT-Learn-sso",
-            )
+            ),
         )
         onboard_oidc_org(
             OIDCIdpConfig(
+                idp_alias="USEK",
+                idp_display_name="Holy Spirit University of Kaslik",
+                org_oidc_metadata_url="https://login.microsoftonline.com/06d0a2c4-59b9-4cf8-a36a-9190f22cd1f6/v2.0/.well-known/openid-configuration",
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                client_id="52ef5b83-479c-4bd6-9979-ee56e0aeaa15",
+            ),
+            org=OrgConfig(
                 org_domains=[
                     "usek.edu.lb",
                     "net.usek.edu.lb",
@@ -1073,12 +1267,8 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 org_alias="USEK",
                 learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,
-                keycloak_url=keycloak_url,
-                first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
-                org_oidc_metadata_url="https://login.microsoftonline.com/06d0a2c4-59b9-4cf8-a36a-9190f22cd1f6/v2.0/.well-known/openid-configuration",
-                client_id="52ef5b83-479c-4bd6-9979-ee56e0aeaa15",
-            )
+            ),
         )
 
     # B2B Organizations [END]
