@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 
@@ -146,14 +147,20 @@ tls_configuration = fastly.get_tls_configuration(
     opts=InvokeOptions(provider=fastly_opts.provider),
 )
 
+# Generate hash of domains to identify subscription version
+# When domains change, a new subscription will be created with a unique name
+tls_domains = sorted(
+    [domain for domain in redirect_domains if lookup_zone_id_from_domain(domain)]
+)
+domains_hash = hashlib.sha256(",".join(sorted(tls_domains)).encode()).hexdigest()[:8]
+subscription_name = f"ol-redirect-service-tls-subscription-{domains_hash}"
+
 ol_redirect_service_tls = fastly.TlsSubscription(
-    "ol-redirect-service-tls-subscription",
+    subscription_name,
     # valid values are certainly, lets-encrypt, or globalsign
     certificate_authority="certainly",
-    domains=[
-        domain for domain in redirect_domains if lookup_zone_id_from_domain(domain)
-    ],
-    # Retrieved from 0https://manage.fastly.com/network/tls-configurations
+    domains=tls_domains,
+    # Retrieved from https://manage.fastly.com/network/tls-configurations
     configuration_id=tls_configuration.id,
     opts=fastly_opts,
 )
@@ -163,7 +170,7 @@ ol_redirect_service_tls.managed_dns_challenges.apply(
 )
 
 validated_tls_subscription = fastly.TlsSubscriptionValidation(
-    "ol-redirect-service-tls-subscription-validation",
+    f"{subscription_name}-validation",
     subscription_id=ol_redirect_service_tls.id,
     opts=fastly_opts,
 )
