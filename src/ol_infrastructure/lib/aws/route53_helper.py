@@ -52,7 +52,15 @@ def zone_opts(domain: str) -> pulumi.ResourceOptions:
 
     :rtype: pulumi.ResourceOptions
     """
-    zone = route53_client.list_hosted_zones_by_name(DNSName=domain)["HostedZones"][0]
+    zones = route53_client.list_hosted_zones_by_name(DNSName=domain).get(
+        "HostedZones", []
+    )
+
+    if not zones:
+        # Zone doesn't exist yet, will be created by Pulumi
+        return pulumi.ResourceOptions()
+
+    zone = zones[0]
     if zone["Name"] == domain:
         zone_id = zone["Id"].split("/")[
             -1
