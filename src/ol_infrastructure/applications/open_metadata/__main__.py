@@ -355,6 +355,9 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     },
                 },
             },
+            "hpa": {
+                "enabled": True,
+            },
             "omjobOperator": {
                 "enabled": True,
                 "image": {
