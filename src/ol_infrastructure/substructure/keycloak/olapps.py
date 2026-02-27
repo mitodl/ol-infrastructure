@@ -1033,7 +1033,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 idp_display_name="Cyprus Aydin University - Students",
                 org_saml_metadata_url="https://login.microsoftonline.com/7b2d4163-41c3-478f-8911-e9117b736dfb/federationmetadata/2007-06/federationmetadata.xml?appid=59324ddf-cc35-40c2-a91b-fa7c0def6e78",
                 principal_type="ATTRIBUTE",
-                principal_attribute="user.email",
+                principal_attribute="user.mail",
                 name_id_format=NameIdFormat.unspecified,
                 keycloak_url=keycloak_url,
                 realm_id=ol_apps_realm.id,
