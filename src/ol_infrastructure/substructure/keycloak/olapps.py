@@ -970,7 +970,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         )
         onboard_saml_org(
             SamlIdpConfig(
-                idp_alias="Istanbul Aydin - Students",
+                idp_alias="istanbul_aydin_students",
                 idp_display_name="Istanbul Aydin University - Students",
                 org_saml_metadata_url="https://login.microsoftonline.com/1220f94e-b228-4761-9501-da9e83e540ac/federationmetadata/2007-06/federationmetadata.xml?appid=d134d48b-ca70-46fd-a008-ab83b9a565fe",
                 principal_type="ATTRIBUTE",
