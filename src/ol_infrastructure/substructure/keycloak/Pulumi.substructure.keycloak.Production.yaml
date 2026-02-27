@@ -82,6 +82,8 @@ config:
   keycloak_realm:ol-data-platform-openmetadata-client-roles:
   - "open_metadata_admin"
   - "open_metadata_user"
+  keycloak_realm:ol-data-platform-lightdash-redirect-uris:
+  - "https://lightdash.ol.mit.edu/*"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   keycloak_realm:olapps-unified-ecommerce-client-secret:
@@ -106,6 +108,8 @@ config:
     secure: v1:LTpB1a4pNAAm04uf:1IqPnuHcO78FzzwhML/wLgP2IzoW2GEvmjipQtm5fXGW2qV9Snw9CUYP9qFGfdMZ
   keycloak_realm:ol-data-platform-openmetadata-client-secret:
     secure: v1:U19XJ1SgglbFMWWn:HXqzyUdQhqOPDWROVnnB21BkPoNO4ac+xkRhEVpD4zTqb8hzwYckjgH1UbXtAIww
+  keycloak_realm:ol-data-platform-lightdash-client-secret:
+    secure: v1:eDeyRvEjq0tSAEpT:a8fLiDU42WPc5X5guf9g91onxeypkLRlq80EqqW5YD5t/HAdbF0GOXmGkrEt+hKWwCsaFX3oUhbXaGWq8ArG16EbQBSVM7mYzwQojvp+9Oq3ky4tUl3gvvq5ELYP9EDa # Run: pulumi config set --secret keycloak_realm:ol-data-platform-lightdash-client-secret <value>
   keycloak_realm:session_secret:
     secure: v1:iTCu9uKpnLGZe88a:Eq7sfBEJas2LCl3zY0+gDxhyo0VehCPHQmBe7ZykP4TNUge2QbPpqwZ9VeSQ97klu3jSw9ReNjdAVH4=
   keycloak_realm:dynideas_client_secret:

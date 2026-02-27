@@ -85,6 +85,8 @@ config:
   keycloak_realm:ol-data-platform-openmetadata-client-roles:
   - "open_metadata_admin"
   - "open_metadata_user"
+  keycloak_realm:ol-data-platform-lightdash-redirect-uris:
+  - "https://lightdash-qa.ol.mit.edu/*"
   keycloak_realm:ol-data-platform-starrocks-redirect-uris:
   - "https://lakehouse.qa.starrocks.ol.mit.edu/*"
   - "https://lakehouse.qa.starrocks.ol.mit.edu/oauth2/callback"
@@ -121,5 +123,7 @@ config:
     secure: v1:kUumLXwbKKqZQU3/:IogyWYCtDjFs71I4LJW+DvOhYULDwPJ/Gbucf+0nxqhBY/Tt3vAj1AtGnQf9FHbQ
   keycloak_realm:ol-data-platform-starrocks-client-secret:
     secure: v1:zHo95RFS+Eoplvmf:NBtJt1ajx88FL6NMWqqmk0czTWG+2ZoUvB/nWhuERLkXffbW5LDIwJ6EhtQCUQ84Cm0CntuUXq6gTACdrjdLdNk0AINAP+0pfvvDk5+0Gus=
+  keycloak_realm:ol-data-platform-lightdash-client-secret:
+    secure: v1:UaBynXF6p+zM953L:E7JcfXyMLvgwiNGcjdLVyJMilYQYlmGsclyr45vtHetRhviKyzc+hUMo3MZ5N/UzxaFkUjpGZIZiqGeVvDAx45F96MQZHMJu6ypoZNuAVCHxWnttz/lHE2snKaZ0qYFt # Run: pulumi config set --secret keycloak_realm:ol-data-platform-lightdash-client-secret <value>
   keycloak_realm:session_secret:
     secure: v1:9Y54vvxTRbuuDCro:dXlzvu2/QqxZyEA1iG/elwzgP3xAQSVChqh/c5bXsLmz3j6hDzBlgBzlp9pIbxVk/+1GhYKrIgsULgU=
