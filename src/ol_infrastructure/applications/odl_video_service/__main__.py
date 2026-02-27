@@ -833,6 +833,7 @@ for domain in ovs_config.get_object("route53_managed_domains"):
         ttl=five_minutes,
         records=[autoscale_setup.load_balancer.dns_name],
         zone_id=mitodl_zone_id,
+        allow_overwrite=True,
     )
 
 ovs_mediaconvert_config = MediaConvertConfig(
