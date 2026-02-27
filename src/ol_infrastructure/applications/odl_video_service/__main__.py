@@ -19,6 +19,7 @@ from pulumi import (
     export,
 )
 from pulumi_aws import ec2, get_caller_identity, iam, route53
+from pulumi_aws.s3 import BucketCorsConfigurationCorsRuleArgs
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
@@ -109,6 +110,14 @@ ovs_main_bucket_config = S3BucketConfig(
     server_side_encryption_enabled=True,
     intelligent_tiering_enabled=True,
     intelligent_tiering_days=90,
+    cors_rules=[
+        BucketCorsConfigurationCorsRuleArgs(
+            allowed_headers=["*"],
+            allowed_methods=["GET", "HEAD"],
+            allowed_origins=["*"],
+            max_age_seconds=3000,
+        )
+    ],
     tags=aws_config.merged_tags(
         {"Name": s3_bucket_name, "Application": "odl-video-service"}
     ),
@@ -134,6 +143,14 @@ ovs_subtitles_bucket_config = S3BucketConfig(
     sse_algorithm="AES256",  # Use SSE-S3 for CloudFront compatibility
     intelligent_tiering_enabled=True,
     intelligent_tiering_days=90,
+    cors_rules=[
+        BucketCorsConfigurationCorsRuleArgs(
+            allowed_headers=["*"],
+            allowed_methods=["GET", "HEAD"],
+            allowed_origins=["*"],
+            max_age_seconds=3000,
+        )
+    ],
     tags=aws_config.merged_tags(
         {"Name": s3_subtitle_bucket_name, "Application": "odl-video-service"}
     ),
@@ -159,6 +176,14 @@ ovs_thumbnails_bucket_config = S3BucketConfig(
     sse_algorithm="AES256",  # Use SSE-S3 for CloudFront compatibility
     intelligent_tiering_enabled=True,
     intelligent_tiering_days=90,
+    cors_rules=[
+        BucketCorsConfigurationCorsRuleArgs(
+            allowed_headers=["*"],
+            allowed_methods=["GET", "HEAD"],
+            allowed_origins=["*"],
+            max_age_seconds=3000,
+        )
+    ],
     tags=aws_config.merged_tags(
         {"Name": s3_thumbnail_bucket_name, "Application": "odl-video-service"}
     ),
@@ -190,6 +215,14 @@ ovs_transcoded_bucket_config = S3BucketConfig(
     block_public_policy=False,
     ignore_public_acls=False,
     restrict_public_buckets=False,
+    cors_rules=[
+        BucketCorsConfigurationCorsRuleArgs(
+            allowed_headers=["*"],
+            allowed_methods=["GET", "HEAD"],
+            allowed_origins=["*"],
+            max_age_seconds=3000,
+        )
+    ],
     tags=aws_config.merged_tags(
         {"Name": s3_transcode_bucket_name, "Application": "odl-video-service"}
     ),
