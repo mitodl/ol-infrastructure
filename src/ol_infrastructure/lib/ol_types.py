@@ -14,6 +14,7 @@ class Product(StrEnum):
     data = "data"
     infrastructure = "infrastructure"
     mitlearn = "mit-learn"
+    odl_video = "odl-video"
     residential = "residential"
     xpro = "mitxpro"
 
