@@ -905,8 +905,17 @@ for location in code_locations:
         "startupProbe": {
             "enabled": True,
             "periodSeconds": 10,
-            "timeoutSeconds": 3,
+            "timeoutSeconds": 10,
             "failureThreshold": 60,
+            # Allow time for container and gRPC server initialization
+            "initialDelaySeconds": 15,
+        },
+        "readinessProbe": {
+            "enabled": True,
+            "periodSeconds": 20,
+            "timeoutSeconds": 10,
+            "failureThreshold": 3,
+            "initialDelaySeconds": 10,
         },
         "livenessProbe": {
             "enabled": True,
@@ -975,6 +984,27 @@ for location in code_locations:
                 "cpu": "4000m",
                 "memory": "8Gi",
             },
+        }
+        # Lakehouse has slow definitions loading (~19s) due to Airbyte+dbt integration.
+        # Increase startup probe delays to prevent race condition when webserver tries
+        # to connect before the code location has finished initializing.
+        deployment["startupProbe"] = {
+            "enabled": True,
+            "periodSeconds": 10,
+            # Allow longer timeout for health check response
+            "timeoutSeconds": 10,
+            # 1200s total (10s * 120), gives 20s for definitions to load
+            "failureThreshold": 120,
+            # Delay before first check to let container fully initialize
+            "initialDelaySeconds": 30,
+        }
+        deployment["readinessProbe"] = {
+            "enabled": True,
+            # Less aggressive after startup
+            "periodSeconds": 20,
+            "timeoutSeconds": 10,
+            "failureThreshold": 3,
+            "initialDelaySeconds": 30,
         }
 
     # Increase RAM for legacy edX because of studentmodule loading to memory
@@ -1126,6 +1156,11 @@ dagster_helm_values = {
                 "name": "DAGSTER_GRPC_MAX_RX_BYTES",
                 "value": "536870912",
             },
+            {
+                # 2 minutes timeout for loading code locations (handles slow locations)
+                "name": "DAGSTER_CODE_SERVER_TIMEOUT_SECONDS",
+                "value": "120",
+            },
             {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
         ],
         "envSecrets": [
@@ -1162,6 +1197,11 @@ dagster_helm_values = {
             {
                 "name": "DAGSTER_GRPC_MAX_RX_BYTES",
                 "value": "536870912",
+            },
+            {
+                # 2 minutes timeout for loading code locations (handles slow locations)
+                "name": "DAGSTER_CODE_SERVER_TIMEOUT_SECONDS",
+                "value": "120",
             },
             {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
         ],
