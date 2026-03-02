@@ -434,7 +434,6 @@ cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info
 cluster_substructure_stack = StackReference(
     f"substructure.aws.eks.applications.{stack_info.name}"
 )
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 
 k8s_app_labels = K8sAppLabels(
