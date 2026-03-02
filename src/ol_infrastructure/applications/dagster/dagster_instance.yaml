@@ -104,3 +104,10 @@ run_coordinator:
   class: QueuedRunCoordinator
   config:
     max_concurrent_runs: 30
+
+
+# Configures how long Dagster waits for code locations
+# to load before timing out.
+code_servers:
+  local_startup_timeout: 360
+  reload_timeout: 360
