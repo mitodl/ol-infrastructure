@@ -190,7 +190,10 @@ class OLApplicationK8sConfig(BaseModel):
     def validate_application_config(cls, application_config: dict[str, Any]):
         """Ensure that all application config values are strings."""
         # Convert all values to strings because that is what k8s expects.
-        return {key: str(value) for key, value in application_config.items()}
+        return {
+            key: value if isinstance(value, Output) else str(value)
+            for key, value in application_config.items()
+        }
 
     @model_validator(mode="after")
     def validate_image_tag_or_digest(self):
