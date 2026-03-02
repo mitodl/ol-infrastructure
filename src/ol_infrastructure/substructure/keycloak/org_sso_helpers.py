@@ -1,9 +1,9 @@
 from enum import StrEnum
-from typing import Literal
+from typing import Annotated, Literal
 
 import pulumi
 import pulumi_keycloak as keycloak
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, StringConstraints, model_validator
 
 from ol_infrastructure.substructure.keycloak.oidc_helpers import (
     oidc_identity_provider_args_from_discovery_url,
@@ -14,6 +14,12 @@ from ol_infrastructure.substructure.keycloak.saml_helpers import (
     generate_pulumi_args_dict,
     get_saml_attribute_mappers,
 )
+
+# Safe alias: alphanumeric, hyphens, and underscores only — no spaces or special
+# characters that would break Keycloak API paths or Pulumi resource names.
+# Uniqueness within a realm must be enforced by the caller; Pydantic cannot
+# validate cross-instance constraints.
+_IdpAlias = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_-]+$", min_length=1)]
 
 
 class NameIdFormat(StrEnum):
@@ -43,7 +49,9 @@ class SamlIdpConfig(BaseModel):
     """Configuration for a SAML identity provider, decoupled from org creation."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    idp_alias: str  # Keycloak alias for the IdP; also used for Pulumi resource names
+    idp_alias: (
+        _IdpAlias  # Keycloak alias for the IdP; also used for Pulumi resource names
+    )
     idp_display_name: str  # Human-readable display name shown on the login page
     keycloak_url: str
     first_login_flow: keycloak.authentication.Flow
@@ -245,10 +253,11 @@ class OIDCIdpConfig(BaseModel):
     """Configuration for an OIDC identity provider, decoupled from org creation."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    idp_alias: str  # Keycloak alias for the IdP; also used for Pulumi resource names
+    idp_alias: (
+        _IdpAlias  # Keycloak alias for the IdP; also used for Pulumi resource names
+    )
     idp_display_name: str  # Human-readable display name shown on the login page
     org_oidc_metadata_url: str
-    keycloak_url: str
     first_login_flow: keycloak.authentication.Flow
     realm_id: str | pulumi.Output[str]
     resource_options: pulumi.ResourceOptions
