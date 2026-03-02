@@ -27,10 +27,10 @@ path "secret-global/data/mailgun" {
 }
 
 # Concourse credentials for CI/CD integration
-path "secret-concourse/ocw/api-bearer-token" {
+path "secret-concourse/data/ocw/api-bearer-token" {
   capabilities = ["read"]
 }
-path "secret-concourse/web" {
+path "secret-concourse/data/web" {
   capabilities = ["read"]
 }
 

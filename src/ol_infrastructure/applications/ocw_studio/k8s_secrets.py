@@ -312,6 +312,7 @@ def create_ocw_studio_k8s_secrets(
             namespace=ocw_studio_namespace,
             labels=k8s_global_labels,
             mount=config["mount"],
+            mount_type="kv-v2",
             path=config["path"],
             templates=config["templates"],
             vaultauth=vaultauth,

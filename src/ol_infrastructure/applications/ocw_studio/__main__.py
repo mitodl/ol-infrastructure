@@ -577,7 +577,7 @@ if k8s_deploy:
     )
 
     # Merge stack-level config vars into the app env vars
-    app_env_vars.update(**ocw_studio_config.get_object("vars") or {})
+    app_env_vars.update(**heroku_app_config.get_object("vars") or {})
     app_env_vars["POSTHOG_API_HOST"] = app_env_vars.pop(
         "PUBLISH_POSTHOG_API_HOST",
         ocw_studio_config.get("posthog_api_host") or "https://app.posthog.com",
