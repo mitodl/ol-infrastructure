@@ -863,10 +863,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
         )
     ],
     dictionaries=[
-        fastly.ServiceVclDictionaryArgs(name="path_redirects"),  # exact path redirects
-        fastly.ServiceVclDictionaryArgs(
-            name="prefix_redirects"
-        ),  # first-segment prefix redirects
+        fastly.ServiceVclDictionaryArgs(name="path_redirects"),  # path level redirects
     ],
     domains=[
         fastly.ServiceVclDomainArgs(
@@ -1013,20 +1010,6 @@ mitlearn_redirects_dictionary = fastly.ServiceDictionaryItems(
     "mitlearn-redirects-dictionary",
     dictionary_id=path_redirects_dict_id,
     items={"/dashboard/organization/mit": "/dashboard/organization/mit-universal-ai"},
-    service_id=mitlearn_fastly_service.id,
-    manage_items=True,
-    opts=fastly_provider,
-)
-
-prefix_redirects_dict_id = mitlearn_fastly_service.dictionaries.apply(
-    lambda dicts: str(
-        next(d.dictionary_id for d in (dicts or []) if d.name == "prefix_redirects")
-    )
-)
-mitlearn_prefix_redirects_dictionary = fastly.ServiceDictionaryItems(
-    "mitlearn-prefix-redirects-dictionary",
-    dictionary_id=prefix_redirects_dict_id,
-    items={"/articles": "/news"},
     service_id=mitlearn_fastly_service.id,
     manage_items=True,
     opts=fastly_provider,
