@@ -66,7 +66,7 @@ micromasters_bucket_config = S3BucketConfig(
     block_public_policy=False,
     ignore_public_acls=False,
     restrict_public_buckets=False,
-    ownership_controls="BucketOwnerEnforced",
+    ownership_controls="BucketOwnerPreferred",
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
             allowed_methods=["GET", "HEAD"],
