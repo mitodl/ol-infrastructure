@@ -15,10 +15,11 @@ from ol_infrastructure.substructure.keycloak.saml_helpers import (
     get_saml_attribute_mappers,
 )
 
-# Safe alias: alphanumeric, hyphens, and underscores only — no spaces or special
-# characters that would break Keycloak API paths or Pulumi resource names.
-# Uniqueness within a realm must be enforced by the caller; Pydantic cannot
-# validate cross-instance constraints.
+# idp_alias accepts any case ([A-Za-z0-9_-]) but must not contain spaces or
+# special characters that would break Keycloak API paths or Pulumi resource names.
+# The original-case value is preserved so that existing Pulumi resource names remain
+# stable; callers are responsible for ensuring aliases are unique independent of case
+# (Keycloak treats aliases case-insensitively).
 _IdpAlias = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_-]+$", min_length=1)]
 
 
