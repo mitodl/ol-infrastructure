@@ -3,9 +3,7 @@ secretsprovider: awskms://alias/PulumiSecrets
 encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEmOuKx7TjiG3WvrduMXtibAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMsgzrV+TMGt9WcJXzAgEQgDtNRhDDddtK6dqcatu+JoRNY+vrvaHPwOxI/uUO7MWEM1WVMEmRYyE1V0LVXKNZs8bLOHrSI3QxYilLxA==
 config:
   aws:region: us-east-1
-  heroku:app_id:
-    secure: v1:WNbvtJ6EDIiQuDbl:8crTsAfkRMBwW5Jbxf/FbJEb1c0Zdn8ry8QaqGoLKDTu6Ttmqoh0tFhG5ve3xEIm9xrUjA==
-  heroku_app:vars:
+  ocw_studio:vars:
     CONCOURSE_URL: https://cicd-qa.odl.mit.edu
     CONTENT_FILE_SEARCH_API_URL: 'https://mitopen.odl.mit.edu/api/v1/content_file_search/'
     COURSE_SEARCH_API_URL: 'https://mitopen.odl.mit.edu/api/v1/learning_resources_search/'
@@ -34,7 +32,6 @@ config:
     VIDEO_S3_UPLOAD_PREFIX: 'gdrive_uploads'
     TRANSCODE_JOB_TEMPLATE: './videos/config/mediaconvert.json'
   ocw_studio:app_domain: ocw-studio-ci.odl.mit.edu
-  ocw_studio:k8s_deploy: "true"
   ocw_studio:db_password:
     secure: v1:PMhnJY0c/38fxcK/:HwHpoUXfP5YTzXq/3cyZUj4eRjCmNkdScLTGca863qCG/U1Py2BHwJXHiM8KPXx9NJufyVDzNtf79Ss7UTEcKOmM+M+8NXFE6I8UCapuui3yi52KFOWk7o6X
   vault:address: https://vault-ci.odl.mit.edu
