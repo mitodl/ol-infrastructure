@@ -78,7 +78,10 @@ pipeline_params = {
         fastly_service_prefix="learn_",
     ),
     "xpro": AppPipelineParams(
-        app_name="xpro", repo_name="mitxpro", repo_main_branch="master"
+        app_name="xpro",
+        repo_name="mitxpro",
+        repo_main_branch="master",
+        build_target="production",
     ),
     "ocw-studio": AppPipelineParams(app_name="ocw-studio", repo_main_branch="master"),
 }
