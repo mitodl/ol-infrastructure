@@ -602,6 +602,7 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
                 "ENABLE_LTI_PROVIDER": True,
                 "ENABLE_V2_CERT_DISPLAY_SETTINGS": True,
                 "ENABLE_BULK_USER_RETIREMENT": True,
+                "ENABLE_PROCTORED_EXAMS": True,
             },
             "OAUTH2_PROVIDER": {
                 "ALLOWED_REDIRECT_URI_SCHEMES": [
