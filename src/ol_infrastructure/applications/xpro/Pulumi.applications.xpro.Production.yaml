@@ -55,6 +55,6 @@ config:
   xpro:app_domain: xpro-web.odl.mit.edu
   xpro:db_password:
     secure: v1:03/tvzdJDwyJHyoA:uh3PJ8mSBp/NpFaSay1BaxC/B4rNhagzmj8crCmEdxuSVXldUvKViy5pa8k0If0K21dX4uo8p0wMiIA=
-  xpro:k8s_deploy: "false"
+  xpro:k8s_deploy: "true"
   redis:password:
     secure: v1:d94F9GsoyBVWV68i:T6OpRTRnK5fcHqRM/9DCtCz3PEFc4y6BTdwYJEGugPOkuHz+4LHb2+FXWPxAwf9rV/s0dtE/ThYv9ZoUYH69iZ3JpCE=
