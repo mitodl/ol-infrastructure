@@ -306,6 +306,7 @@ edxapp_course_bucket_config = S3BucketConfig(
     bucket_name=course_bucket_name,
     versioning_status="Suspended",  # Migration: was explicitly set to Suspended
     tags=aws_config.tags,
+    ownership_controls="BucketOwnerPreferred",
 )
 edxapp_course_bucket = OLBucket(
     "edxapp-courses-s3-bucket",
@@ -327,6 +328,7 @@ edxapp_grades_bucket_config = S3BucketConfig(
     bucket_name=grades_bucket_name,
     versioning_enabled=True,
     tags=aws_config.tags,
+    ownership_controls="BucketOwnerPreferred",
 )
 edxapp_grades_bucket = OLBucket(
     "edxapp-grades-s3-bucket",
