@@ -3,9 +3,9 @@
 - Create a Redis instance in AWS Elasticache
 - Create a PostgreSQL database in AWS RDS for production environments
 - Create an IAM policy to grant access to S3 and other resources
-- Optionally deploy the application to Kubernetes (toggle via xpro:k8s_deploy)
 """
 
+import base64
 import json
 import os
 from pathlib import Path
@@ -29,6 +29,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_NGINX_PORT,
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
+    ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.xpro.k8s_secrets import (
@@ -67,7 +68,10 @@ from ol_infrastructure.lib.aws.route53_helper import (
     fastly_certificate_validation_records,
     lookup_zone_id_from_domain,
 )
-from ol_infrastructure.lib.fastly import get_fastly_provider
+from ol_infrastructure.lib.fastly import (
+    build_fastly_log_format_string,
+    get_fastly_provider,
+)
 from ol_infrastructure.lib.heroku import setup_heroku_provider
 from ol_infrastructure.lib.ol_types import (
     Application,
@@ -77,9 +81,6 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.fastly import get_fastly_provider
-from ol_infrastructure.lib.heroku import setup_heroku_provider
-from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -92,11 +93,17 @@ stack_info = parse_stack()
 k8s_deploy = xpro_config.get_bool("k8s_deploy") or False
 
 heroku_config = Config("heroku")
+heroku_app_config = Config("heroku_app")
 fastly_provider = get_fastly_provider()
 
+stack_info = parse_stack()
 backend_domain = xpro_config.require("backend_domain")
 frontend_domain = xpro_config.require("frontend_domain")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+monitoring_stack = StackReference("infrastructure.monitoring")
+vector_log_proxy_stack = StackReference(
+    f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
+)
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
@@ -738,6 +745,24 @@ sensitive_heroku_vars = {
         lambda data: "{}".format(data["api_key"])
     ),
 }
+
+vector_log_proxy_secrets = read_yaml_secrets(
+    Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
+)
+fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
+encoded_fastly_proxy_credentials = base64.b64encode(
+    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
+).decode()
+vector_log_proxy_domain = vector_log_proxy_stack.require_output(
+    "vector_log_proxy_domain"
+)
+fastly_access_logging_bucket = monitoring_stack.require_output(
+    "fastly_access_logging_bucket"
+)
+fastly_access_logging_iam_role = monitoring_stack.require_output(
+    "fastly_access_logging_iam_role"
+)
+
 xpro_service = fastly.ServiceVcl(
     "xpro-service",
     backends=[
@@ -996,6 +1021,39 @@ set bereq.http.x-forwarded-host = "{frontend_domain}";""",  # noqa: E501
 set bereq.http.x-forwarded-host = "{frontend_domain}";""",  # noqa: E501
             name="Set x-forwarded-host - pass",
             type="pass",
+        ),
+    ],
+    logging_https=[
+        fastly.ServiceVclLoggingHttpArgs(
+            url=vector_log_proxy_domain.apply(
+                lambda domain: f"https://{domain}/fastly"
+            ),
+            name=f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-https-logging-args",
+            content_type="application/json",
+            format=build_fastly_log_format_string(
+                additional_static_fields={
+                    "application": "xpro",
+                    "environment": stack_info.env_suffix,
+                }
+            ),
+            format_version=2,
+            header_name="Authorization",
+            header_value=f"Basic {encoded_fastly_proxy_credentials}",
+            json_format="0",
+            method="POST",
+            request_max_bytes=ONE_MEGABYTE_BYTE,
+        )
+    ],
+    logging_s3s=[
+        fastly.ServiceVclLoggingS3Args(
+            bucket_name=fastly_access_logging_bucket["bucket_name"],
+            name=f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-s3-logging-args",
+            format=build_fastly_log_format_string(additional_static_fields={}),
+            gzip_level=3,
+            message_type="blank",
+            path=f"/xpro/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+            redundancy="standard",
+            s3_iam_role=fastly_access_logging_iam_role["role_arn"],
         ),
     ],
     stale_if_error=True,
