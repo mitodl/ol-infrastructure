@@ -147,6 +147,26 @@ class OLApplicationK8sConfig(BaseModel):
     init_collectstatic: bool = Field(default=True)
     celery_worker_configs: list[OLApplicationK8sCeleryWorkerConfig] = []
     celery_beat_config: OLApplicationK8sCeleryBeatConfig | None = None
+
+    @model_validator(mode="after")
+    def validate_beat_config(self) -> "OLApplicationK8sConfig":
+        beat_workers = [w for w in self.celery_worker_configs if w.run_beat]
+        if self.celery_beat_config is not None and beat_workers:
+            names = ", ".join(w.queue_name for w in beat_workers)
+            msg = (
+                f"celery_beat_config is set but worker(s) '{names}' also have "
+                "run_beat=True. Use celery_beat_config exclusively."
+            )
+            raise ValueError(msg)
+        if len(beat_workers) > 1:
+            names = ", ".join(w.queue_name for w in beat_workers)
+            msg = (
+                f"Only one worker may have run_beat=True, but found: '{names}'. "
+                "Multiple beat schedulers will corrupt the RedBeat schedule in Redis."
+            )
+            raise ValueError(msg)
+        return self
+
     pre_deploy_commands: list[tuple[str, list[str]]] | None = Field(
         default=None,
         description="A tuple of <job_name>, <job_command_array> for executing prior to the deployment updating",
