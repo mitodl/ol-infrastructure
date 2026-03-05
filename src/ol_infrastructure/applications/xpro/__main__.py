@@ -954,6 +954,9 @@ xpro_service = fastly.ServiceVcl(
         name="",
         webp=True,
     ),
+    product_enablement=fastly.ServiceVclProductEnablementArgs(
+        image_optimizer=True,
+    ),
     name=f"xPRO {stack_info.name}",
     request_settings=[
         fastly.ServiceVclRequestSettingArgs(
