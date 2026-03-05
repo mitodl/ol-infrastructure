@@ -1043,10 +1043,10 @@ for location in code_locations:
         deployment["resources"] = {
             "requests": {
                 "cpu": "1000m",
-                "memory": "8Gi",
+                "memory": "32Gi",
             },
             "limits": {
-                "memory": "32Gi",
+                "memory": "64Gi",
             },
         }
     deployments.append(deployment)
