@@ -55,6 +55,7 @@ from ol_infrastructure.components.services.k8s import (
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
     OLApplicationK8s,
+    OLApplicationK8sCeleryBeatConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
 )
@@ -1486,6 +1487,7 @@ mitlearn_k8s_app = OLApplicationK8s(
                 resource_limits={"memory": "2400Mi"},
             ),
         ],
+        celery_beat_config=OLApplicationK8sCeleryBeatConfig(),
         resource_requests={"cpu": "250m", "memory": "2400Mi"},
         resource_limits={"memory": "2400Mi"},
         hpa_scaling_metrics=[

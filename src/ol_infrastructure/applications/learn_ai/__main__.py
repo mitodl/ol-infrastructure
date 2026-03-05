@@ -49,6 +49,7 @@ from ol_infrastructure.components.services.k8s import (
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
     OLApplicationK8s,
+    OLApplicationK8sCeleryBeatConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
 )
@@ -821,6 +822,7 @@ learn_ai_app_k8s = OLApplicationK8s(
                 resource_limits={"memory": "2500Mi"},
             ),
         ],
+        celery_beat_config=OLApplicationK8sCeleryBeatConfig(),
         hpa_scaling_metrics=[
             kubernetes.autoscaling.v2.MetricSpecArgs(
                 type="Resource",

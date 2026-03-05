@@ -59,6 +59,27 @@ class OLApplicationK8sCeleryWorkerConfig(BaseModel):
     redis_host: Output[str]
     redis_password: str
     redis_port: int = DEFAULT_REDIS_PORT
+    run_beat: bool = (
+        False  # Deprecated: use celery_beat_config on OLApplicationK8sConfig instead
+    )
+
+
+class OLApplicationK8sCeleryBeatConfig(BaseModel):
+    """Configuration for a standalone celery beat scheduler deployment.
+
+    Use this instead of run_beat=True on a worker. A dedicated beat deployment
+    runs exactly one replica and is never autoscaled, ensuring only one scheduler
+    writes to the RedBeat Redis keys at any time.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "FATAL"] = (
+        "INFO"
+    )
+    resource_requests: dict[str, str] = Field(
+        default={"cpu": "100m", "memory": "512Mi"}
+    )
+    resource_limits: dict[str, str] = Field(default={"memory": "512Mi"})
 
 
 class OLApplicationK8sConfig(BaseModel):
@@ -126,6 +147,27 @@ class OLApplicationK8sConfig(BaseModel):
     init_migrations: bool = Field(default=True)
     init_collectstatic: bool = Field(default=True)
     celery_worker_configs: list[OLApplicationK8sCeleryWorkerConfig] = []
+    celery_beat_config: OLApplicationK8sCeleryBeatConfig | None = None
+
+    @model_validator(mode="after")
+    def validate_beat_config(self) -> "OLApplicationK8sConfig":
+        beat_workers = [w for w in self.celery_worker_configs if w.run_beat]
+        if self.celery_beat_config is not None and beat_workers:
+            names = ", ".join(w.queue_name for w in beat_workers)
+            msg = (
+                f"celery_beat_config is set but worker(s) '{names}' also have "
+                "run_beat=True. Use celery_beat_config exclusively."
+            )
+            raise ValueError(msg)
+        if len(beat_workers) > 1:
+            names = ", ".join(w.queue_name for w in beat_workers)
+            msg = (
+                f"Only one worker may have run_beat=True, but found: '{names}'. "
+                "Multiple beat schedulers will corrupt the RedBeat schedule in Redis."
+            )
+            raise ValueError(msg)
+        return self
+
     pre_deploy_commands: list[tuple[str, list[str]]] | None = Field(
         default=None,
         description="A tuple of <job_name>, <job_command_array> for executing prior to the deployment updating",
@@ -921,9 +963,15 @@ class OLApplicationK8s(ComponentResource):
                                         "-E",  # send task-related events for monitoring
                                         "-Q",  # queue name
                                         celery_worker_config.queue_name,
-                                        "-B",  # beat (scheduler?)
-                                        "--scheduler",
-                                        "redbeat.RedBeatScheduler",
+                                        *(
+                                            [
+                                                "-B",  # beat scheduler - only on one worker to avoid multiple competing schedulers
+                                                "--scheduler",
+                                                "redbeat.RedBeatScheduler",
+                                            ]
+                                            if celery_worker_config.run_beat
+                                            else []
+                                        ),
                                         "-l",  # set log level
                                         celery_worker_config.log_level,
                                         "--max-tasks-per-child",  # Max number of tasks the pool worker will process before being replaced
@@ -1020,6 +1068,70 @@ class OLApplicationK8s(ComponentResource):
                 opts=resource_options.merge(
                     ResourceOptions(delete_before_replace=True)
                 ),
+            )
+
+        if ol_app_k8s_config.celery_beat_config is not None:
+            beat_config = ol_app_k8s_config.celery_beat_config
+            beat_labels = ol_app_k8s_config.k8s_global_labels | {
+                "ol.mit.edu/component": str(Component.celery),
+                "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
+                "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
+                    truncate_k8s_metanames
+                ),
+                "ol.mit.edu/worker-name": "beat",
+            }
+            if ol_app_k8s_config.slack_channel:
+                beat_labels["ol.mit.edu/slack-channel"] = (
+                    ol_app_k8s_config.slack_channel
+                )
+            _beat_deployment_name = truncate_k8s_metanames(
+                f"{ol_app_k8s_config.application_name}-celery-beat".replace("_", "-")
+            )
+            _beat_deployment = kubernetes.apps.v1.Deployment(
+                f"{ol_app_k8s_config.application_name}-celery-beat-{stack_info.env_suffix}",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=_beat_deployment_name,
+                    namespace=ol_app_k8s_config.application_namespace,
+                    labels=beat_labels,
+                ),
+                spec=kubernetes.apps.v1.DeploymentSpecArgs(
+                    replicas=1,
+                    selector=kubernetes.meta.v1.LabelSelectorArgs(
+                        match_labels=beat_labels,
+                    ),
+                    template=kubernetes.core.v1.PodTemplateSpecArgs(
+                        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                            labels=beat_labels,
+                        ),
+                        spec=kubernetes.core.v1.PodSpecArgs(
+                            service_account_name=ol_app_k8s_config.application_service_account_name,
+                            dns_policy="ClusterFirst",
+                            containers=[
+                                kubernetes.core.v1.ContainerArgs(
+                                    name="celery-beat",
+                                    image=app_image,
+                                    command=[
+                                        "celery",
+                                        "-A",
+                                        "main.celery:app",
+                                        "beat",
+                                        "--scheduler",
+                                        "redbeat.RedBeatScheduler",
+                                        "-l",
+                                        beat_config.log_level,
+                                    ],
+                                    env=application_deployment_env_vars,
+                                    env_from=application_deployment_envfrom,
+                                    resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                        requests=beat_config.resource_requests,
+                                        limits=beat_config.resource_limits,
+                                    ),
+                                ),
+                            ],
+                        ),
+                    ),
+                ),
+                opts=resource_options,
             )
 
         _application_pod_security_group_policy = (

@@ -50,6 +50,7 @@ from ol_infrastructure.components.services.cert_manager import (
 )
 from ol_infrastructure.components.services.k8s import (
     OLApplicationK8s,
+    OLApplicationK8sCeleryBeatConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
 )
@@ -619,6 +620,7 @@ ocw_studio_k8s_app = OLApplicationK8s(
                 redis_password=redis_config.require("password"),
             ),
         ],
+        celery_beat_config=OLApplicationK8sCeleryBeatConfig(),
         resource_requests={"cpu": "250m", "memory": "1Gi"},
         resource_limits={"memory": "1Gi"},
         # App lacks health check endpoints so we use nginx's
