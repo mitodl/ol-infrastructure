@@ -242,10 +242,10 @@ def _build_image_job(
                             path="sh",
                             args=[
                                 "-c",
-                                f"""cd {git_repo_resource.name}
+                                f"""
                                 # Command to get the *latest* tag that points to the current HEAD
                                 # The result is echoed into a file that is passed to the next step
-                                LATEST_TAG=$(git describe --tags --abbrev=0)
+                                LATEST_TAG=$(cd {git_repo_resource.name} && git describe --tags --abbrev=0)
                                 echo $LATEST_TAG > {version_file}""",
                             ],
                         ),
