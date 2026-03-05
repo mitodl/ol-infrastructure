@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 
+import pulumi_fastly as fastly
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
@@ -22,7 +23,7 @@ from pulumi import (
     StackReference,
     export,
 )
-from pulumi_aws import ec2, iam
+from pulumi_aws import ec2, iam, route53
 
 from bridge.lib.magic_numbers import (
     DEFAULT_NGINX_PORT,
@@ -62,6 +63,11 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.aws.route53_helper import (
+    fastly_certificate_validation_records,
+    lookup_zone_id_from_domain,
+)
+from ol_infrastructure.lib.fastly import get_fastly_provider
 from ol_infrastructure.lib.heroku import setup_heroku_provider
 from ol_infrastructure.lib.ol_types import (
     Application,
@@ -71,6 +77,9 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
+from ol_infrastructure.lib.fastly import get_fastly_provider
+from ol_infrastructure.lib.heroku import setup_heroku_provider
+from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -83,7 +92,10 @@ stack_info = parse_stack()
 k8s_deploy = xpro_config.get_bool("k8s_deploy") or False
 
 heroku_config = Config("heroku")
+fastly_provider = get_fastly_provider()
 
+backend_domain = xpro_config.require("backend_domain")
+frontend_domain = xpro_config.require("frontend_domain")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
@@ -726,6 +738,312 @@ sensitive_heroku_vars = {
         lambda data: "{}".format(data["api_key"])
     ),
 }
+xpro_service = fastly.ServiceVcl(
+    "xpro-service",
+    backends=[
+        fastly.ServiceVclBackendArgs(
+            address=backend_domain,
+            first_byte_timeout=45000,
+            name=f"xPRO {stack_info.name}",
+            port=443,
+            shield="iad-va-us",
+            ssl_cert_hostname=backend_domain,
+            ssl_sni_hostname=backend_domain,
+            use_ssl=True,
+        )
+    ],
+    cache_settings=[
+        fastly.ServiceVclCacheSettingArgs(
+            cache_condition="path starts with /images cache condition",
+            name="Extend images cache duration",
+            ttl=2592000,
+        )
+    ],
+    comment="",
+    conditions=[
+        fastly.ServiceVclConditionArgs(
+            name="Set location for LASERx redirect",
+            statement='req.url.path == "/programs/program-v1:xPRO+LASERx+R1/" && resp.status == 301',  # noqa: E501
+            type="RESPONSE",
+        ),
+        fastly.ServiceVclConditionArgs(
+            name="Set location for QCF redirect",
+            statement='req.url == "/programs/program-v1:xPRO+QCF+R5/" && resp.status == 301',  # noqa: E501
+            type="RESPONSE",
+        ),
+        fastly.ServiceVclConditionArgs(
+            name="Set location for QCR redirect",
+            statement='req.url == "/programs/program-v1:xPRO+QCR+R2/" && resp.status == 301',  # noqa: E501
+            type="RESPONSE",
+        ),
+        fastly.ServiceVclConditionArgs(
+            name="Set location for SysEngx redirect",
+            statement='req.url == "/programs/program-v1:xPRO+SysEngx+R7/" && resp.status == 301',  # noqa: E501
+            type="RESPONSE",
+        ),
+        fastly.ServiceVclConditionArgs(
+            name="Wagtail Images",
+            statement='req.url.path ~ "^/images/"',
+            type="REQUEST",
+        ),
+        fastly.ServiceVclConditionArgs(
+            name="navair emergency response condition",
+            statement='req.url == "/checkout/?product=76" && resp.status == 301',
+            type="RESPONSE",
+        ),
+        fastly.ServiceVclConditionArgs(
+            name="navair product 76",
+            statement='req.url ~ "^/checkout/\\?product=76"',
+            type="REQUEST",
+        ),
+        fastly.ServiceVclConditionArgs(
+            name="path is LASERx",
+            statement='req.url.path == "/programs/program-v1:xPRO+LASERx+R1/"',
+            type="REQUEST",
+        ),
+        fastly.ServiceVclConditionArgs(
+            name="path is QCF",
+            statement='req.url == "/programs/program-v1:xPRO+QCF+R5/"',
+            type="REQUEST",
+        ),
+        fastly.ServiceVclConditionArgs(
+            name="path is QCR",
+            statement='req.url == "/programs/program-v1:xPRO+QCR+R2/"',
+            type="REQUEST",
+        ),
+        fastly.ServiceVclConditionArgs(
+            name="path is SysEngx",
+            statement='req.url == "/programs/program-v1:xPRO+SysEngx+R7/"',
+            type="REQUEST",
+        ),
+        fastly.ServiceVclConditionArgs(
+            name="path starts with /images cache condition",
+            statement='req.url.path ~ "^/images/"',
+            type="CACHE",
+        ),
+    ],
+    default_ttl=0,
+    domains=[
+        fastly.ServiceVclDomainArgs(
+            comment="for the shield POP to avoid unknown domain error",
+            name=backend_domain,
+        ),
+        fastly.ServiceVclDomainArgs(
+            comment=f"xPRO {stack_info.name}",
+            name=frontend_domain,
+        ),
+    ],
+    gzips=[
+        fastly.ServiceVclGzipArgs(
+            content_types=[
+                "text/html",
+                "application/x-javascript",
+                "text/css",
+                "application/javascript",
+                "text/javascript",
+                "application/json",
+                "application/vnd.ms-fontobject",
+                "application/x-font-opentype",
+                "application/x-font-truetype",
+                "application/x-font-ttf",
+                "application/xml",
+                "font/eot",
+                "font/opentype",
+                "font/otf",
+                "image/svg+xml",
+                "image/vnd.microsoft.icon",
+                "text/plain",
+                "text/xml",
+            ],
+            extensions=[
+                "css",
+                "js",
+                "html",
+                "eot",
+                "ico",
+                "otf",
+                "ttf",
+                "json",
+                "svg",
+            ],
+            name="Generated by default gzip policy",
+        )
+    ],
+    headers=[
+        fastly.ServiceVclHeaderArgs(
+            action="set",
+            destination="http.Location",
+            name="Location for LASERx redirect",
+            priority=10,
+            response_condition="Set location for LASERx redirect",
+            source=f'"https://{frontend_domain}/programs/program-v1:xPRO+LASERx/?" + req.url.qs',  # noqa: E501
+            type="response",
+        ),
+        fastly.ServiceVclHeaderArgs(
+            action="set",
+            destination="http.Location",
+            name="Location for QCF redirect",
+            priority=10,
+            response_condition="Set location for QCF redirect",
+            source=f'"https://{frontend_domain}/programs/program-v1:xPRO+QCF/"',
+            type="response",
+        ),
+        fastly.ServiceVclHeaderArgs(
+            action="set",
+            destination="http.Location",
+            name="Location for SysEngx redirect",
+            priority=10,
+            response_condition="Set location for SysEngx redirect",
+            source=f'"https://{frontend_domain}/programs/program-v1:xPRO+SysEngx/"',
+            type="response",
+        ),
+        fastly.ServiceVclHeaderArgs(
+            action="set",
+            destination="http.Location",
+            name="location for QCR redirect",
+            priority=10,
+            response_condition="Set location for QCR redirect",
+            source=f'"https://{frontend_domain}/programs/program-v1:xPRO+QCR/"',
+            type="response",
+        ),
+        fastly.ServiceVclHeaderArgs(
+            action="set",
+            destination="http.Location",
+            name="location for navair emergency redirect",
+            priority=10,
+            response_condition="navair emergency response condition",
+            source=f'"https://{frontend_domain}/checkout/?product=80"',
+            type="response",
+        ),
+        fastly.ServiceVclHeaderArgs(
+            action="set",
+            cache_condition="path starts with /images cache condition",
+            destination="http.Cache-Control",
+            name="extend images max age",
+            priority=10,
+            source='"max-age=2592000"',
+            type="cache",
+        ),
+    ],
+    image_optimizer_default_settings=fastly.ServiceVclImageOptimizerDefaultSettingsArgs(
+        name="",
+        webp=True,
+    ),
+    name=f"xPRO {stack_info.name}",
+    request_settings=[
+        fastly.ServiceVclRequestSettingArgs(
+            default_host=backend_domain,
+            force_ssl=True,
+            name="Override Host",
+            xff="leave",
+        ),
+        fastly.ServiceVclRequestSettingArgs(
+            default_host=backend_domain,
+            force_ssl=True,
+            hash_keys="req.http.host, req.url.path, req.url.qs",
+            name="Cache images with query param",
+            request_condition="Wagtail Images",
+            xff="leave",
+        ),
+    ],
+    response_objects=[
+        fastly.ServiceVclResponseObjectArgs(
+            name="Redirect to LASERx",
+            request_condition="path is LASERx",
+            response="Moved Permanently",
+            status=301,
+        ),
+        fastly.ServiceVclResponseObjectArgs(
+            name="Redirect to QCF product page",
+            request_condition="path is QCF",
+            response="Moved Permanently",
+            status=301,
+        ),
+        fastly.ServiceVclResponseObjectArgs(
+            name="Redirect to SysEngx product page",
+            request_condition="path is SysEngx",
+            response="Moved Permanently",
+            status=301,
+        ),
+        fastly.ServiceVclResponseObjectArgs(
+            name="navair emergency",
+            request_condition="navair product 76",
+            response="Moved Permanently",
+            status=301,
+        ),
+        fastly.ServiceVclResponseObjectArgs(
+            name="redirect to QCR",
+            request_condition="path is QCR",
+            response="Moved Permanently",
+            status=301,
+        ),
+    ],
+    snippets=[
+        fastly.ServiceVclSnippetArgs(
+            content=f"""// The app needx X-Forwarded-Host to be accurate, and it must not be the
+// comma-separated list that it would be if using a Fastly shield POP and
+// left to the default behavior.
+//
+set bereq.http.x-forwarded-host = "{frontend_domain}";""",  # noqa: E501
+            name="Set x-forwarded-host - miss",
+            type="miss",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            content=f"""// The app needx X-Forwarded-Host to be accurate, and it must not be the
+// comma-separated list that it would be if using a Fastly shield POP and
+// left to the default behavior.
+//
+set bereq.http.x-forwarded-host = "{frontend_domain}";""",  # noqa: E501
+            name="Set x-forwarded-host - pass",
+            type="pass",
+        ),
+    ],
+    stale_if_error=True,
+    opts=fastly_provider,
+)
+
+
+xpro_tls_configuration = fastly.get_tls_configuration(
+    default=False,
+    name="TLS v1.3",
+    tls_protocols=["1.2", "1.3"],
+    opts=InvokeOptions(provider=fastly_provider.provider),
+)
+
+xpro_fastly_tls = fastly.TlsSubscription(
+    f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-tls-subscription",
+    # valid values are certainly, lets-encrypt, or globalsign
+    certificate_authority="certainly",
+    domains=xpro_service.domains.apply(
+        lambda domains: [domain.name for domain in domains]
+    ),
+    # Retrieved from https://manage.fastly.com/network/tls-configurations
+    configuration_id=xpro_tls_configuration.id,
+    opts=fastly_provider,
+)
+
+xpro_fastly_tls.managed_dns_challenges.apply(fastly_certificate_validation_records)
+
+fastly.TlsSubscriptionValidation(
+    "xpro-tls-subscription-validation",
+    subscription_id=xpro_fastly_tls.id,
+    opts=fastly_provider,
+)
+
+five_minutes = 60 * 5
+route53.Record(
+    "xpro-fastly-dns-record",
+    name=frontend_domain,
+    type="A",
+    ttl=five_minutes,
+    records=[
+        record["record_value"]
+        for record in xpro_tls_configuration.dns_records
+        if record["record_type"] == "A"
+    ],
+    zone_id=lookup_zone_id_from_domain(frontend_domain),
+    allow_overwrite=True,
+)
 
 
 # Put it all together into a ConfigAssociation resource

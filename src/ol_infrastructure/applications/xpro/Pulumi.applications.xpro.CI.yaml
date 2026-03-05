@@ -39,6 +39,8 @@ config:
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
   xpro:app_domain: xpro-ci.odl.mit.edu
+  xpro:backend_domain: "xpro-ci.odl.mit.edu"
+  xpro:frontend_domain: "ci.xpro.mit.edu"
   xpro:db_password:
     secure: v1:37ScjUMRQrn2YgQA:3KOoFUWATBblqOCUlFsLj07tl4ebSEymwA/DN/iLbXdrDdCmF7YzlH1XpwFkUzW06IEsXHo=
   xpro:k8s_deploy: "true"
