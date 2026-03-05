@@ -80,6 +80,7 @@ class OLApplicationK8sCeleryBeatConfig(BaseModel):
         default={"cpu": "100m", "memory": "512Mi"}
     )
     resource_limits: dict[str, str] = Field(default={"memory": "512Mi"})
+    scheduler: str = "redbeat.RedBeatScheduler"
 
 
 class OLApplicationK8sConfig(BaseModel):
@@ -1116,7 +1117,7 @@ class OLApplicationK8s(ComponentResource):
                                         "main.celery:app",
                                         "beat",
                                         "--scheduler",
-                                        "redbeat.RedBeatScheduler",
+                                        beat_config.scheduler,
                                         "-l",
                                         beat_config.log_level,
                                     ],

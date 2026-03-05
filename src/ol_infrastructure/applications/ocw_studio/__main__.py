@@ -609,7 +609,9 @@ ocw_studio_k8s_app = OLApplicationK8s(
                 redis_password=redis_config.require("password"),
             ),
         ],
-        celery_beat_config=OLApplicationK8sCeleryBeatConfig(),
+        celery_beat_config=OLApplicationK8sCeleryBeatConfig(
+            scheduler="celery.beat.PersistentScheduler"
+        ),
         resource_requests={"cpu": "250m", "memory": "1Gi"},
         resource_limits={"memory": "1Gi"},
         # App lacks health check endpoints so we use nginx's
