@@ -1042,8 +1042,8 @@ for location in code_locations:
         # Give more memory for processing edxorg archives
         deployment["resources"] = {
             "requests": {
-                "cpu": "1000m",
-                "memory": "32Gi",
+                "cpu": "2000m",
+                "memory": "64Gi",
             },
             "limits": {
                 "memory": "64Gi",
