@@ -158,7 +158,7 @@ def _define_registry_image_resources(
         image_tag=None,
         # While check_every=never, defining tag_regex helps Concourse UI understand
         # resource versions
-        tag_regex=r"[0-9]+\.[0-9]+\.[0-9]+",  # examples 0.24.0, 0.26.3
+        tag_regex=r"v?[0-9]+\.[0-9]+\.[0-9]+",  # examples 0.24.0, 0.26.3
         sort_by_creation=True,
         **dockerhub_kwargs,
     )
@@ -176,7 +176,7 @@ def _define_registry_image_resources(
         image_tag=None,
         # While check_every=never, defining tag_regex helps Concourse UI understand
         # resource versions
-        tag_regex=r"[0-9]+\.[0-9]+\.[0-9]+",  # examples 0.24.0, 0.26.3
+        tag_regex=r"v?[0-9]+\.[0-9]+\.[0-9]+",  # examples 0.24.0, 0.26.3
         sort_by_creation=True,
         **ecr_kwargs,
     )
@@ -234,7 +234,7 @@ def _build_image_job(
                         platform=Platform.linux,
                         image_resource=AnonymousResource(
                             type=REGISTRY_IMAGE,
-                            source=RegistryImage(repository="alpine"),
+                            source=RegistryImage(repository="alpine/git"),
                         ),
                         inputs=[Input(name=git_repo_resource.name)],
                         outputs=[Output(name=Identifier(version_output_dir))],
@@ -242,7 +242,11 @@ def _build_image_job(
                             path="sh",
                             args=[
                                 "-c",
-                                rf"""grep -E -o '^VERSION = "[0-9]+\.[0-9]+\.[0-9]+"$' {git_repo_resource.name}/main/settings.py | cut -d\" -f2 > {version_file}""",
+                                f"""cd {git_repo_resource.name}
+                                # Command to get the *latest* tag that points to the current HEAD
+                                # The result is echoed into a file that is passed to the next step
+                                LATEST_TAG=$(git describe --tags --abbrev=0)
+                                echo $LATEST_TAG > {version_file}""",
                             ],
                         ),
                     ),
