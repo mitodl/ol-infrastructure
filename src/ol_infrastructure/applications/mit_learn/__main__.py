@@ -913,30 +913,36 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             priority=10,
         ),
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent(r"""
+            content=textwrap.dedent(
+                r"""
             declare local var.is_media_request BOOL;
             set var.is_media_request = false;
             if( req.url ~ "^/media" ) {
               set var.is_media_request = true;
               unset req.http.Cookie;
-            }"""),
+            }"""
+            ),
             name="Route media requests to S3",
             priority=200,
             type="recv",
         ),
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent(f"""\
+            content=textwrap.dedent(
+                f"""\
             if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
               unset bereq.http.Authorization;
-            }}"""),
+            }}"""
+            ),
             name="Strip auth headers in S3 miss requests",
             type="miss",
         ),
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent(f"""\
+            content=textwrap.dedent(
+                f"""\
             if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
               unset bereq.http.Authorization;
-            }}"""),
+            }}"""
+            ),
             name="Strip auth headers in S3 pass requests",
             type="pass",
         ),
@@ -1116,6 +1122,7 @@ env_vars = {
     "POSTHOG_ENABLED": "True",
     "POSTHOG_PROJECT_ID": 63497,
     "POSTHOG_TIMEOUT_MS": 1000,
+    "POSTHOG_UI_HOST": "https://us.posthog.com",
     "PROLEARN_CATALOG_API_URL": "https://prolearn.mit.edu/graphql",
     "QDRANT_COLLECTION_NAME": f"mitlearn-{stack_info.env_suffix}",
     "QDRANT_DENSE_MODEL": "text-embedding-3-large",
