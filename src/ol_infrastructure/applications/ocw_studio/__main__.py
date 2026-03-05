@@ -256,17 +256,6 @@ db_ingress_rules = [
         security_groups=[data_vpc["security_groups"]["integrator"]],
         cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"],
     ),
-    # Don't delete this yet. The application is talking to the
-    # database over the public internet and we need to verify that
-    # it's working before we remove this rule.
-    ec2.SecurityGroupIngressArgs(
-        protocol="tcp",
-        from_port=DEFAULT_POSTGRES_PORT,
-        to_port=DEFAULT_POSTGRES_PORT,
-        cidr_blocks=["0.0.0.0/0"],
-        ipv6_cidr_blocks=["::/0"],
-        description="Allow access over the public internet from Heroku",
-    ),
     ec2.SecurityGroupIngressArgs(
         protocol="tcp",
         from_port=DEFAULT_POSTGRES_PORT,
@@ -304,7 +293,7 @@ ocw_studio_db_config = OLPostgresDBConfig(
     engine_major_version="18",
     tags=aws_config.tags,
     db_name="ocw_studio",
-    public_access=True,
+    public_access=False,
     **rds_defaults,
 )
 ocw_studio_db_config.parameter_overrides.append(
