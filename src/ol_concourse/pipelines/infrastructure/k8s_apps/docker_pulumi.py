@@ -58,6 +58,7 @@ class AppPipelineParams(BaseModel):
     repo_rc_branch: str = "release-candidate"
     repo_release_branch: str = "release"
     ol_infra_branch: str = "main"
+    settings_dir: str = "main"
 
     @model_validator(mode="after")
     def set_repo_name(self) -> "AppPipelineParams":
@@ -82,6 +83,7 @@ pipeline_params = {
         repo_name="mitxpro",
         repo_main_branch="master",
         build_target="production",
+        settings_dir="mitxpro",
     ),
     "ocw-studio": AppPipelineParams(app_name="ocw-studio", repo_main_branch="master"),
 }
@@ -158,7 +160,7 @@ def _define_registry_image_resources(
         image_tag=None,
         # While check_every=never, defining tag_regex helps Concourse UI understand
         # resource versions
-        tag_regex=r"v?[0-9]+\.[0-9]+\.[0-9]+",  # examples 0.24.0, 0.26.3
+        tag_regex=r"[0-9]+\.[0-9]+\.[0-9]+",  # examples 0.24.0, 0.26.3
         sort_by_creation=True,
         **dockerhub_kwargs,
     )
@@ -176,7 +178,7 @@ def _define_registry_image_resources(
         image_tag=None,
         # While check_every=never, defining tag_regex helps Concourse UI understand
         # resource versions
-        tag_regex=r"v?[0-9]+\.[0-9]+\.[0-9]+",  # examples 0.24.0, 0.26.3
+        tag_regex=r"[0-9]+\.[0-9]+\.[0-9]+",  # examples 0.24.0, 0.26.3
         sort_by_creation=True,
         **ecr_kwargs,
     )
@@ -207,6 +209,7 @@ def _build_image_job(
     dockerhub_registry_image_resource: Resource,
     ecr_registry_image_resource: Resource,
     build_target: str | None = None,
+    django_settings_dir: str = "main",
 ) -> Job:
     """Generate an image build job for a specific branch type (main or rc)."""
     job_name = f"build-{app_name}-image-from-{branch_type}"
@@ -234,7 +237,7 @@ def _build_image_job(
                         platform=Platform.linux,
                         image_resource=AnonymousResource(
                             type=REGISTRY_IMAGE,
-                            source=RegistryImage(repository="alpine/git"),
+                            source=RegistryImage(repository="alpine"),
                         ),
                         inputs=[Input(name=git_repo_resource.name)],
                         outputs=[Output(name=Identifier(version_output_dir))],
@@ -242,11 +245,7 @@ def _build_image_job(
                             path="sh",
                             args=[
                                 "-c",
-                                f"""
-                                # Command to get the *latest* tag that points to the current HEAD
-                                # The result is echoed into a file that is passed to the next step
-                                LATEST_TAG=$(cd {git_repo_resource.name} && git describe --tags --abbrev=0)
-                                echo $LATEST_TAG > {version_file}""",
+                                rf"""grep -E -o '^VERSION = "[0-9]+\.[0-9]+\.[0-9]+"$' {git_repo_resource.name}/{django_settings_dir}/settings.py | cut -d\" -f2 > {version_file}""",
                             ],
                         ),
                     ),
@@ -363,6 +362,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         dockerhub_registry_image_resource=docker_ci_image,
         ecr_registry_image_resource=app_ci_image,
         build_target=pipeline_parameters.build_target,
+        django_settings_dir=pipeline_parameters.settings_dir or "main",
     )
     rc_image_build_job = _build_image_job(
         app_name=app_name,
@@ -372,6 +372,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         dockerhub_registry_image_resource=docker_rc_image,
         ecr_registry_image_resource=app_rc_image,
         build_target=pipeline_parameters.build_target,
+        django_settings_dir=pipeline_parameters.settings_dir or "main",
     )
 
     # Define Deployment Jobs
