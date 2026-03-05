@@ -2,6 +2,9 @@
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHjnbqe9AmEW1Js10nySybyuAG7Fb5E9EHUgkmqFDv7PxQGajxbkewesj3PCq3IiGvEkAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMLdJMjR0tj3iBnE3zAgEQgDuyIU42lpmTEO6PIHEU1dyNeIx0UiVTdoUqn4nXWcCOsqlRNWM1o7CyByuiATE23j7d9AIOhwEZxCRvew==
 config:
+  heroku:app_id:
+    secure: v1:d1JeftBc68QcCrCH:tQV5P2EU4H/eF7jMjUied4fIcj2Q6d9ujnhvfn5oxJiPbh41oVff6sWQDs9SUl65gQOTWg==
+  heroku:user: "mitx-devops"
   xpro:vars:
     CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
     CYBERSOURCE_WSDL_URL: "https://ics2wstest.ic3.com/commerce/1.x/transactionProcessor/CyberSourceTransaction_1.154.wsdl"

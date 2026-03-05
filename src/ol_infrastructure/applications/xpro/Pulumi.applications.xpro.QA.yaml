@@ -2,6 +2,9 @@
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHg42pDDDGBhpaX14TdtzcK1hbiMYTHsYRH4k5GL5RFpIwGkmvWWRjGZVEsaIcDCbAAnAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM0nzLkwr0lwKzMM8uAgEQgDs4M/ioh+ijwiVK9fQ5KTN+GvChiAKQYBUwBv5RQwr5kB6SLAD4cf7YjK+mCjUbHnxvG4veumZkiRGWmw==
 config:
+  heroku:app_id:
+    secure: v1:CwgCINZqs7rxJOiU:xMp2xgeZd+tGV/v10GRE0fJ7Snuwah5tHbKh2ojO3mbTjBhjI77Gqd6PyvUIBe/H8R8DxQ==
+  heroku:user: "mitx-devops"
   xpro:vars:
     CSRF_TRUSTED_ORIGINS: "https://rc.xpro.mit.edu,https://xpro-rc.odl.mit.edu"
     CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
