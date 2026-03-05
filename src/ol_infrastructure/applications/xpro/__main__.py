@@ -13,7 +13,6 @@ from pathlib import Path
 import pulumi_fastly as fastly
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-import pulumiverse_heroku as heroku
 from pulumi import (
     ROOT_STACK_RESOURCE,
     Alias,
@@ -72,7 +71,6 @@ from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
 )
-from ol_infrastructure.lib.heroku import setup_heroku_provider
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -92,8 +90,6 @@ xpro_config = Config("xpro")
 stack_info = parse_stack()
 k8s_deploy = xpro_config.get_bool("k8s_deploy") or False
 
-heroku_config = Config("heroku")
-heroku_app_config = Config("heroku_app")
 fastly_provider = get_fastly_provider()
 
 stack_info = parse_stack()
@@ -114,8 +110,6 @@ aws_config = AWSBase(
         "Application": "xpro",
     }
 )
-
-setup_heroku_provider()
 
 # Create S3 buckets
 
@@ -614,138 +608,6 @@ if k8s_deploy:
         k8s_labels=k8s_app_labels,
     )
 
-################################
-# Heroku Deployment Path       #
-################################
-heroku_vars = dict(app_env_vars)
-heroku_vars["MITXPRO_SECURE_SSL_REDIRECT"] = "True"
-heroku_vars.update(**xpro_config.get_object("vars") or {})
-
-# Finally, populate a map of vars that contain secrets
-auth_aws_mitx_creds_xpro_app = vault.generic.get_secret_output(
-    path="aws-mitx/creds/xpro-app",
-    with_lease_start_time=False,
-    opts=InvokeOptions(parent=xpro_vault_backend_role),
-)
-auth_postgres_xpro_creds_app = vault.generic.get_secret_output(
-    path="postgres-xpro/creds/app",
-    with_lease_start_time=False,
-    opts=InvokeOptions(parent=xpro_vault_backend_role),
-)
-secret_global_mailgun_api_key = vault.generic.get_secret_output(
-    path="secret-global/mailgun",
-    opts=InvokeOptions(parent=xpro_vault_backend_role),
-)
-
-sensitive_heroku_vars = {
-    # Secrets that can be source locally from SOPS
-    "COUPON_REQUEST_SHEET_ID": xpro_vault_secrets["google-sheets"]["sheet_id"],
-    "CYBERSOURCE_ACCESS_KEY": xpro_vault_secrets["cybersource"]["access_key"],
-    "CYBERSOURCE_INQUIRY_LOG_NACL_ENCRYPTION_KEY": xpro_vault_secrets["cybersource"][
-        "inquiry_log_nacl_encryption_key"
-    ],
-    "CYBERSOURCE_PROFILE_ID": xpro_vault_secrets["cybersource"]["profile_id"],
-    "CYBERSOURCE_SECURITY_KEY": xpro_vault_secrets["cybersource"]["security_key"],
-    "CYBERSOURCE_TRANSACTION_KEY": xpro_vault_secrets["cybersource"]["transaction_key"],
-    "DEFERRAL_REQUEST_WORKSHEET_ID": xpro_vault_secrets["google-sheets"][
-        "deferral_worksheet_id"
-    ],
-    "DIGITAL_CREDENTIALS_ISSUER_ID": xpro_vault_secrets["digital-credentials"][
-        "issuer_id"
-    ],
-    "DIGITAL_CREDENTIALS_OAUTH2_CLIENT_ID": xpro_vault_secrets["digital-credentials"][
-        "oauth2_client_id"
-    ],
-    "DIGITAL_CREDENTIALS_VERIFICATION_METHOD": xpro_vault_secrets[
-        "digital-credentials"
-    ]["verification_method"],
-    "DRIVE_OUTPUT_FOLDER_ID": xpro_vault_secrets["google-sheets"]["folder_id"],
-    "DRIVE_SERVICE_ACCOUNT_CREDS": xpro_vault_secrets["google-sheets"][
-        "service_account_creds"
-    ],
-    "DRIVE_SHARED_ID": xpro_vault_secrets["google-sheets"]["drive_shared_id"],
-    "EMERITUS_API_KEY": xpro_vault_secrets["emeritus"]["api_key"],
-    "ENROLLMENT_CHANGE_SHEET_ID": xpro_vault_secrets["google-sheets"][
-        "enroll_change_sheet_id"
-    ],
-    "EXTERNAL_COURSE_SYNC_API_KEY": xpro_vault_secrets["external-course-sync"][
-        "api_key"
-    ],
-    "EXTERNAL_COURSE_SYNC_EMAIL_RECIPIENTS": xpro_vault_secrets["external-course-sync"][
-        "email-recipients"
-    ],
-    "HIREFIRE_TOKEN": xpro_vault_secrets["hirefire"]["token"],
-    "MITOL_DIGITAL_CREDENTIALS_HMAC_SECRET": xpro_vault_secrets["digital-credentials"][
-        "hmac_secret"
-    ],
-    "MITOL_DIGITAL_CREDENTIALS_VERIFY_SERVICE_BASE_URL": xpro_vault_secrets[
-        "digital-credentials"
-    ]["sign_and_verify_url"],
-    "MITOL_HUBSPOT_API_PRIVATE_TOKEN": xpro_vault_secrets["hubspot"][
-        "api_private_token"
-    ],
-    "MITXPRO_EMAIL_HOST": xpro_vault_secrets["smtp"]["relay_host"],
-    "MITXPRO_EMAIL_PASSWORD": xpro_vault_secrets["smtp"]["relay_password"],
-    "MITXPRO_EMAIL_PORT": xpro_vault_secrets["smtp"]["relay_port"],
-    "MITXPRO_EMAIL_USER": xpro_vault_secrets["smtp"]["relay_username"],
-    "MITXPRO_REGISTRATION_ACCESS_TOKEN": xpro_vault_secrets["openedx"][
-        "registration_access_token"
-    ],
-    "MITXPRO_SUPPORT_EMAIL": xpro_vault_secrets["smtp"]["support_email"],
-    "OPENEDX_API_CLIENT_ID": xpro_vault_secrets["openedx-api-client"]["client_id"],
-    "OPENEDX_API_CLIENT_SECRET": xpro_vault_secrets["openedx-api-client"][
-        "client_secret"
-    ],
-    "OPENEDX_GRADES_API_TOKEN": xpro_vault_secrets["openedx"]["grades_api_token"],
-    "OPENEDX_SERVICE_WORKER_API_TOKEN": xpro_vault_secrets["openedx"][
-        "service_worker_api_token"
-    ],
-    "POSTHOG_PROJECT_API_KEY": xpro_vault_secrets.get("posthog", {}).get(
-        "project_api_key", ""
-    ),
-    "RECAPTCHA_SECRET_KEY": xpro_vault_secrets["recaptcha"]["secret_key"],
-    "RECAPTCHA_SITE_KEY": xpro_vault_secrets["recaptcha"]["site_key"],
-    "REFUND_REQUEST_WORKSHEET_ID": xpro_vault_secrets["google-sheets"][
-        "refund_worksheet_id"
-    ],
-    "SECRET_KEY": xpro_vault_secrets["django"]["secret-key"],
-    "SENTRY_DSN": xpro_vault_secrets["sentry"]["dsn"],
-    "SHEETS_ADMIN_EMAILS": xpro_vault_secrets["google-sheets"]["admin_emails"],
-    "STATUS_TOKEN": xpro_vault_secrets["django"]["status-token"],
-    "VOUCHER_DOMESTIC_AMOUNT_KEY": xpro_vault_secrets["voucher-domestic"]["amount_key"],
-    "VOUCHER_DOMESTIC_COURSE_KEY": xpro_vault_secrets["voucher-domestic"]["course_key"],
-    "VOUCHER_DOMESTIC_CREDITS_KEY": xpro_vault_secrets["voucher-domestic"][
-        "credits_key"
-    ],
-    "VOUCHER_DOMESTIC_DATES_KEY": xpro_vault_secrets["voucher-domestic"]["dates_key"],
-    "VOUCHER_DOMESTIC_DATE_KEY": xpro_vault_secrets["voucher-domestic"]["date_key"],
-    "VOUCHER_DOMESTIC_EMPLOYEE_ID_KEY": xpro_vault_secrets["voucher-domestic"][
-        "employee_id_key"
-    ],
-    "VOUCHER_DOMESTIC_EMPLOYEE_KEY": xpro_vault_secrets["voucher-domestic"][
-        "employee_key"
-    ],
-    "VOUCHER_DOMESTIC_KEY": xpro_vault_secrets["voucher-domestic"]["key"],
-    # Auth secrets that require something more involved
-    "AWS_ACCESS_KEY_ID": auth_aws_mitx_creds_xpro_app.data.apply(
-        lambda data: "{}".format(data["access_key"])
-    ),
-    "AWS_SECRET_ACCESS_KEY": auth_aws_mitx_creds_xpro_app.data.apply(
-        lambda data: "{}".format(data["secret_key"])
-    ),
-    "DATABASE_URL": auth_postgres_xpro_creds_app.data.apply(
-        lambda data: (
-            "postgres://{}:{}@xpro-db-applications-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/xpro".format(
-                data["username"], data["password"], stack_info.name.lower()
-            )
-        )
-    ),
-    # Static secrets that require something more involved
-    "MAILGUN_KEY": secret_global_mailgun_api_key.data.apply(
-        lambda data: "{}".format(data["api_key"])
-    ),
-}
-
 vector_log_proxy_secrets = read_yaml_secrets(
     Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
 )
@@ -1101,16 +963,6 @@ route53.Record(
     ],
     zone_id=lookup_zone_id_from_domain(frontend_domain),
     allow_overwrite=True,
-)
-
-
-# Put it all together into a ConfigAssociation resource
-heroku_app_id = heroku_config.require("app_id")
-xpro_heroku_configassociation = heroku.app.ConfigAssociation(
-    f"xpro-{stack_info.env_suffix}-heroku-configassociation",
-    app_id=heroku_app_id,
-    sensitive_vars=sensitive_heroku_vars,
-    vars=heroku_vars,
 )
 
 export(
