@@ -5,7 +5,7 @@ config:
   heroku:app_id:
     secure: v1:d1JeftBc68QcCrCH:tQV5P2EU4H/eF7jMjUied4fIcj2Q6d9ujnhvfn5oxJiPbh41oVff6sWQDs9SUl65gQOTWg==
   heroku:user: "mitx-devops"
-  heroku_app:vars:
+  xpro:vars:
     CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
     CYBERSOURCE_WSDL_URL: "https://ics2wstest.ic3.com/commerce/1.x/transactionProcessor/CyberSourceTransaction_1.154.wsdl"
     DIGITAL_CREDENTIALS_SUPPORTED_RUNS: ""
@@ -38,5 +38,9 @@ config:
     ZENDESK_DOMAIN_VERIFICATION_TAG_VALUE: "o0itxdfh369m1bw4cuz9"
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
+  xpro:app_domain: xpro-ci.odl.mit.edu
   xpro:db_password:
     secure: v1:37ScjUMRQrn2YgQA:3KOoFUWATBblqOCUlFsLj07tl4ebSEymwA/DN/iLbXdrDdCmF7YzlH1XpwFkUzW06IEsXHo=
+  xpro:k8s_deploy: "true"
+  redis:password:
+    secure: v1:HoUB1OmmtBi5mvsr:MYyTAJRPDKWVOBvkl7TuHrtQ7dNhgy/Um9EEd4MSSaabZLacFcl3UITTNTrPy8XdoMOB7HgMovE2
