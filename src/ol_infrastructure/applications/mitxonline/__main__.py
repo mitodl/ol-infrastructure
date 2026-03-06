@@ -637,11 +637,11 @@ mitxonline_k8s_app = OLApplicationK8s(
 
 if mitxonline_config.get_bool("use_granian"):
     mitxonline_service_monitor = kubernetes.apiextensions.CustomResource(
-        "mitxonline-webapp-service-monitor",
+        "mitxonline-webapp-pod-monitor",
         api_version="monitoring.coreos.com/v1",
-        kind="ServiceMonitor",
+        kind="PodMonitor",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="mitxonline-webapp-monitor",
+            name="mitxonline-webapp-pod-monitor",
             namespace=mitxonline_namespace,
             labels=k8s_app_labels,
         ),
@@ -653,16 +653,12 @@ if mitxonline_config.get_bool("use_granian"):
                     "ol.mit.edu/component": "webapp",
                 }
             },
-            "endpoints": [
+            "podMetricsEndpoints": [
                 {
                     "port": "http",
                     "path": "/metrics",
                     "scheme": "http",
                     "interval": f"{metrics_scrape_interval}s",
-                    "tlsConfig": {
-                        "insecureSkipVerify": True  # For internal metrics scraping, often
-                        # used if Prometheus doesn't have the CA
-                    },
                 }
             ],
             "namespaceSelector": {"matchNames": [mitxonline_namespace]},
