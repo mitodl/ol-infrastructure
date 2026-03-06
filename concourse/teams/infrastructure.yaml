@@ -2,14 +2,15 @@
 roles:
 - name: owner
   github:
-    teams:
-    - mitodl:devops
+    orgs:
+    - mitodl
   local:
     users:
     - oldevops
   oidc:
     groups:
     - admin
+    - developer
 - name: viewer
   github:
     orgs:

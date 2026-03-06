@@ -4,6 +4,7 @@ roles:
   github:
     teams:
     - mitodl:devops
+    - mitodl:odl-engineering
   local:
     users:
     - oldevops
