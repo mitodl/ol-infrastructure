@@ -783,6 +783,7 @@ learn_ai_app_k8s = OLApplicationK8s(
             backlog=None,
             log_level="debug",
             application_module="main.asgi:application",
+            nginx_config_filename="web.conf",  # learn_ai shares one nginx config for all server types
         )
         if learn_ai_config.get_bool("use_granian")
         else None,
