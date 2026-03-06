@@ -111,3 +111,4 @@ config:
     secure: v1:SKlByHIh5fj/2MlA:1hzqRgIoqGowunYEVMMhdzPPBPUGucSUjlcOUDuuPL7JIg+Mpp2nGu8sHGfSMtfeAFOKNlQ6bmMF2oQ=
   keycloak_realm:ol-platform-engineering-grafana-client-secret:
     secure: v1:rAIQutctJKUBe/rV:VV0DhdOXs5U+zCqXE/bOTjqe98nBvo/Kkdfnf0JJjzFwI9gxOIBXwSmwoyP2XsIi7+VVVLVzfCHVcvay
+  keycloak_realm:olapps_email_tmeme: ol-learn

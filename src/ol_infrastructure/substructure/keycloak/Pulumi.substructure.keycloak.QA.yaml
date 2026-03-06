@@ -124,3 +124,4 @@ config:
     secure: v1:zHo95RFS+Eoplvmf:NBtJt1ajx88FL6NMWqqmk0czTWG+2ZoUvB/nWhuERLkXffbW5LDIwJ6EhtQCUQ84Cm0CntuUXq6gTACdrjdLdNk0AINAP+0pfvvDk5+0Gus=
   keycloak_realm:session_secret:
     secure: v1:9Y54vvxTRbuuDCro:dXlzvu2/QqxZyEA1iG/elwzgP3xAQSVChqh/c5bXsLmz3j6hDzBlgBzlp9pIbxVk/+1GhYKrIgsULgU=
+  keycloak_realm:olapps_email_tmeme: ol-learn
