@@ -655,7 +655,7 @@ if mitxonline_config.get_bool("use_granian"):
             },
             "endpoints": [
                 {
-                    "port": "9090",
+                    "port": "http",
                     "path": "/metrics",
                     "scheme": "http",
                     "interval": f"{metrics_scrape_interval}s",
@@ -894,7 +894,7 @@ mitxonline_service = fastly.ServiceVcl(
         fastly.ServiceVclBackendArgs(
             address=api_domain,
             connect_timeout=15000,
-            first_byte_timeout=30000,
+            first_byte_timeout=1_200_000,
             name=f"MITx Online {stack_info.name} K8s App",
             port=443,
             ssl_cert_hostname=api_domain,
