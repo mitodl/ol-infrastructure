@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Apply OL governance RLS policies to Superset via the REST API.
 
 This script is run as a post-deployment Kubernetes Job. It reads
@@ -115,10 +114,13 @@ def get_dataset_name_to_id(session: requests.Session) -> dict[str, int]:
     - qualified ``schema.table_name`` (e.g.
       ``"ol_warehouse_production_reporting.instructor_module_report"``)
 
-    When both a bare and a qualified key would collide (two datasets sharing the
-    same table_name in different schemas) the qualified form is authoritative.
+    If two datasets share the same ``table_name`` across different schemas the bare
+    key is ambiguous and is removed from the mapping.  Policies that reference an
+    ambiguous name must use the fully-qualified ``schema.table_name`` form.
     """
     result: dict[str, int] = {}
+    # Track which bare names are seen more than once so we can remove them.
+    bare_name_collision: set[str] = set()
     page = 0
     page_size = 100
     while True:
@@ -141,9 +143,20 @@ def get_dataset_name_to_id(session: requests.Session) -> dict[str, int]:
             schema = item.get("schema") or ""
             table = item.get("table_name", "")
             dataset_id = item["id"]
-            # Always index by bare table name so policies can use short names.
-            result[table] = dataset_id
-            # Also index by qualified name so policies can be explicit.
+            if table in bare_name_collision:
+                pass  # Already marked ambiguous; skip bare entry.
+            elif table in result:
+                # Second dataset with the same bare name — mark as ambiguous.
+                bare_name_collision.add(table)
+                del result[table]
+                log.warning(
+                    "Multiple datasets share table_name %r; "
+                    "use schema-qualified name in RLS policies.",
+                    table,
+                )
+            else:
+                result[table] = dataset_id
+            # Always index by qualified name regardless of collisions.
             if schema:
                 result[f"{schema}.{table}"] = dataset_id
         if len(data.get("result", [])) < page_size:

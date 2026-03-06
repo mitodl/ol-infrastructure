@@ -738,7 +738,7 @@ _rls_apply_job = kubernetes.batch.v1.Job(
     ),
     spec=kubernetes.batch.v1.JobSpecArgs(
         backoff_limit=3,
-        active_deadline_seconds=600,
+        active_deadline_seconds=1800,
         ttl_seconds_after_finished=3600,
         template=kubernetes.core.v1.PodTemplateSpecArgs(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
