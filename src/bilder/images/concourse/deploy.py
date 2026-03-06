@@ -128,17 +128,17 @@ concourse_config_map = {
         oidc_display_name="OL Platform Engineering",
         oidc_client_id=(
             '{{ with secret "secret-operations/sso/concourse" }}'
-            "{{ .Data.data.client_id }}"
+            "{{ .Data.client_id }}"
             "{{ end }}"
         ),
         oidc_client_secret=(  # noqa: S106
             '{{ with secret "secret-operations/sso/concourse" }}'
-            "{{ .Data.data.client_secret }}"
+            "{{ .Data.client_secret }}"
             "{{ end }}"
         ),
         oidc_issuer=(
             '{{ with secret "secret-operations/sso/concourse" }}'
-            "{{ .Data.data.url }}"
+            "{{ .Data.url }}"
             "{{ end }}"
         ),
         default_build_logs_to_retain="10",
