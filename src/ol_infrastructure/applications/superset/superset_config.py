@@ -83,7 +83,7 @@ JWT_PUBLIC_KEY = OIDC_REALM_PUBLIC_KEY
 # ol_platform_admin → built-in Admin (full privileges).
 # All other roles map to custom roles loaded from ol_governance_roles.json via
 # `flask fab import-roles` during deployment init.
-# See src/ol_concourse/pipelines/infrastructure/superset/ol_governance_roles.json
+# See src/ol_infrastructure/applications/superset/ol_governance_roles.json
 # https://superset.apache.org/docs/installation/configuring-superset#mapping-ldap-or-oauth-groups-to-superset-roles
 AUTH_ROLES_MAPPING = {
     "ol_platform_admin": ["Admin"],

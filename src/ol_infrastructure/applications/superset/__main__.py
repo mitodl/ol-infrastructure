@@ -1,5 +1,6 @@
 """Deploy Superset to EKS."""
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -556,29 +557,27 @@ superset_chart = kubernetes.helm.v3.Release(
                 .parent.joinpath("superset_config.py")
                 .read_text()
             },
-            # Mount governance policy files into /app/pythonpath so the init
-            # command and the post-deploy RLS Job can access them.
+            # Mount the governance roles JSON into /app/pythonpath so the init
+            # command can import them via `flask fab import-roles`.
+            # The RLS policy files are mounted separately via a dedicated ConfigMap
+            # (superset-rls-policies) into the post-deploy Job pod.
             "extraConfigs": {
                 "ol_governance_roles.json": (
                     _POLICY_DIR / "ol_governance_roles.json"
-                ).read_text(),
-                "ol_rls_policies.json": (
-                    _POLICY_DIR / "ol_rls_policies.json"
-                ).read_text(),
-                "apply_rls_policies.py": (
-                    _POLICY_DIR / "apply_rls_policies.py"
                 ).read_text(),
             },
             # Override init command to load governance roles after superset init.
             # `flask fab import-roles` is idempotent: it creates missing roles and
             # updates existing ones without touching Admin/Alpha/Gamma/Public.
+            # `set -e` ensures any failure aborts the whole init sequence.
             "init": {
                 "command": [
                     "/bin/sh",
                     "-c",
+                    "set -e; "
                     ". /app/pythonpath/superset_bootstrap.sh; "
-                    "superset db upgrade && "
-                    "superset init && "
+                    "superset db upgrade; "
+                    "superset init; "
                     "flask fab import-roles"
                     " --path /app/pythonpath/ol_governance_roles.json",
                 ]
@@ -680,9 +679,29 @@ celery_keda_scaling = kubernetes.apiextensions.CustomResource(
 ########################################
 
 # RLS policy application Job — runs after Helm deployment completes.
-# Reads ol_rls_policies.json (mounted via extraConfigs into /app/pythonpath)
-# and idempotently creates/updates Superset RLS filters via the REST API.
-# The Job uses the same Vault-synced secrets as the main application pods.
+# Idempotently creates/updates Superset RLS filters via the REST API.
+# Policy files are mounted from a dedicated ConfigMap (not the Helm chart's
+# extraConfigs ConfigMap, which is only available to Helm-managed pods).
+
+_rls_policy_hash = hashlib.sha256(
+    (_POLICY_DIR / "ol_rls_policies.json").read_bytes()
+    + (_POLICY_DIR / "apply_rls_policies.py").read_bytes()
+).hexdigest()
+
+rls_policy_configmap = kubernetes.core.v1.ConfigMap(
+    f"superset-rls-policies-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="superset-rls-policies",
+        namespace=superset_namespace,
+        labels=k8s_global_labels,
+    ),
+    data={
+        "ol_rls_policies.json": (_POLICY_DIR / "ol_rls_policies.json").read_text(),
+        "apply_rls_policies.py": (_POLICY_DIR / "apply_rls_policies.py").read_text(),
+    },
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
 rls_admin_secret = OLVaultK8SSecret(
     f"superset-rls-admin-secret-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
@@ -712,15 +731,14 @@ _rls_apply_job = kubernetes.batch.v1.Job(
         namespace=superset_namespace,
         labels=k8s_global_labels | {"ol.mit.edu/process": "rls-init"},
         annotations={
-            # Re-run whenever the policy content hash changes so drift is corrected
-            # on every Pulumi deployment.
-            "ol.mit.edu/policy-hash": str(
-                hash((_POLICY_DIR / "ol_rls_policies.json").read_text())
-            ),
+            # SHA-256 of policy JSON + script so the Job is recreated only when
+            # content changes — avoids the non-determinism of Python's hash().
+            "ol.mit.edu/policy-hash": _rls_policy_hash,
         },
     ),
     spec=kubernetes.batch.v1.JobSpecArgs(
         backoff_limit=3,
+        active_deadline_seconds=600,
         ttl_seconds_after_finished=3600,
         template=kubernetes.core.v1.PodTemplateSpecArgs(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -729,13 +747,21 @@ _rls_apply_job = kubernetes.batch.v1.Job(
             spec=kubernetes.core.v1.PodSpecArgs(
                 restart_policy="OnFailure",
                 service_account_name="superset",
+                volumes=[
+                    kubernetes.core.v1.VolumeArgs(
+                        name="rls-policies",
+                        config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                            name="superset-rls-policies",
+                        ),
+                    ),
+                ],
                 containers=[
                     kubernetes.core.v1.ContainerArgs(
                         name="apply-rls",
                         image=ecr_image_uri("mitodl/superset") + f":{SUPERSET_TAG}",
                         command=[
                             "python",
-                            "/app/pythonpath/apply_rls_policies.py",
+                            "/app/rls-policies/apply_rls_policies.py",
                         ],
                         env=[
                             kubernetes.core.v1.EnvVarArgs(
@@ -750,6 +776,13 @@ _rls_apply_job = kubernetes.batch.v1.Job(
                                 )
                             ),
                         ],
+                        volume_mounts=[
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="rls-policies",
+                                mount_path="/app/rls-policies",
+                                read_only=True,
+                            ),
+                        ],
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(
                             requests={"cpu": "100m", "memory": "256Mi"},
                             limits={"cpu": "500m", "memory": "512Mi"},
@@ -761,7 +794,7 @@ _rls_apply_job = kubernetes.batch.v1.Job(
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
-        depends_on=[superset_chart, rls_admin_secret],
+        depends_on=[superset_chart, rls_admin_secret, rls_policy_configmap],
     ),
 )
 

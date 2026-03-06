@@ -2,8 +2,9 @@
 """Apply OL governance RLS policies to Superset via the REST API.
 
 This script is run as a post-deployment Kubernetes Job. It reads
-ol_rls_policies.json, resolves role and table names to their Superset
-database IDs, then creates or updates each RLS filter idempotently.
+ol_rls_policies.json (co-located in the same directory), resolves role and
+table names to their Superset database IDs, then creates or updates each RLS
+filter idempotently.
 
 Environment variables (sourced from Vault-synced K8s secrets):
     SUPERSET_ADMIN_USER     - admin username for API authentication
@@ -34,9 +35,16 @@ POLICY_FILE = Path(__file__).parent / "ol_rls_policies.json"
 MAX_RETRIES = 10
 RETRY_DELAY = 15  # seconds
 
+if not ADMIN_PASSWORD:
+    log.error(
+        "Environment variable SUPERSET_ADMIN_PASSWORD is not set or is empty. "
+        "A non-empty admin password is required for Superset API authentication."
+    )
+    sys.exit(1)
+
 
 def wait_for_superset(session: requests.Session) -> None:
-    """Poll until Superset's health endpoint responds, with exponential backoff."""
+    """Poll until Superset's health endpoint responds, with linear backoff."""
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             resp = session.get(f"{SUPERSET_URL}/health", timeout=5)
@@ -100,7 +108,16 @@ def build_name_to_id_map(session: requests.Session, endpoint: str) -> dict[str, 
 
 
 def get_dataset_name_to_id(session: requests.Session) -> dict[str, int]:
-    """Return mapping of 'schema.table_name' -> dataset_id for all datasets."""
+    """Return mapping of dataset names to dataset IDs for all datasets.
+
+    Datasets are indexed under two keys so that policies can use either format:
+    - bare ``table_name`` (e.g. ``"instructor_module_report"``)
+    - qualified ``schema.table_name`` (e.g.
+      ``"ol_warehouse_production_reporting.instructor_module_report"``)
+
+    When both a bare and a qualified key would collide (two datasets sharing the
+    same table_name in different schemas) the qualified form is authoritative.
+    """
     result: dict[str, int] = {}
     page = 0
     page_size = 100
@@ -123,8 +140,12 @@ def get_dataset_name_to_id(session: requests.Session) -> dict[str, int]:
         for item in data.get("result", []):
             schema = item.get("schema") or ""
             table = item.get("table_name", "")
-            key = f"{schema}.{table}" if schema else table
-            result[key] = item["id"]
+            dataset_id = item["id"]
+            # Always index by bare table name so policies can use short names.
+            result[table] = dataset_id
+            # Also index by qualified name so policies can be explicit.
+            if schema:
+                result[f"{schema}.{table}"] = dataset_id
         if len(data.get("result", [])) < page_size:
             break
         page += 1
@@ -159,38 +180,32 @@ def apply_rls_filter(
     dataset_map: dict[str, int],
     existing: dict[str, int],
 ) -> None:
-    """Create or update a single RLS filter from the policy template."""
+    """Create or update a single RLS filter from the policy template.
+
+    Raises ``RuntimeError`` if any required role or table is missing so that
+    partial or misconfigured security policies are never silently accepted.
+    """
     name = policy["name"]
 
-    role_ids = []
-    for role_name in policy["roles"]:
-        if role_name not in role_map:
-            log.warning(
-                "Role '%s' not found in Superset; skipping filter '%s'.",
-                role_name,
-                name,
-            )
-            return
-        role_ids.append(role_map[role_name])
-
-    table_ids = []
-    missing_tables = []
-    for table_name in policy["tables"]:
-        if table_name not in dataset_map:
-            missing_tables.append(table_name)
-        else:
-            table_ids.append(dataset_map[table_name])
-
-    if missing_tables:
-        log.warning(
-            "Tables not found in Superset for filter '%s' (will be skipped): %s",
-            name,
-            missing_tables,
+    missing_roles = [r for r in policy["roles"] if r not in role_map]
+    if missing_roles:
+        msg = (
+            f"Required roles not found in Superset for filter '{name}': "
+            f"{', '.join(missing_roles)}. "
+            "Custom roles may not have been imported yet; the Job will retry."
         )
+        raise RuntimeError(msg)
+    role_ids = [role_map[r] for r in policy["roles"]]
 
-    if not table_ids:
-        log.warning("No valid tables for filter '%s'; skipping.", name)
-        return
+    missing_tables = [t for t in policy["tables"] if t not in dataset_map]
+    if missing_tables:
+        msg = (
+            f"Required datasets not found in Superset for filter '{name}': "
+            f"{', '.join(missing_tables)}. "
+            "Ensure dataset names in ol_rls_policies.json match registered datasets."
+        )
+        raise RuntimeError(msg)
+    table_ids = [dataset_map[t] for t in policy["tables"]]
 
     payload = {
         "name": name,
@@ -247,19 +262,38 @@ def main() -> None:
         len(existing),
     )
 
+    success_count = 0
+    failure_count = 0
+    failed_policies: list[str] = []
+
     for policy in policies:
         try:
             apply_rls_filter(session, policy, role_map, dataset_map, existing)
+            success_count += 1
         except requests.HTTPError as exc:
+            failure_count += 1
+            failed_policies.append(policy["name"])
             log.exception(
                 "HTTP error applying filter '%s' (response: %s).",
                 policy["name"],
                 exc.response.text if exc.response is not None else "no response",
             )
         except Exception:
-            log.exception("Unexpected error applying filter '%s'.", policy["name"])
+            failure_count += 1
+            failed_policies.append(policy["name"])
+            log.exception("Error applying filter '%s'.", policy["name"])
 
-    log.info("RLS policy application complete.")
+    log.info(
+        "RLS policy application complete. %d succeeded, %d failed.",
+        success_count,
+        failure_count,
+    )
+    if failure_count > 0:
+        log.error(
+            "One or more RLS policies failed to apply: %s",
+            ", ".join(failed_policies),
+        )
+        sys.exit(1)
 
 
 if __name__ == "__main__":
