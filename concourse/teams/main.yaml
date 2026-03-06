@@ -7,11 +7,21 @@ roles:
   local:
     users:
     - oldevops
+  oidc:
+    groups:
+    - admin
+    - developer
 - name: member
   github:
     teams:
     - mitodl:odl-engineering
+  oidc:
+    groups:
+    - developer
 - name: viewer
+  oidc:
+    groups:
+    - developer
   github:
     orgs:
     - mitodl

@@ -290,6 +290,20 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913
             ),
         ).apply(json.dumps),
     )
+    # Map realm roles (e.g. admin, developer) into the "groups" claim so that
+    # Concourse can use them for team membership via CONCOURSE_OIDC_GROUPS_KEY.
+    keycloak.openid.UserRealmRoleProtocolMapper(
+        "ol-platform-engineering-concourse-realm-role-groups-mapper",
+        realm_id=ol_platform_engineering_concourse_client.realm_id,
+        client_id=ol_platform_engineering_concourse_client.id,
+        name="Realm Role Groups Mapper",
+        claim_name="groups",
+        multivalued=True,
+        add_to_id_token=True,
+        add_to_access_token=True,
+        add_to_userinfo=True,
+        opts=resource_options,
+    )
     # CONCOURSE [END] # noqa: ERA001
 
     # LEEK [START] # noqa: ERA001
