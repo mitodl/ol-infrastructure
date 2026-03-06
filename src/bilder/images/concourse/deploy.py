@@ -125,6 +125,22 @@ concourse_config_map = {
             "{{ .Data.data.github_client_secret }}"
             "{{ end }}"
         ),
+        oidc_display_name="OL Platform Engineering",
+        oidc_client_id=(
+            '{{ with secret "secret-operations/sso/concourse" }}'
+            "{{ .Data.data.client_id }}"
+            "{{ end }}"
+        ),
+        oidc_client_secret=(  # noqa: S106
+            '{{ with secret "secret-operations/sso/concourse" }}'
+            "{{ .Data.data.client_secret }}"
+            "{{ end }}"
+        ),
+        oidc_issuer=(
+            '{{ with secret "secret-operations/sso/concourse" }}'
+            "{{ .Data.data.url }}"
+            "{{ end }}"
+        ),
         default_build_logs_to_retain="10",
         default_days_to_retain_build_logs="10",
         enable_build_auditing=False,

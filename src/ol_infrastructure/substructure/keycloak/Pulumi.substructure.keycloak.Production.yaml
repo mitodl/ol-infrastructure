@@ -62,6 +62,7 @@ config:
   - "https://mitxonline.mit.edu/account/action/complete*"
   keycloak_realm:olapps-open-discussions-client-redirect-uris: ["https://open.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-airbyte-redirect-uris: ["https://airbyte.odl.mit.edu/*"]
+  keycloak_realm:ol-platform-engineering-concourse-redirect-uris: ["https://cicd.odl.mit.edu/sky/issuer/callback"]
   keycloak_realm:ol-platform-engineering-dagster-redirect-uris: ["https://pipelines.odl.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-leek-redirect-uris: ["https://celery-monitoring.odl.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-vault-redirect-uris:

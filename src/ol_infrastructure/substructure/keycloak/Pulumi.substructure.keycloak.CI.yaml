@@ -49,6 +49,7 @@ config:
   keycloak_realm:ol-platform-engineering-airbyte-client-secret:
     secure: v1:RN2SKGo+MKCkI9OY:tP05EhbUMuyqGY4OmVsNIGefmYeqoHVX85z6ZyEhmzs9Jcp7fVaslk/R6FSbNd2Z
   keycloak_realm:ol-platform-engineering-airbyte-redirect-uris: ["https://airbyte-ci.odl.mit.edu/*"]
+  keycloak_realm:ol-platform-engineering-concourse-redirect-uris: ["https://cicd-ci.odl.mit.edu/sky/issuer/callback"]
   keycloak_realm:ol-platform-engineering-dagster-client-secret:
     secure: v1:F4rjMcwJr2e+854p:8qPUK+Pi112EQrWoNsczQW99e5IHP7sxwtqZTIDnonrED8qTZiMofJGEHp1vliua
   keycloak_realm:ol-platform-engineering-dagster-redirect-uris: ["https://pipelines-ci.odl.mit.edu/*"]
