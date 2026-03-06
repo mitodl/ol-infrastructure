@@ -30,7 +30,6 @@ from pulumi_aws import ec2, iam, route53, s3
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
-    DEFAULT_WSGI_PORT,
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.mitxonline.k8s_secrets import (
@@ -47,6 +46,7 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.k8s import (
+    GranianConfig,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixPluginConfig,
@@ -506,54 +506,12 @@ if "MITXONLINE_DOCKER_TAG" not in os.environ:
     raise OSError(msg)
 MITXONLINE_DOCKER_TAG = os.environ["MITXONLINE_DOCKER_TAG"]
 granian_workers = 2
-metrics_scrape_interval = "30"
 mitxonline_web_memory_limit = "1500Mi"
-if mitxonline_config.get_bool("use_granian"):
-    cmd_array = [
-        "granian",
-    ]
-    arg_array = [
-        "--interface",
-        "wsgi",
-        "--host",
-        "0.0.0.0",  # noqa: S104
-        "--port",
-        f"{DEFAULT_WSGI_PORT}",
-        "--workers",
-        str(granian_workers),
-        "--no-ws",
-        "--runtime-mode",
-        "mt",  # explicitly use multi-threading
-        "--runtime-threads",
-        "2",  # use 2 runtime threads
-        "--workers-max-rss",
-        # Limit worker memory to 90% of half of the limit in megabytes
-        str(
-            int(
-                int(parse_quantity(mitxonline_web_memory_limit) / granian_workers) * 0.9
-            )
-            // 1024
-            // 1024
-        ),
-        "--blocking-threads-idle-timeout",
-        "120",
-        "--respawn-failed-workers",
-        "--backlog",
-        "128",
-        "--metrics",
-        "--metrics-scrape-interval",
-        metrics_scrape_interval,
-        "--metrics-address",
-        "0.0.0.0",  # noqa: S104
-        "--log-level",
-        "warning",
-        "main.wsgi:application",
-    ]
-    nginx_config_path = "files/web.conf_granian"
-else:
-    cmd_array = ["uwsgi"]
-    arg_array = ["/tmp/uwsgi.ini"]  # noqa: S108
-    nginx_config_path = "files/web.conf_uwsgi"
+granian_workers_max_rss = (
+    int(int(parse_quantity(mitxonline_web_memory_limit) / granian_workers) * 0.9)
+    // 1024
+    // 1024
+)
 
 mitxonline_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
@@ -571,12 +529,21 @@ mitxonline_k8s_app = OLApplicationK8s(
         application_security_group_name=mitxonline_app_security_group.name,
         application_image_repository="mitodl/mitxonline-app",
         application_docker_tag=MITXONLINE_DOCKER_TAG,
-        application_cmd_array=cmd_array,
-        application_arg_array=arg_array,
+        application_cmd_array=["uwsgi"],
+        application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
+        granian_config=GranianConfig(
+            workers=granian_workers,
+            workers_max_rss=granian_workers_max_rss,
+            blocking_threads_idle_timeout=120,
+            respawn_failed_workers=True,
+            enable_metrics=True,
+        )
+        if mitxonline_config.get_bool("use_granian")
+        else None,
         slack_channel=slack_channel,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,
-        import_nginx_config_path=nginx_config_path,
+        import_nginx_config_path="files/web.conf_uwsgi",
         import_uwsgi_config=True,
         init_migrations=False,
         init_collectstatic=True,
@@ -634,36 +601,6 @@ mitxonline_k8s_app = OLApplicationK8s(
         depends_on=[mitxonline_app_security_group, *secret_resources]
     ),
 )
-
-if mitxonline_config.get_bool("use_granian"):
-    mitxonline_service_monitor = kubernetes.apiextensions.CustomResource(
-        "mitxonline-webapp-pod-monitor",
-        api_version="monitoring.coreos.com/v1",
-        kind="PodMonitor",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="mitxonline-webapp-pod-monitor",
-            namespace=mitxonline_namespace,
-            labels=k8s_app_labels,
-        ),
-        spec={
-            "selector": {
-                "matchLabels": {
-                    "ol.mit.edu/service": "mitxonline",
-                    "ol.mit.edu/application": "mitxonline",
-                    "ol.mit.edu/component": "webapp",
-                }
-            },
-            "podMetricsEndpoints": [
-                {
-                    "port": "http",
-                    "path": "/metrics",
-                    "scheme": "http",
-                    "interval": f"{metrics_scrape_interval}s",
-                }
-            ],
-            "namespaceSelector": {"matchNames": [mitxonline_namespace]},
-        },
-    )
 
 api_domain = mitxonline_config.require("backend_domain")
 frontend_domain = mitxonline_config.require("frontend_domain")
