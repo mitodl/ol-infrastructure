@@ -1,6 +1,7 @@
 [Unit]
 Description=Concourse service for managing continuous deployment pipelines
-After=network.target
+After=network.target vault.service
+Wants=vault.service
 Documentation=https://concourse-ci.org/
 
 [Service]
