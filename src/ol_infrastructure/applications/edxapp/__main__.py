@@ -329,6 +329,10 @@ edxapp_grades_bucket_config = S3BucketConfig(
     versioning_enabled=True,
     tags=aws_config.tags,
     ownership_controls="BucketOwnerPreferred",
+    block_public_acls=False,
+    block_public_policy=False,
+    ignore_public_acls=False,
+    restrict_public_buckets=False,
 )
 edxapp_grades_bucket = OLBucket(
     "edxapp-grades-s3-bucket",
