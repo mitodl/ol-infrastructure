@@ -141,6 +141,7 @@ concourse_config_map = {
             "{{ .Data.url }}"
             "{{ end }}"
         ),
+        oidc_user_name_key="preferred_username",
         default_build_logs_to_retain="10",
         default_days_to_retain_build_logs="10",
         enable_build_auditing=False,
