@@ -79,13 +79,19 @@ OAUTH_PROVIDERS = [
 JWT_ALGORITHM = "RS256"
 JWT_PUBLIC_KEY = OIDC_REALM_PUBLIC_KEY
 
-# Testing out Keycloak role mapping to Superset
+# Map Keycloak realm roles to Superset roles.
+# ol_platform_admin → built-in Admin (full privileges).
+# All other roles map to custom roles loaded from ol_governance_roles.json via
+# `flask fab import-roles` during deployment init.
+# See src/ol_infrastructure/applications/superset/ol_governance_roles.json
 # https://superset.apache.org/docs/installation/configuring-superset#mapping-ldap-or-oauth-groups-to-superset-roles
 AUTH_ROLES_MAPPING = {
     "ol_platform_admin": ["Admin"],
-    "ol_researcher": ["Alpha", "sql_lab"],
-    "ol_data_engineer": ["Alpha"],
-    "ol_data_analyst": ["Alpha"],
+    "ol_data_engineer": ["ol_data_engineer"],
+    "ol_data_analyst": ["ol_data_analyst"],
+    "ol_researcher": ["ol_researcher"],
+    "ol_instructor": ["ol_instructor"],
+    "ol_business_analyst": ["ol_business_analyst"],
 }
 
 # if we should replace ALL the user's roles each login, or only on registration
@@ -112,6 +118,27 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
             "role_keys": data.get("role_keys", []),
         }
 
+    @staticmethod
+    def _expand_role_keys(role_keys: list[str]) -> list[str]:
+        """Expand Keycloak role keys through AUTH_ROLES_MAPPING.
+
+        Applied consistently in both OAuth and JWT provisioning paths so that
+        a role like ``ol_platform_admin`` is expanded to ``["Admin"]`` regardless
+        of which authentication flow the user arrives through.
+
+        Any key not present in AUTH_ROLES_MAPPING is passed through unchanged,
+        which allows Superset role names to be placed directly in tokens when
+        needed.
+        """
+        expanded: list[str] = []
+        for role_key in role_keys:
+            mapped = AUTH_ROLES_MAPPING.get(role_key)
+            if mapped:
+                expanded.extend(mapped)
+            else:
+                expanded.append(role_key)
+        return expanded
+
     def _get_roles_from_keycloak_roles(self, role_keys: list[str]) -> list[object]:
         """Map Keycloak role_keys to Superset roles.
 
@@ -132,9 +159,10 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
             if public_role:
                 roles.append(public_role)
 
-        # Map Keycloak roles to Superset roles
-        for role_key in role_keys:
-            superset_role = self.find_role(role_key)
+        # Expand through AUTH_ROLES_MAPPING so the JWT path is consistent with
+        # the OAuth path (which FAB expands via AUTH_ROLES_MAPPING automatically).
+        for superset_role_name in self._expand_role_keys(role_keys):
+            superset_role = self.find_role(superset_role_name)
             if superset_role:
                 roles.append(superset_role)
 
