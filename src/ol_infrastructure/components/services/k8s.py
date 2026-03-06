@@ -83,6 +83,72 @@ class OLApplicationK8sCeleryBeatConfig(BaseModel):
     scheduler: str = "redbeat.RedBeatScheduler"
 
 
+class GranianConfig(BaseModel):
+    """Configuration for running applications with the Granian ASGI/WSGI server.
+
+    When set on OLApplicationK8sConfig, the component will generate the granian
+    command/args, select the appropriate nginx config, expose a metrics port, and
+    create a PodMonitor — replacing the manual if/else blocks in each caller.
+    """
+
+    interface: Literal["wsgi", "asgi"] = "wsgi"
+    workers: int = 2
+    runtime_mode: str | None = "mt"
+    runtime_threads: int = 2
+    no_ws: bool = True
+    workers_max_rss: int | None = None  # MB; omitted when None
+    blocking_threads_idle_timeout: int | None = None  # seconds; omitted when None
+    respawn_failed_workers: bool = False
+    backlog: int | None = 128
+    log_level: str = "warning"
+    application_module: str = "main.wsgi:application"
+    enable_metrics: bool = False
+    metrics_port: int = 9090
+    metrics_scrape_interval: int = 30
+    nginx_config_filename: str = "web.conf_granian"
+
+    def build_args(self) -> list[str]:
+        """Build the granian CLI argument list from this configuration."""
+        args = [
+            "--interface",
+            self.interface,
+            "--host",
+            "0.0.0.0",  # noqa: S104
+            "--port",
+            str(DEFAULT_WSGI_PORT),
+            "--workers",
+            str(self.workers),
+        ]
+        if self.no_ws:
+            args.append("--no-ws")
+        if self.runtime_mode is not None:
+            args += ["--runtime-mode", self.runtime_mode]
+        args += ["--runtime-threads", str(self.runtime_threads)]
+        if self.workers_max_rss is not None:
+            args += ["--workers-max-rss", str(self.workers_max_rss)]
+        if self.blocking_threads_idle_timeout is not None:
+            args += [
+                "--blocking-threads-idle-timeout",
+                str(self.blocking_threads_idle_timeout),
+            ]
+        if self.respawn_failed_workers:
+            args.append("--respawn-failed-workers")
+        if self.backlog is not None:
+            args += ["--backlog", str(self.backlog)]
+        if self.enable_metrics:
+            args += [
+                "--metrics",
+                "--metrics-scrape-interval",
+                str(self.metrics_scrape_interval),
+                "--metrics-address",
+                "0.0.0.0",  # noqa: S104
+                "--metrics-port",
+                str(self.metrics_port),
+            ]
+        args += ["--log-level", self.log_level, self.application_module]
+        return args
+
+
 class OLApplicationK8sConfig(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -214,6 +280,19 @@ class OLApplicationK8sConfig(BaseModel):
         ),
     }
     app_pdb_maximum_unavailable: NonNegativeInt | str = 1
+    extra_container_ports: list[kubernetes.core.v1.ContainerPortArgs] = Field(
+        default_factory=list,
+        description="Additional named ports to expose on the application container (e.g. a metrics port).",
+    )
+    granian_config: GranianConfig | None = Field(
+        default=None,
+        description=(
+            "When set, the component generates granian cmd/args, selects the granian "
+            "nginx config, and (if enable_metrics=True) exposes a metrics port and "
+            "creates a PodMonitor. application_cmd_array/application_arg_array serve "
+            "as the fallback command when granian_config is None."
+        ),
+    )
 
     # See https://www.pulumi.com/docs/reference/pkg/python/pulumi/#pulumi.Output.from_input
     # for docs. This unwraps the value so Pydantic can store it in the config class.
@@ -338,6 +417,28 @@ class OLApplicationK8s(ComponentResource):
         webapp_volume_mounts = nginx_volume_mounts.copy()
 
         app_containers = []
+
+        # Resolve granian vs. fallback application server configuration.
+        # When granian_config is set the component builds cmd/args; otherwise
+        # application_cmd_array / application_arg_array are used as-is.
+        effective_extra_ports = list(ol_app_k8s_config.extra_container_ports)
+        if ol_app_k8s_config.granian_config is not None:
+            gc = ol_app_k8s_config.granian_config
+            effective_nginx_config_path = f"files/{gc.nginx_config_filename}"
+            effective_cmd_array: list[str] | None = ["granian"]
+            effective_arg_array: list[str] | None = gc.build_args()
+            if gc.enable_metrics:
+                effective_extra_ports.append(
+                    kubernetes.core.v1.ContainerPortArgs(
+                        name="metrics",
+                        container_port=gc.metrics_port,
+                    )
+                )
+        else:
+            effective_nginx_config_path = ol_app_k8s_config.import_nginx_config_path
+            effective_cmd_array = ol_app_k8s_config.application_cmd_array
+            effective_arg_array = ol_app_k8s_config.application_arg_array
+
         # Import nginx configuration as a configmap
         if ol_app_k8s_config.import_nginx_config:
             application_nginx_configmap = kubernetes.core.v1.ConfigMap(
@@ -349,7 +450,7 @@ class OLApplicationK8s(ComponentResource):
                 ),
                 data={
                     "web.conf": ol_app_k8s_config.project_root.joinpath(
-                        ol_app_k8s_config.import_nginx_config_path
+                        effective_nginx_config_path
                     ).read_text(),
                 },
                 opts=resource_options,
@@ -627,15 +728,16 @@ class OLApplicationK8s(ComponentResource):
                 ports=[
                     kubernetes.core.v1.ContainerPortArgs(
                         container_port=application_port
-                    )
+                    ),
+                    *effective_extra_ports,
                 ],
                 image_pull_policy=image_pull_policy,
                 resources=kubernetes.core.v1.ResourceRequirementsArgs(
                     requests=ol_app_k8s_config.resource_requests,
                     limits=ol_app_k8s_config.resource_limits,
                 ),
-                command=ol_app_k8s_config.application_cmd_array,
-                args=ol_app_k8s_config.application_arg_array,
+                command=effective_cmd_array,
+                args=effective_arg_array,
                 env=application_deployment_env_vars,
                 env_from=application_deployment_envfrom,
                 volume_mounts=webapp_volume_mounts,
@@ -682,6 +784,42 @@ class OLApplicationK8s(ComponentResource):
             ),
             opts=deployment_options,
         )
+
+        if (
+            ol_app_k8s_config.granian_config is not None
+            and ol_app_k8s_config.granian_config.enable_metrics
+        ):
+            gc = ol_app_k8s_config.granian_config
+            kubernetes.apiextensions.CustomResource(
+                f"{ol_app_k8s_config.application_name}-webapp-pod-monitor",
+                api_version="monitoring.coreos.com/v1",
+                kind="PodMonitor",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=f"{ol_app_k8s_config.application_name}-webapp-pod-monitor",
+                    namespace=ol_app_k8s_config.application_namespace,
+                    labels=ol_app_k8s_config.k8s_global_labels,
+                ),
+                spec={
+                    "selector": {
+                        "matchLabels": {
+                            "ol.mit.edu/application": ol_app_k8s_config.application_name,
+                            "ol.mit.edu/component": "webapp",
+                        }
+                    },
+                    "podMetricsEndpoints": [
+                        {
+                            "port": "metrics",
+                            "path": "/metrics",
+                            "scheme": "http",
+                            "interval": f"{gc.metrics_scrape_interval}s",
+                        }
+                    ],
+                    "namespaceSelector": {
+                        "matchNames": [ol_app_k8s_config.application_namespace]
+                    },
+                },
+                opts=resource_options,
+            )
 
         if post_deploy_commands := ol_app_k8s_config.post_deploy_commands:
             # Create post-deployment job
