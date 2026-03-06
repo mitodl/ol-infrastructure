@@ -16,7 +16,7 @@ import pulumi
 import pulumi_fastly as fastly
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from kubernetes.utils import parse_quantity
+from kubernetes.utils.quantity import parse_quantity
 from pulumi import (
     ROOT_STACK_RESOURCE,
     Alias,
