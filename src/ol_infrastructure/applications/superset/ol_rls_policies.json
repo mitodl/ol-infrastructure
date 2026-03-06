@@ -1,12 +1,12 @@
 {
-  "_comment": "RLS policies for the OL data governance framework. Table names should be bare table names (e.g. 'instructor_module_report') when datasets are registered without a schema in Superset, or 'schema.table_name' when a schema is set. The apply_rls_policies.py script indexes datasets by both formats and resolves the policy table names to IDs via the Superset REST API at deploy time. Jinja clauses use current_email() which returns the authenticated user's email address as stored in the Superset user record (sourced from the Keycloak 'email' JWT claim via CustomSsoSecurityManager). The instructor course-scope subquery identifies staff/instructor-mode enrollments as the signal for course ownership.",
+  "_comment": "RLS policies for the OL data governance framework. Table names should be bare table names (e.g. 'instructor_module_report') when datasets are registered without a schema in Superset, or 'schema.table_name' when a schema is set. The apply_rls_policies.py script indexes datasets by both formats and resolves the policy table names to IDs via the Superset REST API at deploy time. Jinja clauses use current_user_email() which returns the authenticated user's email address. The instructor course-scope subquery uses int__combined__user_course_roles (the canonical cross-platform course roles table) with courseaccess_role IN ('staff', 'instructor') as the signal for course ownership.",
   "rls_filters": [
     {
       "name": "instructor_course_scope",
-      "description": "Restricts per-learner engagement and reporting datasets to courses the instructor teaches. Instructor course ownership is determined by enrollment mode 'instructor' or 'staff' in marts__combined_course_enrollment_detail.",
+      "description": "Restricts per-learner engagement and reporting datasets to courses the instructor teaches. Course ownership is determined by courseaccess_role IN ('staff', 'instructor') in int__combined__user_course_roles.",
       "filter_type": "Regular",
       "group_key": "course_scope",
-      "clause": "courserun_readable_id IN (SELECT DISTINCT courserun_readable_id FROM ol_warehouse_production_mart.marts__combined_course_enrollment_detail WHERE user_email = '{{ current_email() }}' AND courserunenrollment_enrollment_mode IN ('instructor', 'staff'))",
+      "clause": "courserun_readable_id IN (SELECT courserun_readable_id FROM ol_data_lake_production.ol_warehouse_production_intermediate.int__combined__user_course_roles WHERE courseaccess_role IN ('staff', 'instructor') AND user_email = '{{ current_user_email() }}')",
       "tables": [
         "instructor_module_report",
         "learner_engagement_report",
@@ -22,10 +22,10 @@
     },
     {
       "name": "instructor_enrollment_scope_with_term_expiry",
-      "description": "Restricts enrollment-detail datasets to the instructor's own courses and enforces a 30-day post-term access window. Both constraints are combined in one clause because the table exposes courserun_end_on.",
+      "description": "Restricts enrollment-detail datasets to the instructor's own courses and enforces a 30-day post-term access window. Course ownership uses int__combined__user_course_roles; the term expiry applies to tables that expose courserun_end_on.",
       "filter_type": "Regular",
       "group_key": "course_scope",
-      "clause": "courserun_readable_id IN (SELECT DISTINCT courserun_readable_id FROM ol_warehouse_production_mart.marts__combined_course_enrollment_detail WHERE user_email = '{{ current_email() }}' AND courserunenrollment_enrollment_mode IN ('instructor', 'staff')) AND courserun_end_on >= CURRENT_DATE - INTERVAL '30' DAY",
+      "clause": "courserun_readable_id IN (SELECT courserun_readable_id FROM ol_data_lake_production.ol_warehouse_production_intermediate.int__combined__user_course_roles WHERE courseaccess_role IN ('staff', 'instructor') AND user_email = '{{ current_user_email() }}') AND courserun_end_on >= CURRENT_DATE - INTERVAL '30' DAY",
       "tables": [
         "marts__combined_course_enrollment_detail",
         "enrollment_detail_report",
