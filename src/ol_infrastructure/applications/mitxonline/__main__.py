@@ -16,6 +16,7 @@ import pulumi
 import pulumi_fastly as fastly
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
+from kubernetes.utils import parse_quantity
 from pulumi import (
     ROOT_STACK_RESOURCE,
     Alias,
@@ -504,6 +505,9 @@ if "MITXONLINE_DOCKER_TAG" not in os.environ:
     msg = "MITXONLINE_DOCKER_TAG must be set."
     raise OSError(msg)
 MITXONLINE_DOCKER_TAG = os.environ["MITXONLINE_DOCKER_TAG"]
+granian_workers = 2
+metrics_scrape_interval = "30"
+mitxonline_web_memory_limit = "1500Mi"
 if mitxonline_config.get_bool("use_granian"):
     cmd_array = [
         "granian",
@@ -516,14 +520,31 @@ if mitxonline_config.get_bool("use_granian"):
         "--port",
         f"{DEFAULT_WSGI_PORT}",
         "--workers",
-        "2",
+        str(granian_workers),
         "--no-ws",
         "--runtime-mode",
         "mt",  # explicitly use multi-threading
         "--runtime-threads",
         "2",  # use 2 runtime threads
+        "--workers-max-rss",
+        # Limit worker memory to 90% of half of the limit in megabytes
+        str(
+            int(
+                int(parse_quantity(mitxonline_web_memory_limit) / granian_workers) * 0.9
+            )
+            // 1024
+            // 1024
+        ),
+        "--blocking-threads-idle-timeout",
+        "120",
+        "--respawn-failed-workers",
         "--backlog",
         "128",
+        "--metrics",
+        "--metrics-scrape-interval",
+        metrics_scrape_interval,
+        "--metrics-address",
+        "0.0.0.0",  # noqa: S104
         "--log-level",
         "warning",
         "main.wsgi:application",
@@ -583,7 +604,7 @@ mitxonline_k8s_app = OLApplicationK8s(
             resource_limits={"memory": "512Mi"},
         ),
         resource_requests={"cpu": "250m", "memory": "1500Mi"},
-        resource_limits={"memory": "1500Mi"},
+        resource_limits={"memory": mitxonline_web_memory_limit},
         hpa_scaling_metrics=[
             kubernetes.autoscaling.v2.MetricSpecArgs(
                 type="Resource",
@@ -613,6 +634,41 @@ mitxonline_k8s_app = OLApplicationK8s(
         depends_on=[mitxonline_app_security_group, *secret_resources]
     ),
 )
+
+if mitxonline_config.get_bool("use_granian"):
+    mitxonline_service_monitor = kubernetes.apiextensions.CustomResource(
+        "mitxonline-webapp-service-monitor",
+        api_version="monitoring.coreos.com/v1",
+        kind="ServiceMonitor",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="mitxonline-webapp-monitor",
+            namespace=mitxonline_namespace,
+            labels=k8s_app_labels,
+        ),
+        spec={
+            "selector": {
+                "matchLabels": {
+                    "ol.mit.edu/service": "mitxonline",
+                    "ol.mit.edu/application": "mitxonline",
+                    "ol.mit.edu/component": "webapp",
+                }
+            },
+            "endpoints": [
+                {
+                    "port": "9090",
+                    "path": "/metrics",
+                    "scheme": "http",
+                    "interval": f"{metrics_scrape_interval}s",
+                    "tlsConfig": {
+                        "insecureSkipVerify": True  # For internal metrics scraping, often
+                        # used if Prometheus doesn't have the CA
+                    },
+                }
+            ],
+            "namespaceSelector": {"matchNames": [mitxonline_namespace]},
+        },
+    )
+
 api_domain = mitxonline_config.require("backend_domain")
 frontend_domain = mitxonline_config.require("frontend_domain")
 api_path_prefix = "mitxonline"
