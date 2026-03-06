@@ -7,11 +7,6 @@ Documentation=https://concourse-ci.org/
 [Service]
 User={{ concourse_config.user }}
 Group={{ concourse_config.user }}
-# Wait until vault-agent has rendered the env file (replaced template markers
-# with real secret values). Without this, Concourse may start with the raw
-# vault template string as CONCOURSE_ENCRYPTION_KEY, which is 80 bytes and
-# fails AES key-size validation.
-ExecStartPre=/bin/bash -c 'until ! grep -qF "{{" {{ concourse_config.env_file_path }}; do sleep 2; done'
 ExecStart={{ concourse_config.deploy_directory }}/bin/concourse {{ concourse_config._node_type }}
 Restart=always
 RestartSec=3
