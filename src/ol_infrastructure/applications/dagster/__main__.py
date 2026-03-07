@@ -1042,11 +1042,11 @@ for location in code_locations:
         # Give more memory for processing edxorg archives
         deployment["resources"] = {
             "requests": {
-                "cpu": "2000m",
-                "memory": "64Gi",
+                "cpu": "500m",
+                "memory": "1Gi",
             },
             "limits": {
-                "memory": "64Gi",
+                "memory": "8Gi",
             },
         }
     deployments.append(deployment)
