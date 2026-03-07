@@ -58,6 +58,17 @@ digital_credentials_vault_kv_mount = vault.Mount(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
+clickhouse_vault_kv_mount = vault.Mount(
+    "clickhouse-vault-kv-secrets-mount",
+    path="secret-clickhouse",
+    description="Static secrets storage for the shared ClickHouse LLMOps cluster",
+    type="kv-v2",
+    options={
+        "version": 2,
+    },
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
 export(
     "superset_kv",
     {
@@ -87,5 +98,13 @@ export(
     {
         "path": digital_credentials_vault_kv_mount.path,
         "type": digital_credentials_vault_kv_mount.type,
+    },
+)
+
+export(
+    "clickhouse_kv",
+    {
+        "path": clickhouse_vault_kv_mount.path,
+        "type": clickhouse_vault_kv_mount.type,
     },
 )

@@ -24,6 +24,8 @@ config:
   eks:gateway_release_channel: experimental
   eks:namespaces:
   - airbyte
+  - clickhouse
+  - clickhouse-operator
   - dagster
   - kubewatch
   - open-metadata
