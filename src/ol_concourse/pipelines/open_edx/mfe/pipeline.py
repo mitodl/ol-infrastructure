@@ -52,6 +52,7 @@ class OpenEdxVars(BaseModel):
     display_feedback_widget: str | None = None
     environment: str
     environment_stage: EnvStage
+    fastly_service_prefix: str | None = None
     favicon_url: str
     honor_code_url: str | None = None
     learning_base_url: str | None = None
@@ -63,6 +64,7 @@ class OpenEdxVars(BaseModel):
     mit_learn_base_url: str | None = None
     plugin_slot_config_file_map: dict[str, str] | None = None
     privacy_policy_url: str | None = None
+    purge_fastly_cache: bool = False
     schedule_email_section: str | None = None
     site_name: str
     studio_domain: str
@@ -362,6 +364,34 @@ def mfe_job(  # noqa: C901, PLR0915
             },
         ),
     ]
+
+    # Add Fastly cache purge step if configured
+    if open_edx.purge_fastly_cache and open_edx.fastly_service_prefix:
+        fastly_service_id_key = (
+            f"{open_edx.fastly_service_prefix}service_id_"
+            f"{open_edx.environment_stage.lower()}"
+        )
+        mfe_build_plan.append(
+            TaskStep(
+                task=Identifier("purge-fastly-cache"),
+                config=TaskConfig(
+                    platform=Platform.linux,
+                    image_resource=AnonymousResource(
+                        type="registry-image",
+                        source={"repository": "alpine/curl"},
+                    ),
+                    run=Command(
+                        path="sh",
+                        args=[
+                            "-exc",
+                            f"""curl -H "Fastly-Key: ((fastly.fastly_api_token))" """
+                            f"""-H "Accept: application/json" -i -X POST """
+                            f""""https://api.fastly.com/service/((fastly.{fastly_service_id_key}))/purge_all" """,  # noqa: E501
+                        ],
+                    ),
+                ),
+            )
+        )
 
     # GitHub Issue resource for success notification
     gh_issues_post = github_issues(
