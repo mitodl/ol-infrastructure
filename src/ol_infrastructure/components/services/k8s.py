@@ -6,7 +6,7 @@ calls we currently make into one convenient callable package.
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import pulumi_kubernetes as kubernetes
 import pulumiverse_time as pulumi_time
@@ -16,6 +16,7 @@ from pydantic import (
     ConfigDict,
     Field,
     NonNegativeInt,
+    PositiveInt,
     field_validator,
     model_validator,
 )
@@ -94,24 +95,33 @@ class GranianConfig(BaseModel):
     runtime_mode, runtime_threads, no_ws, workers_max_rss,
     blocking_threads_idle_timeout, respawn_failed_workers, backlog, log_level,
     application_module, and metrics-related flags.
+
+    **Port/nginx coupling:** when ``import_nginx_config=True`` on
+    ``OLApplicationK8sConfig``, the nginx config proxies to a fixed upstream address
+    (typically ``127.0.0.1:{DEFAULT_WSGI_PORT}``). Overriding ``port`` without also
+    supplying a custom ``nginx_config_filename`` whose content matches the new port
+    will silently misdirect traffic. A cross-model validator on
+    ``OLApplicationK8sConfig`` enforces this constraint at stack evaluation time.
     """
 
     interface: Literal["wsgi", "asgi"] = "wsgi"
     host: str = "0.0.0.0"  # noqa: S104
-    port: int = DEFAULT_WSGI_PORT
-    workers: int = 2
+    port: Annotated[int, Field(ge=1, le=65535)] = DEFAULT_WSGI_PORT
+    workers: PositiveInt = 2
     runtime_mode: str | None = "mt"
-    runtime_threads: int = 2
+    runtime_threads: PositiveInt = 2
     no_ws: bool = True
-    workers_max_rss: int | None = None  # MB; omitted when None
-    blocking_threads_idle_timeout: int | None = None  # seconds; omitted when None
+    workers_max_rss: PositiveInt | None = None  # MB; omitted when None
+    blocking_threads_idle_timeout: PositiveInt | None = (
+        None  # seconds; omitted when None
+    )
     respawn_failed_workers: bool = False
-    backlog: int | None = 128
+    backlog: PositiveInt | None = 128
     log_level: str = "warning"
     application_module: str = "main.wsgi:application"
     enable_metrics: bool = False
-    metrics_port: int = 9090
-    metrics_scrape_interval: int = 30
+    metrics_port: Annotated[int, Field(ge=1, le=65535)] = 9090
+    metrics_scrape_interval: PositiveInt = 30
     nginx_config_filename: str = "web.conf_granian"
 
     @field_validator("nginx_config_filename")
@@ -349,6 +359,53 @@ class OLApplicationK8sConfig(BaseModel):
                 "Must specify either application_docker_tag or application_image_digest"
             )
             raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def validate_granian_port_nginx_coupling(self) -> "OLApplicationK8sConfig":
+        """Catch mismatched granian port / nginx config at evaluation time.
+
+        When import_nginx_config=True the nginx sidecar proxies to a fixed upstream
+        port baked into the config file. Overriding granian_config.port without also
+        supplying a custom nginx_config_filename whose content matches the new port
+        would silently misdirect all traffic at runtime.
+        """
+        gc = self.granian_config
+        if (
+            gc is not None
+            and self.import_nginx_config
+            and gc.port != DEFAULT_WSGI_PORT
+            and gc.nginx_config_filename == "web.conf_granian"
+        ):
+            msg = (
+                f"granian_config.port={gc.port} differs from DEFAULT_WSGI_PORT "
+                f"({DEFAULT_WSGI_PORT}) but nginx_config_filename is still the "
+                "default 'web.conf_granian'. The nginx config proxies to "
+                f"127.0.0.1:{DEFAULT_WSGI_PORT}, so traffic will be misdirected. "
+                "Either keep the default port or supply a custom nginx_config_filename "
+                "whose upstream address matches the overridden port."
+            )
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def validate_no_duplicate_metrics_port(self) -> "OLApplicationK8sConfig":
+        """Raise an error if a caller-supplied extra_container_ports entry clashes.
+
+        When granian_config.enable_metrics=True the component automatically adds
+        a port named 'metrics'. A duplicate from extra_container_ports would cause
+        Kubernetes to reject the pod spec.
+        """
+        gc = self.granian_config
+        if gc is not None and gc.enable_metrics:
+            for port_arg in self.extra_container_ports:
+                if getattr(port_arg, "name", None) == "metrics":
+                    msg = (
+                        "extra_container_ports already contains a port named 'metrics'. "
+                        "Remove it from extra_container_ports — the metrics port is "
+                        "added automatically when granian_config.enable_metrics=True."
+                    )
+                    raise ValueError(msg)
         return self
 
 
