@@ -499,6 +499,12 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         0, GetStep(get=release_repo.name, trigger=True)
     )
 
+    # Make the release-candidate branch code available to the RC
+    # pulumi deployment job similar to how it is available to production
+    qa_and_production_fragment.jobs[0].plan.insert(
+        0, GetStep(get=release_candidate_repo.name, trigger=False)
+    )
+
     # Group into Fragments
 
     main_branch_container_fragement = PipelineFragment(
