@@ -518,12 +518,10 @@ class OLApplicationK8s(ComponentResource):
                 and (memory_str := ol_app_k8s_config.resource_limits.get("memory"))
             ):
                 limit_bytes = int(parse_quantity(memory_str))
-                gc = gc.model_copy(
-                    update={
-                        "workers_max_rss": int(limit_bytes / gc.workers * 0.9)
-                        // (1024 * 1024)
-                    }
+                computed_rss = max(
+                    1, int(limit_bytes / gc.workers * 0.9) // (1024 * 1024)
                 )
+                gc = gc.model_copy(update={"workers_max_rss": computed_rss})
             effective_nginx_config_path = f"files/{gc.nginx_config_filename}"
             effective_cmd_array: list[str] | None = ["granian"]
             effective_arg_array: list[str] | None = gc.build_args()

@@ -730,19 +730,6 @@ static_secrets = OLVaultK8SSecret(
     ),
 )
 
-# Load the nginx configuration into a configmap
-learn_ai_nginx_configmap = kubernetes.core.v1.ConfigMap(
-    f"learn-ai-{stack_info.env_suffix}-nginx-configmap",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="nginx-config",
-        namespace=learn_ai_namespace,
-        labels=k8s_global_labels,
-    ),
-    data={
-        "web.conf": Path(__file__).parent.joinpath("files/web.conf").read_text(),
-    },
-)
-
 # Instantiate the OLApplicationK8s component
 learn_ai_app_k8s = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
