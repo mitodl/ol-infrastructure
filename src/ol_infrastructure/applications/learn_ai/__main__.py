@@ -801,7 +801,9 @@ learn_ai_app_k8s = OLApplicationK8s(
                 resource_limits={"memory": "2500Mi"},
             ),
         ],
-        celery_beat_config=OLApplicationK8sCeleryBeatConfig(),
+        celery_beat_config=OLApplicationK8sCeleryBeatConfig(
+            scheduler="celery.beat.PersistentScheduler"
+        ),
         hpa_scaling_metrics=[
             kubernetes.autoscaling.v2.MetricSpecArgs(
                 type="Resource",
