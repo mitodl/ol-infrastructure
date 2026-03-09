@@ -29,7 +29,6 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
-    DEFAULT_WSGI_PORT,
     ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
@@ -47,6 +46,7 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.k8s import (
+    GranianConfig,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixPluginConfig,
@@ -1406,36 +1406,6 @@ if "MIT_LEARN_DOCKER_TAG" not in os.environ:
 MIT_LEARN_DOCKER_TAG = os.environ["MIT_LEARN_DOCKER_TAG"]
 
 # Configure and deploy the mitlearn application using OLApplicationK8s
-if mitlearn_config.get_bool("use_granian"):
-    cmd_array = [
-        "granian",
-    ]
-    arg_array = [
-        "--interface",
-        "wsgi",
-        "--host",
-        "0.0.0.0",  # noqa: S104
-        "--port",
-        f"{DEFAULT_WSGI_PORT}",
-        "--workers",
-        "2",
-        "--no-ws",
-        "--runtime-mode",
-        "mt",  # explicitly use multi-threading
-        "--runtime-threads",
-        "2",  # use 2 runtime threads
-        "--backlog",
-        "128",
-        "--log-level",
-        "warning",
-        "main.wsgi:application",
-    ]
-    nginx_config_path = "files/web.conf_granian"
-else:
-    cmd_array = ["uwsgi"]
-    arg_array = ["/tmp/uwsgi.ini"]  # noqa: S108
-    nginx_config_path = "files/web.conf_uwsgi"
-
 mitlearn_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
         project_root=Path(__file__).parent,
@@ -1453,11 +1423,14 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_security_group_name=mitlearn_app_security_group.name,
         application_image_repository="mitodl/mit-learn-app",
         application_docker_tag=MIT_LEARN_DOCKER_TAG,
-        application_cmd_array=cmd_array,
-        application_arg_array=arg_array,
+        application_cmd_array=["uwsgi"],
+        application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
+        granian_config=GranianConfig(workers=2)
+        if mitlearn_config.get_bool("use_granian")
+        else None,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,  # Assuming Django app needs nginx
-        import_nginx_config_path=nginx_config_path,
+        import_nginx_config_path="files/web.conf_uwsgi",
         import_uwsgi_config=True,
         init_migrations=False,
         init_collectstatic=True,  # Assuming Django app needs collectstatic

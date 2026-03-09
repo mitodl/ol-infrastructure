@@ -6,16 +6,18 @@ calls we currently make into one convenient callable package.
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import pulumi_kubernetes as kubernetes
 import pulumiverse_time as pulumi_time
+from kubernetes.utils.quantity import parse_quantity
 from pulumi import ComponentResource, Output, ResourceOptions
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
     NonNegativeInt,
+    PositiveInt,
     field_validator,
     model_validator,
 )
@@ -81,6 +83,109 @@ class OLApplicationK8sCeleryBeatConfig(BaseModel):
     )
     resource_limits: dict[str, str] = Field(default={"memory": "512Mi"})
     scheduler: str = "redbeat.RedBeatScheduler"
+
+
+class GranianConfig(BaseModel):
+    """Configuration for running applications with the Granian ASGI/WSGI server.
+
+    When set on OLApplicationK8sConfig, the component will generate the granian
+    command/args, select the appropriate nginx config, expose a metrics port, and
+    create a PodMonitor — replacing the manual if/else blocks in each caller.
+
+    The supported subset of granian CLI options is: interface, host, port, workers,
+    runtime_mode, runtime_threads, no_ws, workers_max_rss,
+    blocking_threads_idle_timeout, respawn_failed_workers, backlog, log_level,
+    application_module, and metrics-related flags.
+
+    **Port/nginx coupling:** when ``import_nginx_config=True`` on
+    ``OLApplicationK8sConfig``, the nginx config proxies to a fixed upstream address
+    (typically ``127.0.0.1:{DEFAULT_WSGI_PORT}``). Overriding ``port`` without also
+    supplying a custom ``nginx_config_filename`` whose content matches the new port
+    will silently misdirect traffic. A cross-model validator on
+    ``OLApplicationK8sConfig`` enforces this constraint at stack evaluation time.
+    """
+
+    interface: Literal["wsgi", "asgi"] = "wsgi"
+    host: str = "0.0.0.0"  # noqa: S104
+    port: Annotated[int, Field(ge=1, le=65535)] = DEFAULT_WSGI_PORT
+    workers: PositiveInt = 2
+    runtime_mode: str | None = "mt"
+    runtime_threads: PositiveInt = 2
+    no_ws: bool = True
+    limit_workers_max_rss: bool = True
+    """When ``True`` (default), automatically cap each worker's RSS at 90 % of the
+    per-worker share of the container memory limit.  Set to ``False`` to disable the
+    ``--workers-max-rss`` flag entirely (e.g. for ASGI apps without a fixed memory
+    budget or when the limit is managed externally)."""
+    workers_max_rss: PositiveInt | None = None
+    """Explicit per-worker RSS cap in MiB.  When ``None`` and ``limit_workers_max_rss``
+    is ``True``, the value is derived from the container ``resource_limits["memory"]``
+    via ``floor(memory_limit_bytes / workers * 0.9) MiB``.  Set explicitly only to
+    override the computed value."""
+    blocking_threads_idle_timeout: PositiveInt | None = None
+    """Seconds before an idle blocking thread is retired (granian ``--blocking-threads-idle-timeout``). Omitted when ``None``."""
+    respawn_failed_workers: bool = True
+    backlog: PositiveInt | None = 128
+    log_level: str = "warning"
+    application_module: str = "main.wsgi:application"
+    enable_metrics: bool = False
+    metrics_port: Annotated[int, Field(ge=1, le=65535)] = 9090
+    metrics_scrape_interval: PositiveInt = 30
+    nginx_config_filename: str = "web.conf_granian"
+
+    @field_validator("nginx_config_filename")
+    @classmethod
+    def validate_nginx_config_filename(cls, v: str) -> str:
+        """Ensure nginx_config_filename is a simple filename with no path traversal."""
+        p = Path(v)
+        if p.name != v or ".." in p.parts:
+            msg = (
+                "granian_config.nginx_config_filename must be a plain filename "
+                "with no path separators or '..' components"
+            )
+            raise ValueError(msg)
+        return v
+
+    def build_args(self) -> list[str]:
+        """Build the granian CLI argument list from this configuration."""
+        args = [
+            "--interface",
+            self.interface,
+            "--host",
+            self.host,
+            "--port",
+            str(self.port),
+            "--workers",
+            str(self.workers),
+        ]
+        if self.no_ws:
+            args.append("--no-ws")
+        if self.runtime_mode is not None:
+            args += ["--runtime-mode", self.runtime_mode]
+        args += ["--runtime-threads", str(self.runtime_threads)]
+        if self.workers_max_rss is not None:
+            args += ["--workers-max-rss", str(self.workers_max_rss)]
+        if self.blocking_threads_idle_timeout is not None:
+            args += [
+                "--blocking-threads-idle-timeout",
+                str(self.blocking_threads_idle_timeout),
+            ]
+        if self.respawn_failed_workers:
+            args.append("--respawn-failed-workers")
+        if self.backlog is not None:
+            args += ["--backlog", str(self.backlog)]
+        if self.enable_metrics:
+            args += [
+                "--metrics",
+                "--metrics-scrape-interval",
+                str(self.metrics_scrape_interval),
+                "--metrics-address",
+                "0.0.0.0",  # noqa: S104
+                "--metrics-port",
+                str(self.metrics_port),
+            ]
+        args += ["--log-level", self.log_level, self.application_module]
+        return args
 
 
 class OLApplicationK8sConfig(BaseModel):
@@ -214,6 +319,19 @@ class OLApplicationK8sConfig(BaseModel):
         ),
     }
     app_pdb_maximum_unavailable: NonNegativeInt | str = 1
+    extra_container_ports: list[kubernetes.core.v1.ContainerPortArgs] = Field(
+        default_factory=list,
+        description="Additional named ports to expose on the application container (e.g. a metrics port).",
+    )
+    granian_config: GranianConfig | None = Field(
+        default=None,
+        description=(
+            "When set, the component generates granian cmd/args, selects the granian "
+            "nginx config, and (if enable_metrics=True) exposes a metrics port and "
+            "creates a PodMonitor. application_cmd_array/application_arg_array serve "
+            "as the fallback command when granian_config is None."
+        ),
+    )
 
     # See https://www.pulumi.com/docs/reference/pkg/python/pulumi/#pulumi.Output.from_input
     # for docs. This unwraps the value so Pydantic can store it in the config class.
@@ -250,6 +368,53 @@ class OLApplicationK8sConfig(BaseModel):
                 "Must specify either application_docker_tag or application_image_digest"
             )
             raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def validate_granian_port_nginx_coupling(self) -> "OLApplicationK8sConfig":
+        """Catch mismatched granian port / nginx config at evaluation time.
+
+        When import_nginx_config=True the nginx sidecar proxies to a fixed upstream
+        port baked into the config file. Overriding granian_config.port without also
+        supplying a custom nginx_config_filename whose content matches the new port
+        would silently misdirect all traffic at runtime.
+        """
+        gc = self.granian_config
+        if (
+            gc is not None
+            and self.import_nginx_config
+            and gc.port != DEFAULT_WSGI_PORT
+            and gc.nginx_config_filename == "web.conf_granian"
+        ):
+            msg = (
+                f"granian_config.port={gc.port} differs from DEFAULT_WSGI_PORT "
+                f"({DEFAULT_WSGI_PORT}) but nginx_config_filename is still the "
+                "default 'web.conf_granian'. The nginx config proxies to "
+                f"127.0.0.1:{DEFAULT_WSGI_PORT}, so traffic will be misdirected. "
+                "Either keep the default port or supply a custom nginx_config_filename "
+                "whose upstream address matches the overridden port."
+            )
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def validate_no_duplicate_metrics_port(self) -> "OLApplicationK8sConfig":
+        """Raise an error if a caller-supplied extra_container_ports entry clashes.
+
+        When granian_config.enable_metrics=True the component automatically adds
+        a port named 'metrics'. A duplicate from extra_container_ports would cause
+        Kubernetes to reject the pod spec.
+        """
+        gc = self.granian_config
+        if gc is not None and gc.enable_metrics:
+            for port_arg in self.extra_container_ports:
+                if getattr(port_arg, "name", None) == "metrics":
+                    msg = (
+                        "extra_container_ports already contains a port named 'metrics'. "
+                        "Remove it from extra_container_ports — the metrics port is "
+                        "added automatically when granian_config.enable_metrics=True."
+                    )
+                    raise ValueError(msg)
         return self
 
 
@@ -338,6 +503,40 @@ class OLApplicationK8s(ComponentResource):
         webapp_volume_mounts = nginx_volume_mounts.copy()
 
         app_containers = []
+
+        # Resolve granian vs. fallback application server configuration.
+        # When granian_config is set the component builds cmd/args; otherwise
+        # application_cmd_array / application_arg_array are used as-is.
+        effective_extra_ports = list(ol_app_k8s_config.extra_container_ports)
+        if ol_app_k8s_config.granian_config is not None:
+            gc = ol_app_k8s_config.granian_config
+            # Derive workers_max_rss from the container memory limit when not explicit.
+            # Formula: floor(memory_limit_bytes / workers * 0.9) MiB
+            if (
+                gc.limit_workers_max_rss
+                and gc.workers_max_rss is None
+                and (memory_str := ol_app_k8s_config.resource_limits.get("memory"))
+            ):
+                limit_bytes = int(parse_quantity(memory_str))
+                computed_rss = max(
+                    1, int(limit_bytes / gc.workers * 0.9) // (1024 * 1024)
+                )
+                gc = gc.model_copy(update={"workers_max_rss": computed_rss})
+            effective_nginx_config_path = f"files/{gc.nginx_config_filename}"
+            effective_cmd_array: list[str] | None = ["granian"]
+            effective_arg_array: list[str] | None = gc.build_args()
+            if gc.enable_metrics:
+                effective_extra_ports.append(
+                    kubernetes.core.v1.ContainerPortArgs(
+                        name="metrics",
+                        container_port=gc.metrics_port,
+                    )
+                )
+        else:
+            effective_nginx_config_path = ol_app_k8s_config.import_nginx_config_path
+            effective_cmd_array = ol_app_k8s_config.application_cmd_array
+            effective_arg_array = ol_app_k8s_config.application_arg_array
+
         # Import nginx configuration as a configmap
         if ol_app_k8s_config.import_nginx_config:
             application_nginx_configmap = kubernetes.core.v1.ConfigMap(
@@ -349,7 +548,7 @@ class OLApplicationK8s(ComponentResource):
                 ),
                 data={
                     "web.conf": ol_app_k8s_config.project_root.joinpath(
-                        ol_app_k8s_config.import_nginx_config_path
+                        effective_nginx_config_path
                     ).read_text(),
                 },
                 opts=resource_options,
@@ -627,15 +826,16 @@ class OLApplicationK8s(ComponentResource):
                 ports=[
                     kubernetes.core.v1.ContainerPortArgs(
                         container_port=application_port
-                    )
+                    ),
+                    *effective_extra_ports,
                 ],
                 image_pull_policy=image_pull_policy,
                 resources=kubernetes.core.v1.ResourceRequirementsArgs(
                     requests=ol_app_k8s_config.resource_requests,
                     limits=ol_app_k8s_config.resource_limits,
                 ),
-                command=ol_app_k8s_config.application_cmd_array,
-                args=ol_app_k8s_config.application_arg_array,
+                command=effective_cmd_array,
+                args=effective_arg_array,
                 env=application_deployment_env_vars,
                 env_from=application_deployment_envfrom,
                 volume_mounts=webapp_volume_mounts,
@@ -682,6 +882,40 @@ class OLApplicationK8s(ComponentResource):
             ),
             opts=deployment_options,
         )
+
+        if (
+            ol_app_k8s_config.granian_config is not None
+            and ol_app_k8s_config.granian_config.enable_metrics
+        ):
+            gc = ol_app_k8s_config.granian_config
+            _pod_monitor_name = truncate_k8s_metanames(
+                f"{ol_app_k8s_config.application_name}-webapp-pod-monitor"
+            )
+            kubernetes.apiextensions.CustomResource(
+                _pod_monitor_name,
+                api_version="monitoring.coreos.com/v1",
+                kind="PodMonitor",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=_pod_monitor_name,
+                    namespace=ol_app_k8s_config.application_namespace,
+                    labels=ol_app_k8s_config.k8s_global_labels,
+                ),
+                spec={
+                    "selector": {"matchLabels": application_labels},
+                    "podMetricsEndpoints": [
+                        {
+                            "port": "metrics",
+                            "path": "/metrics",
+                            "scheme": "http",
+                            "interval": f"{gc.metrics_scrape_interval}s",
+                        }
+                    ],
+                    "namespaceSelector": {
+                        "matchNames": [ol_app_k8s_config.application_namespace]
+                    },
+                },
+                opts=resource_options,
+            )
 
         if post_deploy_commands := ol_app_k8s_config.post_deploy_commands:
             # Create post-deployment job
