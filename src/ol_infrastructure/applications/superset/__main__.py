@@ -557,8 +557,9 @@ superset_chart = kubernetes.helm.v3.Release(
                 .parent.joinpath("superset_config.py")
                 .read_text()
             },
-            # Mount the governance roles JSON into /app/pythonpath so the init
-            # command can import them via `flask fab import-roles`.
+            # Mount the governance roles JSON via extraConfigs (mounted at
+            # /app/configs by the Helm chart) so the init command can import
+            # them via `flask fab import-roles`.
             # The RLS policy files are mounted separately via a dedicated ConfigMap
             # (superset-rls-policies) into the post-deploy Job pod.
             "extraConfigs": {
