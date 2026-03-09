@@ -525,6 +525,7 @@ mitxonline_k8s_app = OLApplicationK8s(
         application_cmd_array=["uwsgi"],
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         granian_config=GranianConfig(
+            workers=2,
             blocking_threads_idle_timeout=120,
             enable_metrics=True,
         )
