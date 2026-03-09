@@ -112,16 +112,16 @@ class GranianConfig(BaseModel):
     runtime_mode: str | None = "mt"
     runtime_threads: PositiveInt = 2
     no_ws: bool = True
-    memory_limit: str | None = None
-    """Kubernetes memory limit for the application container (e.g. ``"1500Mi"``).
-
-    When set and ``workers_max_rss`` is ``None``, the per-worker RSS cap is
-    computed automatically as ``floor(memory_limit / workers * 0.9)`` expressed in
-    MiB.  This matches the mitxonline convention and prevents OOM-killed workers
-    from consuming more than their fair share of the pod's memory budget.
-    """
+    limit_workers_max_rss: bool = True
+    """When ``True`` (default), automatically cap each worker's RSS at 90 % of the
+    per-worker share of the container memory limit.  Set to ``False`` to disable the
+    ``--workers-max-rss`` flag entirely (e.g. for ASGI apps without a fixed memory
+    budget or when the limit is managed externally)."""
     workers_max_rss: PositiveInt | None = None
-    """Per-worker RSS cap in MiB.  Computed from ``memory_limit`` when not set explicitly."""
+    """Explicit per-worker RSS cap in MiB.  When ``None`` and ``limit_workers_max_rss``
+    is ``True``, the value is derived from the container ``resource_limits["memory"]``
+    via ``floor(memory_limit_bytes / workers * 0.9) MiB``.  Set explicitly only to
+    override the computed value."""
     blocking_threads_idle_timeout: PositiveInt | None = None
     """Seconds before an idle blocking thread is retired (granian ``--blocking-threads-idle-timeout``). Omitted when ``None``."""
     respawn_failed_workers: bool = True
@@ -132,21 +132,6 @@ class GranianConfig(BaseModel):
     metrics_port: Annotated[int, Field(ge=1, le=65535)] = 9090
     metrics_scrape_interval: PositiveInt = 30
     nginx_config_filename: str = "web.conf_granian"
-
-    @model_validator(mode="after")
-    def compute_workers_max_rss(self) -> "GranianConfig":
-        """Derive workers_max_rss from memory_limit when not supplied explicitly.
-
-        Formula: ``floor(memory_limit_bytes / workers * 0.9) // 1_048_576`` (MiB).
-        The 0.9 factor reserves 10 % headroom so the kernel OOM killer is not
-        triggered before granian recycles the worker.
-        """
-        if self.workers_max_rss is None and self.memory_limit is not None:
-            limit_bytes = int(parse_quantity(self.memory_limit))
-            self.workers_max_rss = int(limit_bytes / self.workers * 0.9) // (
-                1024 * 1024
-            )
-        return self
 
     @field_validator("nginx_config_filename")
     @classmethod
@@ -525,6 +510,20 @@ class OLApplicationK8s(ComponentResource):
         effective_extra_ports = list(ol_app_k8s_config.extra_container_ports)
         if ol_app_k8s_config.granian_config is not None:
             gc = ol_app_k8s_config.granian_config
+            # Derive workers_max_rss from the container memory limit when not explicit.
+            # Formula: floor(memory_limit_bytes / workers * 0.9) MiB
+            if (
+                gc.limit_workers_max_rss
+                and gc.workers_max_rss is None
+                and (memory_str := ol_app_k8s_config.resource_limits.get("memory"))
+            ):
+                limit_bytes = int(parse_quantity(memory_str))
+                gc = gc.model_copy(
+                    update={
+                        "workers_max_rss": int(limit_bytes / gc.workers * 0.9)
+                        // (1024 * 1024)
+                    }
+                )
             effective_nginx_config_path = f"files/{gc.nginx_config_filename}"
             effective_cmd_array: list[str] | None = ["granian"]
             effective_arg_array: list[str] | None = gc.build_args()
