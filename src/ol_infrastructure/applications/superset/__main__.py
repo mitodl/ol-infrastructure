@@ -570,6 +570,7 @@ superset_chart = kubernetes.helm.v3.Release(
             # `flask fab import-roles` is idempotent: it creates missing roles and
             # updates existing ones without touching Admin/Alpha/Gamma/Public.
             # `set -e` ensures any failure aborts the whole init sequence.
+            # Note: extraConfigs are mounted at /app/configs (not /app/pythonpath).
             "init": {
                 "command": [
                     "/bin/sh",
@@ -579,7 +580,7 @@ superset_chart = kubernetes.helm.v3.Release(
                     "superset db upgrade; "
                     "superset init; "
                     "flask fab import-roles"
-                    " --path /app/pythonpath/ol_governance_roles.json",
+                    " --path /app/configs/ol_governance_roles.json",
                 ]
             },
             "envFromSecret": app_config_secret_name,
