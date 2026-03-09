@@ -42,6 +42,8 @@ config:
   - ["legacy_studio.updates", "--deactivate"]
   - ["legacy_studio.video_editor", "--deactivate"]
   - ["contentstore.new_studio_mfe.use_new_video_uploads_page", "--create", "--everyone"]
+  - ["contentstore.enable_course_optimizer", "--create", "--everyone"]
+  - ["contentstore.enable_course_optimizer_check_prev_run_links", "--create", "--everyone"]
   - ["notifications.enable_email_notifications", "--create", "--everyone"]
   - ["notifications.enable_notifications", "--create", "--everyone"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone",
