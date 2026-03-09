@@ -89,9 +89,16 @@ class GranianConfig(BaseModel):
     When set on OLApplicationK8sConfig, the component will generate the granian
     command/args, select the appropriate nginx config, expose a metrics port, and
     create a PodMonitor — replacing the manual if/else blocks in each caller.
+
+    The supported subset of granian CLI options is: interface, host, port, workers,
+    runtime_mode, runtime_threads, no_ws, workers_max_rss,
+    blocking_threads_idle_timeout, respawn_failed_workers, backlog, log_level,
+    application_module, and metrics-related flags.
     """
 
     interface: Literal["wsgi", "asgi"] = "wsgi"
+    host: str = "0.0.0.0"  # noqa: S104
+    port: int = DEFAULT_WSGI_PORT
     workers: int = 2
     runtime_mode: str | None = "mt"
     runtime_threads: int = 2
@@ -107,15 +114,28 @@ class GranianConfig(BaseModel):
     metrics_scrape_interval: int = 30
     nginx_config_filename: str = "web.conf_granian"
 
+    @field_validator("nginx_config_filename")
+    @classmethod
+    def validate_nginx_config_filename(cls, v: str) -> str:
+        """Ensure nginx_config_filename is a simple filename with no path traversal."""
+        p = Path(v)
+        if p.name != v or ".." in p.parts:
+            msg = (
+                "granian_config.nginx_config_filename must be a plain filename "
+                "with no path separators or '..' components"
+            )
+            raise ValueError(msg)
+        return v
+
     def build_args(self) -> list[str]:
         """Build the granian CLI argument list from this configuration."""
         args = [
             "--interface",
             self.interface,
             "--host",
-            "0.0.0.0",  # noqa: S104
+            self.host,
             "--port",
-            str(DEFAULT_WSGI_PORT),
+            str(self.port),
             "--workers",
             str(self.workers),
         ]
@@ -790,22 +810,20 @@ class OLApplicationK8s(ComponentResource):
             and ol_app_k8s_config.granian_config.enable_metrics
         ):
             gc = ol_app_k8s_config.granian_config
+            _pod_monitor_name = truncate_k8s_metanames(
+                f"{ol_app_k8s_config.application_name}-webapp-pod-monitor"
+            )
             kubernetes.apiextensions.CustomResource(
-                f"{ol_app_k8s_config.application_name}-webapp-pod-monitor",
+                _pod_monitor_name,
                 api_version="monitoring.coreos.com/v1",
                 kind="PodMonitor",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    name=f"{ol_app_k8s_config.application_name}-webapp-pod-monitor",
+                    name=_pod_monitor_name,
                     namespace=ol_app_k8s_config.application_namespace,
                     labels=ol_app_k8s_config.k8s_global_labels,
                 ),
                 spec={
-                    "selector": {
-                        "matchLabels": {
-                            "ol.mit.edu/application": ol_app_k8s_config.application_name,
-                            "ol.mit.edu/component": "webapp",
-                        }
-                    },
+                    "selector": {"matchLabels": application_labels},
                     "podMetricsEndpoints": [
                         {
                             "port": "metrics",
