@@ -16,7 +16,6 @@ import pulumi
 import pulumi_fastly as fastly
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from kubernetes.utils.quantity import parse_quantity
 from pulumi import (
     ROOT_STACK_RESOURCE,
     Alias,
@@ -505,13 +504,7 @@ if "MITXONLINE_DOCKER_TAG" not in os.environ:
     msg = "MITXONLINE_DOCKER_TAG must be set."
     raise OSError(msg)
 MITXONLINE_DOCKER_TAG = os.environ["MITXONLINE_DOCKER_TAG"]
-granian_workers = 2
 mitxonline_web_memory_limit = "1500Mi"
-granian_workers_max_rss = (
-    int(int(parse_quantity(mitxonline_web_memory_limit) / granian_workers) * 0.9)
-    // 1024
-    // 1024
-)
 
 mitxonline_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
@@ -532,10 +525,8 @@ mitxonline_k8s_app = OLApplicationK8s(
         application_cmd_array=["uwsgi"],
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         granian_config=GranianConfig(
-            workers=granian_workers,
-            workers_max_rss=granian_workers_max_rss,
+            memory_limit=mitxonline_web_memory_limit,
             blocking_threads_idle_timeout=120,
-            respawn_failed_workers=True,
             enable_metrics=True,
         )
         if mitxonline_config.get_bool("use_granian")
