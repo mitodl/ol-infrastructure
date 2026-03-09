@@ -613,7 +613,7 @@ ocw_studio_k8s_app = OLApplicationK8s(
             scheduler="celery.beat.PersistentScheduler"
         ),
         resource_requests={"cpu": "250m", "memory": "1Gi"},
-        resource_limits={"memory": "1Gi"},
+        resource_limits={"memory": "2Gi"},
         # App lacks health check endpoints so we use nginx's
         probe_configs={
             "liveness_probe": kubernetes.core.v1.ProbeArgs(
