@@ -383,14 +383,14 @@ FEATURE_FLAGS: dict[str, bool] = {
 LOCAL_EXTENSIONS = ["/app/extensions/nl-explorer"]
 
 
-def FLASK_APP_MUTATOR(app):  # noqa: N802
-    """Register the NL Explorer plugin (Blueprint + REST API) with Superset."""
-    try:
-        from nl_explorer.entrypoint import register  # noqa: PLC0415
+# def FLASK_APP_MUTATOR(app):
+#     """Register the NL Explorer plugin (Blueprint + REST API) with Superset."""
+#     try:
+#         from nl_explorer.entrypoint import register
 
-        register(app)
-    except Exception:
-        logging.getLogger(__name__).exception("Failed to register NL Explorer plugin")
+#         register(app)
+#     except Exception:
+#         logging.getLogger(__name__).exception("Failed to register NL Explorer plugin")
 
 
 # Default configurator will consume the LOG_* settings below
@@ -526,37 +526,37 @@ JINJA_CONTEXT_ADDONS = {"current_user_email": current_user_email}
 #                cfg.get("max_tokens"), cfg.get("streaming")
 #   api.py:      cfg.get("max_datasets_in_context")
 # AWS credentials come from IRSA; region from AWS_DEFAULT_REGION env var.
-NL_EXPLORER_CONFIG = {
-    "model": os.environ.get(
-        "NL_EXPLORER_MODEL",
-        "bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0",
-    ),
-    "max_tokens": 4096,
-    "streaming": True,
-    "max_datasets_in_context": 20,
-}
+# NL_EXPLORER_CONFIG = {
+#     "model": os.environ.get(
+#         "NL_EXPLORER_MODEL",
+#         "bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+#     ),
+#     "max_tokens": 4096,
+#     "streaming": True,
+#     "max_datasets_in_context": 20,
+# }
 
 
-def COMMON_BOOTSTRAP_OVERRIDES_FUNC(  # noqa: N802
-    _bootstrap_data: dict[str, object],
-) -> dict[str, object]:
-    """Inject NL Explorer org-level config into every page's bootstrapData.
+# def COMMON_BOOTSTRAP_OVERRIDES_FUNC(
+#     _bootstrap_data: dict[str, object],
+# ) -> dict[str, object]:
+#     """Inject NL Explorer org-level config into every page's bootstrapData.
 
-    This data is forwarded from the parent Superset frame to the NL Explorer
-    iframe via postMessage and then included in every LLM API call, allowing
-    server-controlled instructions to be appended to the system prompt without
-    embedding them in the frontend bundle.
-    """
-    _default_suffix = (
-        "You are deployed at MIT Open Learning. "
-        "Datasets follow MIT OpenLearning naming conventions. "
-        "Prefer clear, concise answers suitable for a higher-education"
-        " analytics audience."
-    )
-    return {
-        "nl_explorer": {
-            "system_prompt_suffix": os.environ.get(
-                "NL_EXPLORER_SYSTEM_PROMPT_SUFFIX", _default_suffix
-            ),
-        }
-    }
+#     This data is forwarded from the parent Superset frame to the NL Explorer
+#     iframe via postMessage and then included in every LLM API call, allowing
+#     server-controlled instructions to be appended to the system prompt without
+#     embedding them in the frontend bundle.
+#     """
+#     _default_suffix = (
+#         "You are deployed at MIT Open Learning. "
+#         "Datasets follow MIT OpenLearning naming conventions. "
+#         "Prefer clear, concise answers suitable for a higher-education"
+#         " analytics audience."
+#     )
+#     return {
+#         "nl_explorer": {
+#             "system_prompt_suffix": os.environ.get(
+#                 "NL_EXPLORER_SYSTEM_PROMPT_SUFFIX", _default_suffix
+#             ),
+#         }
+#     }

@@ -1,6 +1,5 @@
 """Deploy Superset to EKS."""
 
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -557,10 +556,11 @@ superset_chart = kubernetes.helm.v3.Release(
                 .parent.joinpath("superset_config.py")
                 .read_text()
             },
-            # Mount the governance roles JSON into /app/pythonpath so the init
-            # command can import them via `flask fab import-roles`.
-            # The RLS policy files are mounted separately via a dedicated ConfigMap
-            # (superset-rls-policies) into the post-deploy Job pod.
+            # Mount the governance roles JSON via extraConfigs (mounted at
+            # /app/configs by the Helm chart) so the init command can import
+            # them via `flask fab import-roles`.
+            # RLS policies are managed independently via `ol-superset apply-rls`
+            # (the ol-superset CLI in ol-data-platform).
             "extraConfigs": {
                 "ol_governance_roles.json": (
                     _POLICY_DIR / "ol_governance_roles.json"
@@ -570,6 +570,7 @@ superset_chart = kubernetes.helm.v3.Release(
             # `flask fab import-roles` is idempotent: it creates missing roles and
             # updates existing ones without touching Admin/Alpha/Gamma/Public.
             # `set -e` ensures any failure aborts the whole init sequence.
+            # Note: extraConfigs are mounted at /app/configs (not /app/pythonpath).
             "init": {
                 "command": [
                     "/bin/sh",
@@ -579,7 +580,7 @@ superset_chart = kubernetes.helm.v3.Release(
                     "superset db upgrade; "
                     "superset init; "
                     "flask fab import-roles"
-                    " --path /app/pythonpath/ol_governance_roles.json",
+                    " --path /app/configs/ol_governance_roles.json",
                 ]
             },
             "envFromSecret": app_config_secret_name,
@@ -677,127 +678,6 @@ celery_keda_scaling = kubernetes.apiextensions.CustomResource(
 ########################################
 # Gateway API routing + TLS certificate #
 ########################################
-
-# RLS policy application Job — runs after Helm deployment completes.
-# Idempotently creates/updates Superset RLS filters via the REST API.
-# Policy files are mounted from a dedicated ConfigMap (not the Helm chart's
-# extraConfigs ConfigMap, which is only available to Helm-managed pods).
-
-_rls_policy_hash = hashlib.sha256(
-    (_POLICY_DIR / "ol_rls_policies.json").read_bytes()
-    + (_POLICY_DIR / "apply_rls_policies.py").read_bytes()
-).hexdigest()
-
-rls_policy_configmap = kubernetes.core.v1.ConfigMap(
-    f"superset-rls-policies-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="superset-rls-policies",
-        namespace=superset_namespace,
-        labels=k8s_global_labels,
-    ),
-    data={
-        "ol_rls_policies.json": (_POLICY_DIR / "ol_rls_policies.json").read_text(),
-        "apply_rls_policies.py": (_POLICY_DIR / "apply_rls_policies.py").read_text(),
-    },
-    opts=ResourceOptions(delete_before_replace=True),
-)
-
-rls_admin_secret = OLVaultK8SSecret(
-    f"superset-rls-admin-secret-{stack_info.env_suffix}",
-    resource_config=OLVaultK8SStaticSecretConfig(
-        name="superset-rls-admin",
-        namespace=superset_namespace,
-        labels=k8s_global_labels,
-        dest_secret_labels=k8s_global_labels,
-        dest_secret_name="superset-rls-admin",  # pragma: allowlist secret  # noqa: S106
-        dest_secret_type="Opaque",  # pragma: allowlist secret  # noqa: S106
-        mount=superset_vault_kv_path,
-        mount_type="kv-v2",
-        path="app-config",
-        templates={
-            "SUPERSET_ADMIN_USER": '{{ get .Secrets "admin_user" | default "admin" }}',
-            "SUPERSET_ADMIN_PASSWORD": '{{ get .Secrets "admin_password" }}',
-        },
-        refresh_after="1h",
-        vaultauth=vault_k8s_resources.auth_name,
-    ),
-    opts=ResourceOptions(delete_before_replace=True, depends_on=vault_k8s_resources),
-)
-
-_rls_apply_job = kubernetes.batch.v1.Job(
-    "superset-apply-rls-policies",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="superset-apply-rls-policies",
-        namespace=superset_namespace,
-        labels=k8s_global_labels | {"ol.mit.edu/process": "rls-init"},
-        annotations={
-            # SHA-256 of policy JSON + script so the Job is recreated only when
-            # content changes — avoids the non-determinism of Python's hash().
-            "ol.mit.edu/policy-hash": _rls_policy_hash,
-        },
-    ),
-    spec=kubernetes.batch.v1.JobSpecArgs(
-        backoff_limit=3,
-        active_deadline_seconds=1800,
-        ttl_seconds_after_finished=3600,
-        template=kubernetes.core.v1.PodTemplateSpecArgs(
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                labels=k8s_global_labels | {"ol.mit.edu/process": "rls-init"},
-            ),
-            spec=kubernetes.core.v1.PodSpecArgs(
-                restart_policy="OnFailure",
-                service_account_name="superset",
-                volumes=[
-                    kubernetes.core.v1.VolumeArgs(
-                        name="rls-policies",
-                        config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                            name="superset-rls-policies",
-                        ),
-                    ),
-                ],
-                containers=[
-                    kubernetes.core.v1.ContainerArgs(
-                        name="apply-rls",
-                        image=ecr_image_uri("mitodl/superset") + f":{SUPERSET_TAG}",
-                        command=[
-                            "python",
-                            "/app/rls-policies/apply_rls_policies.py",
-                        ],
-                        env=[
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="SUPERSET_URL",
-                                value="http://superset:8088",
-                            ),
-                        ],
-                        env_from=[
-                            kubernetes.core.v1.EnvFromSourceArgs(
-                                secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
-                                    name="superset-rls-admin",
-                                )
-                            ),
-                        ],
-                        volume_mounts=[
-                            kubernetes.core.v1.VolumeMountArgs(
-                                name="rls-policies",
-                                mount_path="/app/rls-policies",
-                                read_only=True,
-                            ),
-                        ],
-                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                            requests={"cpu": "100m", "memory": "256Mi"},
-                            limits={"cpu": "500m", "memory": "512Mi"},
-                        ),
-                    )
-                ],
-            ),
-        ),
-    ),
-    opts=ResourceOptions(
-        delete_before_replace=True,
-        depends_on=[superset_chart, rls_admin_secret, rls_policy_configmap],
-    ),
-)
-
 
 gateway_config = OLEKSGatewayConfig(
     cert_issuer="letsencrypt-production",

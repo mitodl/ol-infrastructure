@@ -41,6 +41,7 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.k8s import (
+    GranianConfig,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixPluginConfig,
@@ -729,47 +730,6 @@ static_secrets = OLVaultK8SSecret(
     ),
 )
 
-# Load the nginx configuration into a configmap
-learn_ai_nginx_configmap = kubernetes.core.v1.ConfigMap(
-    f"learn-ai-{stack_info.env_suffix}-nginx-configmap",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="nginx-config",
-        namespace=learn_ai_namespace,
-        labels=k8s_global_labels,
-    ),
-    data={
-        "web.conf": Path(__file__).parent.joinpath("files/web.conf").read_text(),
-    },
-)
-
-if learn_ai_config.get_bool("use_granian"):
-    cmd_array = ["granian"]
-    arg_array = [
-        "--interface",
-        "asgi",
-        "--host",
-        "0.0.0.0",  # noqa: S104
-        "--port",
-        f"{DEFAULT_WSGI_PORT}",
-        "--workers",
-        "1",
-        "--runtime-threads",
-        "2",
-        "--log-level",
-        "debug",
-        "main.asgi:application",
-    ]
-else:
-    cmd_array = ["uvicorn"]
-    arg_array = [
-        "main.asgi:application",
-        "--reload",
-        "--host",
-        "0.0.0.0",  # noqa: S104
-        "--port",
-        f"{DEFAULT_WSGI_PORT}",
-    ]
-
 # Instantiate the OLApplicationK8s component
 learn_ai_app_k8s = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
@@ -793,8 +753,27 @@ learn_ai_app_k8s = OLApplicationK8s(
         application_image_repository="mitodl/learn-ai-app",
         application_docker_tag=LEARN_AI_DOCKER_TAG,
         application_min_replicas=learn_ai_config.get("min_replicas") or 2,
-        application_cmd_array=cmd_array,
-        application_arg_array=arg_array,
+        application_cmd_array=["uvicorn"],
+        application_arg_array=[
+            "main.asgi:application",
+            "--reload",
+            "--host",
+            "0.0.0.0",  # noqa: S104
+            "--port",
+            f"{DEFAULT_WSGI_PORT}",
+        ],
+        granian_config=GranianConfig(
+            interface="asgi",
+            workers=1,
+            runtime_mode=None,
+            no_ws=False,
+            backlog=None,
+            log_level="debug",
+            application_module="main.asgi:application",
+            nginx_config_filename="web.conf",  # learn_ai shares one nginx config for all server types
+        )
+        if learn_ai_config.get_bool("use_granian")
+        else None,
         slack_channel=slack_channel,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,
@@ -822,7 +801,9 @@ learn_ai_app_k8s = OLApplicationK8s(
                 resource_limits={"memory": "2500Mi"},
             ),
         ],
-        celery_beat_config=OLApplicationK8sCeleryBeatConfig(),
+        celery_beat_config=OLApplicationK8sCeleryBeatConfig(
+            scheduler="celery.beat.PersistentScheduler"
+        ),
         hpa_scaling_metrics=[
             kubernetes.autoscaling.v2.MetricSpecArgs(
                 type="Resource",
