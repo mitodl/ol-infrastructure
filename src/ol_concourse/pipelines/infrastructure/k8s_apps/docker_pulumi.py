@@ -420,7 +420,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         additional_env_vars={
             f"{app_name.replace('-', '_').upper()}_DOCKER_TAG": "((.:image_tag))",
         },
-        slack_url_path="((eks.slack_url))",
+        slack_url_path="eks.slack_url",
     )
 
     additional_post_steps: dict[int, list[TaskStep]] = {}
