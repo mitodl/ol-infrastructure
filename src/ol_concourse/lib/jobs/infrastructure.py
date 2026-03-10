@@ -23,13 +23,19 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
+from ol_concourse.lib.notifications import notification
 from ol_concourse.lib.resource_types import (
     github_issues_resource,
     packer_build,
     packer_validate,
     pulumi_provisioner_resource,
+    slack_notification_resource,
 )
-from ol_concourse.lib.resources import github_issues, pulumi_provisioner
+from ol_concourse.lib.resources import (
+    github_issues,
+    pulumi_provisioner,
+    slack_notification,
+)
 from ol_concourse.pipelines.constants import GH_ISSUES_DEFAULT_REPOSITORY
 
 
@@ -304,6 +310,7 @@ def pulumi_job(  # noqa: PLR0913
     previous_job: Job | None = None,
     additional_env_vars: dict[str, str] | None = None,
     env_vars_from_files: dict[str, str] | None = None,
+    slack_url_path: str | None = None,
 ) -> PipelineFragment:
     """Create a job definition for running a Pulumi task.
 
@@ -317,6 +324,9 @@ def pulumi_job(  # noqa: PLR0913
         triggers for the jobs in the chain
     :param previous_job: The job object that should be added as a `passed` dependency
         for the `get` step input for this job definition.
+    :param slack_url_path: A Vault secret path containing the Slack webhook URL. When
+        provided, failure, error, and abort notifications are sent to that Slack
+        channel.
 
     :returns: A `PipelineFragment` object that can be composed with other fragments to
               build a full pipeline.
@@ -378,8 +388,42 @@ def pulumi_job(  # noqa: PLR0913
         ]
         + (additional_post_steps or []),
     )
+
+    extra_resources: list[Resource] = []
+    extra_resource_types = [pulumi_provisioner_resource_type]
+
+    if slack_url_path:
+        slack_resource = slack_notification(
+            name=Identifier(f"slack-alert-{project_name}"),
+            url=f"(({slack_url_path}))",
+        )
+        extra_resources.append(slack_resource)
+        extra_resource_types.append(slack_notification_resource())
+        notification_body = (
+            f"Pulumi job deploy-{project_name}-{stack_name.lower()} encountered a"
+            " problem. Check the pipeline for details."
+        )
+        pulumi_job_object.on_failure = notification(
+            resource=slack_resource,
+            title=f"Pulumi {project_name} {stack_name} failed",
+            body=notification_body,
+            alert_type="failed",
+        )
+        pulumi_job_object.on_error = notification(
+            resource=slack_resource,
+            title=f"Pulumi {project_name} {stack_name} errored",
+            body=notification_body,
+            alert_type="errored",
+        )
+        pulumi_job_object.on_abort = notification(
+            resource=slack_resource,
+            title=f"Pulumi {project_name} {stack_name} aborted",
+            body=notification_body,
+            alert_type="aborted",
+        )
+
     return PipelineFragment(
-        resources=[pulumi_resource],
-        resource_types=[pulumi_provisioner_resource_type],
+        resources=[pulumi_resource, *extra_resources],
+        resource_types=extra_resource_types,
         jobs=[pulumi_job_object],
     )
