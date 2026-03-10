@@ -493,6 +493,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
             f"{app_name.replace('-', '_').upper()}_DOCKER_TAG": "((.:image_tag))",
         },
         enable_github_issue_resource=False,
+        slack_url_path="eks.slack_url",
     )
 
     # Trigger a production deploy when the release branch is updated

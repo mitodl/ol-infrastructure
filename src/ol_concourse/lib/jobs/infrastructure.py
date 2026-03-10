@@ -161,6 +161,7 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901, PLR0912
     github_issue_repository: str | None = None,
     additional_env_vars: dict[str, str] | None = None,
     env_vars_from_files: dict[str, str] | None = None,
+    slack_url_path: str | None = None,
 ) -> PipelineFragment:
     """Create a chained sequence of jobs for running Pulumi tasks.
 
@@ -180,6 +181,9 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901, PLR0912
     :param env_vars_from_files: The list of environment variables that should be set
         during the build and the files to load for populating the values (e.g. the
         `version` file from a GitHub resource)
+    :param slack_url_path: A Vault secret path containing the Slack webhook URL. When
+        provided, failure, error, and abort notifications are sent to that Slack
+        channel.
     :type custom_dependencies: Dict[int, list[GetStep]]
 
     :returns: A `PipelineFragment` object that can be composed with other fragments to
@@ -263,6 +267,7 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901, PLR0912
             previous_job,
             additional_env_vars=additional_env_vars,
             env_vars_from_files=env_vars_from_files,
+            slack_url_path=slack_url_path,
         )
 
         default_github_issue_labels = [
