@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, ResourceOptions, StackReference
@@ -72,7 +73,7 @@ starrocks_root_password_secret = kubernetes.core.v1.Secret(
 )
 
 # Vault/K8s auth binding: provisions the IAM role, Vault policy, and K8s auth
-# backend role that allow the VSO service account (starrocks-vault) to sync
+# backend role that allows the VSO service account (starrocks-vault) to sync
 # secrets from Vault into the starrocks namespace.
 starrocks_auth_binding = OLEKSAuthBinding(
     OLEKSAuthBindingConfig(
@@ -138,7 +139,7 @@ if not starrocks_config.get_bool("use_be") and not starrocks_config.get_bool("us
 
 # Ref: https://github.com/StarRocks/starrocks-kubernetes-operator/blob/main/helm-charts/charts/kube-starrocks/charts/starrocks/values.yaml
 fe_config = starrocks_config.get_object("fe_config") or {}
-starrocks_values = {
+starrocks_values: dict[str, Any] = {
     "nameOverride": f"{stack_info.env_prefix}-starrocks",
     "initPassword": {
         "enabled": True,
@@ -236,6 +237,11 @@ if starrocks_config.get_bool("use_cn"):
         },
     }
 
+if starrocks_config.get_bool("oidc_enabled"):
+    # authentication_chain in fe.conf applies at every FE startup, ensuring the
+    # Keycloak auth chain is active even if BDB metadata is reset.
+    starrocks_values["starrocksFESpec"]["config"] = "authentication_chain = keycloak\n"
+
 starrocks_release = kubernetes.helm.v3.Release(
     f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
@@ -285,12 +291,57 @@ starrocks_apisix_httproute = OLApisixHTTPRoute(
 )
 
 # Configure OAuth2 authentication via SQL Security Integration.
-# Uses CREATE SECURITY INTEGRATION + ADMIN SET FRONTEND CONFIG authentication_chain.
+# Uses idempotent ALTER-if-exists / CREATE-if-not pattern.
+# authentication_chain is managed durably via starrocksFESpec.config (fe.conf above);
+# this Job only handles Security Integration DDL.
 # Ref: https://docs.starrocks.io/docs/administration/user_privs/authentication/security_integration/
-# SSO credentials are read at runtime from the VSO-synced K8s Secret (sso_k8s_secret).
 if sso_k8s_secret is not None:
     domain = starrocks_config.require("domain")
     fe_service = f"{stack_info.env_prefix}-starrocks-fe-service"
+
+    setup_sh = """\
+#!/bin/sh
+set -e
+MC="mysql --default-auth=mysql_native_password -h $FE_SERVICE -P 9030 -u root"
+
+if $MC -e 'SHOW SECURITY INTEGRATIONS' | grep -q keycloak; then
+  $MC <<ENDSQL
+ALTER SECURITY INTEGRATION keycloak SET(
+  "auth_server_url" = "$SSO_URL/protocol/openid-connect/auth",
+  "token_server_url" = "$SSO_URL/protocol/openid-connect/token",
+  "client_id" = "$SSO_CLIENT_ID",
+  "client_secret" = "$SSO_CLIENT_SECRET",
+  "redirect_url" = "https://$DOMAIN/api/oauth2",
+  "jwks_url" = "$SSO_URL/protocol/openid-connect/certs",
+  "principal_field" = "preferred_username"
+);
+ENDSQL
+else
+  $MC <<ENDSQL
+CREATE SECURITY INTEGRATION keycloak PROPERTIES (
+  "type" = "authentication_oauth2",
+  "auth_server_url" = "$SSO_URL/protocol/openid-connect/auth",
+  "token_server_url" = "$SSO_URL/protocol/openid-connect/token",
+  "client_id" = "$SSO_CLIENT_ID",
+  "client_secret" = "$SSO_CLIENT_SECRET",
+  "redirect_url" = "https://$DOMAIN/api/oauth2",
+  "jwks_url" = "$SSO_URL/protocol/openid-connect/certs",
+  "principal_field" = "preferred_username"
+);
+ENDSQL
+fi
+"""
+
+    oauth2_setup_configmap_name = f"{stack_info.env_prefix}-starrocks-oauth2-setup"
+    oauth2_setup_configmap = kubernetes.core.v1.ConfigMap(
+        f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-oauth2-setup-cm",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=oauth2_setup_configmap_name,
+            namespace=namespace,
+            labels=k8s_app_labels.model_dump(),
+        ),
+        data={"setup.sh": setup_sh},
+    )
 
     kubernetes.batch.v1.Job(
         f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-oauth2-setup-job",
@@ -316,7 +367,7 @@ if sso_k8s_secret is not None:
                                 "i=0; "
                                 "until mysql"
                                 " --default-auth=mysql_native_password"
-                                f" -h {fe_service} -P 9030 -u root"
+                                " -h $FE_SERVICE -P 9030 -u root"
                                 " -e 'SELECT 1' >/dev/null 2>&1; "
                                 "do i=$((i+1)); "
                                 "if [ $i -ge 36 ]; then "
@@ -335,6 +386,10 @@ if sso_k8s_secret is not None:
                                         )
                                     ),
                                 ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="FE_SERVICE",
+                                    value=fe_service,
+                                ),
                             ],
                         ),
                     ],
@@ -342,52 +397,7 @@ if sso_k8s_secret is not None:
                         kubernetes.core.v1.ContainerArgs(
                             name="configure-oauth2",
                             image=cached_image_uri("mysql:8.0"),
-                            # SSO_URL/SSO_CLIENT_ID/SSO_CLIENT_SECRET from
-                            # VSO-synced secret; MYSQL_PWD from root password.
-                            command=[
-                                "sh",
-                                "-c",
-                                # ALTER if integration already exists, CREATE if not.
-                                # Both paths are non-destructive/idempotent.
-                                "MC='mysql --default-auth=mysql_native_password"
-                                f" -h {fe_service} -P 9030 -u root'; "
-                                "if $MC -e 'SHOW SECURITY INTEGRATIONS'"
-                                " | grep -q keycloak; then "
-                                "$MC <<ENDSQL\n"
-                                "ALTER SECURITY INTEGRATION keycloak SET(\n"
-                                '  "auth_server_url" = "$SSO_URL'
-                                '/protocol/openid-connect/auth",\n'
-                                '  "token_server_url" = "$SSO_URL'
-                                '/protocol/openid-connect/token",\n'
-                                '  "client_id" = "$SSO_CLIENT_ID",\n'
-                                '  "client_secret" = "$SSO_CLIENT_SECRET",\n'
-                                f'  "redirect_url" = "https://{domain}/api/oauth2",\n'
-                                '  "jwks_url" = "$SSO_URL'
-                                '/protocol/openid-connect/certs",\n'
-                                '  "principal_field" = "preferred_username"\n'
-                                ");\n"
-                                "ENDSQL\n"
-                                "else "
-                                "$MC <<ENDSQL\n"
-                                "CREATE SECURITY INTEGRATION keycloak"
-                                " PROPERTIES (\n"
-                                '  "type" = "authentication_oauth2",\n'
-                                '  "auth_server_url" = "$SSO_URL'
-                                '/protocol/openid-connect/auth",\n'
-                                '  "token_server_url" = "$SSO_URL'
-                                '/protocol/openid-connect/token",\n'
-                                '  "client_id" = "$SSO_CLIENT_ID",\n'
-                                '  "client_secret" = "$SSO_CLIENT_SECRET",\n'
-                                f'  "redirect_url" = "https://{domain}/api/oauth2",\n'
-                                '  "jwks_url" = "$SSO_URL'
-                                '/protocol/openid-connect/certs",\n'
-                                '  "principal_field" = "preferred_username"\n'
-                                ");\n"
-                                "ENDSQL\n"
-                                "fi; "
-                                "$MC -e 'ADMIN SET FRONTEND CONFIG"
-                                ' ("authentication_chain" = "keycloak");\'',
-                            ],
+                            command=["sh", "/scripts/setup.sh"],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="MYSQL_PWD",
@@ -398,6 +408,14 @@ if sso_k8s_secret is not None:
                                         )
                                     ),
                                 ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="FE_SERVICE",
+                                    value=fe_service,
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="DOMAIN",
+                                    value=domain,
+                                ),
                             ],
                             env_from=[
                                 kubernetes.core.v1.EnvFromSourceArgs(
@@ -406,6 +424,22 @@ if sso_k8s_secret is not None:
                                     ),
                                 ),
                             ],
+                            volume_mounts=[
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="scripts",
+                                    mount_path="/scripts",
+                                    read_only=True,
+                                ),
+                            ],
+                        ),
+                    ],
+                    volumes=[
+                        kubernetes.core.v1.VolumeArgs(
+                            name="scripts",
+                            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                                name=oauth2_setup_configmap_name,
+                                default_mode=0o555,
+                            ),
                         ),
                     ],
                     restart_policy="OnFailure",
@@ -413,7 +447,11 @@ if sso_k8s_secret is not None:
             ),
         ),
         opts=ResourceOptions(
-            depends_on=[starrocks_release, sso_k8s_secret],
+            depends_on=[
+                starrocks_release,
+                sso_k8s_secret,
+                oauth2_setup_configmap,
+            ],
             delete_before_replace=True,
         ),
     )
