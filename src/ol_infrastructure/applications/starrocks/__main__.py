@@ -21,6 +21,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SStaticSecretConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
+    cached_image_uri,
     check_cluster_namespace,
     setup_k8s_provider,
 )
@@ -299,7 +300,6 @@ if sso_k8s_secret is not None:
             labels=k8s_app_labels.model_dump(),
         ),
         spec=kubernetes.batch.v1.JobSpecArgs(
-            ttl_seconds_after_finished=600,
             active_deadline_seconds=300,
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -309,33 +309,68 @@ if sso_k8s_secret is not None:
                     init_containers=[
                         kubernetes.core.v1.ContainerArgs(
                             name="wait-for-fe",
-                            image="busybox:1.36",
+                            image=cached_image_uri("mysql:8.0"),
                             command=[
                                 "sh",
                                 "-c",
                                 "i=0; "
-                                f"until nc -z {fe_service} 9030; "
+                                "until mysql"
+                                " --default-auth=mysql_native_password"
+                                f" -h {fe_service} -P 9030 -u root"
+                                " -e 'SELECT 1' >/dev/null 2>&1; "
                                 "do i=$((i+1)); "
                                 "if [ $i -ge 36 ]; then "
-                                "echo 'Timed out waiting for StarRocks FE'; "
-                                "exit 1; fi; "
-                                "echo 'Waiting for StarRocks FE...'; sleep 5; done",
+                                "echo 'Timed out waiting for StarRocks FE';"
+                                " exit 1; fi; "
+                                "echo 'Waiting for StarRocks FE...'; "
+                                "sleep 5; done",
+                            ],
+                            env=[
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="MYSQL_PWD",
+                                    value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                        secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                            name=starrocks_root_password_secret_name,
+                                            key="password",
+                                        )
+                                    ),
+                                ),
                             ],
                         ),
                     ],
                     containers=[
                         kubernetes.core.v1.ContainerArgs(
                             name="configure-oauth2",
-                            image="mysql:8.0",
+                            image=cached_image_uri("mysql:8.0"),
                             # SSO_URL/SSO_CLIENT_ID/SSO_CLIENT_SECRET from
                             # VSO-synced secret; MYSQL_PWD from root password.
                             command=[
                                 "sh",
                                 "-c",
-                                "mysql --default-auth=mysql_native_password"
-                                f" -h {fe_service} -P 9030 -u root <<ENDSQL\n"
-                                "DROP SECURITY INTEGRATION IF EXISTS keycloak;\n"
-                                "CREATE SECURITY INTEGRATION keycloak PROPERTIES (\n"
+                                # ALTER if integration already exists, CREATE if not.
+                                # Both paths are non-destructive/idempotent.
+                                "MC='mysql --default-auth=mysql_native_password"
+                                f" -h {fe_service} -P 9030 -u root'; "
+                                "if $MC -e 'SHOW SECURITY INTEGRATIONS'"
+                                " | grep -q keycloak; then "
+                                "$MC <<ENDSQL\n"
+                                "ALTER SECURITY INTEGRATION keycloak SET(\n"
+                                '  "auth_server_url" = "$SSO_URL'
+                                '/protocol/openid-connect/auth",\n'
+                                '  "token_server_url" = "$SSO_URL'
+                                '/protocol/openid-connect/token",\n'
+                                '  "client_id" = "$SSO_CLIENT_ID",\n'
+                                '  "client_secret" = "$SSO_CLIENT_SECRET",\n'
+                                f'  "redirect_url" = "https://{domain}/api/oauth2",\n'
+                                '  "jwks_url" = "$SSO_URL'
+                                '/protocol/openid-connect/certs",\n'
+                                '  "principal_field" = "preferred_username"\n'
+                                ");\n"
+                                "ENDSQL\n"
+                                "else "
+                                "$MC <<ENDSQL\n"
+                                "CREATE SECURITY INTEGRATION keycloak"
+                                " PROPERTIES (\n"
                                 '  "type" = "authentication_oauth2",\n'
                                 '  "auth_server_url" = "$SSO_URL'
                                 '/protocol/openid-connect/auth",\n'
@@ -348,9 +383,10 @@ if sso_k8s_secret is not None:
                                 '/protocol/openid-connect/certs",\n'
                                 '  "principal_field" = "preferred_username"\n'
                                 ");\n"
-                                "ADMIN SET FRONTEND CONFIG "
-                                '("authentication_chain" = "keycloak");\n'
-                                "ENDSQL",
+                                "ENDSQL\n"
+                                "fi; "
+                                "$MC -e 'ADMIN SET FRONTEND CONFIG"
+                                ' ("authentication_chain" = "keycloak");\'',
                             ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
