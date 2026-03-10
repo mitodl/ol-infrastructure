@@ -1,7 +1,8 @@
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, ResourceOptions, StackReference
+import pulumi_vault as vault
+from pulumi import Config, InvokeOptions, ResourceOptions, StackReference
 
 from bridge.lib.versions import STARROCKS_CHART_VERSION
 from ol_infrastructure.components.applications.eks import (
@@ -16,10 +17,6 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
 )
-from ol_infrastructure.components.services.vault import (
-    OLVaultK8SSecret,
-    OLVaultK8SStaticSecretConfig,
-)
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
@@ -33,7 +30,7 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
-from ol_infrastructure.lib.vault import setup_vault_provider
+from ol_infrastructure.lib.vault import get_vault_provider, setup_vault_provider
 
 setup_vault_provider()
 stack_info = parse_stack()
@@ -87,35 +84,17 @@ starrocks_auth_binding = OLEKSAuthBinding(
     )
 )
 
-# Create OIDC configuration secret if enabled
+# Read OIDC credentials from Vault at deploy time for OAuth2 Security Integration setup
+sso_secret = None
 if starrocks_config.get_bool("oidc_enabled"):
-    oidc_config_secret_name = f"{stack_info.env_prefix}-starrocks-oidc-config"
-    oidc_config_secret_config = OLVaultK8SStaticSecretConfig(
-        name="starrocks-oidc-config",
-        namespace=namespace,
-        dest_secret_labels=k8s_app_labels.model_dump(),
-        dest_secret_name=oidc_config_secret_name,
-        labels=k8s_app_labels.model_dump(),
-        mount="secret-operations",
-        mount_type="kv-v1",
-        path="sso/starrocks",
-        restart_target_kind="StatefulSet",
-        restart_target_name=f"{stack_info.env_prefix}-starrocks-fe",
-        templates={
-            "OIDC_ISSUER_URL": '{{ get .Secrets "url" }}',
-            "OIDC_CLIENT_ID": '{{ get .Secrets "client_id" }}',
-            "OIDC_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
-            "OIDC_JWKS_URI": '{{ get .Secrets "url" }}/protocol/openid-connect/certs',
-        },
-        vaultauth=starrocks_auth_binding.vault_k8s_resources.auth_name,
+    vault_provider = get_vault_provider(
+        Config("vault").require("address"),
+        Config("vault_server").require("env_namespace"),
+        skip_child_token=None,
     )
-    oidc_config_secret = OLVaultK8SSecret(
-        f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-oidc-config-secret",
-        oidc_config_secret_config,
-        opts=ResourceOptions(
-            delete_before_replace=True,
-            parent=starrocks_auth_binding.vault_k8s_resources,
-        ),
+    sso_secret = vault.generic.get_secret_output(
+        path="secret-operations/sso/starrocks",
+        opts=InvokeOptions(provider=vault_provider),
     )
 
 
@@ -280,3 +259,117 @@ starrocks_apisix_httproute = OLApisixHTTPRoute(
     k8s_namespace=namespace,
     k8s_labels=k8s_app_labels.model_dump(),
 )
+
+# Configure OAuth2 authentication via SQL Security Integration.
+# The fe.conf approach is legacy; the current approach uses:
+#   CREATE SECURITY INTEGRATION + ADMIN SET FRONTEND CONFIG authentication_chain
+# Ref: https://docs.starrocks.io/docs/administration/user_privs/authentication/security_integration/
+if sso_secret is not None:
+    domain = starrocks_config.require("domain")
+    fe_service = f"{stack_info.env_prefix}-starrocks-fe-service"
+
+    # Build the SQL at deploy time with Vault values inlined.
+    # Stored as a Secret (not ConfigMap) because it contains the OAuth2 client_secret.
+    oauth2_sql_secret = kubernetes.core.v1.Secret(
+        f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-oauth2-sql-secret",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"starrocks-{stack_info.env_prefix}-oauth2-sql",
+            namespace=namespace,
+            labels=k8s_app_labels.model_dump(),
+        ),
+        string_data=sso_secret.data.apply(
+            lambda data: {
+                "setup.sql": (
+                    "DROP SECURITY INTEGRATION IF EXISTS keycloak;\n"
+                    "CREATE SECURITY INTEGRATION keycloak PROPERTIES (\n"
+                    '  "type" = "authentication_oauth2",\n'
+                    f'  "auth_server_url" = "{data["url"]}'
+                    '/protocol/openid-connect/auth",\n'
+                    f'  "token_server_url" = "{data["url"]}'
+                    '/protocol/openid-connect/token",\n'
+                    f'  "client_id" = "{data["client_id"]}",\n'
+                    f'  "client_secret" = "{data["client_secret"]}",\n'
+                    f'  "redirect_url" = "https://{domain}/api/oauth2",\n'
+                    f'  "jwks_url" = "{data["url"]}/protocol/openid-connect/certs",\n'
+                    '  "principal_field" = "preferred_username"\n'
+                    ");\n"
+                    'ADMIN SET FRONTEND CONFIG ("authentication_chain" = "keycloak");\n'
+                )
+            }
+        ),
+    )
+
+    kubernetes.batch.v1.Job(
+        f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-oauth2-setup-job",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"starrocks-{stack_info.env_prefix}-oauth2-setup",
+            namespace=namespace,
+            labels=k8s_app_labels.model_dump(),
+        ),
+        spec=kubernetes.batch.v1.JobSpecArgs(
+            ttl_seconds_after_finished=600,
+            template=kubernetes.core.v1.PodTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    labels=k8s_app_labels.model_dump(),
+                ),
+                spec=kubernetes.core.v1.PodSpecArgs(
+                    init_containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="wait-for-fe",
+                            image="busybox:1.36",
+                            command=[
+                                "sh",
+                                "-c",
+                                f"until nc -z {fe_service} 9030; "
+                                "do echo 'Waiting for StarRocks FE...'; "
+                                "sleep 5; done",
+                            ],
+                        ),
+                    ],
+                    containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="configure-oauth2",
+                            image="mysql:8.0",
+                            command=[
+                                "sh",
+                                "-c",
+                                f"mysql --default-auth=mysql_native_password"
+                                f" -h {fe_service} -P 9030 -u root < /sql/setup.sql",
+                            ],
+                            env=[
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="MYSQL_PWD",
+                                    value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                        secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                            name=starrocks_root_password_secret_name,
+                                            key="password",
+                                        )
+                                    ),
+                                ),
+                            ],
+                            volume_mounts=[
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="sql",
+                                    mount_path="/sql",
+                                    read_only=True,
+                                ),
+                            ],
+                        ),
+                    ],
+                    volumes=[
+                        kubernetes.core.v1.VolumeArgs(
+                            name="sql",
+                            secret=kubernetes.core.v1.SecretVolumeSourceArgs(
+                                secret_name=f"starrocks-{stack_info.env_prefix}-oauth2-sql",
+                            ),
+                        ),
+                    ],
+                    restart_policy="OnFailure",
+                ),
+            ),
+        ),
+        opts=ResourceOptions(
+            depends_on=[starrocks_release, oauth2_sql_secret],
+            delete_before_replace=True,
+        ),
+    )
