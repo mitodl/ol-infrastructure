@@ -12,7 +12,6 @@ config:
     ADWORDS_CONVERSION_ID: "935224753"
     ALLOWED_HOSTS: '["micromasters.mit.edu", "mmfin.mit.edu", "mm.mit.edu"]'
     AWS_STORAGE_BUCKET_NAME: "ol-micromasters-app-production"
-    CLOUDFRONT_DIST: "d34pclujt4iir0"
     CYBERSOURCE_REFERENCE_PREFIX: "production"
     CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://secureacceptance.cybersource.com/pay"
     EDXORG_BASE_URL: "https://courses.edx.org"
