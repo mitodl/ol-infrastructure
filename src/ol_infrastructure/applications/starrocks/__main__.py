@@ -302,6 +302,10 @@ if sso_k8s_secret is not None:
     setup_sh = """\
 #!/bin/sh
 set -e
+if [ -z "$SSO_URL" ] || [ -z "$SSO_CLIENT_ID" ] || [ -z "$SSO_CLIENT_SECRET" ]; then
+  echo "SSO credentials not yet available (VSO sync pending); retrying..."
+  exit 1
+fi
 MC="mysql --default-auth=mysql_native_password -h $FE_SERVICE -P 9030 -u root"
 
 if $MC -e 'SHOW SECURITY INTEGRATIONS' | grep -q keycloak; then
@@ -421,6 +425,7 @@ fi
                                 kubernetes.core.v1.EnvFromSourceArgs(
                                     secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
                                         name=sso_k8s_secret_name,
+                                        optional=True,
                                     ),
                                 ),
                             ],
