@@ -3,6 +3,7 @@
 
 import os
 from pathlib import Path
+from typing import Any
 
 import pulumi
 import pulumi_aws as aws
@@ -561,7 +562,9 @@ def create_k8s_resources(  # noqa: C901
             application_port=8000,
             application_min_replicas=replicas_dict["webapp"]["lms"]["min"],
             application_max_replicas=replicas_dict["webapp"]["lms"]["max"],
-            application_security_group_name=edxapp_k8s_app_security_group.id,
+            application_security_group_name=pulumi.Output.from_input(
+                f"{stack_info.env_prefix}-edxapp-lms-{stack_info.env_suffix}"
+            ),
             application_security_group_id=edxapp_k8s_app_security_group.id,
             application_service_account_name=vault_k8s_resources.service_account_name,
             vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
@@ -788,7 +791,9 @@ def create_k8s_resources(  # noqa: C901
             application_port=8000,
             application_min_replicas=replicas_dict["webapp"]["cms"]["min"],
             application_max_replicas=replicas_dict["webapp"]["cms"]["max"],
-            application_security_group_name=edxapp_k8s_app_security_group.id,
+            application_security_group_name=pulumi.Output.from_input(
+                f"{stack_info.env_prefix}-edxapp-cms-{stack_info.env_suffix}"
+            ),
             application_security_group_id=edxapp_k8s_app_security_group.id,
             application_service_account_name=vault_k8s_resources.service_account_name,
             vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
