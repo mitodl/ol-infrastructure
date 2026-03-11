@@ -80,7 +80,7 @@ def create_k8s_resources(  # noqa: C901
     stack_info: StackInfo,
     vault_config: Config,
     vault_policy: vault.Policy,
-) -> None:
+) -> dict[str, Any]:
     """Create all Kubernetes resources for the edxapp LMS and CMS deployments."""
     env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
     lms_webapp_deployment_name = f"{env_name}-edxapp-lms-webapp"
