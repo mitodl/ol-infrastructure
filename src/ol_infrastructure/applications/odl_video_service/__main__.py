@@ -59,13 +59,13 @@ from ol_infrastructure.components.aws.mediaconvert import (
     OLMediaConvert,
 )
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
-from ol_infrastructure.components.services.apisix_gateway_api import (
-    OLApisixHTTPRoute,
-    OLApisixHTTPRouteConfig,
-)
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
+)
+from ol_infrastructure.components.services.k8s import (
+    OLApisixRoute,
+    OLApisixRouteConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -921,19 +921,6 @@ else:
 
 domains_string = ",".join(ovs_config.get_object("domains"))
 
-# Create Route53 DNS records
-five_minutes = 60 * 5
-for domain in ovs_config.get_object("route53_managed_domains"):
-    route53.Record(
-        f"ovs-server-dns-record-{domain}",
-        name=domain,
-        type="CNAME",
-        ttl=five_minutes,
-        records=[autoscale_setup.load_balancer.dns_name],
-        zone_id=mitodl_zone_id,
-        allow_overwrite=True,
-    )
-
 # MediaConvert resources (needed by both EC2 and K8s paths)
 ovs_mediaconvert_config = MediaConvertConfig(
     service_name="odl-video",
@@ -1099,9 +1086,21 @@ if k8s_deploy:
 
     nginx_with_shib_conf = f"""\
     server {{
-    listen 80 default_server;
-    listen [::]:80;
+    listen 443 ssl default_server;
+    listen [::]:443;
     server_name {default_domain};
+
+    ssl_certificate /etc/nginx/cert.pem;
+    ssl_certificate_key /etc/nginx/key.pem;
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+    # ssl_protocols TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-SHA256:DHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA256;
+    ssl_prefer_server_ciphers on;
+    resolver 1.1.1.1;
 
     # 1. Determine the 'real' scheme from the Ingress
     set $my_scheme $http_x_forwarded_proto;
@@ -1118,7 +1117,9 @@ if k8s_deploy:
         include fastcgi_params;
         include shib_fastcgi_params;
         # Tell Shibboleth the request IS secure
-        fastcgi_param HTTPS $my_https;
+        fastcgi_param SERVER_PORT 443;
+        fastcgi_param REQUEST_SCHEME https;
+        fastcgi_param HTTPS on;
         fastcgi_pass unix:/opt/shibboleth/shibauthorizer.sock;
     }}
 
@@ -1126,7 +1127,9 @@ if k8s_deploy:
         include fastcgi_params;
         include shib_fastcgi_params;
         # Tell the responder the request IS secure
-        fastcgi_param HTTPS $my_https;
+        fastcgi_param SERVER_PORT 443;
+        fastcgi_param REQUEST_SCHEME https;
+        fastcgi_param HTTPS on;
         fastcgi_pass unix:/opt/shibboleth/shibresponder.sock;
     }}
 
@@ -1554,8 +1557,8 @@ server {{
         image="pennlabs/shibboleth-sp-nginx:latest",
         ports=[
             kubernetes.core.v1.ContainerPortArgs(
-                container_port=80,
-                name="http",
+                container_port=443,
+                name="https",
                 protocol="TCP",
             ),
         ],
@@ -1567,7 +1570,8 @@ server {{
         liveness_probe=kubernetes.core.v1.ProbeArgs(
             http_get=kubernetes.core.v1.HTTPGetActionArgs(
                 path="/nginx-health",
-                port=80,
+                port=443,
+                scheme="HTTPS",
             ),
             initial_delay_seconds=30,
             period_seconds=30,
@@ -1577,7 +1581,8 @@ server {{
         readiness_probe=kubernetes.core.v1.ProbeArgs(
             http_get=kubernetes.core.v1.HTTPGetActionArgs(
                 path="/nginx-health",
-                port=80,
+                port=443,
+                scheme="HTTPS",
             ),
             initial_delay_seconds=15,
             period_seconds=15,
@@ -1587,7 +1592,8 @@ server {{
         startup_probe=kubernetes.core.v1.ProbeArgs(
             http_get=kubernetes.core.v1.HTTPGetActionArgs(
                 path="/nginx-health",
-                port=80,
+                port=443,
+                scheme="HTTPS",
             ),
             initial_delay_seconds=10,
             period_seconds=10,
@@ -1677,9 +1683,10 @@ server {{
             ports=[
                 kubernetes.core.v1.ServicePortArgs(
                     name="http",
-                    port=DEFAULT_HTTP_PORT,
-                    target_port="http",
+                    port=DEFAULT_HTTPS_PORT,
+                    target_port="https",
                     protocol="TCP",
+                    app_protocol="https",
                 ),
             ],
         ),
@@ -1762,15 +1769,15 @@ server {{
             ),
         )
 
-        ovs_apisix_httproute = OLApisixHTTPRoute(
+        ovs_apisix_httproute = OLApisixRoute(
             f"ovs-apisix-httproute-{stack_info.env_suffix}",
             route_configs=[
-                OLApisixHTTPRouteConfig(
+                OLApisixRouteConfig(
                     route_name="passthrough",
                     hosts=[default_domain],
                     paths=["/*"],
                     backend_service_name=ovs_service_name,
-                    backend_service_port=80,
+                    backend_service_port=443,
                     plugins=[],
                 ),
             ],
@@ -1786,6 +1793,42 @@ server {{
         },
     )
 
+consul_keys = {
+    "ovs/database_endpoint": db_address,
+    "ovs/default_domain": ovs_config.get("default_domain"),
+    "ovs/domains": domains_string,
+    "ovs/edx_base_url": ovs_config.get("edx_base_url"),
+    "ovs/environment": stack_info.env_suffix,
+    "ovs/feature_annotations": ("True" if enabled_annotations else "False"),
+    "ovs/log_level": ovs_config.get("log_level"),
+    "ovs/mediaconvert_sns_topic_arn": ovs_mediaconvert.sns_topic.arn,
+    "ovs/nginx_config_file_path": nginx_config_file_path,
+    "ovs/redis_cluster_address": ovs_server_redis_cluster.address,
+    "ovs/redis_max_connections": redis_config.get("max_connections") or 65000,
+    "ovs/s3_bucket_name": ovs_config.get("s3_bucket_name"),
+    "ovs/s3_subtitle_bucket_name": ovs_config.get("s3_subtitle_bucket_name"),
+    "ovs/s3_thumbnail_bucket_name": ovs_config.get("s3_thumbnail_bucket_name"),
+    "ovs/s3_transcode_bucket_name": ovs_config.get("s3_transcode_bucket_name"),
+    "ovs/s3_watch_bucket_name": ovs_config.get("s3_watch_bucket_name"),
+    "ovs/use_shibboleth": "True" if use_shibboleth else "False",
+    "ovs/aws_role_name": ovs_mediaconvert.role.name,
+    "ovs/aws_account_id": aws_account.account_id,
+    "ovs/post_transcode_actions": "cloudsync.api.process_transcode_results",
+    "ovs/transcode_job_template": "./config/mediaconvert.json",
+    "ovs/video_s3_thumbnail_bucket": ovs_config.get("s3_thumbnail_bucket_name"),
+    "ovs/video_s3_transcode_bucket": ovs_config.get("s3_transcode_bucket_name"),
+    "ovs/video_s3_transcode_endpoint": secrets["transcode_endpoint"],
+    "ovs/video_s3_upload_prefix": "",
+    "ovs/video_s3_transcode_prefix": "transcoded",
+    "ovs/video_s3_thumbnail_prefix": "thumbnails",
+    "ovs/video_transcode_queue": ovs_mediaconvert.queue.name,
+}
+consul.Keys(
+    "ovs-server-configuration-data",
+    keys=consul_key_helper(consul_keys),
+    opts=consul_provider,
+)
+
 # Create Route53 DNS records and Consul keys only when not cut over to K8s
 if not k8s_cutover:
     five_minutes = 60 * 5
@@ -1798,42 +1841,6 @@ if not k8s_cutover:
             records=[autoscale_setup.load_balancer.dns_name],
             zone_id=mitodl_zone_id,
         )
-
-    consul_keys = {
-        "ovs/database_endpoint": db_address,
-        "ovs/default_domain": ovs_config.get("default_domain"),
-        "ovs/domains": domains_string,
-        "ovs/edx_base_url": ovs_config.get("edx_base_url"),
-        "ovs/environment": stack_info.env_suffix,
-        "ovs/feature_annotations": ("True" if enabled_annotations else "False"),
-        "ovs/log_level": ovs_config.get("log_level"),
-        "ovs/mediaconvert_sns_topic_arn": ovs_mediaconvert.sns_topic.arn,
-        "ovs/nginx_config_file_path": nginx_config_file_path,
-        "ovs/redis_cluster_address": ovs_server_redis_cluster.address,
-        "ovs/redis_max_connections": redis_config.get("max_connections") or 65000,
-        "ovs/s3_bucket_name": ovs_config.get("s3_bucket_name"),
-        "ovs/s3_subtitle_bucket_name": ovs_config.get("s3_subtitle_bucket_name"),
-        "ovs/s3_thumbnail_bucket_name": ovs_config.get("s3_thumbnail_bucket_name"),
-        "ovs/s3_transcode_bucket_name": ovs_config.get("s3_transcode_bucket_name"),
-        "ovs/s3_watch_bucket_name": ovs_config.get("s3_watch_bucket_name"),
-        "ovs/use_shibboleth": "True" if use_shibboleth else "False",
-        "ovs/aws_role_name": ovs_mediaconvert.role.name,
-        "ovs/aws_account_id": aws_account.account_id,
-        "ovs/post_transcode_actions": "cloudsync.api.process_transcode_results",
-        "ovs/transcode_job_template": "./config/mediaconvert.json",
-        "ovs/video_s3_thumbnail_bucket": ovs_config.get("s3_thumbnail_bucket_name"),
-        "ovs/video_s3_transcode_bucket": ovs_config.get("s3_transcode_bucket_name"),
-        "ovs/video_s3_transcode_endpoint": secrets["transcode_endpoint"],
-        "ovs/video_s3_upload_prefix": "",
-        "ovs/video_s3_transcode_prefix": "transcoded",
-        "ovs/video_s3_thumbnail_prefix": "thumbnails",
-        "ovs/video_transcode_queue": ovs_mediaconvert.queue.name,
-    }
-    consul.Keys(
-        "ovs-server-configuration-data",
-        keys=consul_key_helper(consul_keys),
-        opts=consul_provider,
-    )
 
 # Add the resources to the export
 export(

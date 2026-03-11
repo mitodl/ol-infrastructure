@@ -34,6 +34,7 @@ config:
   - studio-backend.learn.mit.edu
   - studio-backend.xpro.mit.edu
   - tika-production.ol.mit.edu
+  - video.odl.mit.edu
   eks:apisix_min_replicas: '5'
   eks:apisix_max_replicas: '10'
   eks:apisix_memory: 1000Mi
