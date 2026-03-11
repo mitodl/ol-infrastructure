@@ -618,19 +618,19 @@ def create_k8s_resources(  # noqa: C901
             webapp_deployment_aliases=[
                 pulumi.Alias(
                     name=f"ol-{stack_info.env_prefix}-edxapp-lms-deployment-{stack_info.env_suffix}",
-                    no_parent=True,
+                    parent=None,
                 )
             ],
             webapp_service_aliases=[
                 pulumi.Alias(
                     name=f"ol-{stack_info.env_prefix}-edxapp-lms-service-{stack_info.env_suffix}",
-                    no_parent=True,
+                    parent=None,
                 )
             ],
             webapp_keda_aliases=[
                 pulumi.Alias(
                     name=f"ol-{stack_info.env_prefix}-edxapp-lms-scaledobject-{stack_info.env_suffix}",
-                    no_parent=True,
+                    parent=None,
                 )
             ],
         ),
@@ -837,19 +837,19 @@ def create_k8s_resources(  # noqa: C901
             webapp_deployment_aliases=[
                 pulumi.Alias(
                     name=f"ol-{stack_info.env_prefix}-edxapp-cms-deployment-{stack_info.env_suffix}",
-                    no_parent=True,
+                    parent=None,
                 )
             ],
             webapp_service_aliases=[
                 pulumi.Alias(
                     name=f"ol-{stack_info.env_prefix}-edxapp-cms-service-{stack_info.env_suffix}",
-                    no_parent=True,
+                    parent=None,
                 )
             ],
             webapp_keda_aliases=[
                 pulumi.Alias(
                     name=f"ol-{stack_info.env_prefix}-edxapp-cms-scaledobject-{stack_info.env_suffix}",
-                    no_parent=True,
+                    parent=None,
                 )
             ],
         ),
