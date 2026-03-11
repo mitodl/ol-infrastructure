@@ -615,6 +615,24 @@ def create_k8s_resources(  # noqa: C901
                 ),
             ],
             webapp_keda_config=lms_webapp_keda_config,
+            webapp_deployment_aliases=[
+                pulumi.Alias(
+                    name=f"ol-{stack_info.env_prefix}-edxapp-lms-deployment-{stack_info.env_suffix}",
+                    no_parent=True,
+                )
+            ],
+            webapp_service_aliases=[
+                pulumi.Alias(
+                    name=f"ol-{stack_info.env_prefix}-edxapp-lms-service-{stack_info.env_suffix}",
+                    no_parent=True,
+                )
+            ],
+            webapp_keda_aliases=[
+                pulumi.Alias(
+                    name=f"ol-{stack_info.env_prefix}-edxapp-lms-scaledobject-{stack_info.env_suffix}",
+                    no_parent=True,
+                )
+            ],
         ),
         opts=ResourceOptions(
             depends_on=[
@@ -816,6 +834,24 @@ def create_k8s_resources(  # noqa: C901
                 ),
             ],
             webapp_keda_config=cms_webapp_keda_config,
+            webapp_deployment_aliases=[
+                pulumi.Alias(
+                    name=f"ol-{stack_info.env_prefix}-edxapp-cms-deployment-{stack_info.env_suffix}",
+                    no_parent=True,
+                )
+            ],
+            webapp_service_aliases=[
+                pulumi.Alias(
+                    name=f"ol-{stack_info.env_prefix}-edxapp-cms-service-{stack_info.env_suffix}",
+                    no_parent=True,
+                )
+            ],
+            webapp_keda_aliases=[
+                pulumi.Alias(
+                    name=f"ol-{stack_info.env_prefix}-edxapp-cms-scaledobject-{stack_info.env_suffix}",
+                    no_parent=True,
+                )
+            ],
         ),
         opts=ResourceOptions(
             depends_on=[
@@ -848,8 +884,15 @@ def create_k8s_resources(  # noqa: C901
         ),
     ]
 
-    lms_celery_labels = k8s_global_labels | {
+    # Selector labels must match the existing Deployment's spec.selector (immutable).
+    # The old SGP label (pod-security-group) is kept in the selector; the new
+    # edxapp-celery-sg label is added only to the pod template so the
+    # edxapp_celery_sg_policy SGP can select celery pods without altering the selector.
+    lms_celery_selector_labels = k8s_global_labels | {
         "ol.mit.edu/component": "edxapp-lms-celery",
+        "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
+    }
+    lms_celery_labels = lms_celery_selector_labels | {
         "ol.mit.edu/edxapp-celery-sg": "true",
     }
     lms_celery_deployment = kubernetes.apps.v1.Deployment(
@@ -861,7 +904,7 @@ def create_k8s_resources(  # noqa: C901
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             selector=kubernetes.meta.v1.LabelSelectorArgs(
-                match_labels=lms_celery_labels
+                match_labels=lms_celery_selector_labels
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=lms_celery_labels),
@@ -959,8 +1002,11 @@ def create_k8s_resources(  # noqa: C901
     )
 
     # Special one-off deployment that invokes the process_scheduled_emails.py script
-    lms_process_scheduled_emails_labels = k8s_global_labels | {
+    lms_process_scheduled_emails_selector_labels = k8s_global_labels | {
         "ol.mit.edu/component": "edxapp-lms-process-scheduled-emails",
+        "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
+    }
+    lms_process_scheduled_emails_labels = lms_process_scheduled_emails_selector_labels | {
         "ol.mit.edu/edxapp-celery-sg": "true",
     }
     lms_process_scheduled_emails_deployment = kubernetes.apps.v1.Deployment(
@@ -973,7 +1019,7 @@ def create_k8s_resources(  # noqa: C901
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             replicas=1,
             selector=kubernetes.meta.v1.LabelSelectorArgs(
-                match_labels=lms_process_scheduled_emails_labels
+                match_labels=lms_process_scheduled_emails_selector_labels
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -1046,8 +1092,11 @@ def create_k8s_resources(  # noqa: C901
         ),
     )
 
-    cms_celery_labels = k8s_global_labels | {
+    cms_celery_selector_labels = k8s_global_labels | {
         "ol.mit.edu/component": "edxapp-cms-celery",
+        "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
+    }
+    cms_celery_labels = cms_celery_selector_labels | {
         "ol.mit.edu/edxapp-celery-sg": "true",
     }
     cms_celery_deployment = kubernetes.apps.v1.Deployment(
@@ -1059,7 +1108,7 @@ def create_k8s_resources(  # noqa: C901
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             selector=kubernetes.meta.v1.LabelSelectorArgs(
-                match_labels=cms_celery_labels
+                match_labels=cms_celery_selector_labels
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=cms_celery_labels),

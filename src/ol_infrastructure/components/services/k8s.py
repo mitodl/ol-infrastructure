@@ -11,7 +11,7 @@ from typing import Annotated, Any, Literal
 import pulumi_kubernetes as kubernetes
 import pulumiverse_time as pulumi_time
 from kubernetes.utils.quantity import parse_quantity
-from pulumi import ComponentResource, Output, ResourceOptions
+from pulumi import Alias, ComponentResource, Output, ResourceOptions
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -461,6 +461,30 @@ class OLApplicationK8sConfig(BaseModel):
             "Not added to main application or celery containers."
         ),
     )
+    webapp_deployment_aliases: list[Any] = Field(
+        default_factory=list,
+        description=(
+            "Pulumi Aliases applied to the webapp Deployment. Use when migrating from "
+            "hand-rolled resources to this component to prevent delete-and-recreate of "
+            "the existing Deployment. Typically: [Alias(name=<old-pulumi-name>, no_parent=True)]."
+        ),
+    )
+    webapp_service_aliases: list[Any] = Field(
+        default_factory=list,
+        description=(
+            "Pulumi Aliases applied to the webapp Service. Use when migrating from "
+            "hand-rolled resources to this component. "
+            "Typically: [Alias(name=<old-pulumi-name>, no_parent=True)]."
+        ),
+    )
+    webapp_keda_aliases: list[Any] = Field(
+        default_factory=list,
+        description=(
+            "Pulumi Aliases applied to the KEDA ScaledObject for the webapp. Use when "
+            "migrating from hand-rolled resources to this component. "
+            "Typically: [Alias(name=<old-pulumi-name>, no_parent=True)]."
+        ),
+    )
 
     # See https://www.pulumi.com/docs/reference/pkg/python/pulumi/#pulumi.Output.from_input
     # for docs. This unwraps the value so Pydantic can store it in the config class.
@@ -564,14 +588,25 @@ class OLApplicationK8s(ComponentResource):
         """
         It's .. the constructor. Shaddap Ruff :)
         """
+        # Use application_name as the Pulumi resource name so two components in the
+        # same namespace (e.g. LMS + CMS) get distinct URNs.  Alias the old
+        # application_namespace name so existing stacks don't see replacement.
+        _component_aliases: list[Any] = (
+            [Alias(name=ol_app_k8s_config.application_namespace)]
+            if ol_app_k8s_config.application_namespace != ol_app_k8s_config.application_name
+            else []
+        )
         super().__init__(
             "ol:infrastructure:components:services:OLApplicationK8s",
-            ol_app_k8s_config.application_namespace,
+            ol_app_k8s_config.application_name,
             None,
-            opts=opts,
+            opts=ResourceOptions.merge(opts, ResourceOptions(aliases=_component_aliases)),
         )
         resource_options = ResourceOptions(parent=self)
-        deployment_options = ResourceOptions(parent=self)
+        deployment_options = ResourceOptions(
+            parent=self,
+            aliases=ol_app_k8s_config.webapp_deployment_aliases or None,
+        )
 
         extra_deployment_args: dict[str, int] = {}
         # KEDA ScaledObject manages replicas when webapp_keda_config is set.
@@ -1365,6 +1400,7 @@ class OLApplicationK8s(ComponentResource):
                     ResourceOptions(
                         depends_on=[_application_deployment],
                         delete_before_replace=True,
+                        aliases=ol_app_k8s_config.webapp_keda_aliases or None,
                     )
                 ),
             )
@@ -1435,7 +1471,11 @@ class OLApplicationK8s(ComponentResource):
                 ],
                 type="ClusterIP",
             ),
-            opts=resource_options,
+            opts=resource_options.merge(
+                ResourceOptions(
+                    aliases=ol_app_k8s_config.webapp_service_aliases or None,
+                )
+            ),
         )
 
         for celery_worker_config in ol_app_k8s_config.celery_worker_configs:
