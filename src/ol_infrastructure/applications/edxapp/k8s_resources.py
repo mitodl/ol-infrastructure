@@ -80,7 +80,8 @@ def create_k8s_resources(  # noqa: C901
     stack_info: StackInfo,
     vault_config: Config,
     vault_policy: vault.Policy,
-):
+) -> None:
+    """Create all Kubernetes resources for the edxapp LMS and CMS deployments."""
     env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
     lms_webapp_deployment_name = f"{env_name}-edxapp-lms-webapp"
     cms_webapp_deployment_name = f"{env_name}-edxapp-cms-webapp"
@@ -544,7 +545,6 @@ def create_k8s_resources(  # noqa: C901
     )
 
     lms_app = OLApplicationK8s(
-        f"ol-{stack_info.env_prefix}-edxapp-lms-{stack_info.env_suffix}",
         OLApplicationK8sConfig(
             application_name="lms-edxapp",
             application_namespace=namespace,
@@ -616,7 +616,6 @@ def create_k8s_resources(  # noqa: C901
             ],
             webapp_keda_config=lms_webapp_keda_config,
         ),
-        stack_info=stack_info,
         opts=ResourceOptions(
             depends_on=[
                 *[v for v in lms_edxapp_config_sources.values() if v is not None],
@@ -755,7 +754,6 @@ def create_k8s_resources(  # noqa: C901
     )
 
     cms_app = OLApplicationK8s(
-        f"ol-{stack_info.env_prefix}-edxapp-cms-{stack_info.env_suffix}",
         OLApplicationK8sConfig(
             application_name="cms-edxapp",
             application_namespace=namespace,
@@ -819,7 +817,6 @@ def create_k8s_resources(  # noqa: C901
             ],
             webapp_keda_config=cms_webapp_keda_config,
         ),
-        stack_info=stack_info,
         opts=ResourceOptions(
             depends_on=[
                 *[v for v in cms_edxapp_config_sources.values() if v is not None],
