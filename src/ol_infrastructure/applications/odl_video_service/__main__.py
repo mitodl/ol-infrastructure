@@ -1189,11 +1189,21 @@ if k8s_deploy:
 
     nginx_wo_shib_conf = f"""\
 server {{
+    listen 443 ssl default_server;
+    listen [::]:443;
     server_name {default_domain};
-    listen 80 default_server;
-    listen [::]:80;
-    root /opt/odl-video-service/;
 
+    ssl_certificate /etc/nginx/cert.pem;
+    ssl_certificate_key /etc/nginx/key.pem;
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+    # ssl_protocols TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-SHA256:DHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA256;
+    ssl_prefer_server_ciphers on;
+    resolver 1.1.1.1;
     # Health check endpoint for Kubernetes probes (doesn't hit Django)
     location = /nginx-health {{
         access_log off;
