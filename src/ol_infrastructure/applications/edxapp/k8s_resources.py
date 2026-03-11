@@ -553,6 +553,8 @@ def create_k8s_resources(  # noqa: C901
             application_image_repository="mitodl/edxapp",
             application_image_digest=EDXAPP_DOCKER_IMAGE_DIGEST,
             registry="dockerhub",
+            application_config={
+                "SERVICE_VARIANT": "lms",
                 "DJANGO_SETTINGS_MODULE": "lms.envs.production",
                 "UWSGI_WORKERS": "2",
             },
