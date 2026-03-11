@@ -593,14 +593,17 @@ class OLApplicationK8s(ComponentResource):
         # application_namespace name so existing stacks don't see replacement.
         _component_aliases: list[Any] = (
             [Alias(name=ol_app_k8s_config.application_namespace)]
-            if ol_app_k8s_config.application_namespace != ol_app_k8s_config.application_name
+            if ol_app_k8s_config.application_namespace
+            != ol_app_k8s_config.application_name
             else []
         )
         super().__init__(
             "ol:infrastructure:components:services:OLApplicationK8s",
             ol_app_k8s_config.application_name,
             None,
-            opts=ResourceOptions.merge(opts, ResourceOptions(aliases=_component_aliases)),
+            opts=ResourceOptions.merge(
+                opts, ResourceOptions(aliases=_component_aliases)
+            ),
         )
         resource_options = ResourceOptions(parent=self)
         deployment_options = ResourceOptions(

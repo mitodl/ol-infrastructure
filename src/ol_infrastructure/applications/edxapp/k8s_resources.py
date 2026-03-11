@@ -1006,9 +1006,12 @@ def create_k8s_resources(  # noqa: C901
         "ol.mit.edu/component": "edxapp-lms-process-scheduled-emails",
         "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
     }
-    lms_process_scheduled_emails_labels = lms_process_scheduled_emails_selector_labels | {
-        "ol.mit.edu/edxapp-celery-sg": "true",
-    }
+    lms_process_scheduled_emails_labels = (
+        lms_process_scheduled_emails_selector_labels
+        | {
+            "ol.mit.edu/edxapp-celery-sg": "true",
+        }
+    )
     lms_process_scheduled_emails_deployment = kubernetes.apps.v1.Deployment(
         f"ol-{stack_info.env_prefix}-edxapp-lms-process-scheduled-emails-deployment-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
