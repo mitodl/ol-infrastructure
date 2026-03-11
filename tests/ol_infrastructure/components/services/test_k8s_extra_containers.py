@@ -1,4 +1,3 @@
-# ruff: noqa: D101, D102, D103
 """Tests for new OLApplicationK8s component features.
 
 Validates:
