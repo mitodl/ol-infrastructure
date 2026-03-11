@@ -1294,14 +1294,8 @@ server {{
 </SPConfig>
 """  # noqa: E501
 
-    # Static NGINX support files (read from existing bilder files directory)
-    bilder_files_dir = (
-        Path(__file__).resolve().parents[3]
-        / "bilder"
-        / "images"
-        / "odl_video_service"
-        / "files"
-    )
+    # Static NGINX support files
+    bilder_files_dir = Path(__file__).resolve().parent / "files"
 
     fastcgi_params_content = bilder_files_dir.joinpath("fastcgi_params").read_text()
     uwsgi_params_content = bilder_files_dir.joinpath("uwsgi_params").read_text()
