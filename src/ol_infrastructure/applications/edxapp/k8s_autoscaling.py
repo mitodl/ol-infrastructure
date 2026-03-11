@@ -135,7 +135,7 @@ def build_lms_webapp_keda_config(
             },
             {
                 "type": "cpu",
-                "metricType": "AverageValue",
+                "metricType": "Utilization",
                 "metadata": {
                     "value": lms_cpu_threshold,
                     "containerName": "lms-edxapp-app",
@@ -176,7 +176,7 @@ def build_cms_webapp_keda_config(
             },
             {
                 "type": "cpu",
-                "metricType": "AverageValue",
+                "metricType": "Utilization",
                 "metadata": {
                     "value": cms_cpu_threshold,
                     "containerName": "cms-edxapp-app",
