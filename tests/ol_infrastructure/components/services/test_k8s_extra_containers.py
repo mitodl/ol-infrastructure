@@ -3,14 +3,14 @@
 This module verifies:
 1. GranianConfig.static_path_mounts produces correct granian args
 2. OLApplicationK8sCeleryBeatConfig.application_name is propagated correctly
-3. webapp_keda_config selects KEDA ScaledObject configuration instead of HPA
-4. Default values and simple overrides on OLApplicationK8s*Config data models
+3. Default values and simple overrides on OLApplicationK8s*Config data models
    behave as expected
 
 Note:
     These tests operate at the configuration/model level and do not instantiate
     OLApplicationK8s or assert on full Kubernetes pod specs (e.g., sidecars,
-    init containers, volumes, or pod_security_context).
+    init containers, volumes, or pod_security_context), nor do they assert on
+    autoscaling resources such as HPAs or KEDA ScaledObjects.
 """
 
 from __future__ import annotations
@@ -373,7 +373,6 @@ def test_edxapp_like_config_composes_cleanly():
 # ─── celery beat application_name integration ──────────────────────────────────
 
 
-@pulumi.runtime.test
 def test_celery_beat_uses_custom_application_name():
     """Verify beat config application_name replaces the hardcoded default."""
     beat_cfg = OLApplicationK8sCeleryBeatConfig(application_name="lms.celery:app")
