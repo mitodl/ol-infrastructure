@@ -226,6 +226,10 @@
           "name": "Charts"
         }
       }
+    ],
+    "allowed_schemas": [
+      "ol_warehouse_production_dimensional",
+      "ol_warehouse_production_mart"
     ]
   },
   {
@@ -535,6 +539,12 @@
           "name": "Datasets"
         }
       }
+    ],
+    "allowed_schemas": [
+      "ol_warehouse_production_intermediate",
+      "ol_warehouse_production_dimensional",
+      "ol_warehouse_production_mart",
+      "ol_warehouse_production_reporting"
     ]
   },
   {
@@ -844,6 +854,12 @@
           "name": "Datasets"
         }
       }
+    ],
+    "allowed_schemas": [
+      "ol_warehouse_production_intermediate",
+      "ol_warehouse_production_dimensional",
+      "ol_warehouse_production_mart",
+      "ol_warehouse_production_reporting"
     ]
   },
   {
@@ -1257,6 +1273,12 @@
           "name": "SQL Editor"
         }
       }
+    ],
+    "allowed_schemas": [
+      "ol_warehouse_production_intermediate",
+      "ol_warehouse_production_dimensional",
+      "ol_warehouse_production_mart",
+      "ol_warehouse_production_reporting"
     ]
   },
   {
@@ -2046,6 +2068,13 @@
           "name": "Manage"
         }
       }
+    ],
+    "allowed_schemas": [
+      "ol_warehouse_production_raw",
+      "ol_warehouse_production_intermediate",
+      "ol_warehouse_production_dimensional",
+      "ol_warehouse_production_mart",
+      "ol_warehouse_production_reporting"
     ]
   }
 ]
