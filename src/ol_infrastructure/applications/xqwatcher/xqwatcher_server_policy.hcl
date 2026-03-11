@@ -5,3 +5,7 @@ path "sys/leases/renew" {
 path "secret-xqwatcher/*" {
   capabilities = [ "read" ]
 }
+
+path "secret-DEPLOYMENT/edx-xqueue" {
+  capabilities = [ "read" ]
+}

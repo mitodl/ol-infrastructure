@@ -93,6 +93,7 @@ class Services(StrEnum):
     vector_log_proxy = "vector-log-proxy"
     xpro = "xpro"
     xqueue = "xqueue"
+    xqwatcher = "xqwatcher"
 
 
 @unique
@@ -130,6 +131,7 @@ class Application(StrEnum):
     vector_log_proxy = "vector-log-proxy"
     xpro = "xpro"
     xqueue = "xqueue"
+    xqwatcher = "xqwatcher"
 
 
 @unique
