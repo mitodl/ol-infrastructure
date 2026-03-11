@@ -17,6 +17,7 @@ import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import get_caller_identity
 
+from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
@@ -30,8 +31,6 @@ from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
 from ol_infrastructure.lib.ol_types import AWSBase, K8sGlobalLabels, Services
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
-
-from bridge.secrets.sops import read_yaml_secrets
 
 ##################################
 ##    Setup + Config Retrieval  ##
@@ -115,9 +114,7 @@ vault.kv.SecretV2(
 vault_policy_template = (
     Path(__file__).parent.joinpath("xqwatcher_server_policy.hcl").read_text()
 )
-vault_policy_text = vault_policy_template.replace(
-    "DEPLOYMENT", stack_info.env_prefix
-)
+vault_policy_text = vault_policy_template.replace("DEPLOYMENT", stack_info.env_prefix)
 
 xqwatcher_app = OLEKSAuthBinding(
     OLEKSAuthBindingConfig(
@@ -320,9 +317,12 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                         image_pull_policy="IfNotPresent",
                         command=["xqueue-watcher"],
                         args=[
-                            "--config", "/xqwatcher/conf.d/xqwatcher.json",
-                            "--logging-config", "/xqwatcher/conf.d/logging.json",
-                            "-d", "/xqwatcher/conf.d",
+                            "--config",
+                            "/xqwatcher/conf.d/xqwatcher.json",
+                            "--logging-config",
+                            "/xqwatcher/conf.d/logging.json",
+                            "-d",
+                            "/xqwatcher/conf.d",
                         ],
                         # Liveness: verify the Python runtime is functional.
                         # The process will crash (and K8s will restart) on
