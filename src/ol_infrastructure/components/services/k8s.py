@@ -246,9 +246,9 @@ class OLApplicationK8sKedaWebappScalingConfig(BaseModel):
     triggers: list[dict[str, Any]] = Field(
         description=(
             "List of KEDA trigger specifications. Each entry is a dict that matches the "
-            "KEDA trigger schema (type, metadata, …). Triggers that include an "
-            "'authenticationRef' key will have it overwritten if "
-            "``trigger_authentication_name`` is also set."
+            "KEDA trigger schema (type, metadata, …). When "
+            "``trigger_authentication_name`` is set, an ``authenticationRef`` block is "
+            "automatically injected into any trigger that does not already define one."
         )
     )
     trigger_authentication_name: str | None = Field(

@@ -1,13 +1,16 @@
-"""Tests for new OLApplicationK8s component features.
+"""Tests for OLApplicationK8s-related configuration helpers.
 
-Validates:
-1. extra_sidecar_containers appear in web/celery/beat deployments
-2. extra_init_containers appear before component init containers
-3. pod_security_context is applied to all deployments
-4. extra_volumes and extra_volume_mounts appear on all relevant pods
-5. GranianConfig.static_path_mounts produces correct granian args
-6. OLApplicationK8sCeleryBeatConfig.application_name replaces hardcoded value
-7. webapp_keda_config creates a KEDA ScaledObject instead of HPA
+This module verifies:
+1. GranianConfig.static_path_mounts produces correct granian args
+2. OLApplicationK8sCeleryBeatConfig.application_name is propagated correctly
+3. webapp_keda_config selects KEDA ScaledObject configuration instead of HPA
+4. Default values and simple overrides on OLApplicationK8s*Config data models
+   behave as expected
+
+Note:
+    These tests operate at the configuration/model level and do not instantiate
+    OLApplicationK8s or assert on full Kubernetes pod specs (e.g., sidecars,
+    init containers, volumes, or pod_security_context).
 """
 
 from __future__ import annotations

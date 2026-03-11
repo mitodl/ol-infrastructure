@@ -219,8 +219,9 @@ def create_k8s_resources(  # noqa: C901
     # Tell EKS to hook all edxapp pods to the application security group.
     # The component creates its own SecurityGroupPolicies for LMS and CMS webapp pods;
     # this hand-rolled policy covers celery and lms-process-scheduled-emails pods.
-    # Using the SG ID as the label value (matching what the component injects) ensures
-    # a single shared label across all edxapp workloads.
+    # Celery pods are selected via the label ol.mit.edu/edxapp-celery-sg=true, which
+    # is added to pod template labels (not the immutable selector) so the SGP can
+    # select them without altering existing Deployment selectors.
     edxapp_celery_sg_policy = kubernetes.apiextensions.CustomResource(
         f"ol-{stack_info.env_prefix}-edxapp-celery-sg-policy-{stack_info.env_suffix}",
         api_version="vpcresources.k8s.aws/v1beta1",
@@ -870,8 +871,13 @@ def create_k8s_resources(  # noqa: C901
     # as hand-rolled deployments and are scaled via external KEDA ScaledObjects.
     ############################################
 
-    # Common volume mounts for celery containers (no uwsgi.ini needed)
-    celery_volume_mounts = common_extra_volume_mounts[:-1]  # exclude uwsgi.ini
+    # Common volume mounts for celery containers (no uwsgi.ini needed).
+    # Filter by name rather than slicing to be robust against list reordering.
+    celery_volume_mounts = [
+        vm
+        for vm in common_extra_volume_mounts
+        if vm.name != configmaps.uwsgi_ini_config_name
+    ]
 
     celery_env_vars = [
         kubernetes.core.v1.EnvVarArgs(

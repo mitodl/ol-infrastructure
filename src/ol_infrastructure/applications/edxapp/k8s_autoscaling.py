@@ -108,9 +108,9 @@ def build_lms_webapp_keda_config(
         scale_up_stabilization_seconds=60,
         scale_up_percent=50,
         scale_up_period_seconds=60,
-        scale_down_stabilization_seconds=300 * 5,  # 15 minutes
+        scale_down_stabilization_seconds=300 * 5,  # 25 minutes
         scale_down_percent=10,
-        scale_down_period_seconds=300 * 5,
+        scale_down_period_seconds=300 * 5,  # 25 minutes
         polling_interval=60,
         cooldown_period=300,
         trigger_authentication_name=trigger_auth_name,
@@ -138,7 +138,7 @@ def build_lms_webapp_keda_config(
                 "metricType": "AverageValue",
                 "metadata": {
                     "value": lms_cpu_threshold,
-                    "containerName": "lms-edxapp",
+                    "containerName": "lms-edxapp-app",
                 },
             },
         ],
@@ -179,7 +179,7 @@ def build_cms_webapp_keda_config(
                 "metricType": "AverageValue",
                 "metadata": {
                     "value": cms_cpu_threshold,
-                    "containerName": "cms-edxapp",
+                    "containerName": "cms-edxapp-app",
                 },
             },
         ],
