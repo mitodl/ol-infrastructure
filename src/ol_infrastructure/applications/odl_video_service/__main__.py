@@ -982,9 +982,6 @@ if k8s_deploy:
     cluster_stack = StackReference(
         f"infrastructure.aws.eks.applications.{stack_info.name}"
     )
-    cluster_substructure_stack = StackReference(
-        f"substructure.aws.eks.applications.{stack_info.name}"
-    )
     k8s_pod_subnet_cidrs = target_vpc["k8s_pod_subnet_cidrs"]
 
     k8s_app_labels = K8sAppLabels(
