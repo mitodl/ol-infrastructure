@@ -466,7 +466,7 @@ class OLApplicationK8sConfig(BaseModel):
         description=(
             "Pulumi Aliases applied to the webapp Deployment. Use when migrating from "
             "hand-rolled resources to this component to prevent delete-and-recreate of "
-            "the existing Deployment. Typically: [Alias(name=<old-pulumi-name>, parent=None)]."
+            "the existing Deployment. Typically: [Alias(name=<old-pulumi-name>, parent=pulumi.ROOT_STACK_RESOURCE)]."
         ),
     )
     webapp_service_aliases: list[Any] = Field(
@@ -474,7 +474,7 @@ class OLApplicationK8sConfig(BaseModel):
         description=(
             "Pulumi Aliases applied to the webapp Service. Use when migrating from "
             "hand-rolled resources to this component. "
-            "Typically: [Alias(name=<old-pulumi-name>, parent=None)]."
+            "Typically: [Alias(name=<old-pulumi-name>, parent=pulumi.ROOT_STACK_RESOURCE)]."
         ),
     )
     webapp_keda_aliases: list[Any] = Field(
@@ -482,7 +482,7 @@ class OLApplicationK8sConfig(BaseModel):
         description=(
             "Pulumi Aliases applied to the KEDA ScaledObject for the webapp. Use when "
             "migrating from hand-rolled resources to this component. "
-            "Typically: [Alias(name=<old-pulumi-name>, parent=None)]."
+            "Typically: [Alias(name=<old-pulumi-name>, parent=pulumi.ROOT_STACK_RESOURCE)]."
         ),
     )
 
