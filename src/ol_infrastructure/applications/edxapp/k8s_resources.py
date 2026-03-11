@@ -922,6 +922,21 @@ def create_k8s_resources(  # noqa: C901
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=lms_celery_labels),
                 spec=kubernetes.core.v1.PodSpecArgs(
+                    affinity=kubernetes.core.v1.AffinityArgs(
+                        pod_anti_affinity=kubernetes.core.v1.PodAntiAffinityArgs(
+                            preferred_during_scheduling_ignored_during_execution=[
+                                kubernetes.core.v1.WeightedPodAffinityTermArgs(
+                                    weight=100,
+                                    pod_affinity_term=kubernetes.core.v1.PodAffinityTermArgs(
+                                        label_selector=kubernetes.meta.v1.LabelSelectorArgs(
+                                            match_labels=lms_celery_selector_labels,
+                                        ),
+                                        topology_key="kubernetes.io/hostname",
+                                    ),
+                                ),
+                            ]
+                        )
+                    ),
                     service_account_name=vault_k8s_resources.service_account_name,
                     security_context=pod_security_context,
                     volumes=lms_edxapp_volumes,
@@ -1042,6 +1057,21 @@ def create_k8s_resources(  # noqa: C901
                     labels=lms_process_scheduled_emails_labels
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
+                    affinity=kubernetes.core.v1.AffinityArgs(
+                        pod_anti_affinity=kubernetes.core.v1.PodAntiAffinityArgs(
+                            preferred_during_scheduling_ignored_during_execution=[
+                                kubernetes.core.v1.WeightedPodAffinityTermArgs(
+                                    weight=100,
+                                    pod_affinity_term=kubernetes.core.v1.PodAffinityTermArgs(
+                                        label_selector=kubernetes.meta.v1.LabelSelectorArgs(
+                                            match_labels=lms_process_scheduled_emails_selector_labels,
+                                        ),
+                                        topology_key="kubernetes.io/hostname",
+                                    ),
+                                ),
+                            ]
+                        )
+                    ),
                     service_account_name=vault_k8s_resources.service_account_name,
                     security_context=pod_security_context,
                     volumes=lms_edxapp_volumes,
@@ -1129,6 +1159,21 @@ def create_k8s_resources(  # noqa: C901
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=cms_celery_labels),
                 spec=kubernetes.core.v1.PodSpecArgs(
+                    affinity=kubernetes.core.v1.AffinityArgs(
+                        pod_anti_affinity=kubernetes.core.v1.PodAntiAffinityArgs(
+                            preferred_during_scheduling_ignored_during_execution=[
+                                kubernetes.core.v1.WeightedPodAffinityTermArgs(
+                                    weight=100,
+                                    pod_affinity_term=kubernetes.core.v1.PodAffinityTermArgs(
+                                        label_selector=kubernetes.meta.v1.LabelSelectorArgs(
+                                            match_labels=cms_celery_selector_labels,
+                                        ),
+                                        topology_key="kubernetes.io/hostname",
+                                    ),
+                                ),
+                            ]
+                        )
+                    ),
                     service_account_name=vault_k8s_resources.service_account_name,
                     security_context=pod_security_context,
                     volumes=cms_edxapp_volumes,
