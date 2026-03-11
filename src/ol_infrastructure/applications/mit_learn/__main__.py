@@ -1425,7 +1425,7 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_docker_tag=MIT_LEARN_DOCKER_TAG,
         application_cmd_array=["uwsgi"],
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
-        granian_config=GranianConfig(workers=2)
+        granian_config=GranianConfig(workers=2, enable_metrics=True)
         if mitlearn_config.get_bool("use_granian")
         else None,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
