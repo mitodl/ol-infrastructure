@@ -23,6 +23,7 @@ pypi_type = pypi_resource()
 plugins = [
     "edx_sysadmin",
     "edx_username_changer",
+    "ol_openedx_auto_select_language",
     "ol_openedx_canvas_integration",
     "ol_openedx_chat",
     "ol_openedx_chat_xblock",
