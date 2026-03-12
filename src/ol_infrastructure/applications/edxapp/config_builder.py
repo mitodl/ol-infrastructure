@@ -538,6 +538,7 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
             "PLATFORM_NAME": "MIT Learn",
             "PLATFORM_DESCRIPTION": "MIT Learn",
             "PRESS_EMAIL": "support@mitxonline.mit.edu",
+            "ENABLE_DATES_COURSE_APP": True,
             "MITX_REDIRECT_ENABLED": True,
             "MITX_REDIRECT_ALLOW_RE_LIST": [
                 "^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/|lti_provider)",
