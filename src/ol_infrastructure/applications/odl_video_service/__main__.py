@@ -1737,8 +1737,8 @@ server {{
                             ],
                             env_from=env_from_sources,
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                                requests={"cpu": "100m", "memory": "1024Mi"},
-                                limits={"memory": "1024Mi"},
+                                requests={"cpu": "100m", "memory": "2048Mi"},
+                                limits={"memory": "2048Mi"},
                             ),
                         ),
                     ],
