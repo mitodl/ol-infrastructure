@@ -89,6 +89,7 @@ pipeline_params = {
     "odl-video-service": AppPipelineParams(
         app_name="odl-video-service",
         repo_main_branch="master",
+        build_target="production",
         settings_dir="odl_video",
     ),
 }
