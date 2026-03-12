@@ -10,4 +10,4 @@ openai==2.15.0
 # Experimental Plugins for Translations feature
 # install at the end to override any dependency issues
 ol-openedx-course-translations
-ol-openedx-auto-language-select
+ol-openedx-auto-select-language
