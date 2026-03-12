@@ -5,20 +5,14 @@
 - Create a Redis cluster in AWS Elasticache
 - Create an IAM policy to grant access to S3 and other resources
 - Create MediaConvert resources for video transcoding
-- Optionally deploy the application to Kubernetes (toggle via ovs:k8s_deploy)
 """
 
-import base64
 import json
 import os
-import textwrap
-from itertools import chain
 from pathlib import Path
 
-import pulumi_consul as consul
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-import yaml
 from pulumi import (
     ROOT_STACK_RESOURCE,
     Alias,
@@ -28,13 +22,11 @@ from pulumi import (
     StackReference,
     export,
 )
-from pulumi_aws import ec2, get_caller_identity, iam, route53
+from pulumi_aws import ec2, get_caller_identity, iam
 from pulumi_aws.s3 import BucketCorsConfigurationCorsRuleArgs
-from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
-    DEFAULT_HTTP_PORT,
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
@@ -42,15 +34,6 @@ from bridge.lib.magic_numbers import (
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.odl_video_service.k8s_secrets import (
     create_ovs_k8s_secrets,
-)
-from ol_infrastructure.components.aws.auto_scale_group import (
-    BlockDeviceMapping,
-    OLAutoScaleGroupConfig,
-    OLAutoScaling,
-    OLLaunchTemplateConfig,
-    OLLoadBalancerConfig,
-    OLTargetGroupConfig,
-    TagSpecification,
 )
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
@@ -73,7 +56,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResourcesConfig,
     OLVaultPostgresDatabaseConfig,
 )
-from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
+from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     default_psg_egress_args,
@@ -81,7 +64,6 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
-from ol_infrastructure.lib.consul import consul_key_helper, get_consul_provider
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -99,7 +81,6 @@ if Config("vault_server").get("env_namespace"):
     setup_vault_provider()
 ovs_config = Config("ovs")
 stack_info = parse_stack()
-k8s_deploy = ovs_config.get_bool("k8s_deploy") or False
 k8s_cutover = ovs_config.get_bool("k8s_cutover") or False
 
 aws_account = get_caller_identity()
@@ -129,7 +110,6 @@ aws_config = AWSBase(
         "Environment": f"applications_{stack_info.env_suffix}",
     }
 )
-consul_provider = get_consul_provider(stack_info)
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
@@ -524,37 +504,6 @@ ocw_studio_vault_backend_role = vault.aws.SecretBackendRole(
 # Network Access Control
 
 # Create various security groups
-ovs_server_security_group = ec2.SecurityGroup(
-    f"odl-video-service-server-security-group-{env_name}",
-    name=f"odl-video-service-server-{target_vpc_name}-{env_name}",
-    description="Access control for odl-video-service servers",
-    ingress=[
-        ec2.SecurityGroupIngressArgs(
-            protocol="tcp",
-            from_port=DEFAULT_HTTPS_PORT,
-            to_port=DEFAULT_HTTPS_PORT,
-            cidr_blocks=["0.0.0.0/0"],
-            description=(
-                "Allow traffic to the odl-video-service server on port"
-                f" {DEFAULT_HTTPS_PORT}"
-            ),
-        ),
-        ec2.SecurityGroupIngressArgs(
-            protocol="tcp",
-            from_port=DEFAULT_HTTP_PORT,
-            to_port=DEFAULT_HTTP_PORT,
-            cidr_blocks=["0.0.0.0/0"],
-            description=(
-                "Allow traffic to the odl-video-service server on port"
-                f" {DEFAULT_HTTP_PORT}"
-            ),
-        ),
-    ],
-    egress=default_egress_args,
-    vpc_id=target_vpc_id,
-    tags=aws_config.tags,
-)
-
 ovs_database_security_group = ec2.SecurityGroup(
     f"odl-video-service-database-security-group-{env_name}",
     name=f"odl-video-service-database-{target_vpc_name}-{env_name}",
@@ -562,7 +511,6 @@ ovs_database_security_group = ec2.SecurityGroup(
     ingress=[
         ec2.SecurityGroupIngressArgs(
             security_groups=[
-                ovs_server_security_group.id,
                 consul_stack.require_output("security_groups")["consul_server"],
                 vault_stack.require_output("vault_server")["security_group"],
                 data_vpc["security_groups"]["integrator"],
@@ -578,19 +526,6 @@ ovs_database_security_group = ec2.SecurityGroup(
                 f" {DEFAULT_POSTGRES_PORT}"
             ),
         ),
-        *(
-            [
-                ec2.SecurityGroupIngressArgs(
-                    cidr_blocks=target_vpc["k8s_pod_subnet_cidrs"],
-                    protocol="tcp",
-                    from_port=DEFAULT_POSTGRES_PORT,
-                    to_port=DEFAULT_POSTGRES_PORT,
-                    description=("Allow access from OVS K8s pods to Postgres"),
-                ),
-            ]
-            if k8s_deploy
-            else []
-        ),
     ],
     vpc_id=target_vpc_id,
     tags=aws_config.tags,
@@ -602,28 +537,11 @@ ovs_redis_security_group = ec2.SecurityGroup(
     description="Access control for the odl-video-service redis queue",
     ingress=[
         ec2.SecurityGroupIngressArgs(
-            security_groups=[
-                ovs_server_security_group.id,
-            ],
+            cidr_blocks=target_vpc["k8s_pod_subnet_cidrs"],
             protocol="tcp",
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,
-            description=(
-                f"Access to Redis from odl-video-service nodes on {DEFAULT_REDIS_PORT}"
-            ),
-        ),
-        *(
-            [
-                ec2.SecurityGroupIngressArgs(
-                    cidr_blocks=target_vpc["k8s_pod_subnet_cidrs"],
-                    protocol="tcp",
-                    from_port=DEFAULT_REDIS_PORT,
-                    to_port=DEFAULT_REDIS_PORT,
-                    description=("Allow access from OVS K8s pods to Redis"),
-                ),
-            ]
-            if k8s_deploy
-            else []
+            description=("Allow access from OVS K8s pods to Redis"),
         ),
     ],
     egress=default_egress_args,
@@ -663,38 +581,6 @@ ovs_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
 )
 ovs_db_vault_backend = OLVaultDatabaseBackend(ovs_db_vault_backend_config)
 
-ovs_db_consul_node = Node(
-    f"odl-video-service-{stack_info.env_suffix}-db-node",
-    name="ovs-postgres-db",
-    address=db_address,
-    opts=consul_provider,
-)
-
-ovs_db_consul_service = Service(
-    f"odl-video-service-{stack_info.env_suffix}-db-service",
-    node=ovs_db_consul_node.name,
-    name="ovs-postgres",
-    port=db_port,
-    meta={
-        "external-node": True,
-        "external-probe": True,
-    },
-    checks=[
-        ServiceCheckArgs(
-            check_id="ovs-instance-db",
-            interval="10s",
-            name="ovs-instance-db",
-            timeout="60s",
-            status="passing",
-            tcp=Output.all(
-                address=db_address,
-                port=db_port,
-            ).apply(lambda db: "{address}:{port}".format(**db)),
-        )
-    ],
-    opts=consul_provider,
-)
-
 redis_auth_token = secrets["redis"]["auth_token"]
 redis_config = Config("redis")
 
@@ -725,175 +611,6 @@ ovs_server_redis_cluster = OLAmazonCache(
     ),
 )
 
-# Provision EC2 resources
-instance_type_name = (
-    ovs_config.get("instance_type") or InstanceTypes.burstable_medium.name
-)
-instance_type = InstanceTypes[instance_type_name].value
-
-subnets = target_vpc["subnet_ids"]
-subnet_id = subnets.apply(chain)
-
-grafana_credentials = read_yaml_secrets(
-    Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
-)
-consul_datacenter = consul_stack.require_output("datacenter")
-
-instance_tags = aws_config.merged_tags(
-    {"Name": f"odl-video-service-{stack_info.env_suffix}"}
-)
-
-branch_tag = ovs_config.get("ami_branch_tag") or "master"
-
-ovs_server_ami = ec2.get_ami(
-    filters=[
-        {
-            "name": "tag:Name",
-            "values": ["odl_video_service-server"],
-        },
-        {
-            "name": "tag:branch",
-            "values": [branch_tag],
-        },
-        {
-            "name": "virtualization-type",
-            "values": ["hvm"],
-        },
-    ],
-    most_recent=True,
-    owners=[str(aws_account.id)],
-)
-
-block_device_mappings = [BlockDeviceMapping()]
-
-ovs_lb_config = OLLoadBalancerConfig(
-    enable_insecure_http=True,
-    listener_cert_domain="*.odl.mit.edu",
-    listener_use_acm=True,
-    security_groups=[ovs_server_security_group],
-    subnets=subnets,
-    tags=instance_tags,
-)
-
-ovs_tg_config = OLTargetGroupConfig(
-    vpc_id=target_vpc["id"],
-    target_group_healthcheck=False,
-    health_check_interval=60,
-    health_check_matcher="404",  # TODO Figure out a real endpoint for this  # noqa: E501, FIX002, TD002, TD004
-    health_check_path="/ping",
-    stickiness="lb_cookie",
-    tags=instance_tags,
-)
-
-ovs_lt_config = OLLaunchTemplateConfig(
-    block_device_mappings=block_device_mappings,
-    image_id=ovs_server_ami.id,
-    instance_type=instance_type,
-    instance_profile_arn=ovs_server_instance_profile.arn,
-    security_groups=[
-        target_vpc["security_groups"]["default"],
-        ovs_server_security_group,
-    ],
-    tags=instance_tags,
-    tag_specifications=[
-        TagSpecification(
-            resource_type="instance",
-            tags=instance_tags,
-        ),
-        TagSpecification(
-            resource_type="volume",
-            tags=instance_tags,
-        ),
-    ],
-    user_data=consul_datacenter.apply(
-        lambda consul_dc: base64.b64encode(
-            "#cloud-config\n{}".format(
-                yaml.dump(
-                    {
-                        "write_files": [
-                            {
-                                "path": "/etc/consul.d/02-autojoin.json",
-                                "content": json.dumps(
-                                    {
-                                        "retry_join": [
-                                            "provider=aws tag_key=consul_env "
-                                            f"tag_value={consul_dc}"
-                                        ],
-                                        "datacenter": consul_dc,
-                                    }
-                                ),
-                                "owner": "consul:consul",
-                            },
-                            {
-                                "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
-                            ENVIRONMENT={consul_dc}
-                            APPLICATION=ovs
-                            SERVICE=ovs
-                            VECTOR_CONFIG_DIR=/etc/vector/
-                            VECTOR_STRICT_ENV_VARS=false
-                            AWS_REGION={aws_config.region}
-                            GRAFANA_CLOUD_API_KEY={grafana_credentials["api_key"]}
-                            GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials["prometheus_user_id"]}
-                            GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials["loki_user_id"]}
-                            """
-                                ),
-                                "owner": "root:root",
-                            },
-                        ],
-                    }
-                ),
-            ).encode("utf8")
-        ).decode("utf8")
-    ),
-)
-
-ovs_autoscale_sizes = ovs_config.get_object("auto_scale") or {
-    "desired": 2,
-    "min": 1,
-    "max": 3,
-}
-ovs_asg_config = OLAutoScaleGroupConfig(
-    asg_name=f"odl-video-service-{stack_info.env_suffix}",
-    aws_config=aws_config,
-    desired_size=ovs_autoscale_sizes["desired"],
-    min_size=ovs_autoscale_sizes["min"],
-    max_size=ovs_autoscale_sizes["max"],
-    vpc_zone_identifiers=target_vpc["subnet_ids"],
-    tags=instance_tags,
-)
-
-autoscale_setup = OLAutoScaling(
-    asg_config=ovs_asg_config,
-    lt_config=ovs_lt_config,
-    tg_config=ovs_tg_config,
-    lb_config=ovs_lb_config,
-)
-
-# Vault policy definition
-ovs_server_vault_policy = vault.Policy(
-    "ovs-server-vault-policy",
-    name="odl-video-service-server",
-    policy=Path(__file__)
-    .parent.joinpath("odl_video_service_server_policy.hcl")
-    .read_text(),
-)
-
-vault.aws.AuthBackendRole(
-    "odl-video-service-server-ec2-vault-auth",
-    backend="aws",
-    auth_type="iam",
-    role="ovs-server",
-    inferred_entity_type="ec2_instance",
-    inferred_aws_region=aws_config.region,
-    bound_iam_instance_profile_arns=[ovs_server_instance_profile.arn],
-    bound_ami_ids=[ovs_server_ami.id],
-    bound_account_ids=[aws_account.account_id],
-    bound_vpc_ids=[target_vpc_id],
-    token_policies=[ovs_server_vault_policy.name],
-)
-
 # Vault KV2 mount definition
 ovs_server_vault_mount = vault.Mount(
     "ovs-server-configuration-secrets-mount",
@@ -905,21 +622,15 @@ ovs_server_vault_mount = vault.Mount(
     ),
     opts=ResourceOptions(delete_before_replace=True),
 )
-
-
 ovs_server_secrets = vault.generic.Secret(
     "ovs-server-configuration-secrets",
     path=ovs_server_vault_mount.path.apply("{}/ovs-secrets".format),
     data_json=json.dumps(secrets),
 )
+
+
 enabled_annotations = ovs_config.get_bool("feature_annotations")
 use_shibboleth = ovs_config.get_bool("use_shibboleth") or False
-if use_shibboleth:
-    nginx_config_file_path = "/etc/nginx/nginx_with_shib.conf"
-else:
-    nginx_config_file_path = "/etc/nginx/nginx_wo_shib.conf"
-
-domains_string = ",".join(ovs_config.get_object("domains"))
 
 # MediaConvert resources (needed by both EC2 and K8s paths)
 ovs_mediaconvert_config = MediaConvertConfig(
@@ -973,116 +684,110 @@ app_env_vars: dict[str, str | bool] = {
     "VIDEO_WATCH_BUCKET_FREQUENCY": "600",
 }
 
-if k8s_deploy:
-    ################################
-    # Kubernetes Deployment Path   #
-    ################################
-    vault_config = Config("vault")
+vault_config = Config("vault")
 
-    cluster_stack = StackReference(
-        f"infrastructure.aws.eks.applications.{stack_info.name}"
-    )
-    k8s_pod_subnet_cidrs = target_vpc["k8s_pod_subnet_cidrs"]
+cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+k8s_pod_subnet_cidrs = target_vpc["k8s_pod_subnet_cidrs"]
 
-    k8s_app_labels = K8sAppLabels(
-        application=Application.odl_video_service,
-        product=Product.odl_video,
-        service=Services.odl_video_service,
-        ou=BusinessUnit.ovs,
-        source_repository="https://github.com/mitodl/odl-video-service",
-        stack=stack_info,
-    ).model_dump()
+k8s_app_labels = K8sAppLabels(
+    application=Application.odl_video_service,
+    product=Product.odl_video,
+    service=Services.odl_video_service,
+    ou=BusinessUnit.ovs,
+    source_repository="https://github.com/mitodl/odl-video-service",
+    stack=stack_info,
+).model_dump()
 
-    setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
-    ovs_namespace = "odl-video-service"
-    cluster_stack.require_output("namespaces").apply(
-        lambda ns: check_cluster_namespace(ovs_namespace, ns)
-    )
+setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
+ovs_namespace = "odl-video-service"
+cluster_stack.require_output("namespaces").apply(
+    lambda ns: check_cluster_namespace(ovs_namespace, ns)
+)
 
-    # Pod security group for the OVS application
-    ovs_app_security_group = ec2.SecurityGroup(
-        f"ovs-app-access-{stack_info.env_suffix}",
-        description=f"Access control for the OVS App in {stack_info.name}",
-        egress=default_psg_egress_args,
-        ingress=get_default_psg_ingress_args(k8s_pod_subnet_cidrs=k8s_pod_subnet_cidrs),
-        tags=aws_config.tags,
-        vpc_id=target_vpc_id,
-    )
+# Pod security group for the OVS application
+ovs_app_security_group = ec2.SecurityGroup(
+    f"ovs-app-access-{stack_info.env_suffix}",
+    description=f"Access control for the OVS App in {stack_info.name}",
+    egress=default_psg_egress_args,
+    ingress=get_default_psg_ingress_args(k8s_pod_subnet_cidrs=k8s_pod_subnet_cidrs),
+    tags=aws_config.tags,
+    vpc_id=target_vpc_id,
+)
 
-    # Vault policy and K8s auth
-    ovs_k8s_vault_policy = vault.Policy(
-        f"ovs-k8s-vault-policy-{stack_info.env_suffix}",
-        name="odl-video-service-k8s",
-        policy=Path(__file__)
-        .parent.joinpath("odl_video_service_server_policy.hcl")
-        .read_text(),
-    )
+# Vault policy and K8s auth
+ovs_k8s_vault_policy = vault.Policy(
+    f"ovs-k8s-vault-policy-{stack_info.env_suffix}",
+    name="odl-video-service-k8s",
+    policy=Path(__file__)
+    .parent.joinpath("odl_video_service_server_policy.hcl")
+    .read_text(),
+)
 
-    ovs_vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
-        f"ovs-vault-k8s-auth-backend-role-{stack_info.env_suffix}",
-        role_name=Services.odl_video_service,
-        backend=cluster_stack.require_output("vault_auth_endpoint"),
-        bound_service_account_names=["*"],
-        bound_service_account_namespaces=[ovs_namespace],
-        token_policies=[ovs_k8s_vault_policy.name],
-    )
+ovs_vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
+    f"ovs-vault-k8s-auth-backend-role-{stack_info.env_suffix}",
+    role_name=Services.odl_video_service,
+    backend=cluster_stack.require_output("vault_auth_endpoint"),
+    bound_service_account_names=["*"],
+    bound_service_account_namespaces=[ovs_namespace],
+    token_policies=[ovs_k8s_vault_policy.name],
+)
 
-    vault_k8s_resources = OLVaultK8SResources(
-        resource_config=OLVaultK8SResourcesConfig(
-            application_name=Services.odl_video_service,
-            namespace=ovs_namespace,
-            labels=k8s_app_labels,
-            vault_address=vault_config.require("address"),
-            vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
-            vault_auth_role_name=ovs_vault_k8s_auth_backend_role.role_name,
-        ),
-        opts=ResourceOptions(delete_before_replace=True),
-    )
+vault_k8s_resources = OLVaultK8SResources(
+    resource_config=OLVaultK8SResourcesConfig(
+        application_name=Services.odl_video_service,
+        namespace=ovs_namespace,
+        labels=k8s_app_labels,
+        vault_address=vault_config.require("address"),
+        vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+        vault_auth_role_name=ovs_vault_k8s_auth_backend_role.role_name,
+    ),
+    opts=ResourceOptions(delete_before_replace=True),
+)
 
-    # RDS endpoint for K8s secret templates
-    rds_endpoint = (
-        f"{db_instance_name}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com"
-        f":{DEFAULT_POSTGRES_PORT}"
-    )
+# RDS endpoint for K8s secret templates
+rds_endpoint = (
+    f"{db_instance_name}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com"
+    f":{DEFAULT_POSTGRES_PORT}"
+)
 
-    # Create K8s secrets
-    secret_names, secret_resources = create_ovs_k8s_secrets(
-        stack_info=stack_info,
-        ovs_namespace=ovs_namespace,
-        k8s_global_labels=k8s_app_labels,
-        vault_k8s_resources=vault_k8s_resources,
-        db_config=ovs_db_vault_backend,
-        rds_endpoint=rds_endpoint,
-        redis_auth_token=redis_auth_token,
-        redis_cluster=ovs_server_redis_cluster,
-        use_shibboleth=use_shibboleth,
-    )
+# Create K8s secrets
+secret_names, secret_resources = create_ovs_k8s_secrets(
+    stack_info=stack_info,
+    ovs_namespace=ovs_namespace,
+    k8s_global_labels=k8s_app_labels,
+    vault_k8s_resources=vault_k8s_resources,
+    db_config=ovs_db_vault_backend,
+    rds_endpoint=rds_endpoint,
+    redis_auth_token=redis_auth_token,
+    redis_cluster=ovs_server_redis_cluster,
+    use_shibboleth=use_shibboleth,
+)
 
-    # Merge stack-level config vars into the app env vars
-    k8s_extra_vars: dict[str, str | Output[str]] = {
-        **(ovs_config.get_object("k8s_vars") or {}),
-        # MediaConvert-related vars that need resource outputs
-        "AWS_ROLE_NAME": ovs_mediaconvert.role.name,
-        "AWS_ACCOUNT_ID": aws_account.account_id,
-        "POST_TRANSCODE_ACTIONS": "cloudsync.api.process_transcode_results",
-        "TRANSCODE_JOB_TEMPLATE": "./config/mediaconvert.json",
-        "EDX_BASE_URL": ovs_config.get("edx_base_url") or "",
-        "VIDEO_TRANSCODE_QUEUE": ovs_mediaconvert.queue.name,
-    }
-    app_env_vars.update(k8s_extra_vars)
+# Merge stack-level config vars into the app env vars
+k8s_extra_vars: dict[str, str | Output[str]] = {
+    **(ovs_config.get_object("k8s_vars") or {}),
+    # MediaConvert-related vars that need resource outputs
+    "AWS_ROLE_NAME": ovs_mediaconvert.role.name,
+    "AWS_ACCOUNT_ID": aws_account.account_id,
+    "POST_TRANSCODE_ACTIONS": "cloudsync.api.process_transcode_results",
+    "TRANSCODE_JOB_TEMPLATE": "./config/mediaconvert.json",
+    "EDX_BASE_URL": ovs_config.get("edx_base_url") or "",
+    "VIDEO_TRANSCODE_QUEUE": ovs_mediaconvert.queue.name,
+}
+app_env_vars.update(k8s_extra_vars)
 
-    if "ODL_VIDEO_SERVICE_DOCKER_TAG" not in os.environ:
-        msg = "ODL_VIDEO_SERVICE_DOCKER_TAG must be set."
-        raise OSError(msg)
-    ODL_VIDEO_SERVICE_DOCKER_TAG = os.environ["ODL_VIDEO_SERVICE_DOCKER_TAG"]
+if "ODL_VIDEO_SERVICE_DOCKER_TAG" not in os.environ:
+    msg = "ODL_VIDEO_SERVICE_DOCKER_TAG must be set."
+    raise OSError(msg)
+ODL_VIDEO_SERVICE_DOCKER_TAG = os.environ["ODL_VIDEO_SERVICE_DOCKER_TAG"]
 
-    # NGINX configuration for K8s (HTTP only — APISIX handles TLS)
-    ovs_domains = ovs_config.get_object("domains") or [ovs_config.get("default_domain")]
-    server_names = " ".join(ovs_domains)
-    default_domain = ovs_config.get("default_domain")
+# NGINX configuration for K8s (HTTP only — APISIX handles TLS)
+ovs_domains = ovs_config.get_object("domains") or [ovs_config.get("default_domain")]
+server_names = " ".join(ovs_domains)
+default_domain = ovs_config.get("default_domain")
 
-    nginx_with_shib_conf = f"""\
-    server {{
+nginx_with_shib_conf = f"""\
+server {{
     listen 443 ssl default_server;
     listen [::]:443;
     server_name {default_domain};
@@ -1184,7 +889,7 @@ if k8s_deploy:
 }}
 """  # noqa: E501
 
-    nginx_wo_shib_conf = f"""\
+nginx_wo_shib_conf = f"""\
 server {{
     listen 443 ssl default_server;
     listen [::]:443;
@@ -1201,7 +906,7 @@ server {{
     ssl_ciphers TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-SHA256:DHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA256;
     ssl_prefer_server_ciphers on;
     resolver 1.1.1.1;
-    # Health check endpoint for Kubernetes probes (doesn't hit Django)
+
     location = /nginx-health {{
         access_log off;
         return 200 "healthy\n";
@@ -1240,24 +945,24 @@ server {{
 }}
 """  # noqa: E501
 
-    nginx_conf_content = nginx_with_shib_conf if use_shibboleth else nginx_wo_shib_conf
+nginx_conf_content = nginx_with_shib_conf if use_shibboleth else nginx_wo_shib_conf
 
-    # Shibboleth2.xml configuration
-    shibboleth2_xml = f"""\
+shibboleth2_xml = f"""\
 <SPConfig xmlns="urn:mace:shibboleth:3.0:native:sp:config"
-    xmlns:conf="urn:mace:shibboleth:3.0:native:sp:config"
-    clockSkew="180">
+          xmlns:conf="urn:mace:shibboleth:3.0:native:sp:config"
+          clockSkew="180">
 
-<OutOfProcess tranLogFormat="%u|%s|%IDP|%i|%ac|%t|%attr|%n|%b|%E|%S|%SS|%L|%UA|%a" />
-  <RequestMapper type="Native">
-    <RequestMap>
-      <Host authType="shibboleth" name="{default_domain}" requireSession="true" scheme="https" port="443"/>
-    </RequestMap>
-  </RequestMapper>
+    <OutOfProcess tranLogFormat="%u|%s|%IDP|%i|%ac|%t|%attr|%n|%b|%E|%S|%SS|%L|%UA|%a" />
 
-  <ApplicationDefaults entityID="https://{default_domain}/shibboleth"
-        REMOTE_USER="eppn subject-id pairwise-id persistent-id"
-        cipherSuites="DEFAULT:!EXP:!LOW:!aNULL:!eNULL:!DES:!IDEA:!SEED:!RC4:!3DES:!kRSA:!SSLv2:!SSLv3:!TLSv1:!TLSv1.1">
+    <RequestMapper type="Native">
+        <RequestMap>
+            <Host authType="shibboleth" name="{default_domain}" requireSession="true" scheme="https" port="443"/>
+        </RequestMap>
+    </RequestMapper>
+
+    <ApplicationDefaults entityID="https://{default_domain}/shibboleth"
+                         REMOTE_USER="eppn subject-id pairwise-id persistent-id"
+                         cipherSuites="DEFAULT:!EXP:!LOW:!aNULL:!eNULL:!DES:!IDEA:!SEED:!RC4:!3DES:!kRSA:!SSLv2:!SSLv3:!TLSv1:!TLSv1.1">
 
         <Sessions lifetime="28800" timeout="3600" relayState="ss:mem"
                   checkAddress="false" handlerSSL="false" cookieProps="https"
@@ -1265,7 +970,7 @@ server {{
                   redirectWhitelist="https://idp.mit.edu/ https://idp.touchstonenetwork.net/ https://idp-alum.mit.edu/">
 
             <SSO discoveryProtocol="SAMLDS" discoveryURL="https://wayf.mit.edu/DS">
-              SAML2
+                SAML2
             </SSO>
 
             <Logout>SAML2 Local</Logout>
@@ -1277,12 +982,12 @@ server {{
         </Sessions>
 
         <Errors supportContact="odl-devops@mit.edu"
-            helpLocation="/about.html"
-            styleSheet="/shibboleth-sp/main.css"/>
+                helpLocation="/about.html"
+                styleSheet="/shibboleth-sp/main.css"/>
 
         <MetadataProvider type="XML" validate="true" url="http://touchstone.mit.edu/metadata/MIT-metadata.xml" backingFilePath="MIT-metadata.xml" maxRefreshDelay="7200">
-          <MetadataFilter type="RequireValidUntil" maxValidityInterval="5184000"/>
-          <MetadataFilter type="Signature" certificate="mit-md-cert.pem" verifyBackup="false"/>
+            <MetadataFilter type="RequireValidUntil" maxValidityInterval="5184000"/>
+            <MetadataFilter type="Signature" certificate="mit-md-cert.pem" verifyBackup="false"/>
         </MetadataProvider>
 
         <TrustEngine type="ExplicitKey" />
@@ -1301,547 +1006,488 @@ server {{
 </SPConfig>
 """  # noqa: E501
 
-    # Static NGINX support files
-    bilder_files_dir = Path(__file__).resolve().parent / "files"
+# Static NGINX support files
+bilder_files_dir = Path(__file__).resolve().parent / "files"
 
-    fastcgi_params_content = bilder_files_dir.joinpath("fastcgi_params").read_text()
-    uwsgi_params_content = bilder_files_dir.joinpath("uwsgi_params").read_text()
-    shib_clear_headers_content = bilder_files_dir.joinpath(
-        "shib_clear_headers"
-    ).read_text()
-    shib_fastcgi_params_content = bilder_files_dir.joinpath(
-        "shib_fastcgi_params"
-    ).read_text()
-    shib_params_content = bilder_files_dir.joinpath("shib_params").read_text()
-    logging_conf_content = bilder_files_dir.joinpath("logging.conf").read_text()
+fastcgi_params_content = bilder_files_dir.joinpath("fastcgi_params").read_text()
+uwsgi_params_content = bilder_files_dir.joinpath("uwsgi_params").read_text()
+logging_conf_content = bilder_files_dir.joinpath("logging.conf").read_text()
+
+# Shibboleth-specific ConfigMap, volumes, and mounts (consolidated)
+if use_shibboleth:
     attribute_map_content = bilder_files_dir.joinpath("attribute-map.xml").read_text()
-
-    # ConfigMap for NGINX configuration files
-    nginx_configmap_data: dict[str, str] = {
-        "default.conf": nginx_conf_content,
-        "fastcgi_params": fastcgi_params_content,
-        "uwsgi_params": uwsgi_params_content,
-        "logging.conf": logging_conf_content,
+    shib_extra_nginx_data: dict[str, str] = {
+        "shib_clear_headers": bilder_files_dir.joinpath(
+            "shib_clear_headers"
+        ).read_text(),
+        "shib_fastcgi_params": bilder_files_dir.joinpath(
+            "shib_fastcgi_params"
+        ).read_text(),
+        "shib_params": bilder_files_dir.joinpath("shib_params").read_text(),
     }
-    if use_shibboleth:
-        nginx_configmap_data.update(
-            {
-                "shib_clear_headers": shib_clear_headers_content,
-                "shib_fastcgi_params": shib_fastcgi_params_content,
-                "shib_params": shib_params_content,
-            }
-        )
-
-    nginx_configmap = kubernetes.core.v1.ConfigMap(
-        f"ovs-nginx-configmap-{stack_info.env_suffix}",
+    shib_configmap: kubernetes.core.v1.ConfigMap | None = kubernetes.core.v1.ConfigMap(
+        f"ovs-shib-configmap-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="ovs-nginx-config",
-            namespace=ovs_namespace,
-            labels=k8s_app_labels,
-        ),
-        data=nginx_configmap_data,
-    )
-
-    # ConfigMap for Shibboleth configuration (only when enabled)
-    shib_configmap = None
-    if use_shibboleth:
-        shib_configmap = kubernetes.core.v1.ConfigMap(
-            f"ovs-shib-configmap-{stack_info.env_suffix}",
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                name="ovs-shib-config",
-                namespace=ovs_namespace,
-                labels=k8s_app_labels,
-            ),
-            data={
-                "shibboleth2.xml": shibboleth2_xml,
-                "attribute-map.xml": attribute_map_content,
-            },
-        )
-
-    # ConfigMap for non-sensitive application environment variables
-    app_configmap = kubernetes.core.v1.ConfigMap(
-        f"ovs-app-configmap-{stack_info.env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="ovs-app-config",
+            name="ovs-shib-config",
             namespace=ovs_namespace,
             labels=k8s_app_labels,
         ),
         data={
-            k: v if isinstance(v, Output) else str(v) for k, v in app_env_vars.items()
+            "shibboleth2.xml": shibboleth2_xml,
+            "attribute-map.xml": attribute_map_content,
         },
     )
-
-    # Build env_from references for the deployment
-    env_from_sources = [
-        kubernetes.core.v1.EnvFromSourceArgs(
-            config_map_ref=kubernetes.core.v1.ConfigMapEnvSourceArgs(
-                name="ovs-app-config",
-            ),
-        ),
-    ] + [
-        kubernetes.core.v1.EnvFromSourceArgs(
-            secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
-                name=secret_name,
-            ),
-        )
-        for secret_name in secret_names
-    ]
-
-    # Volume definitions
-    volumes: list[kubernetes.core.v1.VolumeArgs] = [
+    shib_extra_volumes: list[kubernetes.core.v1.VolumeArgs] = [
         kubernetes.core.v1.VolumeArgs(
-            name="nginx-config",
+            name="shib-config",
             config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                name="ovs-nginx-config",
+                name="ovs-shib-config",
             ),
         ),
         kubernetes.core.v1.VolumeArgs(
-            name="staticfiles",
-            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+            name="shib-certs",
+            secret=kubernetes.core.v1.SecretVolumeSourceArgs(
+                secret_name="ovs-shib-certs-static-secret",  # noqa: S106  # pragma: allowlist secret
+            ),
         ),
     ]
-    if use_shibboleth:
-        volumes.extend(
-            [
-                kubernetes.core.v1.VolumeArgs(
-                    name="shib-config",
-                    config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                        name="ovs-shib-config",
-                    ),
-                ),
-                kubernetes.core.v1.VolumeArgs(
-                    name="shib-certs",
-                    secret=kubernetes.core.v1.SecretVolumeSourceArgs(
-                        secret_name="ovs-shib-certs-static-secret",  # noqa: S106  # pragma: allowlist secret
-                    ),
-                ),
-            ]
-        )
-
-    # NGINX sidecar volume mounts
-    nginx_volume_mounts: list[kubernetes.core.v1.VolumeMountArgs] = [
+    shib_extra_nginx_mounts: list[kubernetes.core.v1.VolumeMountArgs] = [
         kubernetes.core.v1.VolumeMountArgs(
             name="nginx-config",
-            mount_path="/etc/nginx/conf.d/default.conf",
-            sub_path="default.conf",
+            mount_path="/etc/nginx/shib_clear_headers",
+            sub_path="shib_clear_headers",
             read_only=True,
         ),
         kubernetes.core.v1.VolumeMountArgs(
             name="nginx-config",
-            mount_path="/etc/nginx/fastcgi_params",
-            sub_path="fastcgi_params",
+            mount_path="/etc/nginx/shib_fastcgi_params",
+            sub_path="shib_fastcgi_params",
             read_only=True,
         ),
         kubernetes.core.v1.VolumeMountArgs(
             name="nginx-config",
-            mount_path="/etc/nginx/uwsgi_params",
-            sub_path="uwsgi_params",
+            mount_path="/etc/nginx/shib_params",
+            sub_path="shib_params",
             read_only=True,
         ),
         kubernetes.core.v1.VolumeMountArgs(
-            name="nginx-config",
-            mount_path="/etc/nginx/logging.conf",
-            sub_path="logging.conf",
+            name="shib-config",
+            mount_path="/etc/shibboleth/shibboleth2.xml",
+            sub_path="shibboleth2.xml",
             read_only=True,
         ),
         kubernetes.core.v1.VolumeMountArgs(
-            name="staticfiles",
-            mount_path="/opt/odl-video-service/staticfiles",
+            name="shib-config",
+            mount_path="/etc/shibboleth/attribute-map.xml",
+            sub_path="attribute-map.xml",
+            read_only=True,
+        ),
+        kubernetes.core.v1.VolumeMountArgs(
+            name="shib-certs",
+            mount_path="/etc/shibboleth/sp-cert.pem",
+            sub_path="sp-cert.pem",
+            read_only=True,
+        ),
+        kubernetes.core.v1.VolumeMountArgs(
+            name="shib-certs",
+            mount_path="/etc/shibboleth/sp-key.pem",
+            sub_path="sp-key.pem",
+            read_only=True,
+        ),
+        kubernetes.core.v1.VolumeMountArgs(
+            name="shib-certs",
+            mount_path="/etc/shibboleth/mit-md-cert.pem",
+            sub_path="mit-md-cert.pem",
             read_only=True,
         ),
     ]
-    if use_shibboleth:
-        nginx_volume_mounts.extend(
-            [
-                kubernetes.core.v1.VolumeMountArgs(
-                    name="nginx-config",
-                    mount_path="/etc/nginx/shib_clear_headers",
-                    sub_path="shib_clear_headers",
-                    read_only=True,
-                ),
-                kubernetes.core.v1.VolumeMountArgs(
-                    name="nginx-config",
-                    mount_path="/etc/nginx/shib_fastcgi_params",
-                    sub_path="shib_fastcgi_params",
-                    read_only=True,
-                ),
-                kubernetes.core.v1.VolumeMountArgs(
-                    name="nginx-config",
-                    mount_path="/etc/nginx/shib_params",
-                    sub_path="shib_params",
-                    read_only=True,
-                ),
-                kubernetes.core.v1.VolumeMountArgs(
-                    name="shib-config",
-                    mount_path="/etc/shibboleth/shibboleth2.xml",
-                    sub_path="shibboleth2.xml",
-                    read_only=True,
-                ),
-                kubernetes.core.v1.VolumeMountArgs(
-                    name="shib-config",
-                    mount_path="/etc/shibboleth/attribute-map.xml",
-                    sub_path="attribute-map.xml",
-                    read_only=True,
-                ),
-                kubernetes.core.v1.VolumeMountArgs(
-                    name="shib-certs",
-                    mount_path="/etc/shibboleth/sp-cert.pem",
-                    sub_path="sp-cert.pem",
-                    read_only=True,
-                ),
-                kubernetes.core.v1.VolumeMountArgs(
-                    name="shib-certs",
-                    mount_path="/etc/shibboleth/sp-key.pem",
-                    sub_path="sp-key.pem",
-                    read_only=True,
-                ),
-                kubernetes.core.v1.VolumeMountArgs(
-                    name="shib-certs",
-                    mount_path="/etc/shibboleth/mit-md-cert.pem",
-                    sub_path="mit-md-cert.pem",
-                    read_only=True,
-                ),
-            ]
-        )
+else:
+    shib_configmap = None
+    shib_extra_nginx_data = {}
+    shib_extra_volumes = []
+    shib_extra_nginx_mounts = []
 
-    # Init container for migrations and collectstatic
-    init_container = kubernetes.core.v1.ContainerArgs(
-        name="ovs-init",
-        image=f"mitodl/odl-video-service-app:{ODL_VIDEO_SERVICE_DOCKER_TAG}",
-        command=["/bin/bash", "-c"],
-        args=[
-            "python3 manage.py migrate --noinput && "
-            "python3 manage.py collectstatic --noinput"
-        ],
-        env_from=env_from_sources,
-        volume_mounts=[
-            kubernetes.core.v1.VolumeMountArgs(
-                name="staticfiles",
-                mount_path="/src/staticfiles",
-            ),
-        ],
-        resources=kubernetes.core.v1.ResourceRequirementsArgs(
-            requests={"cpu": "100m", "memory": "256Mi"},
-            limits={"memory": "512Mi"},
+# ConfigMap for NGINX configuration files
+nginx_configmap_data: dict[str, str] = {
+    "default.conf": nginx_conf_content,
+    "fastcgi_params": fastcgi_params_content,
+    "uwsgi_params": uwsgi_params_content,
+    "logging.conf": logging_conf_content,
+    **shib_extra_nginx_data,
+}
+
+nginx_configmap = kubernetes.core.v1.ConfigMap(
+    f"ovs-nginx-configmap-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="ovs-nginx-config",
+        namespace=ovs_namespace,
+        labels=k8s_app_labels,
+    ),
+    data=nginx_configmap_data,
+)
+
+# ConfigMap for non-sensitive application environment variables
+app_configmap = kubernetes.core.v1.ConfigMap(
+    f"ovs-app-configmap-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="ovs-app-config",
+        namespace=ovs_namespace,
+        labels=k8s_app_labels,
+    ),
+    data={k: v if isinstance(v, Output) else str(v) for k, v in app_env_vars.items()},
+)
+
+# Build env_from references for the deployment
+env_from_sources = [
+    kubernetes.core.v1.EnvFromSourceArgs(
+        config_map_ref=kubernetes.core.v1.ConfigMapEnvSourceArgs(
+            name="ovs-app-config",
+        ),
+    ),
+] + [
+    kubernetes.core.v1.EnvFromSourceArgs(
+        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+            name=secret_name,
         ),
     )
+    for secret_name in secret_names
+]
 
-    # Main app container (uWSGI)
-    app_container = kubernetes.core.v1.ContainerArgs(
-        name="ovs-app",
-        image=f"mitodl/odl-video-service-app:{ODL_VIDEO_SERVICE_DOCKER_TAG}",
-        command=["uwsgi"],
-        args=["uwsgi.ini"],
-        ports=[
-            kubernetes.core.v1.ContainerPortArgs(
-                container_port=8087,
-                name="uwsgi",
-                protocol="TCP",
-            ),
-        ],
-        env_from=env_from_sources,
-        volume_mounts=[
-            kubernetes.core.v1.VolumeMountArgs(
-                name="staticfiles",
-                mount_path="/src/staticfiles",
-            ),
-        ],
-        resources=kubernetes.core.v1.ResourceRequirementsArgs(
-            requests={"cpu": "250m", "memory": "512Mi"},
-            limits={"memory": "1Gi"},
+# Volume definitions
+volumes: list[kubernetes.core.v1.VolumeArgs] = [
+    kubernetes.core.v1.VolumeArgs(
+        name="nginx-config",
+        config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+            name="ovs-nginx-config",
         ),
-    )
+    ),
+    kubernetes.core.v1.VolumeArgs(
+        name="staticfiles",
+        empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+    ),
+    *shib_extra_volumes,
+]
 
-    # NGINX + Shibboleth sidecar container
-    nginx_sidecar = kubernetes.core.v1.ContainerArgs(
-        name="nginx-shib",
-        image="pennlabs/shibboleth-sp-nginx:latest",
-        ports=[
-            kubernetes.core.v1.ContainerPortArgs(
-                container_port=443,
-                name="https",
-                protocol="TCP",
-            ),
-        ],
-        volume_mounts=nginx_volume_mounts,
-        resources=kubernetes.core.v1.ResourceRequirementsArgs(
-            requests={"cpu": "50m", "memory": "128Mi"},
-            limits={"memory": "256Mi"},
-        ),
-        liveness_probe=kubernetes.core.v1.ProbeArgs(
-            http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                path="/nginx-health",
-                port=443,
-                scheme="HTTPS",
-            ),
-            initial_delay_seconds=30,
-            period_seconds=30,
-            failure_threshold=3,
-            timeout_seconds=5,
-        ),
-        readiness_probe=kubernetes.core.v1.ProbeArgs(
-            http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                path="/nginx-health",
-                port=443,
-                scheme="HTTPS",
-            ),
-            initial_delay_seconds=15,
-            period_seconds=15,
-            failure_threshold=3,
-            timeout_seconds=5,
-        ),
-        startup_probe=kubernetes.core.v1.ProbeArgs(
-            http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                path="/nginx-health",
-                port=443,
-                scheme="HTTPS",
-            ),
-            initial_delay_seconds=10,
-            period_seconds=10,
-            failure_threshold=6,
-            success_threshold=1,
-            timeout_seconds=5,
-        ),
-    )
+# NGINX sidecar volume mounts
+nginx_volume_mounts: list[kubernetes.core.v1.VolumeMountArgs] = [
+    kubernetes.core.v1.VolumeMountArgs(
+        name="nginx-config",
+        mount_path="/etc/nginx/conf.d/default.conf",
+        sub_path="default.conf",
+        read_only=True,
+    ),
+    kubernetes.core.v1.VolumeMountArgs(
+        name="nginx-config",
+        mount_path="/etc/nginx/fastcgi_params",
+        sub_path="fastcgi_params",
+        read_only=True,
+    ),
+    kubernetes.core.v1.VolumeMountArgs(
+        name="nginx-config",
+        mount_path="/etc/nginx/uwsgi_params",
+        sub_path="uwsgi_params",
+        read_only=True,
+    ),
+    kubernetes.core.v1.VolumeMountArgs(
+        name="nginx-config",
+        mount_path="/etc/nginx/logging.conf",
+        sub_path="logging.conf",
+        read_only=True,
+    ),
+    kubernetes.core.v1.VolumeMountArgs(
+        name="staticfiles",
+        mount_path="/opt/odl-video-service/staticfiles",
+        read_only=True,
+    ),
+    *shib_extra_nginx_mounts,
+]
 
-    # Deployment
-    ovs_deployment = kubernetes.apps.v1.Deployment(
-        f"ovs-deployment-{stack_info.env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="ovs",
-            namespace=ovs_namespace,
-            labels={
-                **k8s_app_labels,
-                "ol.mit.edu/component": "webapp",
-            },
+# Init container for migrations and collectstatic
+init_container = kubernetes.core.v1.ContainerArgs(
+    name="ovs-init",
+    image=f"mitodl/odl-video-service-app:{ODL_VIDEO_SERVICE_DOCKER_TAG}",
+    command=["/bin/bash", "-c"],
+    args=[
+        "python3 manage.py migrate --noinput && "
+        "python3 manage.py collectstatic --noinput"
+    ],
+    env_from=env_from_sources,
+    volume_mounts=[
+        kubernetes.core.v1.VolumeMountArgs(
+            name="staticfiles",
+            mount_path="/src/staticfiles",
         ),
-        spec=kubernetes.apps.v1.DeploymentSpecArgs(
-            replicas=ovs_config.get_int("k8s_replicas") or 2,
-            selector=kubernetes.meta.v1.LabelSelectorArgs(
-                match_labels={
-                    "ol.mit.edu/application": Application.odl_video_service,
-                    "ol.mit.edu/component": "webapp",
-                },
-            ),
-            template=kubernetes.core.v1.PodTemplateSpecArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels={
-                        **k8s_app_labels,
-                        "ol.mit.edu/component": "webapp",
-                        "ol.mit.edu/pod-security-group": ovs_app_security_group.id,
-                    },
-                ),
-                spec=kubernetes.core.v1.PodSpecArgs(
-                    init_containers=[init_container],
-                    containers=[app_container, nginx_sidecar],
-                    volumes=volumes,
-                    affinity=kubernetes.core.v1.AffinityArgs(
-                        pod_anti_affinity=kubernetes.core.v1.PodAntiAffinityArgs(
-                            preferred_during_scheduling_ignored_during_execution=[
-                                kubernetes.core.v1.WeightedPodAffinityTermArgs(
-                                    weight=100,
-                                    pod_affinity_term=kubernetes.core.v1.PodAffinityTermArgs(
-                                        label_selector=kubernetes.meta.v1.LabelSelectorArgs(
-                                            match_labels={
-                                                "ol.mit.edu/application": Application.odl_video_service,  # noqa: E501
-                                            },
-                                        ),
-                                        topology_key="kubernetes.io/hostname",
-                                    ),
-                                ),
-                            ],
-                        ),
-                    ),
-                ),
-            ),
-        ),
-        opts=ResourceOptions(
-            depends_on=[
-                ovs_app_security_group,
-                app_configmap,
-                nginx_configmap,
-                *secret_resources,
-                *([] if shib_configmap is None else [shib_configmap]),
-            ]
-        ),
-    )
+    ],
+    resources=kubernetes.core.v1.ResourceRequirementsArgs(
+        requests={"cpu": "100m", "memory": "256Mi"},
+        limits={"memory": "512Mi"},
+    ),
+)
 
-    # Service for the deployment (points to NGINX sidecar port)
-    ovs_service_name = "ovs-webapp"
-    ovs_service = kubernetes.core.v1.Service(
-        f"ovs-service-{stack_info.env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=ovs_service_name,
-            namespace=ovs_namespace,
-            labels=k8s_app_labels,
+# Main app container (uWSGI)
+app_container = kubernetes.core.v1.ContainerArgs(
+    name="ovs-app",
+    image=f"mitodl/odl-video-service-app:{ODL_VIDEO_SERVICE_DOCKER_TAG}",
+    command=["uwsgi"],
+    args=["uwsgi.ini"],
+    ports=[
+        kubernetes.core.v1.ContainerPortArgs(
+            container_port=8087,
+            name="uwsgi",
+            protocol="TCP",
         ),
-        spec=kubernetes.core.v1.ServiceSpecArgs(
-            type="ClusterIP",
-            selector={
+    ],
+    env_from=env_from_sources,
+    volume_mounts=[
+        kubernetes.core.v1.VolumeMountArgs(
+            name="staticfiles",
+            mount_path="/src/staticfiles",
+        ),
+    ],
+    resources=kubernetes.core.v1.ResourceRequirementsArgs(
+        requests={"cpu": "250m", "memory": "512Mi"},
+        limits={"memory": "1Gi"},
+    ),
+)
+
+# NGINX + Shibboleth sidecar container
+nginx_sidecar = kubernetes.core.v1.ContainerArgs(
+    name="nginx-shib",
+    image="pennlabs/shibboleth-sp-nginx:latest",
+    ports=[
+        kubernetes.core.v1.ContainerPortArgs(
+            container_port=443,
+            name="https",
+            protocol="TCP",
+        ),
+    ],
+    volume_mounts=nginx_volume_mounts,
+    resources=kubernetes.core.v1.ResourceRequirementsArgs(
+        requests={"cpu": "50m", "memory": "128Mi"},
+        limits={"memory": "256Mi"},
+    ),
+    liveness_probe=kubernetes.core.v1.ProbeArgs(
+        http_get=kubernetes.core.v1.HTTPGetActionArgs(
+            path="/nginx-health",
+            port=443,
+            scheme="HTTPS",
+        ),
+        initial_delay_seconds=30,
+        period_seconds=30,
+        failure_threshold=3,
+        timeout_seconds=5,
+    ),
+    readiness_probe=kubernetes.core.v1.ProbeArgs(
+        http_get=kubernetes.core.v1.HTTPGetActionArgs(
+            path="/nginx-health",
+            port=443,
+            scheme="HTTPS",
+        ),
+        initial_delay_seconds=15,
+        period_seconds=15,
+        failure_threshold=3,
+        timeout_seconds=5,
+    ),
+    startup_probe=kubernetes.core.v1.ProbeArgs(
+        http_get=kubernetes.core.v1.HTTPGetActionArgs(
+            path="/nginx-health",
+            port=443,
+            scheme="HTTPS",
+        ),
+        initial_delay_seconds=10,
+        period_seconds=10,
+        failure_threshold=6,
+        success_threshold=1,
+        timeout_seconds=5,
+    ),
+)
+
+# Deployment
+ovs_deployment = kubernetes.apps.v1.Deployment(
+    f"ovs-deployment-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="ovs",
+        namespace=ovs_namespace,
+        labels={
+            **k8s_app_labels,
+            "ol.mit.edu/component": "webapp",
+        },
+    ),
+    spec=kubernetes.apps.v1.DeploymentSpecArgs(
+        replicas=ovs_config.get_int("k8s_replicas") or 2,
+        selector=kubernetes.meta.v1.LabelSelectorArgs(
+            match_labels={
                 "ol.mit.edu/application": Application.odl_video_service,
                 "ol.mit.edu/component": "webapp",
             },
-            ports=[
-                kubernetes.core.v1.ServicePortArgs(
-                    name="http",
-                    port=DEFAULT_HTTPS_PORT,
-                    target_port="https",
-                    protocol="TCP",
-                    app_protocol="https",
-                ),
-            ],
         ),
-    )
+        template=kubernetes.core.v1.PodTemplateSpecArgs(
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                labels={
+                    **k8s_app_labels,
+                    "ol.mit.edu/component": "webapp",
+                    "ol.mit.edu/pod-security-group": ovs_app_security_group.id,
+                },
+            ),
+            spec=kubernetes.core.v1.PodSpecArgs(
+                init_containers=[init_container],
+                containers=[app_container, nginx_sidecar],
+                volumes=volumes,
+                affinity=kubernetes.core.v1.AffinityArgs(
+                    pod_anti_affinity=kubernetes.core.v1.PodAntiAffinityArgs(
+                        preferred_during_scheduling_ignored_during_execution=[
+                            kubernetes.core.v1.WeightedPodAffinityTermArgs(
+                                weight=100,
+                                pod_affinity_term=kubernetes.core.v1.PodAffinityTermArgs(
+                                    label_selector=kubernetes.meta.v1.LabelSelectorArgs(
+                                        match_labels={
+                                            "ol.mit.edu/application": Application.odl_video_service,  # noqa: E501
+                                        },
+                                    ),
+                                    topology_key="kubernetes.io/hostname",
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+        ),
+    ),
+    opts=ResourceOptions(
+        depends_on=[
+            ovs_app_security_group,
+            app_configmap,
+            nginx_configmap,
+            *secret_resources,
+            *([] if shib_configmap is None else [shib_configmap]),
+        ]
+    ),
+)
 
-    # Celery worker deployment (no NGINX sidecar needed)
-    celery_log_level = ovs_config.get("log_level") or "INFO"
-    celery_deployment = kubernetes.apps.v1.Deployment(
-        f"ovs-celery-deployment-{stack_info.env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="ovs-celery",
-            namespace=ovs_namespace,
-            labels={
-                **k8s_app_labels,
+# Service for the deployment (points to NGINX sidecar port)
+ovs_service_name = "ovs-webapp"
+ovs_service = kubernetes.core.v1.Service(
+    f"ovs-service-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=ovs_service_name,
+        namespace=ovs_namespace,
+        labels=k8s_app_labels,
+    ),
+    spec=kubernetes.core.v1.ServiceSpecArgs(
+        type="ClusterIP",
+        selector={
+            "ol.mit.edu/application": Application.odl_video_service,
+            "ol.mit.edu/component": "webapp",
+        },
+        ports=[
+            kubernetes.core.v1.ServicePortArgs(
+                name="http",
+                port=DEFAULT_HTTPS_PORT,
+                target_port="https",
+                protocol="TCP",
+                app_protocol="https",
+            ),
+        ],
+    ),
+)
+
+# Celery worker deployment (no NGINX sidecar needed)
+celery_log_level = ovs_config.get("log_level") or "INFO"
+celery_deployment = kubernetes.apps.v1.Deployment(
+    f"ovs-celery-deployment-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="ovs-celery",
+        namespace=ovs_namespace,
+        labels={
+            **k8s_app_labels,
+            "ol.mit.edu/component": "celery",
+        },
+    ),
+    spec=kubernetes.apps.v1.DeploymentSpecArgs(
+        replicas=1,
+        selector=kubernetes.meta.v1.LabelSelectorArgs(
+            match_labels={
+                "ol.mit.edu/application": Application.odl_video_service,
                 "ol.mit.edu/component": "celery",
             },
         ),
-        spec=kubernetes.apps.v1.DeploymentSpecArgs(
-            replicas=1,
-            selector=kubernetes.meta.v1.LabelSelectorArgs(
-                match_labels={
-                    "ol.mit.edu/application": Application.odl_video_service,
+        template=kubernetes.core.v1.PodTemplateSpecArgs(
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                labels={
+                    **k8s_app_labels,
                     "ol.mit.edu/component": "celery",
+                    "ol.mit.edu/pod-security-group": ovs_app_security_group.id,
                 },
             ),
-            template=kubernetes.core.v1.PodTemplateSpecArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels={
-                        **k8s_app_labels,
-                        "ol.mit.edu/component": "celery",
-                        "ol.mit.edu/pod-security-group": ovs_app_security_group.id,
-                    },
-                ),
-                spec=kubernetes.core.v1.PodSpecArgs(
-                    containers=[
-                        kubernetes.core.v1.ContainerArgs(
-                            name="ovs-celery",
-                            image=f"mitodl/odl-video-service-app:{ODL_VIDEO_SERVICE_DOCKER_TAG}",
-                            command=["celery"],
-                            args=[
-                                "-A",
-                                "odl_video",
-                                "worker",
-                                "-B",
-                                "-l",
-                                celery_log_level,
-                            ],
-                            env_from=env_from_sources,
-                            resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                                requests={"cpu": "100m", "memory": "2048Mi"},
-                                limits={"memory": "2048Mi"},
-                            ),
+            spec=kubernetes.core.v1.PodSpecArgs(
+                containers=[
+                    kubernetes.core.v1.ContainerArgs(
+                        name="ovs-celery",
+                        image=f"mitodl/odl-video-service-app:{ODL_VIDEO_SERVICE_DOCKER_TAG}",
+                        command=["celery"],
+                        args=[
+                            "-A",
+                            "odl_video",
+                            "worker",
+                            "-B",
+                            "-l",
+                            celery_log_level,
+                        ],
+                        env_from=env_from_sources,
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            requests={"cpu": "100m", "memory": "2048Mi"},
+                            limits={"memory": "2048Mi"},
                         ),
-                    ],
-                ),
+                    ),
+                ],
             ),
         ),
-        opts=ResourceOptions(
-            depends_on=[
-                ovs_app_security_group,
-                app_configmap,
-                *secret_resources,
-            ]
-        ),
-    )
-
-    # APISIX routing and TLS certificate (only when cutover is enabled)
-    if k8s_cutover:
-        tls_secret_name = "ovs-tls-pair"  # noqa: S105  # pragma: allowlist secret
-
-        cert_manager_certificate = OLCertManagerCert(
-            f"ovs-cert-manager-certificate-{stack_info.env_suffix}",
-            cert_config=OLCertManagerCertConfig(
-                application_name="ovs",
-                k8s_namespace=ovs_namespace,
-                k8s_labels=k8s_app_labels,
-                create_apisixtls_resource=True,
-                dest_secret_name=tls_secret_name,
-                dns_names=[default_domain],
-            ),
-        )
-
-        ovs_apisix_httproute = OLApisixRoute(
-            f"ovs-apisix-httproute-{stack_info.env_suffix}",
-            route_configs=[
-                OLApisixRouteConfig(
-                    route_name="passthrough",
-                    hosts=[default_domain],
-                    paths=["/*"],
-                    backend_service_name=ovs_service_name,
-                    backend_service_port=443,
-                    plugins=[],
-                ),
-            ],
-            k8s_namespace=ovs_namespace,
-            k8s_labels=k8s_app_labels,
-        )
-
-    export(
-        "odl_video_service_k8s",
-        {
-            "namespace": ovs_namespace,
-            "service_name": "ovs-webapp",
-        },
-    )
-
-consul_keys = {
-    "ovs/database_endpoint": db_address,
-    "ovs/default_domain": ovs_config.get("default_domain"),
-    "ovs/domains": domains_string,
-    "ovs/edx_base_url": ovs_config.get("edx_base_url"),
-    "ovs/environment": stack_info.env_suffix,
-    "ovs/feature_annotations": ("True" if enabled_annotations else "False"),
-    "ovs/log_level": ovs_config.get("log_level"),
-    "ovs/mediaconvert_sns_topic_arn": ovs_mediaconvert.sns_topic.arn,
-    "ovs/nginx_config_file_path": nginx_config_file_path,
-    "ovs/redis_cluster_address": ovs_server_redis_cluster.address,
-    "ovs/redis_max_connections": redis_config.get("max_connections") or 65000,
-    "ovs/s3_bucket_name": ovs_config.get("s3_bucket_name"),
-    "ovs/s3_subtitle_bucket_name": ovs_config.get("s3_subtitle_bucket_name"),
-    "ovs/s3_thumbnail_bucket_name": ovs_config.get("s3_thumbnail_bucket_name"),
-    "ovs/s3_transcode_bucket_name": ovs_config.get("s3_transcode_bucket_name"),
-    "ovs/s3_watch_bucket_name": ovs_config.get("s3_watch_bucket_name"),
-    "ovs/use_shibboleth": "True" if use_shibboleth else "False",
-    "ovs/aws_role_name": ovs_mediaconvert.role.name,
-    "ovs/aws_account_id": aws_account.account_id,
-    "ovs/post_transcode_actions": "cloudsync.api.process_transcode_results",
-    "ovs/transcode_job_template": "./config/mediaconvert.json",
-    "ovs/video_s3_thumbnail_bucket": ovs_config.get("s3_thumbnail_bucket_name"),
-    "ovs/video_s3_transcode_bucket": ovs_config.get("s3_transcode_bucket_name"),
-    "ovs/video_s3_transcode_endpoint": secrets["transcode_endpoint"],
-    "ovs/video_s3_upload_prefix": "",
-    "ovs/video_s3_transcode_prefix": "transcoded",
-    "ovs/video_s3_thumbnail_prefix": "thumbnails",
-    "ovs/video_transcode_queue": ovs_mediaconvert.queue.name,
-}
-consul.Keys(
-    "ovs-server-configuration-data",
-    keys=consul_key_helper(consul_keys),
-    opts=consul_provider,
+    ),
+    opts=ResourceOptions(
+        depends_on=[
+            ovs_app_security_group,
+            app_configmap,
+            *secret_resources,
+        ]
+    ),
 )
 
-# Create Route53 DNS records and Consul keys only when not cut over to K8s
-if not k8s_cutover:
-    five_minutes = 60 * 5
-    for domain in ovs_config.get_object("route53_managed_domains"):
-        route53.Record(
-            f"ovs-server-dns-record-{domain}",
-            name=domain,
-            type="CNAME",
-            ttl=five_minutes,
-            records=[autoscale_setup.load_balancer.dns_name],
-            zone_id=mitodl_zone_id,
-        )
+tls_secret_name = "ovs-tls-pair"  # noqa: S105  # pragma: allowlist secret
+cert_manager_certificate = OLCertManagerCert(
+    f"ovs-cert-manager-certificate-{stack_info.env_suffix}",
+    cert_config=OLCertManagerCertConfig(
+        application_name="ovs",
+        k8s_namespace=ovs_namespace,
+        k8s_labels=k8s_app_labels,
+        create_apisixtls_resource=True,
+        dest_secret_name=tls_secret_name,
+        dns_names=[default_domain],
+    ),
+)
+
+ovs_apisix_httproute = OLApisixRoute(
+    f"ovs-apisix-httproute-{stack_info.env_suffix}",
+    route_configs=[
+        OLApisixRouteConfig(
+            route_name="passthrough",
+            hosts=[default_domain],
+            paths=["/*"],
+            backend_service_name=ovs_service_name,
+            backend_service_port=443,
+            plugins=[],
+        ),
+    ],
+    k8s_namespace=ovs_namespace,
+    k8s_labels=k8s_app_labels,
+)
+
+export(
+    "odl_video_service_k8s",
+    {
+        "namespace": ovs_namespace,
+        "service_name": "ovs-webapp",
+    },
+)
 
 # Add the resources to the export
 export(

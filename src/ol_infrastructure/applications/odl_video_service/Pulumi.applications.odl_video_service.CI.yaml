@@ -13,8 +13,6 @@ config:
   - video-ci.odl.mit.edu
   ovs:edx_base_url: https://courses-ci.xpro.mit.edu
   ovs:feature_annotations: "False"
-  ovs:k8s_deploy: true
-  ovs:k8s_cutover: true
   ovs:log_level: INFO
   ovs:rds_password:
     secure: v1:CFR8W+XpCttoYTa/:IRecvFvHJMZmf4hzMvWrJ00puDMFht2ArQSk/FDCZGnc7rQM42e7HtJwEeN1YI/W
