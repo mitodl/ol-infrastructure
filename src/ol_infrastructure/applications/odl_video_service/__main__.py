@@ -1071,10 +1071,10 @@ if k8s_deploy:
     }
     app_env_vars.update(k8s_extra_vars)
 
-    if "OVS_DOCKER_TAG" not in os.environ:
-        msg = "OVS_DOCKER_TAG must be set."
+    if "ODL_VIDEO_SERVICE_DOCKER_TAG" not in os.environ:
+        msg = "ODL_VIDEO_SERVICE_DOCKER_TAG must be set."
         raise OSError(msg)
-    OVS_DOCKER_TAG = os.environ["OVS_DOCKER_TAG"]
+    ODL_VIDEO_SERVICE_DOCKER_TAG = os.environ["ODL_VIDEO_SERVICE_DOCKER_TAG"]
 
     # NGINX configuration for K8s (HTTP only — APISIX handles TLS)
     ovs_domains = ovs_config.get_object("domains") or [ovs_config.get("default_domain")]
@@ -1507,7 +1507,7 @@ server {{
     # Init container for migrations and collectstatic
     init_container = kubernetes.core.v1.ContainerArgs(
         name="ovs-init",
-        image=f"mitodl/ovs-app:{OVS_DOCKER_TAG}",
+        image=f"mitodl/odl-video-service-app:{ODL_VIDEO_SERVICE_DOCKER_TAG}",
         command=["/bin/bash", "-c"],
         args=[
             "python3 manage.py migrate --noinput && "
@@ -1529,7 +1529,7 @@ server {{
     # Main app container (uWSGI)
     app_container = kubernetes.core.v1.ContainerArgs(
         name="ovs-app",
-        image=f"mitodl/ovs-app:{OVS_DOCKER_TAG}",
+        image=f"mitodl/odl-video-service-app:{ODL_VIDEO_SERVICE_DOCKER_TAG}",
         command=["uwsgi"],
         args=["uwsgi.ini"],
         ports=[
@@ -1725,7 +1725,7 @@ server {{
                     containers=[
                         kubernetes.core.v1.ContainerArgs(
                             name="ovs-celery",
-                            image=f"mitodl/ovs-app:{OVS_DOCKER_TAG}",
+                            image=f"mitodl/odl-video-service-app:{ODL_VIDEO_SERVICE_DOCKER_TAG}",
                             command=["celery"],
                             args=[
                                 "-A",
