@@ -589,6 +589,57 @@ def create_k8s_resources(  # noqa: C901
                 log_level=log_level,
                 limit_workers_max_rss=True,
             ),
+            probe_configs={
+                "liveness_probe": kubernetes.core.v1.ProbeArgs(
+                    http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                        path="/heartbeat",
+                        port=8000,
+                        http_headers=[
+                            kubernetes.core.v1.HTTPHeaderArgs(
+                                name="Host",
+                                value=edxapp_config.require_object("domains")["lms"],
+                            ),
+                        ],
+                    ),
+                    initial_delay_seconds=30,
+                    period_seconds=30,
+                    failure_threshold=3,
+                    timeout_seconds=3,
+                ),
+                "readiness_probe": kubernetes.core.v1.ProbeArgs(
+                    http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                        path="/heartbeat",
+                        port=8000,
+                        http_headers=[
+                            kubernetes.core.v1.HTTPHeaderArgs(
+                                name="Host",
+                                value=edxapp_config.require_object("domains")["lms"],
+                            ),
+                        ],
+                    ),
+                    initial_delay_seconds=15,
+                    period_seconds=15,
+                    failure_threshold=3,
+                    timeout_seconds=3,
+                ),
+                "startup_probe": kubernetes.core.v1.ProbeArgs(
+                    http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                        path="/heartbeat",
+                        port=8000,
+                        http_headers=[
+                            kubernetes.core.v1.HTTPHeaderArgs(
+                                name="Host",
+                                value=edxapp_config.require_object("domains")["lms"],
+                            ),
+                        ],
+                    ),
+                    initial_delay_seconds=10,
+                    period_seconds=10,
+                    failure_threshold=6,
+                    success_threshold=1,
+                    timeout_seconds=5,
+                ),
+            },
             resource_requests={
                 "cpu": resources_dict["webapp"]["lms"]["cpu_request"],
                 "memory": resources_dict["webapp"]["lms"]["memory_request"],
@@ -819,6 +870,57 @@ def create_k8s_resources(  # noqa: C901
                 log_level=log_level,
                 limit_workers_max_rss=True,
             ),
+            probe_configs={
+                "liveness_probe": kubernetes.core.v1.ProbeArgs(
+                    http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                        path="/heartbeat",
+                        port=8000,
+                        http_headers=[
+                            kubernetes.core.v1.HTTPHeaderArgs(
+                                name="Host",
+                                value=edxapp_config.require_object("domains")["studio"],
+                            ),
+                        ],
+                    ),
+                    initial_delay_seconds=30,
+                    period_seconds=30,
+                    failure_threshold=3,
+                    timeout_seconds=3,
+                ),
+                "readiness_probe": kubernetes.core.v1.ProbeArgs(
+                    http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                        path="/heartbeat",
+                        port=8000,
+                        http_headers=[
+                            kubernetes.core.v1.HTTPHeaderArgs(
+                                name="Host",
+                                value=edxapp_config.require_object("domains")["studio"],
+                            ),
+                        ],
+                    ),
+                    initial_delay_seconds=15,
+                    period_seconds=15,
+                    failure_threshold=3,
+                    timeout_seconds=3,
+                ),
+                "startup_probe": kubernetes.core.v1.ProbeArgs(
+                    http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                        path="/heartbeat",
+                        port=8000,
+                        http_headers=[
+                            kubernetes.core.v1.HTTPHeaderArgs(
+                                name="Host",
+                                value=edxapp_config.require_object("domains")["studio"],
+                            ),
+                        ],
+                    ),
+                    initial_delay_seconds=10,
+                    period_seconds=10,
+                    failure_threshold=6,
+                    success_threshold=1,
+                    timeout_seconds=5,
+                ),
+            },
             resource_requests={
                 "cpu": resources_dict["webapp"]["cms"]["cpu_request"],
                 "memory": resources_dict["webapp"]["cms"]["memory_request"],
