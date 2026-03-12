@@ -118,10 +118,11 @@ if __name__ == "__main__":
     app_names = [
         "learn-ai",
         "mit-learn",
-        "mitxonline",
         "mit-learn-nextjs",
-        "xpro",
+        "mitxonline",
         "ocw-studio",
+        "odl-video-service",
+        "xpro",
     ]
 
     with open("definition.json", "w") as definition:  # noqa: PTH123
