@@ -1,0 +1,9 @@
+uwsgi_param REMOTE_USER $shib_remote_user;
+uwsgi_param EPPN $shib_eppn;
+uwsgi_param MAIL $shib_mail;
+uwsgi_param DISPLAY_NAME $shib_displayname;
+
+shib_request_set $shib_remote_user $upstream_http_variable_remote_user;
+shib_request_set $shib_eppn $upstream_http_variable_eppn;
+shib_request_set $shib_mail $upstream_http_variable_mail;
+shib_request_set $shib_displayname $upstream_http_variable_displayname;

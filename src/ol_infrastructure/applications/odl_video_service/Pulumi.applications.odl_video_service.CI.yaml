@@ -12,6 +12,9 @@ config:
   ovs:domains:
   - video-ci.odl.mit.edu
   ovs:edx_base_url: https://courses-ci.xpro.mit.edu
+  ovs:feature_annotations: "False"
+  ovs:k8s_deploy: true
+  ovs:k8s_cutover: true
   ovs:log_level: INFO
   ovs:rds_password:
     secure: v1:CFR8W+XpCttoYTa/:IRecvFvHJMZmf4hzMvWrJ00puDMFht2ArQSk/FDCZGnc7rQM42e7HtJwEeN1YI/W
@@ -23,7 +26,7 @@ config:
   ovs:s3_transcode_bucket_name: odl-video-service-transcoded-ci
   ovs:s3_watch_bucket_name: odl-video-service-uploaded-ci
   ovs:target_vpc: applications_vpc
-  ovs:use_shibboleth: "False"
+  ovs:use_shibboleth: false
   redis:max_connections: "30"
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci

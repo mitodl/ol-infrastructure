@@ -32,6 +32,7 @@ config:
   - studio-backend.rc.learn.mit.edu
   - studio-backend.rc.xpro.mit.edu
   - tika-qa.ol.mit.edu
+  - video-rc.odl.mit.edu
   eks:developer_role_policy_name: AmazonEKSClusterAdminPolicy
   eks:developer_role_kubernetes_groups:
   - admin
