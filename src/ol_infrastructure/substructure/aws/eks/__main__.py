@@ -1,3 +1,5 @@
+"""Configure shared EKS substructure resources for an environment stack."""
+
 import os
 from pathlib import Path
 
@@ -324,8 +326,8 @@ if stack_info.env_prefix == "data":
         k8s_provider=k8s_provider,
     )
 
-# Setup NVMe local-path-provisioner (data cluster, QA and Production only)
-if stack_info.env_prefix == "data" and stack_info.env_suffix != "ci":
+# Setup NVMe local-path-provisioner when the EKS stack enables io-optimized storage
+if stack_info.env_prefix == "data":
     setup_nvme_local_storage(
         cluster_name=cluster_name,
         cluster_stack=cluster_stack,
