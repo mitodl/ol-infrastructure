@@ -5,15 +5,16 @@ Architecture:
 - Altinity ClickHouseInstallation CRD manages the cluster (installed by the
   substructure.aws.eks.data stack).
 - ClickHouse Keeper (3 replicas) provides distributed coordination.
-- Hot storage: local NVMe SSD via ``local-nvme`` StorageClass (EBS gp3 for CI).
+- Hot storage: local NVMe SSD via ``local-nvme`` when enabled by the data EKS
+  stack; otherwise EBS gp3.
 - Cold storage: S3 bucket with Intelligent-Tiering; ClickHouse moves data via
   table-level TTL MOVE expressions.
 - Multi-tenancy: separate database + user + resource quota per LLMOps tool.
   Passwords are stored in Vault KV and synced to a K8s Secret as a users.xml
   file, which is volume-mounted into ClickHouse pods.
 
-Requires the ``eks-local-storage-provisioner`` todo to have been applied before
-deploying to QA/Production (creates the ``local-nvme`` StorageClass on NVMe nodes).
+Requires the ``eks-local-storage-provisioner`` setup to be enabled in the data
+EKS stack before using the ``local-nvme`` StorageClass.
 """
 
 import json
@@ -43,7 +44,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 from ol_infrastructure.lib.ol_types import AWSBase, BusinessUnit
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, require_stack_output_value
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 setup_vault_provider()
@@ -58,6 +59,9 @@ vault_mount_stack = StackReference(
     f"substructure.vault.static_mounts.operations.{stack_info.name}"
 )
 cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
+stateful_workload_storage = require_stack_output_value(
+    cluster_stack, "stateful_workload_storage"
+)
 
 data_vpc = network_stack.require_output("data_vpc")
 clickhouse_vault_kv_path = vault_mount_stack.require_output("clickhouse_kv")["path"]
@@ -79,8 +83,7 @@ k8s_global_labels = {
     "app.kubernetes.io/managed-by": "pulumi",
 }
 
-setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
-
+setup_k8s_provider(kubeconfig=require_stack_output_value(cluster_stack, "kube_config"))
 CLICKHOUSE_NAMESPACE = "clickhouse"
 
 cluster_stack.require_output("namespaces").apply(
@@ -90,12 +93,38 @@ cluster_stack.require_output("namespaces").apply(
 # Configuration values
 hot_data_days = int(clickhouse_config.get("hot_data_days") or "7")
 hot_storage_size = clickhouse_config.get("hot_storage_size") or "100Gi"
-storage_class = clickhouse_config.get("storage_class") or "ebs-gp3-sc"
+storage_class = stateful_workload_storage["storage_class"]
+use_io_optimized_nodes = stateful_workload_storage["use_io_optimized_nodes"]
 ch_replicas = int(clickhouse_config.get("replicas") or "1")
 keeper_replicas = int(clickhouse_config.get("keeper_replicas") or "1")
 ch_version = clickhouse_config.get("version") or "25.8.1.2953.altinitystable"
 ch_image = f"altinity/clickhouse-server:{ch_version}"
 keeper_image = f"clickhouse/clickhouse-keeper:{ch_version.split('.')[0]}-alpine"
+
+IO_OPTIMIZED_NODE_SELECTOR = {"ol.mit.edu/io_optimized": "true"}
+IO_OPTIMIZED_TOLERATION = kubernetes.core.v1.TolerationArgs(
+    key="ol.mit.edu/io-workload",
+    operator="Equal",
+    value="true",
+    effect="NoSchedule",
+)
+IO_OPTIMIZED_NODE_AFFINITY = kubernetes.core.v1.AffinityArgs(
+    node_affinity=kubernetes.core.v1.NodeAffinityArgs(
+        required_during_scheduling_ignored_during_execution=kubernetes.core.v1.NodeSelectorArgs(
+            node_selector_terms=[
+                kubernetes.core.v1.NodeSelectorTermArgs(
+                    match_expressions=[
+                        kubernetes.core.v1.NodeSelectorRequirementArgs(
+                            key="ol.mit.edu/io_optimized",
+                            operator="In",
+                            values=["true"],
+                        )
+                    ]
+                )
+            ]
+        )
+    )
+)
 
 # Per-tool passwords from stack config (must be set with `pulumi config set --secret`)
 admin_password = clickhouse_config.get_secret("admin_password") or Output.secret(
@@ -347,19 +376,9 @@ keeper_client_service = kubernetes.core.v1.Service(
     ),
 )
 
-# Keeper tolerations and node selector only apply when running on io-optimized nodes
-keeper_tolerations = []
-keeper_node_selector: dict[str, str] = {}
-if storage_class == "local-nvme":
-    keeper_tolerations = [
-        kubernetes.core.v1.TolerationArgs(
-            key="ol.mit.edu/io-workload",
-            operator="Equal",
-            value="true",
-            effect="NoSchedule",
-        )
-    ]
-    keeper_node_selector = {"ol.mit.edu/io_optimized": "true"}
+# Keeper node placement follows the EKS storage backend toggle.
+keeper_tolerations = [IO_OPTIMIZED_TOLERATION] if use_io_optimized_nodes else []
+keeper_node_selector = IO_OPTIMIZED_NODE_SELECTOR if use_io_optimized_nodes else {}
 
 keeper_statefulset = kubernetes.apps.v1.StatefulSet(
     f"clickhouse-keeper-{stack_info.env_suffix}",
@@ -383,6 +402,11 @@ keeper_statefulset = kubernetes.apps.v1.StatefulSet(
                 tolerations=keeper_tolerations,
                 node_selector=keeper_node_selector,
                 affinity=kubernetes.core.v1.AffinityArgs(
+                    node_affinity=(
+                        IO_OPTIMIZED_NODE_AFFINITY.node_affinity
+                        if use_io_optimized_nodes
+                        else None
+                    ),
                     pod_anti_affinity=kubernetes.core.v1.PodAntiAffinityArgs(
                         required_during_scheduling_ignored_during_execution=[
                             kubernetes.core.v1.PodAffinityTermArgs(
@@ -392,7 +416,7 @@ keeper_statefulset = kubernetes.apps.v1.StatefulSet(
                                 topology_key="kubernetes.io/hostname",
                             )
                         ]
-                    )
+                    ),
                 )
                 if keeper_replicas > 1
                 else None,
@@ -527,11 +551,9 @@ keeper_statefulset = kubernetes.apps.v1.StatefulSet(
 # volume-mounted at /etc/clickhouse-server/users.d/.
 ############################################################
 
-# Tolerations and node selector for io-optimized node group (QA/Prod only)
-ch_tolerations = []
-ch_node_selector: dict[str, str] = {}
-if storage_class == "local-nvme":
-    ch_tolerations = [
+# ClickHouse hot-storage placement follows the EKS storage backend toggle.
+ch_tolerations = (
+    [
         {
             "key": "ol.mit.edu/io-workload",
             "operator": "Equal",
@@ -539,7 +561,67 @@ if storage_class == "local-nvme":
             "effect": "NoSchedule",
         }
     ]
-    ch_node_selector = {"ol.mit.edu/io_optimized": "true"}
+    if use_io_optimized_nodes
+    else []
+)
+ch_node_selector = IO_OPTIMIZED_NODE_SELECTOR if use_io_optimized_nodes else {}
+ch_affinity = (
+    {
+        "podAntiAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": [
+                {
+                    "labelSelector": {
+                        "matchLabels": {"clickhouse.altinity.com/chi": "clickhouse"}
+                    },
+                    "topologyKey": "kubernetes.io/hostname",
+                }
+            ]
+        },
+        **(
+            {
+                "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                        "nodeSelectorTerms": [
+                            {
+                                "matchExpressions": [
+                                    {
+                                        "key": "ol.mit.edu/io_optimized",
+                                        "operator": "In",
+                                        "values": ["true"],
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+            if use_io_optimized_nodes
+            else {}
+        ),
+    }
+    if ch_replicas > 1
+    else (
+        {
+            "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                    "nodeSelectorTerms": [
+                        {
+                            "matchExpressions": [
+                                {
+                                    "key": "ol.mit.edu/io_optimized",
+                                    "operator": "In",
+                                    "values": ["true"],
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }
+        if use_io_optimized_nodes
+        else {}
+    )
+)
 
 storage_config_xml = cold_bucket.bucket.bucket.apply(
     lambda bucket: dedent(f"""\
@@ -653,22 +735,7 @@ clickhouse_installation = Output.all(
                             "serviceAccountName": "clickhouse",
                             "tolerations": ch_tolerations,
                             "nodeSelector": ch_node_selector,
-                            "affinity": {
-                                "podAntiAffinity": {
-                                    "requiredDuringSchedulingIgnoredDuringExecution": [
-                                        {
-                                            "labelSelector": {
-                                                "matchLabels": {
-                                                    "clickhouse.altinity.com/chi": "clickhouse"
-                                                }
-                                            },
-                                            "topologyKey": "kubernetes.io/hostname",
-                                        }
-                                    ]
-                                }
-                            }
-                            if ch_replicas > 1
-                            else {},
+                            "affinity": ch_affinity,
                             "containers": [
                                 {
                                     "name": "clickhouse",

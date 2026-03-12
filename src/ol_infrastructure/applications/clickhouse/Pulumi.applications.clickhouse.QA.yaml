@@ -3,7 +3,6 @@ config:
   consul:address: https://consul-data-qa.odl.mit.edu
   clickhouse:hot_data_days: '3'
   clickhouse:hot_storage_size: 500Gi
-  clickhouse:storage_class: local-nvme
   clickhouse:replicas: '1'
   clickhouse:keeper_replicas: '1'
   clickhouse:version: 25.8.1.2953.altinitystable

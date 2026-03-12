@@ -18,9 +18,10 @@ taint so they land exclusively on the io-optimized node group.
 """
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, ResourceOptions, StackReference
+from pulumi import ResourceOptions, StackReference
 
 from bridge.lib.versions import LOCAL_PATH_PROVISIONER_CHART_VERSION
+from ol_infrastructure.lib.pulumi_helper import require_stack_output_value
 
 IO_OPTIMIZED_NODE_SELECTOR = {"ol.mit.edu/io_optimized": "true"}
 IO_OPTIMIZED_TOLERATION = kubernetes.core.v1.TolerationArgs(
@@ -69,13 +70,11 @@ echo "NVMe mounted at $MOUNT_POINT"
 
 def setup_nvme_local_storage(
     cluster_name: str,
-    cluster_stack: StackReference,  # noqa: ARG001 — kept for dependency ordering
+    cluster_stack: StackReference,
     k8s_provider: kubernetes.Provider,
     k8s_labels: dict[str, str],
 ) -> kubernetes.helm.v3.Release | None:
     """Deploy NVMe init DaemonSet and local-path-provisioner for io-optimized nodes.
-
-    Skipped when ``clickhouse:enable_nvme_setup`` is not ``true`` in stack config.
 
     Args:
         cluster_name: EKS cluster name, used for Pulumi resource naming.
@@ -86,8 +85,10 @@ def setup_nvme_local_storage(
     Returns:
         The local-path-provisioner Helm Release, or None if disabled.
     """
-    clickhouse_config = Config("clickhouse")
-    if not clickhouse_config.get_bool("enable_nvme_setup"):
+    stateful_workload_storage = require_stack_output_value(
+        cluster_stack, "stateful_workload_storage"
+    )
+    if not stateful_workload_storage["use_io_optimized_nodes"]:
         return None
 
     opts = ResourceOptions(provider=k8s_provider, delete_before_replace=True)

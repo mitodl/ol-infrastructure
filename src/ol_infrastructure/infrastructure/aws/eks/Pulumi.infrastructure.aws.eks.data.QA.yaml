@@ -16,6 +16,7 @@ config:
   - pipelines-qa.odl.mit.edu
   eks:apisix_viewer_key:
     secure: v1:FXn/5LA92VaA0LDu:+M5NNNgprjafZJTssawGZoRrI9ZEoiGKbRa3oVh4YjtZO4B5MLwXgfRvfWyY1zSbT0LJxxMJT90KQtWN3MsWobIseTYXLrdnPcpcYXY9lmg=
+  eks:stateful_workload_storage_backend: ebs
   eks:developer_role_kubernetes_groups:
   - admin
   eks:developer_role_policy_name: AmazonEKSAdminPolicy
