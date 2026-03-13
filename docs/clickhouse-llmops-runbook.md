@@ -144,12 +144,14 @@ of VSO syncing the new secret).
 
 ## Adjusting Hot/Cold Storage Tier Cutoff
 
-The `hot_data_days` config controls how long before table-level TTL MOVE expressions
-can evict data to cold S3 storage. The setting is per-environment.
+The `hot_data_days` config is **informational only** — it is stored as a Pulumi stack
+config value for operator reference but is **not read by the Pulumi program** and does
+not automatically configure ClickHouse TTL MOVE intervals. The actual data movement
+cutoff is determined by the `TTL … TO VOLUME 'cold'` expressions defined in each
+table's DDL.
 
-**Note:** This config does NOT automatically move existing data. Each LLMOps tool must
-define `TTL` expressions in their table DDL pointing to the `tiered` storage policy.
-Example table DDL:
+Each LLMOps tool must define `TTL` expressions in their table DDL pointing to the
+`tiered` storage policy. Example table DDL:
 ```sql
 CREATE TABLE IF NOT EXISTS tensorzero_db.spans
 (
@@ -164,15 +166,14 @@ TTL timestamp + INTERVAL 7 DAY TO VOLUME 'cold'
 SETTINGS storage_policy = 'tiered';
 ```
 
-To change the cutoff:
-```bash
-pulumi stack select applications.clickhouse.Production
-pulumi config set clickhouse:hot_data_days 14
-pulumi up
+To update the cutoff for a table, alter the TTL expression directly in ClickHouse:
+```sql
+ALTER TABLE tensorzero_db.spans MODIFY TTL timestamp + INTERVAL 14 DAY TO VOLUME 'cold';
 ```
 
-The storage policy XML is regenerated; existing tables need their TTL updated manually
-if a different interval was specified in their DDL.
+Updating `clickhouse:hot_data_days` via `pulumi config set` and running `pulumi up`
+will **not** change the TTL of existing tables; it only records the intended policy for
+operator awareness.
 
 ---
 
