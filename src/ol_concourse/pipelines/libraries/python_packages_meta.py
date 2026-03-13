@@ -157,9 +157,7 @@ def meta_pipeline() -> Pipeline:
             set_child_pipeline_job(
                 job_name="set-ol-django-pipeline",
                 pipeline_name="publish-ol-django-pypi",
-                generator_script=(
-                    "src/ol_concourse/pipelines/libraries/ol_django.py"
-                ),
+                generator_script=("src/ol_concourse/pipelines/libraries/ol_django.py"),
                 source_resource_name=str(OL_DJANGO_REPO.name),
             ),
         ],

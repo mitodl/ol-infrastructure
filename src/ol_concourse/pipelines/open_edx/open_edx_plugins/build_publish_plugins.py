@@ -30,6 +30,7 @@ def pipeline_from_source(source_repo_path: str | Path) -> tuple[list[str], Pipel
     )
     return plugins, pipeline
 
+
 if __name__ == "__main__":
     import sys
 
