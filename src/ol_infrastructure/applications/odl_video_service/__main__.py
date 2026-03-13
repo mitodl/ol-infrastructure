@@ -431,6 +431,11 @@ ovs_server_policy_document = {
                 f"arn:aws:s3:::{ovs_config.get('s3_watch_bucket_name')}/*",
             ],
         },
+        {
+            "Action": ["cloudfront:CreateInvalidation"],
+            "Effect": "Allow",
+            "Resource": [f"arn:aws:cloudfront::{aws_account.id}:distribution/*"],
+        },
         # Include standard MediaConvert policy statements
         *mediaconvert_policy_statements,
     ],
