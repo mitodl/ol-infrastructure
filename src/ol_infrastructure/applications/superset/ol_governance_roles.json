@@ -229,7 +229,8 @@
     ],
     "allowed_schemas": [
       "ol_warehouse_production_dimensional",
-      "ol_warehouse_production_mart"
+      "ol_warehouse_production_mart",
+      "public"
     ]
   },
   {
@@ -860,7 +861,8 @@
       "ol_warehouse_production_intermediate",
       "ol_warehouse_production_dimensional",
       "ol_warehouse_production_mart",
-      "ol_warehouse_production_reporting"
+      "ol_warehouse_production_reporting",
+      "public"
     ]
   },
   {
@@ -1279,7 +1281,8 @@
       "ol_warehouse_production_intermediate",
       "ol_warehouse_production_dimensional",
       "ol_warehouse_production_mart",
-      "ol_warehouse_production_reporting"
+      "ol_warehouse_production_reporting",
+      "public"
     ]
   },
   {
@@ -2075,7 +2078,8 @@
       "ol_warehouse_production_intermediate",
       "ol_warehouse_production_dimensional",
       "ol_warehouse_production_mart",
-      "ol_warehouse_production_reporting"
+      "ol_warehouse_production_reporting",
+      "public"
     ]
   }
 ]
