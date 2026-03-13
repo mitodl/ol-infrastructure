@@ -13,8 +13,8 @@ Architecture:
   Passwords are stored in Vault KV and synced to a K8s Secret as a users.xml
   file, which is volume-mounted into ClickHouse pods.
 
-Requires the ``eks-local-storage-provisioner`` setup to be enabled in the data
-EKS stack before using the ``local-nvme`` StorageClass.
+Requires the ``substructure.aws.eks.data.*`` stack to be deployed (which installs
+the NVMe DaemonSet and local-path-provisioner) before deploying to QA/Production.
 """
 
 import json
@@ -24,7 +24,6 @@ from textwrap import dedent
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import get_caller_identity
 
 from bridge.lib.versions import (
     CLICKHOUSE_OPERATOR_VERSION,  # noqa: F401 — for traceability
@@ -53,8 +52,6 @@ clickhouse_config = Config("clickhouse")
 vault_config = Config("vault")
 stack_info = parse_stack()
 
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-dns_stack = StackReference("infrastructure.aws.dns")
 vault_mount_stack = StackReference(
     f"substructure.vault.static_mounts.operations.{stack_info.name}"
 )
@@ -63,7 +60,6 @@ stateful_workload_storage = require_stack_output_value(
     cluster_stack, "stateful_workload_storage"
 )
 
-data_vpc = network_stack.require_output("data_vpc")
 clickhouse_vault_kv_path = vault_mount_stack.require_output("clickhouse_kv")["path"]
 
 clickhouse_env = f"data-{stack_info.env_suffix}"
@@ -126,21 +122,44 @@ IO_OPTIMIZED_NODE_AFFINITY = kubernetes.core.v1.AffinityArgs(
     )
 )
 
-# Per-tool passwords from stack config (must be set with `pulumi config set --secret`)
-admin_password = clickhouse_config.get_secret("admin_password") or Output.secret(
-    "changeme"
-)
-tensorzero_password = clickhouse_config.get_secret(
-    "tensorzero_password"
-) or Output.secret("changeme")
-openlit_password = clickhouse_config.get_secret("openlit_password") or Output.secret(
-    "changeme"
-)
-opik_password = clickhouse_config.get_secret("opik_password") or Output.secret(
-    "changeme"
-)
 
-aws_account = get_caller_identity()
+def _require_password(password_output: Output, username: str) -> Output:
+    """Fail fast if a ClickHouse user password is left at the insecure default."""
+
+    def _check(password: str) -> str:
+        if password == "changeme":  # pragma: allowlist secret  # noqa: S105
+            msg = (
+                f"ClickHouse password for user '{username}' must be set via "
+                f"'pulumi config set --secret clickhouse:{username}_password' "
+                f"and cannot use the default 'changeme' value."  # pragma: allowlist secret
+            )
+            raise ValueError(msg)
+        return password
+
+    return password_output.apply(_check)
+
+
+# Per-tool passwords from stack config (must be set with `pulumi config set --secret`)
+admin_password = _require_password(
+    clickhouse_config.get_secret("admin_password")
+    or Output.secret("changeme"),  # pragma: allowlist secret
+    "admin",
+)
+tensorzero_password = _require_password(
+    clickhouse_config.get_secret("tensorzero_password")
+    or Output.secret("changeme"),  # pragma: allowlist secret
+    "tensorzero",
+)
+openlit_password = _require_password(
+    clickhouse_config.get_secret("openlit_password")
+    or Output.secret("changeme"),  # pragma: allowlist secret
+    "openlit",
+)
+opik_password = _require_password(
+    clickhouse_config.get_secret("opik_password")
+    or Output.secret("changeme"),  # pragma: allowlist secret
+    "opik",
+)
 
 ############################################################
 # S3 Cold Storage Bucket
@@ -453,16 +472,6 @@ keeper_statefulset = kubernetes.apps.v1.StatefulSet(
                     kubernetes.core.v1.ContainerArgs(
                         name="clickhouse-keeper",
                         image=keeper_image,
-                        env=[
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="MY_ID",
-                                value_from=kubernetes.core.v1.EnvVarSourceArgs(
-                                    field_ref=kubernetes.core.v1.ObjectFieldSelectorArgs(
-                                        field_path="metadata.name"
-                                    )
-                                ),
-                            )
-                        ],
                         command=[
                             "sh",
                             "-c",
@@ -482,7 +491,7 @@ keeper_statefulset = kubernetes.apps.v1.StatefulSet(
                         ),
                         liveness_probe=kubernetes.core.v1.ProbeArgs(
                             exec_=kubernetes.core.v1.ExecActionArgs(
-                                command=["bash", "-c", "echo ruok | nc localhost 2181"]
+                                command=["sh", "-c", "echo ruok | nc localhost 2181"]
                             ),
                             initial_delay_seconds=30,
                             period_seconds=30,
@@ -527,7 +536,12 @@ keeper_statefulset = kubernetes.apps.v1.StatefulSet(
                 ),
                 spec=kubernetes.core.v1.PersistentVolumeClaimSpecArgs(
                     access_modes=["ReadWriteOnce"],
-                    storage_class_name=cluster_stack.require_output("ebs_storageclass"),
+                    # Keeper stores only coordination logs; always prefer EBS for
+                    # durability. Fall back to the cluster storage class if the EBS
+                    # CSI provisioner is not enabled on this cluster.
+                    storage_class_name=cluster_stack.get_output(
+                        "ebs_storageclass"
+                    ).apply(lambda sc: sc if sc is not None else storage_class),
                     resources=kubernetes.core.v1.VolumeResourceRequirementsArgs(
                         requests={"storage": "20Gi"},
                     ),
@@ -856,6 +870,10 @@ clickhouse_client_service = kubernetes.core.v1.Service(
     ),
 )
 
+# NOTE: These namespaces must exist on the data EKS cluster and be included in
+# the `eks:namespaces` list in the `infrastructure.aws.eks.data.*` stack
+# configurations. If they are missing, this NetworkPolicy will not allow
+# traffic from LLMOps workloads in those namespaces as intended.
 LLMOPS_NAMESPACES = ["tensorzero", "openlit", "opik"]
 
 clickhouse_network_policy = kubernetes.networking.v1.NetworkPolicy(
