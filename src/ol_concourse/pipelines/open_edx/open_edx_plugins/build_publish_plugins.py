@@ -42,6 +42,7 @@ if __name__ == "__main__":
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(pipeline.model_dump_json(indent=2))
     sys.stdout.write(pipeline.model_dump_json(indent=2))
-    print()  # noqa: T201
-    print(f"Discovered packages: {', '.join(plugins)}")  # noqa: T201
-    print("fly -t pr-main sp -p publish-open-edx-plugins-pypi -c definition.json")  # noqa: T201
+    sys.stderr.write(
+        f"\nDiscovered packages: {', '.join(plugins)}\n"
+        "fly -t pr-main sp -p publish-open-edx-plugins-pypi -c definition.json\n"
+    )

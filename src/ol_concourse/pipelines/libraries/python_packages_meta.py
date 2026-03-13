@@ -169,7 +169,7 @@ if __name__ == "__main__":
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(pipeline.model_dump_json(indent=2))
     sys.stdout.write(pipeline.model_dump_json(indent=2))
-    sys.stdout.write("\n")
-    sys.stdout.write(
+    sys.stderr.write("\n")
+    sys.stderr.write(
         "fly -t pr-main sp -p publish-python-packages-meta -c definition.json\n"
     )
