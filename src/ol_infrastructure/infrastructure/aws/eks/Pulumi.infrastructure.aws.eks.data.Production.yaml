@@ -19,11 +19,14 @@ config:
   eks:apisix_memory: 800Mi
   eks:apisix_viewer_key:
     secure: v1:j5+aTOfRBG8QiV+V:C6NTWitDBjV4DkOQGApae7GHK9w1wOFAlS7ACNu/s728A5q1zDWv9E13E2hs0IlAtMnP17KJR0HZjxDlg5fckv2nguEVgNA/d90j1XWlFY8=
+  eks:stateful_workload_storage_backend: ebs
   eks:ebs_csi_provisioner: 'true'
   eks:efs_csi_provisioner: 'true'
   eks:gateway_release_channel: experimental
   eks:namespaces:
   - airbyte
+  - clickhouse
+  - clickhouse-operator
   - dagster
   - kubewatch
   - open-metadata
@@ -31,6 +34,24 @@ config:
   - starrocks
   - superset
   eks:nodegroups:
+    io-optimized:
+      disk_size_gb: 200
+      instance_type: i4i.2xlarge
+      labels:
+        node_size: i4i.2xlarge
+        ondemand: true
+        ol.mit.edu/io_optimized: "true"
+      node_group_options: {}
+      scaling:
+        desired: 3
+        max: 5
+        min: 3
+      tags: {}
+      taints:
+        io-workload:
+          value: "true"
+          effect: NO_SCHEDULE
+      version:
     worker-xlarge:
       disk_size_gb: 500
       instance_type: m7i.2xlarge

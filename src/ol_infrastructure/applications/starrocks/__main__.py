@@ -1,4 +1,7 @@
+"""Deploy the StarRocks application to the data EKS cluster."""
+
 from pathlib import Path
+from typing import Any, cast
 
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, ResourceOptions, StackReference
@@ -32,7 +35,7 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, require_stack_output_value
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 setup_vault_provider()
@@ -40,7 +43,12 @@ stack_info = parse_stack()
 starrocks_config = Config("starrocks")
 
 cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
-setup_k8s_provider(cluster_stack.require_output("kube_config"))
+setup_k8s_provider(require_stack_output_value(cluster_stack, "kube_config"))
+stateful_workload_storage = require_stack_output_value(
+    cluster_stack, "stateful_workload_storage"
+)
+use_io_optimized_nodes = stateful_workload_storage["use_io_optimized_nodes"]
+starrocks_data_storage_class = stateful_workload_storage["storage_class"]
 
 starrocks_env = f"data-{stack_info.env_suffix}"
 aws_config = AWSBase(tags={"OU": "data", "Environment": starrocks_env})
@@ -58,6 +66,33 @@ k8s_app_labels = K8sAppLabels(
     source_repository="https://github.com/StarRocks/starrocks-kubernetes-operator",
     stack=stack_info,
 )
+
+io_optimized_node_selector = {"ol.mit.edu/io_optimized": "true"}
+io_optimized_tolerations = [
+    {
+        "key": "ol.mit.edu/io-workload",
+        "operator": "Equal",
+        "value": "true",
+        "effect": "NoSchedule",
+    }
+]
+io_optimized_node_affinity = {
+    "nodeAffinity": {
+        "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+                {
+                    "matchExpressions": [
+                        {
+                            "key": "ol.mit.edu/io_optimized",
+                            "operator": "In",
+                            "values": ["true"],
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}
 
 starrocks_root_password_secret_name = f"{stack_info.env_prefix}-starrocks-root-password"
 starrocks_root_password_secret = kubernetes.core.v1.Secret(
@@ -135,7 +170,7 @@ if not starrocks_config.get_bool("use_be") and not starrocks_config.get_bool("us
 
 # Ref: https://github.com/StarRocks/starrocks-kubernetes-operator/blob/main/helm-charts/charts/kube-starrocks/charts/starrocks/values.yaml
 fe_config = starrocks_config.get_object("fe_config") or {}
-starrocks_values = {
+starrocks_values: dict[str, Any] = {
     "nameOverride": f"{stack_info.env_prefix}-starrocks",
     "initPassword": {
         "enabled": True,
@@ -191,11 +226,16 @@ if starrocks_config.get_bool("use_be"):
         },
         "storageSpec": {
             "name": f"{stack_info.env_prefix}-be-storage",
-            "storageClassName": "ebs-gp3-sc",
+            "storageClassName": starrocks_data_storage_class,
             "storageSize": be_config.get("storage", "1Ti"),
             "logStorageSize": be_config.get("log_storage", "100Gi"),
         },
     }
+    if use_io_optimized_nodes:
+        starrocks_be_spec = cast(dict[str, Any], starrocks_values["starrocksBeSpec"])
+        starrocks_be_spec["nodeSelector"] = io_optimized_node_selector
+        starrocks_be_spec["tolerations"] = io_optimized_tolerations
+        starrocks_be_spec["affinity"] = io_optimized_node_affinity
 
 if starrocks_config.get_bool("use_cn"):
     # shared storage configuration
