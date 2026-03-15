@@ -12,6 +12,6 @@ path.py==12.5.0
 PyYAML==6.0.3
 requests==2.32.5
 six==1.17.0
-smmap==5.0.2
+smmap==5.0.3
 torch==2.10.0
 urllib3==1.26.20
