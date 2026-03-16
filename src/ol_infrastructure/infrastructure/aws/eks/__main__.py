@@ -78,6 +78,26 @@ stack_info = parse_stack()
 setup_vault_provider(stack_info)
 aws_account = aws.get_caller_identity()
 
+STATEFUL_WORKLOAD_IO_OPTIMIZED_BACKEND = "io-optimized"
+STATEFUL_WORKLOAD_EBS_BACKEND = "ebs"
+STATEFUL_WORKLOAD_STORAGE_BACKEND = (
+    eks_config.get("stateful_workload_storage_backend") or STATEFUL_WORKLOAD_EBS_BACKEND
+)
+if STATEFUL_WORKLOAD_STORAGE_BACKEND not in {
+    STATEFUL_WORKLOAD_IO_OPTIMIZED_BACKEND,
+    STATEFUL_WORKLOAD_EBS_BACKEND,
+}:
+    msg = (
+        "eks:stateful_workload_storage_backend must be one of "
+        f"{STATEFUL_WORKLOAD_IO_OPTIMIZED_BACKEND!r} or "
+        f"{STATEFUL_WORKLOAD_EBS_BACKEND!r}"
+    )
+    raise ValueError(msg)
+
+USE_IO_OPTIMIZED_STATEFUL_WORKLOAD_STORAGE = (
+    STATEFUL_WORKLOAD_STORAGE_BACKEND == STATEFUL_WORKLOAD_IO_OPTIMIZED_BACKEND
+)
+
 dns_stack = StackReference("infrastructure.aws.dns")
 iam_stack = StackReference("infrastructure.aws.iam")
 kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
@@ -391,6 +411,16 @@ export("cluster_security_group_id", cluster.cluster_security_group_id)
 export("node_security_group_id", cluster.node_security_group_id)
 export("pod_subnet_ids", pod_subnet_ids)
 export(
+    "stateful_workload_storage",
+    {
+        "backend": STATEFUL_WORKLOAD_STORAGE_BACKEND,
+        "storage_class": (
+            "local-nvme" if USE_IO_OPTIMIZED_STATEFUL_WORKLOAD_STORAGE else "ebs-gp3-sc"
+        ),
+        "use_io_optimized_nodes": USE_IO_OPTIMIZED_STATEFUL_WORKLOAD_STORAGE,
+    },
+)
+export(
     "kube_config_data",
     {
         "admin_role_arn": administrator_role.arn,
@@ -533,7 +563,23 @@ k8s_provider = kubernetes.Provider(
 
 # Loop through the node group definitions and add them to the cluster
 node_groups = []
-for ng_name, ng_config in eks_config.require_object("nodegroups").items():
+configured_node_groups = eks_config.require_object("nodegroups")
+if USE_IO_OPTIMIZED_STATEFUL_WORKLOAD_STORAGE and (
+    "io-optimized" not in configured_node_groups
+):
+    msg = (
+        "eks:stateful_workload_storage_backend is set to 'io-optimized', "
+        "but the stack config does not define an 'io-optimized' nodegroup."
+    )
+    raise ValueError(msg)
+if not USE_IO_OPTIMIZED_STATEFUL_WORKLOAD_STORAGE:
+    configured_node_groups = {
+        ng_name: ng_config
+        for ng_name, ng_config in configured_node_groups.items()
+        if ng_name != "io-optimized"
+    }
+
+for ng_name, ng_config in configured_node_groups.items():
     taint_list = {}
     for taint_name, taint_config in ng_config["taints"].items() or {}:
         taint_list[taint_name] = eks.TaintArgs(

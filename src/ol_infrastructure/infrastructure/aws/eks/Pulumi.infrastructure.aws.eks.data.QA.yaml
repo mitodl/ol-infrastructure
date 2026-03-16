@@ -16,6 +16,7 @@ config:
   - pipelines-qa.odl.mit.edu
   eks:apisix_viewer_key:
     secure: v1:FXn/5LA92VaA0LDu:+M5NNNgprjafZJTssawGZoRrI9ZEoiGKbRa3oVh4YjtZO4B5MLwXgfRvfWyY1zSbT0LJxxMJT90KQtWN3MsWobIseTYXLrdnPcpcYXY9lmg=
+  eks:stateful_workload_storage_backend: ebs
   eks:developer_role_kubernetes_groups:
   - admin
   eks:developer_role_policy_name: AmazonEKSAdminPolicy
@@ -24,6 +25,8 @@ config:
   eks:gateway_release_channel: experimental
   eks:namespaces:
   - airbyte
+  - clickhouse
+  - clickhouse-operator
   - dagster
   - kubewatch
   - open-metadata
@@ -31,6 +34,27 @@ config:
   - starrocks
   - superset
   eks:nodegroups:
+    # This nodegroup is only provisioned when eks:stateful_workload_storage_backend
+    # is set to "io-optimized". With the current "ebs" backend it is defined here
+    # for reference but will NOT be created by the infra program.
+    io-optimized:
+      disk_size_gb: 200
+      instance_type: i4i.xlarge
+      labels:
+        node_size: i4i.xlarge
+        ondemand: true
+        ol.mit.edu/io_optimized: "true"
+      node_group_options: {}
+      scaling:
+        desired: 1
+        max: 3
+        min: 1
+      tags: {}
+      taints:
+        io-workload:
+          value: "true"
+          effect: NO_SCHEDULE
+      version:
     worker-xlarge:
       disk_size_gb: 500
       instance_type: c5n.xlarge

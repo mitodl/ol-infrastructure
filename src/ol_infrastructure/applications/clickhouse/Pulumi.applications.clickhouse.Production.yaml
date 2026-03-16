@@ -1,0 +1,12 @@
+---
+# secretsprovider and encryptedkey will be set on first `pulumi stack init`
+# Passwords must be added encrypted: `pulumi config set --secret clickhouse:admin_password`
+config:
+  consul:address: https://consul-data-production.odl.mit.edu
+  clickhouse:hot_data_days: '7'
+  clickhouse:hot_storage_size: 1500Gi
+  clickhouse:replicas: '3'
+  clickhouse:keeper_replicas: '3'
+  clickhouse:version: 25.8.1.2953.altinitystable
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production

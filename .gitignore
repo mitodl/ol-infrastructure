@@ -16,3 +16,7 @@ pyinfra-debug.log
 .vscode/
 .python-version
 .aider*
+.env
+.erk/scratch/
+.erk/config.local.toml
+.erk/bin/

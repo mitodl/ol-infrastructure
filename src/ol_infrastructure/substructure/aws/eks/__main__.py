@@ -1,3 +1,5 @@
+"""Configure shared EKS substructure resources for an environment stack."""
+
 import os
 from pathlib import Path
 
@@ -21,10 +23,14 @@ from ol_infrastructure.components.services.vault import (
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
+from ol_infrastructure.substructure.aws.eks.clickhouse_operator import (
+    setup_clickhouse_operator,
+)
 from ol_infrastructure.substructure.aws.eks.grafana import setup_grafana
 from ol_infrastructure.substructure.aws.eks.karpenter import setup_karpenter
 from ol_infrastructure.substructure.aws.eks.keda import setup_keda
 from ol_infrastructure.substructure.aws.eks.nvidia import setup_nvidia
+from ol_infrastructure.substructure.aws.eks.nvme_setup import setup_nvme_local_storage
 from ol_infrastructure.substructure.aws.eks.starrocks import setup_starrocks
 
 env_config = Config("environment")
@@ -310,4 +316,21 @@ if stack_info.env_suffix != "ci" and stack_info.env_prefix == "data":
         k8s_provider=k8s_provider,
         stack_info=stack_info,
         aws_config=aws_config,
+    )
+
+# Setup ClickHouse operator (data cluster, all environments)
+if stack_info.env_prefix == "data":
+    setup_clickhouse_operator(
+        cluster_name=cluster_name,
+        cluster_stack=cluster_stack,
+        k8s_provider=k8s_provider,
+    )
+
+# Setup NVMe local-path-provisioner when the EKS stack enables io-optimized storage
+if stack_info.env_prefix == "data":
+    setup_nvme_local_storage(
+        cluster_name=cluster_name,
+        cluster_stack=cluster_stack,
+        k8s_provider=k8s_provider,
+        k8s_labels=k8s_global_labels,
     )

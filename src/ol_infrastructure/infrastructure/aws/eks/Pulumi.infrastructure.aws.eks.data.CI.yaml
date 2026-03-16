@@ -16,6 +16,7 @@ config:
   - pipelines-ci.odl.mit.edu
   eks:apisix_viewer_key:
     secure: v1:ZFN4gG/xa7D+1wDe:qwerlKPydX7u54UjHLBvNUCT2Oha5e4EgXs5Uf+8tMOMUtf4yz/5SYy4rfpfls1HDMgroXWwRUY9U21sgKsGF+YJ5lexA+Fo9VSStrw9zPc=
+  eks:stateful_workload_storage_backend: ebs
   eks:developer_role_kubernetes_groups:
   - admin
   eks:developer_role_policy_name: AmazonEKSAdminPolicy
@@ -24,6 +25,8 @@ config:
   eks:gateway_release_channel: experimental
   eks:namespaces:
   - airbyte
+  - clickhouse
+  - clickhouse-operator
   - dagster
   - kubewatch
   - open-metadata
