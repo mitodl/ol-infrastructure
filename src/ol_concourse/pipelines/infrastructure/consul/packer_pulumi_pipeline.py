@@ -57,7 +57,6 @@ consul_pulumi_substructure_fragments = []
 for network in [
     "mitx",
     "mitxonline",
-    "apps",
     "data",
     "operations",
 ]:
