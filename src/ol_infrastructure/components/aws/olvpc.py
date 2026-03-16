@@ -235,7 +235,7 @@ class OLVPC(ComponentResource):
             f"{vpc_config.vpc_name}-default-external-ipv6-network-route",
             route_table_id=self.route_table.id,
             destination_ipv6_cidr_block="::/0",
-            egress_only_gateway_id=self.egress_gateway.id,
+            gateway_id=self.gateway.id,
         )
 
         self.olvpc_subnets: list[ec2.Subnet] = []
