@@ -462,6 +462,14 @@
       },
       {
         "permission": {
+          "name": "can_csv"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
           "name": "can_recent_activity"
         },
         "view_menu": {
@@ -771,6 +779,14 @@
       {
         "permission": {
           "name": "can_recent_activity"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_csv"
         },
         "view_menu": {
           "name": "Superset"
@@ -1731,6 +1747,14 @@
       {
         "permission": {
           "name": "can_sqllab_history"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_csv"
         },
         "view_menu": {
           "name": "Superset"
