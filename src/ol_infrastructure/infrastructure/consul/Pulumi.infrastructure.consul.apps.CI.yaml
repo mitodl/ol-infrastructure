@@ -1,8 +1,0 @@
----
-secretsprovider: awskms://alias/infrastructure-secrets-ci
-encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQGFBeNksqO95z6Ao/qJQZ7WAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMAXWy9IRFaBBES+Q4AgEQgDt+dtb92tzc5rQQSmuWYzzQIjiyPmod+SZ61YIi5rn7m0cicnv9YJgH8eIQNsZ6OP+fDSBHTk00Bty6vA==
-config:
-  aws:region: us-east-1
-  consul:instance_type: burstable_nano
-  environment:business_unit: operations
-  environment:vpc_reference: applications_vpc
