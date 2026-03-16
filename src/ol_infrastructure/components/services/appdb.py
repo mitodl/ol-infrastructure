@@ -93,11 +93,6 @@ class OLAppDatabase(ComponentResource):
             stack_name=f"infrastructure.vault.operations.{stack_info.name}",
         )
 
-        consul_stack = StackReference(
-            name=f"db_consul_stack_reference_{ol_db_config.app_db_name}",
-            stack_name=f"infrastructure.consul.apps.{stack_info.name}",
-        )
-
         ################################################
         # RDS configuration and networking setup
         self.db_security_group: ec2.SecurityGroup = ec2.SecurityGroup(
@@ -107,7 +102,6 @@ class OLAppDatabase(ComponentResource):
             ingress=[
                 ec2.SecurityGroupIngressArgs(
                     security_groups=[
-                        consul_stack.require_output("security_groups")["consul_server"],
                         vault_stack.require_output("vault_server")["security_group"],
                     ],
                     # Airbyte isn't using pod security groups in Kubernetes. This is a
@@ -119,7 +113,7 @@ class OLAppDatabase(ComponentResource):
                     protocol="tcp",
                     from_port=DEFAULT_POSTGRES_PORT,
                     to_port=DEFAULT_POSTGRES_PORT,
-                    description="Access to postgres from consul, airbyte, and vault.",
+                    description="Access to postgres from the data platform, and vault.",
                 ),
                 ec2.SecurityGroupIngressArgs(
                     security_groups=[ol_db_config.app_security_group],
