@@ -326,7 +326,7 @@ def build_base_general_config() -> ConfigDict:
         "DISABLE_START_DATES": False,
         "EMBARGO": True,
         "ENABLE_AUTOADVANCE_VIDEOS": False,
-        "ENABLE_CORS_HEADERS": False,
+        "ENABLE_CORS_HEADERS": True,
         "ENABLE_COURSE_OLX_VALIDATION": False,
         "ENABLE_DISCUSSION_SERVICE": True,
         "ENABLE_EDXNOTES": True,
