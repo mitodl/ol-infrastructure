@@ -11,7 +11,7 @@ from typing import Annotated, Any, Literal
 import pulumi_kubernetes as kubernetes
 import pulumiverse_time as pulumi_time
 from kubernetes.utils.quantity import parse_quantity
-from pulumi import ComponentResource, Output, ResourceOptions
+from pulumi import Alias, ComponentResource, Output, ResourceOptions
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -75,6 +75,7 @@ class OLApplicationK8sCeleryBeatConfig(BaseModel):
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
+    application_name: str = "main.celery:app"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "FATAL"] = (
         "INFO"
     )
@@ -132,6 +133,14 @@ class GranianConfig(BaseModel):
     metrics_port: Annotated[int, Field(ge=1, le=65535)] = 9090
     metrics_scrape_interval: PositiveInt = 30
     nginx_config_filename: str = "web.conf_granian"
+    static_path_mounts: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Paths to mount as Granian static file directories. Each entry produces a "
+            "'--static-path-mount <path>' argument pair. Granian supports multiple "
+            "static path mounts simultaneously."
+        ),
+    )
 
     @field_validator("nginx_config_filename")
     @classmethod
@@ -184,8 +193,72 @@ class GranianConfig(BaseModel):
                 "--metrics-port",
                 str(self.metrics_port),
             ]
+        for path in self.static_path_mounts:
+            args += ["--static-path-mount", path]
         args += ["--log-level", self.log_level, self.application_module]
         return args
+
+
+class OLApplicationK8sKedaWebappScalingConfig(BaseModel):
+    """KEDA-based webapp scaling configuration.
+
+    When set on ``OLApplicationK8sConfig.webapp_keda_config``, the component
+    creates a KEDA ``ScaledObject`` targeting the webapp deployment instead of a
+    native ``HorizontalPodAutoscaler``.  This enables more sophisticated scaling
+    triggers (Prometheus metrics, external queues) beyond what HPA natively
+    supports.
+
+    The caller is responsible for creating any ``TriggerAuthentication`` resource
+    referenced by ``trigger_authentication_name``.  The component passes the name
+    through to each trigger's ``authenticationRef`` automatically when provided.
+
+    ``min_replicas`` and ``max_replicas`` are inherited from
+    ``OLApplicationK8sConfig.application_min_replicas`` / ``application_max_replicas``.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    polling_interval: int = Field(
+        default=60, description="Seconds between trigger evaluations."
+    )
+    cooldown_period: int = Field(
+        default=300,
+        description="Seconds to wait before scaling down after last trigger.",
+    )
+    scale_up_stabilization_seconds: int = Field(
+        default=60, description="Stabilization window before scaling up (seconds)."
+    )
+    scale_up_percent: int = Field(
+        default=50, description="Maximum scale-up percent per period."
+    )
+    scale_up_period_seconds: int = Field(
+        default=60, description="Period for scale-up policy evaluation (seconds)."
+    )
+    scale_down_stabilization_seconds: int = Field(
+        default=300, description="Stabilization window before scaling down (seconds)."
+    )
+    scale_down_percent: int = Field(
+        default=10, description="Maximum scale-down percent per period."
+    )
+    scale_down_period_seconds: int = Field(
+        default=300, description="Period for scale-down policy evaluation (seconds)."
+    )
+    triggers: list[dict[str, Any]] = Field(
+        description=(
+            "List of KEDA trigger specifications. Each entry is a dict that matches the "
+            "KEDA trigger schema (type, metadata, …). When "
+            "``trigger_authentication_name`` is set, an ``authenticationRef`` block is "
+            "automatically injected into any trigger that does not already define one."
+        )
+    )
+    trigger_authentication_name: str | None = Field(
+        default=None,
+        description=(
+            "Name of an existing KEDA ``TriggerAuthentication`` resource in the same "
+            "namespace. When set, an ``authenticationRef`` block is automatically "
+            "injected into every trigger that does not already define one."
+        ),
+    )
 
 
 class OLApplicationK8sConfig(BaseModel):
@@ -332,6 +405,86 @@ class OLApplicationK8sConfig(BaseModel):
             "as the fallback command when granian_config is None."
         ),
     )
+    webapp_keda_config: OLApplicationK8sKedaWebappScalingConfig | None = Field(
+        default=None,
+        description=(
+            "When set, the component creates a KEDA ScaledObject for the webapp "
+            "deployment instead of a native HorizontalPodAutoscaler. The caller is "
+            "responsible for creating any TriggerAuthentication resource referenced "
+            "by webapp_keda_config.trigger_authentication_name."
+        ),
+    )
+    extra_sidecar_containers: list[kubernetes.core.v1.ContainerArgs] = Field(
+        default_factory=list,
+        description=(
+            "Additional sidecar containers appended to the webapp pod's container list "
+            "after the main application container (and after nginx, if enabled). "
+            "Also applied to celery worker and beat pods."
+        ),
+    )
+    extra_init_containers: list[kubernetes.core.v1.ContainerArgs] = Field(
+        default_factory=list,
+        description=(
+            "Additional init containers prepended before the component-managed init "
+            "containers (migrations, collectstatic) in the webapp pod. "
+            "Also applied to celery worker and beat pods."
+        ),
+    )
+    pod_security_context: kubernetes.core.v1.PodSecurityContextArgs | None = Field(
+        default=None,
+        description=(
+            "Pod-level security context applied to all pod specs (webapp, celery "
+            "workers, celery beat, and pre/post-deploy jobs). When None, no "
+            "securityContext is set on pods."
+        ),
+    )
+    extra_volumes: list[kubernetes.core.v1.VolumeArgs] = Field(
+        default_factory=list,
+        description=(
+            "Additional volumes added to all pod specs: webapp deployment, celery "
+            "worker deployments, celery beat deployment, and pre/post-deploy jobs."
+        ),
+    )
+    extra_volume_mounts: list[kubernetes.core.v1.VolumeMountArgs] = Field(
+        default_factory=list,
+        description=(
+            "Additional volume mounts added to the main application container, all "
+            "init containers (both component-managed and extra_init_containers), "
+            "pre/post-deploy job containers, and celery worker/beat containers."
+        ),
+    )
+    extra_init_volume_mounts: list[kubernetes.core.v1.VolumeMountArgs] = Field(
+        default_factory=list,
+        description=(
+            "Additional volume mounts added only to init containers "
+            "(both component-managed and extra_init_containers). "
+            "Not added to main application or celery containers."
+        ),
+    )
+    webapp_deployment_aliases: list[Any] = Field(
+        default_factory=list,
+        description=(
+            "Pulumi Aliases applied to the webapp Deployment. Use when migrating from "
+            "hand-rolled resources to this component to prevent delete-and-recreate of "
+            "the existing Deployment. Typically: [Alias(name=<old-pulumi-name>, parent=pulumi.ROOT_STACK_RESOURCE)]."
+        ),
+    )
+    webapp_service_aliases: list[Any] = Field(
+        default_factory=list,
+        description=(
+            "Pulumi Aliases applied to the webapp Service. Use when migrating from "
+            "hand-rolled resources to this component. "
+            "Typically: [Alias(name=<old-pulumi-name>, parent=pulumi.ROOT_STACK_RESOURCE)]."
+        ),
+    )
+    webapp_keda_aliases: list[Any] = Field(
+        default_factory=list,
+        description=(
+            "Pulumi Aliases applied to the KEDA ScaledObject for the webapp. Use when "
+            "migrating from hand-rolled resources to this component. "
+            "Typically: [Alias(name=<old-pulumi-name>, parent=pulumi.ROOT_STACK_RESOURCE)]."
+        ),
+    )
 
     # See https://www.pulumi.com/docs/reference/pkg/python/pulumi/#pulumi.Output.from_input
     # for docs. This unwraps the value so Pydantic can store it in the config class.
@@ -435,19 +588,37 @@ class OLApplicationK8s(ComponentResource):
         """
         It's .. the constructor. Shaddap Ruff :)
         """
+        # Use application_name as the Pulumi resource name so two components in the
+        # same namespace (e.g. LMS + CMS) get distinct URNs.  Alias the old
+        # application_namespace name so existing stacks don't see replacement.
+        _component_aliases: list[Any] = (
+            [Alias(name=ol_app_k8s_config.application_namespace)]
+            if ol_app_k8s_config.application_namespace
+            != ol_app_k8s_config.application_name
+            else []
+        )
         super().__init__(
             "ol:infrastructure:components:services:OLApplicationK8s",
-            ol_app_k8s_config.application_namespace,
+            ol_app_k8s_config.application_name,
             None,
-            opts=opts,
+            opts=ResourceOptions.merge(
+                opts, ResourceOptions(aliases=_component_aliases)
+            ),
         )
         resource_options = ResourceOptions(parent=self)
-        deployment_options = ResourceOptions(parent=self)
+        deployment_options = ResourceOptions(
+            parent=self,
+            aliases=ol_app_k8s_config.webapp_deployment_aliases or None,
+        )
 
         extra_deployment_args: dict[str, int] = {}
-        # If we have ANY metrics args, then we use HPA and don't pass replicas to the deployment
-        # If we don't have metrics, then we pass min_replicas to the deployment
-        if ol_app_k8s_config.hpa_scaling_metrics:
+        # KEDA ScaledObject manages replicas when webapp_keda_config is set.
+        # When using native HPA with metrics, replicas are also omitted.
+        # Only set a fixed replica count when neither HPA nor KEDA is active.
+        if (
+            ol_app_k8s_config.webapp_keda_config is not None
+            or ol_app_k8s_config.hpa_scaling_metrics
+        ):
             extra_deployment_args = {}
         else:
             extra_deployment_args = {
@@ -492,7 +663,8 @@ class OLApplicationK8s(ComponentResource):
             kubernetes.core.v1.VolumeArgs(
                 name="staticfiles",
                 empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
-            )
+            ),
+            *ol_app_k8s_config.extra_volumes,
         ]
         nginx_volume_mounts = [
             kubernetes.core.v1.VolumeMountArgs(
@@ -501,6 +673,8 @@ class OLApplicationK8s(ComponentResource):
             )
         ]
         webapp_volume_mounts = nginx_volume_mounts.copy()
+        # Apply extra volume mounts to the main application container
+        webapp_volume_mounts.extend(ol_app_k8s_config.extra_volume_mounts)
 
         app_containers = []
 
@@ -663,6 +837,24 @@ class OLApplicationK8s(ComponentResource):
             image_pull_policy = "Always"
 
         init_containers = []
+        # extra_init_containers run first, before component-managed ones
+        for extra_init in ol_app_k8s_config.extra_init_containers:
+            # Inject extra_volume_mounts and extra_init_volume_mounts onto each extra init container
+            existing_mounts = list(getattr(extra_init, "volume_mounts", None) or [])
+            extra_init = kubernetes.core.v1.ContainerArgs(  # noqa: PLW2901
+                **{
+                    k: v
+                    for k, v in vars(extra_init).items()
+                    if k != "volume_mounts" and v is not None
+                },
+                volume_mounts=[
+                    *existing_mounts,
+                    *ol_app_k8s_config.extra_volume_mounts,
+                    *ol_app_k8s_config.extra_init_volume_mounts,
+                ],
+            )
+            init_containers.append(extra_init)
+
         if ol_app_k8s_config.init_migrations:
             init_containers.append(
                 # Run database migrations at startup
@@ -673,6 +865,10 @@ class OLApplicationK8s(ComponentResource):
                     image_pull_policy=image_pull_policy,
                     env=application_deployment_env_vars,
                     env_from=application_deployment_envfrom,
+                    volume_mounts=[
+                        *ol_app_k8s_config.extra_volume_mounts,
+                        *ol_app_k8s_config.extra_init_volume_mounts,
+                    ],
                 )
             )
 
@@ -690,6 +886,8 @@ class OLApplicationK8s(ComponentResource):
                             name="staticfiles",
                             mount_path="/src/staticfiles",
                         ),
+                        *ol_app_k8s_config.extra_volume_mounts,
+                        *ol_app_k8s_config.extra_init_volume_mounts,
                     ],
                 )
             )
@@ -716,7 +914,7 @@ class OLApplicationK8s(ComponentResource):
                 ol_app_k8s_config.slack_channel
             )
 
-        pod_spec_args = {}
+        pod_spec_args: dict[str, Any] = {}
         if ol_app_k8s_config.application_deployment_use_anti_affinity:
             pod_spec_args["affinity"] = kubernetes.core.v1.AffinityArgs(
                 pod_anti_affinity=kubernetes.core.v1.PodAntiAffinityArgs(
@@ -732,6 +930,15 @@ class OLApplicationK8s(ComponentResource):
                         ),
                     ],
                 ),
+            )
+        if ol_app_k8s_config.pod_security_context is not None:
+            pod_spec_args["security_context"] = ol_app_k8s_config.pod_security_context
+
+        # Shared pod spec kwargs for worker/beat pods (no anti-affinity)
+        worker_pod_spec_args: dict[str, Any] = {}
+        if ol_app_k8s_config.pod_security_context is not None:
+            worker_pod_spec_args["security_context"] = (
+                ol_app_k8s_config.pod_security_context
             )
 
         _application_deployment_name = truncate_k8s_metanames(
@@ -762,6 +969,25 @@ class OLApplicationK8s(ComponentResource):
                         ),
                         spec=kubernetes.core.v1.PodSpecArgs(
                             service_account_name=ol_app_k8s_config.application_service_account_name,
+                            volumes=ol_app_k8s_config.extra_volumes or None,
+                            init_containers=[
+                                *[
+                                    kubernetes.core.v1.ContainerArgs(
+                                        **{
+                                            k: v
+                                            for k, v in vars(c).items()
+                                            if k != "volume_mounts" and v is not None
+                                        },
+                                        volume_mounts=[
+                                            *(getattr(c, "volume_mounts", None) or []),
+                                            *ol_app_k8s_config.extra_volume_mounts,
+                                            *ol_app_k8s_config.extra_init_volume_mounts,
+                                        ],
+                                    )
+                                    for c in ol_app_k8s_config.extra_init_containers
+                                ]
+                            ]
+                            or None,
                             containers=[
                                 kubernetes.core.v1.ContainerArgs(
                                     name=command_name,
@@ -770,10 +996,13 @@ class OLApplicationK8s(ComponentResource):
                                     image_pull_policy=image_pull_policy,
                                     env=application_deployment_env_vars,
                                     env_from=application_deployment_envfrom,
+                                    volume_mounts=ol_app_k8s_config.extra_volume_mounts
+                                    or None,
                                 )
                                 for (command_name, command_array) in pre_deploy_commands
                             ],
                             restart_policy="Never",
+                            **worker_pod_spec_args,
                         ),
                     ),
                 ),
@@ -842,6 +1071,8 @@ class OLApplicationK8s(ComponentResource):
                 **ol_app_k8s_config.probe_configs,
             ),
         )
+        # Append caller-supplied sidecar containers after the main app container
+        app_containers.extend(ol_app_k8s_config.extra_sidecar_containers)
 
         _application_deployment = kubernetes.apps.v1.Deployment(
             f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-deployment",
@@ -870,7 +1101,7 @@ class OLApplicationK8s(ComponentResource):
                     spec=kubernetes.core.v1.PodSpecArgs(
                         volumes=volumes,
                         init_containers=[
-                            *init_containers,  # Add existing init containers after the new one
+                            *init_containers,
                         ],
                         dns_policy="ClusterFirst",
                         service_account_name=ol_app_k8s_config.application_service_account_name,
@@ -942,6 +1173,25 @@ class OLApplicationK8s(ComponentResource):
                         ),
                         spec=kubernetes.core.v1.PodSpecArgs(
                             service_account_name=ol_app_k8s_config.application_service_account_name,
+                            volumes=ol_app_k8s_config.extra_volumes or None,
+                            init_containers=[
+                                *[
+                                    kubernetes.core.v1.ContainerArgs(
+                                        **{
+                                            k: v
+                                            for k, v in vars(c).items()
+                                            if k != "volume_mounts" and v is not None
+                                        },
+                                        volume_mounts=[
+                                            *(getattr(c, "volume_mounts", None) or []),
+                                            *ol_app_k8s_config.extra_volume_mounts,
+                                            *ol_app_k8s_config.extra_init_volume_mounts,
+                                        ],
+                                    )
+                                    for c in ol_app_k8s_config.extra_init_containers
+                                ]
+                            ]
+                            or None,
                             containers=[
                                 kubernetes.core.v1.ContainerArgs(
                                     name=command_name,
@@ -950,6 +1200,8 @@ class OLApplicationK8s(ComponentResource):
                                     image_pull_policy=image_pull_policy,
                                     env=application_deployment_env_vars,
                                     env_from=application_deployment_envfrom,
+                                    volume_mounts=ol_app_k8s_config.extra_volume_mounts
+                                    or None,
                                 )
                                 for (
                                     command_name,
@@ -957,6 +1209,7 @@ class OLApplicationK8s(ComponentResource):
                                 ) in post_deploy_commands
                             ],
                             restart_policy="Never",
+                            **worker_pod_spec_args,
                         ),
                     ),
                 ),
@@ -1076,50 +1329,127 @@ class OLApplicationK8s(ComponentResource):
             opts=resource_options,
         )
 
-        _application_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
-            "application-hpa",
-            spec=kubernetes.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
-                scale_target_ref=kubernetes.autoscaling.v2.CrossVersionObjectReferenceArgs(
-                    api_version="apps/v1",
-                    kind="Deployment",
-                    name=truncate_k8s_metanames(
-                        f"{ol_app_k8s_config.application_name}-app"
+        if ol_app_k8s_config.webapp_keda_config is not None:
+            keda_cfg = ol_app_k8s_config.webapp_keda_config
+
+            # Build triggers: inject authenticationRef into any trigger that doesn't already have one
+            def _build_keda_triggers(
+                triggers: list[dict[str, Any]],
+                auth_name: str | None,
+            ) -> list[dict[str, Any]]:
+                if not auth_name:
+                    return triggers
+                result = []
+                for trigger in triggers:
+                    t = dict(trigger)
+                    if "authenticationRef" not in t:
+                        t["authenticationRef"] = {"name": auth_name}
+                    result.append(t)
+                return result
+
+            _webapp_scaled_object_name = truncate_k8s_metanames(
+                f"{ol_app_k8s_config.application_name}-webapp-scaledobject"
+            )
+            kubernetes.apiextensions.CustomResource(
+                f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-webapp-scaledobject",
+                api_version="keda.sh/v1alpha1",
+                kind="ScaledObject",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=_webapp_scaled_object_name,
+                    namespace=ol_app_k8s_config.application_namespace,
+                    labels=application_labels,
+                ),
+                spec={
+                    "scaleTargetRef": {
+                        "apiVersion": "apps/v1",
+                        "kind": "Deployment",
+                        "name": _application_deployment_name,
+                    },
+                    "minReplicaCount": ol_app_k8s_config.application_min_replicas,
+                    "maxReplicaCount": ol_app_k8s_config.application_max_replicas,
+                    "pollingInterval": keda_cfg.polling_interval,
+                    "cooldownPeriod": keda_cfg.cooldown_period,
+                    "advanced": {
+                        "horizontalPodAutoscalerConfig": {
+                            "behavior": {
+                                "scaleUp": {
+                                    "stabilizationWindowSeconds": keda_cfg.scale_up_stabilization_seconds,
+                                    "policies": [
+                                        {
+                                            "type": "Percent",
+                                            "value": keda_cfg.scale_up_percent,
+                                            "periodSeconds": keda_cfg.scale_up_period_seconds,
+                                        }
+                                    ],
+                                },
+                                "scaleDown": {
+                                    "stabilizationWindowSeconds": keda_cfg.scale_down_stabilization_seconds,
+                                    "policies": [
+                                        {
+                                            "type": "Percent",
+                                            "value": keda_cfg.scale_down_percent,
+                                            "periodSeconds": keda_cfg.scale_down_period_seconds,
+                                        }
+                                    ],
+                                },
+                            }
+                        }
+                    },
+                    "triggers": _build_keda_triggers(
+                        keda_cfg.triggers, keda_cfg.trigger_authentication_name
+                    ),
+                },
+                opts=resource_options.merge(
+                    ResourceOptions(
+                        depends_on=[_application_deployment],
+                        delete_before_replace=True,
+                        aliases=ol_app_k8s_config.webapp_keda_aliases or None,
+                    )
+                ),
+            )
+        else:
+            _application_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
+                "application-hpa",
+                spec=kubernetes.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
+                    scale_target_ref=kubernetes.autoscaling.v2.CrossVersionObjectReferenceArgs(
+                        api_version="apps/v1",
+                        kind="Deployment",
+                        name=truncate_k8s_metanames(
+                            f"{ol_app_k8s_config.application_name}-app"
+                        ),
+                    ),
+                    min_replicas=ol_app_k8s_config.application_min_replicas,
+                    max_replicas=ol_app_k8s_config.application_max_replicas,
+                    metrics=ol_app_k8s_config.hpa_scaling_metrics,
+                    behavior=kubernetes.autoscaling.v2.HorizontalPodAutoscalerBehaviorArgs(
+                        scale_up=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
+                            stabilization_window_seconds=60,
+                            select_policy="Max",
+                            policies=[
+                                kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
+                                    type="Percent",
+                                    value=100,
+                                    period_seconds=60,
+                                )
+                            ],
+                        ),
+                        scale_down=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
+                            stabilization_window_seconds=300,
+                            select_policy="Min",
+                            policies=[
+                                kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
+                                    type="Percent",
+                                    value=25,
+                                    period_seconds=60,
+                                )
+                            ],
+                        ),
                     ),
                 ),
-                min_replicas=ol_app_k8s_config.application_min_replicas,  # Minimum number of replicas
-                max_replicas=ol_app_k8s_config.application_max_replicas,  # Maximum number of replicas
-                # Corrected parameter name from "metrics" to the proper name for the API
-                metrics=ol_app_k8s_config.hpa_scaling_metrics,
-                # Optional: behavior configuration for scaling
-                behavior=kubernetes.autoscaling.v2.HorizontalPodAutoscalerBehaviorArgs(
-                    scale_up=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
-                        stabilization_window_seconds=60,  # Wait 1 minute before scaling up again
-                        select_policy="Max",  # Choose max value when multiple metrics
-                        policies=[
-                            kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
-                                type="Percent",
-                                value=100,  # Double pods at most
-                                period_seconds=60,  # In this time period
-                            )
-                        ],
-                    ),
-                    scale_down=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
-                        stabilization_window_seconds=300,  # Wait 5 minutes before scaling down
-                        select_policy="Min",
-                        policies=[
-                            kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
-                                type="Percent",
-                                value=25,  # Remove at most 25% of pods at once
-                                period_seconds=60,
-                            )
-                        ],
-                    ),
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    namespace=ol_app_k8s_config.application_namespace,
                 ),
-            ),
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                namespace=ol_app_k8s_config.application_namespace,
-            ),
-        )
+            )
 
         # A kubernetes service resource to act as load balancer for the app instances
         _application_service = kubernetes.core.v1.Service(
@@ -1144,7 +1474,11 @@ class OLApplicationK8s(ComponentResource):
                 ],
                 type="ClusterIP",
             ),
-            opts=resource_options,
+            opts=resource_options.merge(
+                ResourceOptions(
+                    aliases=ol_app_k8s_config.webapp_service_aliases or None,
+                )
+            ),
         )
 
         for celery_worker_config in ol_app_k8s_config.celery_worker_configs:
@@ -1189,6 +1523,25 @@ class OLApplicationK8s(ComponentResource):
                         spec=kubernetes.core.v1.PodSpecArgs(
                             service_account_name=ol_app_k8s_config.application_service_account_name,
                             dns_policy="ClusterFirst",
+                            volumes=ol_app_k8s_config.extra_volumes or None,
+                            init_containers=[
+                                *[
+                                    kubernetes.core.v1.ContainerArgs(
+                                        **{
+                                            k: v
+                                            for k, v in vars(c).items()
+                                            if k != "volume_mounts" and v is not None
+                                        },
+                                        volume_mounts=[
+                                            *(getattr(c, "volume_mounts", None) or []),
+                                            *ol_app_k8s_config.extra_volume_mounts,
+                                            *ol_app_k8s_config.extra_init_volume_mounts,
+                                        ],
+                                    )
+                                    for c in ol_app_k8s_config.extra_init_containers
+                                ]
+                            ]
+                            or None,
                             containers=[
                                 kubernetes.core.v1.ContainerArgs(
                                     name="celery-worker",
@@ -1233,8 +1586,12 @@ class OLApplicationK8s(ComponentResource):
                                         requests=celery_worker_config.resource_requests,
                                         limits=celery_worker_config.resource_limits,
                                     ),
+                                    volume_mounts=ol_app_k8s_config.extra_volume_mounts
+                                    or None,
                                 ),
+                                *ol_app_k8s_config.extra_sidecar_containers,
                             ],
+                            **worker_pod_spec_args,
                         ),
                     ),
                 ),
@@ -1344,6 +1701,25 @@ class OLApplicationK8s(ComponentResource):
                         spec=kubernetes.core.v1.PodSpecArgs(
                             service_account_name=ol_app_k8s_config.application_service_account_name,
                             dns_policy="ClusterFirst",
+                            volumes=ol_app_k8s_config.extra_volumes or None,
+                            init_containers=[
+                                *[
+                                    kubernetes.core.v1.ContainerArgs(
+                                        **{
+                                            k: v
+                                            for k, v in vars(c).items()
+                                            if k != "volume_mounts" and v is not None
+                                        },
+                                        volume_mounts=[
+                                            *(getattr(c, "volume_mounts", None) or []),
+                                            *ol_app_k8s_config.extra_volume_mounts,
+                                            *ol_app_k8s_config.extra_init_volume_mounts,
+                                        ],
+                                    )
+                                    for c in ol_app_k8s_config.extra_init_containers
+                                ]
+                            ]
+                            or None,
                             containers=[
                                 kubernetes.core.v1.ContainerArgs(
                                     name="celery-beat",
@@ -1351,7 +1727,7 @@ class OLApplicationK8s(ComponentResource):
                                     command=[
                                         "celery",
                                         "-A",
-                                        "main.celery:app",
+                                        beat_config.application_name,
                                         "beat",
                                         "--scheduler",
                                         beat_config.scheduler,
@@ -1364,8 +1740,12 @@ class OLApplicationK8s(ComponentResource):
                                         requests=beat_config.resource_requests,
                                         limits=beat_config.resource_limits,
                                     ),
+                                    volume_mounts=ol_app_k8s_config.extra_volume_mounts
+                                    or None,
                                 ),
+                                *ol_app_k8s_config.extra_sidecar_containers,
                             ],
+                            **worker_pod_spec_args,
                         ),
                     ),
                 ),
