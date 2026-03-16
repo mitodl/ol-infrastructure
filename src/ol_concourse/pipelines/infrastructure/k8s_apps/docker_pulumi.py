@@ -59,6 +59,9 @@ class AppPipelineParams(BaseModel):
     repo_release_branch: str = "release"
     ol_infra_branch: str = "main"
     settings_dir: str = "main"
+    version_file: str | None = (
+        None  # Repo-relative path to a standalone VERSION file (e.g. "VERSION"); if set, overrides Django settings grep
+    )
 
     @model_validator(mode="after")
     def set_repo_name(self) -> "AppPipelineParams":
@@ -69,6 +72,13 @@ class AppPipelineParams(BaseModel):
 
 
 pipeline_params = {
+    "micromasters": AppPipelineParams(
+        app_name="micromasters",
+        build_target="production",
+        repo_main_branch="master",
+        settings_dir="micromasters",
+        version_file="VERSION",
+    ),
     "mitxonline": AppPipelineParams(app_name="mitxonline", build_target="production"),
     "mit-learn-nextjs": AppPipelineParams(
         app_name="mit-learn-nextjs",
@@ -216,6 +226,7 @@ def _build_image_job(
     ecr_registry_image_resource: Resource,
     build_target: str | None = None,
     django_settings_dir: str = "main",
+    repo_version_file: str | None = None,
 ) -> Job:
     """Generate an image build job for a specific branch type (main or rc)."""
     job_name = f"build-{app_name}-image-from-{branch_type}"
@@ -251,7 +262,9 @@ def _build_image_job(
                             path="sh",
                             args=[
                                 "-c",
-                                rf"""grep -E -o '^VERSION = "[0-9]+\.[0-9]+\.[0-9]+"$' {git_repo_resource.name}/{django_settings_dir}/settings.py | cut -d\" -f2 > {version_file}""",
+                                rf"""cat {git_repo_resource.name}/{repo_version_file} > {version_file}"""
+                                if repo_version_file
+                                else rf"""grep -E -o '^VERSION = "[0-9]+\.[0-9]+\.[0-9]+"$' {git_repo_resource.name}/{django_settings_dir}/settings.py | cut -d\" -f2 > {version_file}""",
                             ],
                         ),
                     ),
@@ -369,6 +382,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         ecr_registry_image_resource=app_ci_image,
         build_target=pipeline_parameters.build_target,
         django_settings_dir=pipeline_parameters.settings_dir or "main",
+        repo_version_file=pipeline_parameters.version_file,
     )
     rc_image_build_job = _build_image_job(
         app_name=app_name,
@@ -379,6 +393,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         ecr_registry_image_resource=app_rc_image,
         build_target=pipeline_parameters.build_target,
         django_settings_dir=pipeline_parameters.settings_dir or "main",
+        repo_version_file=pipeline_parameters.version_file,
     )
 
     # Define Deployment Jobs

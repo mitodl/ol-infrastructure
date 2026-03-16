@@ -117,6 +117,7 @@ def meta_pipeline(app_names: list[str]) -> Pipeline:
 if __name__ == "__main__":
     app_names = [
         "learn-ai",
+        "micromasters",
         "mit-learn",
         "mit-learn-nextjs",
         "mitxonline",
