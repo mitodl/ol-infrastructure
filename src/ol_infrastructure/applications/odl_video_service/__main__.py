@@ -1440,8 +1440,8 @@ celery_deployment = kubernetes.apps.v1.Deployment(
                         ],
                         env_from=env_from_sources,
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                            requests={"cpu": "100m", "memory": "2048Mi"},
-                            limits={"memory": "2048Mi"},
+                            requests={"cpu": "100m", "memory": "3000Mi"},
+                            limits={"memory": "3000Mi"},
                         ),
                     ),
                 ],
