@@ -527,7 +527,9 @@ _POLICY_DIR = Path(__file__).parent
 
 # Mount the OL Data Platform logo as a ConfigMap so it is always present in
 # the running pods, independent of image build caching.
-_LOGO_SVG = (Path(__file__).parent / "ol-data-platform-logo.svg").read_text()
+_LOGO_SVG = (Path(__file__).parent / "ol-data-platform-logo.svg").read_text(
+    encoding="utf-8"
+)
 _LOGO_FILENAME = "ol-data-platform-logo.svg"
 _LOGO_CONFIGMAP_NAME = "superset-logo"
 _LOGO_MOUNT_PATH = f"/app/superset/static/assets/images/{_LOGO_FILENAME}"
@@ -571,7 +573,7 @@ superset_chart = kubernetes.helm.v3.Release(
             "configOverrides": {
                 "config": Path(__file__)
                 .parent.joinpath("superset_config.py")
-                .read_text()
+                .read_text(encoding="utf-8")
             },
             # Mount the governance roles JSON via extraConfigs (mounted at
             # /app/configs by the Helm chart) so the init command can import
@@ -581,7 +583,7 @@ superset_chart = kubernetes.helm.v3.Release(
             "extraConfigs": {
                 "ol_governance_roles.json": (
                     _POLICY_DIR / "ol_governance_roles.json"
-                ).read_text(),
+                ).read_text(encoding="utf-8"),
             },
             # Override init command to load governance roles after superset init.
             # `flask fab import-roles` is idempotent: it creates missing roles and
