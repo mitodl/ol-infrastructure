@@ -88,7 +88,6 @@ aws_account = get_caller_identity()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
-consul_stack = StackReference(f"infrastructure.consul.apps.{stack_info.name}")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 
 target_vpc_name = ovs_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
@@ -516,7 +515,6 @@ ovs_database_security_group = ec2.SecurityGroup(
     ingress=[
         ec2.SecurityGroupIngressArgs(
             security_groups=[
-                consul_stack.require_output("security_groups")["consul_server"],
                 vault_stack.require_output("vault_server")["security_group"],
                 data_vpc["security_groups"]["integrator"],
             ],
