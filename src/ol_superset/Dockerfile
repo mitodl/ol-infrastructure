@@ -13,7 +13,6 @@ RUN npm ci && npm run build
 
 FROM apache/superset:${SUPERSET_TAG}
 COPY --link requirements.txt /tmp/requirements.txt
-COPY static/assets/images/ol-data-platform-logo.svg /app/superset/static/assets/images/ol-data-platform-logo.svg
 # Copy extension manifest + compiled frontend assets into the image
 COPY --from=nl-explorer-frontend /build/nl-explorer/extension.json /app/extensions/nl-explorer/extension.json
 COPY --from=nl-explorer-frontend /build/nl-explorer/dist/ /app/extensions/nl-explorer/dist/
