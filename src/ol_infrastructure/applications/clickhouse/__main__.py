@@ -20,6 +20,7 @@ the NVMe DaemonSet and local-path-provisioner) before deploying to QA/Production
 import json
 from pathlib import Path
 from textwrap import dedent
+from typing import Any
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
@@ -122,6 +123,30 @@ IO_OPTIMIZED_NODE_AFFINITY = kubernetes.core.v1.AffinityArgs(
     )
 )
 
+_QUOTA_PROFILES_XML = dedent("""\
+    <clickhouse>
+      <profiles>
+        <llmops_profile>
+          <max_memory_usage>4000000000</max_memory_usage>
+          <max_concurrent_queries_for_user>10</max_concurrent_queries_for_user>
+          <readonly>0</readonly>
+        </llmops_profile>
+      </profiles>
+      <quotas>
+        <llmops_quota>
+          <interval>
+            <duration>3600</duration>
+            <queries>1000</queries>
+            <errors>100</errors>
+            <result_rows>1000000000</result_rows>
+            <read_rows>10000000000</read_rows>
+            <execution_time>3600</execution_time>
+          </interval>
+        </llmops_quota>
+      </quotas>
+    </clickhouse>
+""")
+
 
 def _require_password(password_output: Output, username: str) -> Output:
     """Fail fast if a ClickHouse user password is left at the insecure default."""
@@ -137,6 +162,482 @@ def _require_password(password_output: Output, username: str) -> Output:
         return password
 
     return password_output.apply(_check)
+
+
+def _create_keeper_resources(  # noqa: PLR0913
+    *,
+    env_suffix: str,
+    namespace: str,
+    labels: dict[str, str],
+    replicas: int,
+    image: str,
+    use_io_optimized: bool,
+    ebs_storageclass_output: "Output[Any]",
+    fallback_storage_class: str,
+) -> kubernetes.apps.v1.StatefulSet:
+    """Create ClickHouse Keeper resources and return the StatefulSet.
+
+    Creates the ConfigMap, headless Service, client Service, and StatefulSet
+    for ClickHouse Keeper.  The StatefulSet is returned because it is used as
+    a ``depends_on`` target by the ClickHouseInstallation resource.
+    """
+    config_map = kubernetes.core.v1.ConfigMap(
+        f"clickhouse-keeper-config-{env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="clickhouse-keeper-config",
+            namespace=namespace,
+            labels=labels,
+        ),
+        data={
+            "keeper.xml": keeper_config_xml.format(
+                raft_servers=_build_raft_servers(replicas)
+            )
+        },
+    )
+
+    headless_service = kubernetes.core.v1.Service(
+        f"clickhouse-keeper-headless-{env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="clickhouse-keeper-headless",
+            namespace=namespace,
+            labels={**labels, "app": "clickhouse-keeper"},
+        ),
+        spec=kubernetes.core.v1.ServiceSpecArgs(
+            cluster_ip="None",
+            selector={"app": "clickhouse-keeper"},
+            ports=[
+                kubernetes.core.v1.ServicePortArgs(name="client", port=2181),
+                kubernetes.core.v1.ServicePortArgs(name="raft", port=9444),
+            ],
+        ),
+    )
+
+    client_service = kubernetes.core.v1.Service(
+        f"clickhouse-keeper-client-{env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="clickhouse-keeper",
+            namespace=namespace,
+            labels={**labels, "app": "clickhouse-keeper"},
+        ),
+        spec=kubernetes.core.v1.ServiceSpecArgs(
+            selector={"app": "clickhouse-keeper"},
+            ports=[
+                kubernetes.core.v1.ServicePortArgs(name="client", port=2181),
+            ],
+        ),
+    )
+
+    tolerations = [IO_OPTIMIZED_TOLERATION] if use_io_optimized else []
+    node_selector = IO_OPTIMIZED_NODE_SELECTOR if use_io_optimized else {}
+
+    return kubernetes.apps.v1.StatefulSet(
+        f"clickhouse-keeper-{env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="clickhouse-keeper",
+            namespace=namespace,
+            labels={**labels, "app": "clickhouse-keeper"},
+        ),
+        spec=kubernetes.apps.v1.StatefulSetSpecArgs(
+            replicas=replicas,
+            service_name="clickhouse-keeper-headless",
+            selector=kubernetes.meta.v1.LabelSelectorArgs(
+                match_labels={"app": "clickhouse-keeper"},
+            ),
+            pod_management_policy="Parallel",
+            template=kubernetes.core.v1.PodTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    labels={**labels, "app": "clickhouse-keeper"},
+                ),
+                spec=kubernetes.core.v1.PodSpecArgs(
+                    tolerations=tolerations,
+                    node_selector=node_selector,
+                    affinity=kubernetes.core.v1.AffinityArgs(
+                        node_affinity=(
+                            IO_OPTIMIZED_NODE_AFFINITY.node_affinity
+                            if use_io_optimized
+                            else None
+                        ),
+                        pod_anti_affinity=kubernetes.core.v1.PodAntiAffinityArgs(
+                            required_during_scheduling_ignored_during_execution=[
+                                kubernetes.core.v1.PodAffinityTermArgs(
+                                    label_selector=kubernetes.meta.v1.LabelSelectorArgs(
+                                        match_labels={"app": "clickhouse-keeper"},
+                                    ),
+                                    topology_key="kubernetes.io/hostname",
+                                )
+                            ]
+                        ),
+                    )
+                    if replicas > 1
+                    else None,
+                    init_containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="set-server-id",
+                            image="busybox:stable-musl",
+                            command=[
+                                "sh",
+                                "-c",
+                                # Extract pod index from hostname (e.g. clickhouse-keeper-0 -> 1)
+                                "export MY_ID=$((${HOSTNAME##*-} + 1)); "
+                                "echo MY_ID=$MY_ID > /keeper-env/env",
+                            ],
+                            env=[
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="HOSTNAME",
+                                    value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                        field_ref=kubernetes.core.v1.ObjectFieldSelectorArgs(
+                                            field_path="metadata.name"
+                                        )
+                                    ),
+                                )
+                            ],
+                            volume_mounts=[
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="keeper-env",
+                                    mount_path="/keeper-env",
+                                )
+                            ],
+                        )
+                    ],
+                    containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="clickhouse-keeper",
+                            image=image,
+                            command=[
+                                "sh",
+                                "-c",
+                                ". /keeper-env/env && export MY_ID && /entrypoint.sh",
+                            ],
+                            ports=[
+                                kubernetes.core.v1.ContainerPortArgs(
+                                    name="client", container_port=2181
+                                ),
+                                kubernetes.core.v1.ContainerPortArgs(
+                                    name="raft", container_port=9444
+                                ),
+                            ],
+                            resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                requests={"cpu": "100m", "memory": "256Mi"},
+                                limits={"memory": "512Mi"},
+                            ),
+                            liveness_probe=kubernetes.core.v1.ProbeArgs(
+                                exec_=kubernetes.core.v1.ExecActionArgs(
+                                    command=[
+                                        "sh",
+                                        "-c",
+                                        "echo ruok | nc localhost 2181",
+                                    ]
+                                ),
+                                initial_delay_seconds=30,
+                                period_seconds=30,
+                                failure_threshold=3,
+                            ),
+                            volume_mounts=[
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="keeper-config",
+                                    mount_path="/etc/clickhouse-keeper/keeper.xml",
+                                    sub_path="keeper.xml",
+                                ),
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="keeper-data",
+                                    mount_path="/var/lib/clickhouse-keeper",
+                                ),
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="keeper-env",
+                                    mount_path="/keeper-env",
+                                ),
+                            ],
+                        )
+                    ],
+                    volumes=[
+                        kubernetes.core.v1.VolumeArgs(
+                            name="keeper-config",
+                            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                                name="clickhouse-keeper-config",
+                            ),
+                        ),
+                        kubernetes.core.v1.VolumeArgs(
+                            name="keeper-env",
+                            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+                        ),
+                    ],
+                ),
+            ),
+            volume_claim_templates=[
+                kubernetes.core.v1.PersistentVolumeClaimArgs(
+                    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                        name="keeper-data",
+                        labels=labels,
+                    ),
+                    spec=kubernetes.core.v1.PersistentVolumeClaimSpecArgs(
+                        access_modes=["ReadWriteOnce"],
+                        # Keeper stores only coordination logs; always prefer EBS for
+                        # durability. Fall back to the cluster storage class if the EBS
+                        # CSI provisioner is not enabled on this cluster.
+                        storage_class_name=ebs_storageclass_output.apply(
+                            lambda sc: sc if sc is not None else fallback_storage_class
+                        ),
+                        resources=kubernetes.core.v1.VolumeResourceRequirementsArgs(
+                            requests={"storage": "20Gi"},
+                        ),
+                    ),
+                )
+            ],
+        ),
+        opts=ResourceOptions(depends_on=[config_map, headless_service, client_service]),
+    )
+
+
+def _create_clickhouse_installation(  # noqa: PLR0913
+    *,
+    env_suffix: str,
+    namespace: str,
+    labels: dict[str, str],
+    ch_replicas: int,
+    ch_image: str,
+    use_io_optimized: bool,
+    storage_class: str,
+    hot_storage_size: str,
+    cold_bucket_name: "Output[str]",
+    users_secret_name: str,
+    irsa_role_arn: "Output[str]",
+    keeper_statefulset: "kubernetes.apps.v1.StatefulSet",
+    users_secret: Any,
+    vault_k8s_resources: Any,
+) -> "Output[kubernetes.apiextensions.CustomResource]":
+    """Build the ClickHouseInstallation CRD and return it wrapped in an Output.
+
+    Uses ``Output.all().apply()`` because the storage configuration XML must be
+    resolved from the cold-storage bucket name, which is an ``Output[str]``.
+    """
+    ch_tolerations = (
+        [
+            {
+                "key": "ol.mit.edu/io-workload",
+                "operator": "Equal",
+                "value": "true",
+                "effect": "NoSchedule",
+            }
+        ]
+        if use_io_optimized
+        else []
+    )
+    ch_node_selector = IO_OPTIMIZED_NODE_SELECTOR if use_io_optimized else {}
+    ch_affinity = (
+        {
+            "podAntiAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": [
+                    {
+                        "labelSelector": {
+                            "matchLabels": {"clickhouse.altinity.com/chi": "clickhouse"}
+                        },
+                        "topologyKey": "kubernetes.io/hostname",
+                    }
+                ]
+            },
+            **(
+                {
+                    "nodeAffinity": {
+                        "requiredDuringSchedulingIgnoredDuringExecution": {
+                            "nodeSelectorTerms": [
+                                {
+                                    "matchExpressions": [
+                                        {
+                                            "key": "ol.mit.edu/io_optimized",
+                                            "operator": "In",
+                                            "values": ["true"],
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
+                if use_io_optimized
+                else {}
+            ),
+        }
+        if ch_replicas > 1
+        else (
+            {
+                "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                        "nodeSelectorTerms": [
+                            {
+                                "matchExpressions": [
+                                    {
+                                        "key": "ol.mit.edu/io_optimized",
+                                        "operator": "In",
+                                        "values": ["true"],
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+            if use_io_optimized
+            else {}
+        )
+    )
+
+    storage_config_xml = cold_bucket_name.apply(
+        lambda bucket: dedent(f"""\
+            <clickhouse>
+              <storage_configuration>
+                <disks>
+                  <hot_local>
+                    <type>local</type>
+                    <path>/var/lib/clickhouse/</path>
+                  </hot_local>
+                  <cold_s3>
+                    <type>s3</type>
+                    <endpoint>https://{bucket}.s3.amazonaws.com/data/</endpoint>
+                    <use_environment_credentials>true</use_environment_credentials>
+                    <metadata_path>/var/lib/clickhouse/disks/cold_s3/</metadata_path>
+                  </cold_s3>
+                </disks>
+                <policies>
+                  <tiered>
+                    <volumes>
+                      <hot>
+                        <disk>hot_local</disk>
+                      </hot>
+                      <cold>
+                        <disk>cold_s3</disk>
+                        <prefer_not_to_merge>true</prefer_not_to_merge>
+                      </cold>
+                    </volumes>
+                  </tiered>
+                </policies>
+              </storage_configuration>
+            </clickhouse>
+        """)
+    )
+
+    return Output.all(
+        storage_config=storage_config_xml,
+        irsa_role_arn=irsa_role_arn,
+    ).apply(
+        lambda kwargs: kubernetes.apiextensions.CustomResource(
+            f"clickhouse-installation-{env_suffix}",
+            api_version="clickhouse.altinity.com/v1",
+            kind="ClickHouseInstallation",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name="clickhouse",
+                namespace=namespace,
+                labels=labels,
+            ),
+            spec={
+                "defaults": {
+                    "templates": {
+                        "podTemplate": "clickhouse-pod-template",
+                        "dataVolumeClaimTemplate": "clickhouse-data",
+                    }
+                },
+                "configuration": {
+                    "zookeeper": {
+                        "nodes": [
+                            {
+                                "host": f"clickhouse-keeper.{namespace}.svc.cluster.local",
+                                "port": 2181,
+                            }
+                        ]
+                    },
+                    "clusters": [
+                        {
+                            "name": "default",
+                            "layout": {
+                                "shardsCount": 1,
+                                "replicasCount": ch_replicas,
+                            },
+                        }
+                    ],
+                    "files": {
+                        "config.d/storage.xml": kwargs["storage_config"],
+                        "config.d/quotas_profiles.xml": _QUOTA_PROFILES_XML,
+                    },
+                    "settings": {
+                        "default_storage_policy": "tiered",
+                    },
+                },
+                "templates": {
+                    "podTemplates": [
+                        {
+                            "name": "clickhouse-pod-template",
+                            "spec": {
+                                "serviceAccountName": "clickhouse",
+                                "tolerations": ch_tolerations,
+                                "nodeSelector": ch_node_selector,
+                                "affinity": ch_affinity,
+                                "containers": [
+                                    {
+                                        "name": "clickhouse",
+                                        "image": ch_image,
+                                        "resources": {
+                                            "requests": {
+                                                "cpu": "500m",
+                                                "memory": "4Gi",
+                                            },
+                                            "limits": {
+                                                "memory": "8Gi",
+                                            },
+                                        },
+                                        "volumeMounts": [
+                                            {
+                                                "name": users_secret_name,
+                                                "mountPath": "/etc/clickhouse-server/users.d/",
+                                                "readOnly": True,
+                                            }
+                                        ],
+                                        "env": [
+                                            {
+                                                "name": "AWS_ROLE_ARN",
+                                                "value": kwargs["irsa_role_arn"],
+                                            },
+                                            {
+                                                "name": "AWS_WEB_IDENTITY_TOKEN_FILE",
+                                                "value": "/var/run/secrets/eks.amazonaws.com/serviceaccount/token",
+                                            },
+                                        ],
+                                    }
+                                ],
+                                "volumes": [
+                                    {
+                                        "name": users_secret_name,
+                                        "secret": {
+                                            "secretName": users_secret_name,
+                                        },
+                                    }
+                                ],
+                            },
+                        }
+                    ],
+                    "volumeClaimTemplates": [
+                        {
+                            "name": "clickhouse-data",
+                            "spec": {
+                                "accessModes": ["ReadWriteOnce"],
+                                "storageClassName": storage_class,
+                                "resources": {
+                                    "requests": {
+                                        "storage": hot_storage_size,
+                                    }
+                                },
+                            },
+                        }
+                    ],
+                },
+            },
+            opts=ResourceOptions(
+                depends_on=[
+                    keeper_statefulset,
+                    users_secret,
+                    vault_k8s_resources,
+                ],
+            ),
+        )
+    )
 
 
 # Per-tool passwords from stack config (must be set with `pulumi config set --secret`)
@@ -349,206 +850,15 @@ def _build_raft_servers(n: int) -> str:
     return "\n          ".join(servers)
 
 
-keeper_config_map = kubernetes.core.v1.ConfigMap(
-    f"clickhouse-keeper-config-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="clickhouse-keeper-config",
-        namespace=CLICKHOUSE_NAMESPACE,
-        labels=k8s_global_labels,
-    ),
-    data={
-        "keeper.xml": keeper_config_xml.format(
-            raft_servers=_build_raft_servers(keeper_replicas)
-        )
-    },
-)
-
-keeper_headless_service = kubernetes.core.v1.Service(
-    f"clickhouse-keeper-headless-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="clickhouse-keeper-headless",
-        namespace=CLICKHOUSE_NAMESPACE,
-        labels={**k8s_global_labels, "app": "clickhouse-keeper"},
-    ),
-    spec=kubernetes.core.v1.ServiceSpecArgs(
-        cluster_ip="None",
-        selector={"app": "clickhouse-keeper"},
-        ports=[
-            kubernetes.core.v1.ServicePortArgs(name="client", port=2181),
-            kubernetes.core.v1.ServicePortArgs(name="raft", port=9444),
-        ],
-    ),
-)
-
-keeper_client_service = kubernetes.core.v1.Service(
-    f"clickhouse-keeper-client-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="clickhouse-keeper",
-        namespace=CLICKHOUSE_NAMESPACE,
-        labels={**k8s_global_labels, "app": "clickhouse-keeper"},
-    ),
-    spec=kubernetes.core.v1.ServiceSpecArgs(
-        selector={"app": "clickhouse-keeper"},
-        ports=[
-            kubernetes.core.v1.ServicePortArgs(name="client", port=2181),
-        ],
-    ),
-)
-
-# Keeper node placement follows the EKS storage backend toggle.
-keeper_tolerations = [IO_OPTIMIZED_TOLERATION] if use_io_optimized_nodes else []
-keeper_node_selector = IO_OPTIMIZED_NODE_SELECTOR if use_io_optimized_nodes else {}
-
-keeper_statefulset = kubernetes.apps.v1.StatefulSet(
-    f"clickhouse-keeper-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="clickhouse-keeper",
-        namespace=CLICKHOUSE_NAMESPACE,
-        labels={**k8s_global_labels, "app": "clickhouse-keeper"},
-    ),
-    spec=kubernetes.apps.v1.StatefulSetSpecArgs(
-        replicas=keeper_replicas,
-        service_name="clickhouse-keeper-headless",
-        selector=kubernetes.meta.v1.LabelSelectorArgs(
-            match_labels={"app": "clickhouse-keeper"},
-        ),
-        pod_management_policy="Parallel",
-        template=kubernetes.core.v1.PodTemplateSpecArgs(
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                labels={**k8s_global_labels, "app": "clickhouse-keeper"},
-            ),
-            spec=kubernetes.core.v1.PodSpecArgs(
-                tolerations=keeper_tolerations,
-                node_selector=keeper_node_selector,
-                affinity=kubernetes.core.v1.AffinityArgs(
-                    node_affinity=(
-                        IO_OPTIMIZED_NODE_AFFINITY.node_affinity
-                        if use_io_optimized_nodes
-                        else None
-                    ),
-                    pod_anti_affinity=kubernetes.core.v1.PodAntiAffinityArgs(
-                        required_during_scheduling_ignored_during_execution=[
-                            kubernetes.core.v1.PodAffinityTermArgs(
-                                label_selector=kubernetes.meta.v1.LabelSelectorArgs(
-                                    match_labels={"app": "clickhouse-keeper"},
-                                ),
-                                topology_key="kubernetes.io/hostname",
-                            )
-                        ]
-                    ),
-                )
-                if keeper_replicas > 1
-                else None,
-                init_containers=[
-                    kubernetes.core.v1.ContainerArgs(
-                        name="set-server-id",
-                        image="busybox:stable-musl",
-                        command=[
-                            "sh",
-                            "-c",
-                            # Extract pod index from hostname (e.g. clickhouse-keeper-0 -> 1)
-                            "export MY_ID=$((${HOSTNAME##*-} + 1)); "
-                            "echo MY_ID=$MY_ID > /keeper-env/env",
-                        ],
-                        env=[
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="HOSTNAME",
-                                value_from=kubernetes.core.v1.EnvVarSourceArgs(
-                                    field_ref=kubernetes.core.v1.ObjectFieldSelectorArgs(
-                                        field_path="metadata.name"
-                                    )
-                                ),
-                            )
-                        ],
-                        volume_mounts=[
-                            kubernetes.core.v1.VolumeMountArgs(
-                                name="keeper-env",
-                                mount_path="/keeper-env",
-                            )
-                        ],
-                    )
-                ],
-                containers=[
-                    kubernetes.core.v1.ContainerArgs(
-                        name="clickhouse-keeper",
-                        image=keeper_image,
-                        command=[
-                            "sh",
-                            "-c",
-                            ". /keeper-env/env && export MY_ID && /entrypoint.sh",
-                        ],
-                        ports=[
-                            kubernetes.core.v1.ContainerPortArgs(
-                                name="client", container_port=2181
-                            ),
-                            kubernetes.core.v1.ContainerPortArgs(
-                                name="raft", container_port=9444
-                            ),
-                        ],
-                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                            requests={"cpu": "100m", "memory": "256Mi"},
-                            limits={"memory": "512Mi"},
-                        ),
-                        liveness_probe=kubernetes.core.v1.ProbeArgs(
-                            exec_=kubernetes.core.v1.ExecActionArgs(
-                                command=["sh", "-c", "echo ruok | nc localhost 2181"]
-                            ),
-                            initial_delay_seconds=30,
-                            period_seconds=30,
-                            failure_threshold=3,
-                        ),
-                        volume_mounts=[
-                            kubernetes.core.v1.VolumeMountArgs(
-                                name="keeper-config",
-                                mount_path="/etc/clickhouse-keeper/keeper.xml",
-                                sub_path="keeper.xml",
-                            ),
-                            kubernetes.core.v1.VolumeMountArgs(
-                                name="keeper-data",
-                                mount_path="/var/lib/clickhouse-keeper",
-                            ),
-                            kubernetes.core.v1.VolumeMountArgs(
-                                name="keeper-env",
-                                mount_path="/keeper-env",
-                            ),
-                        ],
-                    )
-                ],
-                volumes=[
-                    kubernetes.core.v1.VolumeArgs(
-                        name="keeper-config",
-                        config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                            name="clickhouse-keeper-config",
-                        ),
-                    ),
-                    kubernetes.core.v1.VolumeArgs(
-                        name="keeper-env",
-                        empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
-                    ),
-                ],
-            ),
-        ),
-        volume_claim_templates=[
-            kubernetes.core.v1.PersistentVolumeClaimArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    name="keeper-data",
-                    labels=k8s_global_labels,
-                ),
-                spec=kubernetes.core.v1.PersistentVolumeClaimSpecArgs(
-                    access_modes=["ReadWriteOnce"],
-                    # Keeper stores only coordination logs; always prefer EBS for
-                    # durability. Fall back to the cluster storage class if the EBS
-                    # CSI provisioner is not enabled on this cluster.
-                    storage_class_name=cluster_stack.get_output(
-                        "ebs_storageclass"
-                    ).apply(lambda sc: sc if sc is not None else storage_class),
-                    resources=kubernetes.core.v1.VolumeResourceRequirementsArgs(
-                        requests={"storage": "20Gi"},
-                    ),
-                ),
-            )
-        ],
-    ),
+keeper_statefulset = _create_keeper_resources(
+    env_suffix=stack_info.env_suffix,
+    namespace=CLICKHOUSE_NAMESPACE,
+    labels=k8s_global_labels,
+    replicas=keeper_replicas,
+    image=keeper_image,
+    use_io_optimized=use_io_optimized_nodes,
+    ebs_storageclass_output=cluster_stack.get_output("ebs_storageclass"),
+    fallback_storage_class=storage_class,
 )
 
 ############################################################
@@ -564,259 +874,21 @@ keeper_statefulset = kubernetes.apps.v1.StatefulSet(
 # Users/databases are NOT defined here; they come from the users.xml K8s secret
 # volume-mounted at /etc/clickhouse-server/users.d/.
 ############################################################
-
-# ClickHouse hot-storage placement follows the EKS storage backend toggle.
-ch_tolerations = (
-    [
-        {
-            "key": "ol.mit.edu/io-workload",
-            "operator": "Equal",
-            "value": "true",
-            "effect": "NoSchedule",
-        }
-    ]
-    if use_io_optimized_nodes
-    else []
-)
-ch_node_selector = IO_OPTIMIZED_NODE_SELECTOR if use_io_optimized_nodes else {}
-ch_affinity = (
-    {
-        "podAntiAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": [
-                {
-                    "labelSelector": {
-                        "matchLabels": {"clickhouse.altinity.com/chi": "clickhouse"}
-                    },
-                    "topologyKey": "kubernetes.io/hostname",
-                }
-            ]
-        },
-        **(
-            {
-                "nodeAffinity": {
-                    "requiredDuringSchedulingIgnoredDuringExecution": {
-                        "nodeSelectorTerms": [
-                            {
-                                "matchExpressions": [
-                                    {
-                                        "key": "ol.mit.edu/io_optimized",
-                                        "operator": "In",
-                                        "values": ["true"],
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                }
-            }
-            if use_io_optimized_nodes
-            else {}
-        ),
-    }
-    if ch_replicas > 1
-    else (
-        {
-            "nodeAffinity": {
-                "requiredDuringSchedulingIgnoredDuringExecution": {
-                    "nodeSelectorTerms": [
-                        {
-                            "matchExpressions": [
-                                {
-                                    "key": "ol.mit.edu/io_optimized",
-                                    "operator": "In",
-                                    "values": ["true"],
-                                }
-                            ]
-                        }
-                    ]
-                }
-            }
-        }
-        if use_io_optimized_nodes
-        else {}
-    )
-)
-
-storage_config_xml = cold_bucket.bucket.bucket.apply(
-    lambda bucket: dedent(f"""\
-        <clickhouse>
-          <storage_configuration>
-            <disks>
-              <hot_local>
-                <type>local</type>
-                <path>/var/lib/clickhouse/</path>
-              </hot_local>
-              <cold_s3>
-                <type>s3</type>
-                <endpoint>https://{bucket}.s3.amazonaws.com/data/</endpoint>
-                <use_environment_credentials>true</use_environment_credentials>
-                <metadata_path>/var/lib/clickhouse/disks/cold_s3/</metadata_path>
-              </cold_s3>
-            </disks>
-            <policies>
-              <tiered>
-                <volumes>
-                  <hot>
-                    <disk>hot_local</disk>
-                  </hot>
-                  <cold>
-                    <disk>cold_s3</disk>
-                    <prefer_not_to_merge>true</prefer_not_to_merge>
-                  </cold>
-                </volumes>
-              </tiered>
-            </policies>
-          </storage_configuration>
-        </clickhouse>
-    """)
-)
-
-quota_profiles_xml = dedent("""\
-    <clickhouse>
-      <profiles>
-        <llmops_profile>
-          <max_memory_usage>4000000000</max_memory_usage>
-          <max_concurrent_queries_for_user>10</max_concurrent_queries_for_user>
-          <readonly>0</readonly>
-        </llmops_profile>
-      </profiles>
-      <quotas>
-        <llmops_quota>
-          <interval>
-            <duration>3600</duration>
-            <queries>1000</queries>
-            <errors>100</errors>
-            <result_rows>1000000000</result_rows>
-            <read_rows>10000000000</read_rows>
-            <execution_time>3600</execution_time>
-          </interval>
-        </llmops_quota>
-      </quotas>
-    </clickhouse>
-""")
-
-clickhouse_installation = Output.all(
-    storage_config=storage_config_xml,
+clickhouse_installation = _create_clickhouse_installation(
+    env_suffix=stack_info.env_suffix,
+    namespace=CLICKHOUSE_NAMESPACE,
+    labels=k8s_global_labels,
+    ch_replicas=ch_replicas,
+    ch_image=ch_image,
+    use_io_optimized=use_io_optimized_nodes,
+    storage_class=storage_class,
+    hot_storage_size=hot_storage_size,
+    cold_bucket_name=cold_bucket.bucket.bucket,
+    users_secret_name=users_secret_name,
     irsa_role_arn=clickhouse_app.irsa_role.arn,
-).apply(
-    lambda kwargs: kubernetes.apiextensions.CustomResource(
-        f"clickhouse-installation-{stack_info.env_suffix}",
-        api_version="clickhouse.altinity.com/v1",
-        kind="ClickHouseInstallation",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="clickhouse",
-            namespace=CLICKHOUSE_NAMESPACE,
-            labels=k8s_global_labels,
-        ),
-        spec={
-            "defaults": {
-                "templates": {
-                    "podTemplate": "clickhouse-pod-template",
-                    "dataVolumeClaimTemplate": "clickhouse-data",
-                }
-            },
-            "configuration": {
-                "zookeeper": {
-                    "nodes": [
-                        {
-                            "host": f"clickhouse-keeper.{CLICKHOUSE_NAMESPACE}.svc.cluster.local",
-                            "port": 2181,
-                        }
-                    ]
-                },
-                "clusters": [
-                    {
-                        "name": "default",
-                        "layout": {
-                            "shardsCount": 1,
-                            "replicasCount": ch_replicas,
-                        },
-                    }
-                ],
-                "files": {
-                    "config.d/storage.xml": kwargs["storage_config"],
-                    "config.d/quotas_profiles.xml": quota_profiles_xml,
-                },
-                "settings": {
-                    "default_storage_policy": "tiered",
-                },
-            },
-            "templates": {
-                "podTemplates": [
-                    {
-                        "name": "clickhouse-pod-template",
-                        "spec": {
-                            "serviceAccountName": "clickhouse",
-                            "tolerations": ch_tolerations,
-                            "nodeSelector": ch_node_selector,
-                            "affinity": ch_affinity,
-                            "containers": [
-                                {
-                                    "name": "clickhouse",
-                                    "image": ch_image,
-                                    "resources": {
-                                        "requests": {
-                                            "cpu": "500m",
-                                            "memory": "4Gi",
-                                        },
-                                        "limits": {
-                                            "memory": "8Gi",
-                                        },
-                                    },
-                                    "volumeMounts": [
-                                        {
-                                            "name": users_secret_name,
-                                            "mountPath": "/etc/clickhouse-server/users.d/",
-                                            "readOnly": True,
-                                        }
-                                    ],
-                                    "env": [
-                                        {
-                                            "name": "AWS_ROLE_ARN",
-                                            "value": kwargs["irsa_role_arn"],
-                                        },
-                                        {
-                                            "name": "AWS_WEB_IDENTITY_TOKEN_FILE",
-                                            "value": "/var/run/secrets/eks.amazonaws.com/serviceaccount/token",
-                                        },
-                                    ],
-                                }
-                            ],
-                            "volumes": [
-                                {
-                                    "name": users_secret_name,
-                                    "secret": {
-                                        "secretName": users_secret_name,
-                                    },
-                                }
-                            ],
-                        },
-                    }
-                ],
-                "volumeClaimTemplates": [
-                    {
-                        "name": "clickhouse-data",
-                        "spec": {
-                            "accessModes": ["ReadWriteOnce"],
-                            "storageClassName": storage_class,
-                            "resources": {
-                                "requests": {
-                                    "storage": hot_storage_size,
-                                }
-                            },
-                        },
-                    }
-                ],
-            },
-        },
-        opts=ResourceOptions(
-            depends_on=[
-                keeper_statefulset,
-                users_secret,
-                clickhouse_app.vault_k8s_resources,
-            ],
-        ),
-    )
+    keeper_statefulset=keeper_statefulset,
+    users_secret=users_secret,
+    vault_k8s_resources=clickhouse_app.vault_k8s_resources,
 )
 
 ############################################################

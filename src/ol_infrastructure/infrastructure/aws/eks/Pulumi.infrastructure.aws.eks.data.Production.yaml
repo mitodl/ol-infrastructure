@@ -34,6 +34,9 @@ config:
   - starrocks
   - superset
   eks:nodegroups:
+    # This nodegroup is only provisioned when eks:stateful_workload_storage_backend
+    # is set to "io-optimized". With the current "ebs" backend it is defined here
+    # for reference but will NOT be created by the infra program.
     io-optimized:
       disk_size_gb: 200
       instance_type: i4i.2xlarge

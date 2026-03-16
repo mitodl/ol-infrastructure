@@ -40,7 +40,30 @@ def parse_stack() -> StackInfo:
 def require_stack_output_value(
     stack_reference: StackReference, output_name: str
 ) -> Any:
-    """Return a concrete stack output value from a StackReference."""
+    """Return a concrete (eagerly-resolved) stack output value from a StackReference.
+
+    This helper is intentionally synchronous and is only appropriate for
+    program-bootstrapping code that must produce concrete Python values *before*
+    any Pulumi resources are declared — for example, setting up a Kubernetes
+    provider from a kubeconfig or driving conditional resource creation based on a
+    storage-backend flag.  In those situations staying in the ``Output`` world via
+    ``.apply()`` is not feasible.
+
+    **Technical debt — private API:** The implementation calls
+    ``pulumi.runtime.sync_await._sync_await``, an internal Pulumi function indicated
+    by the leading underscore.  It is stable across current Pulumi 3.x releases but
+    may break without a deprecation warning in a future version.  If breakage occurs,
+    the migration path is to switch callers to the Pulumi Automation API's synchronous
+    ``stack.outputs()`` method, or to restructure the program so that provider
+    initialisation can be deferred into ``.apply()`` callbacks.
+
+    **Secret outputs:** When *output_name* refers to a Pulumi secret, the raw
+    plaintext value is returned as an ordinary Python object — Pulumi's
+    secret-tracking is *not* preserved.  Only use this function with secret outputs
+    when the value is consumed solely for bootstrapping (e.g. a kubeconfig passed
+    directly to a provider constructor) and will *not* be re-exported, logged, or
+    stored in a Pulumi resource input.
+    """
     output_details = sync_await._sync_await(  # noqa: SLF001
         stack_reference.get_output_details(output_name)
     )
