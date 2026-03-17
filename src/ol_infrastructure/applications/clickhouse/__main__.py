@@ -4,7 +4,7 @@
 Architecture:
 - Altinity ClickHouseInstallation CRD manages the cluster (installed by the
   substructure.aws.eks.data stack).
-- ClickHouse Keeper (3 replicas) provides distributed coordination.
+- ClickHouseKeeperInstallation CRD manages Keeper (3 replicas) for distributed coordination.
 - Hot storage: local NVMe SSD via ``local-nvme`` when enabled by the data EKS
   stack; otherwise EBS gp3.
 - Cold storage: S3 bucket with Intelligent-Tiering; ClickHouse moves data via
@@ -178,7 +178,7 @@ def _require_password(password_output: Output, username: str) -> Output:
     return password_output.apply(_check)
 
 
-def _create_keeper_resources(  # noqa: PLR0913
+def _create_clickhouse_keeper_installation(  # noqa: PLR0913
     *,
     env_suffix: str,
     namespace: str,
@@ -188,217 +188,138 @@ def _create_keeper_resources(  # noqa: PLR0913
     use_io_optimized: bool,
     ebs_storageclass_output: "Output[Any]",
     fallback_storage_class: str,
-) -> kubernetes.apps.v1.StatefulSet:
-    """Create ClickHouse Keeper resources and return the StatefulSet.
+) -> "Output[kubernetes.apiextensions.CustomResource]":
+    """Create a ClickHouseKeeperInstallation CRD resource managed by the Altinity operator.
 
-    Creates the ConfigMap, headless Service, client Service, and StatefulSet
-    for ClickHouse Keeper.  The StatefulSet is returned because it is used as
-    a ``depends_on`` target by the ClickHouseInstallation resource.
+    The operator automatically creates a service named ``keeper-clickhouse`` which is used
+    by the ClickHouseInstallation for ZooKeeper-compatible coordination.
     """
-    config_map = kubernetes.core.v1.ConfigMap(
-        f"clickhouse-keeper-config-{env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="clickhouse-keeper-config",
-            namespace=namespace,
-            labels=labels,
-        ),
-        data={
-            "keeper.xml": keeper_config_xml.format(
-                raft_servers=_build_raft_servers(replicas)
-            )
-        },
+    tolerations = (
+        [
+            {
+                "key": "ol.mit.edu/io-workload",
+                "operator": "Equal",
+                "value": "true",
+                "effect": "NoSchedule",
+            }
+        ]
+        if use_io_optimized
+        else []
     )
-
-    headless_service = kubernetes.core.v1.Service(
-        f"clickhouse-keeper-headless-{env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="clickhouse-keeper-headless",
-            namespace=namespace,
-            labels={**labels, "app": "clickhouse-keeper"},
-        ),
-        spec=kubernetes.core.v1.ServiceSpecArgs(
-            cluster_ip="None",
-            selector={"app": "clickhouse-keeper"},
-            ports=[
-                kubernetes.core.v1.ServicePortArgs(name="client", port=2181),
-                kubernetes.core.v1.ServicePortArgs(name="raft", port=9444),
-            ],
-        ),
-    )
-
-    client_service = kubernetes.core.v1.Service(
-        f"clickhouse-keeper-client-{env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="clickhouse-keeper",
-            namespace=namespace,
-            labels={**labels, "app": "clickhouse-keeper"},
-        ),
-        spec=kubernetes.core.v1.ServiceSpecArgs(
-            selector={"app": "clickhouse-keeper"},
-            ports=[
-                kubernetes.core.v1.ServicePortArgs(name="client", port=2181),
-            ],
-        ),
-    )
-
-    tolerations = [IO_OPTIMIZED_TOLERATION] if use_io_optimized else []
     node_selector = IO_OPTIMIZED_NODE_SELECTOR if use_io_optimized else {}
+    affinity: dict[str, Any] = {}
+    if replicas > 1:
+        affinity["podAntiAffinity"] = {
+            "requiredDuringSchedulingIgnoredDuringExecution": [
+                {
+                    "labelSelector": {
+                        "matchExpressions": [
+                            {
+                                "key": "clickhouse-keeper.altinity.com/chk",
+                                "operator": "In",
+                                "values": ["clickhouse"],
+                            }
+                        ]
+                    },
+                    "topologyKey": "kubernetes.io/hostname",
+                }
+            ]
+        }
+    if use_io_optimized:
+        affinity["nodeAffinity"] = {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                    {
+                        "matchExpressions": [
+                            {
+                                "key": "ol.mit.edu/io_optimized",
+                                "operator": "In",
+                                "values": ["true"],
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
 
-    return kubernetes.apps.v1.StatefulSet(
-        f"clickhouse-keeper-{env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="clickhouse-keeper",
-            namespace=namespace,
-            labels={**labels, "app": "clickhouse-keeper"},
-        ),
-        spec=kubernetes.apps.v1.StatefulSetSpecArgs(
-            replicas=replicas,
-            service_name="clickhouse-keeper-headless",
-            selector=kubernetes.meta.v1.LabelSelectorArgs(
-                match_labels={"app": "clickhouse-keeper"},
+    return ebs_storageclass_output.apply(
+        lambda sc: kubernetes.apiextensions.CustomResource(
+            f"clickhouse-keeper-installation-{env_suffix}",
+            api_version="clickhouse-keeper.altinity.com/v1",
+            kind="ClickHouseKeeperInstallation",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name="clickhouse",
+                namespace=namespace,
+                labels=labels,
             ),
-            pod_management_policy="Parallel",
-            template=kubernetes.core.v1.PodTemplateSpecArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels={**labels, "app": "clickhouse-keeper"},
-                ),
-                spec=kubernetes.core.v1.PodSpecArgs(
-                    tolerations=tolerations,
-                    node_selector=node_selector,
-                    affinity=kubernetes.core.v1.AffinityArgs(
-                        node_affinity=(
-                            IO_OPTIMIZED_NODE_AFFINITY.node_affinity
-                            if use_io_optimized
-                            else None
-                        ),
-                        pod_anti_affinity=kubernetes.core.v1.PodAntiAffinityArgs(
-                            required_during_scheduling_ignored_during_execution=[
-                                kubernetes.core.v1.PodAffinityTermArgs(
-                                    label_selector=kubernetes.meta.v1.LabelSelectorArgs(
-                                        match_labels={"app": "clickhouse-keeper"},
-                                    ),
-                                    topology_key="kubernetes.io/hostname",
-                                )
-                            ]
-                        ),
-                    )
-                    if replicas > 1
-                    else None,
-                    init_containers=[
-                        kubernetes.core.v1.ContainerArgs(
-                            name="set-server-id",
-                            image="busybox:stable-musl",
-                            command=[
-                                "sh",
-                                "-c",
-                                # Extract pod index from hostname (e.g. clickhouse-keeper-0 -> 1)
-                                "export MY_ID=$((${HOSTNAME##*-} + 1)); "
-                                "echo MY_ID=$MY_ID > /keeper-env/env",
-                            ],
-                            env=[
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="HOSTNAME",
-                                    value_from=kubernetes.core.v1.EnvVarSourceArgs(
-                                        field_ref=kubernetes.core.v1.ObjectFieldSelectorArgs(
-                                            field_path="metadata.name"
-                                        )
-                                    ),
-                                )
-                            ],
-                            volume_mounts=[
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="keeper-env",
-                                    mount_path="/keeper-env",
-                                )
-                            ],
-                        )
+            spec={
+                "defaults": {
+                    "templates": {
+                        "podTemplate": "keeper-pod",
+                        "dataVolumeClaimTemplate": "keeper-data",
+                    }
+                },
+                "configuration": {
+                    "clusters": [
+                        {
+                            "name": "cluster1",
+                            "layout": {"replicasCount": replicas},
+                        }
                     ],
-                    containers=[
-                        kubernetes.core.v1.ContainerArgs(
-                            name="clickhouse-keeper",
-                            image=image,
-                            command=[
-                                "sh",
-                                "-c",
-                                ". /keeper-env/env && export MY_ID && /entrypoint.sh",
-                            ],
-                            ports=[
-                                kubernetes.core.v1.ContainerPortArgs(
-                                    name="client", container_port=2181
-                                ),
-                                kubernetes.core.v1.ContainerPortArgs(
-                                    name="raft", container_port=9444
-                                ),
-                            ],
-                            resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                                requests={"cpu": "100m", "memory": "256Mi"},
-                                limits={"memory": "512Mi"},
-                            ),
-                            liveness_probe=kubernetes.core.v1.ProbeArgs(
-                                exec_=kubernetes.core.v1.ExecActionArgs(
-                                    command=[
-                                        "sh",
-                                        "-c",
-                                        "echo ruok | nc localhost 2181",
-                                    ]
-                                ),
-                                initial_delay_seconds=30,
-                                period_seconds=30,
-                                failure_threshold=3,
-                            ),
-                            volume_mounts=[
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="keeper-config",
-                                    mount_path="/etc/clickhouse-keeper/keeper.xml",
-                                    sub_path="keeper.xml",
-                                ),
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="keeper-data",
-                                    mount_path="/var/lib/clickhouse-keeper",
-                                ),
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="keeper-env",
-                                    mount_path="/keeper-env",
-                                ),
-                            ],
-                        )
+                    "settings": {
+                        "keeper_server/tcp_port": "2181",
+                        "keeper_server/coordination_settings/raft_logs_level": "warning",
+                        "keeper_server/coordination_settings/operation_timeout_ms": "10000",
+                        "keeper_server/coordination_settings/session_timeout_ms": "30000",
+                        "listen_host": "0.0.0.0",  # noqa: S104
+                    },
+                },
+                "templates": {
+                    "podTemplates": [
+                        {
+                            "name": "keeper-pod",
+                            "spec": {
+                                "securityContext": {"fsGroup": 101},
+                                "tolerations": tolerations,
+                                "nodeSelector": node_selector,
+                                **({"affinity": affinity} if affinity else {}),
+                                "containers": [
+                                    {
+                                        "name": "clickhouse-keeper",
+                                        "image": image,
+                                        "resources": {
+                                            "requests": {
+                                                "cpu": "100m",
+                                                "memory": "256Mi",
+                                            },
+                                            "limits": {
+                                                "memory": "512Mi",
+                                            },
+                                        },
+                                    }
+                                ],
+                            },
+                        }
                     ],
-                    volumes=[
-                        kubernetes.core.v1.VolumeArgs(
-                            name="keeper-config",
-                            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                                name="clickhouse-keeper-config",
-                            ),
-                        ),
-                        kubernetes.core.v1.VolumeArgs(
-                            name="keeper-env",
-                            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
-                        ),
+                    "volumeClaimTemplates": [
+                        {
+                            "name": "keeper-data",
+                            "spec": {
+                                "accessModes": ["ReadWriteOnce"],
+                                "storageClassName": sc
+                                if sc is not None
+                                else fallback_storage_class,
+                                "resources": {
+                                    "requests": {
+                                        "storage": "20Gi",
+                                    }
+                                },
+                            },
+                        }
                     ],
-                ),
-            ),
-            volume_claim_templates=[
-                kubernetes.core.v1.PersistentVolumeClaimArgs(
-                    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                        name="keeper-data",
-                        labels=labels,
-                    ),
-                    spec=kubernetes.core.v1.PersistentVolumeClaimSpecArgs(
-                        access_modes=["ReadWriteOnce"],
-                        # Keeper stores only coordination logs; always prefer EBS for
-                        # durability. Fall back to the cluster storage class if the EBS
-                        # CSI provisioner is not enabled on this cluster.
-                        storage_class_name=ebs_storageclass_output.apply(
-                            lambda sc: sc if sc is not None else fallback_storage_class
-                        ),
-                        resources=kubernetes.core.v1.VolumeResourceRequirementsArgs(
-                            requests={"storage": "20Gi"},
-                        ),
-                    ),
-                )
-            ],
-        ),
-        opts=ResourceOptions(depends_on=[config_map, headless_service, client_service]),
+                },
+            },
+        )
     )
 
 
@@ -415,7 +336,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
     cold_bucket_name: "Output[str]",
     users_secret_name: str,
     irsa_role_arn: "Output[str]",
-    keeper_statefulset: "kubernetes.apps.v1.StatefulSet",
+    keeper_installation: "Output[kubernetes.apiextensions.CustomResource]",
     users_secret: Any,
     vault_k8s_resources: Any,
 ) -> "Output[kubernetes.apiextensions.CustomResource]":
@@ -553,7 +474,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                     "zookeeper": {
                         "nodes": [
                             {
-                                "host": f"clickhouse-keeper.{namespace}.svc.cluster.local",
+                                "host": f"keeper-clickhouse.{namespace}.svc.cluster.local",
                                 "port": 2181,
                             }
                         ]
@@ -645,7 +566,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
             },
             opts=ResourceOptions(
                 depends_on=[
-                    keeper_statefulset,
+                    keeper_installation,
                     users_secret,
                     vault_k8s_resources,
                 ],
@@ -846,47 +767,14 @@ users_secret = OLVaultK8SSecret(
 )
 
 ############################################################
-# ClickHouse Keeper — StatefulSet (3 or 1 replicas)
+# ClickHouse Keeper — ClickHouseKeeperInstallation CRD
 #
 # Keeper provides distributed coordination (ZooKeeper-compatible protocol)
-# required for ClickHouse replication. Uses EBS gp3 for its own storage since
-# it stores only coordination logs (not bulk data) — NVMe not needed here.
+# required for ClickHouse replication. Managed by the Altinity operator,
+# which auto-creates the service "keeper-clickhouse". Uses EBS gp3 for
+# its own storage since it stores only coordination logs (not bulk data).
 ############################################################
-KEEPER_CLUSTER_SERVICE_NAME = "clickhouse-keeper"
-keeper_config_xml = dedent("""\
-    <clickhouse>
-      <keeper_server>
-        <tcp_port>2181</tcp_port>
-        <server_id from_env="MY_ID" />
-        <log_storage_path>/var/lib/clickhouse-keeper/coordination/log</log_storage_path>
-        <snapshot_storage_path>/var/lib/clickhouse-keeper/coordination/snapshots</snapshot_storage_path>
-        <coordination_settings>
-          <raft_logs_level>warning</raft_logs_level>
-          <operation_timeout_ms>10000</operation_timeout_ms>
-          <session_timeout_ms>30000</session_timeout_ms>
-        </coordination_settings>
-        <raft_configuration>
-          {raft_servers}
-        </raft_configuration>
-      </keeper_server>
-    </clickhouse>
-""")
-
-
-def _build_raft_servers(n: int) -> str:
-    """Generate Raft server entries for n Keeper pods."""
-    servers = [
-        f"<server>"
-        f"<id>{i + 1}</id>"
-        f"<hostname>clickhouse-keeper-{i}.clickhouse-keeper-headless.{CLICKHOUSE_NAMESPACE}.svc.cluster.local</hostname>"
-        f"<port>9444</port>"
-        f"</server>"
-        for i in range(n)
-    ]
-    return "\n          ".join(servers)
-
-
-keeper_statefulset = _create_keeper_resources(
+keeper_installation = _create_clickhouse_keeper_installation(
     env_suffix=stack_info.env_suffix,
     namespace=CLICKHOUSE_NAMESPACE,
     labels=k8s_global_labels,
@@ -922,7 +810,7 @@ clickhouse_installation = _create_clickhouse_installation(
     cold_bucket_name=cold_bucket.bucket_v2.bucket,
     users_secret_name=users_secret_name,
     irsa_role_arn=clickhouse_app.irsa_role.arn,
-    keeper_statefulset=keeper_statefulset,
+    keeper_installation=keeper_installation,
     users_secret=users_secret,
     vault_k8s_resources=clickhouse_app.vault_k8s_resources,
 )
@@ -1105,7 +993,7 @@ export("clickhouse_native_port", 9000)
 export("clickhouse_http_port", 8123)
 export(
     "keeper_service",
-    f"clickhouse-keeper.{CLICKHOUSE_NAMESPACE}.svc.cluster.local",
+    f"keeper-clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local",
 )
 export("cold_storage_bucket", cold_bucket_name)
 export(
@@ -1113,7 +1001,7 @@ export(
     dedent(f"""\
         ClickHouse HTTP: http://clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:8123
         ClickHouse Native: clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:9000
-        Keeper: clickhouse-keeper.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:2181
+        Keeper: keeper-clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:2181
 
         Tenants: tensorzero_db, openlit_db, opik_db
         Hot/cold cutoff: {hot_data_days} days (table TTL MOVE expressions)
