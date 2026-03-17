@@ -175,14 +175,14 @@ command fetches those; the second registers the locally-authored skills in
 
 1. **Scaffold** — creates the SKILL.md stub:
    ```bash
-   npx skills init .agents/skills/<skill-name>
+   npx skills init agents/skills/<skill-name>
    ```
-2. **Author** — edit `.agents/skills/<skill-name>/SKILL.md`
+2. **Author** — edit `agents/skills/<skill-name>/SKILL.md`
 3. **Register** — propagates symlinks to all agent directories:
    ```bash
-   npx skills add .agents/skills/<skill-name> --all -y
+   npx skills add agents/skills/<skill-name> --all -y
    ```
-4. **Commit** — the source lives in `.agents/skills/`; `skills/` and
+4. **Commit** — the source lives in `agents/skills/`; `.agents/skills/`, `skills/` and
    `skills-lock.json` at the repo root are gitignored generated views.
 
-See [`.agents/skills/README.md`](.agents/skills/README.md) for more detail.
+See [`agents/skills/README.md`](agents/skills/README.md) for more detail.

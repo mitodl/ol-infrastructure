@@ -56,5 +56,5 @@ description: >
 
 - `.agents/skills/` is the npx-managed installation directory and is gitignored.
   Do not author skills there directly.
-- `skills/` at the repo root is a generated symlink view and is gitignored.
+- `skills/` at the repo root is a generated symlink view of installed skills.
 - Skills run with full agent permissions; review content before committing.

@@ -35,8 +35,17 @@ Run from the repo root. Copier will interactively prompt for:
 - **project_type** — one of `application`, `substructure`, or `infrastructure`
 - **project_description** — human-readable description for `Pulumi.yaml`
 
+You should choose a **target module path** under `src/ol_infrastructure` that matches the
+existing directory layout for the kind of project you're creating. For example:
+
+- Application: `applications/<project_name>`
+- Infrastructure (multi-segment): `infrastructure/aws/network/<project_name>`
+- Substructure: `substructure/<project_name>` (or a more specific nested path if applicable)
+
+Use that module path as the copier destination:
+
 ```bash
-copier copy copier_templates/pulumi_project/ src/ol_infrastructure/<project_type>/<project_name>
+copier copy copier_templates/pulumi_project/ src/ol_infrastructure/<target_module_path>
 ```
 
 The generated `Pulumi.yaml` backend is pre-set to `s3://mitol-pulumi-state/`.
@@ -47,21 +56,25 @@ Navigate into the new project directory and initialize CI, QA, and Production
 stacks. Each stack uses a KMS key scoped to its environment.
 
 ```bash
-cd src/ol_infrastructure/<project_type>/<project_name>
+cd src/ol_infrastructure/<target_module_path>
 
-pulumi stack init <project_type>.<project_name>.CI \
+# <namespace> should match the dotted module path for this project,
+# for example: applications.mitxonline or infrastructure.aws.network
+pulumi stack init <namespace>.CI \
   --secrets-provider=awskms://alias/infrastructure-secrets-ci
 
-pulumi stack init <project_type>.<project_name>.QA \
+pulumi stack init <namespace>.QA \
   --secrets-provider=awskms://alias/infrastructure-secrets-qa
 
-pulumi stack init <project_type>.<project_name>.Production \
+pulumi stack init <namespace>.Production \
   --secrets-provider=awskms://alias/infrastructure-secrets-production
 ```
 
-Stack naming convention: `<project_type>.<project_name>.<Environment>` where
-Environment is `CI`, `QA`, or `Production` (capitalization matters — it is
-interpolated into tag values).
+Stack naming convention: `<namespace>.<Environment>` where `namespace` matches
+the dotted module path for the project (for example,
+`applications.mitxonline` or `infrastructure.aws.network`) and Environment is
+`CI`, `QA`, or `Production` (capitalization matters — it is interpolated into
+tag values).
 
 ### 4. Set up encrypted secrets
 
