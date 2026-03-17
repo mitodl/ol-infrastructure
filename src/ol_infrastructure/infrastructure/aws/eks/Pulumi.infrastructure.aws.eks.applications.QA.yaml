@@ -47,6 +47,7 @@ config:
   - jupyter-authoring
   - kubewatch
   - learn-ai
+  - micromasters
   - mitlearn
   - mitxonline
   - mitxonline-openedx
