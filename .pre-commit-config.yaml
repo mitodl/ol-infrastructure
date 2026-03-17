@@ -67,6 +67,8 @@ repos:
     - --exclude-files
     - charts/
     - --exclude-files
+    - sdks/
+    - --exclude-files
     - skills-lock.json
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
@@ -79,7 +81,7 @@ repos:
   rev: v1.19.1
   hooks:
   - id: mypy
-    exclude: dockerfiles/
+    exclude: dockerfiles/|sdks/
     args:
     - --explicit-package-bases
     - --namespace-packages
