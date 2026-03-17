@@ -730,11 +730,32 @@ static_secrets = OLVaultK8SSecret(
     ),
 )
 
+env_vars = dict(learn_ai_config.require_object("env_vars") or {})
+
+# OTEL_RESOURCE_ATTRIBUTES is used as a sentinel to detect stacks where OTEL
+# is enabled (QA and Production). CI does not define it and is left untouched.
+if "OTEL_RESOURCE_ATTRIBUTES" in env_vars:
+    # Enrich telemetry with MIT OL organizational metadata via OTEL_ENTITIES.
+    # ol.mit.edu/stack is the identifying attribute; all other labels are descriptive.
+    # Values are percent-encoded per the OTEL entities spec to escape reserved chars.
+    _reserved = str.maketrans({c: f"%{ord(c):02X}" for c in "{}[]@;,="})
+    stack_id = k8s_global_labels.get("ol.mit.edu/stack", "unknown").translate(
+        _reserved
+    )
+    desc_attrs = ",".join(
+        f"{k}={v.translate(_reserved)}"
+        for k, v in k8s_global_labels.items()
+        if k != "ol.mit.edu/stack"
+    )
+    env_vars["OTEL_ENTITIES"] = (
+        f"mitol.deployment{{ol.mit.edu/stack={stack_id}}}[{desc_attrs}]"
+    )
+
 # Instantiate the OLApplicationK8s component
 learn_ai_app_k8s = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
         project_root=Path(__file__).parent,
-        application_config=learn_ai_config.require_object("env_vars") or {},
+        application_config=env_vars,
         application_name="learn-ai",
         application_namespace=learn_ai_namespace,
         application_lb_service_name="learn-ai-webapp",
@@ -841,40 +862,6 @@ learn_ai_app_k8s = OLApplicationK8s(
         ],
     ),
 )
-
-# Reconstruct variables needed for Celery deployment
-application_image_repository_and_tag = f"mitodl/learn-ai-app:{LEARN_AI_DOCKER_TAG}"
-
-learn_ai_deployment_env_vars = []
-for k, v in (learn_ai_config.require_object("env_vars") or {}).items():
-    learn_ai_deployment_env_vars.append(
-        kubernetes.core.v1.EnvVarArgs(
-            name=k,
-            value=v,
-        )
-    )
-
-# Build a list of sensitive env vars for the deployment config via envFrom
-learn_ai_deployment_envfrom = [
-    # Database creds
-    kubernetes.core.v1.EnvFromSourceArgs(
-        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
-            name=db_creds_secret_name,
-        ),
-    ),
-    # Redis Configuration
-    kubernetes.core.v1.EnvFromSourceArgs(
-        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
-            name=redis_creds_secret_name,
-        ),
-    ),
-    # static secrets from secrets-learn-ai/secrets
-    kubernetes.core.v1.EnvFromSourceArgs(
-        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
-            name=static_secrets_name,
-        ),
-    ),
-]
 
 
 # Create the apisix custom resources since it doesn't support gateway-api yet
