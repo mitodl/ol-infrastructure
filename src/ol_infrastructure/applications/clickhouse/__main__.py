@@ -28,7 +28,9 @@ import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, StackReference, export
 
 from bridge.lib.versions import (
+    CLICKHOUSE_KEEPER_VERSION,
     CLICKHOUSE_OPERATOR_VERSION,  # noqa: F401 — for traceability
+    CLICKHOUSE_SERVER_VERSION,
 )
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
@@ -106,9 +108,9 @@ storage_class = stateful_workload_storage["storage_class"]
 use_io_optimized_nodes = stateful_workload_storage["use_io_optimized_nodes"]
 ch_replicas = int(clickhouse_config.get("replicas") or "1")
 keeper_replicas = int(clickhouse_config.get("keeper_replicas") or "1")
-ch_version = clickhouse_config.get("version") or "25.8.1.2953.altinitystable"
+ch_version = clickhouse_config.get("version") or CLICKHOUSE_SERVER_VERSION
 ch_image = f"altinity/clickhouse-server:{ch_version}"
-keeper_image = f"clickhouse/clickhouse-keeper:{ch_version.split('.')[0]}-alpine"
+keeper_image = f"clickhouse/clickhouse-keeper:{CLICKHOUSE_KEEPER_VERSION}"
 
 IO_OPTIMIZED_NODE_SELECTOR = {"ol.mit.edu/io_optimized": "true"}
 IO_OPTIMIZED_TOLERATION = kubernetes.core.v1.TolerationArgs(
