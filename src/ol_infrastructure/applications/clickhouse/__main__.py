@@ -22,6 +22,7 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Any
 
+import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, StackReference, export
@@ -43,7 +44,12 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
-from ol_infrastructure.lib.ol_types import AWSBase, BusinessUnit
+from ol_infrastructure.lib.ol_types import (
+    AWSBase,
+    BusinessUnit,
+    K8sGlobalLabels,
+    Services,
+)
 from ol_infrastructure.lib.pulumi_helper import parse_stack, require_stack_output_value
 from ol_infrastructure.lib.vault import setup_vault_provider
 
@@ -79,6 +85,12 @@ k8s_global_labels = {
     "ol.mit.edu/stack": stack_info.full_name,
     "app.kubernetes.io/managed-by": "pulumi",
 }
+
+k8s_labels = K8sGlobalLabels(
+    ou=BusinessUnit.data,
+    service=Services.clickhouse,
+    stack=stack_info,
+)
 
 setup_k8s_provider(kubeconfig=require_stack_output_value(cluster_stack, "kube_config"))
 CLICKHOUSE_NAMESPACE = "clickhouse"
@@ -679,36 +691,44 @@ cold_bucket_config = S3BucketConfig(
 
 cold_bucket = OLBucket(
     f"clickhouse-cold-storage-{stack_info.env_suffix}",
-    bucket_config=cold_bucket_config,
+    cold_bucket_config,
 )
 
-export("cold_bucket_name", cold_bucket.bucket.bucket)
-export("cold_bucket_arn", cold_bucket.bucket.arn)
+export("cold_bucket_name", cold_bucket.bucket_v2.bucket)
+export("cold_bucket_arn", cold_bucket.bucket_v2.arn)
 
 ############################################################
 # IRSA + Vault Auth Binding for ClickHouse
 ############################################################
-clickhouse_s3_policy = {
-    "Version": IAM_POLICY_VERSION,
-    "Statement": [
+
+# Build the IAM policy JSON as an Output to resolve bucket ARN values
+clickhouse_s3_policy_json: Output[str] = Output.all(
+    bucket_arn=cold_bucket.bucket_v2.arn,
+).apply(
+    lambda args: json.dumps(
         {
-            "Effect": "Allow",
-            "Action": [
-                "s3:GetObject",
-                "s3:PutObject",
-                "s3:DeleteObject",
-                "s3:ListBucket",
-                "s3:GetBucketLocation",
-                "s3:AbortMultipartUpload",
-                "s3:ListMultipartUploadParts",
+            "Version": IAM_POLICY_VERSION,
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "s3:GetObject",
+                        "s3:PutObject",
+                        "s3:DeleteObject",
+                        "s3:ListBucket",
+                        "s3:GetBucketLocation",
+                        "s3:AbortMultipartUpload",
+                        "s3:ListMultipartUploadParts",
+                    ],
+                    "Resource": [
+                        args["bucket_arn"],
+                        f"{args['bucket_arn']}/*",
+                    ],
+                },
             ],
-            "Resource": [
-                cold_bucket.bucket.arn,
-                cold_bucket.bucket.arn.apply(lambda arn: f"{arn}/*"),
-            ],
-        },
-    ],
-}
+        }
+    )
+)
 
 clickhouse_app = OLEKSAuthBinding(
     OLEKSAuthBindingConfig(
@@ -716,15 +736,29 @@ clickhouse_app = OLEKSAuthBinding(
         namespace=CLICKHOUSE_NAMESPACE,
         stack_info=stack_info,
         aws_config=aws_config,
-        iam_policy_document=clickhouse_s3_policy,
+        iam_policy_document=None,
         vault_policy_path=Path(__file__).parent.joinpath("clickhouse_policy.hcl"),
         cluster_name=cluster_stack.require_output("cluster_name"),
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
         irsa_service_account_name="clickhouse",
         vault_sync_service_account_names="clickhouse-vault",
-        k8s_labels=k8s_global_labels,
+        k8s_labels=k8s_labels,
     )
+)
+
+clickhouse_s3_iam_policy = aws.iam.Policy(
+    f"clickhouse-s3-policy-{stack_info.env_suffix}",
+    name=f"clickhouse-s3-policy-{stack_info.env_suffix}",
+    path=f"/ol-data/clickhouse-s3-policy-{stack_info.env_suffix}/",
+    policy=clickhouse_s3_policy_json,
+    description="Policy for granting ClickHouse access to cold storage S3 bucket",
+)
+
+aws.iam.RolePolicyAttachment(
+    f"clickhouse-s3-policy-attach-{stack_info.env_suffix}",
+    policy_arn=clickhouse_s3_iam_policy.arn,
+    role=clickhouse_app.irsa_role.name,
 )
 
 ############################################################
@@ -883,7 +917,7 @@ clickhouse_installation = _create_clickhouse_installation(
     use_io_optimized=use_io_optimized_nodes,
     storage_class=storage_class,
     hot_storage_size=hot_storage_size,
-    cold_bucket_name=cold_bucket.bucket.bucket,
+    cold_bucket_name=cold_bucket.bucket_v2.bucket,
     users_secret_name=users_secret_name,
     irsa_role_arn=clickhouse_app.irsa_role.arn,
     keeper_statefulset=keeper_statefulset,

@@ -10,5 +10,11 @@ config:
   clickhouse:version: 25.8.1.2953.altinitystable
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
+  clickhouse:admin_password:
+    secure: v1:FJaeilA/IWurPzEC:fAvuOWlo1BE+HbCYfw1tQSlTlpZRtuvVZLh7KeGey/wuW1tuytuL3VjX9kkge6J641UPsyrkuog=
+  clickhouse:tensorzero_password:
+    secure: v1:Zobviz02IkPuv1S0:+2rm8Vf+ppbrAat0wo/2/7h/Sx8WS+RATn17MbgaZ8tabf8+8Ql4ROAY0t0x6oSK1A4PK49MhkE=
+  clickhouse:openlit_password:
+    secure: v1:NqPhT7ljYnfuRUTW:8g9g1M1kcx0lHBwqTdaHnpUtuKfgGWMLTxwrLTzenRXW9uxXCjr956YXfrrijGbq3A2EMQLfLms=
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAHLtEgrQCjsmuo8KCBdgudpAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMxIEgSqVA8a3Tn4V6AgEQgDsUrzePlDlRE3LsXGQFZyYL8ydnDXuwV+uBRwua0UHc7xdUZxcCGUISGouz5NLtQeQ5AhlfyjsTrQAtWQ==

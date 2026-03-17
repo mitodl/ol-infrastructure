@@ -1,3 +1,4 @@
+import json
 from functools import lru_cache, partial
 
 import boto3
@@ -112,9 +113,12 @@ def set_k8s_provider(
 
 
 def setup_k8s_provider(
-    kubeconfig: str,
+    kubeconfig: str | dict[str, object],
     provider_name: str | None = None,
 ):
+    # lru_cache requires hashable arguments; serialize dict kubeconfigs to JSON
+    if isinstance(kubeconfig, dict):
+        kubeconfig = json.dumps(kubeconfig)
     pulumi.runtime.register_stack_transformation(
         partial(
             set_k8s_provider,

@@ -8,5 +8,13 @@ config:
   clickhouse:version: 25.8.1.2953.altinitystable
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
+  clickhouse:admin_password:
+    secure: v1:RGySU3wMNrbikGGg:guxhf4o+zHAsHuk+VfSjbOAwyFhpGX3Tg8pSPxvdGGR0Zt5pFZLajGChFfo9sNRg3Qx5c6TGLMo=
+  clickhouse:tensorzero_password:
+    secure: v1:aCDdZ/XQXLi1PjFu:JW3cgJ4QnmYADnRtbJyuUyC8o20RQzJmp9Zaxwyq2xTThaGiA9+iKi+DAvKgVWj59AihbaJYV+E=
+  clickhouse:openlit_password:
+    secure: v1:bL3v2EWJB/qy2vvj:ecflaLwlsV3XMOGnPZGG6tT2e4YmJjLpwy2PjVGvba46B3TkP4LQIaPKAxgVqvGpA2H7/ljFpGs=
+  clickhouse:opik_password:
+    secure: v1:welcw7aZeYvZE/P1:4a5YIKqFpx7DRcLqOf6HQEkSzj+Ur34KJHD3pZbrc6MePWPSkRSnRxjeFqm+bDXAJM8zBZMejbc=
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHjZAY5LtmRWGljev0oiDGn0jR5cRwD4IVXCn50TW5i0qQFJ5ilpKwEX1fFnZEcvabyvAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMkiHCg5JwutG4bAb/AgEQgDvRQvEmWMj3/wmxQkcAhY9N/KfDJD2xcy+97xpIF8CzCM5r6eC/Hspei7YI4EPw4CosTwavWa0jl4bvEw==
