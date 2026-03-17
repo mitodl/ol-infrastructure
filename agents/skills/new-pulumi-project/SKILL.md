@@ -81,7 +81,8 @@ tag values).
 Create a SOPS-encrypted secrets file for the new project:
 
 ```bash
-mkdir src/bridge/secrets/<project_name>
+cd ../../../                   # from src/ol_infrastructure/<target_module_path> back to repo root
+mkdir -p src/bridge/secrets/<project_name>
 cd src/bridge/secrets/<project_name>
 sops account.yaml             # or whatever the secret file should be named
 ```
