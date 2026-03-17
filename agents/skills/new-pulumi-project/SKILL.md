@@ -3,7 +3,7 @@ name: new-pulumi-project
 description: >
   Step-by-step guide for scaffolding a new Pulumi project in ol-infrastructure.
   Use when creating a new infrastructure, application, or substructure Pulumi
-  project, including stack initialization and optional Terraform provider setup.
+  project, including stack initialization.
 ---
 
 # Creating a New Pulumi Project
@@ -39,8 +39,8 @@ You should choose a **target module path** under `src/ol_infrastructure` that ma
 existing directory layout for the kind of project you're creating. For example:
 
 - Application: `applications/<project_name>`
-- Infrastructure (multi-segment): `infrastructure/aws/network/<project_name>`
-- Substructure: `substructure/<project_name>` (or a more specific nested path if applicable)
+- Infrastructure: `infrastructure/aws/<project_name>` (or another direct child path that matches existing projects)
+- Substructure: `substructure/<project_name>` (or a more specific nested path under an existing substructure hierarchy, if applicable)
 
 Use that module path as the copier destination:
 
@@ -59,7 +59,7 @@ stacks. Each stack uses a KMS key scoped to its environment.
 cd src/ol_infrastructure/<target_module_path>
 
 # <namespace> should match the dotted module path for this project,
-# for example: applications.mitxonline or infrastructure.aws.network
+# for example: applications.mitxonline or infrastructure.aws.myproject
 pulumi stack init <namespace>.CI \
   --secrets-provider=awskms://alias/infrastructure-secrets-ci
 
@@ -72,7 +72,7 @@ pulumi stack init <namespace>.Production \
 
 Stack naming convention: `<namespace>.<Environment>` where `namespace` matches
 the dotted module path for the project (for example,
-`applications.mitxonline` or `infrastructure.aws.network`) and Environment is
+`applications.mitxonline` or `infrastructure.aws.myproject`) and Environment is
 `CI`, `QA`, or `Production` (capitalization matters — it is interpolated into
 tag values).
 

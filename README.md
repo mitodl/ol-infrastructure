@@ -182,7 +182,7 @@ command fetches those; the second registers the locally-authored skills in
    ```bash
    npx skills add agents/skills/<skill-name> --all -y
    ```
-4. **Commit** — the source lives in `agents/skills/`; `.agents/skills/`, `skills/` and
-   `skills-lock.json` at the repo root are gitignored generated views.
+4. **Commit** — the source lives in `agents/skills/`; `.agents/skills/` and `skills/` at the repo root
+   are gitignored generated views, and `skills-lock.json` is a committed lockfile that pins external skills.
 
 See [`agents/skills/README.md`](agents/skills/README.md) for more detail.
