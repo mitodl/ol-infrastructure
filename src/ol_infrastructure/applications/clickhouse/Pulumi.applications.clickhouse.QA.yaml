@@ -8,3 +8,5 @@ config:
   clickhouse:version: 25.8.1.2953.altinitystable
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHjZAY5LtmRWGljev0oiDGn0jR5cRwD4IVXCn50TW5i0qQFJ5ilpKwEX1fFnZEcvabyvAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMkiHCg5JwutG4bAb/AgEQgDvRQvEmWMj3/wmxQkcAhY9N/KfDJD2xcy+97xpIF8CzCM5r6eC/Hspei7YI4EPw4CosTwavWa0jl4bvEw==

@@ -8,3 +8,5 @@ config:
   clickhouse:version: 25.8.1.2953.altinitystable
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagGUp1319rLamkN4eXvfsQY7AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM2fssuyKGmrRZnYJHAgEQgDuzjYP/SqDU3f6u+sc6BYB8R5jwXmcSylT7mNXA7saz6SbK++3EWAaeGNBn6rdv8MMj2SrcgOZP3Ol1hQ==
