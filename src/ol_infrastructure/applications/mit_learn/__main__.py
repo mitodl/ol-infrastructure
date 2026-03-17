@@ -119,7 +119,9 @@ vector_log_proxy_stack = StackReference(
 )
 monitoring_stack = StackReference("infrastructure.monitoring")
 dns_stack = StackReference("infrastructure.aws.dns")
-qdrant_cloud_stack = StackReference(f"infrastructure.qdrant_cloud.{stack_info.name}")
+qdrant_cloud_stack = StackReference(
+    f"infrastructure.qdrant_cloud.mitlearn.{stack_info.name}"
+)
 
 qdrant_secrets = read_yaml_secrets(Path("qdrant_cloud/account.yaml"))
 qdrant_provider = qdrant_cloud.Provider(
