@@ -135,7 +135,10 @@ qdrant_api_key = qdrant_cloud.AccountsDatabaseApiKeyV2(
     global_access_rule=qdrant_cloud.AccountsDatabaseApiKeyV2GlobalAccessRuleArgs(
         access_type="GLOBAL_ACCESS_RULE_ACCESS_TYPE_MANAGE",
     ),
-    opts=ResourceOptions(provider=qdrant_provider),
+    opts=ResourceOptions(
+        provider=qdrant_provider,
+        additional_secret_outputs=["key"],
+    ),
 )
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 learn_zone_id = dns_stack.require_output("learn")["id"]

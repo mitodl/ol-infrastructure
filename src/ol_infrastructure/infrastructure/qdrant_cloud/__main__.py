@@ -95,7 +95,7 @@ if desired_disk_gib is not None and package.resource_configurations:
             raise ValueError(msg)
         node_resource_configurations = [
             qdrant_cloud.AccountsClusterConfigurationNodeConfigurationResourceConfigurationArgs(
-                amount=effective_disk_gib,
+                amount=effective_disk_gib - base_disk_gib,
                 resource_type="disk",
                 resource_unit="GiB",
             )
