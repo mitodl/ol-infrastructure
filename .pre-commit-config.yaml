@@ -66,6 +66,8 @@ repos:
     - src/ol_infrastructure/applications/ocw_site/redirect_dict
     - --exclude-files
     - charts/
+    - --exclude-files
+    - skills-lock.json
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
   rev: 'v0.15.4'

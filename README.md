@@ -67,6 +67,9 @@ stack, it will ask you to interactively select the stack which you are deploying
 
 ## Adding a new Project
 
+> **Using an AI coding agent?** Load the `new-pulumi-project` skill — it walks
+> through every step below interactively. See [Agentic Engineering](#agentic-engineering).
+
 For each deployable unit of work we need to have a Pulumi project defined. The Pulumi CLI has a `new` command, but that
 introduces extra files that we don't want. The minimum necessary work to signal that a given directory is a project is
 the presence of a `Pulumi.yaml` file and a `__main__.py` where the deployment code is located. The contents of the
@@ -126,3 +129,60 @@ Standard](https://en.wikipedia.org/wiki/Filesystem_Hierarchy_Standard). This typ
 means that applications or services which are deployed by downloading an archive or
 cloning a software repository should go under `/opt`, configuration files under `/etc/`,
 and data files under `/var/lib`.
+
+# Agentic Engineering
+
+This repository ships skills for AI coding agents. Skills give agents
+step-by-step, repo-specific guidance so they can perform common tasks correctly
+without being guided through every detail by hand.
+
+## Setup
+
+Install [Node.js](https://nodejs.org/) (needed for `npx`), then restore all
+skills (both external packages and local skills):
+
+```bash
+npx skills experimental_install && npx skills add ./agents/skills --all -y --full-depth
+```
+
+`skills-lock.json` in this repo pins the external skill packages. The first
+command fetches those; the second registers the locally-authored skills in
+`.agents/skills/`. Both create agent-specific symlinks (`.claude/skills/`,
+`.copilot/skills/`, etc.).
+
+## Available skills
+
+### External packages
+
+| Skill | Source | When to use |
+|-------|--------|-------------|
+| `pulumi-best-practices` | `pulumi/agent-skills` | Writing reliable Pulumi programs (Outputs, dependencies, secrets) |
+| `pulumi-component` | `pulumi/agent-skills` | Authoring `ComponentResource` classes |
+| `pulumi-automation-api` | `pulumi/agent-skills` | Using the Pulumi Automation API |
+| `pulumi-terraform-to-pulumi` | `pulumi/agent-skills` | Migrating Terraform HCL to Pulumi |
+| `cloudformation-to-pulumi` | `pulumi/agent-skills` | Migrating CloudFormation to Pulumi |
+| `pulumi-cdk-to-pulumi` | `pulumi/agent-skills` | Migrating AWS CDK to Pulumi |
+| `pulumi-arm-to-pulumi` | `pulumi/agent-skills` | Migrating Azure ARM/Bicep to Pulumi |
+| `pulumi-esc` | `pulumi/agent-skills` | Managing secrets with Pulumi ESC |
+
+### Local skills
+
+| Skill | When to use |
+|-------|-------------|
+| `new-pulumi-project` | Scaffolding a new Pulumi infrastructure, application, or substructure project |
+
+## Adding a skill
+
+1. **Scaffold** — creates the SKILL.md stub:
+   ```bash
+   npx skills init .agents/skills/<skill-name>
+   ```
+2. **Author** — edit `.agents/skills/<skill-name>/SKILL.md`
+3. **Register** — propagates symlinks to all agent directories:
+   ```bash
+   npx skills add .agents/skills/<skill-name> --all -y
+   ```
+4. **Commit** — the source lives in `.agents/skills/`; `skills/` and
+   `skills-lock.json` at the repo root are gitignored generated views.
+
+See [`.agents/skills/README.md`](.agents/skills/README.md) for more detail.
