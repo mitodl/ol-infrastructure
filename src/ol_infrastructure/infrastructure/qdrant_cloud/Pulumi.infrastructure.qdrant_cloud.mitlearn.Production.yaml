@@ -1,0 +1,10 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAGM7v4E+nxhYUgZAkd6WUoCAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMnYUjKqQWTzX7ukWWAgEQgDt2RL3dL4s0nFOspkOEUqG/ONyPehXN9ZiB1HvVqzGY86VjfMgVCCTtaUdzTzejpb1IEXdVQYg5Q3HIVg==
+config:
+  qdrant-cloud:cloud_provider: aws
+  qdrant-cloud:cloud_region: us-east-1
+  qdrant-cloud:number_of_nodes: 3
+  qdrant-cloud:enable_high_availability: "true"
+  qdrant-cloud:desired_package_name: mx2
+  qdrant-cloud:desired_disk_gib: "50"

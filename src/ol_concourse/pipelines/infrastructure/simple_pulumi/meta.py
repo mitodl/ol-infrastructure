@@ -171,6 +171,7 @@ if __name__ == "__main__":
             "open-discussions",
             "open-metadata",
             "opensearch",
+            "qdrant-cloud",
             "starrocks",
             "tika",
             "vector-log-proxy",

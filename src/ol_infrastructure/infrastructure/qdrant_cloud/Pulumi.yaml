@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-qdrant-cloud
+runtime: python
+description: Management of QDrant vector database clusters in the QDrant cloud service
+backend:
+  url: s3://mitol-pulumi-state/
