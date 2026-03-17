@@ -13,8 +13,8 @@ from bridge.lib.versions import CLICKHOUSE_OPERATOR_VERSION
 from ol_infrastructure.lib.aws.eks_helper import check_cluster_namespace
 
 CLICKHOUSE_OPERATOR_MANIFEST_URL = (
-    "https://github.com/Altinity/clickhouse-operator/releases/download/"
-    f"{CLICKHOUSE_OPERATOR_VERSION}/clickhouse-operator-install-bundle.yaml"
+    "https://raw.githubusercontent.com/Altinity/clickhouse-operator/"
+    f"{CLICKHOUSE_OPERATOR_VERSION}/deploy/operator/clickhouse-operator-install-bundle.yaml"
 )
 CLICKHOUSE_OPERATOR_NAMESPACE = "clickhouse-operator"
 
