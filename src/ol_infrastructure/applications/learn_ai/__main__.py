@@ -739,9 +739,7 @@ if "OTEL_RESOURCE_ATTRIBUTES" in env_vars:
     # ol.mit.edu/stack is the identifying attribute; all other labels are descriptive.
     # Values are percent-encoded per the OTEL entities spec to escape reserved chars.
     _reserved = str.maketrans({c: f"%{ord(c):02X}" for c in "{}[]@;,="})
-    stack_id = k8s_global_labels.get("ol.mit.edu/stack", "unknown").translate(
-        _reserved
-    )
+    stack_id = k8s_global_labels.get("ol.mit.edu/stack", "unknown").translate(_reserved)
     desc_attrs = ",".join(
         f"{k}={v.translate(_reserved)}"
         for k, v in k8s_global_labels.items()
