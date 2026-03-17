@@ -6,7 +6,7 @@ USER app
 WORKDIR /home/app/workspace
 ENV PATH /bin:/usr/bin/:/usr/local/bin:/home/app/.local/bin
 COPY --chown=app:app ./ /home/app/workspace/
-RUN uv build
+RUN uv build --all-packages
 
 FROM python:3.14-slim
 COPY --from=build /home/app/workspace/dist/*.whl /tmp/
