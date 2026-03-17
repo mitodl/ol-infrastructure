@@ -6,6 +6,12 @@ resolution-markers = [
     "python_full_version < '3.14'",
 ]
 
+[manifest]
+members = [
+    "ol-infrastructure",
+    "pulumi-qdrant-cloud",
+]
+
 [[package]]
 name = "annotated-types"
 version = "0.7.0"
@@ -1145,6 +1151,7 @@ dependencies = [
     { name = "pulumi-keycloak" },
     { name = "pulumi-mailgun" },
     { name = "pulumi-mongodbatlas" },
+    { name = "pulumi-qdrant-cloud" },
     { name = "pulumi-tls" },
     { name = "pulumi-vault" },
     { name = "pulumiverse-heroku" },
@@ -1161,6 +1168,7 @@ dev = [
     { name = "datamodel-code-generator" },
     { name = "diagrams" },
     { name = "mypy" },
+    { name = "pip" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1192,6 +1200,7 @@ requires-dist = [
     { name = "pulumi-keycloak", specifier = ">=6.0.0,<7" },
     { name = "pulumi-mailgun", specifier = ">=3.0.0,<4" },
     { name = "pulumi-mongodbatlas", specifier = ">=4,<5" },
+    { name = "pulumi-qdrant-cloud", editable = "sdks/qdrant-cloud" },
     { name = "pulumi-tls", specifier = ">=5.0.0,<6" },
     { name = "pulumi-vault", specifier = ">=7,<8" },
     { name = "pulumiverse-heroku", specifier = ">=1.0.3,<2" },
@@ -1208,6 +1217,7 @@ dev = [
     { name = "datamodel-code-generator" },
     { name = "diagrams" },
     { name = "mypy" },
+    { name = "pip", specifier = ">=26.0.1" },
     { name = "pre-commit", specifier = ">=4.0.0,<5" },
     { name = "pytest", specifier = ">=9.0.1,<10" },
     { name = "pytest-asyncio", specifier = ">=0.24.0" },
@@ -1384,6 +1394,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/fa/36/e27608899f9b8d4dff0617b2d9ab17ca5608956ca44461ac14ac48b44015/pathspec-1.0.4.tar.gz", hash = "sha256:0210e2ae8a21a9137c0d470578cb0e595af87edaa6ebf12ff176f14a02e0e645", size = 131200, upload-time = "2026-01-27T03:59:46.938Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ef/3c/2c197d226f9ea224a9ab8d197933f9da0ae0aac5b6e0f884e2b8d9c8e9f7/pathspec-1.0.4-py3-none-any.whl", hash = "sha256:fb6ae2fd4e7c921a165808a552060e722767cfa526f99ca5156ed2ce45a5c723", size = 55206, upload-time = "2026-01-27T03:59:45.137Z" },
+]
+
+[[package]]
+name = "pip"
+version = "26.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/48/83/0d7d4e9efe3344b8e2fe25d93be44f64b65364d3c8d7bc6dc90198d5422e/pip-26.0.1.tar.gz", hash = "sha256:c4037d8a277c89b320abe636d59f91e6d0922d08a05b60e85e53b296613346d8", size = 1812747, upload-time = "2026-02-05T02:20:18.702Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/de/f0/c81e05b613866b76d2d1066490adf1a3dbc4ee9d9c839961c3fc8a6997af/pip-26.0.1-py3-none-any.whl", hash = "sha256:bdb1b08f4274833d62c1aa29e20907365a2ceb950410df15fc9521bad440122b", size = 1787723, upload-time = "2026-02-05T02:20:16.416Z" },
 ]
 
 [[package]]
@@ -1635,6 +1654,24 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/37/5c/49aa0baade3072b5caa752881df89f0c09c7679b3639d2a5d1dca8f7a51a/pulumi_mongodbatlas-4.5.0.tar.gz", hash = "sha256:ef3eca52dbf790b56796924e64630920e92dcdda136421f768fa5d53ae3d8dcb", size = 652240, upload-time = "2026-03-12T04:35:32.541Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f8/52/8c1d0ac49634d424fc634ac8a602aa6502fc6c64f92ae963323f3ae376b5/pulumi_mongodbatlas-4.5.0-py3-none-any.whl", hash = "sha256:d0fe698cc04f76c1eac76832b7b1478b582bc0b3019de7d5be46f55869229a99", size = 908506, upload-time = "2026-03-12T04:35:30.825Z" },
+]
+
+[[package]]
+name = "pulumi-qdrant-cloud"
+version = "1.19.3"
+source = { editable = "sdks/qdrant-cloud" }
+dependencies = [
+    { name = "parver" },
+    { name = "pulumi" },
+    { name = "semver" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "parver", specifier = ">=0.2.1" },
+    { name = "pulumi", specifier = ">=3.165.0,<4.0.0" },
+    { name = "semver", specifier = ">=2.8.1" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'", specifier = ">=4.11,<5" },
 ]
 
 [[package]]

@@ -92,3 +92,5 @@ NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION = "0.18.2"
 PGBOUNCER_VERSION = "1.25.1"
 # renovate: datasource=helm depName=local-path-provisioner packageName=local-path-provisioner registryUrl=https://charts.rancher.io
 LOCAL_PATH_PROVISIONER_CHART_VERSION = "0.0.31"
+# renovate: datasource=github-releases depName=qdrant packageName=qdrant/qdrant
+QDRANT_VERSION = "v1.13.4"

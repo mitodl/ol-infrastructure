@@ -1,0 +1,18 @@
+[project]
+  name = "pulumi_qdrant_cloud"
+  description = "A Pulumi provider dynamically bridged from qdrant-cloud."
+  dependencies = ["parver>=0.2.1", "pulumi>=3.165.0,<4.0.0", "semver>=2.8.1", "typing-extensions>=4.11,<5; python_version < \"3.11\""]
+  readme = "README.md"
+  requires-python = ">=3.9"
+  version = "1.19.3"
+  [project.urls]
+    Repository = "https://github.com/qdrant/terraform-provider-qdrant-cloud"
+
+[build-system]
+  requires = ["setuptools>=61.0"]
+  build-backend = "setuptools.build_meta"
+
+[tool]
+  [tool.setuptools]
+    [tool.setuptools.package-data]
+      pulumi_qdrant_cloud = ["py.typed", "pulumi-plugin.json"]
