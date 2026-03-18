@@ -321,14 +321,7 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                         ),
                         image_pull_policy="Always",
                         command=["xqueue-watcher"],
-                        args=[
-                            "--config",
-                            "/xqwatcher/conf.d/xqwatcher.json",
-                            "--logging-config",
-                            "/xqwatcher/conf.d/logging.json",
-                            "-d",
-                            "/xqwatcher/conf.d",
-                        ],
+                        args=["-d", "/xqwatcher/conf.d"],
                         env=[
                             # HTTP Basic Auth for the xqueue server endpoint.
                             # Value is "username:password"; sourced from the
