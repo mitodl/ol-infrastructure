@@ -74,6 +74,36 @@ if env_suffix == "qa":
 else:
     transcoded_oai_path = oai_path
 
+# ── CORS Response Headers Policy ─────────────────────────────────────────────
+
+# Adds Access-Control-Allow-Origin: * and Vary: Origin to every S3-origin
+# response, regardless of whether the request included an Origin header.
+# This fixes CORS failures when browsers send credentialless cross-origin
+# requests that CloudFront serves from a cached non-CORS response.
+ovs_cloudfront_cors_response_policy = cloudfront.ResponseHeadersPolicy(
+    "ovs-cloudfront-cors-response-policy",
+    comment=f"CORS response headers for ODL Video Service {env_variant}",
+    cors_config={
+        "access_control_allow_credentials": False,
+        "access_control_allow_headers": {"items": ["*"]},
+        "access_control_allow_methods": {"items": ["GET", "HEAD", "OPTIONS"]},
+        "access_control_allow_origins": {"items": ["*"]},
+        "origin_override": True,
+    },
+    # Explicitly set Vary: Origin so clients cache CORS and non-CORS responses
+    # separately. CloudFront does not add this automatically when the allow-list
+    # is a wildcard.
+    custom_headers_config={
+        "items": [
+            {
+                "header": "Vary",
+                "value": "Origin",
+                "override": True,
+            }
+        ]
+    },
+)
+
 # ── Origin / cache-behavior helpers ──────────────────────────────────────────
 
 # Origin IDs are logical names embedded in the CloudFront distribution state.
@@ -110,6 +140,7 @@ _s3_cors_behavior: dict[str, object] = {
         "query_string": False,
     },
     "max_ttl": 31536000,
+    "response_headers_policy_id": ovs_cloudfront_cors_response_policy.id,
     "viewer_protocol_policy": "redirect-to-https",
 }
 
@@ -183,6 +214,7 @@ ovs_cloudfront_distribution = cloudfront.Distribution(
             "cached_methods": ["GET", "HEAD"],
             "compress": True,
             "path_pattern": "/retranscode*",
+            "response_headers_policy_id": ovs_cloudfront_cors_response_policy.id,
             "target_origin_id": transcoded_origin_id,
             "viewer_protocol_policy": "redirect-to-https",
         },
