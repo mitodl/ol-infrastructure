@@ -11,7 +11,7 @@ from typing import Annotated, Any, Literal
 import pulumi_kubernetes as kubernetes
 import pulumiverse_time as pulumi_time
 from kubernetes.utils.quantity import parse_quantity
-from pulumi import Alias, ComponentResource, Output, ResourceOptions
+from pulumi import Alias, ComponentResource, CustomTimeouts, Output, ResourceOptions
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -323,6 +323,14 @@ class OLApplicationK8sConfig(BaseModel):
     )
     resource_requests: dict[str, str] = Field(default={"cpu": "250m", "memory": "1Gi"})
     resource_limits: dict[str, str] = Field(default={"memory": "1Gi"})
+    deployment_timeout_minutes: int = Field(
+        default=15,
+        description=(
+            "Minutes Pulumi will wait for the Deployment and Service to become ready "
+            "before marking the update as failed. Increase for applications with known "
+            "slow rollouts. Pulumi's built-in default is 10 minutes."
+        ),
+    )
     init_migrations: bool = Field(default=True)
     init_collectstatic: bool = Field(default=True)
     celery_worker_configs: list[OLApplicationK8sCeleryWorkerConfig] = []
@@ -386,7 +394,7 @@ class OLApplicationK8sConfig(BaseModel):
             ),
             initial_delay_seconds=10,  # Wait 10 seconds before first probe
             period_seconds=10,  # Probe every 10 seconds
-            failure_threshold=6,  # Allow up to 1 minutes (6 * 10s) for startup
+            failure_threshold=12,  # Allow up to 2 minutes (12 x 10s) for startup
             success_threshold=1,
             timeout_seconds=5,
         ),
@@ -606,9 +614,14 @@ class OLApplicationK8s(ComponentResource):
             ),
         )
         resource_options = ResourceOptions(parent=self)
+        _deployment_timeout = CustomTimeouts(
+            create=f"{ol_app_k8s_config.deployment_timeout_minutes}m",
+            update=f"{ol_app_k8s_config.deployment_timeout_minutes}m",
+        )
         deployment_options = ResourceOptions(
             parent=self,
             aliases=ol_app_k8s_config.webapp_deployment_aliases or None,
+            custom_timeouts=_deployment_timeout,
         )
 
         extra_deployment_args: dict[str, int] = {}
@@ -1476,7 +1489,9 @@ class OLApplicationK8s(ComponentResource):
             ),
             opts=resource_options.merge(
                 ResourceOptions(
+                    depends_on=[_application_deployment],
                     aliases=ol_app_k8s_config.webapp_service_aliases or None,
+                    custom_timeouts=_deployment_timeout,
                 )
             ),
         )
