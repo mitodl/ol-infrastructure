@@ -324,7 +324,7 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                         image=cached_image_uri(docker_image_ref),
                         image_pull_policy="Always",
                         command=["uv", "run", "--no-sync", "xqueue-watcher"],
-                        args=["-d", "/xqwatcher/conf.d"],
+                        args=["-d", "/xqwatcher"],
                         env=[
                             # HTTP Basic Auth for the xqueue server endpoint.
                             # Value is "username:password"; sourced from the
@@ -389,20 +389,22 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                             ),
                         ),
                         volume_mounts=[
-                            # Base poll settings from ConfigMap
+                            # Manager config and logging config at the root of
+                            # the -d directory; conf.d/ holds queue watcher configs.
                             kubernetes.core.v1.VolumeMountArgs(
                                 name="xqwatcher-config",
-                                mount_path="/xqwatcher/conf.d/xqwatcher.json",
+                                mount_path="/xqwatcher/xqwatcher.json",
                                 sub_path="xqwatcher.json",
                                 read_only=True,
                             ),
                             kubernetes.core.v1.VolumeMountArgs(
                                 name="xqwatcher-config",
-                                mount_path="/xqwatcher/conf.d/logging.json",
+                                mount_path="/xqwatcher/logging.json",
                                 sub_path="logging.json",
                                 read_only=True,
                             ),
-                            # Per-queue grader handler config from Vault secret
+                            # Per-queue grader handler config from Vault secret,
+                            # placed under conf.d/ so the manager discovers it.
                             kubernetes.core.v1.VolumeMountArgs(
                                 name="grader-config",
                                 mount_path="/xqwatcher/conf.d/grader_config.json",
