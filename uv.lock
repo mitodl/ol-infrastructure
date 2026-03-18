@@ -1152,6 +1152,7 @@ dependencies = [
     { name = "pulumi-mailgun" },
     { name = "pulumi-mongodbatlas" },
     { name = "pulumi-qdrant-cloud" },
+    { name = "pulumi-terraform" },
     { name = "pulumi-tls" },
     { name = "pulumi-vault" },
     { name = "pulumiverse-heroku" },
@@ -1201,6 +1202,7 @@ requires-dist = [
     { name = "pulumi-mailgun", specifier = ">=3.0.0,<4" },
     { name = "pulumi-mongodbatlas", specifier = ">=4,<5" },
     { name = "pulumi-qdrant-cloud", editable = "sdks/qdrant-cloud" },
+    { name = "pulumi-terraform", specifier = ">=6.0.1" },
     { name = "pulumi-tls", specifier = ">=5.0.0,<6" },
     { name = "pulumi-vault", specifier = ">=7,<8" },
     { name = "pulumiverse-heroku", specifier = ">=1.0.3,<2" },
@@ -1672,6 +1674,20 @@ requires-dist = [
     { name = "pulumi", specifier = ">=3.165.0,<4.0.0" },
     { name = "semver", specifier = ">=2.8.1" },
     { name = "typing-extensions", marker = "python_full_version < '3.11'", specifier = ">=4.11,<5" },
+]
+
+[[package]]
+name = "pulumi-terraform"
+version = "6.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "parver" },
+    { name = "pulumi" },
+    { name = "semver" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8a/bf/681ad9a21450cf252d7dc6dab1251832dd8a4e14033fc6df4f5680a9e9f1/pulumi_terraform-6.0.1.tar.gz", hash = "sha256:c8c98a6795eb1764c2696e58f96890bc083e492a237624216b6be51f6adaa3ff", size = 8023, upload-time = "2025-04-20T08:33:40.448Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/58/9c/4f0a9c7cd281e017c69ce5d96ad4251dabaaf6c3b36c73b8131c248681e3/pulumi_terraform-6.0.1-py3-none-any.whl", hash = "sha256:21a1831f3de659fb3043d914fb860fa6d2762b73ce516aef159abe91ee476f26", size = 11338, upload-time = "2025-04-20T08:33:39.235Z" },
 ]
 
 [[package]]

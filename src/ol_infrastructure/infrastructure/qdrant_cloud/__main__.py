@@ -19,7 +19,6 @@ provider = qdrant_cloud.Provider(
     api_key=qdrant_secrets["cloud_management_key"],
     account_id=qdrant_secrets["account_id"],
 )
-provider_opts = ResourceOptions(provider=provider)
 invoke_opts = InvokeOptions(provider=provider)
 
 cloud_provider = qdrant_cloud_config.get("cloud_provider") or "aws"
@@ -112,6 +111,14 @@ cluster = qdrant_cloud.AccountsCluster(
         ),
         number_of_nodes=number_of_nodes,
         version=cluster_version,
+        # restart_policy, rebalance_strategy, and service_type are all defined as
+        # Optional (not Computed) in the provider schema, so it treats unset values
+        # as "" / 0 rather than preserving what the API returns. The flatten path
+        # always stores the API values, creating a perpetual diff on every run.
+        # Set them explicitly to their managed-cloud defaults to eliminate the diff.
+        restart_policy="CLUSTER_CONFIGURATION_RESTART_POLICY_AUTOMATIC",
+        rebalance_strategy="CLUSTER_CONFIGURATION_REBALANCE_STRATEGY_BY_COUNT_AND_SIZE",
+        service_type="CLUSTER_SERVICE_TYPE_CLUSTER_IP",
         database_configuration=qdrant_cloud.AccountsClusterConfigurationDatabaseConfigurationArgs(
             collection=qdrant_cloud.AccountsClusterConfigurationDatabaseConfigurationCollectionArgs(
                 replication_factor=2 if enable_high_availability else 1,
@@ -123,7 +130,22 @@ cluster = qdrant_cloud.AccountsCluster(
     ),
     account_id=qdrant_secrets["account_id"],
     name=f"mitlearn-{stack_info.env_suffix}",
-    opts=provider_opts,
+    opts=ResourceOptions(
+        provider=provider,
+        # package_id is looked up dynamically from the booking catalogue; ignore
+        # it so catalogue refreshes don't trigger cluster updates.
+        #
+        # database_configuration is also Optional (not Computed) in the schema,
+        # so the provider treats our unset value as [] and diffs it against the
+        # rich object the API always returns (inference.enabled, service.apiKey
+        # wired up by AccountsDatabaseApiKeyV2, etc.). Sending DatabaseConfiguration=nil
+        # in the resulting update causes a 500 from the Qdrant Cloud API.
+        # We ignore it here so Pulumi preserves the current API state on updates.
+        ignore_changes=[
+            "configuration.nodeConfiguration.packageId",
+            "configuration.databaseConfiguration",
+        ],
+    ),
 )
 
 export("cluster_url", cluster.url)
