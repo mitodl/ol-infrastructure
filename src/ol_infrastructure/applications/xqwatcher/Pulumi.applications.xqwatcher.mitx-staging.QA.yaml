@@ -7,6 +7,5 @@ config:
   xqwatcher:cluster: residential
   xqwatcher:namespace: mitx-staging-openedx
   xqwatcher:min_replicas: 1
-  xqwatcher:docker_tag: latest
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
