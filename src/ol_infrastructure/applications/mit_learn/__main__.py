@@ -1153,6 +1153,7 @@ env_vars = {
     "QDRANT_DENSE_MODEL": "text-embedding-3-large",
     "QDRANT_ENABLE_INDEXING_PLUGIN_HOOKS": True,
     "QDRANT_ENCODER": "vector_search.encoders.litellm.LiteLLMEncoder",
+    "QDRANT_ENCODER_V2": "vector_search.encoders.qdrant_cloud.QdrantCloudEncoder",
     "QDRANT_HOST_V2": qdrant_cloud_stack.require_output("cluster_url"),
     "OCR_MODEL": "gpt-5-nano-2025-08-07",
     "SECURE_CROSS_ORIGIN_OPENER_POLICY": "None",
