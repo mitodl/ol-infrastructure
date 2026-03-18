@@ -101,6 +101,12 @@ min_replicas = xqwatcher_config.get_int("min_replicas") or 1
 vault_secrets = read_yaml_secrets(
     Path(f"xqwatcher/secrets.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
 )
+# VSO renders secret values using Go templates: {{ .Secrets.confd_json }}.
+# If confd_json is stored as a nested object, VSO renders it as a Go map
+# literal rather than JSON. Pre-serialize it to a JSON string so the
+# template output is valid JSON that xqueue-watcher can parse.
+if "confd_json" in vault_secrets and not isinstance(vault_secrets["confd_json"], str):
+    vault_secrets["confd_json"] = json.dumps(vault_secrets["confd_json"])
 xqwatcher_vault_mount_name = vault_mount_stack.require_output("xqwatcher_kv")["path"]
 vault.kv.SecretV2(
     f"xqwatcher-{env_name}-grader-static-secrets",
