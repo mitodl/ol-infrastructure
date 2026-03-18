@@ -1501,3 +1501,8 @@ export(
         "mediaconvert_queue": ovs_mediaconvert.queue.id,
     },
 )
+
+# CloudFront distribution and OAI resources (imported from pre-existing AWS resources)
+from ol_infrastructure.applications.odl_video_service import (  # noqa: E402
+    cloudfront,  # noqa: F401
+)
