@@ -323,7 +323,7 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                         name="xqueue-watcher",
                         image=cached_image_uri(docker_image_ref),
                         image_pull_policy="Always",
-                        command=["uv", "run", "xqueue-watcher"],
+                        command=["uv", "run", "--no-sync", "xqueue-watcher"],
                         args=["-d", "/xqwatcher/conf.d"],
                         env=[
                             # HTTP Basic Auth for the xqueue server endpoint.
