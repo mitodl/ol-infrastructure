@@ -256,7 +256,10 @@ def _build_interpolated_config_dict(
 
     # MITx Online-specific configuration
     elif stack_info.env_prefix == "mitxonline":
-        config["CSRF_TRUSTED_ORIGINS"] = [f"https://{domains['lms']}"]
+        config["CSRF_TRUSTED_ORIGINS"] = [
+            f"https://{domains['lms']}",
+            f"https://{domains['studio']}",
+        ]
         config.update(
             {
                 "COURSE_ABOUT_VISIBILITY_PERMISSION": "see_about_page",
