@@ -80,11 +80,15 @@ setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 namespace = xqwatcher_config.get("namespace") or f"{stack_info.env_prefix}-openedx"
 
-docker_image_tag = (
-    os.environ.get("XQWATCHER_DOCKER_TAG")
-    or xqwatcher_config.get("docker_tag")
-    or openedx_release
-)
+docker_image_digest = os.environ.get("XQWATCHER_DOCKER_DIGEST")
+docker_image_tag = xqwatcher_config.get("docker_tag") or openedx_release
+
+# Prefer an immutable digest (sha256:...) supplied by the pipeline over a
+# mutable tag from stack config.  Digests are referenced as image@sha256:...
+if docker_image_digest:
+    docker_image_ref = f"mitodl/xqueue-watcher@{docker_image_digest}"
+else:
+    docker_image_ref = f"mitodl/xqueue-watcher:{docker_image_tag}"
 
 min_replicas = xqwatcher_config.get_int("min_replicas") or 1
 
@@ -317,9 +321,7 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                 containers=[
                     kubernetes.core.v1.ContainerArgs(
                         name="xqueue-watcher",
-                        image=cached_image_uri(
-                            f"mitodl/xqueue-watcher:{docker_image_tag}"
-                        ),
+                        image=cached_image_uri(docker_image_ref),
                         image_pull_policy="Always",
                         command=["xqueue-watcher"],
                         args=["-d", "/xqwatcher/conf.d"],
