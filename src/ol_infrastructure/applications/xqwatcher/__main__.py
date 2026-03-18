@@ -27,7 +27,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
-from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
+from ol_infrastructure.lib.aws.eks_helper import cached_image_uri, setup_k8s_provider
 from ol_infrastructure.lib.ol_types import AWSBase, K8sGlobalLabels, Services
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -316,7 +316,9 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                 containers=[
                     kubernetes.core.v1.ContainerArgs(
                         name="xqueue-watcher",
-                        image=f"mitodl/xqueue-watcher:{docker_image_tag}",
+                        image=cached_image_uri(
+                            f"mitodl/xqueue-watcher:{docker_image_tag}"
+                        ),
                         image_pull_policy="Always",
                         command=["xqueue-watcher"],
                         args=[
