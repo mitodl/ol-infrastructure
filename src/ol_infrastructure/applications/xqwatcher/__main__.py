@@ -97,6 +97,19 @@ min_replicas = xqwatcher_config.get_int("min_replicas") or 1
 vault_secrets = read_yaml_secrets(
     Path(f"xqwatcher/secrets.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
 )
+# For ContainerGrader handlers: if the SOPS secret supplies a plain DockerHub
+# image reference in KWARGS.image, rewrite it to use the ECR pull-through
+# cache so the grading Jobs are not subject to DockerHub rate limits.
+if isinstance(vault_secrets.get("confd_json"), dict):
+    for _queue_cfg in vault_secrets["confd_json"].values():
+        for handler_cfg in _queue_cfg.get("HANDLERS", []):
+            if handler_cfg.get("HANDLER", "").endswith(
+                "ContainerGrader"
+            ) and "image" in handler_cfg.get("KWARGS", {}):
+                handler_cfg["KWARGS"]["image"] = cached_image_uri(
+                    handler_cfg["KWARGS"]["image"]
+                )
+
 # VSO renders secret values using Go templates: {{ .Secrets.confd_json }}.
 # If confd_json is stored as a nested object, VSO renders it as a Go map
 # literal rather than JSON. Pre-serialize it to a JSON string so the
