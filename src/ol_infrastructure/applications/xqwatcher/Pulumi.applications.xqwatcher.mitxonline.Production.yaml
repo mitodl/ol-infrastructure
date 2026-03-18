@@ -4,11 +4,9 @@ encryptedkey: AQICAHjmo6C0sCNz3fdkFlhbu0tdBZxnHmPYSnqtmocvGiuNygG5AzdO0QY0yXbhDG
 config:
   aws:region: us-east-1
   xqwatcher:business_unit: mitxonline
-  xqwatcher:target_vpc: applications_vpc
   xqwatcher:cluster: applications
   xqwatcher:namespace: mitxonline-openedx
   xqwatcher:min_replicas: 2
-  xqwatcher:max_replicas: 8
   xqwatcher:docker_tag: latest
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

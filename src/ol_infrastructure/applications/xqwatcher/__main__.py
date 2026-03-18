@@ -42,7 +42,6 @@ if Config("vault_server").get("env_namespace") or Config("vault").get("address")
 stack_info = parse_stack()
 xqwatcher_config = Config("xqwatcher")
 
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 vault_mount_stack = StackReference(
     f"substructure.vault.static_mounts.operations.{stack_info.name}"
 )
@@ -82,13 +81,12 @@ setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 namespace = xqwatcher_config.get("namespace") or f"{stack_info.env_prefix}-openedx"
 
 docker_image_tag = (
-    os.environ.get("XQWATCHER_DOCKER_DIGEST")
+    os.environ.get("XQWATCHER_DOCKER_TAG")
     or xqwatcher_config.get("docker_tag")
     or openedx_release
 )
 
 min_replicas = xqwatcher_config.get_int("min_replicas") or 1
-max_replicas = xqwatcher_config.get_int("max_replicas") or 2
 
 ##################################
 ##      Vault Secret Data       ##
@@ -130,6 +128,7 @@ xqwatcher_app = OLEKSAuthBinding(
         irsa_service_account_name="xqwatcher",
         vault_sync_service_account_names=f"xqwatcher-{stack_info.env_prefix}-vault",
         k8s_labels=k8s_global_labels,
+        create_irsa_service_account=True,
     )
 )
 
@@ -141,7 +140,9 @@ vault_k8s_resources = xqwatcher_app.vault_k8s_resources
 
 # Grader handler config (queue names, ContainerGrader KWARGS, xqueue URL+auth).
 # Stored as `confd_json` in the Vault KV entry written above.
-grader_config_secret_name = "xqwatcher-grader-config"  # pragma: allowlist secret
+grader_config_secret_name = (
+    "xqwatcher-grader-config"  # pragma: allowlist secret  # noqa: S105
+)
 grader_config_secret = OLVaultK8SSecret(
     f"xqwatcher-{env_name}-grader-config-secret",
     OLVaultK8SStaticSecretConfig(
@@ -156,9 +157,11 @@ grader_config_secret = OLVaultK8SSecret(
         refresh_after="1h",
         restart_target_kind="Deployment",
         restart_target_name="xqwatcher",
-        # Expose just the rendered JSON as a file-friendly key.
+        # Expose the rendered grader JSON and the HTTP Basic Auth credential
+        # used by the xqueue-watcher manager to authenticate with xqueue.
         templates={
             "grader_config.json": "{{ .Secrets.confd_json }}",
+            "http_basic_auth": "{{ .Secrets.http_basic_auth }}",
         },
         vaultauth=vault_k8s_resources.auth_name,
     ),
@@ -197,7 +200,7 @@ xqwatcher_configmap = kubernetes.core.v1.ConfigMap(
                 "disable_existing_loggers": False,
                 "formatters": {
                     "default": {
-                        "format": "%(asctime)s - %(filename)s:%(lineno)d -- %(funcName)s [%(levelname)s]: %(message)s",
+                        "format": "%(asctime)s - %(filename)s:%(lineno)d -- %(funcName)s [%(levelname)s]: %(message)s",  # noqa: E501
                     }
                 },
                 "handlers": {
@@ -313,8 +316,8 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                 containers=[
                     kubernetes.core.v1.ContainerArgs(
                         name="xqueue-watcher",
-                        image=f"ghcr.io/mitodl/xqueue-watcher:{docker_image_tag}",
-                        image_pull_policy="IfNotPresent",
+                        image=f"mitodl/xqueue-watcher:{docker_image_tag}",
+                        image_pull_policy="Always",
                         command=["xqueue-watcher"],
                         args=[
                             "--config",
@@ -323,6 +326,40 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                             "/xqwatcher/conf.d/logging.json",
                             "-d",
                             "/xqwatcher/conf.d",
+                        ],
+                        env=[
+                            # HTTP Basic Auth for the xqueue server endpoint.
+                            # Value is "username:password"; sourced from the
+                            # Vault-synced secret so it never appears in the
+                            # Deployment spec.
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="XQWATCHER_HTTP_BASIC_AUTH",
+                                value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                    secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                        name=grader_config_secret_name,
+                                        key="http_basic_auth",
+                                        optional=True,
+                                    )
+                                ),
+                            ),
+                            # Non-sensitive manager config values — match
+                            # MANAGER_CONFIG_DEFAULTS in env_settings.py.
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="XQWATCHER_POLL_TIME", value="10"
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="XQWATCHER_REQUESTS_TIMEOUT", value="1"
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="XQWATCHER_POLL_INTERVAL", value="1"
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="XQWATCHER_LOGIN_POLL_INTERVAL", value="5"
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="XQWATCHER_FOLLOW_CLIENT_REDIRECTS",
+                                value="true",
+                            ),
                         ],
                         # Liveness: verify the Python runtime is functional.
                         # The process will crash (and K8s will restart) on

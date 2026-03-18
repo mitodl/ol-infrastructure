@@ -4,11 +4,9 @@ encryptedkey: AQICAHjmo6C0sCNz3fdkFlhbu0tdBZxnHmPYSnqtmocvGiuNygF8Luz2qeEEBP5Xlr
 config:
   aws:region: us-east-1
   xqwatcher:business_unit: residential-staging
-  xqwatcher:target_vpc: residential_mitx_staging_vpc
   xqwatcher:cluster: residential
   xqwatcher:namespace: mitx-staging-openedx
   xqwatcher:min_replicas: 1
-  xqwatcher:max_replicas: 2
   xqwatcher:docker_tag: latest
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

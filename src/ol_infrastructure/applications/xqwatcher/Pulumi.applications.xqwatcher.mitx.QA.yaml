@@ -4,11 +4,9 @@ encryptedkey: AQICAHgQW+3bag/cl2fPG3dPdqAPbfcsZuwI7rETXZsx85HRpgFh6uALQ+g4+ZnTTR
 config:
   aws:region: us-east-1
   xqwatcher:business_unit: residential
-  xqwatcher:target_vpc: residential_mitx_vpc
   xqwatcher:cluster: residential
   xqwatcher:namespace: mitx-openedx
   xqwatcher:min_replicas: 1
-  xqwatcher:max_replicas: 2
   xqwatcher:docker_tag: latest
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
