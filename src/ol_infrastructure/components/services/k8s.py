@@ -323,12 +323,13 @@ class OLApplicationK8sConfig(BaseModel):
     )
     resource_requests: dict[str, str] = Field(default={"cpu": "250m", "memory": "1Gi"})
     resource_limits: dict[str, str] = Field(default={"memory": "1Gi"})
-    deployment_timeout_minutes: int = Field(
+    deployment_timeout_minutes: PositiveInt = Field(
         default=15,
         description=(
-            "Minutes Pulumi will wait for the Deployment and Service to become ready "
-            "before marking the update as failed. Increase for applications with known "
-            "slow rollouts. Pulumi's built-in default is 10 minutes."
+            "Minutes Pulumi will wait for the webapp Deployment and its Service to "
+            "become ready before marking the update as failed. Does not affect celery "
+            "worker or beat Deployments. Increase for applications with known slow "
+            "rollouts. Pulumi's built-in default is 10 minutes."
         ),
     )
     init_migrations: bool = Field(default=True)
