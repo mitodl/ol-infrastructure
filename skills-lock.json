@@ -1,0 +1,45 @@
+{
+    "version": 1,
+    "skills": {
+        "cloudformation-to-pulumi": {
+            "source": "pulumi/agent-skills",
+            "sourceType": "github",
+            "computedHash": "9a7b33483619e85bbb1de86e1fdcb964c92cd1b434cc029f259ff5030ca0ca2a"
+        },
+        "pulumi-arm-to-pulumi": {
+            "source": "pulumi/agent-skills",
+            "sourceType": "github",
+            "computedHash": "7a6d3c426524ed2f32ce94d1d21232a882641b3644498ee2e48bd555c5940cc2"
+        },
+        "pulumi-automation-api": {
+            "source": "pulumi/agent-skills",
+            "sourceType": "github",
+            "computedHash": "2929a769c2d7c75bdae6c839ace3752aa8940627e9491c8c9ba3865eb059843b"
+        },
+        "pulumi-best-practices": {
+            "source": "pulumi/agent-skills",
+            "sourceType": "github",
+            "computedHash": "cd48dc6635221399fb4b2aec3853feaa00181e65c7392d1fa6af573e5b027f90"
+        },
+        "pulumi-cdk-to-pulumi": {
+            "source": "pulumi/agent-skills",
+            "sourceType": "github",
+            "computedHash": "89bfa3721b5bd36a5584f13f1804d3b491282d97b66eb1b5fab4f620af889bba"
+        },
+        "pulumi-component": {
+            "source": "pulumi/agent-skills",
+            "sourceType": "github",
+            "computedHash": "b57998c215bc1523e215d9f3df99d0192869b99f359400bc292f2b2f2a9acad4"
+        },
+        "pulumi-esc": {
+            "source": "pulumi/agent-skills",
+            "sourceType": "github",
+            "computedHash": "9f13f9307a31bb897bab3f94f46da302ee7033dbeb30cae38f8cab5203ddcd7d"
+        },
+        "pulumi-terraform-to-pulumi": {
+            "source": "pulumi/agent-skills",
+            "sourceType": "github",
+            "computedHash": "4e37e09d90b07a3dcb8e8e376cf185ec877a72dd0dcb8af7f21e4b285ec3ab46"
+        }
+    }
+}

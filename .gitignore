@@ -20,3 +20,6 @@ pyinfra-debug.log
 .erk/scratch/
 .erk/config.local.toml
 .erk/bin/
+
+# npx skills managed view (source lives in agents/skills/)
+.agents/skills/
