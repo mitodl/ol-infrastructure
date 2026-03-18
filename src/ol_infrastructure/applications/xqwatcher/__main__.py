@@ -302,6 +302,7 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
             ),
             spec=kubernetes.core.v1.PodSpecArgs(
                 service_account_name="xqwatcher",
+                automount_service_account_token=True,
                 # Spread replicas across nodes for HA
                 topology_spread_constraints=[
                     kubernetes.core.v1.TopologySpreadConstraintArgs(
