@@ -38,6 +38,8 @@ dependencies = [
     "parliament@git+https://github.com/mitodl/parliament",
     "cyclopts>=4.4.0",
     "requests-aws4auth>=1.3.1",
+    "pulumi-qdrant-cloud",
+    "pulumi-terraform>=6.0.1",
 ]
 
 [project.urls]
@@ -49,6 +51,7 @@ dev = [
     "datamodel-code-generator",
     "diagrams",
     "mypy",
+    "pip>=26.0.1",
     "pre-commit>=4.0.0,<5",
     "pytest>=9.0.1,<10",
     "pytest-asyncio>=0.24.0",
@@ -103,7 +106,8 @@ no_implicit_reexport = true
 ignore_missing_imports = true
 exclude = [
   "scripts/helpers/.*",
-  "dockerfiles/.*"
+  "dockerfiles/.*",
+  "sdks/.*"
 ]
 
 [tool.pydantic-mypy]
@@ -117,6 +121,7 @@ line-length = 88
 exclude = [
     "scripts/helpers/dump_settings.py",
     "scripts/helpers/json_deep_diff.py",
+    "sdks/",
 ]
 lint.select = [
     "A",  # flake8-builtins
@@ -228,3 +233,11 @@ markers = [
 addopts = "-v -m 'not integration'"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+
+[tool.uv.workspace]
+members = [
+    "sdks/qdrant-cloud",
+]
+
+[tool.uv.sources]
+pulumi-qdrant-cloud = { workspace = true }

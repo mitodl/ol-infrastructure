@@ -5,7 +5,6 @@ applications that follow the simple Pulumi-only pattern (no build steps, just
 infrastructure deployment across CI/QA/Production).
 """
 
-import json
 import sys
 
 from ol_concourse.lib.models.pipeline import (
@@ -123,16 +122,13 @@ def meta_pipeline(app_names: list[str]) -> Pipeline:
                         ],
                         outputs=[Output(name=Identifier("pipeline"))],
                         run=Command(
-                            path="sh",
+                            path="python",
                             dir="pipeline",
                             user="root",
                             args=[
-                                "-c",
-                                (
-                                    "python ../simple-pulumi-pipeline-definitions/src/"
-                                    "ol_concourse/pipelines/infrastructure/simple_pulumi/"
-                                    f"meta.py '{json.dumps(app_names)}'"
-                                ),
+                                "../simple-pulumi-pipeline-definitions/src/"
+                                "ol_concourse/pipelines/infrastructure/simple_pulumi/"
+                                "meta.py",
                             ],
                         ),
                     ),
@@ -152,31 +148,26 @@ def meta_pipeline(app_names: list[str]) -> Pipeline:
 
 
 if __name__ == "__main__":
-    # Check if app_names was passed as a command line argument (for self-update)
-    if len(sys.argv) > 1:
-        # Parse the app_names list from the command line argument
-        app_names = json.loads(sys.argv[1])
-    else:
-        # Use the default list of applications
-        app_names = [
-            "airbyte",
-            "bootcamps",
-            "celery-monitoring",
-            "data_warehouse",
-            "digital-credentials",
-            "fastly-redirector",
-            "micromasters",
-            "mongodb-atlas",
-            "ocw-studio",
-            "open-discussions",
-            "open-metadata",
-            "opensearch",
-            "starrocks",
-            "tika",
-            "vector-log-proxy",
-            "xpro",
-            "xpro-partner-dns",
-        ]
+    app_names = [
+        "airbyte",
+        "bootcamps",
+        "celery-monitoring",
+        "data_warehouse",
+        "digital-credentials",
+        "fastly-redirector",
+        "micromasters",
+        "mongodb-atlas",
+        "ocw-studio",
+        "open-discussions",
+        "open-metadata",
+        "opensearch",
+        "qdrant-cloud",
+        "starrocks",
+        "tika",
+        "vector-log-proxy",
+        "xpro",
+        "xpro-partner-dns",
+    ]
 
     pipeline_json = meta_pipeline(app_names).model_dump_json(indent=2)
     with open("definition.json", "w") as definition:  # noqa: PTH123

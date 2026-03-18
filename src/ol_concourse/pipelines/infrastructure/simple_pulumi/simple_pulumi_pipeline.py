@@ -202,6 +202,16 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             "src/bridge/lib/versions.py",
         ],
     ),
+    "qdrant-cloud": SimplePulumiParams(
+        app_name="qdrant-cloud",
+        pulumi_project_path="infrastructure/qdrant_cloud/",
+        stack_prefix="infrastructure.qdrant_cloud.mitlearn",
+        pulumi_project_name="ol-infrastructure-qdrant-cloud",
+        additional_watched_paths=[
+            "src/bridge/secrets/qdrant_cloud/",
+            "src/bridge/lib/versions.py",
+        ],
+    ),
     "opensearch": SimplePulumiParams(
         app_name="opensearch",
         pulumi_project_path="infrastructure/aws/opensearch/",

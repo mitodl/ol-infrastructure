@@ -1,0 +1,9 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagE3S6v43yaht5Vvif85Nlh+AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM1rJLjR2axk3x2TM2AgEQgDvXUCKPqKnS+NQajLhYdQxJbS2HR1YAMT2q4nO2iX5Lpw9iFvzTzdxqYhQxx2c6pLFjkmmaIutu19wGow==
+config:
+  qdrant-cloud:cloud_provider: aws
+  qdrant-cloud:cloud_region: us-east-1
+  qdrant-cloud:number_of_nodes: 1
+  qdrant-cloud:enable_high_availability: "false"
+  qdrant-cloud:desired_package_name: gpx2

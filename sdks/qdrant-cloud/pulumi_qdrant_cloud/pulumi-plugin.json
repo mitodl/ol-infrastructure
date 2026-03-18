@@ -1,0 +1,10 @@
+{
+  "resource": true,
+  "name": "terraform-provider",
+  "version": "1.1.1",
+  "parameterization": {
+    "name": "qdrant-cloud",
+    "version": "1.19.3",
+    "value": "eyJyZW1vdGUiOnsidXJsIjoicmVnaXN0cnkub3BlbnRvZnUub3JnL3FkcmFudC9xZHJhbnQtY2xvdWQiLCJ2ZXJzaW9uIjoiMS4xOS4zIn19"
+  }
+}

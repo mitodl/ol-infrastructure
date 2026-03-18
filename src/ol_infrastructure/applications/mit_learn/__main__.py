@@ -11,6 +11,7 @@ from string import Template
 import pulumi_fastly as fastly
 import pulumi_github as github
 import pulumi_kubernetes as kubernetes
+import pulumi_qdrant_cloud as qdrant_cloud
 import pulumi_vault as vault
 from pulumi import (
     ROOT_STACK_RESOURCE,
@@ -118,6 +119,29 @@ vector_log_proxy_stack = StackReference(
 )
 monitoring_stack = StackReference("infrastructure.monitoring")
 dns_stack = StackReference("infrastructure.aws.dns")
+qdrant_cloud_stack = StackReference(
+    f"infrastructure.qdrant_cloud.mitlearn.{stack_info.name}"
+)
+
+qdrant_secrets = read_yaml_secrets(Path("qdrant_cloud/account.yaml"))
+qdrant_provider = qdrant_cloud.Provider(
+    "qdrant-cloud-provider",
+    api_key=qdrant_secrets["cloud_management_key"],
+    account_id=qdrant_secrets["account_id"],
+)
+qdrant_cluster_id = qdrant_cloud_stack.require_output("cluster_id")
+qdrant_api_key = qdrant_cloud.AccountsDatabaseApiKeyV2(
+    f"mitlearn-qdrant-api-key-{stack_info.env_suffix}",
+    cluster_id=qdrant_cluster_id,
+    name=f"mitlearn-{stack_info.env_suffix}",
+    global_access_rule=qdrant_cloud.AccountsDatabaseApiKeyV2GlobalAccessRuleArgs(
+        access_type="GLOBAL_ACCESS_RULE_ACCESS_TYPE_MANAGE",
+    ),
+    opts=ResourceOptions(
+        provider=qdrant_provider,
+        additional_secret_outputs=["key"],
+    ),
+)
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 learn_zone_id = dns_stack.require_output("learn")["id"]
 
@@ -1129,6 +1153,9 @@ env_vars = {
     "QDRANT_DENSE_MODEL": "text-embedding-3-large",
     "QDRANT_ENABLE_INDEXING_PLUGIN_HOOKS": True,
     "QDRANT_ENCODER": "vector_search.encoders.litellm.LiteLLMEncoder",
+    "QDRANT_SPARSE_ENCODER_V2": "vector_search.encoders.qdrant_cloud.QdrantCloudEncoder",
+    "QDRANT_SPARSE_MODEL_V2": "qdrant/bm25",
+    "QDRANT_HOST_V2": qdrant_cloud_stack.require_output("cluster_url"),
     "OCR_MODEL": "gpt-5-nano-2025-08-07",
     "SECURE_CROSS_ORIGIN_OPENER_POLICY": "None",
     "SEE_API_ACCESS_TOKEN_URL": "https://mit-unified-portal-prod-78eeds.43d8q2.usa-e2.cloudhub.io/oauth/token",
@@ -1234,6 +1261,7 @@ sensitive_env_vars = {
     "OPENAI_API_KEY": mitlearn_vault_secrets["openai"]["api_key"],
     "OPENSEARCH_HTTP_AUTH": mitlearn_vault_secrets["opensearch"]["http_auth"],
     "QDRANT_API_KEY": mitlearn_vault_secrets["qdrant"]["api_key"],
+    "QDRANT_API_KEY_V2": qdrant_api_key.key,
     "QDRANT_HOST": mitlearn_vault_secrets["qdrant"]["host_url"],
     "SECRET_KEY": mitlearn_vault_secrets["django_secret_key"],
     "SENTRY_DSN": mitlearn_vault_secrets["sentry_dsn"],

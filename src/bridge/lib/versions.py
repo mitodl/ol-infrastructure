@@ -1,5 +1,5 @@
 # renovate: datasource=github-releases depName=concourse packageName=concourse/concourse
-CONCOURSE_VERSION = "8.0.2"  # (TMM 2026-03-06) - Pin to <8.1.0 because of some login bugs with stale state tokens
+CONCOURSE_VERSION = "8.1.1"  # (TMM 2026-03-06) - Pin to <8.1.0 because of some login bugs with stale state tokens
 # renovate: datasource=github-releases depName=consul-template packageName=hashicorp/consul-template
 CONSUL_TEMPLATE_VERSION = "0.41.4"
 # renovate: datasource=github-releases depName=consul packageName=hashicorp/consul
@@ -92,3 +92,5 @@ NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION = "0.18.2"
 PGBOUNCER_VERSION = "1.25.1"
 # renovate: datasource=helm depName=local-path-provisioner packageName=local-path-provisioner registryUrl=https://charts.rancher.io
 LOCAL_PATH_PROVISIONER_CHART_VERSION = "0.0.31"
+# renovate: datasource=github-releases depName=qdrant packageName=qdrant/qdrant
+QDRANT_VERSION = "v1.17.0"
