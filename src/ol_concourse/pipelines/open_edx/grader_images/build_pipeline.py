@@ -39,7 +39,7 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from ol_concourse.lib.resources import git_repo, registry_image
+from ol_concourse.lib.resources import registry_image, ssh_git_repo
 
 _AWS_ACCOUNT_ID = "610119931565"
 _AWS_REGION = "us-east-1"
@@ -52,8 +52,8 @@ class GraderPipelineConfig:
     Attributes:
         pipeline_name: Short identifier used in resource/job names and the
             Concourse pipeline name, e.g. ``"graders-mit-600x"``.
-        grader_repo_url: HTTPS URL of the grader repository, e.g.
-            ``"https://github.com/mitodl/graders-mit-600x"``.
+        grader_repo_url: SSH URL of the grader repository, e.g.
+            ``"git@github.com:mitodl/graders-mit-600x"``.
         grader_repo_branch: Branch to track, e.g. ``"main"`` or ``"master"``.
         ecr_repo_name: ECR repository name (without the registry host), e.g.
             ``"mitodl/graders-mit-600x"``.  Passed directly to the
@@ -62,6 +62,8 @@ class GraderPipelineConfig:
         grader_base_ecr_repo: ECR repository name (without the registry host)
             for the grader base image used as the build trigger.  Defaults to
             the standard MIT OL base image repo name.
+        github_private_key: Vault path for the SSH private key used to clone
+            the (private) grader repository.
         aws_account_id: AWS account ID that hosts the ECR registry.
         aws_region: AWS region for ECR authentication.
     """
@@ -71,6 +73,7 @@ class GraderPipelineConfig:
     grader_repo_branch: str
     ecr_repo_name: str
     grader_base_ecr_repo: str = "mitodl/xqueue-watcher-grader-base"
+    github_private_key: str = "((github.ssh_private_key))"
     aws_account_id: str = _AWS_ACCOUNT_ID
     aws_region: str = _AWS_REGION
 
@@ -94,10 +97,11 @@ def grader_image_pipeline(config: GraderPipelineConfig) -> Pipeline:
     Returns:
         A ``Pipeline`` object suitable for serialisation to Concourse YAML/JSON.
     """
-    grader_repo = git_repo(
+    grader_repo = ssh_git_repo(
         name=Identifier(f"{config.pipeline_name}-code"),
         uri=config.grader_repo_url,
         branch=config.grader_repo_branch,
+        private_key=config.github_private_key,
     )
 
     # Grader base image in ECR — used as a build trigger so that rebuilding
@@ -198,7 +202,7 @@ def grader_image_pipeline(config: GraderPipelineConfig) -> Pipeline:
 GRADER_PIPELINES: list[GraderPipelineConfig] = [
     GraderPipelineConfig(
         pipeline_name="graders-mit-600x",
-        grader_repo_url="https://github.com/mitodl/graders-mit-600x",
+        grader_repo_url="git@github.com:mitodl/graders-mit-600x",
         grader_repo_branch="feat/containerized-grader",
         ecr_repo_name="mitodl/graders-mit-600x",
     ),
