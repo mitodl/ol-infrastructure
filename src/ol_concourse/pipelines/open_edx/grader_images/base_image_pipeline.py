@@ -72,7 +72,7 @@ def grader_base_image_pipeline() -> Pipeline:
             container_build_task(
                 inputs=[Input(name=xqwatcher_repo.name)],
                 build_parameters={
-                    "CONTEXT": f"{xqwatcher_repo.name}/grader_support",
+                    "CONTEXT": str(xqwatcher_repo.name),
                     "DOCKERFILE": (
                         f"{xqwatcher_repo.name}/grader_support/Dockerfile.base"
                     ),
