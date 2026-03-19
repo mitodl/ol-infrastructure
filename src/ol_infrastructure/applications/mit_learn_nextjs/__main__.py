@@ -393,7 +393,7 @@ def create_deployment_for_color(color: str) -> kubernetes.apps.v1.Deployment:
             labels=color_labels,
         ),
         spec=kubernetes.policy.v1.PodDisruptionBudgetSpecArgs(
-            min_available=1,
+            max_unavailable=1,
             selector=kubernetes.meta.v1.LabelSelectorArgs(
                 match_labels=color_labels,
             ),
