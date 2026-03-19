@@ -32,9 +32,6 @@ from ol_concourse.lib.resources import git_repo, registry_image
 _AWS_ACCOUNT_ID = "610119931565"
 _AWS_REGION = "us-east-1"
 _BASE_IMAGE_REPO = "mitodl/xqueue-watcher-grader-base"
-_ECR_BASE_IMAGE_REPO = (
-    f"{_AWS_ACCOUNT_ID}.dkr.ecr.{_AWS_REGION}.amazonaws.com/{_BASE_IMAGE_REPO}"
-)
 
 
 def grader_base_image_pipeline() -> Pipeline:
@@ -60,7 +57,7 @@ def grader_base_image_pipeline() -> Pipeline:
     # pipelines so that a base image rebuild causes downstream rebuilds.
     ecr_base_image = registry_image(
         name=Identifier("grader-base-ecr"),
-        image_repository=_ECR_BASE_IMAGE_REPO,
+        image_repository=_BASE_IMAGE_REPO,
         image_tag="latest",
         ecr_region=_AWS_REGION,
     )
