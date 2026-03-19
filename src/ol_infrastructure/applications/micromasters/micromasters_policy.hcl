@@ -18,6 +18,12 @@ path "secret-micromasters" {
 path "secret-micromasters/*" {
   capabilities = ["read"]
 }
+path "secret-micromasters/data/*" {
+  capabilities = ["read"]
+}
+path "secret-micromasters/metadata/*" {
+  capabilities = ["read", "list"]
+}
 
 path "secret-operations/mailgun" {
   capabilities = ["read"]
