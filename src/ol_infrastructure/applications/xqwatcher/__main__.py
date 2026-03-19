@@ -88,6 +88,14 @@ docker_image_ref = f"mitodl/xqueue-watcher@{docker_image_digest}"
 
 min_replicas = xqwatcher_config.get_int("min_replicas") or 1
 
+# Deployment-wide ContainerGrader defaults.  These become XQWATCHER_GRADER_*
+# environment variables on the xqwatcher pod so operators don't have to repeat
+# them in every conf.d queue JSON file.  Per-queue KWARGS still override these.
+grader_namespace = xqwatcher_config.get("grader_namespace") or namespace
+grader_cpu_limit = xqwatcher_config.get("grader_cpu_limit") or "500m"
+grader_memory_limit = xqwatcher_config.get("grader_memory_limit") or "256Mi"
+grader_timeout = xqwatcher_config.get("grader_timeout") or "20"
+
 ##################################
 ##      Vault Secret Data       ##
 ##################################
@@ -97,18 +105,29 @@ min_replicas = xqwatcher_config.get_int("min_replicas") or 1
 vault_secrets = read_yaml_secrets(
     Path(f"xqwatcher/secrets.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
 )
+
+
 # For ContainerGrader handlers: if the SOPS secret supplies a plain DockerHub
 # image reference in KWARGS.image, rewrite it to use the ECR pull-through
 # cache so the grading Jobs are not subject to DockerHub rate limits.
+# Images that already have a registry hostname (e.g. private ECR URIs like
+# 610119931565.dkr.ecr.us-east-1.amazonaws.com/…, or ghcr.io/…) are left
+# unchanged — the hostname is identified by a "." in the first path component.
+def _needs_pullthrough_rewrite(image: str) -> bool:
+    """Return True only for bare DockerHub image refs (no registry hostname)."""
+    first_component = image.split("/", maxsplit=1)[0]
+    return "." not in first_component and ":" not in first_component
+
+
 if isinstance(vault_secrets.get("confd_json"), dict):
     for _queue_cfg in vault_secrets["confd_json"].values():
         for handler_cfg in _queue_cfg.get("HANDLERS", []):
             if handler_cfg.get("HANDLER", "").endswith(
                 "ContainerGrader"
             ) and "image" in handler_cfg.get("KWARGS", {}):
-                handler_cfg["KWARGS"]["image"] = cached_image_uri(
-                    handler_cfg["KWARGS"]["image"]
-                )
+                image_ref = handler_cfg["KWARGS"]["image"]
+                if _needs_pullthrough_rewrite(image_ref):
+                    handler_cfg["KWARGS"]["image"] = cached_image_uri(image_ref)
 
 # VSO renders secret values using Go templates: {{ .Secrets.confd_json }}.
 # If confd_json is stored as a nested object, VSO renders it as a Go map
@@ -372,6 +391,32 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                             kubernetes.core.v1.EnvVarArgs(
                                 name="XQWATCHER_FOLLOW_CLIENT_REDIRECTS",
                                 value="true",
+                            ),
+                            # ContainerGrader deployment-wide defaults.
+                            # These are used when a queue's KWARGS block does not
+                            # specify the value explicitly.
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="XQWATCHER_GRADER_BACKEND",
+                                value="kubernetes",
+                            ),
+                            # Critical: grading Jobs must land in the same
+                            # namespace as xqwatcher so the RBAC Role binding
+                            # above grants the necessary permissions.
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="XQWATCHER_GRADER_NAMESPACE",
+                                value=grader_namespace,
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="XQWATCHER_GRADER_CPU_LIMIT",
+                                value=grader_cpu_limit,
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="XQWATCHER_GRADER_MEMORY_LIMIT",
+                                value=grader_memory_limit,
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="XQWATCHER_GRADER_TIMEOUT",
+                                value=grader_timeout,
                             ),
                         ],
                         # Liveness: verify the Python runtime is functional.
