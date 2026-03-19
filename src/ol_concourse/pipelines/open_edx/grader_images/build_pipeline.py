@@ -43,10 +43,6 @@ from ol_concourse.lib.resources import git_repo, registry_image
 
 _AWS_ACCOUNT_ID = "610119931565"
 _AWS_REGION = "us-east-1"
-_ECR_BASE_IMAGE_REPO = (
-    f"{_AWS_ACCOUNT_ID}.dkr.ecr.{_AWS_REGION}.amazonaws.com"
-    "/mitodl/xqueue-watcher-grader-base"
-)
 
 
 @dataclasses.dataclass
@@ -59,30 +55,24 @@ class GraderPipelineConfig:
         grader_repo_url: HTTPS URL of the grader repository, e.g.
             ``"https://github.com/mitodl/graders-mit-600x"``.
         grader_repo_branch: Branch to track, e.g. ``"main"`` or ``"master"``.
-        ecr_repo_name: ECR repository path (without the registry host), e.g.
-            ``"mitodl/graders-mit-600x"``.  The full URI is constructed as
-            ``{aws_account_id}.dkr.ecr.{aws_region}.amazonaws.com/{ecr_repo_name}``.
-        grader_base_ecr_repo: Full ECR URI of the grader base image used as the
-            build trigger and ``GRADER_BASE_IMAGE`` build arg.  Defaults to
-            the standard MIT OL base image URI.
+        ecr_repo_name: ECR repository name (without the registry host), e.g.
+            ``"mitodl/graders-mit-600x"``.  Passed directly to the
+            ``registry-image`` resource; ``ecr_region`` causes Concourse to
+            infer the correct registry host automatically.
+        grader_base_ecr_repo: ECR repository name (without the registry host)
+            for the grader base image used as the build trigger.  Defaults to
+            the standard MIT OL base image repo name.
         aws_account_id: AWS account ID that hosts the ECR registry.
-        aws_region: AWS region for ECR authentication and URI construction.
+        aws_region: AWS region for ECR authentication.
     """
 
     pipeline_name: str
     grader_repo_url: str
     grader_repo_branch: str
     ecr_repo_name: str
-    grader_base_ecr_repo: str = _ECR_BASE_IMAGE_REPO
+    grader_base_ecr_repo: str = "mitodl/xqueue-watcher-grader-base"
     aws_account_id: str = _AWS_ACCOUNT_ID
     aws_region: str = _AWS_REGION
-
-    @property
-    def ecr_image_uri(self) -> str:
-        return (
-            f"{self.aws_account_id}.dkr.ecr.{self.aws_region}.amazonaws.com"
-            f"/{self.ecr_repo_name}"
-        )
 
 
 def grader_image_pipeline(config: GraderPipelineConfig) -> Pipeline:
@@ -122,7 +112,7 @@ def grader_image_pipeline(config: GraderPipelineConfig) -> Pipeline:
     # Private ECR image for this course's grader.
     grader_ecr_image = registry_image(
         name=Identifier(f"{config.pipeline_name}-image"),
-        image_repository=config.ecr_image_uri,
+        image_repository=config.ecr_repo_name,
         image_tag="latest",
         ecr_region=config.aws_region,
     )
