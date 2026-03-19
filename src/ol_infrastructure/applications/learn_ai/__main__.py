@@ -732,23 +732,14 @@ static_secrets = OLVaultK8SSecret(
 
 env_vars = dict(learn_ai_config.require_object("env_vars") or {})
 
-# OTEL_RESOURCE_ATTRIBUTES is used as a sentinel to detect stacks where OTEL
-# is enabled (QA and Production). CI does not define it and is left untouched.
+# Append k8s labels to OTEL_RESOURCE_ATTRIBUTES on stacks where OTEL is enabled
+# (QA and Production). CI does not define this variable and is left untouched.
 if "OTEL_RESOURCE_ATTRIBUTES" in env_vars:
-    # Enrich telemetry with MIT OL organizational metadata via OTEL_ENTITIES.
-    # ol.mit.edu/stack is the identifying attribute; all other labels are descriptive.
-    # Values are percent-encoded per the OTEL entities spec to escape reserved chars.
-    _reserved = str.maketrans({c: f"%{ord(c):02X}" for c in "{}[]@;,="})
-    stack_id = k8s_global_labels.get("ol.mit.edu/stack", "unknown").translate(
-        _reserved
+    k8s_label_attrs = ",".join(
+        f"{k}={v}" for k, v in k8s_global_labels.items()
     )
-    desc_attrs = ",".join(
-        f"{k}={v.translate(_reserved)}"
-        for k, v in k8s_global_labels.items()
-        if k != "ol.mit.edu/stack"
-    )
-    env_vars["OTEL_ENTITIES"] = (
-        f"mitol.deployment{{ol.mit.edu/stack={stack_id}}}[{desc_attrs}]"
+    env_vars["OTEL_RESOURCE_ATTRIBUTES"] = (
+        f"{env_vars['OTEL_RESOURCE_ATTRIBUTES']},{k8s_label_attrs}"
     )
 
 # Instantiate the OLApplicationK8s component
