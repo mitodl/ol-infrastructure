@@ -251,13 +251,6 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         stack_prefix="infrastructure.vector_log_proxy.operations",
         pulumi_project_name="ol-infrastructure-vector-log-proxy-server",
     ),
-    "xpro": SimplePulumiParams(
-        app_name="xpro",
-        pulumi_project_path="applications/xpro/",
-        stack_prefix="applications.xpro",
-        pulumi_project_name="ol-infrastructure-xpro-application",
-        additional_watched_paths=["src/bridge/secrets/xpro"],
-    ),
     "xpro-partner-dns": SimplePulumiParams(
         app_name="xpro-partner-dns",
         pulumi_project_path="substructure/xpro_partner_dns/",

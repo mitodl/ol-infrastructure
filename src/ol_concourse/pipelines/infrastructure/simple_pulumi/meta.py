@@ -165,7 +165,6 @@ if __name__ == "__main__":
         "starrocks",
         "tika",
         "vector-log-proxy",
-        "xpro",
         "xpro-partner-dns",
     ]
 
