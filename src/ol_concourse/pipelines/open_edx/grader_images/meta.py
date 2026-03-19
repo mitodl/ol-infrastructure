@@ -44,7 +44,7 @@ _PIPELINE_CODE_PATHS = [
 pipeline_code = git_repo(
     name=Identifier("grader-images-pipeline-code"),
     uri="https://github.com/mitodl/ol-infrastructure",
-    branch="main",
+    branch="feat/xqwatcher-kubernetes-migration",
     paths=_PIPELINE_CODE_PATHS,
 )
 
@@ -137,8 +137,7 @@ def _build_self_update_job() -> Job:
             _generate_pipeline_task(
                 task_name="generate-meta-pipeline-definition",
                 script_path=(
-                    "src/ol_concourse/pipelines/open_edx/"
-                    "grader_images/meta.py"
+                    "src/ol_concourse/pipelines/open_edx/grader_images/meta.py"
                 ),
                 script_args=[],
             ),
@@ -154,10 +153,7 @@ def _build_self_update_job() -> Job:
 meta_jobs = [
     _build_self_update_job(),
     _build_base_image_meta_job(),
-    *[
-        _build_grader_meta_job(config.pipeline_name)
-        for config in GRADER_PIPELINES
-    ],
+    *[_build_grader_meta_job(config.pipeline_name) for config in GRADER_PIPELINES],
 ]
 
 meta_pipeline = Pipeline(resources=[pipeline_code], jobs=meta_jobs)
@@ -169,6 +165,5 @@ if __name__ == "__main__":
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)
     sys.stdout.write(
-        "\nfly -t <target> set-pipeline"
-        " -p grader-images-meta -c definition.json\n"
+        "\nfly -t <target> set-pipeline -p grader-images-meta -c definition.json\n"
     )
