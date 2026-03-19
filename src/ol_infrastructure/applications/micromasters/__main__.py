@@ -983,7 +983,7 @@ if micromasters_config.get_bool("deploy_k8s"):
         ),
     )
 
-    ocw_studio_apisix_httproute = OLApisixHTTPRoute(
+    micromasters_apisix_httproute = OLApisixHTTPRoute(
         f"micromasters-apisix-httproute-{stack_info.env_suffix}",
         route_configs=[
             OLApisixHTTPRouteConfig(
