@@ -852,6 +852,39 @@ learn_ai_app_k8s = OLApplicationK8s(
     ),
 )
 
+# Reconstruct variables needed for Celery deployment
+application_image_repository_and_tag = f"mitodl/learn-ai-app:{LEARN_AI_DOCKER_TAG}"
+
+learn_ai_deployment_env_vars = []
+for k, v in (learn_ai_config.require_object("env_vars") or {}).items():
+    learn_ai_deployment_env_vars.append(
+        kubernetes.core.v1.EnvVarArgs(
+            name=k,
+            value=v,
+        )
+    )
+
+# Build a list of sensitive env vars for the deployment config via envFrom
+learn_ai_deployment_envfrom = [
+    # Database creds
+    kubernetes.core.v1.EnvFromSourceArgs(
+        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+            name=db_creds_secret_name,
+        ),
+    ),
+    # Redis Configuration
+    kubernetes.core.v1.EnvFromSourceArgs(
+        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+            name=redis_creds_secret_name,
+        ),
+    ),
+    # static secrets from secrets-learn-ai/secrets
+    kubernetes.core.v1.EnvFromSourceArgs(
+        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+            name=static_secrets_name,
+        ),
+    ),
+]
 
 # Create the apisix custom resources since it doesn't support gateway-api yet
 
