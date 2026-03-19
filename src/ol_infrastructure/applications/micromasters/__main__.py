@@ -91,7 +91,6 @@ heroku_app_config = Config("heroku_app")
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 dns_stack = StackReference("infrastructure.aws.dns")
-monitoring_stack = StackReference("infrastructure.monitoring")
 vector_log_proxy_stack = StackReference(
     f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
 )
