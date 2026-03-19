@@ -714,6 +714,7 @@ s3_bucket_iam_policy = iam.Policy(
 # Fastly Config #
 #################
 site_domains = ocw_site_config.get_object("domains") or {"draft": [], "live": []}
+fastly_shielding_enabled = ocw_site_config.get_bool("enable_fastly_shielding") or False
 # Website Storage Bucket
 website_storage_bucket_fqdn = "ocw-website-storage.s3.us-east-1.amazonaws.com"
 project_dir = Path(__file__).resolve().parent
@@ -740,6 +741,7 @@ for purpose in ("draft", "live", "test"):
                 override_host=website_bucket_fqdn,
                 port=DEFAULT_HTTPS_PORT,
                 request_condition="not course media or old akamai",
+                shield="iad-va-us" if fastly_shielding_enabled else None,
                 ssl_cert_hostname=website_bucket_fqdn,
                 ssl_sni_hostname=website_bucket_fqdn,
                 use_ssl=True,
@@ -750,6 +752,7 @@ for purpose in ("draft", "live", "test"):
                 override_host=website_storage_bucket_fqdn,
                 port=DEFAULT_HTTPS_PORT,
                 request_condition="is old Akamai file",
+                shield="iad-va-us" if fastly_shielding_enabled else None,
                 ssl_cert_hostname=website_storage_bucket_fqdn,
                 ssl_sni_hostname=website_storage_bucket_fqdn,
                 use_ssl=True,
