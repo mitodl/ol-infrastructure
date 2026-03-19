@@ -279,11 +279,14 @@ def create_deployment_for_color(color: str) -> kubernetes.apps.v1.Deployment:
         mount_path="/app/frontends/main/.next",
     )
 
-    # Determine replica count: active deployment gets configured count, inactive gets 0
+    # Determine replica count: active deployment gets configured count, inactive gets 1.
+    # Keeping 1 pod on the inactive deployment ensures the Service (which still points
+    # to the old selector while the new deployment scales up) always has an endpoint,
+    # eliminating the "no available server" gap.
     def get_replicas(active: str) -> int:
         if color == active:
             return nextjs_config.get_int("pod_count") or 2
-        return 0
+        return 1
 
     # Determine the value for the skipAwait annotation
     def get_skip_await_annotation(active: str) -> bool:
@@ -292,7 +295,7 @@ def create_deployment_for_color(color: str) -> kubernetes.apps.v1.Deployment:
     replicas = active_color.apply(get_replicas)
     skip_await_annotation = active_color.apply(get_skip_await_annotation)
 
-    return kubernetes.apps.v1.Deployment(
+    deployment = kubernetes.apps.v1.Deployment(
         f"mit-learn-nextjs-{stack_info.name}-deployment-{color}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=f"mit-learn-nextjs-{color}",
@@ -312,6 +315,14 @@ def create_deployment_for_color(color: str) -> kubernetes.apps.v1.Deployment:
                 match_labels=color_labels,
             ),
             replicas=replicas,
+            min_ready_seconds=10,
+            strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
+                type="RollingUpdate",
+                rolling_update=kubernetes.apps.v1.RollingUpdateDeploymentArgs(
+                    max_unavailable=0,
+                    max_surge=1,
+                ),
+            ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
                     labels=color_labels,
@@ -345,7 +356,8 @@ def create_deployment_for_color(color: str) -> kubernetes.apps.v1.Deployment:
                                 failure_threshold=3,
                             ),
                             readiness_probe=kubernetes.core.v1.ProbeArgs(
-                                tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
+                                http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                                    path="/healthcheck",
                                     port=DEFAULT_NEXTJS_PORT,
                                 ),
                                 initial_delay_seconds=15,
@@ -353,7 +365,8 @@ def create_deployment_for_color(color: str) -> kubernetes.apps.v1.Deployment:
                                 failure_threshold=3,
                             ),
                             startup_probe=kubernetes.core.v1.ProbeArgs(
-                                tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
+                                http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                                    path="/healthcheck",
                                     port=DEFAULT_NEXTJS_PORT,
                                 ),
                                 initial_delay_seconds=10,
@@ -368,10 +381,26 @@ def create_deployment_for_color(color: str) -> kubernetes.apps.v1.Deployment:
             ),
         ),
         opts=ResourceOptions(
-            delete_before_replace=True,
             depends_on=[mit_learn_nextjs_build_job],
         ),
     )
+
+    kubernetes.policy.v1.PodDisruptionBudget(
+        f"mit-learn-nextjs-{stack_info.name}-pdb-{color}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"mit-learn-nextjs-{color}-pdb",
+            namespace=learn_namespace,
+            labels=color_labels,
+        ),
+        spec=kubernetes.policy.v1.PodDisruptionBudgetSpecArgs(
+            max_unavailable=1,
+            selector=kubernetes.meta.v1.LabelSelectorArgs(
+                match_labels=color_labels,
+            ),
+        ),
+    )
+
+    return deployment
 
 
 # Create both blue and green deployments
