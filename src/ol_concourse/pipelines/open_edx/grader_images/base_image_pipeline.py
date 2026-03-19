@@ -17,7 +17,7 @@ Triggers:
 
 import sys
 
-from ol_concourse.lib.containers import container_build_task
+from ol_concourse.lib.containers import container_build_task, ensure_ecr_task
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     GetStep,
@@ -78,6 +78,7 @@ def grader_base_image_pipeline() -> Pipeline:
                     ),
                 },
             ),
+            ensure_ecr_task(_BASE_IMAGE_REPO),
             # Push to DockerHub first — fail fast if credentials are wrong
             # before consuming the ECR push quota.
             PutStep(

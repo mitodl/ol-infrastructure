@@ -23,6 +23,7 @@ correctly invalidated and the published image records the exact base used.
 import dataclasses
 import sys
 
+from ol_concourse.lib.containers import ensure_ecr_task
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     Cache,
@@ -177,6 +178,7 @@ def grader_image_pipeline(config: GraderPipelineConfig) -> Pipeline:
                     ),
                 ),
             ),
+            ensure_ecr_task(config.ecr_repo_name),
             PutStep(
                 put=grader_ecr_image.name,
                 params={
