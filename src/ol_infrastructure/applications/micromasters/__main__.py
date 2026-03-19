@@ -5,10 +5,14 @@ MicroMasters application.
 - Create an IAM policy to grant access to S3 and other resources
 """
 
+import base64
 import json
+import mimetypes
 import os
+import textwrap
 from pathlib import Path
 
+import pulumi_fastly as fastly
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
@@ -17,13 +21,21 @@ from pulumi import (
     Alias,
     Config,
     InvokeOptions,
+    Output,
     ResourceOptions,
     StackReference,
     export,
 )
-from pulumi_aws import ec2, iam, s3
+from pulumi_aws import ec2, iam, route53, s3
 
-from bridge.lib.magic_numbers import DEFAULT_NGINX_PORT, DEFAULT_POSTGRES_PORT
+from bridge.lib.constants import FASTLY_A_TLS_1_3
+from bridge.lib.magic_numbers import (
+    DEFAULT_HTTPS_PORT,
+    DEFAULT_NGINX_PORT,
+    DEFAULT_POSTGRES_PORT,
+    ONE_MEGABYTE_BYTE,
+)
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.apisix_gateway_api import (
@@ -54,6 +66,10 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
+from ol_infrastructure.lib.fastly import (
+    build_fastly_log_format_string,
+    get_fastly_provider,
+)
 from ol_infrastructure.lib.heroku import setup_heroku_provider
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
@@ -74,9 +90,17 @@ heroku_app_config = Config("heroku_app")
 
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+dns_stack = StackReference("infrastructure.aws.dns")
+monitoring_stack = StackReference("infrastructure.monitoring")
+vector_log_proxy_stack = StackReference(
+    f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
+)
 micromasters_vpc = network_stack.require_output("applications_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
 micromasters_environment = f"micromasters-{stack_info.env_suffix}"
+
+fastly_provider = get_fastly_provider()
+ol_zone_id = dns_stack.require_output("odl")["id"]
 aws_config = AWSBase(
     tags={
         "OU": "micromasters",
@@ -497,6 +521,11 @@ if micromasters_config.get_bool("deploy_k8s"):
         depends_on=[vault_k8s_resources],
     )
 
+    # The secret-micromasters Vault mount is kv-v2 in CI but kv-v1 in QA/Production
+    secret_micromasters_mount_type = (
+        "kv-v2" if stack_info.env_suffix == "ci" else "kv-v1"
+    )
+
     # Dynamic AWS credentials
     aws_creds_secret_name = "micromasters-aws-creds"  # noqa: S105  # pragma: allowlist secret
     aws_creds_secret = OLVaultK8SSecret(
@@ -559,7 +588,7 @@ if micromasters_config.get_bool("deploy_k8s"):
             dest_secret_name=edx_secret_name,
             dest_secret_labels=k8s_global_labels,
             mount="secret-micromasters",
-            mount_type="kv-v2",
+            mount_type=secret_micromasters_mount_type,
             path="edx",
             excludes=[".*"],
             exclude_raw=True,
@@ -583,7 +612,7 @@ if micromasters_config.get_bool("deploy_k8s"):
             dest_secret_name=google_secret_name,
             dest_secret_labels=k8s_global_labels,
             mount="secret-micromasters",
-            mount_type="kv-v2",
+            mount_type=secret_micromasters_mount_type,
             path="google",
             excludes=[".*"],
             exclude_raw=True,
@@ -606,7 +635,7 @@ if micromasters_config.get_bool("deploy_k8s"):
             dest_secret_name=mitxonline_secret_name,
             dest_secret_labels=k8s_global_labels,
             mount="secret-micromasters",
-            mount_type="kv-v2",
+            mount_type=secret_micromasters_mount_type,
             path="mitxonline",
             excludes=[".*"],
             exclude_raw=True,
@@ -635,7 +664,7 @@ if micromasters_config.get_bool("deploy_k8s"):
             dest_secret_name=opensearch_secret_name,
             dest_secret_labels=k8s_global_labels,
             mount="secret-micromasters",
-            mount_type="kv-v2",
+            mount_type=secret_micromasters_mount_type,
             path="opensearch",
             excludes=[".*"],
             exclude_raw=True,
@@ -659,7 +688,7 @@ if micromasters_config.get_bool("deploy_k8s"):
             dest_secret_name=open_discussions_secret_name,
             dest_secret_labels=k8s_global_labels,
             mount="secret-micromasters",
-            mount_type="kv-v2",
+            mount_type=secret_micromasters_mount_type,
             path="open-discussions",
             excludes=[".*"],
             exclude_raw=True,
@@ -682,7 +711,7 @@ if micromasters_config.get_bool("deploy_k8s"):
             dest_secret_name=open_exchange_rates_secret_name,
             dest_secret_labels=k8s_global_labels,
             mount="secret-micromasters",
-            mount_type="kv-v2",
+            mount_type=secret_micromasters_mount_type,
             path="open-exchange-rates",
             excludes=[".*"],
             exclude_raw=True,
@@ -705,7 +734,7 @@ if micromasters_config.get_bool("deploy_k8s"):
             dest_secret_name=django_secret_name,
             dest_secret_labels=k8s_global_labels,
             mount="secret-micromasters",
-            mount_type="kv-v2",
+            mount_type=secret_micromasters_mount_type,
             path="django",
             excludes=[".*"],
             exclude_raw=True,
@@ -729,7 +758,7 @@ if micromasters_config.get_bool("deploy_k8s"):
             dest_secret_name=sentry_secret_name,
             dest_secret_labels=k8s_global_labels,
             mount="secret-micromasters",
-            mount_type="kv-v2",
+            mount_type=secret_micromasters_mount_type,
             path="sentry",
             excludes=[".*"],
             exclude_raw=True,
@@ -753,7 +782,7 @@ if micromasters_config.get_bool("deploy_k8s"):
             dest_secret_name=cybersource_secret_name,
             dest_secret_labels=k8s_global_labels,
             mount="secret-micromasters",
-            mount_type="kv-v2",
+            mount_type=secret_micromasters_mount_type,
             path="cybersource",
             excludes=[".*"],
             exclude_raw=True,
@@ -939,7 +968,8 @@ if micromasters_config.get_bool("deploy_k8s"):
         ),
     )
     # APISIX routing (pass-through, no OIDC)
-    app_domain = micromasters_config.require("domain")
+    backend_domain = micromasters_config.require("backend_domain")
+    frontend_domain = micromasters_config.require("frontend_domain")
     tls_secret_name = "micromasters-tls-pair"  # noqa: S105  # pragma: allowlist secret
 
     cert_manager_certificate = OLCertManagerCert(
@@ -950,7 +980,7 @@ if micromasters_config.get_bool("deploy_k8s"):
             k8s_labels=k8s_global_labels,
             create_apisixtls_resource=True,
             dest_secret_name=tls_secret_name,
-            dns_names=[app_domain],
+            dns_names=[backend_domain],
         ),
     )
 
@@ -959,7 +989,7 @@ if micromasters_config.get_bool("deploy_k8s"):
         route_configs=[
             OLApisixHTTPRouteConfig(
                 route_name="passthrough",
-                hosts=[app_domain],
+                hosts=[backend_domain],
                 paths=["/*"],
                 backend_service_name=micromasters_k8s_app.application_lb_service_name,
                 backend_service_port=micromasters_k8s_app.application_lb_service_port_name,
@@ -968,6 +998,136 @@ if micromasters_config.get_bool("deploy_k8s"):
         ],
         k8s_namespace=micromasters_namespace,
         k8s_labels=k8s_global_labels,
+    )
+
+    ################################################
+    # Fastly CDN configuration
+    vector_log_proxy_secrets = read_yaml_secrets(
+        Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
+    )
+    fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
+    encoded_fastly_proxy_credentials = base64.b64encode(
+        f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
+    ).decode("utf8")
+    vector_log_proxy_domain = vector_log_proxy_stack.require_output(
+        "vector_log_proxy_domain"
+    )
+
+    gzip_settings: dict[str, set[str]] = {"extensions": set(), "content_types": set()}
+    for k, v in mimetypes.types_map.items():
+        if k in (
+            ".json",
+            ".pdf",
+            ".js",
+            ".css",
+            ".html",
+            ".xml",
+            ".svg",
+            ".txt",
+            ".csv",
+        ):
+            gzip_settings["extensions"].add(k.strip("."))
+            gzip_settings["content_types"].add(v)
+
+    micromasters_fastly_service = fastly.ServiceVcl(
+        f"micromasters-fastly-service-{stack_info.env_suffix}",
+        name=f"MicroMasters {stack_info.env_suffix}",
+        comment="Managed by Pulumi",
+        backends=[
+            fastly.ServiceVclBackendArgs(
+                address=backend_domain,
+                name="micromasters_backend",
+                override_host=backend_domain,
+                port=DEFAULT_HTTPS_PORT,
+                ssl_cert_hostname=backend_domain,
+                ssl_sni_hostname=backend_domain,
+                use_ssl=True,
+            ),
+        ],
+        gzips=[
+            fastly.ServiceVclGzipArgs(
+                name="enable-gzip-compression",
+                extensions=list(gzip_settings["extensions"]),
+                content_types=list(gzip_settings["content_types"]),
+            )
+        ],
+        product_enablement=fastly.ServiceVclProductEnablementArgs(
+            brotli_compression=True,
+        ),
+        cache_settings=[],
+        conditions=[],
+        dictionaries=[],
+        domains=[
+            fastly.ServiceVclDomainArgs(
+                comment=f"MicroMasters {stack_info.env_prefix} {stack_info.env_suffix}",
+                name=frontend_domain,
+            ),
+        ],
+        request_settings=[
+            fastly.ServiceVclRequestSettingArgs(
+                force_ssl=True,
+                name="Generated by force TLS and enable HSTS",
+                xff="",
+            )
+        ],
+        headers=[
+            fastly.ServiceVclHeaderArgs(
+                action="set",
+                destination="http.Strict-Transport-Security",
+                name="Generated by force TLS and enable HSTS",
+                source='"max-age=300"',
+                type="response",
+            ),
+        ],
+        snippets=[
+            fastly.ServiceVclSnippetArgs(
+                name="Redirect to correct domain",
+                content=textwrap.dedent(
+                    rf"""
+                    # redirect to the correct host/domain
+                    if (obj.status == 618 && obj.response == "redirect-host") {{
+                      set obj.status = 302;
+                      set obj.http.Location = "https://"
+                        + "{frontend_domain}"
+                        + req.url.path
+                        + if (std.strlen(req.url.qs) > 0, "?" req.url.qs, "");
+                      return (deliver);
+                    }}
+                    """
+                ),
+                type="error",
+            ),
+        ],
+        logging_https=[
+            fastly.ServiceVclLoggingHttpArgs(
+                url=Output.all(domain=vector_log_proxy_domain).apply(
+                    lambda kwargs: f"https://{kwargs['domain']}/fastly"
+                ),
+                name=f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-https-logging-args",
+                content_type="application/json",
+                format=build_fastly_log_format_string(additional_static_fields={}),
+                format_version=2,
+                header_name="Authorization",
+                header_value=f"Basic {encoded_fastly_proxy_credentials}",
+                json_format="0",
+                method="POST",
+                request_max_bytes=ONE_MEGABYTE_BYTE,
+            )
+        ],
+        opts=ResourceOptions.merge(fastly_provider, ResourceOptions()),
+    )
+
+    # Point the frontend domain at Fastly
+    five_minutes = 60 * 5
+    route53.Record(
+        f"micromasters-frontend-dns-{stack_info.env_suffix}",
+        name=frontend_domain,
+        allow_overwrite=True,
+        type="A",
+        ttl=five_minutes,
+        records=[str(addr) for addr in FASTLY_A_TLS_1_3],
+        zone_id=ol_zone_id,
+        opts=ResourceOptions(delete_before_replace=True),
     )
 
 

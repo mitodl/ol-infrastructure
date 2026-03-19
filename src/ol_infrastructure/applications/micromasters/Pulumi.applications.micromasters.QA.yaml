@@ -11,7 +11,7 @@ config:
   heroku:app_id:
     secure: v1:C6kSQ0x/E2q9yf+C:1BS59SvECNdYkFelQxTQPGbzII+msTL4OXGXP3Mag0/mDRWgwcmnpHaLVbMCksB+ZEbcOA==
   heroku_app:vars:
-    ALLOWED_HOSTS: '["micromasters-rc.odl.mit.edu"]'
+    ALLOWED_HOSTS: '["micromasters-rc.odl.mit.edu", "micromasters-rc-backend.odl.mit.edu"]'
     AWS_STORAGE_BUCKET_NAME: "ol-micromasters-app-qa"
     CYBERSOURCE_REFERENCE_PREFIX: "rc"
     CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
@@ -34,6 +34,28 @@ config:
     PGBOUNCER_MAX_CLIENT_CONN: 1000
   micromasters:db_password:
     secure: v1:72AVczMFP7U0adTg:qiVKioH1VjNf38HfLkNIZsCdc8RqKs0bkaou+fU6SSRK9W4kbS1do2PwdD3JWYlc37eojd+sdAL8npp+tyEeQ66q5mHmWDQK3WlqgdWbf8G41fizyMwoy2AQdZmtZtJe40IoeqaSX3ntfJvhI0uP7YWmpge4G9e6KMNBmhZ0wl0T6qHU4z180aId1ZpjCM4=
-  micromasters:domain: micromasters-rc.odl.mit.edu
+  micromasters:deploy_k8s: "true"
+  micromasters:frontend_domain: micromasters-rc.odl.mit.edu
+  micromasters:backend_domain: micromasters-rc-backend.odl.mit.edu
+  micromasters:vars:
+    ALLOWED_HOSTS: '["micromasters-rc.odl.mit.edu", "micromasters-rc-backend.odl.mit.edu"]'
+    AWS_STORAGE_BUCKET_NAME: "ol-micromasters-app-qa"
+    CYBERSOURCE_REFERENCE_PREFIX: "rc"
+    CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
+    EDXORG_BASE_URL: "https://courses.stage.edx.org"
+    EDXORG_CALLBACK_URL: "https://courses.stage.edx.org"
+    FEATURE_EXAMS_CARD_ENABLED: "False"
+    GA_TRACKING_ID: "UA-5145472-14"
+    GTM_CONTAINER_ID: "GTM-NB27R8L"
+    MAILGUN_FROM_EMAIL: "no-reply@micromasters-rc-mail.odl.mit.edu"
+    MAILGUN_URL: "https://api.mailgun.net/v3/micromasters-rc-mail.odl.mit.edu"
+    MICROMASTERS_BASE_URL: "https://micromasters-rc.odl.mit.edu"
+    MICROMASTERS_CORS_ORIGIN_WHITELIST: '[]'
+    MICROMASTERS_ENVIRONMENT: "rc"
+    MICROMASTERS_LOG_LEVEL: "DEBUG"
+    MIDDLEWARE_FEATURE_FLAG_QS_PREFIX: "BGA"
+    MITXONLINE_BASE_URL: "https://courses.rc.learn.mit.edu/"
+    MITXONLINE_CALLBACK_URL: "https://courses.rc.learn.mit.edu/"
+    MITXONLINE_URL: "https://rc.mitxonline.mit.edu/"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa

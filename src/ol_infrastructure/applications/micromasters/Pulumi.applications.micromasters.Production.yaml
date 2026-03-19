@@ -10,7 +10,8 @@ config:
     secure: v1:OyBLyVBR969L8irG:9FYYzxQpNrYL9VcHWr++92n6Mrz/BJ+YHu9ki6RxYfIvTBIT76xjckeQXu6ZTUxuiTO+2g==
   heroku_app:vars:
     ADWORDS_CONVERSION_ID: "935224753"
-    ALLOWED_HOSTS: '["micromasters.mit.edu", "mmfin.mit.edu", "mm.mit.edu"]'
+    ALLOWED_HOSTS: '["micromasters.mit.edu", "mmfin.mit.edu", "mm.mit.edu", "micromasters-backend.odl.mit.edu",
+      "micromasters.odl.mit.edu"]'
     AWS_STORAGE_BUCKET_NAME: "ol-micromasters-app-production"
     CYBERSOURCE_REFERENCE_PREFIX: "production"
     CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://secureacceptance.cybersource.com/pay"
@@ -34,5 +35,31 @@ config:
     PGBOUNCER_MAX_CLIENT_CONN: 500
   micromasters:db_password:
     secure: v1:KuHLKayQ3w6kG9M6:lh+RY/EMrc92HVO60psz6lD6DlYAmf5wWHdWr80yY/Q+L54KMGytwmTLi59lo8xfBZveqwS7S5MyT2U=
+  micromasters:deploy_k8s: "true"
+  micromasters:frontend_domain: micromasters.odl.mit.edu
+  micromasters:backend_domain: micromasters-backend.odl.mit.edu
+  micromasters:vars:
+    ADWORDS_CONVERSION_ID: "935224753"
+    ALLOWED_HOSTS: '["micromasters.mit.edu", "mmfin.mit.edu", "mm.mit.edu", "micromasters-backend.odl.mit.edu",
+      "micromasters.odl.mit.edu"]'
+    AWS_STORAGE_BUCKET_NAME: "ol-micromasters-app-production"
+    CYBERSOURCE_REFERENCE_PREFIX: "production"
+    CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://secureacceptance.cybersource.com/pay"
+    EDXORG_BASE_URL: "https://courses.edx.org"
+    EDXORG_CALLBACK_URL: "https://courses.edx.org"
+    FEATURE_EXAMS_CARD_ENABLED: "True"
+    FEATURE_PEARSON_EXAMS_SYNC: "True"
+    GA_TRACKING_ID: "UA-5145472-10"
+    GTM_CONTAINER_ID: "GTM-NB27R8L"
+    MAILGUN_FROM_EMAIL: "no-reply@micromasters.odl.mit.edu"
+    MAILGUN_URL: "https://api.mailgun.net/v3/micromasters.odl.mit.edu"
+    MICROMASTERS_BASE_URL: "https://micromasters.mit.edu"
+    MICROMASTERS_CORS_ORIGIN_WHITELIST: '[]'
+    MICROMASTERS_ENVIRONMENT: "production"
+    MICROMASTERS_LOG_LEVEL: "INFO"
+    MIDDLEWARE_FEATURE_FLAG_QS_PREFIX: "XIQ"
+    MITXONLINE_BASE_URL: "https://courses.learn.mit.edu"
+    MITXONLINE_CALLBACK_URL: "https://courses.learn.mit.edu"
+    MITXONLINE_URL: "https://mitxonline.mit.edu/"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
