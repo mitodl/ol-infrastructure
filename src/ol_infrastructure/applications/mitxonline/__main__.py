@@ -792,6 +792,7 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
             paths=[
                 f"/{api_path_prefix}/cart/",
                 f"/{api_path_prefix}/cart",
+                f"/{api_path_prefix}/cart/*",
             ],
             plugins=[
                 proxy_rewrite_plugin_config,
