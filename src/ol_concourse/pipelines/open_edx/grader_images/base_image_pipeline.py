@@ -42,7 +42,7 @@ def grader_base_image_pipeline() -> Pipeline:
     xqwatcher_repo = git_repo(
         name=Identifier("xqueue-watcher-code"),
         uri="https://github.com/mitodl/xqueue-watcher",
-        branch="master",
+        branch="chore/migrate-to-uv-and-k8s-container-grader",
         paths=["grader_support/"],
     )
 
@@ -73,7 +73,9 @@ def grader_base_image_pipeline() -> Pipeline:
                 inputs=[Input(name=xqwatcher_repo.name)],
                 build_parameters={
                     "CONTEXT": f"{xqwatcher_repo.name}/grader_support",
-                    "DOCKERFILE": f"{xqwatcher_repo.name}/grader_support/Dockerfile.base",
+                    "DOCKERFILE": (
+                        f"{xqwatcher_repo.name}/grader_support/Dockerfile.base"
+                    ),
                 },
             ),
             # Push to DockerHub first — fail fast if credentials are wrong
@@ -113,6 +115,5 @@ if __name__ == "__main__":
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)
     sys.stdout.write(
-        "\nfly -t <target> set-pipeline"
-        " -p build-grader-base-image -c definition.json\n"
+        "\nfly -t <target> set-pipeline -p build-grader-base-image -c definition.json\n"
     )

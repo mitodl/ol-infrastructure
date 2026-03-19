@@ -169,7 +169,8 @@ def grader_image_pipeline(config: GraderPipelineConfig) -> Pipeline:
                             "-euc",
                             (
                                 f"export BUILD_ARG_GRADER_BASE_IMAGE="
-                                f'"$(cat {base_ref}/repository)@$(cat {base_ref}/digest)"'
+                                f'"$(cat {base_ref}/repository)'
+                                f'@$(cat {base_ref}/digest)"'
                                 " && exec build"
                             ),
                         ],
@@ -180,9 +181,7 @@ def grader_image_pipeline(config: GraderPipelineConfig) -> Pipeline:
                 put=grader_ecr_image.name,
                 params={
                     "image": "image/image.tar",
-                    "additional_tags": (
-                        f"./{grader_repo.name}/.git/describe_ref"
-                    ),
+                    "additional_tags": (f"./{grader_repo.name}/.git/describe_ref"),
                 },
             ),
         ],
@@ -208,7 +207,7 @@ GRADER_PIPELINES: list[GraderPipelineConfig] = [
     GraderPipelineConfig(
         pipeline_name="graders-mit-600x",
         grader_repo_url="https://github.com/mitodl/graders-mit-600x",
-        grader_repo_branch="main",
+        grader_repo_branch="feat/containerized-grader",
         ecr_repo_name="mitodl/graders-mit-600x",
     ),
 ]
