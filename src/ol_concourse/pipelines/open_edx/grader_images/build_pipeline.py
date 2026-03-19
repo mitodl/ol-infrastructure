@@ -63,7 +63,8 @@ class GraderPipelineConfig:
             for the grader base image used as the build trigger.  Defaults to
             the standard MIT OL base image repo name.
         github_private_key: Vault path for the SSH private key used to clone
-            the (private) grader repository.
+            the (private) grader repository.  Defaults to the odlbot SSH key
+            stored at ``infrastructure/open_api_clients`` in Vault.
         aws_account_id: AWS account ID that hosts the ECR registry.
         aws_region: AWS region for ECR authentication.
     """
@@ -73,7 +74,7 @@ class GraderPipelineConfig:
     grader_repo_branch: str
     ecr_repo_name: str
     grader_base_ecr_repo: str = "mitodl/xqueue-watcher-grader-base"
-    github_private_key: str = "((github.ssh_private_key))"
+    github_private_key: str = "((open_api_clients.odlbot_private_ssh_key))"
     aws_account_id: str = _AWS_ACCOUNT_ID
     aws_region: str = _AWS_REGION
 
