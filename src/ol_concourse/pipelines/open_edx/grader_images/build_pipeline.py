@@ -59,9 +59,9 @@ class GraderPipelineConfig:
             ``"mitodl/graders-mit-600x"``.  Passed directly to the
             ``registry-image`` resource; ``ecr_region`` causes Concourse to
             infer the correct registry host automatically.
-        grader_base_ecr_repo: ECR repository name (without the registry host)
-            for the grader base image used as the build trigger.  Defaults to
-            the standard MIT OL base image repo name.
+        grader_base_dockerhub_repo: DockerHub repository name for the grader
+            base image used as the build trigger, e.g.
+            ``"mitodl/xqueue-watcher-grader-base"``.
         github_private_key: Vault path for the SSH private key used to clone
             the (private) grader repository.  Defaults to the odlbot SSH key
             stored at ``infrastructure/open_api_clients`` in Vault.
@@ -73,7 +73,7 @@ class GraderPipelineConfig:
     grader_repo_url: str
     grader_repo_branch: str
     ecr_repo_name: str
-    grader_base_ecr_repo: str = "mitodl/xqueue-watcher-grader-base"
+    grader_base_dockerhub_repo: str = "mitodl/xqueue-watcher-grader-base"
     github_private_key: str = "((open_api_clients.odlbot_private_ssh_key))"
     aws_account_id: str = _AWS_ACCOUNT_ID
     aws_region: str = _AWS_REGION
@@ -84,7 +84,7 @@ def grader_image_pipeline(config: GraderPipelineConfig) -> Pipeline:
 
     The pipeline contains a single build job that:
       1. Watches the grader repo for new commits (trigger).
-      2. Watches the grader base image in ECR for updates (trigger).
+      2. Watches the grader base image on DockerHub for updates (trigger).
       3. Builds the Dockerfile in the root of the grader repo.  A shell
          wrapper reads the ``repository`` and ``digest`` files written by the
          ``registry-image`` resource and sets ``BUILD_ARG_GRADER_BASE_IMAGE``
@@ -105,13 +105,14 @@ def grader_image_pipeline(config: GraderPipelineConfig) -> Pipeline:
         private_key=config.github_private_key,
     )
 
-    # Grader base image in ECR — used as a build trigger so that rebuilding
-    # the base image automatically causes this pipeline to run.
+    # Grader base image on DockerHub — used as a build trigger so that
+    # rebuilding the base image automatically causes this pipeline to run.
     grader_base_image = registry_image(
         name=Identifier("grader-base-image"),
-        image_repository=config.grader_base_ecr_repo,
+        image_repository=config.grader_base_dockerhub_repo,
         image_tag="latest",
-        ecr_region=config.aws_region,
+        username="((dockerhub.username))",
+        password="((dockerhub.password))",  # noqa: S106
     )
 
     # Private ECR image for this course's grader.
