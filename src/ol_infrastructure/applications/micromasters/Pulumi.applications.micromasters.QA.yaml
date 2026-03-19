@@ -59,3 +59,5 @@ config:
     MITXONLINE_URL: "https://rc.mitxonline.mit.edu/"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
+  redis:password:
+    secure: v1:rzy32SZz/6eZsbXE:x2g0q5E0IzK/8IVbOp4fhzEoMcT8HShQQB5hkKhWotzKCjT/cm94fxoU5A51zDa/dJh6RV4T21GmnmySRTqk3V81FjaVjdafychawE9wHus=
