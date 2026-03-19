@@ -1046,8 +1046,8 @@ if micromasters_config.get_bool("deploy_k8s"):
         gzips=[
             fastly.ServiceVclGzipArgs(
                 name="enable-gzip-compression",
-                extensions=list(gzip_settings["extensions"]),
-                content_types=list(gzip_settings["content_types"]),
+                extensions=sorted(gzip_settings["extensions"]),
+                content_types=sorted(gzip_settings["content_types"]),
             )
         ],
         product_enablement=fastly.ServiceVclProductEnablementArgs(
