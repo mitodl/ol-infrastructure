@@ -9,9 +9,8 @@ config:
   heroku:app_id:
     secure: v1:sgsxJ/o4VFRg9Gwo:3K5dWKF4yiNcZ3oQ1/INdBMOionm5uqiK03t5m+wUmg8FrqG6mIccjDghAel1hKHBBfMKw==
   heroku_app:vars:
-    ALLOWED_HOSTS: '["micromasters-ci.odl.mit.edu"]'
+    ALLOWED_HOSTS: '["micromasters-ci.odl.mit.edu", "micromasters-ci-backend.odl.mit.edu"]'
     AWS_STORAGE_BUCKET_NAME: "ol-micromasters-app-ci"
-    CLOUDFRONT_DIST: ""
     CYBERSOURCE_REFERENCE_PREFIX: "ci"
     CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
     EDXORG_BASE_URL: "https://lms-ci.mitx.mit.edu"
@@ -33,6 +32,28 @@ config:
     PGBOUNCER_MAX_CLIENT_CONN: 1000
   micromasters:db_password:
     secure: v1:DTEttuHYUMFQ5AJM:FSsYgItu3JT8hNcO/kz/JJn3t/dSHEWl5RSNUzlErvov6GDajBte9cvhMjrWi1itHopHJCkiseHdBxjz8Iulaodo9eeHQwSMrAq3+HuWgXE=
-  micromasters:domain: micromasters-ci.odl.mit.edu
+  micromasters:deploy_k8s: "true"
+  micromasters:frontend_domain: micromasters-ci.odl.mit.edu
+  micromasters:backend_domain: micromasters-ci-backend.odl.mit.edu
+  micromasters:vars:
+    ALLOWED_HOSTS: '["micromasters-ci.odl.mit.edu", "micromasters-ci-backend.odl.mit.edu"]'
+    AWS_STORAGE_BUCKET_NAME: "ol-micromasters-app-ci"
+    CYBERSOURCE_REFERENCE_PREFIX: "ci"
+    CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
+    EDXORG_BASE_URL: "https://lms-ci.mitx.mit.edu"
+    EDXORG_CALLBACK_URL: "https://lms-ci.mitx.mit.edu"
+    FEATURE_EXAMS_CARD_ENABLED: "False"
+    GA_TRACKING_ID: "UA-5145472-14"
+    GTM_CONTAINER_ID: "GTM-NB27R8L"
+    MAILGUN_FROM_EMAIL: "no-reply@micromasters-rc-mail.odl.mit.edu"
+    MAILGUN_URL: "https://api.mailgun.net/v3/micromasters-rc-mail.odl.mit.edu"
+    MICROMASTERS_BASE_URL: "https://micromasters-ci.odl.mit.edu"
+    MICROMASTERS_CORS_ORIGIN_WHITELIST: "[]"
+    MICROMASTERS_ENVIRONMENT: "ci"
+    MICROMASTERS_LOG_LEVEL: "DEBUG"
+    MIDDLEWARE_FEATURE_FLAG_QS_PREFIX: ""
+    MITXONLINE_BASE_URL: ""
+    MITXONLINE_CALLBACK_URL: ""
+    MITXONLINE_URL: ""
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
