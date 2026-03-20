@@ -730,11 +730,21 @@ static_secrets = OLVaultK8SSecret(
     ),
 )
 
+env_vars = dict(learn_ai_config.require_object("env_vars") or {})
+
+# Append k8s labels to OTEL_RESOURCE_ATTRIBUTES on stacks where OTEL is enabled
+# (QA and Production). CI does not define this variable and is left untouched.
+if "OTEL_RESOURCE_ATTRIBUTES" in env_vars:
+    k8s_label_attrs = ",".join(f"{k}={v}" for k, v in k8s_global_labels.items())
+    env_vars["OTEL_RESOURCE_ATTRIBUTES"] = (
+        f"{env_vars['OTEL_RESOURCE_ATTRIBUTES']},{k8s_label_attrs}"
+    )
+
 # Instantiate the OLApplicationK8s component
 learn_ai_app_k8s = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
         project_root=Path(__file__).parent,
-        application_config=learn_ai_config.require_object("env_vars") or {},
+        application_config=env_vars,
         application_name="learn-ai",
         application_namespace=learn_ai_namespace,
         application_lb_service_name="learn-ai-webapp",
@@ -875,7 +885,6 @@ learn_ai_deployment_envfrom = [
         ),
     ),
 ]
-
 
 # Create the apisix custom resources since it doesn't support gateway-api yet
 
