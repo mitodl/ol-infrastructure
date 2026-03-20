@@ -89,11 +89,6 @@ ecr_lifecycle_policy = aws.ecr.LifecyclePolicy(
     }""",
 )
 
-# Get ECR authorization token
-ecr_auth_token = aws.ecr.get_authorization_token_output(
-    registry_id=ecr_repository.registry_id
-)
-
 # Reference the Docker image (built separately in Concourse pipeline)
 # The image is built by the Concourse pipeline before this Pulumi stack runs
 webhook_image_name = ecr_repository.repository_url.apply(lambda url: f"{url}:latest")
