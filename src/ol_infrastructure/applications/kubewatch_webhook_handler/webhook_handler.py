@@ -188,13 +188,20 @@ def should_post_notification(  # noqa: PLR0911
             deployment_states[deployment_key] = "completed"
             logger.info("Deployment %s completed successfully", deployment_key)
             return True, "finish"
-        else:
-            # Either already completed or no start notification was sent
+        elif current_state == "completed":
+            # Already notified about completion
             logger.debug(
-                "Deployment %s already completed or never started tracking, skipping",
+                "Deployment %s already completed, skipping",
                 deployment_key,
             )
             return False, ""
+        else:
+            # No start was tracked (e.g. handler restarted mid-rollout or
+            # the rollout was too fast to catch ReplicaSetUpdated). Still
+            # notify so the team sees the deployment happened.
+            deployment_states[deployment_key] = "completed"
+            logger.info("Deployment %s completed (start not tracked)", deployment_key)
+            return True, "finish"
 
     # Check if deployment failed
     elif progressing_reason == "ProgressDeadlineExceeded":
@@ -203,13 +210,18 @@ def should_post_notification(  # noqa: PLR0911
             deployment_states[deployment_key] = "failed"
             logger.info("Deployment %s failed", deployment_key)
             return True, "finish"
-        else:
-            # Already notified or wasn't tracked
+        elif current_state == "failed":
+            # Already notified about failure
             logger.debug(
-                "Deployment %s already failed or never started tracking, skipping",
+                "Deployment %s already failed, skipping",
                 deployment_key,
             )
             return False, ""
+        else:
+            # No start was tracked — still notify about the failure.
+            deployment_states[deployment_key] = "failed"
+            logger.info("Deployment %s failed (start not tracked)", deployment_key)
+            return True, "finish"
 
     # Other progressing reasons - don't notify
     logger.debug(
