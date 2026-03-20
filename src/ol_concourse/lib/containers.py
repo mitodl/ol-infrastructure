@@ -60,6 +60,7 @@ def ensure_ecr_task(ecr_repo_name: str) -> TaskStep:
             ),
             params={
                 "REPO_NAME": ecr_repo_name,
+                "AWS_DEFAULT_REGION": "us-east-1",
                 "AWS_PAGER": "cat",
             },
             run=Command(

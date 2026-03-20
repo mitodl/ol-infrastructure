@@ -383,6 +383,9 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                         liveness_probe=kubernetes.core.v1.ProbeArgs(
                             exec_=kubernetes.core.v1.ExecActionArgs(
                                 command=[
+                                    "uv",
+                                    "run",
+                                    "--no-sync",
                                     "python",
                                     "-c",
                                     "import xqueue_watcher; import sys; sys.exit(0)",

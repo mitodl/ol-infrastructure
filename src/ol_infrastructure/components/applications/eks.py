@@ -212,7 +212,6 @@ class OLEKSAuthBinding(ComponentResource):
             or f"https://vault-{stack_info.env_suffix}.odl.mit.edu",
             vault_auth_endpoint=config.vault_auth_endpoint,
             vault_auth_role_name=k8s_auth_backend_role.role_name,
-            service_account_name=service_account_names[0],
         )
         self.vault_k8s_resources = OLVaultK8SResources(
             resource_config=vault_k8s_resources_config,
