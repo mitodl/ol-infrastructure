@@ -57,3 +57,5 @@ config:
     MITXONLINE_URL: ""
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
+  redis:password:
+    secure: v1:ccOoAu57O0ZjO41G:uNfBlzTnumDLMQTNGep1SD1dD2Q8FPJv05boWJLzcoeW1eLLlybZ2tWF7QywH9y6Va/wG9triZgeSbxos4ugUWZbZRLYKYAlhJ1kmDhruME=

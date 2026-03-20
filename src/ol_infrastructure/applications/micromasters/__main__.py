@@ -33,9 +33,11 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_NGINX_PORT,
     DEFAULT_POSTGRES_PORT,
+    DEFAULT_REDIS_PORT,
     ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.apisix_gateway_api import (
@@ -48,6 +50,7 @@ from ol_infrastructure.components.services.cert_manager import (
 )
 from ol_infrastructure.components.services.k8s import (
     OLApplicationK8s,
+    OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
 )
 from ol_infrastructure.components.services.vault import (
@@ -453,8 +456,12 @@ if micromasters_config.get_bool("deploy_k8s"):
     MICROMASTERS_DOCKER_TAG = os.environ["MICROMASTERS_DOCKER_TAG"]
 
     vault_config = Config("vault")
+    redis_config = Config("redis")
     cluster_stack = StackReference(
         f"infrastructure.aws.eks.applications.{stack_info.name}"
+    )
+    cluster_substructure_stack = StackReference(
+        f"substructure.aws.eks.applications.{stack_info.name}"
     )
 
     setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
@@ -483,7 +490,59 @@ if micromasters_config.get_bool("deploy_k8s"):
         vpc_id=micromasters_vpc["id"],
     )
 
-    # Vault K8s auth
+    # Redis / Elasticache
+    redis_cluster_security_group = ec2.SecurityGroup(
+        f"micromasters-redis-cluster-security-group-{stack_info.env_suffix}",
+        name_prefix=f"micromasters-redis-cluster-security-group-{stack_info.env_suffix}",
+        description="Access control for the MicroMasters redis cluster.",
+        ingress=[
+            ec2.SecurityGroupIngressArgs(
+                security_groups=[
+                    micromasters_app_security_group.id,
+                    cluster_substructure_stack.require_output(
+                        "cluster_keda_security_group_id"
+                    ),
+                ],
+                protocol="tcp",
+                from_port=DEFAULT_REDIS_PORT,
+                to_port=DEFAULT_REDIS_PORT,
+                description="Allow application pods to talk to Redis",
+            ),
+            ec2.SecurityGroupIngressArgs(
+                cidr_blocks=operations_vpc["k8s_pod_subnet_cidrs"],
+                protocol="tcp",
+                from_port=DEFAULT_REDIS_PORT,
+                to_port=DEFAULT_REDIS_PORT,
+                description=(
+                    "Allow Operations VPC celery monitoring pods to talk to Redis"
+                ),
+            ),
+        ],
+        vpc_id=micromasters_vpc["id"],
+        tags=aws_config.tags,
+    )
+    redis_defaults = defaults(stack_info)["redis"]
+    redis_defaults["instance_type"] = (
+        redis_config.get("instance_type") or redis_defaults["instance_type"]
+    )
+    redis_cache_config = OLAmazonRedisConfig(
+        encrypt_transit=True,
+        auth_token=redis_config.require("password"),
+        cluster_mode_enabled=False,
+        encrypted=True,
+        engine_version="7.2",
+        engine="valkey",
+        num_instances=3,
+        shard_count=1,
+        auto_upgrade=True,
+        cluster_description="Redis cluster for MicroMasters",
+        cluster_name=f"micromasters-app-redis-{stack_info.env_suffix}",
+        subnet_group=micromasters_vpc["elasticache_subnet"],
+        security_groups=[redis_cluster_security_group.id],
+        tags=aws_config.tags,
+        **redis_defaults,
+    )
+    redis_cache = OLAmazonCache(redis_cache_config)
     micromasters_vault_k8s_policy = vault.Policy(
         f"micromasters-vault-k8s-policy-{stack_info.env_suffix}",
         name="micromasters",
@@ -843,6 +902,28 @@ if micromasters_config.get_bool("deploy_k8s"):
         opts=secret_opts,
     )
 
+    # Redis credentials (plain K8s secret)
+    redis_creds_secret_name = "micromasters-redis-creds"  # noqa: S105  # pragma: allowlist secret
+    redis_creds_secret = kubernetes.core.v1.Secret(
+        f"micromasters-{stack_info.env_suffix}-redis-creds",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=redis_creds_secret_name,
+            namespace=micromasters_namespace,
+            labels=k8s_global_labels,
+        ),
+        string_data=redis_cache.address.apply(
+            lambda address: {
+                "REDIS_URL": f"rediss://default:{redis_config.require('password')}@{address}:{DEFAULT_REDIS_PORT}",
+                "CELERY_BROKER_URL": f"rediss://default:{redis_config.require('password')}@{address}:{DEFAULT_REDIS_PORT}/1?ssl_cert_reqs=required",
+                "CELERY_RESULT_BACKEND": f"rediss://default:{redis_config.require('password')}@{address}:{DEFAULT_REDIS_PORT}/1?ssl_cert_reqs=required",
+            }
+        ),
+        opts=ResourceOptions(
+            depends_on=[redis_cache],
+            delete_before_replace=True,
+        ),
+    )
+
     k8s_secret_names = [
         aws_creds_secret_name,
         db_creds_secret_name,
@@ -857,6 +938,7 @@ if micromasters_config.get_bool("deploy_k8s"):
         cybersource_secret_name,
         mailgun_secret_name,
         mit_smtp_secret_name,
+        redis_creds_secret_name,
     ]
     k8s_secret_resources = [
         aws_creds_secret,
@@ -872,6 +954,7 @@ if micromasters_config.get_bool("deploy_k8s"):
         cybersource_secret,
         mailgun_secret,
         mit_smtp_secret,
+        redis_creds_secret,
     ]
 
     k8s_env_vars: dict[str, str | int] = {
@@ -929,6 +1012,36 @@ if micromasters_config.get_bool("deploy_k8s"):
             init_collectstatic=True,
             resource_requests={"cpu": "250m", "memory": "1500Mi"},
             resource_limits={"memory": "1500Mi"},
+            celery_worker_configs=[
+                OLApplicationK8sCeleryWorkerConfig(
+                    application_name="micromasters.celery:app",
+                    queue_name="search",
+                    queues=["search"],
+                    redis_host=redis_cache.address,
+                    redis_password=redis_config.require("password"),
+                ),
+                OLApplicationK8sCeleryWorkerConfig(
+                    application_name="micromasters.celery:app",
+                    queue_name="exams",
+                    queues=["exams"],
+                    redis_host=redis_cache.address,
+                    redis_password=redis_config.require("password"),
+                ),
+                OLApplicationK8sCeleryWorkerConfig(
+                    application_name="micromasters.celery:app",
+                    queue_name="dashboard",
+                    queues=["dashboard"],
+                    redis_host=redis_cache.address,
+                    redis_password=redis_config.require("password"),
+                ),
+                OLApplicationK8sCeleryWorkerConfig(
+                    application_name="micromasters.celery:app",
+                    queue_name="default",
+                    queues=["default"],
+                    redis_host=redis_cache.address,
+                    redis_password=redis_config.require("password"),
+                ),
+            ],
             probe_configs={
                 "liveness_probe": kubernetes.core.v1.ProbeArgs(
                     http_get=kubernetes.core.v1.HTTPGetActionArgs(

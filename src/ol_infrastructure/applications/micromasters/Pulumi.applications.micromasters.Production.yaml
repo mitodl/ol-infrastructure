@@ -63,3 +63,5 @@ config:
     MITXONLINE_URL: "https://mitxonline.mit.edu/"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
+  redis:password:
+    secure: v1:QXYvf7fmwAFVLqi+:TyU1jblD3P9zPEnj/EA97CZEnR0okQyV3fM5/BIZLhKcrR3/TaF+wWFw/xRVTXMqjT5sR4vRnE6H1b+M7O0VJIejaM2LUBKsk36Zuc7mahk=
