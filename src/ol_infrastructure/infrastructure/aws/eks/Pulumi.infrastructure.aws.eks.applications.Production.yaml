@@ -47,7 +47,6 @@ config:
   eks:gateway_release_channel: experimental
   eks:namespaces:
   - digital-credentials
-  - ecommerce
   - jupyter
   - jupyter-authoring
   - kubewatch
