@@ -66,10 +66,12 @@ setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 namespace = xqwatcher_config.get("namespace") or f"{stack_info.env_prefix}-openedx"
 
-if "XQWATCHER_DOCKER_DIGEST" not in os.environ:
-    msg = "XQWATCHER_DOCKER_DIGEST must be set"
+docker_image_digest = os.environ.get("XQWATCHER_DOCKER_DIGEST") or xqwatcher_config.get(
+    "docker_tag"
+)
+if not docker_image_digest:
+    msg = "Either XQWATCHER_DOCKER_DIGEST env var or xqwatcher:docker_tag config must be set"  # noqa: E501
     raise ValueError(msg)
-docker_image_digest = os.environ["XQWATCHER_DOCKER_DIGEST"]
 docker_image_ref = f"mitodl/xqueue-watcher@{docker_image_digest}"
 
 min_replicas = xqwatcher_config.get_int("min_replicas") or 1
@@ -331,23 +333,10 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                         command=["uv", "run", "--no-sync", "xqueue-watcher"],
                         args=["-d", "/xqwatcher"],
                         env=[
-                            # Non-sensitive manager config values — match
-                            # MANAGER_CONFIG_DEFAULTS in env_settings.py.
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="XQWATCHER_POLL_TIME", value="10"
-                            ),
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="XQWATCHER_REQUESTS_TIMEOUT", value="1"
-                            ),
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="XQWATCHER_POLL_INTERVAL", value="1"
-                            ),
+                            # Non-sensitive manager config values that are not
+                            # already covered by the mounted xqwatcher.json ConfigMap.
                             kubernetes.core.v1.EnvVarArgs(
                                 name="XQWATCHER_LOGIN_POLL_INTERVAL", value="5"
-                            ),
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="XQWATCHER_FOLLOW_CLIENT_REDIRECTS",
-                                value="true",
                             ),
                             # ContainerGrader deployment-wide defaults.
                             # These are used when a queue's KWARGS block does not

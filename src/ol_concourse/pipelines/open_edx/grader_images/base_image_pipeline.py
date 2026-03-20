@@ -6,10 +6,11 @@ The base image (grader_support/Dockerfile.base) is the foundation for all
 course-specific grader images.  Publishing it to both registries allows:
   - DockerHub (mitodl/xqueue-watcher-grader-base): public reference usable
     without AWS credentials; used in grader repo Dockerfiles as the default
-    GRADER_BASE_IMAGE build arg.
-  - ECR (mitodl/xqueue-watcher-grader-base): used by the per-grader Concourse
-    build pipelines as the trigger source, so a base image rebuild
-    automatically triggers downstream grader image rebuilds.
+    GRADER_BASE_IMAGE build arg.  The per-grader Concourse build pipelines
+    trigger off this DockerHub image so a base image rebuild automatically
+    triggers downstream grader image rebuilds.
+  - ECR (mitodl/xqueue-watcher-grader-base): private mirror for use inside
+    AWS without DockerHub rate-limit concerns.
 
 Triggers:
   - Push to the xqueue-watcher repo on paths under grader_support/.
@@ -39,7 +40,7 @@ def grader_base_image_pipeline() -> Pipeline:
     xqwatcher_repo = git_repo(
         name=Identifier("xqueue-watcher-code"),
         uri="https://github.com/mitodl/xqueue-watcher",
-        branch="chore/migrate-to-uv-and-k8s-container-grader",
+        branch="main",
         paths=["grader_support/"],
     )
 

@@ -205,7 +205,7 @@ GRADER_PIPELINES: list[GraderPipelineConfig] = [
     GraderPipelineConfig(
         pipeline_name="graders-mit-600x",
         grader_repo_url="git@github.com:mitodl/graders-mit-600x",
-        grader_repo_branch="feat/containerized-grader",
+        grader_repo_branch="main",
         ecr_repo_name="mitodl/graders-mit-600x",
     ),
 ]

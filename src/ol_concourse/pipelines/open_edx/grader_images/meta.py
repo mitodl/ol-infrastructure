@@ -44,7 +44,7 @@ _PIPELINE_CODE_PATHS = [
 pipeline_code = git_repo(
     name=Identifier("grader-images-pipeline-code"),
     uri="https://github.com/mitodl/ol-infrastructure",
-    branch="feat/xqwatcher-kubernetes-migration",
+    branch="main",
     paths=_PIPELINE_CODE_PATHS,
 )
 
