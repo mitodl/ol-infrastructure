@@ -105,7 +105,7 @@ for queue_name, queue_cfg in _queues_raw.items():
             first_component = image_ref.split("/", maxsplit=1)[0]
             if "." not in first_component and ":" not in first_component:
                 handler_cfg["KWARGS"]["image"] = cached_image_uri(image_ref)
-    entry["SERVER_REF"] = "default"
+    entry.setdefault("SERVER_REF", "default")
     queues_config[queue_name] = entry
 
 ##################################
@@ -151,7 +151,14 @@ xqueue_servers_template = json.dumps(
         "default": {
             "SERVER": xqueue_server_url,
             "AUTH": ["xqwatcher", "{{ .Secrets.xqwatcher_password }}"],
-        }
+        },
+        "edxorg": {
+            "SERVER": "https://xqueue.edx.org",
+            "AUTH": [
+                "{{ .Secrets.edxorg_xqueue_username }}",
+                "{{ .Secrets.edxorg_xqueue_password }}",
+            ],
+        },
     }
 )
 xqueue_servers_secret = OLVaultK8SSecret(

@@ -24,6 +24,7 @@ config:
           timeout: 60
           image_pull_policy: always
     edxorg-686x:
+      SERVER_REF: edxorg
       CONNECTIONS: 5
       HANDLERS:
       - HANDLER: xqueue_watcher.containergrader.ContainerGrader
