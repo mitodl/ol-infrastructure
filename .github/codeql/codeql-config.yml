@@ -1,9 +1,0 @@
----
-# CodeQL configuration for Default Setup.
-# The "actions" extractor (CodeQL 2.24+) fails on this repository because it
-# detects the Erk agent workflow files but cannot extract any source code from
-# them (exit code 32: "no code was successfully extracted").  Excluding the
-# .github tree from actions analysis suppresses the fatal extractor error while
-# keeping Python and JavaScript/TypeScript analysis fully intact.
-paths-ignore:
-- ".github"
