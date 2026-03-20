@@ -11,6 +11,7 @@ This service receives webhook events from kubewatch and:
 import json
 import logging
 import os
+from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import Any
 
@@ -62,9 +63,11 @@ IGNORED_LABEL_PATTERNS = [
     pattern.strip() for pattern in IGNORED_LABEL_PATTERNS if pattern.strip()
 ]
 
-# In-memory state tracking for deployments
-# Tracks deployment states: "rolling_out", "completed", "failed"
-deployment_states: dict[str, str] = {}
+# Deduplication tracking: maps deployment_key → timestamp of last notification sent.
+# Prevents re-notifying when kubewatch re-syncs already-stable deployments.
+# TTL is configurable via NOTIFICATION_DEDUP_SECONDS (default: 5 minutes).
+NOTIFICATION_DEDUP_SECONDS = int(os.environ.get("NOTIFICATION_DEDUP_SECONDS", "300"))
+last_notified_at: dict[str, datetime] = {}
 
 logger.info("Watching namespaces: %s", WATCHED_NAMESPACES or "ALL")
 logger.info("Ignoring label patterns: %s", IGNORED_LABEL_PATTERNS)
@@ -141,83 +144,47 @@ def get_target_slack_channel(deployment_details: dict[str, Any] | None) -> str:
     return target_channel
 
 
-def should_post_notification(  # noqa: PLR0911
+def should_post_notification(
     deployment_key: str,
     progressing_reason: str | None,
-) -> tuple[bool, str]:
+) -> bool:
     """
     Determine if we should post a notification based on deployment state.
 
-    Only posts notifications for:
-    - Start: When rollout begins (ReplicaSetUpdated)
-    - Finish: When rollout completes (NewReplicaSetAvailable) or fails
-      (ProgressDeadlineExceeded)
+    Posts a notification whenever a deployment reaches a terminal state
+    (NewReplicaSetAvailable or ProgressDeadlineExceeded), deduplicating
+    within NOTIFICATION_DEDUP_SECONDS to suppress kubewatch re-sync noise.
 
     Args:
         deployment_key: Unique key for deployment (namespace/name)
         progressing_reason: The reason from the Progressing condition
 
     Returns:
-        Tuple of (should_post: bool, notification_type: str)
-        notification_type can be "start", "finish", or ""
+        True if a notification should be sent, False otherwise
     """
-    if not progressing_reason:
-        logger.debug("No progressing reason for %s, skipping", deployment_key)
-        return False, ""
+    if progressing_reason not in ("NewReplicaSetAvailable", "ProgressDeadlineExceeded"):
+        logger.debug(
+            "Deployment %s has progressing reason '%s', not a terminal event",
+            deployment_key,
+            progressing_reason,
+        )
+        return False
 
-    current_state = deployment_states.get(deployment_key)
-
-    # Check if deployment is starting (beginning rollout)
-    if progressing_reason == "ReplicaSetUpdated":
-        if current_state != "rolling_out":
-            # Deployment is starting - post start message
-            deployment_states[deployment_key] = "rolling_out"
-            logger.info("Deployment %s starting rollout", deployment_key)
-            return True, "start"
-        else:
-            # Already notified about start
+    now = datetime.now(tz=UTC)
+    last_sent = last_notified_at.get(deployment_key)
+    if last_sent is not None:
+        elapsed = (now - last_sent).total_seconds()
+        if elapsed < NOTIFICATION_DEDUP_SECONDS:
             logger.debug(
-                "Deployment %s already in rolling_out state, skipping", deployment_key
-            )
-            return False, ""
-
-    # Check if deployment completed successfully
-    elif progressing_reason == "NewReplicaSetAvailable":
-        if current_state == "rolling_out":
-            # Deployment completed - post finish message
-            deployment_states[deployment_key] = "completed"
-            logger.info("Deployment %s completed successfully", deployment_key)
-            return True, "finish"
-        else:
-            # Either already completed or no start notification was sent
-            logger.debug(
-                "Deployment %s already completed or never started tracking, skipping",
+                "Deduplicating notification for %s (last sent %.0fs ago, TTL=%ds)",
                 deployment_key,
+                elapsed,
+                NOTIFICATION_DEDUP_SECONDS,
             )
-            return False, ""
+            return False
 
-    # Check if deployment failed
-    elif progressing_reason == "ProgressDeadlineExceeded":
-        if current_state == "rolling_out":
-            # Deployment failed - post finish message
-            deployment_states[deployment_key] = "failed"
-            logger.info("Deployment %s failed", deployment_key)
-            return True, "finish"
-        else:
-            # Already notified or wasn't tracked
-            logger.debug(
-                "Deployment %s already failed or never started tracking, skipping",
-                deployment_key,
-            )
-            return False, ""
-
-    # Other progressing reasons - don't notify
-    logger.debug(
-        "Deployment %s has progressing reason '%s', not a start/finish event",
-        deployment_key,
-        progressing_reason,
-    )
-    return False, ""
+    last_notified_at[deployment_key] = now
+    return True
 
 
 def get_deployment_from_replicaset(
@@ -572,25 +539,21 @@ def webhook_handler():  # noqa: C901, PLR0912, PLR0915, PLR0911
         progressing_reason = (
             deployment_details.get("progressing_reason") if deployment_details else None
         )
-        should_post, notification_type = should_post_notification(
-            deployment_key, progressing_reason
-        )
-
-        if not should_post:
+        if not should_post_notification(deployment_key, progressing_reason):
             logger.info(
-                "Skipping notification for %s (reason: %s, state: %s)",
+                "Skipping notification for %s (reason: %s)",
                 deployment_key,
                 progressing_reason,
-                deployment_states.get(deployment_key, "unknown"),
             )
             return (
-                jsonify({"status": "ignored", "reason": "not a start or finish event"}),
+                jsonify(
+                    {"status": "ignored", "reason": "not a terminal event or duplicate"}
+                ),
                 HTTPStatus.OK,
             )
 
         logger.info(
-            "Posting %s notification for %s (reason: %s)",
-            notification_type,
+            "Posting notification for %s (reason: %s)",
             deployment_key,
             progressing_reason,
         )
