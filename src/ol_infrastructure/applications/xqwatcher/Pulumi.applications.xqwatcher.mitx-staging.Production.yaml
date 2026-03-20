@@ -9,3 +9,29 @@ config:
   xqwatcher:min_replicas: 1
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
+  xqwatcher:xqueue_server_url: https://xqueue.mitx-staging-prod.odl.mit.edu
+  xqwatcher:queues:
+    Watcher-MITx-staging-6.00x:
+      CONNECTIONS: 5
+      HANDLERS:
+      - HANDLER: xqueue_watcher.containergrader.ContainerGrader
+        KWARGS:
+          grader_root: /graders/python3graders/
+          image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/mitodl/graders-mit-600x:latest
+          backend: kubernetes
+          cpu_limit: 1000m
+          memory_limit: 512Mi
+          timeout: 60
+          image_pull_policy: always
+    Watcher-MITx-staging-6.0001r:
+      CONNECTIONS: 5
+      HANDLERS:
+      - HANDLER: xqueue_watcher.containergrader.ContainerGrader
+        KWARGS:
+          grader_root: /graders/python3graders/
+          image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/mitodl/graders-mit-600x:latest
+          backend: kubernetes
+          cpu_limit: 1000m
+          memory_limit: 512Mi
+          timeout: 60
+          image_pull_policy: always

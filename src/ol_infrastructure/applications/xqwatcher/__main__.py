@@ -8,17 +8,15 @@ Deployment on the shared applications EKS cluster.
 Secrets are managed via the Vault Secrets Operator (VaultStaticSecret CRD).
 """
 
+import copy
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 import pulumi_kubernetes as kubernetes
-import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
-from pulumi_aws import get_caller_identity
 
-from bridge.secrets.sops import read_yaml_secrets
-from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
@@ -42,24 +40,12 @@ if Config("vault_server").get("env_namespace") or Config("vault").get("address")
 stack_info = parse_stack()
 xqwatcher_config = Config("xqwatcher")
 
-vault_mount_stack = StackReference(
-    f"substructure.vault.static_mounts.operations.{stack_info.name}"
-)
-
 cluster_name = xqwatcher_config.get("cluster") or "applications"
 cluster_stack = StackReference(
     f"infrastructure.aws.eks.{cluster_name}.{stack_info.name}"
 )
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
-
-openedx_release = (
-    OpenLearningOpenEdxDeployment.get_item(stack_info.env_prefix)
-    .release_by_env(stack_info.name)
-    .value
-)
-
-aws_account = get_caller_identity()
 
 aws_config = AWSBase(
     tags={
@@ -97,51 +83,28 @@ grader_memory_limit = xqwatcher_config.get("grader_memory_limit") or "256Mi"
 grader_timeout = xqwatcher_config.get("grader_timeout") or "20"
 
 ##################################
-##      Vault Secret Data       ##
+##      Grader Queue Config     ##
 ##################################
 
-# Preserve management of the grader config secret in Vault KV.
-# The VaultStaticSecret CRD (below) will sync this into the cluster.
-vault_secrets = read_yaml_secrets(
-    Path(f"xqwatcher/secrets.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
-)
+xqueue_server_url = xqwatcher_config.require("xqueue_server_url")
 
-
-# For ContainerGrader handlers: if the SOPS secret supplies a plain DockerHub
-# image reference in KWARGS.image, rewrite it to use the ECR pull-through
-# cache so the grading Jobs are not subject to DockerHub rate limits.
-# Images that already have a registry hostname (e.g. private ECR URIs like
-# 610119931565.dkr.ecr.us-east-1.amazonaws.com/…, or ghcr.io/…) are left
-# unchanged — the hostname is identified by a "." in the first path component.
-def _needs_pullthrough_rewrite(image: str) -> bool:
-    """Return True only for bare DockerHub image refs (no registry hostname)."""
-    first_component = image.split("/", maxsplit=1)[0]
-    return "." not in first_component and ":" not in first_component
-
-
-if isinstance(vault_secrets.get("confd_json"), dict):
-    for _queue_cfg in vault_secrets["confd_json"].values():
-        for handler_cfg in _queue_cfg.get("HANDLERS", []):
-            if handler_cfg.get("HANDLER", "").endswith(
-                "ContainerGrader"
-            ) and "image" in handler_cfg.get("KWARGS", {}):
-                image_ref = handler_cfg["KWARGS"]["image"]
-                if _needs_pullthrough_rewrite(image_ref):
-                    handler_cfg["KWARGS"]["image"] = cached_image_uri(image_ref)
-
-# VSO renders secret values using Go templates: {{ .Secrets.confd_json }}.
-# If confd_json is stored as a nested object, VSO renders it as a Go map
-# literal rather than JSON. Pre-serialize it to a JSON string so the
-# template output is valid JSON that xqueue-watcher can parse.
-if "confd_json" in vault_secrets and not isinstance(vault_secrets["confd_json"], str):
-    vault_secrets["confd_json"] = json.dumps(vault_secrets["confd_json"])
-xqwatcher_vault_mount_name = vault_mount_stack.require_output("xqwatcher_kv")["path"]
-vault.kv.SecretV2(
-    f"xqwatcher-{env_name}-grader-static-secrets",
-    mount=xqwatcher_vault_mount_name,
-    name=f"{stack_info.env_prefix}-grader-config",
-    data_json=json.dumps(vault_secrets),
-)
+# Read the non-secret queue configs from Pulumi stack config and inject
+# SERVER_REF so credentials are resolved from xqueue_servers.json at runtime.
+_queues_raw: dict[str, Any] = xqwatcher_config.require_object("queues")
+queues_config: dict[str, Any] = {}
+for queue_name, queue_cfg in _queues_raw.items():
+    entry = copy.deepcopy(queue_cfg)
+    # Rewrite bare DockerHub image refs to use the ECR pull-through cache.
+    for handler_cfg in entry.get("HANDLERS", []):
+        if handler_cfg.get("HANDLER", "").endswith(
+            "ContainerGrader"
+        ) and "image" in handler_cfg.get("KWARGS", {}):
+            image_ref = handler_cfg["KWARGS"]["image"]
+            first_component = image_ref.split("/", maxsplit=1)[0]
+            if "." not in first_component and ":" not in first_component:
+                handler_cfg["KWARGS"]["image"] = cached_image_uri(image_ref)
+    entry["SERVER_REF"] = "default"
+    queues_config[queue_name] = entry
 
 ##################################
 ##    Vault Policy + K8s Auth   ##
@@ -176,30 +139,35 @@ vault_k8s_resources = xqwatcher_app.vault_k8s_resources
 ##        Vault Secrets         ##
 ##################################
 
-# Grader handler config (queue names, ContainerGrader KWARGS, xqueue URL+auth).
-# Stored as `confd_json` in the Vault KV entry written above.
-grader_config_secret_name = (
-    "xqwatcher-grader-config"  # pragma: allowlist secret  # noqa: S105
+# xqueue_servers.json — the only secret: xqueue URL and xqwatcher credentials.
+# Sourced from the same Vault KV entry used by the xqueue and edxapp deployments.
+xqueue_servers_secret_name = (
+    "xqwatcher-xqueue-servers"  # pragma: allowlist secret  # noqa: S105
 )
-grader_config_secret = OLVaultK8SSecret(
-    f"xqwatcher-{env_name}-grader-config-secret",
+xqueue_servers_template = json.dumps(
+    {
+        "default": {
+            "SERVER": xqueue_server_url,
+            "AUTH": ["xqwatcher", "{{ .Secrets.xqwatcher_password }}"],
+        }
+    }
+)
+xqueue_servers_secret = OLVaultK8SSecret(
+    f"xqwatcher-{env_name}-xqueue-servers-secret",
     OLVaultK8SStaticSecretConfig(
-        name=grader_config_secret_name,
+        name=xqueue_servers_secret_name,
         namespace=namespace,
-        dest_secret_name=grader_config_secret_name,
+        dest_secret_name=xqueue_servers_secret_name,
         dest_secret_labels=k8s_global_labels.model_dump(),
         labels=k8s_global_labels.model_dump(),
-        mount=xqwatcher_vault_mount_name,
-        mount_type="kv-v2",
-        path=f"{stack_info.env_prefix}-grader-config",
+        mount=f"secret-{stack_info.env_prefix}",
+        mount_type="kv-v1",
+        path="edx-xqueue",
         refresh_after="1h",
         restart_target_kind="Deployment",
         restart_target_name="xqwatcher",
-        # Expose the rendered grader JSON and the HTTP Basic Auth credential
-        # used by the xqueue-watcher manager to authenticate with xqueue.
         templates={
-            "grader_config.json": "{{ .Secrets.confd_json }}",
-            "http_basic_auth": "{{ .Secrets.http_basic_auth }}",
+            "xqueue_servers.json": xqueue_servers_template,
         },
         vaultauth=vault_k8s_resources.auth_name,
     ),
@@ -213,8 +181,8 @@ grader_config_secret = OLVaultK8SSecret(
 ##          ConfigMap           ##
 ##################################
 
-# Base xqueue-watcher config (poll settings, logging).
-# Per-queue grader config comes from the Vault-synced secret above.
+# Base xqueue-watcher config (poll settings, logging) and non-secret grader
+# queue configs.  The Vault-synced secret provides xqueue_servers.json.
 xqwatcher_configmap = kubernetes.core.v1.ConfigMap(
     f"xqwatcher-{env_name}-configmap",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -256,6 +224,9 @@ xqwatcher_configmap = kubernetes.core.v1.ConfigMap(
                 },
             }
         ),
+        # Non-secret queue configs; SERVER_REF resolves credentials at runtime
+        # from xqueue_servers.json (mounted from the Vault-synced secret).
+        "grader_config.json": json.dumps(queues_config),
     },
 )
 
@@ -360,20 +331,6 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                         command=["uv", "run", "--no-sync", "xqueue-watcher"],
                         args=["-d", "/xqwatcher"],
                         env=[
-                            # HTTP Basic Auth for the xqueue server endpoint.
-                            # Value is "username:password"; sourced from the
-                            # Vault-synced secret so it never appears in the
-                            # Deployment spec.
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="XQWATCHER_HTTP_BASIC_AUTH",
-                                value_from=kubernetes.core.v1.EnvVarSourceArgs(
-                                    secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
-                                        name=grader_config_secret_name,
-                                        key="http_basic_auth",
-                                        optional=True,
-                                    )
-                                ),
-                            ),
                             # Non-sensitive manager config values — match
                             # MANAGER_CONFIG_DEFAULTS in env_settings.py.
                             kubernetes.core.v1.EnvVarArgs(
@@ -463,12 +420,21 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                                 sub_path="logging.json",
                                 read_only=True,
                             ),
-                            # Per-queue grader handler config from Vault secret,
-                            # placed under conf.d/ so the manager discovers it.
+                            # Per-queue grader handler config from the ConfigMap
+                            # (non-secret: no SERVER/AUTH, uses SERVER_REF).
                             kubernetes.core.v1.VolumeMountArgs(
-                                name="grader-config",
+                                name="xqwatcher-config",
                                 mount_path="/xqwatcher/conf.d/grader_config.json",
                                 sub_path="grader_config.json",
+                                read_only=True,
+                            ),
+                            # Named server definitions (SERVER URL + AUTH credentials)
+                            # from the Vault-synced secret, mounted at the config
+                            # root so xqueue-watcher can resolve SERVER_REF entries.
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="xqueue-servers",
+                                mount_path="/xqwatcher/xqueue_servers.json",
+                                sub_path="xqueue_servers.json",
                                 read_only=True,
                             ),
                         ],
@@ -482,16 +448,16 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                         ),
                     ),
                     kubernetes.core.v1.VolumeArgs(
-                        name="grader-config",
+                        name="xqueue-servers",
                         secret=kubernetes.core.v1.SecretVolumeSourceArgs(
-                            secret_name=grader_config_secret_name,
+                            secret_name=xqueue_servers_secret_name,
                         ),
                     ),
                 ],
             ),
         ),
     ),
-    opts=ResourceOptions(depends_on=[grader_config_secret]),
+    opts=ResourceOptions(depends_on=[xqueue_servers_secret]),
 )
 
 ##################################
@@ -500,4 +466,4 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
 
 export("k8s_deployment_name", "xqwatcher")
 export("k8s_namespace", namespace)
-export("grader_config_secret", grader_config_secret_name)
+export("xqueue_servers_secret", xqueue_servers_secret_name)
