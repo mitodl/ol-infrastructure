@@ -11,9 +11,8 @@ from ol_concourse.lib.models.pipeline import (
     Input,
     Job,
     PutStep,
-    Resource,
 )
-from ol_concourse.lib.resources import git_repo
+from ol_concourse.lib.resources import git_repo, registry_image
 from ol_concourse.pipelines.constants import (
     PULUMI_CODE_PATH,
     PULUMI_WATCHED_PATHS,
@@ -36,19 +35,12 @@ def build_kubewatch_webhook_handler_pipeline() -> PipelineFragment:
     )
 
     # ECR image resource for webhook handler
-    ecr_repo_url = (
-        "610119931565.dkr.ecr.us-east-1.amazonaws.com/kubewatch-webhook-handler-ci"
-    )
-    ecr_image_resource = Resource(
+    # When ecr_region is set, the registry-image resource constructs the ECR registry
+    # URL itself from the AWS account/region, so only the short repo name is used here.
+    ecr_image_resource = registry_image(
         name=Identifier("kubewatch-webhook-handler-image"),
-        type=Identifier("registry-image"),
-        icon=Identifier("docker"),
-        source={
-            "repository": ecr_repo_url,
-            "aws_region": "us-east-1",
-            "aws_access_key_id": "((aws.access_key_id))",
-            "aws_secret_access_key": "((aws.secret_access_key))",
-        },
+        image_repository="kubewatch-webhook-handler-ci",
+        ecr_region="us-east-1",
     )
 
     # Docker build job for CI environment
@@ -78,17 +70,6 @@ def build_kubewatch_webhook_handler_pipeline() -> PipelineFragment:
         ],
     )
 
-    # Create Pulumi deployment jobs with Docker build dependency
-    custom_dependencies = {
-        0: [  # CI environment
-            GetStep(
-                get=webhook_handler_pulumi_code.name,
-                trigger=True,
-                passed=[docker_build_job.name],
-            ),
-        ],
-    }
-
     webhook_handler_fragment = pulumi_jobs_chain(
         pulumi_code=webhook_handler_pulumi_code,
         stack_names=[
@@ -99,7 +80,13 @@ def build_kubewatch_webhook_handler_pipeline() -> PipelineFragment:
         project_source_path=PULUMI_CODE_PATH.joinpath(
             "applications/kubewatch_webhook_handler/"
         ),
-        custom_dependencies=custom_dependencies,
+        dependencies=[
+            GetStep(
+                get=ecr_image_resource.name,
+                trigger=True,
+                passed=[docker_build_job.name],
+            )
+        ],
     )
 
     # Add Docker build job and ECR resource to fragment
