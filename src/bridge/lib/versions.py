@@ -48,7 +48,7 @@ EXTERNAL_DNS_CHART_VERSION = "1.20.0"
 # renovate: datasource=github-releases depName=gateway-api packageName=kubernetes-sigs/gateway-api
 GATEWAY_API_VERSION = "v1.5.1"
 # renovate: datasource=docker depName=karpenter packageName=public.ecr.aws/karpenter/karpenter
-KARPENTER_CHART_VERSION = "1.9.0"
+KARPENTER_CHART_VERSION = "1.10.0"
 # renoavate: datasource=helm depName=keda registryUrl=https://kedacore.github.io/charts packageName=keda
 KEDA_CHART_VERSION = "2.17.1"
 # renovate: datasource=docker depName=kube-state-metrics packageName=registry-1.docker.io/bitnamicharts/kube-state-metrics
