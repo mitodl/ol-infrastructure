@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Any
 
+import pulumi_kubernetes as kubernetes
 from pulumi import ComponentResource, Config, Output, ResourceOptions
 from pulumi_aws import get_caller_identity, iam
 from pulumi_vault import Policy
@@ -49,6 +50,11 @@ class OLEKSAuthBindingConfig(BaseModel):
     k8s_labels: K8sGlobalLabels
     # Optional parliament config for IAM policy linting
     parliament_config: dict[str, Any] | None = None
+    # When True, create the K8s ServiceAccount object(s) for irsa_service_account_name
+    # with the eks.amazonaws.com/role-arn annotation so pods can reference them.
+    # Set to False (default) when the ServiceAccount is managed externally (e.g. by
+    # Helm) or already exists in the cluster.
+    create_irsa_service_account: bool = False
 
     @model_validator(mode="after")
     def validate_vault_policy(self):
@@ -73,6 +79,7 @@ class OLEKSAuthBinding(ComponentResource):
     irsa_role: iam.Role
     iam_policy: iam.Policy | None
     vault_k8s_resources: OLVaultK8SResources
+    irsa_service_accounts: list[kubernetes.core.v1.ServiceAccount]
 
     def __init__(
         self,
@@ -141,6 +148,31 @@ class OLEKSAuthBinding(ComponentResource):
             )
         self.irsa_role = self.trust_role.role
 
+        if config.create_irsa_service_account:
+            sa_names = (
+                [config.irsa_service_account_name]
+                if isinstance(config.irsa_service_account_name, str)
+                else config.irsa_service_account_name
+            )
+            self.irsa_service_accounts = [
+                kubernetes.core.v1.ServiceAccount(
+                    f"{config.application_name}-{sa_name}-irsa-service-account",
+                    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                        name=sa_name,
+                        namespace=config.namespace,
+                        labels=config.k8s_labels.model_dump(),
+                        annotations={
+                            "eks.amazonaws.com/role-arn": self.irsa_role.arn,
+                        },
+                    ),
+                    automount_service_account_token=False,
+                    opts=ResourceOptions(parent=self),
+                )
+                for sa_name in sa_names
+            ]
+        else:
+            self.irsa_service_accounts = []
+
         # Read Vault policy from file or use provided text
         vault_policy_text = (
             config.vault_policy_path.read_text()
@@ -180,7 +212,6 @@ class OLEKSAuthBinding(ComponentResource):
             or f"https://vault-{stack_info.env_suffix}.odl.mit.edu",
             vault_auth_endpoint=config.vault_auth_endpoint,
             vault_auth_role_name=k8s_auth_backend_role.role_name,
-            service_account_name=service_account_names[0],
         )
         self.vault_k8s_resources = OLVaultK8SResources(
             resource_config=vault_k8s_resources_config,
@@ -195,6 +226,7 @@ class OLEKSAuthBinding(ComponentResource):
             {
                 "iam_policy": self.iam_policy,
                 "irsa_role": self.irsa_role,
+                "irsa_service_accounts": self.irsa_service_accounts,
                 "vault_policy": vault_policy,
                 "vault_k8s_auth_role": k8s_auth_backend_role,
                 "vault_k8s_resources": self.vault_k8s_resources,

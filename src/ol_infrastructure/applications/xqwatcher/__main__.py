@@ -1,265 +1,468 @@
-"""Create the resources needed to run a xqwatcher server.  # noqa: D200"""
+"""Create the Kubernetes resources needed to run xqueue-watcher.  # noqa: D200
 
-# Note: This stack has a silent dependency on an peering connection between the VPC
-# that it is installed in and the VPC(s) that contain the xqueue instances.
+xqueue-watcher polls an xqueue server for student code submissions and grades
+them by spawning an isolated container (ContainerGrader) per submission.  This
+stack replaces the previous EC2 AMI-based deployment with a Kubernetes
+Deployment on the shared applications EKS cluster.
 
-import base64
+Secrets are managed via the Vault Secrets Operator (VaultStaticSecret CRD).
+"""
+
+import copy
 import json
-import textwrap
+import os
 from pathlib import Path
+from typing import Any
 
-import pulumi_vault as vault
-import yaml
-from pulumi import Config, StackReference, export
-from pulumi_aws import ec2, get_caller_identity, iam
+import pulumi_kubernetes as kubernetes
+from pulumi import Config, ResourceOptions, StackReference, export
 
-from bridge.secrets.sops import read_yaml_secrets
-from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
-from ol_infrastructure.components.aws.auto_scale_group import (
-    BlockDeviceMapping,
-    OLAutoScaleGroupConfig,
-    OLAutoScaling,
-    OLLaunchTemplateConfig,
-    TagSpecification,
+from ol_infrastructure.components.applications.eks import (
+    OLEKSAuthBinding,
+    OLEKSAuthBindingConfig,
 )
-from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
-from ol_infrastructure.lib.consul import get_consul_provider
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.components.services.vault import (
+    OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
+)
+from ol_infrastructure.lib.aws.eks_helper import cached_image_uri, setup_k8s_provider
+from ol_infrastructure.lib.ol_types import AWSBase, K8sGlobalLabels, Services
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 ##################################
-##    Setup + Config Retrival   ##
+##    Setup + Config Retrieval  ##
 ##################################
 
-if Config("vault_server").get("env_namespace"):
+if Config("vault_server").get("env_namespace") or Config("vault").get("address"):
     setup_vault_provider()
+
 stack_info = parse_stack()
 xqwatcher_config = Config("xqwatcher")
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-policy_stack = StackReference("infrastructure.aws.policies")
-dns_stack = StackReference("infrastructure.aws.dns")
-consul_stack = StackReference(
-    f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
+
+cluster_name = xqwatcher_config.get("cluster") or "applications"
+cluster_stack = StackReference(
+    f"infrastructure.aws.eks.{cluster_name}.{stack_info.name}"
 )
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
-target_vpc_name = xqwatcher_config.get("target_vpc")
-target_vpc = network_stack.require_output(target_vpc_name)
-vpc_id = target_vpc["id"]
-
-consul_security_groups = consul_stack.require_output("security_groups")
-consul_provider = get_consul_provider(stack_info)
-
-vault_mount_stack = StackReference(
-    f"substructure.vault.static_mounts.operations.{stack_info.name}"
-)
-
-aws_account = get_caller_identity()
-
 aws_config = AWSBase(
     tags={
-        "OU": xqwatcher_config.get("business_unit"),
+        "OU": xqwatcher_config.require("business_unit"),
         "Environment": env_name,
         "Application": "open-edx-xqwatcher",
         "Owner": "platform-engineering",
     }
 )
-xqwatcher_server_tag = f"open-edx-xqwatcher-server-{env_name}"
 
-openedx_release = (
-    OpenLearningOpenEdxDeployment.get_item(stack_info.env_prefix)
-    .release_by_env(stack_info.name)
-    .value
+k8s_global_labels = K8sGlobalLabels(
+    service=Services.xqwatcher,
+    ou=xqwatcher_config.require("business_unit"),
+    stack=stack_info,
 )
 
-xqwatcher_server_ami = ec2.get_ami(
-    filters=[
-        ec2.GetAmiFilterArgs(name="name", values=["open-edx-xqwatcher-server-*"]),
-        ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
-        ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
-        ec2.GetAmiFilterArgs(name="tag:deployment", values=[stack_info.env_prefix]),
-        ec2.GetAmiFilterArgs(name="tag:openedx_release", values=[openedx_release]),
-    ],
-    most_recent=True,
-    owners=[aws_account.account_id],
+setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
+
+namespace = xqwatcher_config.get("namespace") or f"{stack_info.env_prefix}-openedx"
+
+docker_image_digest = os.environ.get("XQWATCHER_DOCKER_DIGEST") or xqwatcher_config.get(
+    "docker_tag"
+)
+if not docker_image_digest:
+    msg = "Either XQWATCHER_DOCKER_DIGEST env var or xqwatcher:docker_tag config must be set"  # noqa: E501
+    raise ValueError(msg)
+docker_image_ref = f"mitodl/xqueue-watcher@{docker_image_digest}"
+
+min_replicas = xqwatcher_config.get_int("min_replicas") or 1
+
+# Deployment-wide ContainerGrader defaults.  These become XQWATCHER_GRADER_*
+# environment variables on the xqwatcher pod so operators don't have to repeat
+# them in every conf.d queue JSON file.  Per-queue KWARGS still override these.
+grader_namespace = xqwatcher_config.get("grader_namespace") or namespace
+grader_cpu_limit = xqwatcher_config.get("grader_cpu_limit") or "500m"
+grader_memory_limit = xqwatcher_config.get("grader_memory_limit") or "256Mi"
+grader_timeout = xqwatcher_config.get("grader_timeout") or "20"
+
+##################################
+##      Grader Queue Config     ##
+##################################
+
+xqueue_server_url = xqwatcher_config.require("xqueue_server_url")
+
+# Read the non-secret queue configs from Pulumi stack config and inject
+# SERVER_REF so credentials are resolved from xqueue_servers.json at runtime.
+_queues_raw: dict[str, Any] = xqwatcher_config.require_object("queues")
+queues_config: dict[str, Any] = {}
+for queue_name, queue_cfg in _queues_raw.items():
+    entry = copy.deepcopy(queue_cfg)
+    # Rewrite bare DockerHub image refs to use the ECR pull-through cache.
+    for handler_cfg in entry.get("HANDLERS", []):
+        if handler_cfg.get("HANDLER", "").endswith(
+            "ContainerGrader"
+        ) and "image" in handler_cfg.get("KWARGS", {}):
+            image_ref = handler_cfg["KWARGS"]["image"]
+            first_component = image_ref.split("/", maxsplit=1)[0]
+            if "." not in first_component and ":" not in first_component:
+                handler_cfg["KWARGS"]["image"] = cached_image_uri(image_ref)
+    entry.setdefault("SERVER_REF", "default")
+    queues_config[queue_name] = entry
+
+##################################
+##    Vault Policy + K8s Auth   ##
+##################################
+
+vault_policy_template = (
+    Path(__file__).parent.joinpath("xqwatcher_server_policy.hcl").read_text()
+)
+vault_policy_text = vault_policy_template.replace("DEPLOYMENT", stack_info.env_prefix)
+
+xqwatcher_app = OLEKSAuthBinding(
+    OLEKSAuthBindingConfig(
+        application_name=f"xqwatcher-{stack_info.env_prefix}",
+        namespace=namespace,
+        stack_info=stack_info,
+        aws_config=aws_config,
+        iam_policy_document=None,  # no direct AWS resource access required
+        vault_policy_text=vault_policy_text,
+        cluster_name=cluster_stack.require_output("cluster_name"),
+        cluster_identities=cluster_stack.require_output("cluster_identities"),
+        vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+        irsa_service_account_name="xqwatcher",
+        vault_sync_service_account_names=f"xqwatcher-{stack_info.env_prefix}-vault",
+        k8s_labels=k8s_global_labels,
+        create_irsa_service_account=True,
+    )
 )
 
-###############################
-##     General Resources     ##
-###############################
+vault_k8s_resources = xqwatcher_app.vault_k8s_resources
 
-# IAM and instance profile
-xqwatcher_server_instance_role = iam.Role(
-    f"xqwatcher-server-instance-role-{env_name}",
-    assume_role_policy=json.dumps(
-        {
-            "Version": "2012-10-17",
-            "Statement": {
-                "Effect": "Allow",
-                "Action": "sts:AssumeRole",
-                "Principal": {"Service": "ec2.amazonaws.com"},
-            },
-        }
+##################################
+##        Vault Secrets         ##
+##################################
+
+# xqueue_servers.json — the only secret: xqueue URL and xqwatcher credentials.
+# Sourced from the same Vault KV entry used by the xqueue and edxapp deployments.
+xqueue_servers_secret_name = (
+    "xqwatcher-xqueue-servers"  # pragma: allowlist secret  # noqa: S105
+)
+xqueue_servers_template = json.dumps(
+    {
+        "default": {
+            "SERVER": xqueue_server_url,
+            "AUTH": ["xqwatcher", "{{ .Secrets.xqwatcher_password }}"],
+        },
+        "edxorg": {
+            "SERVER": "https://xqueue.edx.org",
+            "AUTH": [
+                "{{ .Secrets.edxorg_xqueue_username }}",
+                "{{ .Secrets.edxorg_xqueue_password }}",
+            ],
+        },
+    }
+)
+xqueue_servers_secret = OLVaultK8SSecret(
+    f"xqwatcher-{env_name}-xqueue-servers-secret",
+    OLVaultK8SStaticSecretConfig(
+        name=xqueue_servers_secret_name,
+        namespace=namespace,
+        dest_secret_name=xqueue_servers_secret_name,
+        dest_secret_labels=k8s_global_labels.model_dump(),
+        labels=k8s_global_labels.model_dump(),
+        mount=f"secret-{stack_info.env_prefix}",
+        mount_type="kv-v1",
+        path="edx-xqueue",
+        refresh_after="1h",
+        restart_target_kind="Deployment",
+        restart_target_name="xqwatcher",
+        templates={
+            "xqueue_servers.json": xqueue_servers_template,
+        },
+        vaultauth=vault_k8s_resources.auth_name,
     ),
-    path="/ol-infrastructure/xqwatcher-server/role/",
-    tags=aws_config.tags,
-)
-iam.RolePolicyAttachment(
-    f"xqwatcher-server-describe-instance-role-policy-{env_name}",
-    policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
-    role=xqwatcher_server_instance_role.name,
-)
-xqwatcher_server_instance_profile = iam.InstanceProfile(
-    f"xqwatcher-server-instance-profile-{env_name}",
-    role=xqwatcher_server_instance_role.name,
-    path="/ol-infrastructure/xqwatcher-server/profile/",
-)
-
-# Vault policy definition
-xqwatcher_server_vault_policy = vault.Policy(
-    f"xqwatcher-server-vault-policy-{env_name}",
-    name=f"xqwatcher-server-{stack_info.env_prefix}",
-    policy=Path(__file__)
-    .parent.joinpath("xqwatcher_server_policy.hcl")
-    .read_text()
-    .replace("DEPLOYMENT", f"{stack_info.env_prefix}"),
-)
-# Register xqwatcher AMI for Vault AWS auth
-vault.aws.AuthBackendRole(
-    f"xqwatcher-server-ami-ec2-vault-auth-{env_name}",
-    backend=f"aws-{stack_info.env_prefix}",
-    auth_type="iam",
-    role="xqwatcher-server",
-    inferred_entity_type="ec2_instance",
-    inferred_aws_region=aws_config.region,
-    bound_iam_instance_profile_arns=[xqwatcher_server_instance_profile.arn],
-    bound_ami_ids=[xqwatcher_server_ami.id],
-    bound_account_ids=[aws_account.account_id],
-    bound_vpc_ids=[vpc_id],
-    token_policies=[xqwatcher_server_vault_policy.name],
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[vault_k8s_resources],
+    ),
 )
 
 ##################################
-#     Network Access Control     #
+##          ConfigMap           ##
 ##################################
-# Create security group
-xqwatcher_server_security_group = ec2.SecurityGroup(
-    f"xqwatcher-server-security-group-{env_name}",
-    name=f"xqwatcher-server-operations-{env_name}",
-    description="Access control for xqwatcher servers",
-    ingress=[],  # no listeners on xqwatcher nodes
-    egress=default_egress_args,
-    vpc_id=vpc_id,
-)
 
-###################################
-#     Web Node EC2 Deployment     #
-###################################
-
-consul_datacenter = consul_stack.require_output("datacenter")
-grafana_credentials = read_yaml_secrets(
-    Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
-)
-
-vault_secrets = read_yaml_secrets(
-    Path(f"xqwatcher/secrets.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
-)
-xqwatcher_vault_mount_name = vault_mount_stack.require_output("xqwatcher_kv")["path"]
-vault.kv.SecretV2(
-    f"xqwatcher-{env_name}-grader-static-secrets",
-    mount=xqwatcher_vault_mount_name,
-    name=f"{stack_info.env_prefix}-grader-config",
-    data_json=json.dumps(vault_secrets),
-)
-
-block_device_mappings = [BlockDeviceMapping(volume_size=50)]
-tag_specs = [
-    TagSpecification(
-        resource_type="instance",
-        tags=aws_config.merged_tags({"Name": xqwatcher_server_tag}),
+# Base xqueue-watcher config (poll settings, logging) and non-secret grader
+# queue configs.  The Vault-synced secret provides xqueue_servers.json.
+xqwatcher_configmap = kubernetes.core.v1.ConfigMap(
+    f"xqwatcher-{env_name}-configmap",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="xqwatcher-config",
+        namespace=namespace,
+        labels=k8s_global_labels.model_dump(),
     ),
-    TagSpecification(
-        resource_type="volume",
-        tags=aws_config.merged_tags({"Name": xqwatcher_server_tag}),
-    ),
-]
+    data={
+        "xqwatcher.json": json.dumps(
+            {
+                "FOLLOW_CLIENT_REDIRECTS": True,
+                "POLL_INTERVAL": 10,
+                "POLL_TIME": 10,
+                "REQUESTS_TIMEOUT": 10,
+            }
+        ),
+        # Emit logs to stdout only; no file rotation needed in containers.
+        "logging.json": json.dumps(
+            {
+                "version": 1,
+                "disable_existing_loggers": False,
+                "formatters": {
+                    "default": {
+                        "format": "%(asctime)s - %(filename)s:%(lineno)d -- %(funcName)s [%(levelname)s]: %(message)s",  # noqa: E501
+                    }
+                },
+                "handlers": {
+                    "console": {
+                        "class": "logging.StreamHandler",
+                        "formatter": "default",
+                        "level": "INFO",
+                    }
+                },
+                "loggers": {
+                    "": {
+                        "handlers": ["console"],
+                        "level": "INFO",
+                    }
+                },
+            }
+        ),
+        # Non-secret queue configs; SERVER_REF resolves credentials at runtime
+        # from xqueue_servers.json (mounted from the Vault-synced secret).
+        "grader_config.json": json.dumps(queues_config),
+    },
+)
 
-lt_config = OLLaunchTemplateConfig(
-    block_device_mappings=block_device_mappings,
-    image_id=xqwatcher_server_ami.id,
-    instance_type=xqwatcher_config.get("instance_type")
-    or InstanceTypes.burstable_small,
-    instance_profile_arn=xqwatcher_server_instance_profile.arn,
-    security_groups=[
-        xqwatcher_server_security_group,
-        consul_security_groups["consul_agent"],
+##################################
+##     RBAC for ContainerGrader ##
+##################################
+
+# xqwatcher uses the ContainerGrader backend which creates a Kubernetes Job
+# per submission.  The service account running xqwatcher pods needs permission
+# to create/delete Jobs and read pod logs in the same namespace.
+
+xqwatcher_grader_role = kubernetes.rbac.v1.Role(
+    f"xqwatcher-{env_name}-grader-role",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="xqwatcher-grader",
+        namespace=namespace,
+        labels=k8s_global_labels.model_dump(),
+    ),
+    rules=[
+        kubernetes.rbac.v1.PolicyRuleArgs(
+            api_groups=["batch"],
+            resources=["jobs"],
+            verbs=["create", "delete", "get", "list", "watch"],
+        ),
+        kubernetes.rbac.v1.PolicyRuleArgs(
+            api_groups=[""],
+            resources=["pods", "pods/log"],
+            verbs=["get", "list", "watch"],
+        ),
     ],
-    tags=aws_config.merged_tags({"Name": xqwatcher_server_tag}),
-    tag_specifications=tag_specs,
-    user_data=consul_datacenter.apply(
-        lambda consul_dc: base64.b64encode(
-            "#cloud-config\n{}".format(
-                yaml.dump(
-                    {
-                        "write_files": [
-                            {
-                                "path": "/etc/consul.d/02-autojoin.json",
-                                "content": json.dumps(
-                                    {
-                                        "retry_join": [
-                                            "provider=aws tag_key=consul_env "
-                                            f"tag_value={consul_dc}"
-                                        ],
-                                        "datacenter": consul_dc,
-                                    }
-                                ),
-                                "owner": "consul:consul",
-                            },
-                            {
-                                "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
-                            ENVIRONMENT={consul_dc}
-                            APPLICATION=xqwatcher-{stack_info.env_prefix}
-                            VECTOR_CONFIG_DIR=/etc/vector/
-                            VECTOR_STRICT_ENV_VARS=false
-                            AWS_REGION={aws_config.region}
-                            GRAFANA_CLOUD_API_KEY={grafana_credentials["api_key"]}
-                            GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials["prometheus_user_id"]}
-                            GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials["loki_user_id"]}
-                            """
-                                ),
-                                "owner": "root:root",
-                            },
-                        ]
-                    },
-                    sort_keys=True,
-                )
-            ).encode("utf8")
-        ).decode("utf8")
+)
+
+xqwatcher_grader_rolebinding = kubernetes.rbac.v1.RoleBinding(
+    f"xqwatcher-{env_name}-grader-rolebinding",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="xqwatcher-grader",
+        namespace=namespace,
+        labels=k8s_global_labels.model_dump(),
     ),
+    role_ref=kubernetes.rbac.v1.RoleRefArgs(
+        api_group="rbac.authorization.k8s.io",
+        kind="Role",
+        name=xqwatcher_grader_role.metadata.name,
+    ),
+    subjects=[
+        kubernetes.rbac.v1.SubjectArgs(
+            kind="ServiceAccount",
+            name="xqwatcher",
+            namespace=namespace,
+        ),
+    ],
 )
 
-auto_scale_config = xqwatcher_config.get_object("auto_scale") or {
-    "desired": 2,
-    "min": 1,
-    "max": 3,
-}
-asg_config = OLAutoScaleGroupConfig(
-    asg_name=f"xqwatcher-server-{env_name}",
-    aws_config=aws_config,
-    desired_size=auto_scale_config["desired"] or 2,
-    min_size=auto_scale_config["min"] or 1,
-    max_size=auto_scale_config["max"] or 3,
-    vpc_zone_identifiers=target_vpc["subnet_ids"],
-    tags=aws_config.merged_tags({"Name": xqwatcher_server_tag}),
+##################################
+##         Deployment           ##
+##################################
+
+app_labels = {**k8s_global_labels.model_dump(), "app": "xqwatcher"}
+
+xqwatcher_deployment = kubernetes.apps.v1.Deployment(
+    f"xqwatcher-{env_name}-deployment",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="xqwatcher",
+        namespace=namespace,
+        labels=k8s_global_labels.model_dump(),
+    ),
+    spec=kubernetes.apps.v1.DeploymentSpecArgs(
+        replicas=min_replicas,
+        selector=kubernetes.meta.v1.LabelSelectorArgs(
+            match_labels={"app": "xqwatcher"},
+        ),
+        strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
+            type="RollingUpdate",
+            rolling_update=kubernetes.apps.v1.RollingUpdateDeploymentArgs(
+                max_surge=1,
+                max_unavailable=0,
+            ),
+        ),
+        template=kubernetes.core.v1.PodTemplateSpecArgs(
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                labels=app_labels,
+            ),
+            spec=kubernetes.core.v1.PodSpecArgs(
+                service_account_name="xqwatcher",
+                automount_service_account_token=True,
+                # Spread replicas across nodes for HA
+                topology_spread_constraints=[
+                    kubernetes.core.v1.TopologySpreadConstraintArgs(
+                        max_skew=1,
+                        topology_key="kubernetes.io/hostname",
+                        when_unsatisfiable="ScheduleAnyway",
+                        label_selector=kubernetes.meta.v1.LabelSelectorArgs(
+                            match_labels={"app": "xqwatcher"},
+                        ),
+                    )
+                ],
+                containers=[
+                    kubernetes.core.v1.ContainerArgs(
+                        name="xqueue-watcher",
+                        image=cached_image_uri(docker_image_ref),
+                        image_pull_policy="Always",
+                        command=["uv", "run", "--no-sync", "xqueue-watcher"],
+                        args=["-d", "/xqwatcher"],
+                        env=[
+                            # Non-sensitive manager config values that are not
+                            # already covered by the mounted xqwatcher.json ConfigMap.
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="XQWATCHER_LOGIN_POLL_INTERVAL", value="5"
+                            ),
+                            # ContainerGrader deployment-wide defaults.
+                            # These are used when a queue's KWARGS block does not
+                            # specify the value explicitly.
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="XQWATCHER_GRADER_BACKEND",
+                                value="kubernetes",
+                            ),
+                            # Critical: grading Jobs must land in the same
+                            # namespace as xqwatcher so the RBAC Role binding
+                            # above grants the necessary permissions.
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="XQWATCHER_GRADER_NAMESPACE",
+                                value=grader_namespace,
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="XQWATCHER_GRADER_CPU_LIMIT",
+                                value=grader_cpu_limit,
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="XQWATCHER_GRADER_MEMORY_LIMIT",
+                                value=grader_memory_limit,
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="XQWATCHER_GRADER_TIMEOUT",
+                                value=grader_timeout,
+                            ),
+                        ],
+                        # Liveness: verify the Python runtime is functional.
+                        # The process will crash (and K8s will restart) on
+                        # persistent xqueue connectivity failures, so we rely on
+                        # the restart policy for connectivity-level health.
+                        liveness_probe=kubernetes.core.v1.ProbeArgs(
+                            exec_=kubernetes.core.v1.ExecActionArgs(
+                                command=[
+                                    "uv",
+                                    "run",
+                                    "--no-sync",
+                                    "python",
+                                    "-c",
+                                    "import xqueue_watcher; import sys; sys.exit(0)",
+                                ]
+                            ),
+                            initial_delay_seconds=30,
+                            period_seconds=60,
+                            failure_threshold=3,
+                            timeout_seconds=10,
+                        ),
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            requests={"cpu": "250m", "memory": "256Mi"},
+                            limits={"memory": "512Mi"},
+                        ),
+                        security_context=kubernetes.core.v1.SecurityContextArgs(
+                            allow_privilege_escalation=False,
+                            run_as_non_root=True,
+                            run_as_user=1000,
+                            capabilities=kubernetes.core.v1.CapabilitiesArgs(
+                                drop=["ALL"],
+                            ),
+                        ),
+                        volume_mounts=[
+                            # Manager config and logging config at the root of
+                            # the -d directory; conf.d/ holds queue watcher configs.
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="xqwatcher-config",
+                                mount_path="/xqwatcher/xqwatcher.json",
+                                sub_path="xqwatcher.json",
+                                read_only=True,
+                            ),
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="xqwatcher-config",
+                                mount_path="/xqwatcher/logging.json",
+                                sub_path="logging.json",
+                                read_only=True,
+                            ),
+                            # Per-queue grader handler config from the ConfigMap
+                            # (non-secret: no SERVER/AUTH, uses SERVER_REF).
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="xqwatcher-config",
+                                mount_path="/xqwatcher/conf.d/grader_config.json",
+                                sub_path="grader_config.json",
+                                read_only=True,
+                            ),
+                            # Named server definitions (SERVER URL + AUTH credentials)
+                            # from the Vault-synced secret, mounted at the config
+                            # root so xqueue-watcher can resolve SERVER_REF entries.
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="xqueue-servers",
+                                mount_path="/xqwatcher/xqueue_servers.json",
+                                sub_path="xqueue_servers.json",
+                                read_only=True,
+                            ),
+                        ],
+                    ),
+                ],
+                volumes=[
+                    kubernetes.core.v1.VolumeArgs(
+                        name="xqwatcher-config",
+                        config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                            name=xqwatcher_configmap.metadata.name,
+                        ),
+                    ),
+                    kubernetes.core.v1.VolumeArgs(
+                        name="xqueue-servers",
+                        secret=kubernetes.core.v1.SecretVolumeSourceArgs(
+                            secret_name=xqueue_servers_secret_name,
+                        ),
+                    ),
+                ],
+            ),
+        ),
+    ),
+    opts=ResourceOptions(depends_on=[xqueue_servers_secret]),
 )
 
-as_setup = OLAutoScaling(
-    asg_config=asg_config,
-    lt_config=lt_config,
-)
+##################################
+##           Exports            ##
+##################################
 
-export("xqwatcher_security_group", xqwatcher_server_security_group.id)
+export("k8s_deployment_name", "xqwatcher")
+export("k8s_namespace", namespace)
+export("xqueue_servers_secret", xqueue_servers_secret_name)

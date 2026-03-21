@@ -3,13 +3,23 @@ secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHgQW+3bag/cl2fPG3dPdqAPbfcsZuwI7rETXZsx85HRpgHzGaCdqKWGOJ49SaKpOTIJAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMolKUc2XHdg9utgvHAgEQgDt45yPejgGlntgwIkd0Eu0ButJHb8w1TpovLlcZAowgytdZ2JXjqvmRyncU1GOtcf7/NYjfjqj5WE5iSg==
 config:
   aws:region: us-east-1
-  consul:address: https://consul-mitxonline-qa.odl.mit.edu
-  xqwatcher:auto_scale:
-    desired: 1
-    max: 2
-    min: 1
-  xqwatcher:instance_type: t3a.small
   xqwatcher:business_unit: mitxonline
-  xqwatcher:target_vpc: mitxonline_vpc
+  xqwatcher:cluster: applications
+  xqwatcher:namespace: mitxonline-openedx
+  xqwatcher:min_replicas: 1
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
+  xqwatcher:xqueue_server_url: https://xqueue.mitxonline.qa.odl.mit.edu
+  xqwatcher:queues:
+    Watcher-MITx-6.00x:
+      CONNECTIONS: 5
+      HANDLERS:
+      - HANDLER: xqueue_watcher.containergrader.ContainerGrader
+        KWARGS:
+          grader_root: /graders/python3graders/
+          image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/mitodl/graders-mit-600x:latest
+          backend: kubernetes
+          cpu_limit: 1000m
+          memory_limit: 512Mi
+          timeout: 60
+          image_pull_policy: always
