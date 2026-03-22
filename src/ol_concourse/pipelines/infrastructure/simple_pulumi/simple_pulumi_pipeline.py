@@ -165,13 +165,6 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         stack_prefix="applications.fastly_redirector",
         pulumi_project_name="ol-infrastructure-fastly-redirector",
     ),
-    "micromasters": SimplePulumiParams(
-        app_name="micromasters",
-        pulumi_project_path="applications/micromasters/",
-        stack_prefix="applications.micromasters",
-        pulumi_project_name="ol-infrastructure-micromasters-application",
-        additional_watched_paths=["src/bridge/lib/"],
-    ),
     "mongodb-atlas": SimplePulumiParams(
         app_name="mongodb-atlas",
         pulumi_project_path="infrastructure/mongodb_atlas/",

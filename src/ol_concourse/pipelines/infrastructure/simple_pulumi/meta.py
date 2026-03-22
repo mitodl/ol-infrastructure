@@ -155,7 +155,6 @@ if __name__ == "__main__":
         "data_warehouse",
         "digital-credentials",
         "fastly-redirector",
-        "micromasters",
         "mongodb-atlas",
         "ocw-studio",
         "open-discussions",

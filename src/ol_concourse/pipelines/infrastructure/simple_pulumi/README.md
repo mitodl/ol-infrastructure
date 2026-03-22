@@ -19,15 +19,14 @@ The following applications are currently managed by this meta pipeline:
 3. **digital-credentials** - Digital credentials service
 4. **fastly-redirector** - Fastly redirector service
 5. **kubewatch** - Kubernetes cluster monitoring
-6. **micromasters** - MicroMasters application (Pulumi-only)
-7. **mongodb-atlas** - MongoDB Atlas infrastructure
-8. **ocw-studio** - OCW Studio content management (Pulumi-only)
-9. **open-discussions** - Open Discussions platform (Pulumi-only, QA/Production only)
-10. **open-metadata** - OpenMetadata data catalog
-11. **opensearch** - OpenSearch search and analytics cluster
-12. **tika** - Apache Tika document processing service
-13. **vector-log-proxy** - Vector log proxy service
-15. **xpro-partner-dns** - xPRO partner DNS configuration
+6. **mongodb-atlas** - MongoDB Atlas infrastructure
+7. **ocw-studio** - OCW Studio content management (Pulumi-only)
+8. **open-discussions** - Open Discussions platform (Pulumi-only, QA/Production only)
+9. **open-metadata** - OpenMetadata data catalog
+10. **opensearch** - OpenSearch search and analytics cluster
+11. **tika** - Apache Tika document processing service
+12. **vector-log-proxy** - Vector log proxy service
+13. **xpro-partner-dns** - xPRO partner DNS configuration
 
 ## Files
 
