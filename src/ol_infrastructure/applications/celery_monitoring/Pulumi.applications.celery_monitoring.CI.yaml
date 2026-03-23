@@ -13,6 +13,3 @@ config:
   environment:target_vpc: operations_vpc
   opensearch:consul_service_name: 'celery-monitoring-opensearch'
   opensearch:domain_name: "celeryc"
-  celery_monitoring:heroku_map:
-    mitx-devops:
-    - ocw-studio-ci
