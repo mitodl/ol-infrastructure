@@ -10,5 +10,7 @@ RUN uv build --all-packages
 
 FROM python:3.14-slim
 COPY --from=build /home/app/workspace/dist/*.whl /tmp/
+COPY --from=build /home/app/workspace/pyproject.toml /opt/ol-infrastructure/
+COPY --from=build /home/app/workspace/uv.lock /opt/ol-infrastructure/
 RUN apt-get update && apt-get install --no-install-recommends -y git && apt-get clean && rm -r /var/lib/apt/lists/* && \
     pip install --no-cache-dir /tmp/*.whl
