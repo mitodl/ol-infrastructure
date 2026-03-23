@@ -90,7 +90,7 @@ def build_broker_subscriptions(
             }
         )
 
-    heroku_app_map = celery_monitoring_config.require_object("heroku_map")
+    heroku_app_map = celery_monitoring_config.get_object("heroku_map") or {}
     for heroku_owner, app_list in heroku_app_map.items():
         heroku_provider = get_heroku_provider(heroku_owner)
         for app in app_list:
