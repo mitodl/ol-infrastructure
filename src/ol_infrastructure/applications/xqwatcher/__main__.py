@@ -83,6 +83,10 @@ grader_namespace = xqwatcher_config.get("grader_namespace") or namespace
 grader_cpu_limit = xqwatcher_config.get("grader_cpu_limit") or "500m"
 grader_memory_limit = xqwatcher_config.get("grader_memory_limit") or "256Mi"
 grader_timeout = xqwatcher_config.get("grader_timeout") or "20"
+verify_tls = xqwatcher_config.get("verify_tls") or "true"
+submission_size_limit = xqwatcher_config.get("submission_size_limit") or str(
+    1024 * 1024
+)  # 1 MB default, matching containergrader
 
 ##################################
 ##      Grader Queue Config     ##
@@ -321,6 +325,14 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
             spec=kubernetes.core.v1.PodSpecArgs(
                 service_account_name="xqwatcher",
                 automount_service_account_token=True,
+                # Apply RuntimeDefault seccomp to the xqwatcher pod itself,
+                # mirroring the profile applied to grading Jobs in
+                # containergrader.py for defence-in-depth.
+                security_context=kubernetes.core.v1.PodSecurityContextArgs(
+                    seccomp_profile=kubernetes.core.v1.SeccompProfileArgs(
+                        type="RuntimeDefault",
+                    ),
+                ),
                 # Spread replicas across nodes for HA
                 topology_spread_constraints=[
                     kubernetes.core.v1.TopologySpreadConstraintArgs(
@@ -370,6 +382,20 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                             kubernetes.core.v1.EnvVarArgs(
                                 name="XQWATCHER_GRADER_TIMEOUT",
                                 value=grader_timeout,
+                            ),
+                            # TLS verification for outbound xqueue HTTPS requests.
+                            # Default "true" (safe for production). Set "false"
+                            # only for dev environments with self-signed certs.
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="XQWATCHER_VERIFY_TLS",
+                                value=verify_tls,
+                            ),
+                            # Hard cap on submission size (bytes) before a grading
+                            # container is launched.  Prevents etcd object-size
+                            # overflows and resource-exhaustion attacks.
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="XQWATCHER_SUBMISSION_SIZE_LIMIT",
+                                value=submission_size_limit,
                             ),
                         ],
                         # Liveness: verify the Python runtime is functional.
