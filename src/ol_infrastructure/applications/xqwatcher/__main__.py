@@ -66,13 +66,17 @@ setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 namespace = xqwatcher_config.get("namespace") or f"{stack_info.env_prefix}-openedx"
 
-docker_image_digest = os.environ.get("XQWATCHER_DOCKER_DIGEST") or xqwatcher_config.get(
+docker_image_tag = os.environ.get("XQWATCHER_DOCKER_TAG") or xqwatcher_config.get(
     "docker_tag"
 )
-if not docker_image_digest:
-    msg = "Either XQWATCHER_DOCKER_DIGEST env var or xqwatcher:docker_tag config must be set"  # noqa: E501
+if not docker_image_tag:
+    msg = (
+        "Either XQWATCHER_DOCKER_TAG env var or xqwatcher:docker_tag config must be set"
+    )
     raise ValueError(msg)
-docker_image_ref = f"mitodl/xqueue-watcher@{docker_image_digest}"
+# Digests use @ (e.g. sha256:abc…), tags use : (e.g. latest, v1.2.3)
+_sep = "@" if docker_image_tag.startswith("sha256:") else ":"
+docker_image_ref = f"mitodl/xqueue-watcher{_sep}{docker_image_tag}"
 
 min_replicas = xqwatcher_config.get_int("min_replicas") or 1
 

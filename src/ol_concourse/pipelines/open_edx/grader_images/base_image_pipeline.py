@@ -54,8 +54,9 @@ def grader_base_image_pipeline() -> Pipeline:
         password="((dockerhub.password))",  # noqa: S106
     )
 
-    # ECR push target — used as the trigger source for per-grader build
-    # pipelines so that a base image rebuild causes downstream rebuilds.
+    # ECR push target — private mirror for use inside AWS without DockerHub
+    # rate-limit concerns.  The per-grader Concourse build pipelines trigger
+    # off the DockerHub base image (grader_base_dockerhub_repo), not ECR.
     ecr_base_image = registry_image(
         name=Identifier("grader-base-ecr"),
         image_repository=_BASE_IMAGE_REPO,

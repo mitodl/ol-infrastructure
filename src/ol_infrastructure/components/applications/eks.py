@@ -165,7 +165,6 @@ class OLEKSAuthBinding(ComponentResource):
                             "eks.amazonaws.com/role-arn": self.irsa_role.arn,
                         },
                     ),
-                    automount_service_account_token=False,
                     opts=ResourceOptions(parent=self),
                 )
                 for sa_name in sa_names
