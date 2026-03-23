@@ -11,9 +11,5 @@ config:
   opensearch:consul_service_name: 'celery-monitoring-opensearch'
   opensearch:domain_name: "celeryq"
   celery_monitoring:heroku_map:
-    mitx-devops:
-    - micromasters-rc
-    - ocw-studio-rc
-    - xpro-rc
     odl-devops:
     - odl-open-discussions-rc

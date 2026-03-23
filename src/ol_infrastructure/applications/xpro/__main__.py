@@ -972,6 +972,8 @@ route53.Record(
 export(
     "xpro_app",
     {
+        "redis": redis_cache.address,
+        "redis_token": redis_cache.cache_cluster.auth_token,
         "rds_host": xpro_db.db_instance.address,
     },
 )

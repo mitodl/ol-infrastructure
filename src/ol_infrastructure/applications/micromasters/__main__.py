@@ -1243,4 +1243,11 @@ if micromasters_config.get_bool("deploy_k8s"):
     )
 
 
-export("micromasters_app", {"rds_host": micromasters_db.db_instance.address})
+export(
+    "micromasters_app",
+    {
+        "redis": redis_cache.address,
+        "redis_token": redis_cache.cache_cluster.auth_token,
+        "rds_host": micromasters_db.db_instance.address,
+    },
+)

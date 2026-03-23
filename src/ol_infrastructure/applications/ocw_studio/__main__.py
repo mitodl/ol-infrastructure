@@ -687,6 +687,8 @@ ocw_studio_apisix_httproute = OLApisixHTTPRoute(
 export(
     "ocw_studio_app",
     {
+        "redis": redis_cache.address,
+        "redis_token": redis_cache.cache_cluster.auth_token,
         "rds_host": ocw_studio_db.db_instance.address,
         "mediaconvert_queue": ocw_studio_mediaconvert.queue.id,
     },
