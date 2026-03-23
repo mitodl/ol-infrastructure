@@ -732,8 +732,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
                 "/cart/*",
             ],
             plugins=[
-                proxy_rewrite_plugin_config,
-                mitxonline_prefixed_oidc_resources.get_full_oidc_plugin_config(
+                mitxonline_direct_oidc.get_full_oidc_plugin_config(
                     unauth_action="auth"
                 ),
                 response_rewrite_plugin_config,
