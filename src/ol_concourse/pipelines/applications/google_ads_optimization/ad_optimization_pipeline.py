@@ -68,6 +68,7 @@ def ad_optimization_pipeline() -> Pipeline:
                         # This is a map of course name to customer ID.
                         "CUSTOMER_ID_FOR_COURSES": "((customer_id_for_courses))",
                         "COURSE_NAME": "((course_name))",
+                        "SEMRUSH_API_KEY": "((google_ads_optimization.semrush_api_key))",
                     },
                     run=Command(
                         path="bash",
