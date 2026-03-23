@@ -722,6 +722,26 @@ mitxonline_apisix_route_direct = OLApisixRoute(
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
             backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
         ),
+        OLApisixRouteConfig(
+            route_name="cart",
+            priority=20,
+            hosts=[api_domain, frontend_domain],
+            paths=[
+                "/cart/",
+                "/cart",
+                "/cart/*",
+            ],
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitxonline_prefixed_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="auth"
+                ),
+                response_rewrite_plugin_config,
+            ],
+            shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
+            backend_service_name=mitxonline_k8s_app.application_lb_service_name,
+            backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
+        ),
     ],
     opts=ResourceOptions(
         delete_before_replace=True,
@@ -773,26 +793,6 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
                 f"/{api_path_prefix}/login/oidc*",
                 f"/{api_path_prefix}/admin/login/*",
                 f"/{api_path_prefix}/login",
-            ],
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitxonline_prefixed_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="auth"
-                ),
-                response_rewrite_plugin_config,
-            ],
-            shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
-            backend_service_name=mitxonline_k8s_app.application_lb_service_name,
-            backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
-        ),
-        OLApisixRouteConfig(
-            route_name="cart",
-            priority=20,
-            hosts=[learn_api_domain],
-            paths=[
-                f"/{api_path_prefix}/cart/",
-                f"/{api_path_prefix}/cart",
-                f"/{api_path_prefix}/cart/*",
             ],
             plugins=[
                 proxy_rewrite_plugin_config,
