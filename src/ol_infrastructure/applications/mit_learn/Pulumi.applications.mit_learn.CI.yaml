@@ -75,6 +75,7 @@ config:
     MITPE_API_ENABLED: "true"
     OCW_ITERATOR_CHUNK_SIZE: 300
     OIDC_ENDPOINT: "https://sso-ci.ol.mit.edu/realms/olapps"
+    OVS_API_BASE_URL: "https://video-rc.odl.mit.edu"
     OPENSEARCH_INDEX: "mitlearn-ci"
     OPENSEARCH_SHARD_COUNT: 2
     QDRANT_DENSE_MODEL: "text-embedding-3-small"
