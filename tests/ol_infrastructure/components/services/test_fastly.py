@@ -1,0 +1,532 @@
+"""Tests for OLFastlyServiceVCL component and configuration helpers.
+
+This module verifies:
+1. Builder helper functions produce correct ServiceVcl arguments
+2. Configuration models have correct defaults
+3. Component resource creation works with various configurations
+"""
+
+from __future__ import annotations
+
+import asyncio
+from typing import Any
+
+import pulumi
+
+# Python 3.14+ compatibility
+try:
+    asyncio.get_event_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
+
+class FastlyMocks(pulumi.runtime.Mocks):
+    def new_resource(self, args: pulumi.runtime.MockResourceArgs):
+        return [args.name + "_id", args.inputs]
+
+    def call(self, args: pulumi.runtime.MockCallArgs):
+        if "getTlsConfiguration" in args.token:
+            return {
+                "id": "tls-config-123",
+                "name": "TLS v1.3",
+                "default": False,
+                "dns_records": [
+                    {"record_type": "A", "record_value": "151.101.2.132"},
+                    {"record_type": "A", "record_value": "151.101.66.132"},
+                ],
+            }
+        return {}
+
+
+pulumi.runtime.set_mocks(FastlyMocks())
+
+import pulumi_fastly as fastly  # noqa: E402
+
+from ol_infrastructure.components.services.fastly import (  # noqa: E402
+    DEFAULT_GZIP_EXTENSIONS,
+    OLFastlyServiceVCL,
+    OLFastlyServiceVCLConfig,
+    OLFastlyServiceVCLDNSConfig,
+    OLFastlyServiceVCLHTTPSLoggingConfig,
+    OLFastlyServiceVCLS3LoggingConfig,
+    OLFastlyServiceVCLTLSConfig,
+    _build_gzip_settings,
+    _build_gzips,
+    _build_headers,
+    _build_https_logging,
+    _build_product_enablement,
+    _build_request_settings,
+    _build_s3_logging,
+)
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+
+def _minimal_config(**overrides) -> OLFastlyServiceVCLConfig:
+    """Return a minimal OLFastlyServiceVCLConfig suitable for testing."""
+    defaults: dict[Any, Any] = {
+        "service_name": "Test Service QA",
+        "backends": [
+            fastly.ServiceVclBackendArgs(
+                address="app.example.com",
+                name="test_backend",
+                port=443,
+                ssl_cert_hostname="app.example.com",
+                ssl_sni_hostname="app.example.com",
+                use_ssl=True,
+            ),
+        ],
+        "domains": [
+            fastly.ServiceVclDomainArgs(
+                comment="Test domain",
+                name="test.example.com",
+            ),
+        ],
+    }
+    defaults.update(overrides)
+    return OLFastlyServiceVCLConfig(**defaults)
+
+
+# ─── _build_gzip_settings ────────────────────────────────────────────────────
+
+
+def test_build_gzip_settings_single_extension():
+    extensions, content_types = _build_gzip_settings({".json"})
+    assert extensions == ["json"]
+    assert "application/json" in content_types
+
+
+def test_build_gzip_settings_multiple_extensions():
+    extensions, content_types = _build_gzip_settings({".json", ".html", ".css"})
+    assert extensions == sorted(extensions), "Extensions should be sorted"
+    assert content_types == sorted(content_types), "Content types should be sorted"
+    assert "json" in extensions
+    assert "html" in extensions
+    assert "css" in extensions
+
+
+def test_build_gzip_settings_empty():
+    extensions, content_types = _build_gzip_settings(set())
+    assert extensions == []
+    assert content_types == []
+
+
+def test_build_gzip_settings_unknown_extension():
+    extensions, content_types = _build_gzip_settings({".unknownext12345"})
+    assert extensions == []
+    assert content_types == []
+
+
+# ─── _build_headers ───────────────────────────────────────────────────────────
+
+
+def test_build_headers_hsts_enabled():
+    config = _minimal_config(enable_hsts=True, hsts_max_age=300)
+    headers = _build_headers(config)
+    assert len(headers) == 1
+    assert headers[0].destination == "http.Strict-Transport-Security"
+    assert headers[0].source == '"max-age=300"'
+    assert headers[0].type == "response"
+    assert headers[0].action == "set"
+
+
+def test_build_headers_hsts_disabled():
+    config = _minimal_config(enable_hsts=False)
+    headers = _build_headers(config)
+    assert headers == []
+
+
+def test_build_headers_hsts_custom_max_age():
+    config = _minimal_config(enable_hsts=True, hsts_max_age=86400)
+    headers = _build_headers(config)
+    assert headers[0].source == '"max-age=86400"'
+
+
+def test_build_headers_merges_with_custom():
+    custom_header = fastly.ServiceVclHeaderArgs(
+        action="set",
+        destination="http.X-Custom",
+        name="Custom Header",
+        source='"custom-value"',
+        type="response",
+    )
+    config = _minimal_config(enable_hsts=True, headers=[custom_header])
+    headers = _build_headers(config)
+    assert len(headers) == 2
+    assert headers[0].name == "Custom Header"
+    assert headers[1].name == "Generated by force TLS and enable HSTS"
+
+
+# ─── _build_request_settings ─────────────────────────────────────────────────
+
+
+def test_build_request_settings_auto_generated():
+    config = _minimal_config(force_ssl=True)
+    settings = _build_request_settings(config)
+    assert len(settings) == 1
+    assert settings[0].force_ssl is True
+    assert settings[0].xff == ""
+
+
+def test_build_request_settings_force_ssl_disabled():
+    config = _minimal_config(force_ssl=False)
+    settings = _build_request_settings(config)
+    assert settings == []
+
+
+def test_build_request_settings_explicit_override():
+    custom = [
+        fastly.ServiceVclRequestSettingArgs(
+            force_ssl=True,
+            name="Custom",
+            xff="leave",
+            hash_keys="req.url, req.http.host",
+        ),
+    ]
+    config = _minimal_config(request_settings=custom)
+    settings = _build_request_settings(config)
+    assert len(settings) == 1
+    assert settings[0].name == "Custom"
+    assert settings[0].xff == "leave"
+
+
+def test_build_request_settings_explicit_empty_list():
+    """Providing an empty list should override auto-generation."""
+    config = _minimal_config(force_ssl=True, request_settings=[])
+    settings = _build_request_settings(config)
+    assert settings == []
+
+
+# ─── _build_gzips ─────────────────────────────────────────────────────────────
+
+
+def test_build_gzips_auto_generated():
+    config = _minimal_config(enable_gzip=True)
+    gzips = _build_gzips(config)
+    assert len(gzips) == 1
+    assert gzips[0].name == "enable-gzip-compression"
+    assert len(gzips[0].extensions) > 0
+    assert len(gzips[0].content_types) > 0
+
+
+def test_build_gzips_disabled():
+    config = _minimal_config(enable_gzip=False)
+    gzips = _build_gzips(config)
+    assert gzips == []
+
+
+def test_build_gzips_custom_extensions():
+    config = _minimal_config(enable_gzip=True, gzip_file_extensions={".json"})
+    gzips = _build_gzips(config)
+    assert gzips[0].extensions == ["json"]
+
+
+def test_build_gzips_explicit_override():
+    custom = [
+        fastly.ServiceVclGzipArgs(
+            name="custom-gzip",
+            extensions=["css", "js"],
+            content_types=["text/css", "text/javascript"],
+        )
+    ]
+    config = _minimal_config(gzips=custom)
+    gzips = _build_gzips(config)
+    assert len(gzips) == 1
+    assert gzips[0].name == "custom-gzip"
+
+
+# ─── _build_product_enablement ────────────────────────────────────────────────
+
+
+def test_product_enablement_brotli_only():
+    config = _minimal_config(enable_brotli=True, enable_image_optimizer=False)
+    result = _build_product_enablement(config)
+    assert result is not None
+    assert result.brotli_compression is True
+    assert result.image_optimizer is None
+
+
+def test_product_enablement_image_optimizer_only():
+    config = _minimal_config(enable_brotli=False, enable_image_optimizer=True)
+    result = _build_product_enablement(config)
+    assert result is not None
+    assert result.brotli_compression is None
+    assert result.image_optimizer is True
+
+
+def test_product_enablement_both():
+    config = _minimal_config(enable_brotli=True, enable_image_optimizer=True)
+    result = _build_product_enablement(config)
+    assert result is not None
+    assert result.brotli_compression is True
+    assert result.image_optimizer is True
+
+
+def test_product_enablement_none():
+    config = _minimal_config(enable_brotli=False, enable_image_optimizer=False)
+    result = _build_product_enablement(config)
+    assert result is None
+
+
+# ─── _build_https_logging ─────────────────────────────────────────────────────
+
+
+def test_build_https_logging_none():
+    config = _minimal_config(https_logging=None)
+    result = _build_https_logging(config)
+    assert result == []
+
+
+def test_build_https_logging_configured():
+    log_config = OLFastlyServiceVCLHTTPSLoggingConfig(
+        vector_log_proxy_domain="log.example.com",
+        encoded_credentials="dXNlcjpwYXNz",
+        logging_name="test-logging",
+        additional_static_fields={"app": "test"},
+    )
+    config = _minimal_config(https_logging=log_config)
+    result = _build_https_logging(config)
+    assert len(result) == 1
+    assert result[0].name == "test-logging"
+    assert result[0].content_type == "application/json"
+    assert result[0].method == "POST"
+    assert result[0].header_name == "Authorization"
+    assert result[0].header_value == "Basic dXNlcjpwYXNz"
+
+
+# ─── _build_s3_logging ───────────────────────────────────────────────────────
+
+
+def test_build_s3_logging_none():
+    config = _minimal_config(s3_logging=None)
+    result = _build_s3_logging(config)
+    assert result == []
+
+
+def test_build_s3_logging_configured():
+    s3_config = OLFastlyServiceVCLS3LoggingConfig(
+        bucket_name="my-log-bucket",
+        iam_role_arn="arn:aws:iam::123456789:role/fastly-logging",
+        path_prefix="/app/qa/",
+        logging_name="test-s3-logging",
+        gzip_level=5,
+    )
+    config = _minimal_config(s3_logging=s3_config)
+    result = _build_s3_logging(config)
+    assert len(result) == 1
+    assert result[0].name == "test-s3-logging"
+    assert result[0].gzip_level == 5
+    assert result[0].message_type == "blank"
+    assert result[0].redundancy == "standard"
+
+
+# ─── Config defaults ─────────────────────────────────────────────────────────
+
+
+def test_config_defaults():
+    config = _minimal_config()
+    assert config.enable_hsts is True
+    assert config.hsts_max_age == 300
+    assert config.force_ssl is True
+    assert config.enable_gzip is True
+    assert config.gzip_file_extensions is None
+    assert config.gzips is None
+    assert config.enable_brotli is True
+    assert config.enable_image_optimizer is False
+    assert config.comment == "Managed by Pulumi"
+    assert config.stale_if_error is False
+    assert config.aliases == []
+    assert config.snippets == []
+    assert config.conditions == []
+    assert config.cache_settings == []
+    assert config.headers == []
+    assert config.request_settings is None
+    assert config.response_objects == []
+    assert config.dictionaries == []
+    assert config.dns is None
+    assert config.https_logging is None
+    assert config.s3_logging is None
+    assert config.tls.managed is False
+    assert config.tls.certificate_authority == "certainly"
+
+
+def test_tls_config_defaults():
+    tls = OLFastlyServiceVCLTLSConfig()
+    assert tls.managed is False
+    assert tls.certificate_authority == "certainly"
+
+
+def test_dns_config():
+    dns = OLFastlyServiceVCLDNSConfig(
+        frontend_domain="test.example.com",
+        zone_id="Z123",
+    )
+    assert dns.frontend_domain == "test.example.com"
+    assert dns.zone_id == "Z123"
+
+
+def test_dns_config_auto_lookup():
+    dns = OLFastlyServiceVCLDNSConfig(frontend_domain="test.example.com")
+    assert dns.zone_id is None
+
+
+# ─── DEFAULT_GZIP_EXTENSIONS ─────────────────────────────────────────────────
+
+
+def test_default_gzip_extensions_coverage():
+    """Verify the default set covers the common extensions used across apps."""
+    expected_subset = {".json", ".html", ".css", ".js", ".xml", ".svg", ".pdf"}
+    assert expected_subset.issubset(DEFAULT_GZIP_EXTENSIONS)
+
+
+# ─── Component resource creation ─────────────────────────────────────────────
+
+
+@pulumi.runtime.test
+def test_component_basic_creation():
+    """Smoke test: component creates a ServiceVcl with defaults."""
+    config = _minimal_config()
+    component = OLFastlyServiceVCL("test-basic", config)
+
+    assert component.service is not None
+    assert component.dns_record is None
+    assert component.tls_subscription is None
+
+    def check_service_name(name):
+        assert name == "Test Service QA"
+
+    return component.service.name.apply(check_service_name)
+
+
+@pulumi.runtime.test
+def test_component_with_simple_dns():
+    """Component creates a Route53 A record with static Fastly IPs."""
+    config = _minimal_config(
+        dns=OLFastlyServiceVCLDNSConfig(
+            frontend_domain="test.example.com",
+            zone_id="Z123",
+        ),
+    )
+    component = OLFastlyServiceVCL("test-dns", config)
+
+    assert component.dns_record is not None
+    assert component.tls_subscription is None
+
+    def check_record(args):
+        record_type, zone_id = args
+        assert record_type == "A"
+        assert zone_id == "Z123"
+
+    return pulumi.Output.all(
+        component.dns_record.type,
+        component.dns_record.zone_id,
+    ).apply(check_record)
+
+
+@pulumi.runtime.test
+def test_component_with_managed_tls():
+    """Component creates TLS subscription and DNS record when TLS is managed."""
+    config = _minimal_config(
+        tls=OLFastlyServiceVCLTLSConfig(managed=True),
+        dns=OLFastlyServiceVCLDNSConfig(
+            frontend_domain="test.example.com",
+            zone_id="Z123",
+        ),
+    )
+    component = OLFastlyServiceVCL("test-tls", config)
+
+    assert component.tls_subscription is not None
+    assert component.dns_record is not None
+
+    def check_tls(ca):
+        assert ca == "certainly"
+
+    return component.tls_subscription.certificate_authority.apply(check_tls)
+
+
+@pulumi.runtime.test
+def test_component_stale_if_error():
+    """Verify stale_if_error is passed through to the ServiceVcl."""
+    config = _minimal_config(stale_if_error=True)
+    component = OLFastlyServiceVCL("test-stale", config)
+
+    def check_stale(val):
+        assert val is True
+
+    return component.service.stale_if_error.apply(check_stale)
+
+
+@pulumi.runtime.test
+def test_component_with_https_logging():
+    """Component creates HTTPS logging when configured."""
+    log_config = OLFastlyServiceVCLHTTPSLoggingConfig(
+        vector_log_proxy_domain="log.example.com",
+        encoded_credentials="dXNlcjpwYXNz",
+        logging_name="test-https-logging",
+    )
+    config = _minimal_config(https_logging=log_config)
+    component = OLFastlyServiceVCL("test-logging", config)
+
+    def check_logging(args):
+        assert args is not None
+        assert len(args) == 1
+
+    return component.service.logging_https.apply(check_logging)
+
+
+@pulumi.runtime.test
+def test_component_xpro_like_config():
+    """Validates an xpro-like configuration with all optional features."""
+    config = _minimal_config(
+        comment="",
+        enable_hsts=False,
+        enable_brotli=False,
+        enable_image_optimizer=True,
+        image_optimizer_default_settings=(
+            fastly.ServiceVclImageOptimizerDefaultSettingsArgs(name="", webp=True)
+        ),
+        gzips=[
+            fastly.ServiceVclGzipArgs(
+                name="custom-gzip",
+                extensions=["css", "js", "html"],
+                content_types=["text/css", "text/javascript", "text/html"],
+            )
+        ],
+        request_settings=[
+            fastly.ServiceVclRequestSettingArgs(
+                force_ssl=True,
+                name="Override Host",
+                xff="leave",
+            )
+        ],
+        stale_if_error=True,
+        tls=OLFastlyServiceVCLTLSConfig(managed=True),
+        dns=OLFastlyServiceVCLDNSConfig(
+            frontend_domain="xpro.example.com",
+            zone_id="Z456",
+        ),
+    )
+    component = OLFastlyServiceVCL("test-xpro", config)
+    assert component.service is not None
+    assert component.tls_subscription is not None
+    assert component.dns_record is not None
+
+    def check_comment(val):
+        assert val == ""
+
+    return component.service.comment.apply(check_comment)
+
+
+@pulumi.runtime.test
+def test_service_vcl_resource_name_alias():
+    """Passing service_vcl_resource_name should not raise and produces a service."""
+    config = _minimal_config(
+        service_vcl_resource_name="my-old-fastly-service-qa",
+    )
+    component = OLFastlyServiceVCL("test-alias", config)
+    assert component.service is not None
+
+    def check_name(val):
+        assert val == "Test Service QA"
+
+    return component.service.name.apply(check_name)

@@ -7,7 +7,6 @@ MicroMasters application.
 
 import base64
 import json
-import mimetypes
 import os
 import textwrap
 from pathlib import Path
@@ -21,20 +20,16 @@ from pulumi import (
     Alias,
     Config,
     InvokeOptions,
-    Output,
     ResourceOptions,
     StackReference,
     export,
 )
-from pulumi_aws import ec2, iam, route53, s3
+from pulumi_aws import ec2, iam, s3
 
-from bridge.lib.constants import FASTLY_A_TLS_1_3
 from bridge.lib.magic_numbers import (
-    DEFAULT_HTTPS_PORT,
     DEFAULT_NGINX_PORT,
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
-    ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
@@ -47,6 +42,12 @@ from ol_infrastructure.components.services.apisix_gateway_api import (
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
+)
+from ol_infrastructure.components.services.fastly import (
+    OLFastlyServiceVCL,
+    OLFastlyServiceVCLConfig,
+    OLFastlyServiceVCLDNSConfig,
+    OLFastlyServiceVCLHTTPSLoggingConfig,
 )
 from ol_infrastructure.components.services.k8s import (
     OLApplicationK8s,
@@ -69,10 +70,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
-from ol_infrastructure.lib.fastly import (
-    build_fastly_log_format_string,
-    get_fastly_provider,
-)
+from ol_infrastructure.lib.fastly import get_fastly_provider
 from ol_infrastructure.lib.heroku import setup_heroku_provider
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
@@ -1125,121 +1123,69 @@ if micromasters_config.get_bool("deploy_k8s"):
         "vector_log_proxy_domain"
     )
 
-    gzip_settings: dict[str, set[str]] = {"extensions": set(), "content_types": set()}
-    for k, v in mimetypes.types_map.items():
-        if k in (
-            ".json",
-            ".pdf",
-            ".js",
-            ".css",
-            ".html",
-            ".xml",
-            ".svg",
-            ".txt",
-            ".csv",
-        ):
-            gzip_settings["extensions"].add(k.strip("."))
-            gzip_settings["content_types"].add(v)
-
-    micromasters_fastly_service = fastly.ServiceVcl(
+    OLFastlyServiceVCL(
         f"micromasters-fastly-service-{stack_info.env_suffix}",
-        name=f"MicroMasters {stack_info.env_suffix}",
-        comment="Managed by Pulumi",
-        backends=[
-            fastly.ServiceVclBackendArgs(
-                address=backend_domain,
-                name="micromasters_backend",
-                override_host=backend_domain,
-                port=DEFAULT_HTTPS_PORT,
-                ssl_cert_hostname=backend_domain,
-                ssl_sni_hostname=backend_domain,
-                use_ssl=True,
+        config=OLFastlyServiceVCLConfig(
+            service_name=f"MicroMasters {stack_info.env_suffix}",
+            service_vcl_resource_name=f"micromasters-fastly-service-{stack_info.env_suffix}",
+            backends=[
+                fastly.ServiceVclBackendArgs(
+                    address=backend_domain,
+                    name="micromasters_backend",
+                    override_host=backend_domain,
+                    port=443,
+                    ssl_cert_hostname=backend_domain,
+                    ssl_sni_hostname=backend_domain,
+                    use_ssl=True,
+                ),
+            ],
+            domains=[
+                fastly.ServiceVclDomainArgs(
+                    comment=f"MicroMasters {stack_info.env_prefix} {stack_info.env_suffix}",  # noqa: E501
+                    name=frontend_domain,
+                ),
+            ],
+            dns=OLFastlyServiceVCLDNSConfig(
+                frontend_domain=frontend_domain,
+                zone_id=ol_zone_id,
             ),
-        ],
-        gzips=[
-            fastly.ServiceVclGzipArgs(
-                name="enable-gzip-compression",
-                extensions=sorted(gzip_settings["extensions"]),
-                content_types=sorted(gzip_settings["content_types"]),
-            )
-        ],
-        product_enablement=fastly.ServiceVclProductEnablementArgs(
-            brotli_compression=True,
+            gzip_file_extensions={
+                ".json",
+                ".pdf",
+                ".js",
+                ".css",
+                ".html",
+                ".xml",
+                ".svg",
+                ".txt",
+                ".csv",
+            },
+            snippets=[
+                fastly.ServiceVclSnippetArgs(
+                    name="Redirect to correct domain",
+                    content=textwrap.dedent(
+                        rf"""
+                        # redirect to the correct host/domain
+                        if (obj.status == 618 && obj.response == "redirect-host") {{
+                          set obj.status = 302;
+                          set obj.http.Location = "https://"
+                            + "{frontend_domain}"
+                            + req.url.path
+                            + if (std.strlen(req.url.qs) > 0, "?" req.url.qs, "");
+                          return (deliver);
+                        }}
+                        """
+                    ),
+                    type="error",
+                ),
+            ],
+            https_logging=OLFastlyServiceVCLHTTPSLoggingConfig(
+                vector_log_proxy_domain=vector_log_proxy_domain,
+                encoded_credentials=encoded_fastly_proxy_credentials,
+                logging_name=f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-https-logging-args",
+            ),
         ),
-        cache_settings=[],
-        conditions=[],
-        dictionaries=[],
-        domains=[
-            fastly.ServiceVclDomainArgs(
-                comment=f"MicroMasters {stack_info.env_prefix} {stack_info.env_suffix}",
-                name=frontend_domain,
-            ),
-        ],
-        request_settings=[
-            fastly.ServiceVclRequestSettingArgs(
-                force_ssl=True,
-                name="Generated by force TLS and enable HSTS",
-                xff="",
-            )
-        ],
-        headers=[
-            fastly.ServiceVclHeaderArgs(
-                action="set",
-                destination="http.Strict-Transport-Security",
-                name="Generated by force TLS and enable HSTS",
-                source='"max-age=300"',
-                type="response",
-            ),
-        ],
-        snippets=[
-            fastly.ServiceVclSnippetArgs(
-                name="Redirect to correct domain",
-                content=textwrap.dedent(
-                    rf"""
-                    # redirect to the correct host/domain
-                    if (obj.status == 618 && obj.response == "redirect-host") {{
-                      set obj.status = 302;
-                      set obj.http.Location = "https://"
-                        + "{frontend_domain}"
-                        + req.url.path
-                        + if (std.strlen(req.url.qs) > 0, "?" req.url.qs, "");
-                      return (deliver);
-                    }}
-                    """
-                ),
-                type="error",
-            ),
-        ],
-        logging_https=[
-            fastly.ServiceVclLoggingHttpArgs(
-                url=Output.all(domain=vector_log_proxy_domain).apply(
-                    lambda kwargs: f"https://{kwargs['domain']}/fastly"
-                ),
-                name=f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-https-logging-args",
-                content_type="application/json",
-                format=build_fastly_log_format_string(additional_static_fields={}),
-                format_version=2,
-                header_name="Authorization",
-                header_value=f"Basic {encoded_fastly_proxy_credentials}",
-                json_format="0",
-                method="POST",
-                request_max_bytes=ONE_MEGABYTE_BYTE,
-            )
-        ],
-        opts=ResourceOptions.merge(fastly_provider, ResourceOptions()),
-    )
-
-    # Point the frontend domain at Fastly
-    five_minutes = 60 * 5
-    route53.Record(
-        f"micromasters-frontend-dns-{stack_info.env_suffix}",
-        name=frontend_domain,
-        allow_overwrite=True,
-        type="A",
-        ttl=five_minutes,
-        records=[str(addr) for addr in FASTLY_A_TLS_1_3],
-        zone_id=ol_zone_id,
-        opts=ResourceOptions(delete_before_replace=True),
+        opts=fastly_provider,
     )
 
 
