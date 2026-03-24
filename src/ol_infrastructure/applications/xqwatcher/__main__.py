@@ -80,6 +80,10 @@ docker_image_ref = f"mitodl/xqueue-watcher{_sep}{docker_image_tag}"
 
 min_replicas = xqwatcher_config.get_int("min_replicas") or 1
 max_replicas = xqwatcher_config.get_int("max_replicas") or 5
+# When true, a second VaultStaticSecret reads edx.org xqueue credentials from
+# secret-<env>/edxorg-xqueue and merges them into xqueue_servers.json at pod
+# start.  Set this only for stacks that actually watch edx.org queues.
+edxorg_xqueue_enabled = xqwatcher_config.get_bool("edxorg_xqueue_enabled") or False
 
 # Deployment-wide ContainerGrader defaults.  These become XQWATCHER_GRADER_*
 # environment variables on the xqwatcher pod so operators don't have to repeat
@@ -117,6 +121,24 @@ for queue_name, queue_cfg in _queues_raw.items():
     entry.setdefault("SERVER_REF", "default")
     queues_config[queue_name] = entry
 
+# Split by SERVER_REF so each Deployment only ships configs for its own server.
+# Queues with no SERVER_REF (or SERVER_REF="default") belong to the MIT-hosted
+# server; queues with SERVER_REF="edxorg" belong to the edx.org server.
+default_queues: dict[str, Any] = {
+    name: cfg
+    for name, cfg in queues_config.items()
+    if cfg.get("SERVER_REF", "default") == "default"
+}
+edxorg_queues: dict[str, Any] = (
+    {
+        name: cfg
+        for name, cfg in queues_config.items()
+        if cfg.get("SERVER_REF") == "edxorg"
+    }
+    if edxorg_xqueue_enabled
+    else {}
+)
+
 ##################################
 ##    Vault Policy + K8s Auth   ##
 ##################################
@@ -150,8 +172,9 @@ vault_k8s_resources = xqwatcher_app.vault_k8s_resources
 ##        Vault Secrets         ##
 ##################################
 
-# xqueue_servers.json — the only secret: xqueue URL and xqwatcher credentials.
-# Sourced from the same Vault KV entry used by the xqueue and edxapp deployments.
+# ── Default (MIT-hosted) xqueue server ──────────────────────────────────────
+# Credentials live at secret-<env>/edx-xqueue alongside the xqueue and edxapp
+# deployments.  Only xqwatcher_password is needed here.
 xqueue_servers_secret_name = (
     "xqwatcher-xqueue-servers"  # pragma: allowlist secret  # noqa: S105
 )
@@ -160,13 +183,6 @@ xqueue_servers_template = json.dumps(
         "default": {
             "SERVER": xqueue_server_url,
             "AUTH": ["xqwatcher", "{{ .Secrets.xqwatcher_password }}"],
-        },
-        "edxorg": {
-            "SERVER": "https://xqueue.edx.org",
-            "AUTH": [
-                "{{ .Secrets.edxorg_xqueue_username }}",
-                "{{ .Secrets.edxorg_xqueue_password }}",
-            ],
         },
     }
 )
@@ -193,6 +209,54 @@ xqueue_servers_secret = OLVaultK8SSecret(
         delete_before_replace=True,
         depends_on=[vault_k8s_resources],
     ),
+)
+
+# ── edx.org (external) xqueue server ────────────────────────────────────────
+# Credentials are entirely separate from the MIT-hosted instance and live at
+# secret-<env>/edxorg-xqueue.  Only created for stacks that watch edx.org
+# queues (edxorg_xqueue_enabled = true in stack config).
+edxorg_servers_secret_name = (
+    "xqwatcher-edxorg-servers"  # pragma: allowlist secret  # noqa: S105
+)
+edxorg_servers_template = json.dumps(
+    {
+        "edxorg": {
+            "SERVER": "https://xqueue.edx.org",
+            "AUTH": [
+                "{{ .Secrets.edxorg_xqueue_username }}",
+                "{{ .Secrets.edxorg_xqueue_password }}",
+            ],
+        },
+    }
+)
+
+edxorg_servers_secret = (
+    OLVaultK8SSecret(
+        f"xqwatcher-{env_name}-edxorg-servers-secret",
+        OLVaultK8SStaticSecretConfig(
+            name=edxorg_servers_secret_name,
+            namespace=namespace,
+            dest_secret_name=edxorg_servers_secret_name,
+            dest_secret_labels=k8s_global_labels.model_dump(),
+            labels=k8s_global_labels.model_dump(),
+            mount=f"secret-{stack_info.env_prefix}",
+            mount_type="kv-v1",
+            path="edxorg-xqueue",
+            refresh_after="1h",
+            restart_target_kind="Deployment",
+            restart_target_name="xqwatcher-edxorg",
+            templates={
+                "edxorg_servers.json": edxorg_servers_template,
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=[vault_k8s_resources],
+        ),
+    )
+    if edxorg_xqueue_enabled
+    else None
 )
 
 ##################################
@@ -244,8 +308,29 @@ xqwatcher_configmap = kubernetes.core.v1.ConfigMap(
         ),
         # Non-secret queue configs; SERVER_REF resolves credentials at runtime
         # from xqueue_servers.json (mounted from the Vault-synced secret).
-        "grader_config.json": json.dumps(queues_config),
+        # Only queues for the MIT-hosted server (SERVER_REF="default").
+        "grader_config.json": json.dumps(default_queues),
     },
+)
+
+# edxorg-specific ConfigMap: only the queues that target the external edx.org
+# server.  Created only when edxorg_xqueue_enabled is True.
+xqwatcher_edxorg_configmap = (
+    kubernetes.core.v1.ConfigMap(
+        f"xqwatcher-{env_name}-edxorg-configmap",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="xqwatcher-edxorg-config",
+            namespace=namespace,
+            labels=k8s_global_labels.model_dump(),
+        ),
+        data={
+            "xqwatcher.json": xqwatcher_configmap.data["xqwatcher.json"],
+            "logging.json": xqwatcher_configmap.data["logging.json"],
+            "grader_config.json": json.dumps(edxorg_queues),
+        },
+    )
+    if edxorg_xqueue_enabled
+    else None
 )
 
 ##################################
@@ -458,9 +543,7 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                                 sub_path="grader_config.json",
                                 read_only=True,
                             ),
-                            # Named server definitions (SERVER URL + AUTH credentials)
-                            # from the Vault-synced secret, mounted at the config
-                            # root so xqueue-watcher can resolve SERVER_REF entries.
+                            # MIT-hosted server definitions only (SERVER_REF="default").
                             kubernetes.core.v1.VolumeMountArgs(
                                 name="xqueue-servers",
                                 mount_path="/xqwatcher/xqueue_servers.json",
@@ -566,6 +649,246 @@ xqwatcher_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
     ),
     opts=ResourceOptions(depends_on=[xqwatcher_deployment]),
 )
+
+##################################
+## edx.org Watcher Deployment   ##
+##################################
+
+# A fully independent Deployment for queues that target the external edx.org
+# xqueue server.  It shares the service account and RBAC role with the default
+# Deployment (both need identical permissions to manage grading Jobs) but has
+# its own ConfigMap and VaultStaticSecret so the edxorg credentials are never
+# co-located with the MIT-hosted xqueue credentials.
+if edxorg_xqueue_enabled and edxorg_servers_secret and xqwatcher_edxorg_configmap:
+    edxorg_app_labels = {**k8s_global_labels.model_dump(), "app": "xqwatcher-edxorg"}
+
+    xqwatcher_edxorg_deployment = kubernetes.apps.v1.Deployment(
+        f"xqwatcher-{env_name}-edxorg-deployment",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="xqwatcher-edxorg",
+            namespace=namespace,
+            labels=k8s_global_labels.model_dump(),
+        ),
+        spec=kubernetes.apps.v1.DeploymentSpecArgs(
+            replicas=min_replicas,
+            selector=kubernetes.meta.v1.LabelSelectorArgs(
+                match_labels={"app": "xqwatcher-edxorg"},
+            ),
+            strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
+                type="RollingUpdate",
+                rolling_update=kubernetes.apps.v1.RollingUpdateDeploymentArgs(
+                    max_surge=1,
+                    max_unavailable=0,
+                ),
+            ),
+            template=kubernetes.core.v1.PodTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    labels=edxorg_app_labels,
+                ),
+                spec=kubernetes.core.v1.PodSpecArgs(
+                    service_account_name="xqwatcher",
+                    automount_service_account_token=True,
+                    security_context=kubernetes.core.v1.PodSecurityContextArgs(
+                        seccomp_profile=kubernetes.core.v1.SeccompProfileArgs(
+                            type="RuntimeDefault",
+                        ),
+                    ),
+                    topology_spread_constraints=[
+                        kubernetes.core.v1.TopologySpreadConstraintArgs(
+                            max_skew=1,
+                            topology_key="kubernetes.io/hostname",
+                            when_unsatisfiable="ScheduleAnyway",
+                            label_selector=kubernetes.meta.v1.LabelSelectorArgs(
+                                match_labels={"app": "xqwatcher-edxorg"},
+                            ),
+                        )
+                    ],
+                    containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="xqueue-watcher",
+                            image=cached_image_uri(docker_image_ref),
+                            image_pull_policy="Always",
+                            command=["uv", "run", "--no-sync", "xqueue-watcher"],
+                            args=["-d", "/xqwatcher"],
+                            env=[
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="XQWATCHER_LOGIN_POLL_INTERVAL", value="5"
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="XQWATCHER_GRADER_BACKEND",
+                                    value="kubernetes",
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="XQWATCHER_GRADER_NAMESPACE",
+                                    value=grader_namespace,
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="XQWATCHER_GRADER_CPU_LIMIT",
+                                    value=grader_cpu_limit,
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="XQWATCHER_GRADER_MEMORY_LIMIT",
+                                    value=grader_memory_limit,
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="XQWATCHER_GRADER_TIMEOUT",
+                                    value=grader_timeout,
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="XQWATCHER_VERIFY_TLS",
+                                    value=verify_tls,
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="XQWATCHER_SUBMISSION_SIZE_LIMIT",
+                                    value=submission_size_limit,
+                                ),
+                            ],
+                            liveness_probe=kubernetes.core.v1.ProbeArgs(
+                                exec_=kubernetes.core.v1.ExecActionArgs(
+                                    command=[
+                                        "uv",
+                                        "run",
+                                        "--no-sync",
+                                        "python",
+                                        "-c",
+                                        "import xqueue_watcher; import sys;"
+                                        " sys.exit(0)",
+                                    ]
+                                ),
+                                initial_delay_seconds=30,
+                                period_seconds=60,
+                                failure_threshold=3,
+                                timeout_seconds=10,
+                            ),
+                            resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                requests={"cpu": "250m", "memory": "256Mi"},
+                                limits={"memory": "512Mi"},
+                            ),
+                            security_context=kubernetes.core.v1.SecurityContextArgs(
+                                allow_privilege_escalation=False,
+                                run_as_non_root=True,
+                                run_as_user=1000,
+                                capabilities=kubernetes.core.v1.CapabilitiesArgs(
+                                    drop=["ALL"],
+                                ),
+                            ),
+                            volume_mounts=[
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="xqwatcher-edxorg-config",
+                                    mount_path="/xqwatcher/xqwatcher.json",
+                                    sub_path="xqwatcher.json",
+                                    read_only=True,
+                                ),
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="xqwatcher-edxorg-config",
+                                    mount_path="/xqwatcher/logging.json",
+                                    sub_path="logging.json",
+                                    read_only=True,
+                                ),
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="xqwatcher-edxorg-config",
+                                    mount_path="/xqwatcher/conf.d/grader_config.json",
+                                    sub_path="grader_config.json",
+                                    read_only=True,
+                                ),
+                                # edx.org server defs (SERVER_REF="edxorg");
+                                # mounted under the filename xqueue-watcher expects.
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="edxorg-servers",
+                                    mount_path="/xqwatcher/xqueue_servers.json",
+                                    sub_path="edxorg_servers.json",
+                                    read_only=True,
+                                ),
+                            ],
+                        ),
+                    ],
+                    volumes=[
+                        kubernetes.core.v1.VolumeArgs(
+                            name="xqwatcher-edxorg-config",
+                            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                                name=xqwatcher_edxorg_configmap.metadata.name,
+                            ),
+                        ),
+                        kubernetes.core.v1.VolumeArgs(
+                            name="edxorg-servers",
+                            secret=kubernetes.core.v1.SecretVolumeSourceArgs(
+                                secret_name=edxorg_servers_secret_name,
+                            ),
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        opts=ResourceOptions(
+            depends_on=[edxorg_servers_secret],
+            ignore_changes=["spec.replicas"],
+        ),
+    )
+
+    xqwatcher_edxorg_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
+        f"xqwatcher-{env_name}-edxorg-hpa",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="xqwatcher-edxorg",
+            namespace=namespace,
+            labels=k8s_global_labels.model_dump(),
+        ),
+        spec=kubernetes.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
+            scale_target_ref=kubernetes.autoscaling.v2.CrossVersionObjectReferenceArgs(
+                api_version="apps/v1",
+                kind="Deployment",
+                name="xqwatcher-edxorg",
+            ),
+            min_replicas=min_replicas,
+            max_replicas=max_replicas,
+            metrics=[
+                kubernetes.autoscaling.v2.MetricSpecArgs(
+                    type="Resource",
+                    resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                        name="cpu",
+                        target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                            type="Utilization",
+                            average_utilization=60,
+                        ),
+                    ),
+                ),
+                kubernetes.autoscaling.v2.MetricSpecArgs(
+                    type="Resource",
+                    resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                        name="memory",
+                        target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                            type="Utilization",
+                            average_utilization=80,
+                        ),
+                    ),
+                ),
+            ],
+            behavior=kubernetes.autoscaling.v2.HorizontalPodAutoscalerBehaviorArgs(
+                scale_up=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
+                    stabilization_window_seconds=60,
+                    select_policy="Max",
+                    policies=[
+                        kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
+                            type="Percent",
+                            value=100,
+                            period_seconds=60,
+                        ),
+                    ],
+                ),
+                scale_down=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
+                    stabilization_window_seconds=300,
+                    select_policy="Min",
+                    policies=[
+                        kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
+                            type="Percent",
+                            value=25,
+                            period_seconds=60,
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        opts=ResourceOptions(depends_on=[xqwatcher_edxorg_deployment]),
+    )
 
 ##################################
 ##           Exports            ##
