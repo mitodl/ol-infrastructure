@@ -1,3 +1,5 @@
+"""Concourse pipeline: build and deploy xqueue-watcher Docker image + Pulumi stack."""
+
 import sys
 
 from bridge.settings.openedx.accessors import filter_deployments_by_application
@@ -16,7 +18,8 @@ from ol_concourse.lib.resources import git_repo, registry_image
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 
 
-def build_xqwatcher_pipeline(release_name: str):
+def build_xqwatcher_pipeline(release_name: str) -> Pipeline:
+    """Build a Concourse pipeline that builds and deploys xqueue-watcher."""
     xqwatcher_repo = git_repo(
         name=Identifier("xqueue-watcher-code"),
         uri="https://github.com/mitodl/xqueue-watcher",
@@ -88,7 +91,7 @@ def build_xqwatcher_pipeline(release_name: str):
                 ),
             ],
             env_vars_from_files={
-                "XQWATCHER_DOCKER_DIGEST": f"{xqwatcher_registry_image.name}/digest"
+                "XQWATCHER_DOCKER_TAG": f"{xqwatcher_registry_image.name}/digest"
             },
         )
         loop_fragments.append(pulumi_fragment)
