@@ -16,7 +16,7 @@ from ol_concourse.lib.resources import git_repo, registry_image
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 
 
-def build_xqwatcher_pipeline(release_name: str) -> Pipeline:
+def build_xqwatcher_pipeline(release_name: str):
     xqwatcher_repo = git_repo(
         name=Identifier("xqueue-watcher-code"),
         uri="https://github.com/mitodl/xqueue-watcher",
@@ -26,7 +26,7 @@ def build_xqwatcher_pipeline(release_name: str) -> Pipeline:
     xqwatcher_registry_image = registry_image(
         name=Identifier("xqueue-watcher-container"),
         image_repository="mitodl/xqueue-watcher",
-        image_tag=release_name,
+        image_tag="latest",
         username="((dockerhub.username))",
         password="((dockerhub.password))",  # noqa: S106
     )
@@ -47,8 +47,13 @@ def build_xqwatcher_pipeline(release_name: str) -> Pipeline:
         plan=[
             GetStep(get=xqwatcher_repo.name, trigger=True),
             container_build_task(
-                inputs=[Input(name=xqwatcher_repo.name)],
-                build_parameters={"CONTEXT": str(xqwatcher_repo.name)},
+                inputs=[
+                    Input(name=xqwatcher_repo.name),
+                ],
+                build_parameters={
+                    "CONTEXT": xqwatcher_repo.name,
+                    "DOCKERFILE": f"{xqwatcher_repo.name}/Dockerfile",
+                },
             ),
             PutStep(
                 put=xqwatcher_registry_image.name,
@@ -77,9 +82,9 @@ def build_xqwatcher_pipeline(release_name: str) -> Pipeline:
             project_source_path=PULUMI_CODE_PATH.joinpath("applications/xqwatcher/"),
             dependencies=[
                 GetStep(
-                    get=xqwatcher_registry_image.name,
+                    get=container_fragment.resources[-1].name,
                     trigger=True,
-                    passed=[image_build_job.name],
+                    passed=[container_fragment.jobs[-1].name],
                 ),
             ],
             env_vars_from_files={
@@ -104,8 +109,19 @@ def build_xqwatcher_pipeline(release_name: str) -> Pipeline:
 
 
 if __name__ == "__main__":
+    from bridge.settings.openedx.types import OpenEdxSupportedRelease
+
+    if len(sys.argv) < 2:  # noqa: PLR2004
+        releases = [r.name for r in OpenEdxSupportedRelease]
+        sys.stderr.write(
+            f"Usage: {sys.argv[0]} <release_name>\n"
+            f"Available releases: {', '.join(releases)}\n"
+        )
+        sys.exit(1)
     release_name = sys.argv[1]
-    pipeline_json = build_xqwatcher_pipeline(release_name).model_dump_json(indent=2)
+    pipeline_json = build_xqwatcher_pipeline(
+        release_name,
+    ).model_dump_json(indent=2)
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)
