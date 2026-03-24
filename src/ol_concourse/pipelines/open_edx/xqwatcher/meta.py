@@ -37,10 +37,10 @@ def build_meta_job(release_name):
         pipeline_id = "self"
     else:
         pipeline_definition_path = (
-            "src/ol_concourse/pipelines/open_edx/xqwatcher/packer_pulumi_pipeline.py"
+            "src/ol_concourse/pipelines/open_edx/xqwatcher/docker_pulumi_pipeline.py"
         )
         pipeline_team = "infrastructure"
-        pipeline_id = f"packer-pulumi-xqwatcher-{release_name}"
+        pipeline_id = f"docker-pulumi-xqwatcher-{release_name}"
     return Job(
         name=Identifier(f"create-xqwatcher-{release_name}-pipeline"),
         plan=[
