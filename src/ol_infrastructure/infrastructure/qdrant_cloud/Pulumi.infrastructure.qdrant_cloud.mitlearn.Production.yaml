@@ -7,4 +7,4 @@ config:
   qdrant-cloud:number_of_nodes: 3
   qdrant-cloud:enable_high_availability: "true"
   qdrant-cloud:desired_package_name: mx2
-  qdrant-cloud:desired_disk_gib: "102"
+  qdrant-cloud:desired_disk_gib: "107"
