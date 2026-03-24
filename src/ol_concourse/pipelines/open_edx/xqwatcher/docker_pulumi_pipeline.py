@@ -20,7 +20,7 @@ def build_xqwatcher_pipeline(release_name: str):
     xqwatcher_repo = git_repo(
         name=Identifier("xqueue-watcher-code"),
         uri="https://github.com/mitodl/xqueue-watcher",
-        branch="main",
+        branch="master",
     )
 
     xqwatcher_registry_image = registry_image(
