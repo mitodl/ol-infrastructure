@@ -40,7 +40,7 @@ def grader_base_image_pipeline() -> Pipeline:
     xqwatcher_repo = git_repo(
         name=Identifier("xqueue-watcher-code"),
         uri="https://github.com/mitodl/xqueue-watcher",
-        branch="main",
+        branch="master",
         paths=["grader_support/"],
     )
 
