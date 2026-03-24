@@ -205,13 +205,13 @@ GRADER_PIPELINES: list[GraderPipelineConfig] = [
     GraderPipelineConfig(
         pipeline_name="graders-mit-600x",
         grader_repo_url="git@github.com:mitodl/graders-mit-600x",
-        grader_repo_branch="main",
+        grader_repo_branch="master",
         ecr_repo_name="mitodl/graders-mit-600x",
     ),
     GraderPipelineConfig(
         pipeline_name="graders-mit-686x",
         grader_repo_url="git@github.com:mitodl/graders-mit-686x",
-        grader_repo_branch="main",
+        grader_repo_branch="master",
         ecr_repo_name="mitodl/graders-mit-686x",
     ),
 ]
