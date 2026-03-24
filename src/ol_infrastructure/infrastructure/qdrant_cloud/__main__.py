@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Literal
 
 import pulumi_qdrant_cloud as qdrant_cloud
 from pulumi import Config, InvokeOptions, ResourceOptions, export
@@ -27,6 +28,9 @@ number_of_nodes = qdrant_cloud_config.get_int("number_of_nodes") or 3
 cluster_version = qdrant_cloud_config.get("cluster_version") or QDRANT_VERSION
 enable_high_availability = (
     qdrant_cloud_config.get_bool("enable_high_availability") or False
+)
+storage_type: Literal["balanced", "cost-optimized", "performance"] = (
+    qdrant_cloud_config.get("storage_type") or "cost-optimized"
 )
 
 # Package name from the Qdrant Cloud booking catalogue for the target region.
@@ -84,7 +88,7 @@ package = _find_package(booking_result.packages, desired_package_name)
 node_resource_configurations = None
 if desired_disk_gib is not None and package.resource_configurations:
     base_disk_gib = _parse_gib(package.resource_configurations[0].disk)
-    effective_disk_gib = max(desired_disk_gib, base_disk_gib)
+    effective_disk_gib = desired_disk_gib - base_disk_gib
     if effective_disk_gib > base_disk_gib:
         if not package.available_additional_resources:
             msg = (
@@ -96,9 +100,19 @@ if desired_disk_gib is not None and package.resource_configurations:
             qdrant_cloud.AccountsClusterConfigurationNodeConfigurationResourceConfigurationArgs(
                 amount=effective_disk_gib,
                 resource_type="disk",
-                resource_unit="GiB",
+                resource_unit="Gi",
             )
         ]
+
+storage_type_map = {
+    "balanced": qdrant_cloud.AccountsClusterConfigurationDatabaseConfigurationStorageArgs(  # noqa: E501
+        performance=qdrant_cloud.AccountsClusterConfigurationDatabaseConfigurationStoragePerformanceArgs(
+            optimizer_cpu_budget=0,
+            async_scorer=True,
+        )
+    ),
+    "cost-optimized": None,
+}
 
 cluster = qdrant_cloud.AccountsCluster(
     f"mitlearn-qdrant-{stack_info.env_suffix}",
@@ -124,6 +138,7 @@ cluster = qdrant_cloud.AccountsCluster(
                 replication_factor=2 if enable_high_availability else 1,
                 write_consistency_factor=1,
             ),
+            storage=storage_type_map[storage_type],
         )
         if enable_high_availability
         else None,
