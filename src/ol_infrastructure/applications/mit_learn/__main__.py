@@ -449,11 +449,17 @@ mitlearn_vault_mount = vault.Mount(
 mitlearn_vault_secrets = read_yaml_secrets(
     Path(f"mitlearn/secrets.{stack_info.env_suffix}.yaml"),
 )
-
 mitlearn_vault_static_secrets = vault.generic.Secret(
     f"ol-mitlearn-configuration-secrets-{stack_info.env_suffix}",
     path=mitlearn_vault_mount.path.apply("{}/secrets".format),
-    data_json=json.dumps(mitlearn_vault_secrets),
+    data_json=qdrant_api_key.key.apply(
+        lambda key: json.dumps(
+            {
+                **mitlearn_vault_secrets,
+                "qdrant": {**mitlearn_vault_secrets["qdrant"], "api_key_v2": key},
+            }
+        )
+    ),
 )
 
 # The policy has been updated to allow for reading from the old or
@@ -1242,66 +1248,6 @@ secret_operations_tika_access_token = vault.generic.get_secret_output(
     path="secret-operations/tika/access-token",
     opts=InvokeOptions(parent=mitlearn_vault_iam_role),
 )
-
-# Gets masked in any console outputs
-sensitive_env_vars = {
-    # Vars available locally from SOPS
-    "CKEDITOR_ENVIRONMENT_ID": mitlearn_vault_secrets["ckeditor"]["environment_id"],
-    "CKEDITOR_SECRET_KEY": mitlearn_vault_secrets["ckeditor"]["secret_key"],
-    "CKEDITOR_UPLOAD_URL": mitlearn_vault_secrets["ckeditor"]["upload_url"],
-    "EDX_API_CLIENT_ID": mitlearn_vault_secrets["edx_api_client"]["id"],
-    "EDX_API_CLIENT_SECRET": mitlearn_vault_secrets["edx_api_client"]["secret"],
-    "MITOL_JWT_SECRET": mitlearn_vault_secrets["jwt_secret"],
-    "OLL_API_CLIENT_ID": mitlearn_vault_secrets["open_learning_library_client"][
-        "client_id"
-    ],
-    "OLL_API_CLIENT_SECRET": mitlearn_vault_secrets["open_learning_library_client"][
-        "client_secret"
-    ],
-    "OPENAI_API_KEY": mitlearn_vault_secrets["openai"]["api_key"],
-    "OPENSEARCH_HTTP_AUTH": mitlearn_vault_secrets["opensearch"]["http_auth"],
-    "QDRANT_API_KEY": mitlearn_vault_secrets["qdrant"]["api_key"],
-    "QDRANT_API_KEY_V2": qdrant_api_key.key,
-    "QDRANT_HOST": mitlearn_vault_secrets["qdrant"]["host_url"],
-    "SECRET_KEY": mitlearn_vault_secrets["django_secret_key"],
-    "SENTRY_DSN": mitlearn_vault_secrets["sentry_dsn"],
-    "STATUS_TOKEN": mitlearn_vault_secrets["django_status_token"],
-    "YOUTUBE_DEVELOPER_KEY": mitlearn_vault_secrets["youtube_developer_key"],
-    "POSTHOG_PROJECT_API_KEY": mitlearn_vault_secrets["posthog"]["project_api_key"],
-    "POSTHOG_PERSONAL_API_KEY": mitlearn_vault_secrets["posthog"]["personal_api_key"],
-    "SEE_API_CLIENT_ID": mitlearn_vault_secrets["see_api_client"]["id"],
-    "SEE_API_CLIENT_SECRET": mitlearn_vault_secrets["see_api_client"]["secret"],
-    "EMBEDLY_KEY": secret_operations_global_embedly.data.apply(
-        lambda data: "{}".format(data["key"])
-    ),
-    "GITHUB_ACCESS_TOKEN": secret_operations_global_odlbot_github_access_token.data.apply(
-        lambda data: "{}".format(data["value"])
-    ),
-    "MAILGUN_KEY": secret_global_mailgun_api_key.data.apply(
-        lambda data: "{}".format(data["api_key"])
-    ),
-    "MITOL_EMAIL_HOST": secret_operations_global_mit_smtp.data.apply(
-        lambda data: "{}".format(data["relay_host"])
-    ),
-    "MITOL_EMAIL_PASSWORD": secret_operations_global_mit_smtp.data.apply(
-        lambda data: "{}".format(data["relay_password"])
-    ),
-    "MITOL_EMAIL_USER": secret_operations_global_mit_smtp.data.apply(
-        lambda data: "{}".format(data["relay_username"])
-    ),
-    "OCW_NEXT_SEARCH_WEBHOOK_KEY": secret_operations_global_update_search_data_webhook_key.data.apply(
-        lambda data: "{}".format(data["value"])
-    ),
-    "OCW_WEBHOOK_KEY": secret_operations_global_update_search_data_webhook_key.data.apply(
-        lambda data: "{}".format(data["value"])
-    ),
-    "SOCIAL_AUTH_OL_OIDC_SECRET": secret_operations_sso_learn.data.apply(
-        lambda data: "{}".format(data["client_secret"])
-    ),
-    "TIKA_ACCESS_TOKEN": secret_operations_tika_access_token.data.apply(
-        lambda data: "{}".format(data["value"])
-    ),
-}
 
 # There were a few undiscovered circular dependencies here that wasn't revealed until attempting
 # to build the CI environment. Since we won't even need this in K8S we will just let it be

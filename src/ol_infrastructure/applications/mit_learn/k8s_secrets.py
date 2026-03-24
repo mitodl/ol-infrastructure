@@ -182,6 +182,7 @@ def create_mitlearn_k8s_secrets(
             "OPENAI_API_KEY": '{{ index .Secrets "openai" "api_key" }}',
             "OPENSEARCH_HTTP_AUTH": '{{ index .Secrets "opensearch" "http_auth" }}',
             "QDRANT_API_KEY": '{{ index .Secrets "qdrant" "api_key" }}',
+            "QDRANT_API_KEY_V2": '{{ index .Secrets "qdrant" "api_key_v2" }}',
             "QDRANT_HOST": '{{ index .Secrets "qdrant" "host_url" }}',
             "POSTHOG_PROJECT_API_KEY": '{{ index .Secrets "posthog" "project_api_key" }}',
             "POSTHOG_PERSONAL_API_KEY": '{{ index .Secrets "posthog" "personal_api_key" }}',
