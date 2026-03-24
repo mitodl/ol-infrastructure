@@ -29,13 +29,7 @@ if (obj.status == 606 && obj.response == "redirect") {
   return(deliver);
 }
 
-if (obj.status == 301) {
-  set obj.status = 301;
-  set obj.http.Location = req.protocol + "://" + req.http.host + req.http.slash_header;
-  return (deliver);
-}
-
-if (obj.status == 307) {
+if (obj.status == 301 || obj.status == 307) {
   set obj.http.Location = obj.response;
   return(deliver);
- }
+}
