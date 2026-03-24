@@ -66,7 +66,7 @@ def ad_optimization_pipeline() -> Pipeline:
                         "GOOGLE_MANAGER_ACCOUNT": "((google_ads_optimization.google_manager_account))",
                         "GOOGLE_ADS_JSON": "((google_ads_optimization.google_ads_json))",
                         # This is a map of course name to customer ID.
-                        "CUSTOMER_ID_FOR_COURSES": "((customer_id_for_courses))",
+                        "CUSTOMER_ID_FOR_COURSES": "((google_ads_optimization.customer_id_for_courses))",
                         "COURSE_NAME": "((course_name))",
                         "SEMRUSH_API_KEY": "((google_ads_optimization.semrush_api_key))",
                     },
