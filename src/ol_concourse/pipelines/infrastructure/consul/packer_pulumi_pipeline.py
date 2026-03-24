@@ -60,7 +60,9 @@ for network in [
     "data",
     "operations",
 ]:
-    stages = ("CI", "QA", "Production")
+    stages = ["QA", "Production"]
+    if network == "operations":
+        stages.insert(0, "CI")
     consul_pulumi_infrastructure_fragment = pulumi_jobs_chain(
         consul_pulumi_infrastructure_code,
         project_name="ol-infrastructure-consul-server",
@@ -78,10 +80,12 @@ for network in [
 for network in [
     "mitx",
     "mitxonline",
-    "applications",
     "data",
     "operations",
 ]:
+    stages = ["QA", "Production"]
+    if network == "operations":
+        stages.insert(0, "CI")
     consul_pulumi_substructure_fragment = pulumi_jobs_chain(
         consul_pulumi_substructure_code,
         project_name="ol-infrastructure-substructure-consul",
