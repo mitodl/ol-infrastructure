@@ -507,7 +507,7 @@ keycloak_service_monitor = kubernetes.apiextensions.CustomResource(
         "selector": {
             "matchLabels": {
                 "app": "keycloak",
-                "keycloak": keycloak_resource_name,
+                "app.kubernetes.io/instance": keycloak_resource_name,
             }
         },
         "endpoints": [
