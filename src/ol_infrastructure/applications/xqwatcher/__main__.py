@@ -88,7 +88,7 @@ edxorg_xqueue_enabled = xqwatcher_config.get_bool("edxorg_xqueue_enabled") or Fa
 # Deployment-wide ContainerGrader defaults.  These become XQWATCHER_GRADER_*
 # environment variables on the xqwatcher pod so operators don't have to repeat
 # them in every conf.d queue JSON file.  Per-queue KWARGS still override these.
-grader_namespace = xqwatcher_config.get("grader_namespace") or namespace
+grader_namespace = xqwatcher_config.get("grader_namespace") or f"{namespace}-graders"
 grader_cpu_limit = xqwatcher_config.get("grader_cpu_limit") or "500m"
 grader_memory_limit = xqwatcher_config.get("grader_memory_limit") or "256Mi"
 grader_timeout = xqwatcher_config.get("grader_timeout") or "20"
@@ -334,18 +334,56 @@ xqwatcher_edxorg_configmap = (
 )
 
 ##################################
+##       Grader Namespace       ##
+##################################
+
+# A dedicated namespace for student code grading jobs, isolated from the
+# xqwatcher control plane.  Using a separate namespace allows LimitRanges
+# and NetworkPolicies to be scoped to grading workloads only without
+# affecting the xqwatcher deployment namespace.
+grader_namespace_resource = kubernetes.core.v1.Namespace(
+    f"xqwatcher-{env_name}-grader-namespace",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=grader_namespace,
+        labels=k8s_global_labels.model_dump(),
+    ),
+)
+
+# Constrain the number of PIDs per pod in the grader namespace to prevent
+# student code from fork-bombing the node.  Applies to all pods (i.e. grading
+# Jobs) scheduled into this namespace.
+grader_limit_range = kubernetes.core.v1.LimitRange(
+    f"xqwatcher-{env_name}-grader-limit-range",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="xqwatcher-grader-limits",
+        namespace=grader_namespace,
+        labels=k8s_global_labels.model_dump(),
+    ),
+    spec=kubernetes.core.v1.LimitRangeSpecArgs(
+        limits=[
+            kubernetes.core.v1.LimitRangeItemArgs(
+                type="Pod",
+                max={"pids": "256"},
+            ),
+        ]
+    ),
+    opts=ResourceOptions(depends_on=[grader_namespace_resource]),
+)
+
+##################################
 ##     RBAC for ContainerGrader ##
 ##################################
 
 # xqwatcher uses the ContainerGrader backend which creates a Kubernetes Job
-# per submission.  The service account running xqwatcher pods needs permission
-# to create/delete Jobs and read pod logs in the same namespace.
+# per submission in the grader namespace.  The service account running
+# xqwatcher pods needs permission to create/delete Jobs and read pod logs
+# in the grader namespace.
 
 xqwatcher_grader_role = kubernetes.rbac.v1.Role(
     f"xqwatcher-{env_name}-grader-role",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="xqwatcher-grader",
-        namespace=namespace,
+        namespace=grader_namespace,
         labels=k8s_global_labels.model_dump(),
     ),
     rules=[
@@ -360,13 +398,14 @@ xqwatcher_grader_role = kubernetes.rbac.v1.Role(
             verbs=["get", "list", "watch"],
         ),
     ],
+    opts=ResourceOptions(depends_on=[grader_namespace_resource]),
 )
 
 xqwatcher_grader_rolebinding = kubernetes.rbac.v1.RoleBinding(
     f"xqwatcher-{env_name}-grader-rolebinding",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="xqwatcher-grader",
-        namespace=namespace,
+        namespace=grader_namespace,
         labels=k8s_global_labels.model_dump(),
     ),
     role_ref=kubernetes.rbac.v1.RoleRefArgs(
@@ -454,9 +493,10 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                                 name="XQWATCHER_GRADER_BACKEND",
                                 value="kubernetes",
                             ),
-                            # Critical: grading Jobs must land in the same
-                            # namespace as xqwatcher so the RBAC Role binding
-                            # above grants the necessary permissions.
+                            # Grading Jobs are dispatched to the dedicated
+                            # grader namespace; the RBAC RoleBinding above
+                            # grants the xqwatcher service account the
+                            # necessary permissions there.
                             kubernetes.core.v1.EnvVarArgs(
                                 name="XQWATCHER_GRADER_NAMESPACE",
                                 value=grader_namespace,
@@ -896,5 +936,6 @@ if edxorg_xqueue_enabled and edxorg_servers_secret and xqwatcher_edxorg_configma
 
 export("k8s_deployment_name", "xqwatcher")
 export("k8s_namespace", namespace)
+export("k8s_grader_namespace", grader_namespace)
 export("k8s_hpa_name", "xqwatcher")
 export("xqueue_servers_secret", xqueue_servers_secret_name)
