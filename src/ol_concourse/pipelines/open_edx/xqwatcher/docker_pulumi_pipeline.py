@@ -88,7 +88,7 @@ def build_xqwatcher_pipeline(release_name: str):
                 ),
             ],
             env_vars_from_files={
-                "XQWATCHER_DOCKER_DIGEST": f"{xqwatcher_registry_image.name}/digest"
+                "XQWATCHER_DOCKER_TAG": f"{xqwatcher_registry_image.name}/digest"
             },
         )
         loop_fragments.append(pulumi_fragment)
