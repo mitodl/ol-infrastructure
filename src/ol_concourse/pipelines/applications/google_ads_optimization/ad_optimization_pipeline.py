@@ -90,5 +90,5 @@ if __name__ == "__main__":
     print()  # noqa: T201
     for course in COURSES:
         sys.stdout.write(
-            f"fly -t <prod_target> sp -p google-ads-optimization -c definition.json --instance-var course_name={course}"
+            f"fly -t <prod_target> sp -p google-ads-optimization -c definition.json --instance-var course_name={course}\n"
         )
