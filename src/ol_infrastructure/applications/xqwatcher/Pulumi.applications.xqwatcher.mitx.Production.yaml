@@ -22,7 +22,7 @@ config:
           cpu_limit: 1000m
           memory_limit: 512Mi
           timeout: 60
-          image_pull_policy: always
+          image_pull_policy: Always
     Watcher-MITx-6.0001r:
       CONNECTIONS: 5
       HANDLERS:
@@ -34,4 +34,4 @@ config:
           cpu_limit: 1000m
           memory_limit: 512Mi
           timeout: 60
-          image_pull_policy: always
+          image_pull_policy: Always

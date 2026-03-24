@@ -341,47 +341,65 @@ xqwatcher_edxorg_configmap = (
 # per submission.  The service account running xqwatcher pods needs permission
 # to create/delete Jobs and read pod logs in the same namespace.
 
-xqwatcher_grader_role = kubernetes.rbac.v1.Role(
-    f"xqwatcher-{env_name}-grader-role",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="xqwatcher-grader",
-        namespace=namespace,
-        labels=k8s_global_labels.model_dump(),
-    ),
-    rules=[
-        kubernetes.rbac.v1.PolicyRuleArgs(
-            api_groups=["batch"],
-            resources=["jobs"],
-            verbs=["create", "delete", "get", "list", "watch"],
-        ),
-        kubernetes.rbac.v1.PolicyRuleArgs(
-            api_groups=[""],
-            resources=["pods", "pods/log"],
-            verbs=["get", "list", "watch"],
-        ),
-    ],
-)
 
-xqwatcher_grader_rolebinding = kubernetes.rbac.v1.RoleBinding(
-    f"xqwatcher-{env_name}-grader-rolebinding",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="xqwatcher-grader",
-        namespace=namespace,
-        labels=k8s_global_labels.model_dump(),
-    ),
-    role_ref=kubernetes.rbac.v1.RoleRefArgs(
-        api_group="rbac.authorization.k8s.io",
-        kind="Role",
-        name=xqwatcher_grader_role.metadata.name,
-    ),
-    subjects=[
-        kubernetes.rbac.v1.SubjectArgs(
-            kind="ServiceAccount",
-            name="xqwatcher",
-            namespace=namespace,
+def _grader_rbac(ns: str, resource_suffix: str) -> kubernetes.rbac.v1.RoleBinding:
+    """Create a Role + RoleBinding granting xqwatcher permission to manage
+    grading Jobs and read pod logs in *ns*.  Returns the RoleBinding so callers
+    can declare a dependency on it if needed.
+
+    Called once for the application namespace (where xqwatcher runs) and again
+    for grader_namespace when it differs, so permissions follow the Jobs
+    regardless of which namespace they land in.
+    """
+    role = kubernetes.rbac.v1.Role(
+        f"xqwatcher-{env_name}-grader-role-{resource_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="xqwatcher-grader",
+            namespace=ns,
+            labels=k8s_global_labels.model_dump(),
         ),
-    ],
-)
+        rules=[
+            kubernetes.rbac.v1.PolicyRuleArgs(
+                api_groups=["batch"],
+                resources=["jobs"],
+                verbs=["create", "delete", "get", "list", "watch"],
+            ),
+            kubernetes.rbac.v1.PolicyRuleArgs(
+                api_groups=[""],
+                resources=["pods", "pods/log"],
+                verbs=["get", "list", "watch"],
+            ),
+        ],
+    )
+    return kubernetes.rbac.v1.RoleBinding(
+        f"xqwatcher-{env_name}-grader-rolebinding-{resource_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="xqwatcher-grader",
+            namespace=ns,
+            labels=k8s_global_labels.model_dump(),
+        ),
+        role_ref=kubernetes.rbac.v1.RoleRefArgs(
+            api_group="rbac.authorization.k8s.io",
+            kind="Role",
+            name=role.metadata.name,
+        ),
+        subjects=[
+            kubernetes.rbac.v1.SubjectArgs(
+                kind="ServiceAccount",
+                name="xqwatcher",
+                namespace=namespace,
+            ),
+        ],
+    )
+
+
+# Always grant permissions in the application namespace.
+xqwatcher_grader_rolebinding = _grader_rbac(namespace, "app")
+
+# If grading Jobs land in a different namespace, mirror the RBAC there so the
+# xqwatcher service account can manage them.
+if grader_namespace != namespace:
+    xqwatcher_grader_rolebinding_grader_ns = _grader_rbac(grader_namespace, "grader")
 
 ##################################
 ##         Deployment           ##

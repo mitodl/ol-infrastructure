@@ -22,7 +22,7 @@ config:
           cpu_limit: 1000m
           memory_limit: 512Mi
           timeout: 60
-          image_pull_policy: always
+          image_pull_policy: Always
     edxorg-686x:
       SERVER_REF: edxorg
       CONNECTIONS: 5
@@ -35,4 +35,4 @@ config:
           cpu_limit: 1000m
           memory_limit: 1Gi
           timeout: 60
-          image_pull_policy: always
+          image_pull_policy: Always
