@@ -349,26 +349,6 @@ grader_namespace_resource = kubernetes.core.v1.Namespace(
     ),
 )
 
-# Constrain the number of PIDs per pod in the grader namespace to prevent
-# student code from fork-bombing the node.  Applies to all pods (i.e. grading
-# Jobs) scheduled into this namespace.
-grader_limit_range = kubernetes.core.v1.LimitRange(
-    f"xqwatcher-{env_name}-grader-limit-range",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="xqwatcher-grader-limits",
-        namespace=grader_namespace,
-        labels=k8s_global_labels.model_dump(),
-    ),
-    spec=kubernetes.core.v1.LimitRangeSpecArgs(
-        limits=[
-            kubernetes.core.v1.LimitRangeItemArgs(
-                type="Pod",
-                max={"pids": "256"},
-            ),
-        ]
-    ),
-    opts=ResourceOptions(depends_on=[grader_namespace_resource]),
-)
 
 ##################################
 ##     RBAC for ContainerGrader ##
