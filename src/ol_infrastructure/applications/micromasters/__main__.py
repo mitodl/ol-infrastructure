@@ -12,6 +12,7 @@ import os
 import textwrap
 from pathlib import Path
 
+import pulumi
 import pulumi_fastly as fastly
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
@@ -28,7 +29,6 @@ from pulumi import (
 )
 from pulumi_aws import ec2, iam, route53, s3
 
-from bridge.lib.constants import FASTLY_A_TLS_1_3
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_NGINX_PORT,
@@ -69,6 +69,10 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
+from ol_infrastructure.lib.aws.route53_helper import (
+    fastly_certificate_validation_records,
+    lookup_zone_id_from_domain,
+)
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
@@ -1141,6 +1145,9 @@ if micromasters_config.get_bool("deploy_k8s"):
             gzip_settings["extensions"].add(k.strip("."))
             gzip_settings["content_types"].add(v)
 
+    fastly_domains = [frontend_domain]
+    if stack_info.env_suffix == "production":
+        fastly_domains.append("micromasters.mit.edu")
     micromasters_fastly_service = fastly.ServiceVcl(
         f"micromasters-fastly-service-{stack_info.env_suffix}",
         name=f"MicroMasters {stack_info.env_suffix}",
@@ -1172,8 +1179,9 @@ if micromasters_config.get_bool("deploy_k8s"):
         domains=[
             fastly.ServiceVclDomainArgs(
                 comment=f"MicroMasters {stack_info.env_prefix} {stack_info.env_suffix}",
-                name=frontend_domain,
-            ),
+                name=domain,
+            )
+            for domain in fastly_domains
         ],
         request_settings=[
             fastly.ServiceVclRequestSettingArgs(
@@ -1229,17 +1237,49 @@ if micromasters_config.get_bool("deploy_k8s"):
         opts=ResourceOptions.merge(fastly_provider, ResourceOptions()),
     )
 
+    tls_configuration = fastly.get_tls_configuration(
+        default=False,
+        name="TLS v1.3",
+        tls_protocols=["1.3"],
+        opts=pulumi.InvokeOptions(provider=fastly_provider.provider),
+    )
+
+    micromasters_fastly_tls = fastly.TlsSubscription(
+        f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-tls-subscription",
+        # valid values are certainly, lets-encrypt, or globalsign
+        certificate_authority="certainly",
+        domains=micromasters_fastly_service.domains.apply(
+            lambda domains: [domain.name for domain in domains]
+        ),
+        # Retrieved from https://manage.fastly.com/network/tls-configurations
+        configuration_id=tls_configuration.id,
+        opts=fastly_provider,
+    )
+
+    micromasters_fastly_tls.managed_dns_challenges.apply(
+        fastly_certificate_validation_records
+    )
+
+    validated_tls_subscription = fastly.TlsSubscriptionValidation(
+        "micromasters-tls-subscription-validation",
+        subscription_id=micromasters_fastly_tls.id,
+        opts=fastly_provider,
+    )
+
     # Point the frontend domain at Fastly
     five_minutes = 60 * 5
     route53.Record(
-        f"micromasters-frontend-dns-{stack_info.env_suffix}",
+        "micromasters-fastly-dns-record",
         name=frontend_domain,
-        allow_overwrite=True,
         type="A",
         ttl=five_minutes,
-        records=[str(addr) for addr in FASTLY_A_TLS_1_3],
-        zone_id=ol_zone_id,
-        opts=ResourceOptions(delete_before_replace=True),
+        records=[
+            record["record_value"]
+            for record in tls_configuration.dns_records
+            if record["record_type"] == "A"
+        ],
+        zone_id=lookup_zone_id_from_domain(frontend_domain),
+        allow_overwrite=True,
     )
 
 
