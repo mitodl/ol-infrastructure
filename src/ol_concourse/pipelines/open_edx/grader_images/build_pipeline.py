@@ -9,8 +9,8 @@ and pushing that course image to a private ECR repository.
 
 Triggers:
   - New commit to the grader repo (grader scripts or Dockerfile changed).
-  - New digest of the grader base image in ECR (base image rebuilt / security
-    patch applied).
+  - New digest of the Docker Hub grader base image (base image rebuilt /
+    security patch applied).
 
 The base image digest is resolved at build time by reading the ``repository``
 and ``digest`` files that Concourse's ``registry-image`` resource writes for
