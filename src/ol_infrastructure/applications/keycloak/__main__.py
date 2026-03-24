@@ -514,12 +514,9 @@ keycloak_service_monitor = kubernetes.apiextensions.CustomResource(
             {
                 "port": "management",
                 "path": "/metrics",
-                "scheme": "http",
+                "scheme": "https",
                 "interval": "30s",
-                "tlsConfig": {
-                    "insecureSkipVerify": True  # For internal metrics scraping, often
-                    # used if Prometheus doesn't have the CA
-                },
+                "tlsConfig": {"insecureSkipVerify": True},
             }
         ],
         "namespaceSelector": {"matchNames": [keycloak_namespace]},
