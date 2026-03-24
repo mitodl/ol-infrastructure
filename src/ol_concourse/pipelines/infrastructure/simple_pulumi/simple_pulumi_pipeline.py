@@ -146,6 +146,30 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             "src/bridge/lib/versions.py",
         ],
     ),
+    "bootcamps": SimplePulumiParams(
+        app_name="bootcamps",
+        pulumi_project_path="applications/bootcamps/",
+        stack_prefix="applications.bootcamps",
+        pulumi_project_name="ol-infrastructure-bootcamps-application",
+        additional_watched_paths=["src/bridge/lib/"],
+    ),
+    "celery-monitoring": SimplePulumiParams(
+        app_name="celery-monitoring",
+        pulumi_project_path="applications/celery_monitoring/",
+        stack_prefix="applications.celery_monitoring",
+        pulumi_project_name="ol-infrastructure-celery-monitoring-server",
+        docker_image=DockerImageConfig(
+            image_repository="kodhive/leek",
+            image_tag="0.7.5",  # Must match LEEK_VERSION in bridge.lib.versions
+        ),
+    ),
+    "clickhouse": SimplePulumiParams(
+        app_name="clickhouse",
+        pulumi_project_path="applications/clickhouse/",
+        stack_prefix="applications.clickhouse",
+        pulumi_project_name="ol-infrastructure-clickhouse-application",
+        stages=["CI", "QA", "Production"],
+    ),
     "data_warehouse": SimplePulumiParams(
         app_name="data_warehouse",
         pulumi_project_path="infrastructure/aws/data_warehouse/",
@@ -171,13 +195,6 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         stack_prefix="infrastructure.mongodb_atlas",
         deployment_groups=["mitx", "mitx-staging", "mitxonline", "xpro"],
     ),
-    "ocw-studio": SimplePulumiParams(
-        app_name="ocw-studio",
-        pulumi_project_path="applications/ocw_studio/",
-        stack_prefix="applications.ocw_studio",
-        pulumi_project_name="ol-infrastructure-ocw_studio-application",
-        additional_watched_paths=["src/bridge/secrets/ocw_studio/"],
-    ),
     "open-discussions": SimplePulumiParams(
         app_name="open-discussions",
         pulumi_project_path="applications/open_discussions/",
@@ -192,16 +209,6 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         stack_prefix="applications.open_metadata",
         additional_watched_paths=[
             "src/bridge/secrets/open_metadata/",
-            "src/bridge/lib/versions.py",
-        ],
-    ),
-    "qdrant-cloud": SimplePulumiParams(
-        app_name="qdrant-cloud",
-        pulumi_project_path="infrastructure/qdrant_cloud/",
-        stack_prefix="infrastructure.qdrant_cloud.mitlearn",
-        pulumi_project_name="ol-infrastructure-qdrant-cloud",
-        additional_watched_paths=[
-            "src/bridge/secrets/qdrant_cloud/",
             "src/bridge/lib/versions.py",
         ],
     ),
@@ -220,6 +227,16 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             "open",
             "open_metadata",
             "xpro",
+        ],
+    ),
+    "qdrant-cloud": SimplePulumiParams(
+        app_name="qdrant-cloud",
+        pulumi_project_path="infrastructure/qdrant_cloud/",
+        stack_prefix="infrastructure.qdrant_cloud.mitlearn",
+        pulumi_project_name="ol-infrastructure-qdrant-cloud",
+        additional_watched_paths=[
+            "src/bridge/secrets/qdrant_cloud/",
+            "src/bridge/lib/versions.py",
         ],
     ),
     "starrocks": SimplePulumiParams(
@@ -250,23 +267,6 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         stack_prefix="substructure.xpro_partner_dns",
         pulumi_project_name="ol-infrastructure-substructure-xpro-partner-dns",
         stages=[""],
-    ),
-    "bootcamps": SimplePulumiParams(
-        app_name="bootcamps",
-        pulumi_project_path="applications/bootcamps/",
-        stack_prefix="applications.bootcamps",
-        pulumi_project_name="ol-infrastructure-bootcamps-application",
-        additional_watched_paths=["src/bridge/lib/"],
-    ),
-    "celery-monitoring": SimplePulumiParams(
-        app_name="celery-monitoring",
-        pulumi_project_path="applications/celery_monitoring/",
-        stack_prefix="applications.celery_monitoring",
-        pulumi_project_name="ol-infrastructure-celery-monitoring-server",
-        docker_image=DockerImageConfig(
-            image_repository="kodhive/leek",
-            image_tag="0.7.5",  # Must match LEEK_VERSION in bridge.lib.versions
-        ),
     ),
 }
 
