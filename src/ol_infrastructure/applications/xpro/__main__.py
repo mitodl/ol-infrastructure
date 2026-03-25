@@ -533,7 +533,7 @@ if k8s_deploy:
             celery_worker_configs=[
                 OLApplicationK8sCeleryWorkerConfig(
                     application_name="mitxpro.celery:app",
-                    queue_name="default",
+                    worker_name="default",
                     redis_host=redis_cache.address,
                     redis_password=redis_config.require("password"),
                 ),
