@@ -122,6 +122,9 @@ stacks = [
     f"applications.mitxonline.{stack_info.name}",
     f"applications.mit_learn.{stack_info.name}",
     f"applications.learn_ai.{stack_info.name}",
+    f"applications.xpro.{stack_info.name}",
+    f"applications.ocw_studio.{stack_info.name}",
+    f"applications.micromasters.{stack_info.name}",
 ]
 
 redis_outputs: list[tuple[str, Output]] = []
