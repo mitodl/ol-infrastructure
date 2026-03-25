@@ -26,10 +26,10 @@ ol_inf_repo = git_repo(
     paths=["dockerfiles/dcind/"],
 )
 
-earthly_release = github_release(
-    name=Identifier("earthly-release-binary"),
-    owner="earthly",
-    repository="earthly",
+dagger_release = github_release(
+    name=Identifier("dagger-release-binary"),
+    owner="dagger",
+    repository="dagger",
     order_by="time",
 )
 
@@ -47,15 +47,15 @@ dcind_release_image = Resource(
 
 
 docker_pipeline = Pipeline(
-    resources=[ol_inf_repo, earthly_release, dcind_release_image],
+    resources=[ol_inf_repo, dagger_release, dcind_release_image],
     jobs=[
         Job(
             name=Identifier("build-and-publish-container"),
             plan=[
                 GetStep(get=ol_inf_repo.name, trigger=True),
-                GetStep(get=earthly_release.name, trigger=True),
+                GetStep(get=dagger_release.name, trigger=True),
                 TaskStep(
-                    task=Identifier("collect-earthly-version"),
+                    task=Identifier("collect-dagger-version"),
                     config=TaskConfig(
                         platform=Platform.linux,
                         image_resource=AnonymousResource(
@@ -65,15 +65,15 @@ docker_pipeline = Pipeline(
                                 "tag": "3",
                             },
                         ),
-                        inputs=[Input(name=earthly_release.name)],
+                        inputs=[Input(name=dagger_release.name)],
                         outputs=[
-                            Output(name=Identifier("earthly-version")),
+                            Output(name=Identifier("dagger-version")),
                         ],
                         run=Command(
                             path="sh",
                             args=[
                                 "-xc",
-                                f"""echo "EARTHLY_VERSION=$(cat {earthly_release.name}/tag)" > earthly-version/args_file;""",  # noqa: E501
+                                f"""echo "DAGGER_VERSION=$(cat {dagger_release.name}/tag)" > dagger-version/args_file;""",  # noqa: E501
                             ],
                         ),
                     ),
@@ -81,18 +81,18 @@ docker_pipeline = Pipeline(
                 container_build_task(
                     inputs=[
                         Input(name=ol_inf_repo.name),
-                        Input(name="earthly-version"),
+                        Input(name="dagger-version"),
                     ],
                     build_parameters={
                         "CONTEXT": f"{ol_inf_repo.name}/dockerfiles/dcind",
-                        "BUILD_ARGS_FILE": "earthly-version/args_file",
+                        "BUILD_ARGS_FILE": "dagger-version/args_file",
                     },
                 ),
                 PutStep(
                     put=dcind_release_image.name,
                     params={
                         "image": "image/image.tar",
-                        "additional_tags": (f"./{earthly_release.name}/version"),
+                        "additional_tags": (f"./{dagger_release.name}/version"),
                     },
                 ),
             ],
