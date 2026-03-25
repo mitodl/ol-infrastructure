@@ -73,7 +73,9 @@ docker_pipeline = Pipeline(
                             path="sh",
                             args=[
                                 "-xc",
-                                f"""echo "DAGGER_VERSION=$(cat {dagger_release.name}/tag)" > dagger-version/args_file;""",  # noqa: E501
+                                f"""echo "DAGGER_VERSION=$(cat {dagger_release.name}/tag | grep -Eo '[0-9]+\\.[0-9]+\\.[0-9]+')" > dagger-version/args_file;
+                                echo "$(cat {dagger_release.name}/tag | grep -Eo '[0-9]+\\.[0-9]+\\.[0-9]+')" > dagger-version/tag_file;
+                                """,  # noqa: E501
                             ],
                         ),
                     ),
@@ -90,9 +92,10 @@ docker_pipeline = Pipeline(
                 ),
                 PutStep(
                     put=dcind_release_image.name,
+                    inputs="detect",
                     params={
                         "image": "image/image.tar",
-                        "additional_tags": (f"./{dagger_release.name}/version"),
+                        "additional_tags": ("./dagger-version/tag_file"),
                     },
                 ),
             ],
