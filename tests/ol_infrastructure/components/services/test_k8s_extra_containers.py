@@ -5,6 +5,10 @@ This module verifies:
 2. OLApplicationK8sCeleryBeatConfig.application_name is propagated correctly
 3. Default values and simple overrides on OLApplicationK8s*Config data models
    behave as expected
+4. validate_no_duplicate_metrics_port catches all three duplication paths:
+   - extra_container_ports with name='metrics' or same port number
+   - extra_sidecar_containers with name='metrics' or same port number
+   - application_port == metrics_port
 
 Note:
     These tests operate at the configuration/model level and do not instantiate
@@ -37,6 +41,8 @@ class K8sMocks(pulumi.runtime.Mocks):
 pulumi.runtime.set_mocks(K8sMocks())
 
 import pulumi_kubernetes as kubernetes  # noqa: E402
+import pytest  # noqa: E402
+from pydantic import ValidationError  # noqa: E402
 
 from ol_infrastructure.components.services.k8s import (  # noqa: E402
     GranianConfig,
@@ -381,3 +387,175 @@ def test_celery_beat_uses_custom_application_name():
     # is sufficient for unit testing this path.
     assert beat_cfg.application_name == "lms.celery:app"
     assert beat_cfg.application_name != "main.celery:app"
+
+
+# ─── validate_no_duplicate_metrics_port ────────────────────────────────────────
+# Gap 1: extra_container_ports conflicts
+
+
+def test_extra_container_ports_named_metrics_raises():
+    """Clashes: extra_container_ports name='metrics' vs auto-added granian port."""
+    with pytest.raises(ValidationError, match="port named 'metrics'"):
+        _base_config(
+            granian_config=GranianConfig(application_module="app.wsgi:application"),
+            extra_container_ports=[
+                kubernetes.core.v1.ContainerPortArgs(
+                    name="metrics", container_port=9090
+                )
+            ],
+        )
+
+
+def test_extra_container_ports_same_number_raises():
+    """Clashes: extra_container_ports with same port number, different name."""
+    with pytest.raises(ValidationError, match="container_port=9090"):
+        _base_config(
+            granian_config=GranianConfig(application_module="app.wsgi:application"),
+            extra_container_ports=[
+                kubernetes.core.v1.ContainerPortArgs(
+                    name="prometheus", container_port=9090
+                )
+            ],
+        )
+
+
+def test_extra_container_ports_different_port_ok():
+    """extra_container_ports with a different port number is fine."""
+    cfg = _base_config(
+        granian_config=GranianConfig(application_module="app.wsgi:application"),
+        extra_container_ports=[
+            kubernetes.core.v1.ContainerPortArgs(name="debug", container_port=5678)
+        ],
+    )
+    assert len(cfg.extra_container_ports) == 1
+
+
+def test_extra_container_ports_no_granian_ok():
+    """extra_container_ports with any port is fine when granian_config is None."""
+    cfg = _base_config(
+        granian_config=None,
+        extra_container_ports=[
+            kubernetes.core.v1.ContainerPortArgs(name="metrics", container_port=9090)
+        ],
+    )
+    assert len(cfg.extra_container_ports) == 1
+
+
+def test_extra_container_ports_metrics_disabled_ok():
+    """extra_container_ports with name='metrics' is fine when enable_metrics=False."""
+    cfg = _base_config(
+        granian_config=GranianConfig(
+            application_module="app.wsgi:application", enable_metrics=False
+        ),
+        extra_container_ports=[
+            kubernetes.core.v1.ContainerPortArgs(name="metrics", container_port=9090)
+        ],
+    )
+    assert len(cfg.extra_container_ports) == 1
+
+
+# Gap 2: extra_sidecar_containers conflicts
+
+
+def test_sidecar_with_metrics_name_raises():
+    """Clashes: sidecar port named 'metrics' duplicates the granian metrics port."""
+    sidecar_with_metrics = kubernetes.core.v1.ContainerArgs(
+        name="vector",
+        image="timberio/vector:latest-alpine",
+        ports=[
+            kubernetes.core.v1.ContainerPortArgs(name="metrics", container_port=9090)
+        ],
+    )
+    with pytest.raises(ValidationError, match="port named 'metrics'"):
+        _base_config(
+            granian_config=GranianConfig(application_module="app.wsgi:application"),
+            extra_sidecar_containers=[sidecar_with_metrics],
+        )
+
+
+def test_sidecar_with_same_port_number_raises():
+    """Clashes: sidecar container_port==metrics_port duplicates port across the pod."""
+    sidecar_with_9090 = kubernetes.core.v1.ContainerArgs(
+        name="exporter",
+        image="prom/node-exporter:latest",
+        ports=[
+            kubernetes.core.v1.ContainerPortArgs(
+                name="prom-metrics", container_port=9090
+            )
+        ],
+    )
+    with pytest.raises(ValidationError, match="container_port=9090"):
+        _base_config(
+            granian_config=GranianConfig(application_module="app.wsgi:application"),
+            extra_sidecar_containers=[sidecar_with_9090],
+        )
+
+
+def test_sidecar_with_different_port_ok():
+    """A sidecar with a different port number is fine."""
+    sidecar = kubernetes.core.v1.ContainerArgs(
+        name="vector",
+        image="timberio/vector:latest-alpine",
+        ports=[
+            kubernetes.core.v1.ContainerPortArgs(name="vector-api", container_port=8686)
+        ],
+    )
+    cfg = _base_config(
+        granian_config=GranianConfig(application_module="app.wsgi:application"),
+        extra_sidecar_containers=[sidecar],
+    )
+    assert len(cfg.extra_sidecar_containers) == 1
+
+
+def test_sidecar_without_ports_ok():
+    """The edxapp vector sidecar (no ports declared) must not trigger validation."""
+    vector_sidecar = kubernetes.core.v1.ContainerArgs(
+        name="vector",
+        image="timberio/vector:0.34.1-alpine",
+    )
+    cfg = _base_config(
+        granian_config=GranianConfig(
+            application_module="lms.wsgi:application", port=8000
+        ),
+        extra_sidecar_containers=[vector_sidecar],
+    )
+    assert len(cfg.extra_sidecar_containers) == 1
+
+
+# Gap 3: application_port == metrics_port
+
+
+def test_application_port_equals_metrics_port_raises():
+    """Clashes: application_port==metrics_port causes duplicate port numbers.
+
+    Both ports land on the main container.
+    """
+    with pytest.raises(ValidationError, match="application_port=9090"):
+        _base_config(
+            granian_config=GranianConfig(
+                application_module="app.wsgi:application", metrics_port=9090
+            ),
+            application_port=9090,
+        )
+
+
+def test_application_port_differs_from_metrics_port_ok():
+    """application_port different from metrics_port is fine."""
+    cfg = _base_config(
+        granian_config=GranianConfig(
+            application_module="app.wsgi:application", port=8000, metrics_port=9090
+        ),
+        application_port=8000,
+    )
+    assert cfg.application_port == 8000
+
+
+def test_application_port_none_ok():
+    """application_port=None never triggers the application_port==metrics_port check."""
+    cfg = _base_config(
+        granian_config=GranianConfig(
+            application_module="app.wsgi:application", metrics_port=9090
+        ),
+        application_port=None,
+    )
+    assert cfg.application_port is None
