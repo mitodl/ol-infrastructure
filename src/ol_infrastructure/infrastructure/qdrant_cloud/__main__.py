@@ -44,6 +44,11 @@ desired_package_name = qdrant_cloud_config.get("desired_package_name") or "mx2"
 # is represented by one entry in the package's available_additional_resources.
 desired_disk_gib = qdrant_cloud_config.get_int("desired_disk_gib")
 
+# Optional target total RAM per node in GiB. When set to a value larger than
+# the base package RAM, additional memory slabs are requested via
+# resource_configurations (the "memory slider" in the Qdrant Cloud UI).
+desired_ram_gib = qdrant_cloud_config.get_int("desired_ram_gib")
+
 booking_result = qdrant_cloud.get_booking_packages(
     cloud_provider=cloud_provider,
     cloud_region=cloud_region,
@@ -82,27 +87,59 @@ def _parse_gib(quantity: str) -> int:
 
 package = _find_package(booking_result.packages, desired_package_name)
 
-# Build optional additional-disk resource_configurations.
+# Build optional additional resource_configurations for disk and/or RAM.
 # Each entry in available_additional_resources represents one slider step;
-# the amount we pass is how many GiB above the base package disk we want.
-node_resource_configurations = None
-if desired_disk_gib is not None and package.resource_configurations:
-    base_disk_gib = _parse_gib(package.resource_configurations[0].disk)
-    effective_disk_gib = desired_disk_gib - base_disk_gib
-    if effective_disk_gib > base_disk_gib:
-        if not package.available_additional_resources:
-            msg = (
-                f"Package {desired_package_name!r} does not support additional "
-                "disk storage (no available_additional_resources)."
+# the amount we pass is how many GiB above the base package value we want.
+node_resource_configurations: (
+    list[
+        qdrant_cloud.AccountsClusterConfigurationNodeConfigurationResourceConfigurationArgs
+    ]
+    | None
+) = None
+
+if package.resource_configurations:
+    extra_resources: list[
+        qdrant_cloud.AccountsClusterConfigurationNodeConfigurationResourceConfigurationArgs
+    ] = []
+
+    if desired_disk_gib is not None:
+        base_disk_gib = _parse_gib(package.resource_configurations[0].disk)
+        effective_disk_gib = desired_disk_gib - base_disk_gib
+        if effective_disk_gib > 0:
+            if not package.available_additional_resources:
+                msg = (
+                    f"Package {desired_package_name!r} does not support additional "
+                    "disk storage (no available_additional_resources)."
+                )
+                raise ValueError(msg)
+            extra_resources.append(
+                qdrant_cloud.AccountsClusterConfigurationNodeConfigurationResourceConfigurationArgs(
+                    amount=effective_disk_gib,
+                    resource_type="disk",
+                    resource_unit="Gi",
+                )
             )
-            raise ValueError(msg)
-        node_resource_configurations = [
-            qdrant_cloud.AccountsClusterConfigurationNodeConfigurationResourceConfigurationArgs(
-                amount=effective_disk_gib,
-                resource_type="disk",
-                resource_unit="Gi",
+
+    if desired_ram_gib is not None:
+        base_ram_gib = _parse_gib(package.resource_configurations[0].ram)
+        effective_ram_gib = desired_ram_gib - base_ram_gib
+        if effective_ram_gib > 0:
+            if not package.available_additional_resources:
+                msg = (
+                    f"Package {desired_package_name!r} does not support additional "
+                    "RAM (no available_additional_resources)."
+                )
+                raise ValueError(msg)
+            extra_resources.append(
+                qdrant_cloud.AccountsClusterConfigurationNodeConfigurationResourceConfigurationArgs(
+                    amount=effective_ram_gib,
+                    resource_type="ram",
+                    resource_unit="Gi",
+                )
             )
-        ]
+
+    if extra_resources:
+        node_resource_configurations = extra_resources
 
 storage_type_map = {
     "balanced": qdrant_cloud.AccountsClusterConfigurationDatabaseConfigurationStorageArgs(  # noqa: E501
