@@ -45,7 +45,7 @@ def truncate_k8s_metanames(name: str) -> str:
 class OLApplicationK8sCeleryWorkerConfig(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     application_name: str = "main.celery:app"
-    queue_name: str
+    queue_name: str | None = None
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "FATAL"] = (
         "INFO"
     )
@@ -64,6 +64,15 @@ class OLApplicationK8sCeleryWorkerConfig(BaseModel):
     run_beat: bool = (
         False  # Deprecated: use celery_beat_config on OLApplicationK8sConfig instead
     )
+
+    @property
+    def worker_name(self) -> str:
+        """Return the worker's identifying name for K8s resources and KEDA scaling.
+
+        Falls back to "celery" (Celery's default queue name) when queue_name is
+        not set, so the worker consumes from the default queue without -Q filtering.
+        """
+        return self.queue_name or "celery"
 
 
 class OLApplicationK8sCeleryBeatConfig(BaseModel):
@@ -341,14 +350,14 @@ class OLApplicationK8sConfig(BaseModel):
     def validate_beat_config(self) -> "OLApplicationK8sConfig":
         beat_workers = [w for w in self.celery_worker_configs if w.run_beat]
         if self.celery_beat_config is not None and beat_workers:
-            names = ", ".join(w.queue_name for w in beat_workers)
+            names = ", ".join(w.worker_name for w in beat_workers)
             msg = (
                 f"celery_beat_config is set but worker(s) '{names}' also have "
                 "run_beat=True. Use celery_beat_config exclusively."
             )
             raise ValueError(msg)
         if len(beat_workers) > 1:
-            names = ", ".join(w.queue_name for w in beat_workers)
+            names = ", ".join(w.worker_name for w in beat_workers)
             msg = (
                 f"Only one worker may have run_beat=True, but found: '{names}'. "
                 "Multiple beat schedulers will corrupt the RedBeat schedule in Redis."
@@ -1564,7 +1573,7 @@ class OLApplicationK8s(ComponentResource):
                 ),
                 # This is important!
                 # Every type of worker needs a unique set of labels or the pod selectors will break.
-                "ol.mit.edu/worker-name": celery_worker_config.queue_name,
+                "ol.mit.edu/worker-name": celery_worker_config.worker_name,
             }
 
             # Add Slack channel label if specified
@@ -1574,12 +1583,12 @@ class OLApplicationK8s(ComponentResource):
                 )
 
             _celery_deployment_name = truncate_k8s_metanames(
-                f"{ol_app_k8s_config.application_name}-{celery_worker_config.queue_name}-celery-worker".replace(
+                f"{ol_app_k8s_config.application_name}-{celery_worker_config.worker_name}-celery-worker".replace(
                     "_", "-"
                 )
             )
             _celery_deployment = kubernetes.apps.v1.Deployment(
-                f"{ol_app_k8s_config.application_name}-celery-worker-{celery_worker_config.queue_name}-{stack_info.env_suffix}",
+                f"{ol_app_k8s_config.application_name}-celery-worker-{celery_worker_config.worker_name}-{stack_info.env_suffix}",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
                     name=_celery_deployment_name,
                     namespace=ol_app_k8s_config.application_namespace,
@@ -1626,8 +1635,14 @@ class OLApplicationK8s(ComponentResource):
                                         celery_worker_config.application_name,
                                         "worker",  # COMMAND
                                         "-E",  # send task-related events for monitoring
-                                        "-Q",  # queue name
-                                        celery_worker_config.queue_name,
+                                        *(
+                                            [
+                                                "-Q",  # queue name filter
+                                                celery_worker_config.queue_name,
+                                            ]
+                                            if celery_worker_config.queue_name
+                                            else []
+                                        ),
                                         *(
                                             [
                                                 "-B",  # beat scheduler - only on one worker to avoid multiple competing schedulers
@@ -1673,7 +1688,7 @@ class OLApplicationK8s(ComponentResource):
             )
 
             _celery_scaled_object = kubernetes.apiextensions.CustomResource(
-                f"{ol_app_k8s_config.application_name}-celery-worker-{celery_worker_config.queue_name}-{stack_info.env_suffix}-scaledobject",
+                f"{ol_app_k8s_config.application_name}-celery-worker-{celery_worker_config.worker_name}-{stack_info.env_suffix}-scaledobject",
                 api_version="keda.sh/v1alpha1",
                 kind="ScaledObject",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -1722,7 +1737,7 @@ class OLApplicationK8s(ComponentResource):
                                     ].redis_password,
                                     "listName": deployment_info[
                                         "celery_config"
-                                    ].queue_name,
+                                    ].worker_name,
                                     "listLength": str(
                                         deployment_info[
                                             "celery_config"
