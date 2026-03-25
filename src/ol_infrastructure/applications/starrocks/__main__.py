@@ -4,7 +4,8 @@ from pathlib import Path
 from typing import Any, cast
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, ResourceOptions, StackReference
+from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi_aws import iam
 
 from bridge.lib.versions import STARROCKS_CHART_VERSION
 from ol_infrastructure.components.applications.eks import (
@@ -119,6 +120,9 @@ starrocks_auth_binding = OLEKSAuthBinding(
         irsa_service_account_name="starrocks",
         vault_sync_service_account_names=["starrocks-vault"],
         k8s_labels=k8s_app_labels,
+        # Pre-create the SA so the IRSA role-ARN annotation is present before the
+        # StarRocks operator starts and assigns this SA to FE/CN/BE pods.
+        create_irsa_service_account=True,
     )
 )
 
@@ -153,6 +157,41 @@ if starrocks_config.get_bool("oidc_enabled"):
         ),
     )
 
+# Iceberg catalog integration via AWS Glue
+# When enabled, the IRSA role is granted the data-lake query-engine policy so that
+# StarRocks FE/CN pods (which use the annotated "starrocks" service account) can call
+# the Glue Data Catalog API and read Iceberg data from the corresponding S3 buckets.
+#
+# After deploying, create the catalog in StarRocks by running the SQL exported as
+# the "iceberg_catalog_sql" stack output (e.g. via the FE MySQL-compatible port 9030).
+if starrocks_config.get_bool("enable_data_lake_integration"):
+    aws_region = starrocks_config.get("aws_region") or "us-east-1"
+    data_warehouse_stack = StackReference(
+        f"infrastructure.aws.data_warehouse.{stack_info.name}"
+    )
+    iam.RolePolicyAttachment(
+        f"starrocks-data-lake-policy-{stack_info.env_suffix}",
+        policy_arn=data_warehouse_stack.require_output(
+            "data_lake_query_engine_iam_policy_arn"
+        ),
+        role=starrocks_auth_binding.irsa_role.name,
+        opts=ResourceOptions(parent=starrocks_auth_binding),
+    )
+    export(
+        "iceberg_catalog_sql",
+        # Uses instance-profile auth: the IRSA credentials injected into the pod by
+        # the EKS pod-identity webhook act as the "instance profile" for Glue and S3.
+        f"""CREATE EXTERNAL CATALOG ol_data_lake_iceberg
+COMMENT 'MIT OL Data Lake Iceberg Catalog (AWS Glue / {stack_info.env_suffix})'
+PROPERTIES(
+    "type" = "iceberg",
+    "iceberg.catalog.type" = "glue",
+    "aws.glue.use_instance_profile" = "true",
+    "aws.glue.region" = "{aws_region}",
+    "aws.s3.use_instance_profile" = "true",
+    "aws.s3.region" = "{aws_region}"
+);""",
+    )
 
 if starrocks_config.get_bool("use_be") and starrocks_config.get_bool("use_cn"):
     msg = (
@@ -288,7 +327,8 @@ starrocks_release = kubernetes.helm.v3.Release(
         values=starrocks_values,
     ),
     opts=ResourceOptions(
-        delete_before_replace=True, depends_on=[starrocks_root_password_secret]
+        delete_before_replace=True,
+        depends_on=[starrocks_root_password_secret, starrocks_auth_binding],
     ),
 )
 

@@ -31,3 +31,4 @@ config:
     cpu_request: 1000m
     memory_request: 8Gi
     memory_limit: 8Gi
+  starrocks:enable_data_lake_integration: "true"
