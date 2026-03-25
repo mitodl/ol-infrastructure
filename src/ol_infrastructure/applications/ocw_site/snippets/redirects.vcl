@@ -1,6 +1,7 @@
 declare local var.location STRING;
 declare local var.status INTEGER;
 declare local var.last_path_part STRING;
+declare local var.full_path STRING;
 
 # Perform redirects with dictionary lookups
 declare local var.redirect STRING;
@@ -22,18 +23,18 @@ if (var.redirect ~ "^\s*?([0-9]{3})\|([^|]*)\|(.*)$") {
   set var.location = regsub(var.location, "{{PMUSER_PATH}}", "");
 
 
-  error 307 var.location;
+  error var.status var.location;
 }
 
 # Redirect bare directory names to add a trailing slash
 if (req.url.path !~ "^/static" && req.url.path ~ "/([^/]+)$") {               // ends with non-slash character
   set var.last_path_part = re.group.1;
   if (var.last_path_part !~ "\.[a-zA-Z0-9]+$") {  // is directory, not file w. extension
-    set req.http.slash_header = req.url.path + "/";
+    set var.full_path = req.protocol + "://" + req.http.host + req.url.path + "/";
     if (std.strlen(req.url.qs) > 0) {
-      set req.http.slash_header = req.http.slash_header + "?" + req.url.qs;
+      set var.full_path = var.full_path + "?" + req.url.qs;
     }
-    error 301 req.http.slash_header;
+    error 301 var.full_path;
   }
 }
 
