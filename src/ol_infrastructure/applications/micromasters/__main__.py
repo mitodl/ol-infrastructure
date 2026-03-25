@@ -1178,7 +1178,7 @@ if micromasters_config.get_bool("deploy_k8s"):
         dictionaries=[],
         domains=[
             fastly.ServiceVclDomainArgs(
-                comment=f"MicroMasters {stack_info.env_prefix} {stack_info.env_suffix}",
+                comment=f"MicroMasters {stack_info.name}",
                 name=domain,
             )
             for domain in fastly_domains
@@ -1284,7 +1284,7 @@ if micromasters_config.get_bool("deploy_k8s"):
 
 
 export(
-    "micromasters_app",
+    "micromasters",
     {
         "redis": redis_cache.address,
         "redis_token": redis_cache.cache_cluster.auth_token,

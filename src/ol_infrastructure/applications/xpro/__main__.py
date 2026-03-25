@@ -970,7 +970,7 @@ route53.Record(
 )
 
 export(
-    "xpro_app",
+    "xpro",
     {
         "redis": redis_cache.address,
         "redis_token": redis_cache.cache_cluster.auth_token,
