@@ -46,6 +46,7 @@ class OLApplicationK8sCeleryWorkerConfig(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     application_name: str = "main.celery:app"
     queue_name: str | None = None
+    worker_name: str | None = None
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "FATAL"] = (
         "INFO"
     )
@@ -65,14 +66,29 @@ class OLApplicationK8sCeleryWorkerConfig(BaseModel):
         False  # Deprecated: use celery_beat_config on OLApplicationK8sConfig instead
     )
 
-    @property
-    def worker_name(self) -> str:
-        """Return the worker's identifying name for K8s resources and KEDA scaling.
+    @field_validator("queue_name", "worker_name")
+    @classmethod
+    def validate_non_empty(cls, v: str | None) -> str | None:
+        if v is not None and not v.strip():
+            msg = "must be None or a non-empty, non-whitespace string"
+            raise ValueError(msg)
+        return v
 
-        Falls back to "celery" (Celery's default queue name) when queue_name is
-        not set, so the worker consumes from the default queue without -Q filtering.
+    @model_validator(mode="after")
+    def resolve_worker_name(self) -> "OLApplicationK8sCeleryWorkerConfig":
+        """Derive worker_name from queue_name if not explicitly set.
+
+        worker_name drives K8s resource names, pod labels, and the KEDA Redis
+        listName.  queue_name drives the -Q CLI flag passed to the celery worker.
+        Keeping them separate allows a worker to consume from all queues (no -Q)
+        while still scaling on a specific Redis list.
         """
-        return self.queue_name or "celery"
+        if self.worker_name is None:
+            if self.queue_name is None:
+                msg = "At least one of 'queue_name' or 'worker_name' must be set"
+                raise ValueError(msg)
+            self.worker_name = self.queue_name
+        return self
 
 
 class OLApplicationK8sCeleryBeatConfig(BaseModel):
@@ -350,14 +366,14 @@ class OLApplicationK8sConfig(BaseModel):
     def validate_beat_config(self) -> "OLApplicationK8sConfig":
         beat_workers = [w for w in self.celery_worker_configs if w.run_beat]
         if self.celery_beat_config is not None and beat_workers:
-            names = ", ".join(w.worker_name for w in beat_workers)
+            names = ", ".join(w.worker_name or "" for w in beat_workers)
             msg = (
                 f"celery_beat_config is set but worker(s) '{names}' also have "
                 "run_beat=True. Use celery_beat_config exclusively."
             )
             raise ValueError(msg)
         if len(beat_workers) > 1:
-            names = ", ".join(w.worker_name for w in beat_workers)
+            names = ", ".join(w.worker_name or "" for w in beat_workers)
             msg = (
                 f"Only one worker may have run_beat=True, but found: '{names}'. "
                 "Multiple beat schedulers will corrupt the RedBeat schedule in Redis."
