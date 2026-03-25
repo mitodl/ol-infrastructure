@@ -129,7 +129,7 @@ class GranianConfig(BaseModel):
     backlog: PositiveInt | None = 128
     log_level: str = "warning"
     application_module: str = "main.wsgi:application"
-    enable_metrics: bool = False
+    enable_metrics: bool = True
     metrics_port: Annotated[int, Field(ge=1, le=65535)] = 9090
     metrics_scrape_interval: PositiveInt = 30
     nginx_config_filename: str = "web.conf_granian"
@@ -561,22 +561,80 @@ class OLApplicationK8sConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_no_duplicate_metrics_port(self) -> "OLApplicationK8sConfig":
-        """Raise an error if a caller-supplied extra_container_ports entry clashes.
+        """Raise an error if any caller-supplied port configuration clashes with the
+        auto-generated granian metrics port.
 
         When granian_config.enable_metrics=True the component automatically adds
-        a port named 'metrics'. A duplicate from extra_container_ports would cause
-        Kubernetes to reject the pod spec.
+        ContainerPortArgs(name='metrics', container_port=metrics_port) to the main
+        application container. Three independent paths can produce a duplicate:
+
+        1. extra_container_ports has an entry with name='metrics' or
+           container_port==metrics_port — both entries land on the same container.
+        2. extra_sidecar_containers has a container that declares a port with
+           name='metrics' or container_port==metrics_port — the same port number
+           (or name) then appears on two containers in the same pod.
+        3. application_port==metrics_port — the unnamed application port and the
+           named metrics port share the same number on the main container.
+
+        In all three cases Kubernetes emits a duplicate-containerPort warning (or
+        rejects the pod spec for name conflicts).
         """
         gc = self.granian_config
-        if gc is not None and gc.enable_metrics:
-            for port_arg in self.extra_container_ports:
+        if gc is None or not gc.enable_metrics:
+            return self
+
+        mport = gc.metrics_port
+
+        # --- Gap 1: extra_container_ports (same container as metrics port) ---
+        for port_arg in self.extra_container_ports:
+            if getattr(port_arg, "name", None) == "metrics":
+                msg = (
+                    "extra_container_ports already contains a port named 'metrics'. "
+                    "Remove it from extra_container_ports — the metrics port is "
+                    "added automatically when granian_config.enable_metrics=True."
+                )
+                raise ValueError(msg)
+            if getattr(port_arg, "container_port", None) == mport:
+                msg = (
+                    f"extra_container_ports contains a port with container_port={mport}, "
+                    f"which conflicts with the auto-generated granian metrics port "
+                    f"(granian_config.metrics_port={mport}). "
+                    "Use a different port number or set granian_config.enable_metrics=False."
+                )
+                raise ValueError(msg)
+
+        # --- Gap 2: extra_sidecar_containers (different container, same pod) ---
+        for sidecar in self.extra_sidecar_containers:
+            for port_arg in getattr(sidecar, "ports", None) or []:
                 if getattr(port_arg, "name", None) == "metrics":
                     msg = (
-                        "extra_container_ports already contains a port named 'metrics'. "
-                        "Remove it from extra_container_ports — the metrics port is "
-                        "added automatically when granian_config.enable_metrics=True."
+                        f"Sidecar container '{getattr(sidecar, 'name', '<unknown>')}' "
+                        "declares a port named 'metrics', which duplicates the "
+                        "auto-generated granian metrics port name in the same pod. "
+                        "Rename the sidecar port or set granian_config.enable_metrics=False."
                     )
                     raise ValueError(msg)
+                if getattr(port_arg, "container_port", None) == mport:
+                    msg = (
+                        f"Sidecar container '{getattr(sidecar, 'name', '<unknown>')}' "
+                        f"declares container_port={mport}, which duplicates the "
+                        f"auto-generated granian metrics port (granian_config.metrics_port={mport}) "
+                        "across containers in the same pod. "
+                        "Use a different port number or set granian_config.enable_metrics=False."
+                    )
+                    raise ValueError(msg)
+
+        # --- Gap 3: application_port==metrics_port (same container) ---
+        if self.application_port is not None and self.application_port == mport:
+            msg = (
+                f"application_port={self.application_port} is the same as "
+                f"granian_config.metrics_port={mport}. "
+                "The component would declare two containerPorts with the same number "
+                "on the main application container. "
+                "Change application_port or granian_config.metrics_port so they differ."
+            )
+            raise ValueError(msg)
+
         return self
 
 
