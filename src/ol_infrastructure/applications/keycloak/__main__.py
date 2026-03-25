@@ -466,7 +466,6 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
                 "value": "true",
             },
             {"name": "metrics-enabled", "value": "true"},
-            {"name": "event-metrics-user-enabled", "value": "true"},
             {
                 "name": "spi-realm-restapi-extension-scim-admin-url-check",
                 "value": "no-context-path",
