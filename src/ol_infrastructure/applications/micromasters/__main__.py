@@ -1003,7 +1003,7 @@ if micromasters_config.get_bool("deploy_k8s"):
         csrf_trusted_origins.append("https://micromasters.mit.edu")
     k8s_env_vars.update(
         {
-            "CSRF_TRUSTED_ORIGINS": ",".join(csrf_trusted_origins),
+            "CSRF_TRUSTED_ORIGINS": json.dumps(csrf_trusted_origins),
             "SECURE_PROXY_SSL_HEADER": "HTTP_X_FORWARDED_PROTO,https",
         }
     )
