@@ -61,7 +61,7 @@ def zone_opts(domain: str) -> pulumi.ResourceOptions:
         return pulumi.ResourceOptions()
 
     zone = zones[0]
-    if zone["Name"] == domain:
+    if zone["Name"].rstrip(".") == domain:
         zone_id = zone["Id"].split("/")[
             -1
         ]  # 'Id' attribute is of the form /hostedzone/<ZONE_ID>
