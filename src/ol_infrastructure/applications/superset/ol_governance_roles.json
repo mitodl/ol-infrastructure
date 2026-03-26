@@ -1054,6 +1054,22 @@
       },
       {
         "permission": {
+          "name": "can_share_dashboard"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_share_chart"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
           "name": "can_recent_activity"
         },
         "view_menu": {
