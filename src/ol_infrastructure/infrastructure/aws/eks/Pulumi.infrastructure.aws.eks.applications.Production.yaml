@@ -28,9 +28,10 @@ config:
   - courses-backend.learn.mit.edu
   - courses-backend.xpro.mit.edu
   - dcc.learn.mit.edu
+  - micromasters-backend.odl.mit.edu
   - nb.learn.mit.edu
-  - preview.xpro.mit.edu
   - preview-backend.learn.mit.edu
+  - preview.xpro.mit.edu
   - studio-backend.learn.mit.edu
   - studio-backend.xpro.mit.edu
   - tika-production.ol.mit.edu

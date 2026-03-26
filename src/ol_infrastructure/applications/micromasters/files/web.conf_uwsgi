@@ -34,6 +34,7 @@ server {
         uwsgi_pass_request_headers on;
         uwsgi_pass_request_body on;
         uwsgi_ignore_client_abort on;
+        uwsgi_param HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto;
         client_max_body_size 25M;
     }
 }
