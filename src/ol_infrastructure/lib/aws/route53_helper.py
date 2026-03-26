@@ -72,7 +72,7 @@ def zone_opts(domain: str) -> pulumi.ResourceOptions:
             opts = pulumi.ResourceOptions()
         else:
             opts = pulumi.ResourceOptions(
-                import_=zone_id, ignore_changes=["tags", "comment"]
+                import_=zone_id, ignore_changes=["tags", "tagsAll", "comment"]
             )
             if not pulumi.runtime.is_dry_run():
                 route53_client.change_tags_for_resource(
