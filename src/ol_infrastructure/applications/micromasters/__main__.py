@@ -1171,7 +1171,6 @@ if micromasters_config.get_bool("deploy_k8s"):
             fastly.ServiceVclBackendArgs(
                 address=backend_domain,
                 name="micromasters_backend",
-                override_host=backend_domain,
                 port=DEFAULT_HTTPS_PORT,
                 ssl_cert_hostname=backend_domain,
                 ssl_sni_hostname=backend_domain,
