@@ -178,7 +178,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                                     THEME_DIR="../{theme_git_resource.name}"
                                     PYTHON_VERSION="{edx_platform.runtime_version}"
                                     NODE_VERSION="((.:node_version))"
-                                    DAGGER_LOG_LEVEL=debug dagger call build-platform --deployment-name $DEPLOYMENT_NAME --release-name $RELEASE_NAME --pip-package-lists ./pip_package_lists --pip-package-overrides ./pip_package_overrides --custom-settings ./settings --source $EDX_PLATFORM_DIR --theme-source $THEME_DIR --node-version $NODE_VERSION --python-version $PYTHON_VERSION --export ../artifacts/image.tar;""",
+                                    DAGGER_LOG_LEVEL=debug dagger call build-platform --deployment-name $DEPLOYMENT_NAME --release-name $RELEASE_NAME --pip-package-lists ./pip_package_lists --pip-package-overrides ./pip_package_overrides --custom-settings ./settings --source $EDX_PLATFORM_DIR --theme-source $THEME_DIR --node-version $NODE_VERSION --python-version $PYTHON_VERSION export --path ../artifacts/image.tar;""",
                                 ],
                             ),
                         ),
