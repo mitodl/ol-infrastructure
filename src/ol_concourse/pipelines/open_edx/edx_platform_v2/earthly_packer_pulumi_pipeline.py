@@ -153,6 +153,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                             platform=Platform.linux,
                             image_resource=AnonymousResource(
                                 type="registry-image",
+                                # Use 0.20.3 for a dcind that runs dagger.io
                                 source={"repository": "mitodl/dcind", "tag": "0.8.16"},
                             ),
                             # Use some cleverness with path to mount resources within
