@@ -153,7 +153,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                             platform=Platform.linux,
                             image_resource=AnonymousResource(
                                 type="registry-image",
-                                source={"repository": "mitodl/dcind", "tag": "0.20.3"},
+                                source={"repository": "mitodl/dcind", "tag": "0.8.16"},
                             ),
                             # Use some cleverness with path to mount resources within
                             # the earthly git resource so code is where the Earthfile
@@ -183,6 +183,8 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                                     earthly +all --DEPLOYMENT_NAME="$DEPLOYMENT_NAME" --RELEASE_NAME="$RELEASE_NAME" --EDX_PLATFORM_DIR="$EDX_PLATFORM_DIR" --THEME_DIR="$THEME_DIR" --PYTHON_VERSION="$PYTHON_VERSION" --NODE_VERSION="$NODE_VERSION";
                                     DIGEST=$(docker inspect --format '{{{{.Id}}}}' mitodl/edxapp-$DEPLOYMENT_NAME-$RELEASE_NAME | cut -d ":" -f2);
                                     echo "Saving docker image to tar file in the artifacts directory";
+                                    # Check disk usage before build to help with debugging potential issues in CI
+                                    df -h; docker system df;
                                     docker save -o ../../../artifacts/image.tar $DIGEST;""",
                                 ],
                             ),
