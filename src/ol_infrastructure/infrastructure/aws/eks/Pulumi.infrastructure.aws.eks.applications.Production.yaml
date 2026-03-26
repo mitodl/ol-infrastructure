@@ -38,7 +38,7 @@ config:
   - video.odl.mit.edu
   eks:apisix_min_replicas: '5'
   eks:apisix_max_replicas: '10'
-  eks:apisix_memory: 1000Mi
+  eks:apisix_memory: 1500Mi
   eks:developer_role_policy_name: AmazonEKSClusterAdminPolicy
   eks:developer_role_kubernetes_groups:
   - admin
