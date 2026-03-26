@@ -152,7 +152,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                                 type="registry-image",
                                 source={
                                     "repository": "mitodl/dcind",
-                                    "tag": "v0.20.3",
+                                    "tag": "0.20.3",
                                 },
                             ),
                             # Use some cleverness with path to mount resources within
