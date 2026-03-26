@@ -26,7 +26,7 @@ pipeline_code = git_repo(
 def build_meta_job(pipeline_name: str):
     if pipeline_name == "meta":
         pipeline_definition_path = (
-            "src/ol_concourse/pipelines/open_edx/edx_platform_v2/meta.py"
+            "src/ol_concourse/pipelines/open_edx/edx_platform_v3/meta.py"
         )
         pipeline_team = "main"
         pipeline_id = "self"

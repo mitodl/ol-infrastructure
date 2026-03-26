@@ -267,7 +267,7 @@ if __name__ == "__main__":
         {
             "\n",
             (
-                "fly -t pr-inf set-pipeline -p docker-pulumi-edxapp-global -c"
+                "fly -t pr-inf set-pipeline -p dagger-pulumi-edxapp-global -c"
                 " definition.json"
             ),
         }
