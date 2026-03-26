@@ -2362,6 +2362,22 @@
       },
       {
         "permission": {
+          "name": "can_share_dashboard"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_share_chart"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
           "name": "can_read"
         },
         "view_menu": {
@@ -2414,22 +2430,6 @@
         },
         "view_menu": {
           "name": "SavedQuery"
-        }
-      },
-      {
-        "permission": {
-          "name": "can_share_dashboard"
-        },
-        "view_menu": {
-          "name": "Superset"
-        }
-      },
-      {
-        "permission": {
-          "name": "can_share_chart"
-        },
-        "view_menu": {
-          "name": "Superset"
         }
       },
       {
