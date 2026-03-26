@@ -77,6 +77,7 @@ class OpenEdxVars(BaseModel):
     enable_ai_drawer_slot: Literal["true", "false"] | None = None
     appzi_url: str | None = None
     enable_auto_language_selection: Literal["true", "false"] | None = None
+    enable_tagging_taxonomy_pages: Literal["true", "false"] | None = None
 
     @property
     def release_name(self) -> OpenEdxSupportedRelease:
@@ -144,6 +145,7 @@ def mfe_params(
             open_edx.enable_video_upload_page_link_in_content_dropdown
         ),
         "ENABLE_AUTO_LANGUAGE_SELECTION": (open_edx.enable_auto_language_selection),
+        "ENABLE_TAGGING_TAXONOMY_PAGES": (open_edx.enable_tagging_taxonomy_pages),
         "PARAGON_THEME_URLS": "{}",
         "ENABLE_JUMPNAV": open_edx.enable_jumpnav,
         "ENABLE_AI_DRAWER_SLOT": open_edx.enable_ai_drawer_slot,
