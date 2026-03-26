@@ -279,8 +279,6 @@ ReleaseMap: dict[
                 application="authoring",
                 application_type="MFE",
                 release="master",
-                origin_override="https://github.com/mitodl/frontend-app-course-authoring/",
-                branch_override="asad/request-to-cms-for-authz-perms",
             ),
             OpenEdxApplicationVersion(
                 application="discussions",
