@@ -538,8 +538,8 @@ if k8s_deploy:
                     redis_password=redis_config.require("password"),
                 ),
             ],
-            resource_requests={"cpu": "250m", "memory": "1Gi"},
-            resource_limits={"memory": "1Gi"},
+            resource_requests={"cpu": "250m", "memory": "2Gi"},
+            resource_limits={"memory": "2Gi"},
             probe_configs={
                 "liveness_probe": kubernetes.core.v1.ProbeArgs(
                     http_get=kubernetes.core.v1.HTTPGetActionArgs(
