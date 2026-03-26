@@ -988,8 +988,25 @@ if micromasters_config.get_bool("deploy_k8s"):
         "SENTRY_ORG_NAME": "mit-office-of-digital-learning",
         "SENTRY_PROJECT_NAME": "micromasters",
         "USE_X_FORWARDED_HOST": "True",
+        "USE_X_FORWARDED_PORT": "True",
     }
     k8s_env_vars.update(micromasters_config.get_object("vars") or {})
+
+    # Build CSRF_TRUSTED_ORIGINS from the configured frontend domain(s).
+    # Django 4.0+ requires this for requests arriving via a TLS-terminating
+    # proxy (Fastly) because the Origin header carries the HTTPS scheme while
+    # the backend receives plain HTTP. SECURE_PROXY_SSL_HEADER lets Django
+    # honour the X-Forwarded-Proto header set by Fastly.
+    _frontend_domain = micromasters_config.require("frontend_domain")
+    csrf_trusted_origins: list[str] = [f"https://{_frontend_domain}"]
+    if stack_info.env_suffix == "production":
+        csrf_trusted_origins.append("https://micromasters.mit.edu")
+    k8s_env_vars.update(
+        {
+            "CSRF_TRUSTED_ORIGINS": ",".join(csrf_trusted_origins),
+            "SECURE_PROXY_SSL_HEADER": "HTTP_X_FORWARDED_PROTO,https",
+        }
+    )
 
     micromasters_k8s_app = OLApplicationK8s(
         ol_app_k8s_config=OLApplicationK8sConfig(
