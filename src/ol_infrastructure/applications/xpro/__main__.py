@@ -498,6 +498,14 @@ if k8s_deploy:
     # Merge stack-level config vars into the app env vars
     app_env_vars.update(**xpro_config.get_object("vars") or {})
 
+    # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all metrics
+    # carry organizational metadata regardless of stack environment.
+    k8s_label_attrs = ",".join(f"{k}={v}" for k, v in k8s_app_labels.items())
+    base_otel = app_env_vars.get("OTEL_RESOURCE_ATTRIBUTES")
+    app_env_vars["OTEL_RESOURCE_ATTRIBUTES"] = (
+        f"{base_otel},{k8s_label_attrs}" if base_otel else k8s_label_attrs
+    )
+
     if "XPRO_DOCKER_TAG" not in os.environ:
         msg = "XPRO_DOCKER_TAG must be set."
         raise OSError(msg)

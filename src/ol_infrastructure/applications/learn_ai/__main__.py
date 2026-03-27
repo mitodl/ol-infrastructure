@@ -732,13 +732,13 @@ static_secrets = OLVaultK8SSecret(
 
 env_vars = dict(learn_ai_config.require_object("env_vars") or {})
 
-# Append k8s labels to OTEL_RESOURCE_ATTRIBUTES on stacks where OTEL is enabled
-# (QA and Production). CI does not define this variable and is left untouched.
-if "OTEL_RESOURCE_ATTRIBUTES" in env_vars:
-    k8s_label_attrs = ",".join(f"{k}={v}" for k, v in k8s_global_labels.items())
-    env_vars["OTEL_RESOURCE_ATTRIBUTES"] = (
-        f"{env_vars['OTEL_RESOURCE_ATTRIBUTES']},{k8s_label_attrs}"
-    )
+# Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all metrics
+# carry organizational metadata regardless of stack environment.
+k8s_label_attrs = ",".join(f"{k}={v}" for k, v in k8s_global_labels.items())
+base_otel = env_vars.get("OTEL_RESOURCE_ATTRIBUTES")
+env_vars["OTEL_RESOURCE_ATTRIBUTES"] = (
+    f"{base_otel},{k8s_label_attrs}" if base_otel else k8s_label_attrs
+)
 
 # Instantiate the OLApplicationK8s component
 learn_ai_app_k8s = OLApplicationK8s(

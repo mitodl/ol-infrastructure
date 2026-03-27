@@ -363,6 +363,14 @@ env_vars = {
 }
 env_vars.update(**mitxonline_config.get_object("vars"))
 
+# Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all metrics
+# carry organizational metadata regardless of stack environment.
+k8s_label_attrs = ",".join(f"{k}={v}" for k, v in k8s_app_labels.items())
+base_otel = env_vars.get("OTEL_RESOURCE_ATTRIBUTES")
+env_vars["OTEL_RESOURCE_ATTRIBUTES"] = (
+    f"{base_otel},{k8s_label_attrs}" if base_otel else k8s_label_attrs
+)
+
 # All of the secrets for this app must be obtained with async incantations
 
 env_name = (
