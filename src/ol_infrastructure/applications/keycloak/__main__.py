@@ -454,6 +454,22 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
                                     "name": "POSTHOG_API_HOST",
                                     "value": posthog_api_host,
                                 },
+                                # The Docker image is built with --tracing-enabled=true,
+                                # baking the Quarkus OTel extension into the binary at
+                                # build time. KC_TRACING_ENABLED=false (from the CR's
+                                # tracing.enabled: false) only disables Keycloak-level
+                                # trace emission; it does not prevent the OTel SDK from
+                                # initialising and attempting to export to the default
+                                # OTLP endpoint (localhost:4317). Without a telemetry
+                                # receiver those connection attempts time out and
+                                # destabilise the pod. OTEL_SDK_DISABLED is the
+                                # OpenTelemetry-spec env var that suppresses the entire
+                                # SDK regardless of build-time compilation.
+                                *(
+                                    [{"name": "OTEL_SDK_DISABLED", "value": "true"}]
+                                    if stack_info.name == "CI"
+                                    else []
+                                ),
                             ],
                         },
                     ]
