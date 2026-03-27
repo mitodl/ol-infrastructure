@@ -179,26 +179,22 @@ if starrocks_config.get_bool("enable_data_lake_integration"):
     )
     export(
         "iceberg_catalog_sql",
-        # Uses assumed-role auth with the IRSA role ARN. StarRocks will use the
-        # AWS_WEB_IDENTITY_TOKEN_FILE injected by the EKS pod-identity webhook to
-        # call STS AssumeRoleWithWebIdentity and obtain temporary credentials.
-        # use_instance_profile=false avoids a direct IMDS call which fails on EKS.
-        starrocks_auth_binding.irsa_role.arn.apply(
-            lambda role_arn: (
-                f"""CREATE EXTERNAL CATALOG ol_data_lake_iceberg
+        # Uses the default AWS SDK credential chain (no instance profile, no explicit
+        # role assumption). On EKS with IRSA, the pod already runs as the trust role
+        # via AWS_ROLE_ARN + AWS_WEB_IDENTITY_TOKEN_FILE; specifying iam_role_arn
+        # causes StarRocks to re-assume the same role and fail with a 403. Leaving
+        # both use_instance_profile=false and iam_role_arn unset lets the SDK pick up
+        # the web identity token credentials already in the environment.
+        f"""CREATE EXTERNAL CATALOG ol_data_lake_iceberg
 COMMENT 'MIT OL Data Lake Iceberg Catalog (AWS Glue / {stack_info.env_suffix})'
 PROPERTIES(
     "type" = "iceberg",
     "iceberg.catalog.type" = "glue",
     "aws.glue.use_instance_profile" = "false",
-    "aws.glue.iam_role_arn" = "{role_arn}",
     "aws.glue.region" = "{aws_region}",
     "aws.s3.use_instance_profile" = "false",
-    "aws.s3.iam_role_arn" = "{role_arn}",
     "aws.s3.region" = "{aws_region}"
-);"""
-            )
-        ),
+);""",
     )
 
 if starrocks_config.get_bool("use_be") and starrocks_config.get_bool("use_cn"):
