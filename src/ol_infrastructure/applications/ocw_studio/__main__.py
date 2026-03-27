@@ -389,7 +389,6 @@ app_env_vars = {
     "MITOL_MAIL_REPLY_TO_ADDRESS": "ocw-prod-support@mit.edu",
     "OCW_COURSE_TEST_SLUG": "ocw-ci-test-course",
     "OCW_DEFAULT_COURSE_THEME": "ocw-course-v2",
-    "OCW_TEST_SITE_SLUGS": '["ocw-ci-test-www", "ocw-ci-test-course"]',
     "OCW_STUDIO_SECURE_SSL_REDIRECT": False,
     "OCW_STUDIO_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
     "OCW_STUDIO_DB_CONN_MAX_AGE": 0,
@@ -414,6 +413,9 @@ app_env_vars = {
     "VIDEO_S3_TRANSCODE_PREFIX": "aws_mediaconvert_transcodes",
     "VIDEO_TRANSCODE_QUEUE": ocw_studio_mediaconvert.queue.name,
 }
+app_env_vars["OCW_TEST_SITE_SLUGS"] = json.dumps(
+    [app_env_vars["OCW_WWW_TEST_SLUG"], app_env_vars["OCW_COURSE_TEST_SLUG"]]
+)
 
 ################################
 # Kubernetes Deployment Path   #
