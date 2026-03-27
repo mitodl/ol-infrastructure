@@ -345,12 +345,12 @@ env_vars = {
     "MITOL_GOOGLE_SHEETS_REFUNDS_SKIP_ROW_COL": "14",
     "MITX_ONLINE_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
     "MITX_ONLINE_DB_CONN_MAX_AGE": "0",
-    "MITX_ONLINE_DB_DISABLE_SSL": "True",  # pgbouncer buildpack uses stunnel to handle encryption"
-    "MITX_ONLINE_FROM_EMAIL": "MITx Online <mitxonline-support@mit.edu>",
+    "MITX_ONLINE_DB_DISABLE_SSL": "True",  # pgbouncer buildpack uses stunnel to handle encryption
+    "MITX_ONLINE_FROM_EMAIL": "MIT Learn <mitlearn-support@mit.edu>",
     "MITX_ONLINE_OAUTH_PROVIDER": "mitxonline-oauth2",
-    "MITX_ONLINE_REPLY_TO_ADDRESS": "MITx Online <mitxonline-support@mit.edu>",
+    "MITX_ONLINE_REPLY_TO_ADDRESS": "MIT Learn <mitlearn-support@mit.edu>",
     "MITX_ONLINE_SECURE_SSL_REDIRECT": "False",
-    "MITX_ONLINE_SUPPORT_EMAIL": "mitxonline-support@mit.edu",
+    "MITX_ONLINE_SUPPORT_EMAIL": "mitlearn-support@mit.edu",
     "MITX_ONLINE_USE_S3": "True",
     "NODE_MODULES_CACHE": "False",
     "OPENEDX_SERVICE_WORKER_USERNAME": "login_service_user",
