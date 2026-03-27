@@ -38,10 +38,20 @@ vault login -method=aws
 vault read database/creds/postgres-mitlearn-admin
 ```
 
-Connection string format:
+Connection string format (use environment variables to avoid credentials in shell history):
+```bash
+# Preferred: use separate psql parameters to avoid credentials in history
+export PGPASSWORD="<password>"
+psql -h ol-mitlearn-db-production.cbnm7ajau6mi.us-east-1.rds.amazonaws.com \
+     -p 5432 -U <username> -d mitopen
+unset PGPASSWORD
 ```
-psql "postgres://<username>:<password>@ol-mitlearn-db-production.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/mitopen"
+
+Alternatively, use a `.pgpass` file:
 ```
+ol-mitlearn-db-production.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432:mitopen:<username>:<password>
+```
+Set file permissions: `chmod 600 ~/.pgpass`
 
 ---
 
@@ -165,13 +175,12 @@ SELECT
     pid,
     usename,
     now() - query_start AS duration,
-    temp_blks_read,
-    temp_blks_written,
+    temp_files,
+    temp_bytes,
     left(query, 150) AS query_preview
 FROM pg_stat_activity
-JOIN pg_stat_io USING (backend_type)
 WHERE state = 'active'
-ORDER BY temp_blks_written DESC NULLS LAST
+ORDER BY temp_bytes DESC NULLS LAST
 LIMIT 20;
 ```
 

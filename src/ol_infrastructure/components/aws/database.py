@@ -97,6 +97,22 @@ class OLDBConfig(AWSBase):
     # Retention period in days: 7 (free tier) or 731 (paid). Ignored when
     # performance_insights_enabled is False.
     performance_insights_retention_period: int = 7
+
+    @field_validator("performance_insights_retention_period")
+    @classmethod
+    def is_valid_performance_insights_retention(
+        cls, performance_insights_retention_period: int
+    ) -> int:
+        valid_retention_periods = (7, 731)
+        if performance_insights_retention_period not in valid_retention_periods:
+            msg = (
+                f"performance_insights_retention_period must be one of "
+                f"{valid_retention_periods}, "
+                f"got {performance_insights_retention_period}"
+            )
+            raise ValueError(msg)
+        return performance_insights_retention_period
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("engine")
