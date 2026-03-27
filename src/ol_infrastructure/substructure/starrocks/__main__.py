@@ -68,6 +68,21 @@ starrocks_role_statements: dict[str, dict[str, list[str]]] = {
         "renew": [],
         "rollback": [],
     },
+    "admin": {
+        "create": [
+            "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';",
+            # NODE_PRIV allows cluster management operations (ALTER SYSTEM, etc.)
+            "GRANT NODE_PRIV ON *.* TO USER '{{name}}'@'%';",
+            # Full DML + DDL on all databases in the default catalog
+            "GRANT ALL ON ALL TABLES IN ALL DATABASES TO USER '{{name}}'@'%';",
+            "GRANT ALL ON ALL DATABASES TO USER '{{name}}'@'%';",
+            "GRANT USAGE ON CATALOG default_catalog TO USER '{{name}}'@'%';",
+            "GRANT USAGE ON CATALOG ol_data_lake_iceberg TO USER '{{name}}'@'%';",
+        ],
+        "revoke": ["DROP USER '{{name}}'@'%';"],
+        "renew": [],
+        "rollback": [],
+    },
 }
 
 # Connection URL uses Go MySQL DSN format required by Vault's MySQL plugin.
