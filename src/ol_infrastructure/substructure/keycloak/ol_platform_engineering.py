@@ -513,6 +513,53 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913
     )
     # GRAFANA [END] # noqa: ERA001
 
+    # TOOLHIVE DEVELOPERS [START]
+    # OIDC client for the developer-facing ToolHive installation on the operations
+    # cluster. Developers authenticate via the ol-platform-engineering realm to
+    # reach the vMCP Gateway and Registry Server web portal.
+    ol_platform_engineering_toolhive_developers_client = keycloak.openid.Client(
+        "ol-platform-engineering-toolhive-developers-client",
+        name="ol-platform-engineering-toolhive-developers-client",
+        realm_id="ol-platform-engineering",
+        client_id="ol-toolhive-developers-client",
+        client_secret=keycloak_realm_config.get(
+            "ol-platform-engineering-toolhive-developers-client-secret"
+        ),
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        direct_access_grants_enabled=False,
+        service_accounts_enabled=False,
+        pkce_code_challenge_method="S256",
+        valid_redirect_uris=keycloak_realm_config.get_object(
+            "ol-platform-engineering-toolhive-developers-redirect-uris"
+        ),
+        web_origins=keycloak_realm_config.get_object(
+            "ol-platform-engineering-toolhive-developers-web-origins"
+        ),
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    vault.generic.Secret(
+        "ol-platform-engineering-toolhive-developers-client-vault-secret",
+        path="secret-operations/keycloak/toolhive-developers",
+        data_json=Output.all(
+            client_id=ol_platform_engineering_toolhive_developers_client.client_id,
+            client_secret=ol_platform_engineering_toolhive_developers_client.client_secret,
+            realm_id=ol_platform_engineering_realm.id,
+        ).apply(
+            lambda kwargs: json.dumps(
+                {
+                    "client_id": kwargs["client_id"],
+                    "client_secret": kwargs["client_secret"],
+                    "issuer_url": f"{keycloak_url}/realms/{kwargs['realm_id']}",
+                }
+            )
+        ),
+        opts=resource_options,
+    )
+    # TOOLHIVE DEVELOPERS [END]
+
     # OL Platform Engineering Realm - Authentication Flows[START]
     # OL - browser flow [START]
     # username-form -> ol-auth-username-password-form

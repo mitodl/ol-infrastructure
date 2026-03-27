@@ -1,0 +1,6 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+config:
+  toolhive:eks_cluster: data
+  toolhive:registry_replicas: 1
+  toolhive:enable_oidc: "false"

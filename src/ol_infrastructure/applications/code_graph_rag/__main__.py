@@ -7,9 +7,10 @@ This stack provisions:
 - ToolHive MCPServer CRD resource — the operator auto-creates the Deployment + Service
   and registers the server in the ToolHive Registry
 
-The ToolHive Operator (from infrastructure.toolhive.Production) watches for MCPServer
-resources cluster-wide and reconciles them into running Deployments. The code-graph-rag
-MCP server becomes visible via the vMCP Gateway once the MCPServer is healthy.
+The ToolHive Operator (from infrastructure.toolhive.appmcps.<env>) watches
+for MCPServer resources and reconciles them into Deployments.
+code-graph-rag is classified as an agent-facing MCP (applications cluster) since it
+provides code intelligence to agentic workloads.
 
 ⚠️  IMPORTANT: Do NOT use the `index_repository` MCP tool against the shared hosted
     Memgraph instance. It wipes all project data for the given project_name. Repository
@@ -19,7 +20,7 @@ MCP server becomes visible via the vMCP Gateway once the MCPServer is healthy.
 
 Stack references:
   infrastructure.memgraph.codegraph.<env>  → bolt_host, bolt_port, namespace
-  infrastructure.toolhive.Production       → operator_namespace
+  infrastructure.toolhive.appmcps.<env>    → operator_namespace
 """
 
 import pulumi_kubernetes as kubernetes
@@ -52,7 +53,7 @@ k8s_global_labels: dict[str, str] = {
 # Stack references
 cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
 memgraph_stack = StackReference(f"infrastructure.memgraph.codegraph.{stack_info.name}")
-toolhive_stack = StackReference("infrastructure.toolhive.Production")
+toolhive_stack = StackReference(f"infrastructure.toolhive.appmcps.{stack_info.name}")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
@@ -121,8 +122,9 @@ llm_vault_secret = OLVaultK8SSecret(
 # MCPServer CRD — ToolHive Operator reconciles this into a Deployment + Service
 # and registers it in the Registry Server automatically.
 #
-# The MCPServer is created in toolhive-system so the operator can manage it.
-# Env vars reference Memgraph bolt endpoint and LLM configuration from stack outputs.
+# MCPServer placed in toolhive-appmcps namespace (agent-facing installation on
+# the applications cluster). The ToolHive Operator in that namespace reconciles
+# this resource into a Deployment + Service and registers it in the Registry.
 mcpserver = kubernetes.apiextensions.CustomResource(
     "code-graph-rag-mcpserver",
     api_version="toolhive.stacklok.com/v1alpha1",
