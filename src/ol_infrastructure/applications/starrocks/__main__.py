@@ -211,9 +211,6 @@ if not starrocks_config.get_bool("use_be") and not starrocks_config.get_bool("us
 fe_config = starrocks_config.get_object("fe_config") or {}
 starrocks_values: dict[str, Any] = {
     "nameOverride": f"{stack_info.env_prefix}-starrocks",
-    "componentValues": {
-        "image": {"tag": STARROCKS_VERSION},
-    },
     "initPassword": {
         "enabled": True,
         "passwordSecret": starrocks_root_password_secret_name,
@@ -230,6 +227,7 @@ starrocks_values: dict[str, Any] = {
     },
     "starrocksFESpec": {
         "replicas": fe_config.get("replicas", 3),
+        "image": {"tag": STARROCKS_VERSION},
         "serviceAccount": "starrocks",
         "runAsNonRoot": True,
         "service": {
@@ -257,6 +255,7 @@ if starrocks_config.get_bool("use_be"):
     starrocks_values["starrocksBeSpec"] = {
         "replicas": be_config.get("replicas", 3),
         "imagePullPolicy": "IfNotPresent",
+        "image": {"tag": STARROCKS_VERSION},
         "serviceAccount": "starrocks",
         "runAsNonRoot": True,
         "resources": {
@@ -284,6 +283,7 @@ if starrocks_config.get_bool("use_cn"):
     cn_config = starrocks_config.get_object("cn_config") or {}
     starrocks_values["starrocksCnSpec"] = {
         "imagePullPolicy": "IfNotPresent",
+        "image": {"tag": STARROCKS_VERSION},
         "serviceAccount": "starrocks",
         "runAsNonRoot": True,
         "resources": {
