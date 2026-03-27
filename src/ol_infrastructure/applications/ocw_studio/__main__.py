@@ -413,6 +413,9 @@ app_env_vars = {
     "VIDEO_S3_TRANSCODE_PREFIX": "aws_mediaconvert_transcodes",
     "VIDEO_TRANSCODE_QUEUE": ocw_studio_mediaconvert.queue.name,
 }
+app_env_vars["OCW_TEST_SITE_SLUGS"] = json.dumps(
+    [app_env_vars["OCW_WWW_TEST_SLUG"], app_env_vars["OCW_COURSE_TEST_SLUG"]]
+)
 
 ################################
 # Kubernetes Deployment Path   #
