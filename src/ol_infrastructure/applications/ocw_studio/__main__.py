@@ -563,6 +563,14 @@ app_env_vars["POSTHOG_API_HOST"] = app_env_vars.pop(
     ocw_studio_config.get("posthog_api_host") or "https://app.posthog.com",
 )
 
+# Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all metrics
+# carry organizational metadata regardless of stack environment.
+k8s_label_attrs = ",".join(f"{k}={v}" for k, v in k8s_app_labels.items())
+base_otel = app_env_vars.get("OTEL_RESOURCE_ATTRIBUTES")
+app_env_vars["OTEL_RESOURCE_ATTRIBUTES"] = (
+    f"{base_otel},{k8s_label_attrs}" if base_otel else k8s_label_attrs
+)
+
 if "OCW_STUDIO_DOCKER_TAG" not in os.environ:
     msg = "OCW_STUDIO_DOCKER_TAG must be set."
     raise OSError(msg)
