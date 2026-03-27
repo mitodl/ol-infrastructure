@@ -93,6 +93,10 @@ class OLDBConfig(AWSBase):
     blue_green_timeout_minutes: PositiveInt = PositiveInt(60 * 12)
     username: str = "oldevops"  # The name of the admin user for the instance
     enable_iam_auth: bool = True
+    performance_insights_enabled: bool = False
+    # Retention period in days: 7 (free tier) or 731 (paid). Ignored when
+    # performance_insights_enabled is False.
+    performance_insights_retention_period: int = 7
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("engine")
@@ -380,6 +384,12 @@ class OLAmazonDB(pulumi.ComponentResource):
             opts=resource_options,
             parameter_group_name=primary_parameter_group.name,
             password=db_config.password.get_secret_value(),
+            performance_insights_enabled=db_config.performance_insights_enabled,
+            performance_insights_retention_period=(
+                db_config.performance_insights_retention_period
+                if db_config.performance_insights_enabled
+                else None
+            ),
             port=db_config.port,
             publicly_accessible=db_config.public_access,
             skip_final_snapshot=not db_config.take_final_snapshot,
@@ -465,13 +475,24 @@ class OLAmazonDB(pulumi.ComponentResource):
             },
             "FreeStorageSpace": {
                 "comparison_operator": "LessThanThreshold",
-                "description": "RDS - Low Disk Space Remaining",
-                "datapoints_to_alarm": 6,
+                "description": "RDS - Low Disk Space Remaining (warning)",
+                "datapoints_to_alarm": 3,
                 "level": "warning",
                 "period": 300,  # 5 minutes
-                "evaluation_periods": 6,  # 30 minutes
+                "evaluation_periods": 3,  # 15 minutes
                 "metric_name": "FreeStorageSpace",
-                "threshold": 5368709120,  # 5 gigabytes
+                "threshold": 16106127360,  # 15 gigabytes - early warning
+                "unit": "Bytes",
+            },
+            "FreeStorageSpace_critical": {
+                "comparison_operator": "LessThanThreshold",
+                "description": "RDS - Critically Low Disk Space Remaining",
+                "datapoints_to_alarm": 2,
+                "level": "critical",
+                "period": 300,  # 5 minutes
+                "evaluation_periods": 2,  # 10 minutes
+                "metric_name": "FreeStorageSpace",
+                "threshold": 5368709120,  # 5 gigabytes - urgent
                 "unit": "Bytes",
             },
             "WriteLatency": {
@@ -500,7 +521,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             "ci": {},
             "qa": {},
             "production": {
-                "EBSIOBlance": {
+                "EBSIOBalance": {
                     "comparison_operator": "LessThanThreshold",
                     "description": "RDS - EBS IO Balance Remaining",
                     "datapoints_to_alarm": 2,
@@ -513,13 +534,13 @@ class OLAmazonDB(pulumi.ComponentResource):
                 },
                 "DiskQueueDepth": {
                     "comparison_operator": "GreaterThanThreshold",
-                    "description": "RDS - Disk Queue Depth - Requests waiting",
-                    "datapoints_to_alarm": 2,
+                    "description": "RDS - Disk Queue Depth - I/O requests waiting",
+                    "datapoints_to_alarm": 3,
                     "level": "warning",
                     "period": 300,  # 5 minutes
-                    "evaluation_periods": 2,  # 10 minutes
+                    "evaluation_periods": 6,  # 30 minutes of sustained elevation
                     "metric_name": "DiskQueueDepth",
-                    "threshold": 10,  # requests
+                    "threshold": 64,  # requests - tuned to reduce noise
                 },
             },
         }
