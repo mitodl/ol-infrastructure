@@ -61,6 +61,8 @@ MEILISEARCH_CHART_VERSION = "0.23.0"
 STARROCKS_OPERATOR_CHART_VERSION = "1.11.4"
 # renovate: datasource=helm depName=operator packageName=starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
 STARROCKS_CHART_VERSION = "1.11.4"
+# renovate: datasource=docker depName=starrocks packageName=starrocks/fe-ubuntu
+STARROCKS_VERSION = "4.0.8"
 # Altinity ClickHouse Operator — released as tag "release-X.Y.Z" on GitHub
 # renovate: datasource=github-releases depName=clickhouse-operator packageName=Altinity/clickhouse-operator
 CLICKHOUSE_OPERATOR_VERSION = "release-0.26.0"

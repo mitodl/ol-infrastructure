@@ -7,7 +7,7 @@ import pulumi_kubernetes as kubernetes
 from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import iam
 
-from bridge.lib.versions import STARROCKS_CHART_VERSION
+from bridge.lib.versions import STARROCKS_CHART_VERSION, STARROCKS_VERSION
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
@@ -211,6 +211,9 @@ if not starrocks_config.get_bool("use_be") and not starrocks_config.get_bool("us
 fe_config = starrocks_config.get_object("fe_config") or {}
 starrocks_values: dict[str, Any] = {
     "nameOverride": f"{stack_info.env_prefix}-starrocks",
+    "componentValues": {
+        "image": {"tag": STARROCKS_VERSION},
+    },
     "initPassword": {
         "enabled": True,
         "passwordSecret": starrocks_root_password_secret_name,
