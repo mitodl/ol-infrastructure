@@ -1,9 +1,17 @@
 import json
 from typing import Any
 
-from pulumi import Config, StackReference, export
+from pulumi import (
+    ROOT_STACK_RESOURCE,
+    Alias,
+    Config,
+    ResourceOptions,
+    StackReference,
+    export,
+)
 from pulumi_aws import athena, glue, iam, s3
 
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -25,33 +33,35 @@ s3_kms_key = kms_stack.require_output("kms_s3_data_analytics_key")
 
 data_stages = ("raw", "staging", "intermediate", "mart", "external")
 
-results_bucket = s3.Bucket(
-    f"ol_warehouse_results_bucket_{stack_info.env_suffix}",
-    bucket=f"ol-warehouse-results-{stack_info.env_suffix}",
-    acl="private",
-    server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
-        rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
-                sse_algorithm="aws:kms",
-                kms_master_key_id=s3_kms_key["id"],
-            ),
-            bucket_key_enabled=True,
-        )
-    ),
-    tags=aws_config.tags,
+results_bucket_config = S3BucketConfig(
+    bucket_name=f"ol-warehouse-results-{stack_info.env_suffix}",
+    server_side_encryption_enabled=True,
+    kms_key_id=s3_kms_key["id"],
+    bucket_key_enabled=True,
     lifecycle_rules=[
-        s3.BucketLifecycleRuleArgs(
-            enabled=True,
-            expiration=s3.BucketLifecycleRuleExpirationArgs(days=30),
+        s3.BucketLifecycleConfigurationRuleArgs(
             id="expire_old_query_results",
+            status="Enabled",
+            expiration=s3.BucketLifecycleConfigurationRuleExpirationArgs(days=30),
         )
     ],
+    tags=aws_config.tags,
 )
-s3.BucketPublicAccessBlock(
-    f"ol_warehouse_results_bucket_{stack_info.env_suffix}_block_public_access",
-    bucket=results_bucket.bucket,
-    block_public_acls=True,
-    block_public_policy=True,
+results_bucket = OLBucket(
+    f"ol_warehouse_results_bucket_{stack_info.env_suffix}",
+    config=results_bucket_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"ol_warehouse_results_bucket_{stack_info.env_suffix}",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name=f"ol_warehouse_results_bucket_{stack_info.env_suffix}_block_public_access",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+        ]
+    ),
 )
 
 athena_warehouse_workgroup = athena.Workgroup(
@@ -68,7 +78,7 @@ athena_warehouse_workgroup = athena.Workgroup(
                 encryption_option="SSE_KMS",
                 kms_key_arn=s3_kms_key["arn"],
             ),
-            output_location=results_bucket.bucket.apply(
+            output_location=results_bucket.bucket_v2.bucket.apply(
                 lambda bucket_name: f"s3://{bucket_name}/output/"
             ),
         ),
@@ -77,55 +87,60 @@ athena_warehouse_workgroup = athena.Workgroup(
 )
 
 warehouse_buckets = []
-data_landing_zone_bucket = s3.Bucket(
+data_landing_zone_bucket = OLBucket(
     "ol_data_lake_landing_zone_bucket",
-    bucket=f"ol-data-lake-landing-zone-{stack_info.env_suffix}",
-)
-data_landing_zone_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "ol_data_lake_landing_zone_bucket_ownership_controls",
-    bucket=data_landing_zone_bucket.id,
-    rule=s3.BucketOwnershipControlsRuleArgs(
-        object_ownership="BucketOwnerPreferred",
+    config=S3BucketConfig(
+        bucket_name=f"ol-data-lake-landing-zone-{stack_info.env_suffix}",
+        ownership_controls="BucketOwnerPreferred",
+        server_side_encryption_enabled=True,
+        sse_algorithm="aws:kms",
+        bucket_key_enabled=True,
+        tags=aws_config.tags,
     ),
-)
-s3.BucketServerSideEncryptionConfiguration(
-    "encrypt_ol_data_lake_landing_zone_bucket",
-    bucket=data_landing_zone_bucket.id,
-    rules=[
-        s3.BucketServerSideEncryptionConfigurationRuleArgs(
-            bucket_key_enabled=True,
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
-                sse_algorithm="aws:kms"
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name="ol_data_lake_landing_zone_bucket",
+                parent=ROOT_STACK_RESOURCE,
             ),
-        )
-    ],
+            Alias(
+                name="ol_data_lake_landing_zone_bucket_ownership_controls",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+            Alias(
+                name="encrypt_ol_data_lake_landing_zone_bucket",
+                parent=ROOT_STACK_RESOURCE,
+            ),
+        ]
+    ),
 )
 warehouse_buckets.append(data_landing_zone_bucket)
 warehouse_dbs = []
 for data_stage in data_stages:
-    lake_storage_bucket = s3.Bucket(
+    lake_storage_bucket = OLBucket(
         f"ol_data_lake_s3_bucket_{data_stage}",
-        bucket=f"ol-data-lake-{data_stage}-{stack_info.env_suffix}",
-        acl="private",
-        server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
-            rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
-                apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
-                    sse_algorithm="aws:kms",
-                    kms_master_key_id=s3_kms_key["arn"],
-                ),
-                bucket_key_enabled=True,
-            )
+        config=S3BucketConfig(
+            bucket_name=f"ol-data-lake-{data_stage}-{stack_info.env_suffix}",
+            versioning_enabled=True,
+            server_side_encryption_enabled=True,
+            kms_key_id=s3_kms_key["arn"],
+            bucket_key_enabled=True,
+            tags=aws_config.merged_tags({"OU": "data"}),
         ),
-        versioning=s3.BucketVersioningArgs(enabled=True),
-        tags=aws_config.merged_tags({"OU": "data"}),
+        opts=ResourceOptions(
+            aliases=[
+                Alias(
+                    name=f"ol_data_lake_s3_bucket_{data_stage}",
+                    parent=ROOT_STACK_RESOURCE,
+                ),
+                Alias(
+                    name=f"ol_data_lake_s3_bucket_{data_stage}_block_public_access",
+                    parent=ROOT_STACK_RESOURCE,
+                ),
+            ]
+        ),
     )
     warehouse_buckets.append(lake_storage_bucket)
-    s3.BucketPublicAccessBlock(
-        f"ol_data_lake_s3_bucket_{data_stage}_block_public_access",
-        bucket=lake_storage_bucket.bucket,
-        block_public_acls=True,
-        block_public_policy=True,
-    )
     warehouse_db = glue.CatalogDatabase(
         f"ol_warehouse_database_{data_stage}",
         name=f"ol_warehouse_{stack_info.env_suffix}_{data_stage}",
@@ -133,15 +148,17 @@ for data_stage in data_stages:
             f"Data mart for data in {data_stage} format in the"
             f" {stack_info.env_suffix} environment."
         ),
-        location_uri=lake_storage_bucket.bucket.apply(lambda bucket: f"s3://{bucket}/"),
+        location_uri=lake_storage_bucket.bucket_v2.bucket.apply(
+            lambda bucket: f"s3://{bucket}/"
+        ),
     )
     warehouse_dbs.append(warehouse_db)
 
 export(
     "data_warehouse",
     {
-        "source_buckets": [bucket.bucket for bucket in warehouse_buckets],
-        "results_bucket": results_bucket.bucket,
+        "source_buckets": [bucket.bucket_v2.bucket for bucket in warehouse_buckets],
+        "results_bucket": results_bucket.bucket_v2.bucket,
         "databases": [database.name for database in warehouse_dbs],
         "workgroup": athena_warehouse_workgroup.name,
     },
