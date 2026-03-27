@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-memgraph
+runtime: python
+description: Managed Memgraph graph database deployment via Helm on EKS
+backend:
+  url: s3://mitol-pulumi-state/

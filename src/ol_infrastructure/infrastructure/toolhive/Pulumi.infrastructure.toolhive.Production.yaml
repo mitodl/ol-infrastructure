@@ -1,0 +1,4 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+config:
+  toolhive:registry_replicas: 1

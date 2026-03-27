@@ -1,0 +1,8 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+config:
+  code_graph_rag:namespace: code-intelligence
+  code_graph_rag:cypher_provider: google
+  code_graph_rag:cypher_model: gemini-2.0-flash
+  code_graph_rag:orchestrator_provider: google
+  code_graph_rag:orchestrator_model: gemini-2.0-flash
