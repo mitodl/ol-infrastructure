@@ -813,8 +813,7 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
 )
 
 ## Fastly Service
-# UAI B2C paths that should redirect to MIT Learn. The last entry (UAI.ENT.1) is
-# intentionally omitted because its source and target are the same.
+# UAI B2C paths that should redirect to MIT Learn.
 uai_b2c_redirects: dict[str, str] = {
     "/programs/program-v1:UAI+B2C/": f"https://{learn_frontend_domain}/programs/program-v1:UAI+B2C",
     "/programs/program-v1:UAI+B2C.1/": f"https://{learn_frontend_domain}/courses/p/program-v1:UAI+B2C.1",
@@ -826,9 +825,10 @@ uai_b2c_redirects: dict[str, str] = {
     "/courses/course-v1:UAI_SOURCE+UAI.MLTL.1/": f"https://{learn_frontend_domain}/courses/course-v1:UAI_SOURCE+UAI.MLTL.1",
     "/courses/course-v1:UAI_SOURCE+UAI.PM.1/": f"https://{learn_frontend_domain}/courses/course-v1:UAI_SOURCE+UAI.PM.1",
     "/courses/course-v1:UAI_SOURCE+UAI.ST.1/": f"https://{learn_frontend_domain}/courses/course-v1:UAI_SOURCE+UAI.ST.1",
+    "/courses/course-v1:UAI_SOURCE+UAI.ENT.1/": f"https://{learn_frontend_domain}/courses/course-v1:UAI_SOURCE+UAI.ENT.1",
 }
 uai_b2c_redirect_vcl = "\n".join(
-    f'if (req.url == "{path}") {{\n'
+    f'if (req.url.path == "{path}") {{\n'
     f'  set req.http.x-redir-location = "{target}";\n'
     f"  error 602;\n"
     f"}}"
@@ -933,6 +933,13 @@ mitxonline_service = fastly.ServiceVcl(
               set obj.status = 301;
               set obj.response = "Moved Permanently";
               set obj.http.Location = req.http.x-redir-location;
+              if (req.url.qs != "") {
+                if (obj.http.Location !~ "\\?") {
+                  set obj.http.Location = obj.http.Location "?" req.url.qs;
+                } else {
+                  set obj.http.Location = obj.http.Location "&" req.url.qs;
+                }
+              }
               return(deliver);
             }"""),
             name="Handle UAI B2C external redirects",
