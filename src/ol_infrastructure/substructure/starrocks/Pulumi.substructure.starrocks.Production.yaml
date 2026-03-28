@@ -1,0 +1,10 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAFkYLtPxSaeEyWd7CmlxeS1AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMSKzNIOmTYJZ94H/rAgEQgDsMkmzBpfkru3777GqgEfpxLD2Fu7UGfxMVwgeGDscDyi7n9OKdMoDsbmuf1ShPNxOypXILPmljglQ0Bw==
+config:
+  vault:address: https://vault.odl.mit.edu
+  vault_server:env_namespace: operations.production
+  starrocks:db_admin_username: root
+  starrocks:verify_connection: "false"
+  # starrocks:fe_host — set to the VPC-accessible MySQL endpoint for StarRocks FE
+  # starrocks:db_admin_password — set via: pulumi config set --secret starrocks:db_admin_password
