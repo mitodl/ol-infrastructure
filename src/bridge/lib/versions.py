@@ -55,7 +55,7 @@ KEDA_CHART_VERSION = "2.17.1"
 KUBE_STATE_METRICS_CHART_VERSION = "5.1.0"
 # renovate: datasource=helm depName=kubewatch packageName=kubewatch registryUrl=https://robusta-charts.storage.googleapis.com
 KUBEWATCH_CHART_VERSION = "3.5.0"
-# renovate: datasource=helm depName=meilisearch packageName=meilisearch-kubernetes registryUrl=https://meilisearch.github.io/meilisearch-kubernetes
+# renovate: datasource=helm depName=meilisearch packageName=meilisearch registryUrl=https://meilisearch.github.io/meilisearch-kubernetes
 MEILISEARCH_CHART_VERSION = "0.23.0"
 # renovate: datasource=helm depName=operator packageName=operator registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
 STARROCKS_OPERATOR_CHART_VERSION = "1.11.4"
@@ -92,7 +92,7 @@ NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.8.1"
 NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION = "0.19.0"
 # renovate: datasource=docker depName=pgbouncer packageName=ghcr.io/cloudnative-pg/pgbouncer
 PGBOUNCER_VERSION = "1.25.1"
-# renovate: datasource=helm depName=local-path-provisioner packageName=local-path-provisioner registryUrl=https://charts.rancher.io
+# renovate: datasource=github-releases depName=local-path-provisioner packageName=rancher/local-path-provisioner
 LOCAL_PATH_PROVISIONER_CHART_VERSION = "0.0.31"
 # renovate: datasource=github-releases depName=qdrant packageName=qdrant/qdrant
 QDRANT_VERSION = "v1.17.1"
