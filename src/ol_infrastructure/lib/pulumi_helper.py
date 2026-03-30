@@ -74,3 +74,23 @@ def require_stack_output_value(
 
     msg = f"Missing required stack output: {output_name}"
     raise ValueError(msg)
+
+
+def merge_otel_resource_attributes(
+    env_vars: dict[str, Any],
+    k8s_labels: dict[str, str],
+) -> None:
+    """Append k8s label key/value pairs to OTEL_RESOURCE_ATTRIBUTES in-place.
+
+    If OTEL_RESOURCE_ATTRIBUTES already exists in ``env_vars`` its existing value is
+    preserved and the label attributes are appended with a comma separator.  When the
+    key is absent it is created with only the label attributes.
+
+    :param env_vars: Mutable dict of environment variables to update.
+    :param k8s_labels: Kubernetes label key/value pairs to encode as OTEL attributes.
+    """
+    k8s_label_attrs = ",".join(f"{k}={v}" for k, v in k8s_labels.items())
+    base_otel = env_vars.get("OTEL_RESOURCE_ATTRIBUTES")
+    env_vars["OTEL_RESOURCE_ATTRIBUTES"] = (
+        f"{base_otel},{k8s_label_attrs}" if base_otel else k8s_label_attrs
+    )

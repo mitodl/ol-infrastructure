@@ -79,7 +79,10 @@ from ol_infrastructure.lib.ol_types import (
     KubernetesServiceAppProtocol,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import (
+    merge_otel_resource_attributes,
+    parse_stack,
+)
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
@@ -734,11 +737,7 @@ env_vars = dict(learn_ai_config.require_object("env_vars") or {})
 
 # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all metrics
 # carry organizational metadata regardless of stack environment.
-k8s_label_attrs = ",".join(f"{k}={v}" for k, v in k8s_global_labels.items())
-base_otel = env_vars.get("OTEL_RESOURCE_ATTRIBUTES")
-env_vars["OTEL_RESOURCE_ATTRIBUTES"] = (
-    f"{base_otel},{k8s_label_attrs}" if base_otel else k8s_label_attrs
-)
+merge_otel_resource_attributes(env_vars, k8s_global_labels)
 
 # Instantiate the OLApplicationK8s component
 learn_ai_app_k8s = OLApplicationK8s(

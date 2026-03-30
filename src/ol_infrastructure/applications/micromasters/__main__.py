@@ -82,7 +82,10 @@ from ol_infrastructure.lib.ol_types import (
     K8sGlobalLabels,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import (
+    merge_otel_resource_attributes,
+    parse_stack,
+)
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
@@ -1008,11 +1011,7 @@ if micromasters_config.get_bool("deploy_k8s"):
 
     # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all metrics
     # carry organizational metadata regardless of stack environment.
-    k8s_label_attrs = ",".join(f"{k}={v}" for k, v in k8s_global_labels.items())
-    base_otel = k8s_env_vars.get("OTEL_RESOURCE_ATTRIBUTES")
-    k8s_env_vars["OTEL_RESOURCE_ATTRIBUTES"] = (
-        f"{base_otel},{k8s_label_attrs}" if base_otel else k8s_label_attrs
-    )
+    merge_otel_resource_attributes(k8s_env_vars, k8s_global_labels)
 
     micromasters_k8s_app = OLApplicationK8s(
         ol_app_k8s_config=OLApplicationK8sConfig(
