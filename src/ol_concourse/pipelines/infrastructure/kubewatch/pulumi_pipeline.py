@@ -22,8 +22,7 @@ from ol_concourse.pipelines.constants import (
 def build_kubewatch_webhook_handler_pipeline() -> PipelineFragment:
     """Build pipeline for kubewatch webhook handler.
 
-    Builds Docker image first, then pushes to all environment ECR repos
-    before deploying with Pulumi.
+    Builds Docker image first, then deploys with Pulumi.
     """
     webhook_handler_pulumi_code = git_repo(
         name=Identifier("ol-infrastructure-pulumi-kubewatch-webhook"),
@@ -35,24 +34,20 @@ def build_kubewatch_webhook_handler_pipeline() -> PipelineFragment:
         ],
     )
 
-    # ECR image resources for each environment.
+    # ECR image resource for webhook handler
     # When ecr_region is set, the registry-image resource constructs the ECR registry
     # URL itself from the AWS account/region, so only the short repo name is used here.
-    environments = ("ci", "qa", "production")
-    ecr_image_resources = {
-        env: registry_image(
-            name=Identifier(f"kubewatch-webhook-handler-image-{env}"),
-            image_repository=f"kubewatch-webhook-handler-{env}",
-            ecr_region="us-east-1",
-        )
-        for env in environments
-    }
+    ecr_image_resource = registry_image(
+        name=Identifier("kubewatch-webhook-handler-image"),
+        image_repository="kubewatch-webhook-handler-ci",
+        ecr_region="us-east-1",
+    )
 
-    # Build the image once then push to all environment ECR repos
+    # Docker build job for CI environment
     code_name = webhook_handler_pulumi_code.name
     app_path = "src/ol_infrastructure/applications/kubewatch_webhook_handler"
     docker_build_job = Job(
-        name=Identifier("build-kubewatch-webhook-handler-image"),
+        name=Identifier("build-kubewatch-webhook-handler-image-ci"),
         plan=[
             GetStep(
                 get=code_name,
@@ -65,16 +60,13 @@ def build_kubewatch_webhook_handler_pipeline() -> PipelineFragment:
                     "DOCKERFILE": f"{code_name}/{app_path}/Dockerfile",
                 },
             ),
-            *[
-                PutStep(
-                    put=ecr_image_resources[env].name,
-                    params={
-                        "image": "image/image.tar",
-                        "additional_tags": f"{code_name}/.git/short_ref",
-                    },
-                )
-                for env in environments
-            ],
+            PutStep(
+                put=ecr_image_resource.name,
+                params={
+                    "image": "image/image.tar",
+                    "additional_tags": f"{code_name}/.git/short_ref",
+                },
+            ),
         ],
     )
 
@@ -90,17 +82,16 @@ def build_kubewatch_webhook_handler_pipeline() -> PipelineFragment:
         ),
         dependencies=[
             GetStep(
-                get=ecr_image_resources["ci"].name,
+                get=ecr_image_resource.name,
                 trigger=True,
                 passed=[docker_build_job.name],
             )
         ],
     )
 
-    # Add Docker build job and ECR resources to fragment
+    # Add Docker build job and ECR resource to fragment
     webhook_handler_fragment.jobs.insert(0, docker_build_job)
-    for ecr_resource in ecr_image_resources.values():
-        webhook_handler_fragment.resources.append(ecr_resource)
+    webhook_handler_fragment.resources.append(ecr_image_resource)
     webhook_handler_fragment.resources.append(webhook_handler_pulumi_code)
     return webhook_handler_fragment
 
@@ -125,12 +116,10 @@ def build_kubewatch_pipeline() -> PipelineFragment:
     webhook_handler_fragment = build_kubewatch_webhook_handler_pipeline()
     webhook_handler_code = webhook_handler_fragment.resources[-1]
 
-    # Create dependencies for each kubewatch job to wait for webhook handler.
-    # The webhook handler fragment has the build job at index 0, then pulumi
-    # jobs for CI (1), QA (2), Production (3).
+    # Create dependencies for each kubewatch job to wait for webhook handler
     custom_dependencies = {}
     for idx, _env in enumerate(("CI", "QA", "Production")):
-        webhook_handler_job = webhook_handler_fragment.jobs[idx + 1]
+        webhook_handler_job = webhook_handler_fragment.jobs[idx]
         custom_dependencies[idx] = [
             GetStep(
                 get=webhook_handler_code.name,
