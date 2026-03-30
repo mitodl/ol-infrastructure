@@ -49,7 +49,7 @@ def build_notes_pipeline(
 
     notes_lehrer_repo = git_repo(
         name=Identifier("notes-lehrer"),
-        uri="https://github.com/mitodl/ol-infrastructure",
+        uri="https://github.com/mitodl/lehrer",
         branch="main",
     )
 
