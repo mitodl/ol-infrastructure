@@ -849,6 +849,7 @@ for k, v in mimetypes.types_map.items():
     ):
         gzip_settings["extensions"].add(k.strip("."))
         gzip_settings["content_types"].add(v)
+fastly_shielding_enabled = mitlearn_config.get_bool("enable_fastly_shielding") or False
 bucket_backend_name = "MIT Learn S3 Media Storage"
 mitlearn_fastly_service = fastly.ServiceVcl(
     f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}",
@@ -858,8 +859,10 @@ mitlearn_fastly_service = fastly.ServiceVcl(
         fastly.ServiceVclBackendArgs(
             address=nextjs_heroku_domain,
             name="NextJS_Frontend",
+            first_byte_timeout=30000,
             override_host=nextjs_heroku_domain,
             port=DEFAULT_HTTPS_PORT,
+            shield="iad-va-us" if fastly_shielding_enabled else None,
             ssl_cert_hostname=nextjs_heroku_domain,
             ssl_sni_hostname=nextjs_heroku_domain,
             use_ssl=True,
@@ -867,9 +870,11 @@ mitlearn_fastly_service = fastly.ServiceVcl(
         fastly.ServiceVclBackendArgs(
             address=f"{mitlearn_app_storage_bucket_name}.s3.us-east-1.amazonaws.com",
             name=bucket_backend_name,
+            first_byte_timeout=30000,
             override_host=f"{mitlearn_app_storage_bucket_name}.s3.us-east-1.amazonaws.com",
             port=443,
             request_condition="Media asset requests",
+            shield="iad-va-us" if fastly_shielding_enabled else None,
             ssl_cert_hostname=f"{mitlearn_app_storage_bucket_name}.s3.us-east-1.amazonaws.com",
             ssl_sni_hostname=f"{mitlearn_app_storage_bucket_name}.s3.us-east-1.amazonaws.com",
             use_ssl=True,

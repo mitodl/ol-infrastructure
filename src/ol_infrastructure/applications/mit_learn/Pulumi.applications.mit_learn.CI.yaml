@@ -42,6 +42,7 @@ config:
   mitlearn:nextjs_heroku_domain: "next.ci.learn.mit.edu"
   mitlearn:posthog_proxy: "ph.ol.mit.edu"
   mitlearn:support_url: "support.ci.learn.mit.edu"
+  mitlearn:enable_fastly_shielding: true
   mitlearn:use_granian: true
   mitlearn:vars:
     AI_MIT_SYLLABUS_URL: "https://api.ci.learn.mit.edu/api/v0/vector_content_files_search/"
