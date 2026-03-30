@@ -158,24 +158,26 @@ raw_env_vars = {
     "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE": "0.25",
     "NEXT_PUBLIC_SITE_NAME": "MIT Learn",
     "NEXT_PUBLIC_VERSION": MIT_LEARN_NEXTJS_DOCKER_TAG,
-    "NEXT_PUBLIC_FEATURE_universal_ai": nextjs_config.get("feature_universal_ai"),
-    "NEXT_PUBLIC_FEATURE_mitxonline_product_pages": nextjs_config.get(  # pragma: allowlist secret  # noqa: E501
+    "NEXT_PUBLIC_FEATURE_universal_ai": nextjs_config.require("feature_universal_ai"),
+    "NEXT_PUBLIC_FEATURE_mitxonline_product_pages": nextjs_config.require(  # pragma: allowlist secret  # noqa: E501
         "feature_mitxonline_product_pages"
     ),
-    "NEXT_PUBLIC_FEATURE_enrollment_dashboard": nextjs_config.get(  # pragma: allowlist secret  # noqa: E501
+    "NEXT_PUBLIC_FEATURE_enrollment_dashboard": nextjs_config.require(  # pragma: allowlist secret  # noqa: E501
         "feature_enrollment_dashboard"
     ),
-    "NEXT_PUBLIC_FEATURE_lr_drawer_chatbot": nextjs_config.get(
+    "NEXT_PUBLIC_FEATURE_lr_drawer_chatbot": nextjs_config.require(
         "feature_lr_drawer_chatbot"
     ),
-    "NEXT_PUBLIC_FEATURE_pr_drawer_chatbot": nextjs_config.get(
+    "NEXT_PUBLIC_FEATURE_pr_drawer_chatbot": nextjs_config.require(
         "feature_pr_drawer_chatbot"
     ),
-    "NEXT_PUBLIC_FEATURE_home_page_recommendation_bot": nextjs_config.get(  # pragma: allowlist secret  # noqa: E501
+    "NEXT_PUBLIC_FEATURE_home_page_recommendation_bot": nextjs_config.require(  # pragma: allowlist secret  # noqa: E501
         "feature_home_page_recommendation_bot"
     ),
-    "NEXT_PUBLIC_FEATURE_article_viewer": nextjs_config.get("feature_article_viewer"),
-    "NEXT_PUBLIC_FEATURE_video_shorts": nextjs_config.get("feature_video_shorts"),
+    "NEXT_PUBLIC_FEATURE_article_viewer": nextjs_config.require(
+        "feature_article_viewer"
+    ),
+    "NEXT_PUBLIC_FEATURE_video_shorts": nextjs_config.require("feature_video_shorts"),
 }
 
 env_vars = []
