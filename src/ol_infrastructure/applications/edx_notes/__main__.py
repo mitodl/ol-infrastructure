@@ -148,7 +148,7 @@ edxapp_db_address = edxapp_output["mariadb"]
 # of the actual application, which we do not have in this case. So we're going
 # to define an APP_PORT and use that for all probes as well as the listener port
 # of the application (refer to the Dockerfile for usage of APP_PORT)
-APP_PORT = 8071
+APP_PORT = 8000
 
 # Application configuration (non-sensitive, static values only)
 application_config = {
