@@ -1009,8 +1009,9 @@ if micromasters_config.get_bool("deploy_k8s"):
         }
     )
 
-    # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all metrics
-    # carry organizational metadata regardless of stack environment.
+    # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
+    # signals (traces, metrics, logs) carry organizational metadata regardless of
+    # stack environment.
     merge_otel_resource_attributes(k8s_env_vars, k8s_global_labels)
 
     micromasters_k8s_app = OLApplicationK8s(
