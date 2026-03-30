@@ -6,7 +6,7 @@ from typing import Any
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, ResourceOptions
 
-from bridge.lib.versions import MEILISEARCH_CHART_VERSION
+from bridge.lib.versions import MEILISEARCH_CHART_VERSION, MEILISEARCH_VERSION
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.services.apisix_gateway_api import (
     OLApisixHTTPRoute,
@@ -74,6 +74,7 @@ def create_meilisearch_resources(
         "replicaCount": meilisearch_config.get_int("replica_count")
         or 1,  # Default to 1 replica
         "image": {
+            "tag": MEILISEARCH_VERSION,
             "pullPolicy": "IfNotPresent",
         },
         "custom_labels": k8s_global_labels,
