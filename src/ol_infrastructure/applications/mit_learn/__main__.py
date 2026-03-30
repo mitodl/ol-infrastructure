@@ -1219,8 +1219,8 @@ interpolated_vars = {
 env_vars.update(**interpolated_vars)
 env_vars.update(**mitlearn_config.get_object("vars"))
 
-# Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all metrics
-# carry organizational metadata regardless of stack environment.
+# Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
+# carries organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(env_vars, k8s_app_labels)
 
 # Making these `get_secret_*()` calls children of the seemigly un-related vault mount `secret-mitopen/` tricks
