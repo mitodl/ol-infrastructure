@@ -4,7 +4,6 @@ import sys
 from bridge.settings.openedx.accessors import filter_deployments_by_release
 from bridge.settings.openedx.types import DeploymentEnvRelease, OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
-from ol_concourse.lib.containers import container_build_task
 from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
@@ -48,13 +47,6 @@ def build_notes_pipeline(
         password="((dockerhub.password))",  # noqa: S106
     )
 
-    notes_dockerfile_repo = git_repo(
-        name=Identifier("notes-dockerfile"),
-        uri="https://github.com/mitodl/ol-infrastructure",
-        branch="main",
-        paths=["dockerfiles/openedx-notes/"],
-    )
-
     notes_lehrer_repo = git_repo(
         name=Identifier("notes-lehrer"),
         uri="https://github.com/mitodl/ol-infrastructure",
@@ -77,25 +69,7 @@ def build_notes_pipeline(
         name=Identifier("build-notes-image"),
         plan=[
             GetStep(get=notes_repo.name, trigger=True),
-            GetStep(get=notes_dockerfile_repo.name, trigger=True),
             GetStep(get=notes_lehrer_repo.name, trigger=True),
-            container_build_task(
-                inputs=[
-                    Input(name=notes_repo.name),
-                    Input(name=notes_dockerfile_repo.name),
-                ],
-                build_parameters={
-                    "CONTEXT": (
-                        f"{notes_dockerfile_repo.name}/dockerfiles/openedx-notes/"
-                    ),
-                    "BUILD_ARG_OPENEDX_COMMON_VERSION": notes_branch,
-                    "BUILD_ARG_PYTHON_VERSION": openedx_release.python_version,
-                },
-                build_args=[
-                    "-t $(cat ./notes-release/commit_sha)",
-                    f"-t {notes_branch}",
-                ],
-            ),
             TaskStep(
                 task=Identifier("build-notes-image"),
                 privileged=True,
@@ -110,7 +84,6 @@ def build_notes_pipeline(
                     ),
                     inputs=[
                         Input(name=notes_repo.name),
-                        Input(name=notes_dockerfile_repo.name),
                         Input(name=notes_lehrer_repo.name),
                     ],
                     outputs=[Output(name="artifacts")],
@@ -142,7 +115,6 @@ def build_notes_pipeline(
         resources=[
             notes_repo,
             notes_registry_image,
-            notes_dockerfile_repo,
             notes_lehrer_repo,
         ],
         jobs=[image_build_job],
