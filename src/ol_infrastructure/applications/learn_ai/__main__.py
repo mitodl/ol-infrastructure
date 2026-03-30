@@ -735,8 +735,8 @@ static_secrets = OLVaultK8SSecret(
 
 env_vars = dict(learn_ai_config.require_object("env_vars") or {})
 
-# Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all metrics
-# carry organizational metadata regardless of stack environment.
+# Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
+# signals carry organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(env_vars, k8s_global_labels)
 
 # Instantiate the OLApplicationK8s component
