@@ -1,0 +1,7 @@
+---
+name: ol-infrastructure-code-graph-rag
+runtime: python
+description: code-graph-rag MCP server managed by ToolHive Operator with Memgraph
+  graph backend
+backend:
+  url: s3://mitol-pulumi-state/

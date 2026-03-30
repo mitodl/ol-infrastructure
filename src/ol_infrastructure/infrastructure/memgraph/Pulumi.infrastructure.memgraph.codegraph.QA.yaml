@@ -1,0 +1,11 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+config:
+  memgraph:namespace: code-intelligence
+  memgraph:storage_size: 50Gi
+  memgraph:memory_limit: 8Gi
+  memgraph:enable_lab: "true"
+  memgraph:helm_version: "0.4.0"
+  memgraph:allowed_namespaces:
+  - code-intelligence
+  - toolhive-system

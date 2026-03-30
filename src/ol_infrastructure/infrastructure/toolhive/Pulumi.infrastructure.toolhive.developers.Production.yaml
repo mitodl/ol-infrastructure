@@ -1,0 +1,9 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+config:
+  toolhive:eks_cluster: operations
+  toolhive:registry_replicas: 1
+  toolhive:enable_oidc: "true"
+  toolhive:oidc_issuer_url: https://sso.ol.mit.edu/realms/ol-platform-engineering
+  toolhive:oidc_client_id: ol-toolhive-developers-client
+  # toolhive:oidc_client_secret: <encrypt with: pulumi config set --secret toolhive:oidc_client_secret>

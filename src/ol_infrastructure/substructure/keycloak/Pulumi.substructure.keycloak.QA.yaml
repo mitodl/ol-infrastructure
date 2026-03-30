@@ -126,3 +126,9 @@ config:
   keycloak_realm:session_secret:
     secure: v1:9Y54vvxTRbuuDCro:dXlzvu2/QqxZyEA1iG/elwzgP3xAQSVChqh/c5bXsLmz3j6hDzBlgBzlp9pIbxVk/+1GhYKrIgsULgU=
   keycloak_realm:olapps_email_tmeme: ol-learn
+  keycloak_realm:ol-platform-engineering-toolhive-developers-redirect-uris:
+  - "https://toolhive-developers-qa.ol.mit.edu/*"
+  keycloak_realm:ol-platform-engineering-toolhive-developers-web-origins:
+  - "https://toolhive-developers-qa.ol.mit.edu"
+  # keycloak_realm:ol-platform-engineering-toolhive-developers-client-secret:
+  #   secure: <encrypt with: pulumi config set --secret keycloak_realm:ol-platform-engineering-toolhive-developers-client-secret>

@@ -96,3 +96,7 @@ PGBOUNCER_VERSION = "1.25.1"
 LOCAL_PATH_PROVISIONER_CHART_VERSION = "0.0.35"
 # renovate: datasource=github-releases depName=qdrant packageName=qdrant/qdrant
 QDRANT_VERSION = "v1.17.1"
+# renovate: datasource=helm depName=memgraph packageName=memgraph registryUrl=https://memgraph.github.io/helm-charts
+MEMGRAPH_CHART_VERSION = "0.4.0"
+# renovate: datasource=docker depName=toolhive-operator packageName=ghcr.io/stacklok/toolhive/toolhive-operator
+TOOLHIVE_OPERATOR_CHART_VERSION = "0.1.0"
