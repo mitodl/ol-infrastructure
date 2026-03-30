@@ -782,8 +782,8 @@ k8s_extra_vars: dict[str, str | Output[str]] = {
 }
 app_env_vars.update(k8s_extra_vars)
 
-# Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all metrics
-# carry organizational metadata regardless of stack environment.
+# Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
+# signals carry organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(app_env_vars, k8s_app_labels)
 
 if "ODL_VIDEO_SERVICE_DOCKER_TAG" not in os.environ:
