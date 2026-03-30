@@ -13,11 +13,17 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
+from ol_concourse.lib.notifications import notification
+from ol_concourse.lib.resources import slack_notification
 
 COURSES = ["ml", "gen_ai", "sys_think", "sys_eng"]
 
 run_optimization_pipeline = (
     Path(__file__).parent.joinpath("run_optimization_pipeline.sh").read_text()
+)
+
+slack_notification_resource = slack_notification(
+    Identifier("slack-notification"), url="((google_ads_optimization.slack_url))"
 )
 
 
@@ -52,6 +58,24 @@ def ad_optimization_pipeline() -> Pipeline:
                 ),
             ),
         ],
+        on_error=notification(
+            slack_notification_resource,
+            "Google Ads Optimization Pipeline Error",
+            "Google Ads Optimization Pipeline errored for ((course_name)). Check the pipeline logs for details.",
+            alert_type="errored",
+        ),
+        on_failure=notification(
+            slack_notification_resource,
+            "Google Ads Optimization Pipeline Failure",
+            "Google Ads Optimization Pipeline failed for ((course_name)). Check the pipeline logs for details.",
+            alert_type="failed",
+        ),
+        on_abort=notification(
+            slack_notification_resource,
+            "Google Ads Optimization Pipeline Abort",
+            "Google Ads Optimization Pipeline aborted for ((course_name)). Check the pipeline logs for details.",
+            alert_type="aborted",
+        ),
     )
     return Pipeline(jobs=[ad_optimization_object])
 
