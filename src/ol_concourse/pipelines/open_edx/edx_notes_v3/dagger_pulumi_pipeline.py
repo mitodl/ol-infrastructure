@@ -14,6 +14,7 @@ from ol_concourse.lib.models.pipeline import (
     Identifier,
     Input,
     Job,
+    Output,
     Pipeline,
     Platform,
     PutStep,
@@ -112,7 +113,7 @@ def build_notes_pipeline(
                         Input(name=notes_dockerfile_repo.name),
                         Input(name=notes_lehrer_repo.name),
                     ],
-                    outputs=["artifacts"],
+                    outputs=[Output(name="artifacts")],
                     run=Command(
                         path="bash",
                         args=[
