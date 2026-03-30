@@ -89,5 +89,5 @@ if __name__ == "__main__":
         definition.write(meta_pipeline.model_dump_json(indent=2))
     sys.stdout.write(meta_pipeline.model_dump_json(indent=2))
     sys.stdout.write(
-        "\nfly -t <target> set-pipeline -p packer-pulumi-xqwatcher-meta -c definition.json"  # noqa: E501
+        "\nfly -t <target> set-pipeline -p docker-pulumi-xqwatcher-meta -c definition.json"  # noqa: E501
     )
