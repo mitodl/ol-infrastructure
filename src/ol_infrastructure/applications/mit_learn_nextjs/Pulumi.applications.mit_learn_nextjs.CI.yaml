@@ -24,3 +24,6 @@ config:
   nextjs:sentry_env: "ci"
   nextjs:syllabus_endpoint: "https://api.ci.learn.mit.edu/ai/http/syllabus_agent/"
   nextjs:optimize_images: "true"
+  # BEGIN feature flag defaults
+  # None used in CI
+  # END feature flag defaults
