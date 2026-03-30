@@ -566,8 +566,8 @@ app_env_vars["POSTHOG_API_HOST"] = app_env_vars.pop(
     ocw_studio_config.get("posthog_api_host") or "https://app.posthog.com",
 )
 
-# Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all metrics
-# carry organizational metadata regardless of stack environment.
+# Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
+# carries organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(app_env_vars, k8s_app_labels)
 
 if "OCW_STUDIO_DOCKER_TAG" not in os.environ:
