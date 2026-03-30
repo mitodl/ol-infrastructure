@@ -89,8 +89,15 @@ def merge_otel_resource_attributes(
     :param env_vars: Mutable dict of environment variables to update.
     :param k8s_labels: Kubernetes label key/value pairs to encode as OTEL attributes.
     """
-    k8s_label_attrs = ",".join(f"{k}={v}" for k, v in k8s_labels.items())
+    # No-op when there are no labels to merge; avoid clobbering or altering
+    # OTEL_RESOURCE_ATTRIBUTES with an empty string or trailing comma.
+    if not k8s_labels:
+        return
+
+    # Sort labels to ensure deterministic ordering and avoid spurious diffs.
+    k8s_label_attrs = ",".join(f"{k}={v}" for k, v in sorted(k8s_labels.items()))
     base_otel = env_vars.get("OTEL_RESOURCE_ATTRIBUTES")
-    env_vars["OTEL_RESOURCE_ATTRIBUTES"] = (
-        f"{base_otel},{k8s_label_attrs}" if base_otel else k8s_label_attrs
-    )
+    if base_otel:
+        env_vars["OTEL_RESOURCE_ATTRIBUTES"] = f"{base_otel},{k8s_label_attrs}"
+    else:
+        env_vars["OTEL_RESOURCE_ATTRIBUTES"] = k8s_label_attrs
