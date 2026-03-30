@@ -1262,6 +1262,28 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 resource_options=resource_options,
             ),
         )
+        onboard_oidc_org(
+            OIDCIdpConfig(
+                idp_alias="UBSU",
+                idp_display_name="University of Business and Science",
+                org_oidc_metadata_url="https://sso.ubsu.uz/o/.well-known/openid-configuration/",
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                client_id="WvSYK1VfnDG1vSepxtC2o011CkuQvL4GaddAzmZc",
+                client_secret=keycloak_realm_config.require("ubsu-client-secret"),
+            ),
+            org=OrgConfig(
+                org_domains=[
+                    "ubsu.uz",
+                ],
+                org_name="University of Business and Science",
+                org_alias="UBSU",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
 
     # B2B Organizations [END]
 
