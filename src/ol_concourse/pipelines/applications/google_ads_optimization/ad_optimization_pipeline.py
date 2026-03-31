@@ -14,6 +14,9 @@ from ol_concourse.lib.models.pipeline import (
     TaskStep,
 )
 from ol_concourse.lib.notifications import notification
+from ol_concourse.lib.resource_types import (
+    slack_notification_resource as slack_notification_resource_type,
+)
 from ol_concourse.lib.resources import slack_notification
 
 COURSES = ["ml", "gen_ai", "sys_think", "sys_eng"]
@@ -77,7 +80,11 @@ def ad_optimization_pipeline() -> Pipeline:
             alert_type="aborted",
         ),
     )
-    return Pipeline(jobs=[ad_optimization_object])
+    return Pipeline(
+        jobs=[ad_optimization_object],
+        resources=[slack_notification_resource],
+        resource_types=[slack_notification_resource_type()],
+    )
 
 
 if __name__ == "__main__":
