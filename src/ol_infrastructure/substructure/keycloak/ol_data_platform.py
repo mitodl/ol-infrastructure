@@ -523,12 +523,10 @@ def create_ol_data_platform_realm(  # noqa: PLR0913, PLR0915
         service_accounts_enabled=False,
         direct_access_grants_enabled=False,
         valid_redirect_uris=[
-            "https://jupyter-data.odl.mit.edu/hub/oauth_callback",
-            "https://jupyter-data-qa.odl.mit.edu/hub/oauth_callback",
-            "https://jupyter-data-ci.odl.mit.edu/hub/oauth_callback",
-            "https://notebooks.odl.mit.edu/*",
-            "https://notebooks-qa.odl.mit.edu/*",
-            "https://notebooks-ci.odl.mit.edu/*",
+            "https://nb.data.ol.mit.edu/hub/oauth_callback",
+            "https://nb-qa.data.ol.mit.edu/hub/oauth_callback",
+            "https://nb.data.ol.mit.edu/*",
+            "https://nb-qa.data.ol.mit.edu/*",
         ],
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )

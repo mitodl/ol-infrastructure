@@ -1,7 +1,7 @@
 ---
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 config:
-  jupyterhub_data:domain: jupyter-data-qa.odl.mit.edu
+  jupyterhub_data:domain: nb-qa.data.ol.mit.edu
   jupyterhub_data:authenticator_class: generic-oauth
   jupyterhub_data:keycloak_base_url: https://sso-qa.ol.mit.edu
   jupyterhub_data:keycloak_realm: ol-data-platform

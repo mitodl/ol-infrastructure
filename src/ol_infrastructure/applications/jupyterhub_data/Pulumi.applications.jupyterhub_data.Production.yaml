@@ -1,7 +1,7 @@
 ---
 secretsprovider: awskms://alias/infrastructure-secrets-production
 config:
-  jupyterhub_data:domain: jupyter-data.odl.mit.edu
+  jupyterhub_data:domain: nb.data.ol.mit.edu
   jupyterhub_data:authenticator_class: generic-oauth
   jupyterhub_data:keycloak_base_url: https://sso.ol.mit.edu
   jupyterhub_data:keycloak_realm: ol-data-platform
