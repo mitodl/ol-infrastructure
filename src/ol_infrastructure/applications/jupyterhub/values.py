@@ -47,7 +47,7 @@ class InvalidAuthenticatorError(Exception):
 # which we only use for authenticator configuration.
 def get_authenticator_config(jupyterhub_deployment_config):
     authenticator_type = jupyterhub_deployment_config.get("authenticator_class", "tmp")
-    if authenticator_type not in ["shared-password", "tmp"]:
+    if authenticator_type not in ["shared-password", "tmp", "generic-oauth"]:
         raise InvalidAuthenticatorError(authenticator_type)
 
     admin_users_list = jupyterhub_deployment_config.get("admin_users", [])
@@ -67,4 +67,29 @@ def get_authenticator_config(jupyterhub_deployment_config):
         }
     elif authenticator_type == "tmp":
         auth_conf["JupyterHub"] = {"authenticator_class": "tmp"}
+    elif authenticator_type == "generic-oauth":
+        keycloak_base_url = jupyterhub_deployment_config.get(
+            "keycloak_base_url", "https://sso.ol.mit.edu"
+        )
+        realm = jupyterhub_deployment_config.get("keycloak_realm", "ol-data-platform")
+        auth_conf["JupyterHub"] = {"authenticator_class": "generic-oauth"}
+        auth_conf["GenericOAuthenticator"] = {
+            "authorize_url": (
+                f"{keycloak_base_url}/realms/{realm}/protocol/openid-connect/auth"
+            ),
+            "token_url": (
+                f"{keycloak_base_url}/realms/{realm}/protocol/openid-connect/token"
+            ),
+            "userdata_url": (
+                f"{keycloak_base_url}/realms/{realm}/protocol/openid-connect/userinfo"
+            ),
+            "login_service": jupyterhub_deployment_config.get(
+                "login_service", "MIT OL Data Platform"
+            ),
+            "username_claim": jupyterhub_deployment_config.get(
+                "username_claim", "preferred_username"
+            ),
+            "scope": ["openid", "profile", "email", "ol_roles"],
+            "enable_auth_state": True,
+        }
     return auth_conf

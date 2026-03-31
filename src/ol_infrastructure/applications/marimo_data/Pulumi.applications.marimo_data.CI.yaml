@@ -1,0 +1,8 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+config:
+  marimo_data:apps_domain: notebooks-ci.odl.mit.edu
+  marimo_data:hub_domain: jupyter-data-ci.odl.mit.edu
+  aws:region: us-east-1
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci

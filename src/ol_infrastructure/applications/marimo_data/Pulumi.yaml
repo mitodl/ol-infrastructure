@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-marimo-data-application
+runtime: python
+description: MIT OL Marimo Data Platform — published notebook applications
+backend:
+  url: s3://mitol-pulumi-state/
