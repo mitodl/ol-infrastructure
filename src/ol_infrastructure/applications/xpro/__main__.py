@@ -47,6 +47,7 @@ from ol_infrastructure.components.services.cert_manager import (
 )
 from ol_infrastructure.components.services.k8s import (
     OLApplicationK8s,
+    OLApplicationK8sCeleryBeatConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
 )
@@ -545,6 +546,9 @@ if k8s_deploy:
                     redis_password=redis_config.require("password"),
                 ),
             ],
+            celery_beat_config=OLApplicationK8sCeleryBeatConfig(
+                application_name="mitxpro.celery:app",
+            ),
             resource_requests={"cpu": "250m", "memory": "2Gi"},
             resource_limits={"memory": "2Gi"},
             probe_configs={
