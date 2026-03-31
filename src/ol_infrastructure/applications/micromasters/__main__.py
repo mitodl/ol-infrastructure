@@ -82,7 +82,10 @@ from ol_infrastructure.lib.ol_types import (
     K8sGlobalLabels,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import (
+    merge_otel_resource_attributes,
+    parse_stack,
+)
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
@@ -1005,6 +1008,11 @@ if micromasters_config.get_bool("deploy_k8s"):
             "SECURE_PROXY_SSL_HEADER": "HTTP_X_FORWARDED_PROTO,https",
         }
     )
+
+    # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
+    # signals (traces, metrics, logs) carry organizational metadata regardless of
+    # stack environment.
+    merge_otel_resource_attributes(k8s_env_vars, k8s_global_labels)
 
     micromasters_k8s_app = OLApplicationK8s(
         ol_app_k8s_config=OLApplicationK8sConfig(

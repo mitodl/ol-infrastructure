@@ -85,7 +85,10 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import (
+    merge_otel_resource_attributes,
+    parse_stack,
+)
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 
@@ -1215,6 +1218,10 @@ interpolated_vars = {
 # Combine two var sources above with values explictly defined in pulumi configuration
 env_vars.update(**interpolated_vars)
 env_vars.update(**mitlearn_config.get_object("vars"))
+
+# Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
+# carries organizational metadata regardless of stack environment.
+merge_otel_resource_attributes(env_vars, k8s_app_labels)
 
 # Making these `get_secret_*()` calls children of the seemigly un-related vault mount `secret-mitopen/` tricks
 # them into inheriting the correct vault provider rather than attempting to create their own (which won't work and / or

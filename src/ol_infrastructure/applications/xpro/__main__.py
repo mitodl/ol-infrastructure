@@ -79,7 +79,10 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import (
+    merge_otel_resource_attributes,
+    parse_stack,
+)
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
@@ -497,6 +500,10 @@ if k8s_deploy:
 
     # Merge stack-level config vars into the app env vars
     app_env_vars.update(**xpro_config.get_object("vars") or {})
+
+    # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
+    # carries organizational metadata regardless of stack environment.
+    merge_otel_resource_attributes(app_env_vars, k8s_app_labels)
 
     if "XPRO_DOCKER_TAG" not in os.environ:
         msg = "XPRO_DOCKER_TAG must be set."

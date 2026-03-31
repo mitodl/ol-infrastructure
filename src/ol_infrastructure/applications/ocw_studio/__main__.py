@@ -75,7 +75,10 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import (
+    merge_otel_resource_attributes,
+    parse_stack,
+)
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
@@ -562,6 +565,10 @@ app_env_vars["POSTHOG_API_HOST"] = app_env_vars.pop(
     "PUBLISH_POSTHOG_API_HOST",
     ocw_studio_config.get("posthog_api_host") or "https://app.posthog.com",
 )
+
+# Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
+# carries organizational metadata regardless of stack environment.
+merge_otel_resource_attributes(app_env_vars, k8s_app_labels)
 
 if "OCW_STUDIO_DOCKER_TAG" not in os.environ:
     msg = "OCW_STUDIO_DOCKER_TAG must be set."

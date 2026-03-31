@@ -72,7 +72,10 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import (
+    merge_otel_resource_attributes,
+    parse_stack,
+)
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
@@ -778,6 +781,10 @@ k8s_extra_vars: dict[str, str | Output[str]] = {
     "VIDEO_TRANSCODE_QUEUE": ovs_mediaconvert.queue.name,
 }
 app_env_vars.update(k8s_extra_vars)
+
+# Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
+# signals carry organizational metadata regardless of stack environment.
+merge_otel_resource_attributes(app_env_vars, k8s_app_labels)
 
 if "ODL_VIDEO_SERVICE_DOCKER_TAG" not in os.environ:
     msg = "ODL_VIDEO_SERVICE_DOCKER_TAG must be set."
