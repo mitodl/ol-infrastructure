@@ -81,9 +81,9 @@ def setup_grafana(
                 "cluster": {
                     "name": cluster_name,
                 },
-                "destinations": [
-                    {
-                        "name": "grafana-cloud-metrics",
+                # v4: destinations is now a map (keyed by name) instead of an array
+                "destinations": {
+                    "grafana-cloud-metrics": {
                         "type": "prometheus",
                         "url": "https://prometheus-prod-10-prod-us-central-0.grafana.net./api/prom/push",
                         "auth": {
@@ -94,8 +94,7 @@ def setup_grafana(
                             "password": grafana_vault_secrets["k8s_monitoring_api_key"],
                         },
                     },
-                    {
-                        "name": "grafana-cloud-logs",
+                    "grafana-cloud-logs": {
                         "type": "loki",
                         "url": "https://logs-prod-us-central1.grafana.net./loki/api/v1/push",
                         "auth": {
@@ -106,8 +105,7 @@ def setup_grafana(
                             "password": grafana_vault_secrets["k8s_monitoring_api_key"],
                         },
                     },
-                    {
-                        "name": "gc-otlp-endpoint",
+                    "gc-otlp-endpoint": {
                         "type": "otlp",
                         "url": "https://otlp-gateway-prod-us-central-0.grafana.net./otlp",
                         "protocol": "http",
@@ -132,7 +130,7 @@ def setup_grafana(
                                 "enabled": True,
                                 "decisionWait": "5s",
                                 "numTraces": 100,
-                                "expectedNewTracesPerSecond": 10,
+                                "expectedNewTracesPerSec": 10,
                                 "decisionCache": {
                                     "sampledCacheSize": 1000,
                                     "nonSampledCacheSize": 10000,
@@ -157,30 +155,15 @@ def setup_grafana(
                             },
                         },
                     },
-                ],
+                },
                 "clusterMetrics": {
                     "enabled": True,
-                    "opencost": {
-                        "enabled": True,
-                        "metricsSource": "grafana-cloud-metrics",
-                        "opencost": {
-                            "exporter": {
-                                "defaultClusterId": cluster_name,
-                            },
-                            "prometheus": {
-                                "existingSecretName": "grafana-cloud-metrics-grafana-k8s-monitoring",  # pragma: allowlist secret
-                                "external": {
-                                    "url": "https://prometheus-prod-10-prod-us-central-0.grafana.net./api/prom"
-                                },
-                            },
-                        },
-                    },
-                    "kube-state-metrics": {"deploy": True},
-                    "kepler": {
-                        "enabled": True,
-                    },
                 },
-                "annotationAutodiscover": {
+                # v4: opencost moved from clusterMetrics to costMetrics feature
+                "costMetrics": {
+                    "enabled": True,
+                },
+                "annotationAutodiscovery": {
                     "enabled": True,
                 },
                 "prometheusOperatorObjects": {
@@ -188,12 +171,15 @@ def setup_grafana(
                 },
                 "clusterEvents": {
                     "enabled": True,
+                    "collector": "alloy-singleton",
                 },
-                "podLogs": {
+                # v4: podLogs renamed to podLogsViaLoki
+                "podLogsViaLoki": {
                     "enabled": True,
                 },
                 "applicationObservability": {
                     "enabled": True,
+                    "collector": "alloy-receiver",
                     "receivers": {
                         "otlp": {
                             "grpc": {
@@ -211,94 +197,6 @@ def setup_grafana(
                         },
                     },
                 },
-                "alloy-metrics": {
-                    "enabled": True,
-                    "alloy": {
-                        "extraEnv": alloy_extra_env_vars,
-                    },
-                    "remoteConfig": {
-                        "enabled": True,
-                        "url": "https://fleet-management-prod-001.grafana.net",
-                        "auth": {
-                            "type": "basic",
-                            "username": grafana_vault_secrets[
-                                "k8s_monitoring_tracing_username"
-                            ],
-                            "password": grafana_vault_secrets["k8s_monitoring_api_key"],
-                        },
-                    },
-                },
-                "alloy-singleton": {
-                    "enabled": True,
-                    "alloy": {
-                        "extraEnv": alloy_extra_env_vars,
-                    },
-                    "remoteConfig": {
-                        "enabled": True,
-                        "url": "https://fleet-management-prod-001.grafana.net",
-                        "auth": {
-                            "type": "basic",
-                            "username": grafana_vault_secrets[
-                                "k8s_monitoring_tracing_username"
-                            ],
-                            "password": grafana_vault_secrets["k8s_monitoring_api_key"],
-                        },
-                    },
-                },
-                "alloy-logs": {
-                    "enabled": True,
-                    "alloy": {
-                        "extraEnv": alloy_extra_env_vars,
-                    },
-                    "remoteConfig": {
-                        "enabled": True,
-                        "url": "https://fleet-management-prod-001.grafana.net",
-                        "auth": {
-                            "type": "basic",
-                            "username": grafana_vault_secrets[
-                                "k8s_monitoring_tracing_username"
-                            ],
-                            "password": grafana_vault_secrets["k8s_monitoring_api_key"],
-                        },
-                    },
-                },
-                "alloy-receiver": {
-                    "enabled": True,
-                    "alloy": {
-                        "extraEnv": alloy_extra_env_vars,
-                        "extraPorts": [
-                            {
-                                "name": "otlp-grpc",
-                                "port": 4317,
-                                "targetPort": 4317,
-                                "protocol": "TCP",
-                            },
-                            {
-                                "name": "otlp-http",
-                                "port": 4318,
-                                "targetPort": 4318,
-                                "protocol": "TCP",
-                            },
-                            {
-                                "name": "zipkin",
-                                "port": 9411,
-                                "targetPort": 9411,
-                                "protocol": "TCP",
-                            },
-                        ],
-                    },
-                    "remoteConfig": {
-                        "enabled": True,
-                        "url": "https://fleet-management-prod-001.grafana.net",
-                        "auth": {
-                            "type": "basic",
-                            "username": grafana_vault_secrets[
-                                "k8s_monitoring_tracing_username"
-                            ],
-                            "password": grafana_vault_secrets["k8s_monitoring_api_key"],
-                        },
-                    },
-                },
                 "integrations": {
                     "dcgm-exporter": {
                         "instances": [
@@ -309,6 +207,83 @@ def setup_grafana(
                                 },
                             }
                         ],
+                    },
+                },
+                # v4: kepler and kube-state-metrics moved to telemetryServices;
+                #     opencost moved here from clusterMetrics
+                "telemetryServices": {
+                    "kube-state-metrics": {"deploy": True},
+                    "kepler": {"deploy": True},
+                    "opencost": {
+                        "deploy": True,
+                        "metricsSource": "grafana-cloud-metrics",
+                        "opencost": {
+                            "exporter": {
+                                "defaultClusterId": cluster_name,
+                            },
+                            "prometheus": {
+                                "existingSecretName": "grafana-cloud-metrics-grafana-k8s-monitoring",  # pragma: allowlist secret
+                                "external": {
+                                    "url": "https://prometheus-prod-10-prod-us-central-0.grafana.net./api/prom"
+                                },
+                            },
+                        },
+                    },
+                },
+                # v4: remoteConfig and shared extraEnv go under collectorCommon.alloy;
+                #     named alloy instances replaced by collectors map with presets
+                "collectorCommon": {
+                    "alloy": {
+                        "extraEnv": alloy_extra_env_vars,
+                        "remoteConfig": {
+                            "enabled": True,
+                            "url": "https://fleet-management-prod-001.grafana.net",
+                            "auth": {
+                                "type": "basic",
+                                "username": grafana_vault_secrets[
+                                    "k8s_monitoring_tracing_username"
+                                ],
+                                "password": grafana_vault_secrets[
+                                    "k8s_monitoring_api_key"
+                                ],
+                            },
+                        },
+                    },
+                },
+                "collectors": {
+                    "alloy-metrics": {
+                        "presets": ["clustered", "statefulset"],
+                    },
+                    "alloy-singleton": {
+                        "presets": ["singleton"],
+                    },
+                    "alloy-logs": {
+                        "presets": ["filesystem-log-reader", "daemonset"],
+                    },
+                    "alloy-receiver": {
+                        "presets": ["deployment"],
+                        "alloy": {
+                            "extraPorts": [
+                                {
+                                    "name": "otlp-grpc",
+                                    "port": 4317,
+                                    "targetPort": 4317,
+                                    "protocol": "TCP",
+                                },
+                                {
+                                    "name": "otlp-http",
+                                    "port": 4318,
+                                    "targetPort": 4318,
+                                    "protocol": "TCP",
+                                },
+                                {
+                                    "name": "zipkin",
+                                    "port": 9411,
+                                    "targetPort": 9411,
+                                    "protocol": "TCP",
+                                },
+                            ],
+                        },
                     },
                 },
             },
