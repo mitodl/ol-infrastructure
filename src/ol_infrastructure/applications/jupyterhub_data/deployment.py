@@ -55,7 +55,7 @@ async def pre_spawn_hook(spawner):
 c.KubeSpawner.pre_spawn_hook = pre_spawn_hook
 """
 
-# KubeSpawner profile list: lets users choose their compute tier at launch time.
+# KubeSpawner profile list: currently defines Standard and Large CPU/memory tiers.
 _PROFILE_LIST = f"""
 c.KubeSpawner.profile_list = [
     {{
@@ -131,15 +131,16 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
         policy=vault_policy_hcl,
     )
 
-    # Vault K8S Auth Backend Role — bound to the jupyterhub-data namespace.
-    # The marimo namespace is also bound so published-app pods can read their
-    # service-account Trino credentials via VSO.
+    # Vault K8S Auth Backend Role — bound only to the jupyterhub-data namespace.
+    # This role's policy covers JupyterHub hub secrets (OIDC creds, crypt key, DB
+    # creds) and must not be shared with other namespaces. The marimo namespace
+    # has its own dedicated Vault policy and auth role in the marimo_data stack.
     vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
         f"ol-{base_name}-vault-k8s-auth-backend-role-{stack_info.env_suffix}",
         role_name=base_name,
         backend=cluster_stack.require_output("vault_auth_endpoint"),
         bound_service_account_names=["*"],
-        bound_service_account_namespaces=[namespace, "marimo"],
+        bound_service_account_namespaces=[namespace],
         token_policies=[vault_policy.name],
     )
 
@@ -171,7 +172,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
             includes=["client_id", "client_secret"],
             labels=k8s_global_labels,
             mount="secret-operations",
-            mount_type="kv-v2",
+            mount_type="kv-v1",
             name=f"{base_name}-oidc-secret",
             namespace=namespace,
             path="sso/marimo",
@@ -198,7 +199,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
             includes=["JUPYTERHUB_CRYPT_KEY"],
             labels=k8s_global_labels,
             mount="secret-operations",
-            mount_type="kv-v2",
+            mount_type="kv-v1",
             name=f"{base_name}-crypt-key",
             namespace=namespace,
             path="jupyterhub-data/crypt-key",

@@ -1,7 +1,8 @@
 """Marimo Data application stack — published notebook applications.
 
-This stack manages the marimo-operator and the APISIX route that exposes
-published (run-mode) MarimoNotebook CRDs at notebooks.odl.mit.edu/apps/{name}.
+This stack manages the APISIX route and supporting infrastructure that expose
+published (run-mode) MarimoNotebook CRDs at notebooks.odl.mit.edu/apps/{name},
+assuming the marimo-operator is installed and managed separately.
 
 Published apps use the ol-marimo-app-client service account (client credentials
 flow) for Trino access, so they are not tied to a specific user session.
@@ -47,7 +48,6 @@ setup_vault_provider(stack_info)
 marimo_data_config = Config("marimo_data")
 vault_config = Config("vault")
 
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
@@ -57,7 +57,6 @@ aws_config = AWSBase(
 )
 
 marimo_namespace = "marimo"
-marimo_operator_namespace = "marimo-operator-system"
 
 k8s_global_labels = K8sGlobalLabels(
     service=Services.notebooks,
@@ -123,7 +122,7 @@ marimo_app_trino_secret = OLVaultK8SSecret(
         includes=["client_id", "client_secret"],
         labels=k8s_global_labels,
         mount="secret-operations",
-        mount_type="kv-v2",
+        mount_type="kv-v1",
         name="marimo-app-oidc-secret",
         namespace=marimo_namespace,
         path="sso/marimo-app",
@@ -181,9 +180,8 @@ marimo_shared_plugins = OLApisixSharedPlugins(
 )
 
 # APISIX route for notebooks.odl.mit.edu — openid-connect plugin enforces auth,
-# proxy-rewrite strips the /apps/ prefix before forwarding to the individual
-# MarimoNotebook service. The actual per-notebook routing relies on the
-# marimo-operator creating Services named after each MarimoNotebook resource.
+# forwarding to the marimo-operator-gateway service which routes to individual
+# MarimoNotebook services created by the operator.
 OLApisixRoute(
     name=f"ol-marimo-data-k8s-apisix-route-{stack_info.env_suffix}",
     k8s_namespace=marimo_namespace,
