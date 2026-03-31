@@ -16,7 +16,7 @@ import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
-from bridge.lib.versions import JUPYTERHUB_CHART_VERSION
+from bridge.lib.versions import JUPYTERHUB_CHART_VERSION, MARIMO_JUPYTERLAB_VERSION
 from ol_infrastructure.applications.jupyterhub.values import get_authenticator_config
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole
@@ -56,32 +56,31 @@ c.KubeSpawner.pre_spawn_hook = pre_spawn_hook
 """
 
 # KubeSpawner profile list: lets users choose their compute tier at launch time.
-# The GPU profile requires NVIDIA device plugin (already running on data cluster).
-_PROFILE_LIST = """
+_PROFILE_LIST = f"""
 c.KubeSpawner.profile_list = [
-    {
+    {{
         "display_name": "Standard",
         "description": "2 CPU / 8 GB — general data analysis",
         "default": True,
-        "kubespawner_override": {
+        "kubespawner_override": {{
             "cpu_guarantee": 0.5,
             "cpu_limit": 2,
             "mem_guarantee": "2G",
             "mem_limit": "8G",
-            "image": "ghcr.io/mitodl/marimo-jupyterlab:latest",
-        },
-    },
-    {
+            "image": "ghcr.io/mitodl/marimo-jupyterlab:{MARIMO_JUPYTERLAB_VERSION}",
+        }},
+    }},
+    {{
         "display_name": "Large",
         "description": "4 CPU / 32 GB — heavy computation",
-        "kubespawner_override": {
+        "kubespawner_override": {{
             "cpu_guarantee": 1,
             "cpu_limit": 4,
             "mem_guarantee": "8G",
             "mem_limit": "32G",
-            "image": "ghcr.io/mitodl/marimo-jupyterlab:latest",
-        },
-    },
+            "image": "ghcr.io/mitodl/marimo-jupyterlab:{MARIMO_JUPYTERLAB_VERSION}",
+        }},
+    }},
 ]
 """
 
@@ -426,7 +425,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     "serviceAccountName": service_account_name,
                     "image": {
                         "name": "ghcr.io/mitodl/marimo-jupyterlab",
-                        "tag": "latest",
+                        "tag": MARIMO_JUPYTERLAB_VERSION,
                         "pullPolicy": "Always",
                     },
                     "cmd": ["jupyterhub-singleuser"],
