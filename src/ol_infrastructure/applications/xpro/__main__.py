@@ -543,6 +543,7 @@ if k8s_deploy:
                     worker_name="default",
                     redis_host=redis_cache.address,
                     redis_password=redis_config.require("password"),
+                    run_beat=True,
                 ),
             ],
             resource_requests={"cpu": "250m", "memory": "2Gi"},
