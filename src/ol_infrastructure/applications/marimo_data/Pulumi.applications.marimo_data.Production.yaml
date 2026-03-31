@@ -1,0 +1,8 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+config:
+  marimo_data:apps_domain: notebooks.odl.mit.edu
+  marimo_data:hub_domain: jupyter-data.odl.mit.edu
+  aws:region: us-east-1
+  vault:address: https://vault.odl.mit.edu
+  vault_server:env_namespace: operations.production

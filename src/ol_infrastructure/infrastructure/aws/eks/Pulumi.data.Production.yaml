@@ -28,7 +28,10 @@ config:
   - clickhouse
   - clickhouse-operator
   - dagster
+  - jupyter-data
   - kubewatch
+  - marimo
+  - marimo-operator-system
   - open-metadata
   - qdrant
   - starrocks
