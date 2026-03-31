@@ -833,6 +833,7 @@ uai_b2c_redirects: dict[str, str] = {
     "/courses/course-v1:UAI_SOURCE+UAI.PM.1/": f"https://{learn_frontend_domain}/courses/course-v1:UAI_SOURCE+UAI.PM.1",
     "/courses/course-v1:UAI_SOURCE+UAI.ST.1/": f"https://{learn_frontend_domain}/courses/course-v1:UAI_SOURCE+UAI.ST.1",
     "/courses/course-v1:UAI_SOURCE+UAI.ENT.1/": f"https://{learn_frontend_domain}/courses/course-v1:UAI_SOURCE+UAI.ENT.1",
+    "/courses/course-v1:UAI_SOURCE+UAI.HAIM.1/": f"https://{learn_frontend_domain}/courses/course-v1:UAI_SOURCE+UAI.HAIM.1/",
 }
 uai_b2c_redirect_vcl = "\n".join(
     f'if (req.url.path == "{path}") {{\n'
