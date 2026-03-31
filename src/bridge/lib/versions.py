@@ -74,7 +74,7 @@ CLICKHOUSE_SERVER_VERSION = "25.8.1.2953.altinitystable"
 # renovate: datasource=docker depName=clickhouse/clickhouse-keeper packageName=clickhouse/clickhouse-keeper
 CLICKHOUSE_KEEPER_VERSION = "26.3-alpine"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
-TRAEFIK_CHART_VERSION = "39.0.6"
+TRAEFIK_CHART_VERSION = "39.0.7"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
 VANTAGE_K8S_AGENT_CHART_VERSION = "1.4.1"
 # renovate: datasource=helm depName=vault-secrets-operator packageName=vault-secrets-operator registryUrl=https://helm.releases.hashicorp.com
