@@ -526,6 +526,9 @@ def create_ol_data_platform_realm(  # noqa: PLR0913, PLR0915
             "https://jupyter-data.odl.mit.edu/hub/oauth_callback",
             "https://jupyter-data-qa.odl.mit.edu/hub/oauth_callback",
             "https://jupyter-data-ci.odl.mit.edu/hub/oauth_callback",
+            "https://notebooks.odl.mit.edu/*",
+            "https://notebooks-qa.odl.mit.edu/*",
+            "https://notebooks-ci.odl.mit.edu/*",
         ],
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
@@ -534,13 +537,12 @@ def create_ol_data_platform_realm(  # noqa: PLR0913, PLR0915
         "ol-data-platform-marimo-client-vault-oidc-credentials",
         path="secret-operations/sso/marimo",
         data_json=Output.all(
+            url=ol_data_platform_marimo_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
             client_id=ol_data_platform_marimo_client.client_id,
             client_secret=ol_data_platform_marimo_client.client_secret,
-            discovery=ol_data_platform_marimo_client.realm_id.apply(
-                lambda realm_id: (
-                    f"{keycloak_url}/realms/{realm_id}/.well-known/openid-configuration"
-                )
-            ),
+            secret=session_secret,
             realm_id=ol_data_platform_marimo_client.realm_id,
             realm_name="ol-data-platform",
         ).apply(json.dumps),

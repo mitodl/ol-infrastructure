@@ -6,14 +6,6 @@ path "secret-operations/sso/marimo" {
   capabilities = ["read"]
 }
 
-# Read service-account Trino credentials for published apps (marimo-operator)
-path "secret-operations/data/sso/marimo-app" {
-  capabilities = ["read"]
-}
-path "secret-operations/sso/marimo-app" {
-  capabilities = ["read"]
-}
-
 # Read JUPYTERHUB_CRYPT_KEY for auth state encryption
 path "secret-operations/data/jupyterhub-data/crypt-key" {
   capabilities = ["read"]

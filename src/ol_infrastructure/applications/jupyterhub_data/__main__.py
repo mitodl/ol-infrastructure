@@ -99,13 +99,13 @@ jupyterhub_data_lake_policy_document = {
                 "glue:GetTables",
             ],
             "Resource": [
-                "arn:aws:glue:us-east-1:610119931565:catalog",
+                f"arn:aws:glue:us-east-1:{aws_account.account_id}:catalog",
                 (
-                    "arn:aws:glue:us-east-1:610119931565:database"
+                    f"arn:aws:glue:us-east-1:{aws_account.account_id}:database"
                     f"/ol_warehouse_{stack_info.env_suffix}*"
                 ),
                 (
-                    "arn:aws:glue:us-east-1:610119931565:table"
+                    f"arn:aws:glue:us-east-1:{aws_account.account_id}:table"
                     f"/ol_warehouse_{stack_info.env_suffix}*/*"
                 ),
             ],
@@ -165,7 +165,7 @@ iam.RolePolicyAttachment(
 )
 
 # Dedicated RDS instance in the data VPC for JupyterHub session / user state
-rds_defaults = defaults(stack_info)["rds"]
+rds_defaults = dict(defaults(stack_info)["rds"])
 rds_defaults["instance_size"] = (
     jupyterhub_data_config.get("db_instance_size") or rds_defaults["instance_size"]
 )
