@@ -112,4 +112,4 @@ config:
   keycloak_realm:dynideas_client_secret:
     secure: v1:MiHrklsdHBBmM+x/:AKedvrwKVQYvoPpZat06SQ12Bzem8a7EGwPh0411HuW2PCMaU+yfDWebdmQ4msGLJPua
   keycloak_realm:ubsu-client-secret:
-    secure: v1:warHK51ZJe++4hcD:MmDEZUvvQ+BAQ/X6sFFs2OgPkOslaRrNGAj1avJW
+    secure: v1:pFUmPxSvnsIbE8nR:+FrZrRdidnTh5SU05bqIM3WWWF8iawzfx8aUMVwItpI=
