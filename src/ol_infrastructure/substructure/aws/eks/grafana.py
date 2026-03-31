@@ -165,6 +165,7 @@ def setup_grafana(
                 },
                 "annotationAutodiscovery": {
                     "enabled": True,
+                    "collector": "alloy-metrics",
                 },
                 "prometheusOperatorObjects": {
                     "enabled": True,
