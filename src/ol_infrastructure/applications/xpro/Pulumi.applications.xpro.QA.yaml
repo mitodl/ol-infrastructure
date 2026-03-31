@@ -50,7 +50,7 @@ config:
     ZENDESK_DOMAIN_VERIFICATION_TAG_VALUE: "o0itxdfh369m1bw4cuz9"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
-  xpro:app_domain: rc.xpro.mit.edu
+  xpro:app_domain: xpro-rc.odl.mit.edu
   xpro:backend_domain: "xpro-rc.odl.mit.edu"
   xpro:frontend_domain: "rc.xpro.mit.edu"
   xpro:db_password:
