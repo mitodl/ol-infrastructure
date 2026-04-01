@@ -22,7 +22,7 @@ def pipeline_from_source(source_repo_path: str | Path) -> tuple[list[str], Pipel
         build_command_factory=lambda package_dir, repo_name: (
             f"""
             cd {repo_name};
-            PYTHONPATH=build-support/bin uv build src/{package_dir};
+            uv build --package {package_dir};
             uvx twine check dist/*
             uvx twine upload --skip-existing --non-interactive dist/*
             """

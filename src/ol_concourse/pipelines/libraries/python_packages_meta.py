@@ -83,6 +83,7 @@ def set_child_pipeline_job(
                         args=[
                             "-exc",
                             (
+                                f"PYTHONPATH=../{OL_INFRASTRUCTURE_REPO.name}/src "
                                 "python "
                                 f"../{OL_INFRASTRUCTURE_REPO.name}/{generator_script} "
                                 f"../{source_resource_name}"
@@ -114,14 +115,16 @@ def self_update_job() -> Job:
                     inputs=[Input(name=OL_INFRASTRUCTURE_REPO.name)],
                     outputs=[Output(name=Identifier("pipeline"))],
                     run=Command(
-                        path="python",
+                        path="sh",
                         dir="pipeline",
                         user="root",
                         args=[
+                            "-exc",
                             (
-                                "../python-package-pipeline-definitions/src/"
+                                f"PYTHONPATH=../{OL_INFRASTRUCTURE_REPO.name}/src "
+                                f"python ../{OL_INFRASTRUCTURE_REPO.name}/src/"
                                 "ol_concourse/pipelines/libraries/python_packages_meta.py"
-                            )
+                            ),
                         ],
                     ),
                 ),
