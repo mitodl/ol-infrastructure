@@ -25,3 +25,13 @@ config:
   nextjs:sentry_env: "rc"
   nextjs:syllabus_endpoint: "https://api.rc.learn.mit.edu/ai/http/syllabus_agent/"
   nextjs:optimize_images: "true"
+  # BEGIN feature flag defaults
+  nextjs:feature_universal_ai: "true"
+  nextjs:feature_mitxonline_product_pages: "true"
+  nextjs:feature_enrollment_dashboard: "true"
+  nextjs:feature_lr_drawer_chatbot: "true"
+  nextjs:feature_pr_drawer_chatbot: "true"
+  nextjs:feature_home_page_recommendation_bot: "true"
+  nextjs:feature_article_viewer: "true"
+  nextjs:feature_video_shorts: "true"
+  # END feature flag defaults
