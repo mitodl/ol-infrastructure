@@ -1111,7 +1111,7 @@ if micromasters_config.get_bool("deploy_k8s"):
     frontend_domain = micromasters_config.require("frontend_domain")
     fastly_domains = [frontend_domain]
     if stack_info.env_suffix == "production":
-        fastly_domains.append("micromasters.mit.edu")
+        fastly_domains += ["micromasters.mit.edu", "mm.mit.edu", "mmfin.mit.edu"]
     tls_secret_name = "micromasters-tls-pair"  # noqa: S105  # pragma: allowlist secret
 
     cert_manager_certificate = OLCertManagerCert(
