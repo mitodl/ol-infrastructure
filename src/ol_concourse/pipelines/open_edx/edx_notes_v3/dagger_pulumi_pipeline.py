@@ -95,7 +95,7 @@ def build_notes_pipeline(
                             start_docker;
                             cd {notes_lehrer_repo.name};
                             PYTHON_VERSION={openedx_release.python_version};
-                            DAGGER_LOG_LEVEL=debug dagger call build-notes --notes-config ./notes_config --python-version $PYTHON_VERSION --release-name {release_name} export --path ../artifacts/image.tar;
+                            DAGGER_LOG_LEVEL=debug dagger call build-notes --notes-code {notes_repo.name} --notes-config ./notes_config --python-version $PYTHON_VERSION --release-name {release_name} export --path ../artifacts/image.tar;
                             """,
                         ],
                     ),
