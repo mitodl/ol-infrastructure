@@ -158,10 +158,12 @@ def setup_grafana(
                 },
                 "clusterMetrics": {
                     "enabled": True,
+                    "collector": "alloy-metrics",
                 },
                 # v4: opencost moved from clusterMetrics to costMetrics feature
                 "costMetrics": {
                     "enabled": True,
+                    "collector": "alloy-metrics",
                 },
                 "annotationAutodiscovery": {
                     "enabled": True,
@@ -169,6 +171,7 @@ def setup_grafana(
                 },
                 "prometheusOperatorObjects": {
                     "enabled": True,
+                    "collector": "alloy-metrics",
                 },
                 "clusterEvents": {
                     "enabled": True,
@@ -177,6 +180,7 @@ def setup_grafana(
                 # v4: podLogs renamed to podLogsViaLoki
                 "podLogsViaLoki": {
                     "enabled": True,
+                    "collector": "alloy-logs",
                 },
                 "applicationObservability": {
                     "enabled": True,
