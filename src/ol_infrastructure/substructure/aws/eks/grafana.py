@@ -152,6 +152,16 @@ def setup_grafana(
                                         "sampling_percentage": 15,
                                     },
                                 ],
+                                # chart v4.0.0 bug: alloy-sampler.yaml passes an
+                                # incomplete context (missing .Chart/.Release) when
+                                # calling collectors.remoteConfig.alloy. If the
+                                # sampler inherits collectorCommon.alloy.remoteConfig
+                                # (enabled + inline credentials), the template crashes
+                                # on secrets.kubernetesSecretName. Disable remoteConfig
+                                # explicitly on the sampler collector to avoid this.
+                                "collector": {
+                                    "remoteConfig": {"enabled": False},
+                                },
                             },
                         },
                     },
