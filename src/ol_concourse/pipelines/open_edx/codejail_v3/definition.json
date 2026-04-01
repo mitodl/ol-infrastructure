@@ -1,0 +1,160 @@
+{
+  "jobs": [
+    {
+      "name": "create-codejail-master-pipeline",
+      "plan": [
+        {
+          "trigger": true,
+          "get": "codejail-pipeline-code"
+        },
+        {
+          "config": {
+            "image_resource": {
+              "source": {
+                "repository": "mitodl/ol-infrastructure",
+                "tag": "latest"
+              },
+              "type": "registry-image"
+            },
+            "run": {
+              "args": [
+                "../codejail-pipeline-code/src/ol_concourse/pipelines/open_edx/codejail_v3/dagger_pulumi_pipeline.py",
+                "master"
+              ],
+              "user": "root",
+              "path": "python",
+              "dir": "pipeline"
+            },
+            "inputs": [
+              {
+                "name": "codejail-pipeline-code"
+              }
+            ],
+            "platform": "linux",
+            "outputs": [
+              {
+                "name": "pipeline"
+              }
+            ]
+          },
+          "task": "generate-master-pipeline-definition"
+        },
+        {
+          "set_pipeline": "dagger-pulumi-codejail-master",
+          "file": "pipeline/definition.json",
+          "team": "infrastructure"
+        }
+      ]
+    },
+    {
+      "name": "create-codejail-ulmo-pipeline",
+      "plan": [
+        {
+          "trigger": true,
+          "get": "codejail-pipeline-code"
+        },
+        {
+          "config": {
+            "image_resource": {
+              "source": {
+                "repository": "mitodl/ol-infrastructure",
+                "tag": "latest"
+              },
+              "type": "registry-image"
+            },
+            "run": {
+              "args": [
+                "../codejail-pipeline-code/src/ol_concourse/pipelines/open_edx/codejail_v3/dagger_pulumi_pipeline.py",
+                "ulmo"
+              ],
+              "user": "root",
+              "path": "python",
+              "dir": "pipeline"
+            },
+            "inputs": [
+              {
+                "name": "codejail-pipeline-code"
+              }
+            ],
+            "platform": "linux",
+            "outputs": [
+              {
+                "name": "pipeline"
+              }
+            ]
+          },
+          "task": "generate-ulmo-pipeline-definition"
+        },
+        {
+          "set_pipeline": "dagger-pulumi-codejail-ulmo",
+          "file": "pipeline/definition.json",
+          "team": "infrastructure"
+        }
+      ]
+    },
+    {
+      "name": "create-codejail-meta-pipeline",
+      "plan": [
+        {
+          "trigger": true,
+          "get": "codejail-pipeline-code"
+        },
+        {
+          "config": {
+            "image_resource": {
+              "source": {
+                "repository": "mitodl/ol-infrastructure",
+                "tag": "latest"
+              },
+              "type": "registry-image"
+            },
+            "run": {
+              "args": [
+                "../codejail-pipeline-code/src/ol_concourse/pipelines/open_edx/codejail_v3/meta.py",
+                "meta"
+              ],
+              "user": "root",
+              "path": "python",
+              "dir": "pipeline"
+            },
+            "inputs": [
+              {
+                "name": "codejail-pipeline-code"
+              }
+            ],
+            "platform": "linux",
+            "outputs": [
+              {
+                "name": "pipeline"
+              }
+            ]
+          },
+          "task": "generate-meta-pipeline-definition"
+        },
+        {
+          "set_pipeline": "self",
+          "file": "pipeline/definition.json",
+          "team": "main"
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "name": "codejail-pipeline-code",
+      "source": {
+        "uri": "https://github.com/mitodl/ol-infrastructure",
+        "branch": "main",
+        "paths": [
+          "src/bridge/settings/openedx",
+          "src/ol_concourse/lib",
+          "src/ol_concourse/pipelines/open_edx/codejail_v3"
+        ],
+        "fetch_tags": false
+      },
+      "check_every": "60s",
+      "icon": "git",
+      "type": "git"
+    }
+  ]
+}
