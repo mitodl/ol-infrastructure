@@ -1,0 +1,30 @@
+---
+roles:
+- name: owner
+  github:
+    teams:
+    - mitodl:devops
+    - mitodl:odl-engineering
+  local:
+    users:
+    - oldevops
+  oidc:
+    groups:
+    - admin
+    - developer
+- name: member
+  github:
+    teams:
+    - mitodl:odl-engineering
+  oidc:
+    groups:
+    - admin
+    - developer
+- name: viewer
+  oidc:
+    groups:
+    - admin
+    - developer
+  github:
+    orgs:
+    - mitodl

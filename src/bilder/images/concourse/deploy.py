@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 from pyinfra import host
 from pyinfra.api.util import get_template
+from pyinfra.operations import files
 
 from bilder.components.alloy.models import AlloyConfig
 from bilder.components.alloy.steps import install_and_configure_alloy
@@ -142,6 +143,7 @@ concourse_config_map = {
             "{{ end }}"
         ),
         oidc_user_name_key="preferred_username",
+        main_team_config="/etc/concourse/teams/main.yaml",
         default_build_logs_to_retain="10",
         default_days_to_retain_build_logs="10",
         enable_build_auditing=False,
@@ -289,6 +291,23 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: SLF001
 
     # Install Traefik
     FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
+
+    # Deploy main team OIDC config so CONCOURSE_MAIN_TEAM_CONFIG persists
+    # across restarts
+    files.directory(
+        name="Create Concourse teams configuration directory",
+        path="/etc/concourse/teams",
+        user=concourse_config.user,
+        present=True,
+    )
+    files.put(
+        name="Upload main team OIDC configuration",
+        src=str(FILES_DIRECTORY.joinpath("teams", "main.yaml")),
+        dest="/etc/concourse/teams/main.yaml",
+        user=concourse_config.user,
+        mode="640",
+    )
+
     traefik_config = TraefikConfig(
         static_configuration=traefik_static.TraefikStaticConfig.model_validate(
             yaml.safe_load(
