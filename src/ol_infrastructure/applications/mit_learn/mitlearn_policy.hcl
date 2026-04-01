@@ -47,6 +47,11 @@ path "secret-global/data/shared_hmac" {
 path "secret-mitlearn/*" {
   capabilities = ["read"]
 }
+
+# XPro HubSpot secret for CRM integration
+path "secret-xpro/hubspot" {
+  capabilities = ["read"]
+}
 # vault-secrets-operator is a little more particular about
 # managing its own leases, give it the permissions it needs
 # for dynamic secret renwals / revocation without giving
