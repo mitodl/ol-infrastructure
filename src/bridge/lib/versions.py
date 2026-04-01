@@ -14,7 +14,7 @@ MEILISEARCH_VERSION = (
     "v1.33.0"  # (MD 2026-03-30) pin to v1.33.0 because of upgrade compatibility issues
 )
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
-OPEN_METADATA_VERSION = "1.12.3"
+OPEN_METADATA_VERSION = "1.12.4"
 OVS_VERSION = "v0.65.1-3-g2630021"
 REDASH_VERSION = "9d273e4"
 # renovate: datasource=github-releases depName=traefik packageName=traefik/traefik
