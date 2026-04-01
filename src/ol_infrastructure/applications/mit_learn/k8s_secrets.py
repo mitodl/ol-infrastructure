@@ -177,6 +177,7 @@ def create_mitlearn_k8s_secrets(
             "CKEDITOR_UPLOAD_URL": '{{ index .Secrets "ckeditor" "upload_url" }}',
             "EDX_API_CLIENT_ID": '{{ index .Secrets "edx_api_client" "id" }}',
             "EDX_API_CLIENT_SECRET": '{{ index .Secrets "edx_api_client" "secret" }}',
+            "MITOL_HUBSPOT_API_PRIVATE_TOKEN": '{{ index .Secrets "hubspot" "private-api-token" }}',
             "OLL_API_CLIENT_ID": '{{ index .Secrets "open_learning_library_client" "client_id" }}',
             "OLL_API_CLIENT_SECRET": '{{ index .Secrets "open_learning_library_client" "client_secret" }}',
             "OPENAI_API_KEY": '{{ index .Secrets "openai" "api_key" }}',
