@@ -287,7 +287,25 @@ def create_mitlearn_k8s_secrets(
     secret_names.append(secret_global_hmac_token_name)
     secret_resources.append(secret_global_hmac_token)
 
-    # 4. Dynamic AWS credentials from the 'aws-mitx' backend
+    # 4. Static secrets from the 'secret-xpro' KV-v1 mount (cross-app secrets)
+    # HubSpot API token shared with xPro for CRM integration.
+    xpro_hubspot_secret_name, xpro_hubspot_secret = _create_static_secret(
+        stack_info=stack_info,
+        secret_base_name="xpro-hubspot",  # pragma: allowlist secret  # noqa: S106
+        namespace=mitlearn_namespace,
+        labels=k8s_global_labels,
+        mount="secret-xpro",
+        mount_type="kv-v1",
+        path="hubspot",
+        templates={
+            "MITOL_HUBSPOT_API_PRIVATE_TOKEN": '{{ get .Secrets "api_private_token" }}',
+        },
+        vaultauth=vault_k8s_resources.auth_name,
+    )
+    secret_names.append(xpro_hubspot_secret_name)
+    secret_resources.append(xpro_hubspot_secret)
+
+    # 5. Dynamic AWS credentials from the 'aws-mitx' backend
     # Provides temporary AWS access keys for the application role.
     aws_access_key_secret_name, aws_access_key_secret = _create_dynamic_secret(
         stack_info=stack_info,
@@ -305,7 +323,7 @@ def create_mitlearn_k8s_secrets(
     secret_names.append(aws_access_key_secret_name)
     secret_resources.append(aws_access_key_secret)
 
-    # 5. Dynamic PostgreSQL credentials from the database backend
+    # 6. Dynamic PostgreSQL credentials from the database backend
     # Provides temporary database credentials for the application role.
     database_url_secret_name, database_url_secret = _create_dynamic_secret(
         stack_info=stack_info,
@@ -322,7 +340,7 @@ def create_mitlearn_k8s_secrets(
     secret_names.append(database_url_secret_name)
     secret_resources.append(database_url_secret)
 
-    # 6. A normal, k8s secret for redis credentials
+    # 7. A normal, k8s secret for redis credentials
     # Vault is not needed for these.
     redis_creds_secret_name = "redis-creds"  # noqa: S105  # pragma: allowlist secret
     redis_creds = kubernetes.core.v1.Secret(
