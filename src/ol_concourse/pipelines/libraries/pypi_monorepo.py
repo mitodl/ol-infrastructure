@@ -47,22 +47,29 @@ def discover_python_packages(
     return package_dirs
 
 
-def monorepo_publish_pipeline(
+def monorepo_publish_pipeline(  # noqa: PLR0913
     *,
     source_repo_uri: str,
     package_dirs: list[str],
     build_command_factory: Callable[[str, str], str],
     source_root: str = "src",
+    shared_paths: list[str] | None = None,
     check_every: str = "15m",
 ) -> Pipeline:
-    """Build a publish pipeline with one job per package directory."""
+    """Build a publish pipeline with one job per package directory.
+
+    Args:
+        shared_paths: Repo-root-relative paths (e.g. ``["pyproject.toml",
+            "uv.lock"]``) whose changes should trigger every package job in
+            addition to the per-package source directory.
+    """
 
     fragments = []
     for package_dir in package_dirs:
         repo_resource = git_repo(
             Identifier(f"{package_dir}-repo"),
             uri=source_repo_uri,
-            paths=[f"{source_root}/{package_dir}"],
+            paths=[f"{source_root}/{package_dir}", *(shared_paths or [])],
             check_every=check_every,
         )
         build_job = Job(

@@ -19,6 +19,7 @@ def pipeline_from_source(source_repo_path: str | Path) -> tuple[list[str], Pipel
     pipeline = monorepo_publish_pipeline(
         source_repo_uri=SOURCE_REPO_URI,
         package_dirs=package_dirs,
+        shared_paths=["pyproject.toml", "uv.lock"],
         build_command_factory=lambda package_dir, repo_name: (
             f"""
             cd {repo_name};
