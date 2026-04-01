@@ -12,7 +12,9 @@ SOURCE_REPO_URI = "https://github.com/mitodl/open-edx-plugins"
 EXPECTED_ARG_COUNT = 2
 
 
-def pipeline_from_source(source_repo_path: str | Path) -> tuple[list[str], Pipeline]:
+def pipeline_from_source(
+    source_repo_path: str | Path,
+) -> tuple[list[tuple[str, str]], Pipeline]:
     """Generate the pipeline from a checked-out source repository."""
 
     plugins = discover_python_packages(source_repo_path)
@@ -20,10 +22,10 @@ def pipeline_from_source(source_repo_path: str | Path) -> tuple[list[str], Pipel
         source_repo_uri=SOURCE_REPO_URI,
         package_dirs=plugins,
         shared_paths=["pyproject.toml", "uv.lock"],
-        build_command_factory=lambda plugin, repo_name: (
+        build_command_factory=lambda _dir, dist_name, repo_name: (
             f"""
             cd {repo_name};
-            uv build --package {plugin};
+            uv build --package {dist_name};
             uvx twine check dist/*
             uvx twine upload --skip-existing --non-interactive dist/*
             """
@@ -44,6 +46,6 @@ if __name__ == "__main__":
         definition.write(pipeline.model_dump_json(indent=2))
     sys.stdout.write(pipeline.model_dump_json(indent=2))
     sys.stderr.write(
-        f"\nDiscovered packages: {', '.join(plugins)}\n"
+        f"\nDiscovered packages: {', '.join(dist for _, dist in plugins)}\n"
         "fly -t pr-main sp -p publish-open-edx-plugins-pypi -c definition.json\n"
     )

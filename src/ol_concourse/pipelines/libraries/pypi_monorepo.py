@@ -1,5 +1,6 @@
 """Helpers for building PyPI publish pipelines for Python monorepos."""
 
+import tomllib
 from collections.abc import Callable
 from pathlib import Path
 
@@ -24,11 +25,16 @@ from ol_concourse.lib.resources import git_repo
 
 def discover_python_packages(
     source_repo_path: str | Path, source_root: str = "src"
-) -> list[str]:
+) -> list[tuple[str, str]]:
     """Discover Python package directories under ``source_root``.
 
     A package directory is any direct child of ``source_root`` containing a
     ``pyproject.toml`` file.
+
+    Returns:
+        Sorted list of ``(dir_name, dist_name)`` tuples where ``dir_name``
+        is the filesystem directory name and ``dist_name`` is the
+        ``[project] name`` from the package's ``pyproject.toml``.
     """
 
     package_root = Path(source_repo_path) / source_root
@@ -36,22 +42,26 @@ def discover_python_packages(
         msg = f"Package root does not exist: {package_root}"
         raise ValueError(msg)
 
-    package_dirs = sorted(
-        child.name
-        for child in package_root.iterdir()
-        if child.is_dir() and (child / "pyproject.toml").is_file()
-    )
-    if not package_dirs:
+    packages = []
+    for child in sorted(package_root.iterdir()):
+        pyproject = child / "pyproject.toml"
+        if child.is_dir() and pyproject.is_file():
+            with pyproject.open("rb") as f:
+                data = tomllib.load(f)
+            dist_name = data["project"]["name"]
+            packages.append((child.name, dist_name))
+
+    if not packages:
         msg = f"No Python packages found under: {package_root}"
         raise ValueError(msg)
-    return package_dirs
+    return packages
 
 
 def monorepo_publish_pipeline(  # noqa: PLR0913
     *,
     source_repo_uri: str,
-    package_dirs: list[str],
-    build_command_factory: Callable[[str, str], str],
+    package_dirs: list[tuple[str, str]],
+    build_command_factory: Callable[[str, str, str], str],
     source_root: str = "src",
     shared_paths: list[str] | None = None,
     check_every: str = "15m",
@@ -59,21 +69,25 @@ def monorepo_publish_pipeline(  # noqa: PLR0913
     """Build a publish pipeline with one job per package directory.
 
     Args:
+        package_dirs: List of ``(dir_name, dist_name)`` tuples as returned
+            by :func:`discover_python_packages`.
+        build_command_factory: Called as ``factory(dir_name, dist_name,
+            repo_name)`` and must return a shell command string.
         shared_paths: Repo-root-relative paths (e.g. ``["pyproject.toml",
             "uv.lock"]``) whose changes should trigger every package job in
             addition to the per-package source directory.
     """
 
     fragments = []
-    for package_dir in package_dirs:
+    for dir_name, dist_name in package_dirs:
         repo_resource = git_repo(
-            Identifier(f"{package_dir}-repo"),
+            Identifier(f"{dir_name}-repo"),
             uri=source_repo_uri,
-            paths=[f"{source_root}/{package_dir}", *(shared_paths or [])],
+            paths=[f"{source_root}/{dir_name}", *(shared_paths or [])],
             check_every=check_every,
         )
         build_job = Job(
-            name=Identifier(f"build-{package_dir}"),
+            name=Identifier(f"build-{dir_name}"),
             plan=[
                 GetStep(
                     get=repo_resource.name,
@@ -100,7 +114,7 @@ def monorepo_publish_pipeline(  # noqa: PLR0913
                             args=[
                                 "-exc",
                                 build_command_factory(
-                                    package_dir, str(repo_resource.name)
+                                    dir_name, dist_name, str(repo_resource.name)
                                 ),
                             ],
                         ),

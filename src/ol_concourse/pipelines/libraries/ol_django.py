@@ -12,24 +12,26 @@ SOURCE_REPO_URI = "https://github.com/mitodl/ol-django"
 EXPECTED_ARG_COUNT = 2
 
 
-def pipeline_from_source(source_repo_path: str | Path) -> tuple[list[str], Pipeline]:
+def pipeline_from_source(
+    source_repo_path: str | Path,
+) -> tuple[list[tuple[str, str]], Pipeline]:
     """Generate the pipeline from a checked-out source repository."""
 
-    package_dirs = discover_python_packages(source_repo_path)
+    packages = discover_python_packages(source_repo_path)
     pipeline = monorepo_publish_pipeline(
         source_repo_uri=SOURCE_REPO_URI,
-        package_dirs=package_dirs,
+        package_dirs=packages,
         shared_paths=["pyproject.toml", "uv.lock"],
-        build_command_factory=lambda package_dir, repo_name: (
+        build_command_factory=lambda _dir, dist_name, repo_name: (
             f"""
             cd {repo_name};
-            uv build --package {package_dir};
+            uv build --package {dist_name};
             uvx twine check dist/*
             uvx twine upload --skip-existing --non-interactive dist/*
             """
         ),
     )
-    return package_dirs, pipeline
+    return packages, pipeline
 
 
 if __name__ == "__main__":
@@ -44,6 +46,6 @@ if __name__ == "__main__":
         definition.write(pipeline.model_dump_json(indent=2))
     sys.stdout.write(pipeline.model_dump_json(indent=2))
     sys.stderr.write(
-        f"\nDiscovered packages: {', '.join(package_dirs)}\n"
+        f"\nDiscovered packages: {', '.join(dist for _, dist in package_dirs)}\n"
         "fly -t pr-main sp -p publish-ol-django-pypi -c definition.json\n"
     )
