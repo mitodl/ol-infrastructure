@@ -155,7 +155,7 @@ raw_env_vars = {
     "NEXT_PUBLIC_SENTRY_DSN": nextjs_config.require("sentry_dsn"),
     "NEXT_PUBLIC_SENTRY_ENV": nextjs_config.require("sentry_env"),
     "NEXT_PUBLIC_SENTRY_PROFILES_SAMPLE_RATE": "0.25",
-    "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE": "0.25",
+    "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE": "0.1",
     "NEXT_PUBLIC_SITE_NAME": "MIT Learn",
     "NEXT_PUBLIC_VERSION": MIT_LEARN_NEXTJS_DOCKER_TAG,
     "NEXT_PUBLIC_FEATURE_product_page_courses": "false",
