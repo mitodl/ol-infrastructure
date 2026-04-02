@@ -28,6 +28,7 @@ from pydantic import (
     model_validator,
 )
 
+from bridge.lib.magic_numbers import IAM_ROLE_NAME_PREFIX_MAX_LENGTH
 from ol_infrastructure.components.aws.cloudwatch import (
     OLCloudWatchAlarmSimpleRDS,
     OLCloudWatchAlarmSimpleRDSConfig,
@@ -415,7 +416,9 @@ class OLAmazonDB(pulumi.ComponentResource):
                         ],
                     }
                 ),
-                name_prefix=f"{db_config.instance_name}-rds-enhanced-monitoring-",
+                name_prefix=f"{db_config.instance_name}-rds-enhanced-monitoring-"[
+                    :IAM_ROLE_NAME_PREFIX_MAX_LENGTH
+                ],
                 tags=db_config.tags,
                 opts=resource_options,
             )
