@@ -122,6 +122,8 @@ rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["instance_size"] = (
     open_metadata_config.get("db_instance_size") or DBInstanceTypes.small.value
 )
+rds_defaults["enhanced_monitoring_interval"] = 0
+rds_defaults["performance_insights_enabled"] = False
 rds_defaults["use_blue_green"] = False
 rds_defaults["read_replica"] = None
 open_metadata_db_config = OLPostgresDBConfig(

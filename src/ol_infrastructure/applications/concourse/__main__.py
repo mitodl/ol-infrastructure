@@ -396,6 +396,8 @@ rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["instance_size"] = (
     concourse_config.get("db_instance_size") or rds_defaults["instance_size"]
 )
+rds_defaults["enhanced_monitoring_interval"] = 0
+rds_defaults["performance_insights_enabled"] = False
 rds_defaults["use_blue_green"] = False
 rds_defaults["read_replica"] = None
 concourse_db_config = OLPostgresDBConfig(

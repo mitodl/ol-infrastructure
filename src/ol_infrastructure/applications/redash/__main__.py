@@ -185,6 +185,8 @@ redash_db_security_group = ec2.SecurityGroup(
     vpc_id=data_vpc["id"],
 )
 rds_defaults = defaults(stack_info)["rds"]
+rds_defaults["enhanced_monitoring_interval"] = 0
+rds_defaults["performance_insights_enabled"] = False
 rds_defaults["use_blue_green"] = False
 rds_defaults["read_replica"] = None
 redash_db_config = OLPostgresDBConfig(
