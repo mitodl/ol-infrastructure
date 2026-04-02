@@ -11,10 +11,11 @@ This includes:
 
 """
 
+import json
 from enum import StrEnum
 
 import pulumi
-from pulumi_aws import rds
+from pulumi_aws import iam, rds
 from pulumi_aws.ec2 import SecurityGroup
 from pydantic import (
     BaseModel,
@@ -27,6 +28,7 @@ from pydantic import (
     model_validator,
 )
 
+from bridge.lib.magic_numbers import IAM_ROLE_NAME_PREFIX_MAX_LENGTH
 from ol_infrastructure.components.aws.cloudwatch import (
     OLCloudWatchAlarmSimpleRDS,
     OLCloudWatchAlarmSimpleRDSConfig,
@@ -93,7 +95,40 @@ class OLDBConfig(AWSBase):
     blue_green_timeout_minutes: PositiveInt = PositiveInt(60 * 12)
     username: str = "oldevops"  # The name of the admin user for the instance
     enable_iam_auth: bool = True
+    # Enhanced Monitoring: OS-level metrics via an agent installed on the DB host.
+    # Set to 0 to disable, or to 1/5/10/15/30/60 (seconds) to enable.
+    enhanced_monitoring_interval: int = 0
+    # Performance Insights: visibility into database load broken down by wait events.
+    performance_insights_enabled: bool = False
+    # Retention period for Performance Insights data (days). Must be 7 or 731.
+    performance_insights_retention_period: int = 7
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @field_validator("enhanced_monitoring_interval")
+    @classmethod
+    def is_valid_monitoring_interval(cls, interval: int) -> int:
+        """Validate that the enhanced monitoring interval is a supported value."""
+        valid_intervals = (0, 1, 5, 10, 15, 30, 60)
+        if interval not in valid_intervals:
+            msg = (
+                f"enhanced_monitoring_interval must be one of {valid_intervals}. "
+                f"Got {interval}."
+            )
+            raise ValueError(msg)
+        return interval
+
+    @field_validator("performance_insights_retention_period")
+    @classmethod
+    def is_valid_pi_retention(cls, retention: int) -> int:
+        """Validate that the Performance Insights retention period is supported."""
+        valid_retentions = (7, 731)
+        if retention not in valid_retentions:
+            msg = (
+                f"performance_insights_retention_period must be one of "
+                f"{valid_retentions}. Got {retention}."
+            )
+            raise ValueError(msg)
+        return retention
 
     @field_validator("engine")
     @classmethod
@@ -181,6 +216,9 @@ class OLPostgresDBConfig(OLDBConfig):
         },
         {"name": "timezone", "value": "UTC"},
         {"name": "rds.blue_green_replication_type", "value": "logical"},
+        # Log queries taking longer than 1 second (value is in milliseconds).
+        # Set to -1 to disable, 0 to log all queries.
+        {"name": "log_min_duration_statement", "value": 1000},
     ]
 
 
@@ -200,6 +238,9 @@ class OLMariaDBConfig(OLDBConfig):
         {"name": "collation_connection", "value": "utf8mb4_unicode_ci"},
         {"name": "collation_server", "value": "utf8mb4_unicode_ci"},
         {"name": "time_zone", "value": "UTC"},
+        # Enable slow query logging for queries taking longer than 2 seconds.
+        {"name": "slow_query_log", "value": 1},
+        {"name": "long_query_time", "value": 2},
     ]
 
 
@@ -355,6 +396,50 @@ class OLAmazonDB(pulumi.ComponentResource):
             parameters=db_config.parameter_overrides,
         )
 
+        # Create an IAM role for Enhanced Monitoring when a non-zero interval is set.
+        # This role allows the RDS service to publish OS-level metrics to CloudWatch.
+        enhanced_monitoring_role_arn = None
+        if db_config.enhanced_monitoring_interval > 0:
+            enhanced_monitoring_role = iam.Role(
+                f"{db_config.instance_name}-enhanced-monitoring-role",
+                assume_role_policy=json.dumps(
+                    {
+                        "Version": "2012-10-17",
+                        "Statement": [
+                            {
+                                "Effect": "Allow",
+                                "Principal": {
+                                    "Service": "monitoring.rds.amazonaws.com"
+                                },
+                                "Action": "sts:AssumeRole",
+                            }
+                        ],
+                    }
+                ),
+                name_prefix=f"{db_config.instance_name}-rds-enhanced-monitoring-"[
+                    :IAM_ROLE_NAME_PREFIX_MAX_LENGTH
+                ],
+                tags=db_config.tags,
+                opts=resource_options,
+            )
+            iam.RolePolicyAttachment(
+                f"{db_config.instance_name}-enhanced-monitoring-policy",
+                role=enhanced_monitoring_role.name,
+                policy_arn=(
+                    "arn:aws:iam::aws:policy/service-role/"
+                    "AmazonRDSEnhancedMonitoringRole"
+                ),
+                opts=resource_options,
+            )
+            enhanced_monitoring_role_arn = enhanced_monitoring_role.arn
+
+        # Only pass the retention period when Performance Insights is enabled.
+        pi_retention_period = (
+            db_config.performance_insights_retention_period
+            if db_config.performance_insights_enabled
+            else None
+        )
+
         self.db_instance = rds.Instance(
             f"{db_config.instance_name}-{db_config.engine}-instance",
             allocated_storage=db_config.storage,
@@ -376,10 +461,14 @@ class OLAmazonDB(pulumi.ComponentResource):
             identifier=db_config.instance_name,
             instance_class=db_config.instance_size,
             max_allocated_storage=db_config.max_storage,
+            monitoring_interval=db_config.enhanced_monitoring_interval,
+            monitoring_role_arn=enhanced_monitoring_role_arn,
             multi_az=db_config.multi_az,
             opts=resource_options,
             parameter_group_name=primary_parameter_group.name,
             password=db_config.password.get_secret_value(),
+            performance_insights_enabled=db_config.performance_insights_enabled,
+            performance_insights_retention_period=pi_retention_period,
             port=db_config.port,
             publicly_accessible=db_config.public_access,
             skip_final_snapshot=not db_config.take_final_snapshot,
@@ -417,8 +506,12 @@ class OLAmazonDB(pulumi.ComponentResource):
                 instance_class=db_config.read_replica.instance_size,
                 kms_key_id=self.db_instance.kms_key_id,
                 max_allocated_storage=db_config.max_storage,
+                monitoring_interval=db_config.enhanced_monitoring_interval,
+                monitoring_role_arn=enhanced_monitoring_role_arn,
                 opts=replica_options,
                 parameter_group_name=replica_parameter_group.name,
+                performance_insights_enabled=db_config.performance_insights_enabled,
+                performance_insights_retention_period=pi_retention_period,
                 publicly_accessible=db_config.read_replica.public_access,
                 replicate_source_db=self.db_instance.identifier,
                 skip_final_snapshot=True,

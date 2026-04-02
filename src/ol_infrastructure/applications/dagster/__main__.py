@@ -373,6 +373,8 @@ dagster_db_security_group = ec2.SecurityGroup(
 # Keep existing RDS database (Dagster metadata storage)
 rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["monitoring_profile_name"] = "disabled"
+rds_defaults["enhanced_monitoring_interval"] = 0
+rds_defaults["performance_insights_enabled"] = False
 rds_defaults["use_blue_green"] = False
 rds_defaults["read_replica"] = None
 rds_defaults["instance_size"] = (
