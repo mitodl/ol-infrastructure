@@ -26,7 +26,10 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import (
+    merge_otel_resource_attributes,
+    parse_stack,
+)
 
 stack_info = parse_stack()
 
@@ -164,7 +167,36 @@ raw_env_vars = {
     "NEXT_PUBLIC_FEATURE_enrollment_dashboard": "false",  # pragma: allowlist secret
     "NEXT_PUBLIC_FEATURE_lr_drawer_chatbot": "true",
     "NEXT_PUBLIC_FEATURE_home_page_recommendation_bot": "true",  # pragma: allowlist secret  # noqa: E501
+    # OpenTelemetry — server-side only (no NEXT_PUBLIC_ prefix).
+    # OTEL_EXPORTER_OTLP_ENDPOINT is the base URL; the Node.js SDK appends /v1/traces.
+    # OTEL_TRACES_SAMPLER_ARG is read by sentry.server.config.ts as tracesSampleRate.
+    # OTEL_RESOURCE_ATTRIBUTES is read by Sentry's OTEL provider for span metadata.
+    #
+    # The following three vars are set here for consistency with other applications
+    # but are NOT read by the Next.js Sentry-managed OTEL provider:
+    #   OTEL_TRACES_SAMPLER  — Sentry uses SentrySampler (not the standard OTEL
+    #                          env var), which already implements parent-based sampling
+    #                          by inheriting a sampled traceparent before applying the
+    #                          tracesSampleRate fallback.
+    #   OTEL_PROPAGATORS     — Sentry sets its own composite propagator (W3C
+    #                          tracecontext + baggage + Sentry) internally.
+    #   OTEL_EXPORTER_OTLP_PROTOCOL — the OTLPTraceExporter is instantiated directly
+    #                          in sentry.server.config.ts; protocol negotiation is
+    #                          handled by the exporter's own defaults.
+    "OTEL_SERVICE_NAME": "learn-nextjs",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318",
+    "OTEL_TRACES_SAMPLER": "parentbased_traceidratio",
+    "OTEL_TRACES_SAMPLER_ARG": "1.0",
+    "OTEL_PROPAGATORS": "tracecontext,baggage",
+    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+    "OTEL_RESOURCE_ATTRIBUTES": (
+        f"deployment.environment={stack_info.env_suffix}"
+        f",service.namespace=learn"
+        f",service.version={MIT_LEARN_NEXTJS_DOCKER_TAG}"
+    ),
 }
+
+merge_otel_resource_attributes(raw_env_vars, k8s_app_labels)
 
 env_vars = []
 for k, v in raw_env_vars.items():
