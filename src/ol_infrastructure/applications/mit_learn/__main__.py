@@ -577,6 +577,7 @@ mitlearn_db_config = OLPostgresDBConfig(
     db_name="mitopen",
     public_access=True,
     use_blue_green=mitlearn_config.get_bool("db_use_blue_green") or False,
+    enhanced_monitoring_interval=5 if stack_info.env_suffix == "production" else 0,
     **rds_defaults,
 )
 mitlearn_db_config.parameter_overrides.append(

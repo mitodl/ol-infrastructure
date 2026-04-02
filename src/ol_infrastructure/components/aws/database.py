@@ -11,10 +11,11 @@ This includes:
 
 """
 
+import json
 from enum import StrEnum
 
 import pulumi
-from pulumi_aws import rds
+from pulumi_aws import iam, rds
 from pulumi_aws.ec2 import SecurityGroup
 from pydantic import (
     BaseModel,
@@ -93,7 +94,20 @@ class OLDBConfig(AWSBase):
     blue_green_timeout_minutes: PositiveInt = PositiveInt(60 * 12)
     username: str = "oldevops"  # The name of the admin user for the instance
     enable_iam_auth: bool = True
+    enhanced_monitoring_interval: int = (
+        0  # seconds; 0 = disabled. Valid: 0,1,5,10,15,30,60
+    )
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @field_validator("enhanced_monitoring_interval")
+    @classmethod
+    def is_valid_monitoring_interval(cls, enhanced_monitoring_interval: int) -> int:
+        """Validate that enhanced_monitoring_interval is a value supported by AWS."""
+        valid_intervals = (0, 1, 5, 10, 15, 30, 60)
+        if enhanced_monitoring_interval not in valid_intervals:
+            msg = f"enhanced_monitoring_interval must be one of {valid_intervals}, got {enhanced_monitoring_interval}."  # noqa: E501
+            raise ValueError(msg)
+        return enhanced_monitoring_interval
 
     @field_validator("engine")
     @classmethod
@@ -355,6 +369,37 @@ class OLAmazonDB(pulumi.ComponentResource):
             parameters=db_config.parameter_overrides,
         )
 
+        enhanced_monitoring_role_arn: pulumi.Output[str] | None = None
+        if db_config.enhanced_monitoring_interval > 0:
+            enhanced_monitoring_role = iam.Role(
+                f"{db_config.instance_name}-rds-enhanced-monitoring-role",
+                assume_role_policy=json.dumps(
+                    {
+                        "Version": "2012-10-17",
+                        "Statement": [
+                            {
+                                "Effect": "Allow",
+                                "Principal": {
+                                    "Service": "monitoring.rds.amazonaws.com"
+                                },
+                                "Action": "sts:AssumeRole",
+                            }
+                        ],
+                    }
+                ),
+                name_prefix=f"{db_config.instance_name}-rds-mon-"[:32],
+                path="/ol-infrastructure/rds/enhanced-monitoring/",
+                tags=db_config.tags,
+                opts=resource_options,
+            )
+            iam.RolePolicyAttachment(
+                f"{db_config.instance_name}-rds-enhanced-monitoring-policy",
+                role=enhanced_monitoring_role.name,
+                policy_arn="arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole",
+                opts=pulumi.ResourceOptions(parent=enhanced_monitoring_role),
+            )
+            enhanced_monitoring_role_arn = enhanced_monitoring_role.arn
+
         self.db_instance = rds.Instance(
             f"{db_config.instance_name}-{db_config.engine}-instance",
             allocated_storage=db_config.storage,
@@ -376,6 +421,8 @@ class OLAmazonDB(pulumi.ComponentResource):
             identifier=db_config.instance_name,
             instance_class=db_config.instance_size,
             max_allocated_storage=db_config.max_storage,
+            monitoring_interval=db_config.enhanced_monitoring_interval,
+            monitoring_role_arn=enhanced_monitoring_role_arn,
             multi_az=db_config.multi_az,
             opts=resource_options,
             parameter_group_name=primary_parameter_group.name,
