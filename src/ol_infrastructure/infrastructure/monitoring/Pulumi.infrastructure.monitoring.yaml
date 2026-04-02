@@ -5,7 +5,7 @@ config:
   monitoring:fastly_customer_id:
     secure: v1:BlStRhJvdFsmqolz:d4JLskD5SCxBCqzm4RLBybe7IbvxCcCvm2Fpxsp+W6GqkH84mBI=
   monitoring:fastly_logging_bucket_name: mitodl-fastly-access-logs
-  monitoring:opsgenie_critical_email_address:
-    secure: v1:c61HMFGrOe9XKLQ4:r+R3dLOQKwDcynb/R84mBjdrfrFU9in7once1Z6/nc/PU3pPl//sNTA2yAvHHWsUO/E4UJkku/0AtcI6kb3+uKK9HeUzFjyr
-  monitoring:opsgenie_warning_email_address:
-    secure: v1:97+o29BIjpBmagOU:MSexmO1K+DC6e+c3Uuz3CTlNm1auWAbFGQC40LigVvrJFRNwd+ne1znU/BDEBSHNE6xcb+vikvcoas+GuZPD7wbWvRfwkJrd
+  monitoring:rootly_warning_webhook_url:
+    secure: v1:h15ixNmCBl3CGTHB:+T9LNnWxxQelhKTmM1p7QutP4W+7ErNKjX4SD85h7FX9o+ubXHOsNg2KDthr6z/u6EbqI+x4nxYVQXMTJUZDifvyKhDpoyLWREe9od9nOgxUxL11ctsHB4hgVeP0KqOZ/Ai12abGSWrFxPHqFw0Tqj2APpWHcbSrHIyJ/TVQHGPHtzypM/dNTlr+30T4LjMNKFyCg+22THyJQw==
+  monitoring:rootly_critical_webhook_url:
+    secure: v1:rfDUECxh6MkNnTsT:TkMtMOlnXu3X+q0wG+LPsbjL3ii3qanqPnmQVm6sZuAz6Hv4PbmQQKs/JwyImZSWZxa0orJGGecYCI7c/8Gi7Qdb5fTfe43IVvd0hXPXwrrwh1KRCbEXSN88hTf7anI2syZHfN96OscpPv02BfuGk/s5cfnoo32QQA0mNi1DxfGLH2nRGM2XNFwXABwZ6PZuaAc42ucB/1BKsw==
