@@ -1,9 +1,11 @@
+from typing import Any
+
 import pytest
 from pydantic import ValidationError
 
 from ol_infrastructure.components.aws.database import OLDBConfig
 
-VALID_CONFIG = {
+VALID_CONFIG: dict[str, Any] = {
     "db_name": "testdb",
     "engine": "postgres",
     "engine_version": "12.2",
