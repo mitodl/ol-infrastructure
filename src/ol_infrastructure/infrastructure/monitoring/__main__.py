@@ -26,30 +26,28 @@ aws_config = AWSBase(tags={"OU": "operations", "Environment": "operations-produc
 
 ### SNS Resources for notifying opsgenie
 
-# TODO: MD 20230315 Migrate to SNS integration. Email is easier to start with.  # noqa: E501, FIX002, TD002
-# https://support.atlassian.com/opsgenie/docs/integrate-opsgenie-with-incoming-amazon-sns/
 critical_sns_topic = sns.Topic(
     "monitoring-critical-alerts-sns-topic",
     name="OpsGenie_Critical_Notifications",
-    tags=aws_config.merged_tags({"Name": "OpsGenie Critical Notifications"}),
+    tags=aws_config.merged_tags({"Name": "Rootly Critical Notifications"}),
 )
 warning_sns_topic = sns.Topic(
     "monitoring-warning-alerts-sns-topic",
     name="OpsGenie_Warning_Notifications",
-    tags=aws_config.merged_tags({"Name": "OpsGenie Warning Notifications"}),
+    tags=aws_config.merged_tags({"Name": "Rootly Warning Notifications"}),
 )
 
-critical_topic_subscription = sns.TopicSubscription(
-    "monitoring-critical-alerts-sns-topic-subscription",
-    endpoint=monitoring_config.get("opsgenie_critical_email_address"),
-    protocol="email",
+critical_top_webhook_subscription = sns.TopicSubscription(
+    "monitoring-critical-alerts-sns-topic-webhook-subscription",
+    endpoint=monitoring_config.get("rootly_critical_webhook_url"),
+    protocol="https",
     topic=critical_sns_topic.arn,
 )
 
 warning_topic_subscription = sns.TopicSubscription(
     "monitoring-warning-alerts-sns-topic-subscription",
-    endpoint=monitoring_config.get("opsgenie_warning_email_address"),
-    protocol="email",
+    endpoint=monitoring_config.get("rootly_warning_webhook_url"),
+    protocol="https",
     topic=warning_sns_topic.arn,
 )
 
