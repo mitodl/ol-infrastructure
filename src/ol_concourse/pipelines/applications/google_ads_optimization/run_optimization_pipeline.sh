@@ -29,4 +29,10 @@ CUSTOMER_ID_FOR_COURSE=$(echo "${CUSTOMER_ID_FOR_COURSES}" | uv run python -c "i
 # shellcheck disable=SC2086
 uv run python scripts/pull_input_data.py --google-ads-yaml=google-ads.yaml --customer-id=${CUSTOMER_ID_FOR_COURSE} --output-course=${COURSE_NAME} --datasets=ads_reports
 # shellcheck disable=SC2086
-uv run python scripts/run_pipeline.py --course ${COURSE_NAME}
+uv run python scripts/run_pipeline.py --course ${COURSE_NAME} | tee "optimization_pipeline.log"
+
+# Pipe warnings to an output. If that output exists, we want to emit a slack message about it.
+warning_result=$(grep -i -A 3 "warning" optimization_pipeline.log)
+if [ -n "$warning_result" ]
+then echo "$warning_result" > optimization_pipeline_output/warnings.txt
+fi
