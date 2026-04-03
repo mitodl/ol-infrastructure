@@ -16,7 +16,6 @@ Import IDs per environment:
 from pulumi import Config, Output, ResourceOptions
 from pulumi_aws import cloudfront
 
-from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 ovs_config = Config("ovs")
@@ -30,13 +29,6 @@ _env_variant_map: dict[str, str] = {
     "qa": "rc",
 }
 env_variant = _env_variant_map[env_suffix]
-
-aws_config = AWSBase(
-    tags={
-        "OU": "odl-video",
-        "Environment": f"applications_{env_suffix}",
-    }
-)
 
 # Bucket names come from stack config
 s3_bucket_name = ovs_config.require("s3_bucket_name")
@@ -55,6 +47,7 @@ _oai_comment_map: dict[str, str] = {
 ovs_cloudfront_oai = cloudfront.OriginAccessIdentity(
     "ovs-cloudfront-oai",
     comment=_oai_comment_map[env_suffix],
+    opts=ResourceOptions(protect=True),
 )
 
 oai_path: Output[str] = ovs_cloudfront_oai.id.apply(
@@ -67,6 +60,7 @@ if env_suffix == "qa":
     ovs_cloudfront_transcoded_oai = cloudfront.OriginAccessIdentity(
         "ovs-cloudfront-transcoded-oai",
         comment="access-identity-odl-video-service-transcoded-rc",
+        opts=ResourceOptions(protect=True),
     )
     transcoded_oai_path: Output[str] = ovs_cloudfront_transcoded_oai.id.apply(
         lambda oai_id: f"origin-access-identity/cloudfront/{oai_id}"
@@ -159,26 +153,6 @@ logging_config = (
 # Production serves all edge locations; CI/QA use US+Europe only (cost savings).
 price_class = "PriceClass_All" if env_suffix == "production" else "PriceClass_100"
 
-# QA has a custom ACM certificate; production and CI use the CloudFront default.
-_viewer_cert_map: dict[str, dict[str, object]] = {
-    "production": {
-        "cloudfront_default_certificate": True,
-        "minimum_protocol_version": "TLSv1",
-    },
-    "ci": {
-        "cloudfront_default_certificate": True,
-        "minimum_protocol_version": "TLSv1",
-    },
-    "qa": {
-        "acm_certificate_arn": (
-            "arn:aws:acm:us-east-1:610119931565:certificate/"
-            "bb4cc15a-5fcb-46df-a5ae-bf9ca4115667"
-        ),
-        "minimum_protocol_version": "TLSv1.2_2021",
-        "ssl_support_method": "sni-only",
-    },
-}
-
 ovs_cloudfront_distribution = cloudfront.Distribution(
     "ovs-cloudfront-distribution",
     comment=f"odl-video-service-{env_variant}",
@@ -245,11 +219,11 @@ ovs_cloudfront_distribution = cloudfront.Distribution(
     restrictions={
         "geo_restriction": {"restriction_type": "none"},
     },
-    tags=aws_config.merged_tags(
-        {
-            "Name": f"odl-video-service-{env_variant}",
-        }
-    ),
-    viewer_certificate=_viewer_cert_map[env_suffix],
-    opts=ResourceOptions(ignore_changes=["tags"]),
+    # Tags are intentionally not managed here to preserve the imported state
+    # and avoid spurious diffs across environments.
+    viewer_certificate={
+        "cloudfront_default_certificate": True,
+        "minimum_protocol_version": "TLSv1.2_2021",
+    },
+    opts=ResourceOptions(protect=True),
 )
