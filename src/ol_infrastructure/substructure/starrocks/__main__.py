@@ -14,9 +14,9 @@ over the VPC. Configure starrocks:fe_host to an internally routable address
 """
 
 import pulumi_vault as vault
-from ol_infrastructure.lib.magic_numbers import ONE_MONTH_SECONDS
 from pulumi import Config, ResourceOptions, StackReference, export
 
+from bridge.lib.magic_numbers import ONE_MONTH_SECONDS
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 
