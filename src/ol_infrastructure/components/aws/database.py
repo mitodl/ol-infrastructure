@@ -238,10 +238,10 @@ class OLMariaDBConfig(OLDBConfig):
         {"name": "collation_connection", "value": "utf8mb4_unicode_ci"},
         {"name": "collation_server", "value": "utf8mb4_unicode_ci"},
         {"name": "time_zone", "value": "UTC"},
-        # slow_query_log is not a valid parameter in the RDS MariaDB 11.x parameter
-        # group family. long_query_time sets the threshold (seconds) above which queries
-        # are written to the slow query log when logging is otherwise enabled.
-        {"name": "long_query_time", "value": 2},
+        # MariaDB 11.x uses log_slow_query / log_slow_query_time (not the MySQL-style
+        # slow_query_log / long_query_time names).
+        {"name": "log_slow_query", "value": 1},
+        {"name": "log_slow_query_time", "value": 2},
     ]
 
 
