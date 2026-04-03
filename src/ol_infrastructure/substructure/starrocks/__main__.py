@@ -15,7 +15,7 @@ over the VPC. Configure starrocks:fe_host to an internally routable address
 
 import pulumi_vault as vault
 from ol_infrastructure.lib.magic_numbers import ONE_MONTH_SECONDS
-from pulumi import Config, ResourceOptions, export
+from pulumi import Config, ResourceOptions, StackReference, export
 
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -31,10 +31,14 @@ STARROCKS_MYSQL_PORT = 9030
 MAX_TTL = ONE_MONTH_SECONDS * 6
 DEFAULT_TTL = ONE_MONTH_SECONDS * 3
 
-db_host = starrocks_config.require("fe_host")
+# Read the FE MySQL NLB hostname and admin password from the applications stack so
+# both values stay in sync with the deployed cluster without duplication.
+applications_stack = StackReference(starrocks_config.require("applications_stack_name"))
+db_host = applications_stack.require_output("fe_mysql_host")
+db_admin_password = applications_stack.require_output("root_password_secret")
+
 db_port = starrocks_config.get_int("fe_mysql_port") or STARROCKS_MYSQL_PORT
 db_admin_username = starrocks_config.require("db_admin_username")
-db_admin_password = starrocks_config.require_secret("db_admin_password")
 
 # StarRocks-compatible SQL role statements.
 # Each list entry is executed as a separate statement in the same connection.
@@ -89,7 +93,11 @@ starrocks_role_statements: dict[str, dict[str, list[str]]] = {
 # Vault substitutes {{username}} and {{password}} with the admin credentials
 # at connection time (distinct from {{name}}/{{password}} in role statements
 # which are the dynamically-generated credential placeholders).
-connection_url = f"{{{{username}}}}:{{{{password}}}}@tcp({db_host}:{db_port})/"
+# db_host is an Output[str] from the applications stack reference, so we
+# resolve it via .apply() rather than an f-string.
+connection_url = db_host.apply(
+    lambda host: f"{{{{username}}}}:{{{{password}}}}@tcp({host}:{db_port})/"
+)
 
 starrocks_vault_mount = vault.Mount(
     f"starrocks-{stack_info.env_suffix}-vault-database-mount",

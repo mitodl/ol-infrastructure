@@ -367,3 +367,55 @@ starrocks_apisix_httproute = OLApisixHTTPRoute(
     k8s_namespace=namespace,
     k8s_labels=k8s_app_labels.model_dump(),
 )
+
+# Internal NLB exposing the StarRocks FE MySQL port (9030) to the data VPC so that
+# Vault — running on EC2 in the operations VPC, which is peered with the data VPC —
+# can reach StarRocks to manage dynamic database credentials.
+FE_MYSQL_PORT = 9030
+fe_mysql_nlb_service = kubernetes.core.v1.Service(
+    f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-fe-mysql-nlb",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=f"{stack_info.env_prefix}-starrocks-fe-mysql",
+        namespace=namespace,
+        labels=k8s_app_labels.model_dump(),
+        annotations={
+            "service.beta.kubernetes.io/aws-load-balancer-type": "external",
+            "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
+            "service.beta.kubernetes.io/aws-load-balancer-scheme": "internal",
+            "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled": "true",  # noqa: E501
+        },
+    ),
+    spec=kubernetes.core.v1.ServiceSpecArgs(
+        type="LoadBalancer",
+        selector={
+            "app.kubernetes.io/component": "fe",
+            "app.starrocks.ownerreference/name": (
+                f"{stack_info.env_prefix}-starrocks-fe"
+            ),
+        },
+        ports=[
+            kubernetes.core.v1.ServicePortArgs(
+                name="mysql",
+                port=FE_MYSQL_PORT,
+                target_port=FE_MYSQL_PORT,
+                protocol="TCP",
+            ),
+        ],
+    ),
+    opts=ResourceOptions(depends_on=[starrocks_release]),
+)
+
+export(
+    "fe_mysql_host",
+    fe_mysql_nlb_service.status.apply(
+        lambda s: (
+            s.load_balancer.ingress[0].hostname
+            if s and s.load_balancer and s.load_balancer.ingress
+            else ""
+        )
+    ),
+)
+
+# Export the root password as a secret so the substructure/starrocks stack can
+# reference it via StackReference to prime the Vault database connection.
+export("root_password_secret", starrocks_config.require_secret("root_password"))
