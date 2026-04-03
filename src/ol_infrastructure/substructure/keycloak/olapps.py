@@ -1050,6 +1050,34 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
             ),
             org=cyprus_aydin_org,
         )
+        onboard_saml_org(
+            SamlIdpConfig(
+                idp_alias="UCV",
+                idp_display_name="Universidad Cesar Vallejo",
+                org_saml_metadata_url="https://accounts.google.com/o/saml2/idp?idpid=C01o9h2jh",
+                principal_type="ATTRIBUTE",
+                principal_attribute="Email",
+                name_id_format=NameIdFormat.persistent,
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                attribute_map={
+                    "email": "Email",
+                    "firstName": "Given Name",
+                    "lastName": "Surname",
+                    "fullName": "Display Name",
+                },
+            ),
+            org=OrgConfig(
+                org_domains=["ucvvirtual.edu.pe"],
+                org_name="Universidad Cesar Vallejo",
+                org_alias="UCV",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
         create_org_for_learn(
             OrgConfig(
                 org_domains=["ttt-mit.edu"],
