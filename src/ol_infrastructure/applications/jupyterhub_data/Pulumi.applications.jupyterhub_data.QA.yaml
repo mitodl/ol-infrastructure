@@ -1,0 +1,11 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+config:
+  jupyterhub_data:domain: nb-qa.data.ol.mit.edu
+  jupyterhub_data:authenticator_class: generic-oauth
+  jupyterhub_data:keycloak_base_url: https://sso-qa.ol.mit.edu
+  jupyterhub_data:keycloak_realm: ol-data-platform
+  jupyterhub_data:trino_host: mitol-ol-data-lake-production.trino.galaxy.starburst.io
+  aws:region: us-east-1
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa

@@ -1,0 +1,7 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+config:
+  marimo_data:apps_domain: nb.data.ol.mit.edu
+  aws:region: us-east-1
+  vault:address: https://vault.odl.mit.edu
+  vault_server:env_namespace: operations.production

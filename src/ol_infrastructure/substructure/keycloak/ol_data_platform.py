@@ -506,6 +506,93 @@ def create_ol_data_platform_realm(  # noqa: PLR0913, PLR0915
         )
     # STARROCKS [END] # noqa: ERA001
 
+    # MARIMO [START] # noqa: ERA001
+    # ol-marimo-client: used by JupyterHub GenericOAuthenticator (auth code flow)
+    ol_data_platform_marimo_client = keycloak.openid.Client(
+        "ol-data-platform-marimo-client",
+        name="ol-data-platform-marimo-client",
+        realm_id=ol_data_platform_realm.id,
+        client_id="ol-marimo-client",
+        client_secret=keycloak_realm_config.get(
+            "ol-data-platform-marimo-client-secret"
+        ),
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        service_accounts_enabled=False,
+        direct_access_grants_enabled=False,
+        valid_redirect_uris=[
+            "https://nb.data.ol.mit.edu/hub/oauth_callback",
+            "https://nb-qa.data.ol.mit.edu/hub/oauth_callback",
+            "https://nb.data.ol.mit.edu/*",
+            "https://nb-qa.data.ol.mit.edu/*",
+        ],
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+
+    vault.generic.Secret(
+        "ol-data-platform-marimo-client-vault-oidc-credentials",
+        path="secret-operations/sso/marimo",
+        data_json=Output.all(
+            url=ol_data_platform_marimo_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
+            client_id=ol_data_platform_marimo_client.client_id,
+            client_secret=ol_data_platform_marimo_client.client_secret,
+            secret=session_secret,
+            realm_id=ol_data_platform_marimo_client.realm_id,
+            realm_name="ol-data-platform",
+        ).apply(json.dumps),
+    )
+
+    keycloak.openid.ClientDefaultScopes(
+        "ol-data-platform-marimo-client-default-scopes",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_marimo_client.id,
+        default_scopes=[
+            "acr",
+            "basic",
+            "email",
+            "ol_roles",
+            "openid",
+            "profile",
+            "roles",
+            "web-origins",
+        ],
+        opts=resource_options,
+    )
+
+    # ol-marimo-app-client: service account for published (run-mode) notebooks
+    ol_data_platform_marimo_app_client = keycloak.openid.Client(
+        "ol-data-platform-marimo-app-client",
+        name="ol-data-platform-marimo-app-client",
+        realm_id=ol_data_platform_realm.id,
+        client_id="ol-marimo-app-client",
+        client_secret=keycloak_realm_config.get(
+            "ol-data-platform-marimo-app-client-secret"
+        ),
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=False,
+        implicit_flow_enabled=False,
+        service_accounts_enabled=True,
+        direct_access_grants_enabled=False,
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+
+    vault.generic.Secret(
+        "ol-data-platform-marimo-app-client-vault-credentials",
+        path="secret-operations/sso/marimo-app",
+        data_json=Output.all(
+            client_id=ol_data_platform_marimo_app_client.client_id,
+            client_secret=ol_data_platform_marimo_app_client.client_secret,
+            realm_id=ol_data_platform_marimo_app_client.realm_id,
+            realm_name="ol-data-platform",
+        ).apply(json.dumps),
+    )
+    # MARIMO [END] # noqa: ERA001
+
     # OL Data Platform Realm - Authentication Flows[START]
     # OL - browser flow [START]
     # username-form -> ol-auth-username-password-form
