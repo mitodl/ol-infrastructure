@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import iam
 
 from bridge.lib.versions import STARROCKS_CHART_VERSION, STARROCKS_VERSION
@@ -197,6 +197,22 @@ PROPERTIES(
 );""",
     )
 
+# AWS Java SDK v1 (bundled with StarRocks 4.x) does not automatically resolve
+# AWS_ROLE_ARN + AWS_WEB_IDENTITY_TOKEN_FILE env vars through the default credential
+# chain when running inside the JVM. Passing them explicitly as JVM system properties
+# via JAVA_TOOL_OPTIONS ensures WebIdentityTokenFileCredentialsProvider can resolve
+# IRSA credentials for Glue metadata and S3 data-access calls.
+irsa_jvm_opts: Output[str] | None = None
+if starrocks_config.get_bool("enable_data_lake_integration"):
+    irsa_jvm_opts = starrocks_auth_binding.irsa_role.arn.apply(
+        lambda arn: (
+            f"-Daws.roleArn={arn}"
+            " -Daws.webIdentityTokenFile="
+            "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
+            " -Daws.roleSessionName=starrocks-glue"
+        )
+    )
+
 if starrocks_config.get_bool("use_be") and starrocks_config.get_bool("use_cn"):
     msg = (
         "StarRocks can be deployed in either shared-nothing (BE) or shared-storage (CN)"
@@ -250,6 +266,11 @@ starrocks_values: dict[str, Any] = {
             "storageSize": fe_config.get("storage", "100Gi"),
             "logStorageSize": fe_config.get("log_storage", "100Gi"),
         },
+        **(
+            {"feEnvVars": [{"name": "JAVA_TOOL_OPTIONS", "value": irsa_jvm_opts}]}
+            if irsa_jvm_opts is not None
+            else {}
+        ),
     },
 }
 
@@ -275,6 +296,11 @@ if starrocks_config.get_bool("use_be"):
             "storageSize": be_config.get("storage", "1Ti"),
             "logStorageSize": be_config.get("log_storage", "100Gi"),
         },
+        **(
+            {"beEnvVars": [{"name": "JAVA_TOOL_OPTIONS", "value": irsa_jvm_opts}]}
+            if irsa_jvm_opts is not None
+            else {}
+        ),
     }
     if use_io_optimized_nodes:
         starrocks_be_spec = cast(dict[str, Any], starrocks_values["starrocksBeSpec"])
@@ -317,6 +343,11 @@ if starrocks_config.get_bool("use_cn"):
                 ],
             },
         },
+        **(
+            {"cnEnvVars": [{"name": "JAVA_TOOL_OPTIONS", "value": irsa_jvm_opts}]}
+            if irsa_jvm_opts is not None
+            else {}
+        ),
     }
 
 starrocks_release = kubernetes.helm.v3.Release(
