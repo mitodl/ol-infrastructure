@@ -1,0 +1,9 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHjZAY5LtmRWGljev0oiDGn0jR5cRwD4IVXCn50TW5i0qQETyu0clwv/EwnGkgybAJkGAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM8Dx8Q4Wjl14qs4p5AgEQgDu+3cfqdAo2OoItuNF782ktF9nCt800WtTbSYt5AHRaFvCEh6ZYX/YpgA46GUg+5o/yzNpoEFAz7Bxm4g==
+config:
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa
+  starrocks:applications_stack_name: applications.starrocks.lakehouse.QA
+  starrocks:db_admin_username: root
+  starrocks:verify_connection: "false"

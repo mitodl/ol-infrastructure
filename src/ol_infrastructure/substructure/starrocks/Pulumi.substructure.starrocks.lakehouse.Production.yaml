@@ -1,0 +1,9 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAFkYLtPxSaeEyWd7CmlxeS1AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMSKzNIOmTYJZ94H/rAgEQgDsMkmzBpfkru3777GqgEfpxLD2Fu7UGfxMVwgeGDscDyi7n9OKdMoDsbmuf1ShPNxOypXILPmljglQ0Bw==
+config:
+  vault:address: https://vault.odl.mit.edu
+  vault_server:env_namespace: operations.production
+  starrocks:applications_stack_name: applications.starrocks.lakehouse.Production
+  starrocks:db_admin_username: root
+  starrocks:verify_connection: "false"
