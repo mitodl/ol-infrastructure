@@ -6,7 +6,9 @@ from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
     Identifier,
+    Input,
     Job,
+    Output,
     Pipeline,
     Platform,
     RegistryImage,
@@ -24,6 +26,8 @@ COURSES = ["ml", "gen_ai", "sys_think", "sys_eng"]
 run_optimization_pipeline = (
     Path(__file__).parent.joinpath("run_optimization_pipeline.sh").read_text()
 )
+
+check_for_warnings = Path(__file__).parent.joinpath("handle_warnings.sh").read_text()
 
 slack_notification_resource = slack_notification(
     Identifier("slack-notification"), url="((google_ads_optimization.slack_url))"
@@ -58,27 +62,52 @@ def ad_optimization_pipeline() -> Pipeline:
                         path="bash",
                         args=["-c", run_optimization_pipeline],
                     ),
+                    outputs=[Output(name=Identifier("optimization_pipeline_output"))],
+                ),
+                on_error=notification(
+                    slack_notification_resource,
+                    "Google Ads Optimization Pipeline Error",
+                    "Google Ads Optimization Pipeline errored for ((course_name)). Check the pipeline logs for details.",
+                    alert_type="errored",
+                ),
+                on_failure=notification(
+                    slack_notification_resource,
+                    "Google Ads Optimization Pipeline Failure",
+                    "Google Ads Optimization Pipeline failed for ((course_name)). Check the pipeline logs for details.",
+                    alert_type="failed",
+                ),
+                on_abort=notification(
+                    slack_notification_resource,
+                    "Google Ads Optimization Pipeline Abort",
+                    "Google Ads Optimization Pipeline aborted for ((course_name)). Check the pipeline logs for details.",
+                    alert_type="aborted",
+                ),
+            ),
+            TaskStep(
+                task=Identifier("ad-optimization-pipeline-emit-warnings"),
+                config=TaskConfig(
+                    inputs=[Input(name=Identifier("optimization_pipeline_output"))],
+                    platform=Platform.linux,
+                    image_resource=AnonymousResource(
+                        type="registry-image",
+                        source={
+                            "repository": "alpine",
+                            "tag": "3",
+                        },
+                    ),
+                    run=Command(
+                        path="bash",
+                        args=["-c", check_for_warnings],
+                    ),
+                ),
+                on_failure=notification(
+                    slack_notification_resource,
+                    "Google Ads Optimization Warnings detected",
+                    "Google Ads Optimization Pipeline emitted warnings for ((course_name)). Check the pipeline logs for details.",
+                    alert_type="failed",
                 ),
             ),
         ],
-        on_error=notification(
-            slack_notification_resource,
-            "Google Ads Optimization Pipeline Error",
-            "Google Ads Optimization Pipeline errored for ((course_name)). Check the pipeline logs for details.",
-            alert_type="errored",
-        ),
-        on_failure=notification(
-            slack_notification_resource,
-            "Google Ads Optimization Pipeline Failure",
-            "Google Ads Optimization Pipeline failed for ((course_name)). Check the pipeline logs for details.",
-            alert_type="failed",
-        ),
-        on_abort=notification(
-            slack_notification_resource,
-            "Google Ads Optimization Pipeline Abort",
-            "Google Ads Optimization Pipeline aborted for ((course_name)). Check the pipeline logs for details.",
-            alert_type="aborted",
-        ),
     )
     return Pipeline(
         jobs=[ad_optimization_object],
