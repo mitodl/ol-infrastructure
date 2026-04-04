@@ -206,7 +206,7 @@ def build_base_general_config() -> ConfigDict:
         "DEFAULT_NOTIFICATION_ICON_URL": "",
         "OAUTH2_PROVIDER": {
             "OAUTH2_VALIDATOR_CLASS": "openedx.core.djangoapps.oauth_dispatch.dot_overrides.validators.EdxOAuth2Validator",
-            "REFRESH_TOKEN_EXPIRE_SECONDS": 7776000,
+            "REFRESH_TOKEN_EXPIRE_SECONDS": 2592000,  # 30 days
             "SCOPES_BACKEND_CLASS": "openedx.core.djangoapps.oauth_dispatch.scopes.ApplicationModelScopes",
             "SCOPES": {
                 "read": "Read access",
