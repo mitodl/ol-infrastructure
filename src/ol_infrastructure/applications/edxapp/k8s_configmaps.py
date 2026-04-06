@@ -290,12 +290,12 @@ def _build_interpolated_config_dict(
                     "TOS_AND_HONOR": "",
                 },
                 "OPEN_EDX_FILTERS_CONFIG": {
-                    'org.openedx.learning.xblock.render.started.v1': {
-                        'pipeline': [
-                            'ol_openedx_auto_select_language.filters.AddDestLangForVideoBlock',
-                            'ol_openedx_chat_xblock.filters.DisableMathJaxForOLChatBlock',
+                    "org.openedx.learning.xblock.render.started.v1": {
+                        "pipeline": [
+                            "ol_openedx_auto_select_language.filters.AddDestLangForVideoBlock",
+                            "ol_openedx_chat_xblock.filters.DisableMathJaxForOLChatBlock",
                         ],
-                        'fail_silently': False
+                        "fail_silently": False,
                     }
                 },
             }
