@@ -242,6 +242,14 @@ class OLMariaDBConfig(OLDBConfig):
         # slow_query_log / long_query_time names).
         {"name": "log_slow_query", "value": 1},
         {"name": "log_slow_query_time", "value": 2},
+        # Enable RDS Optimized Writes, which replaces the InnoDB doublewrite buffer with
+        # a more efficient write path. Requires gp3/io1 storage (the default). This is a
+        # static parameter and takes effect on the next restart (or blue/green cutover).
+        {
+            "name": "rds.optimized_writes",
+            "value": "ENABLED",
+            "apply_method": "pending-reboot",
+        },
     ]
 
 
