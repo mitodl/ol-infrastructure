@@ -289,6 +289,15 @@ def _build_interpolated_config_dict(
                     "CONTACT": f"https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/",
                     "TOS_AND_HONOR": "",
                 },
+                "OPEN_EDX_FILTERS_CONFIG": {
+                    'org.openedx.learning.xblock.render.started.v1': {
+                        'pipeline': [
+                            'ol_openedx_auto_select_language.filters.AddDestLangForVideoBlock',
+                            'ol_openedx_chat_xblock.filters.DisableMathJaxForOLChatBlock',
+                        ],
+                        'fail_silently': False
+                    }
+                },
             }
         )
 
