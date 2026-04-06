@@ -89,6 +89,13 @@ class OLDBConfig(AWSBase):
     security_groups: list[SecurityGroup]
     storage: PositiveInt = PositiveInt(50)
     storage_type: StorageType = StorageType.ssd
+    # Provisioned IOPS for gp3 (3,000-16,000) or io1 (1,000-256,000).
+    # gp3 baseline is 3,000 IOPS at no extra cost; provisioning above that
+    # speeds up full-baseline snapshots (blue/green seeding, post-autoscale).
+    iops: int | None = None
+    # Provisioned throughput in MB/s for gp3 only (125-1,000 MB/s).
+    # gp3 baseline is 125 MB/s; higher values shorten snapshot duration.
+    storage_throughput: int | None = None
     subnet_group_name: str | pulumi.Output[str]
     take_final_snapshot: bool = True
     use_blue_green: bool = False
@@ -205,8 +212,10 @@ class OLPostgresDBConfig(OLDBConfig):
         },
         # WAL settings for logical replication
         # max_wal_senders: Maximum concurrent WAL sender processes
-        # Recommended: replicas + logical replication slots + 2
-        {"name": "max_wal_senders", "value": 10, "apply_method": "pending-reboot"},
+        # Recommended: replicas + logical replication slots + 2.
+        # 20 is a safe default for instances that use blue/green deployments or
+        # read replicas; AWS will auto-raise the value if it proves too low.
+        {"name": "max_wal_senders", "value": 20, "apply_method": "pending-reboot"},
         # max_replication_slots: Maximum replication slots
         # Each logical replication connection needs one slot
         {
@@ -507,7 +516,9 @@ class OLAmazonDB(pulumi.ComponentResource):
             publicly_accessible=db_config.public_access,
             skip_final_snapshot=not db_config.take_final_snapshot,
             storage_encrypted=True,
+            storage_throughput=db_config.storage_throughput,
             storage_type=db_config.storage_type.value,
+            iops=db_config.iops,
             tags=db_config.tags,
             username=db_config.username,
             vpc_security_group_ids=[group.id for group in db_config.security_groups],

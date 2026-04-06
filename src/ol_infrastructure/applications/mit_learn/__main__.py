@@ -567,6 +567,19 @@ rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["instance_size"] = (
     mitlearn_config.get("db_instance_size") or rds_defaults["instance_size"]
 )
+# Pre-provision storage to avoid autoscaling events that force a full snapshot
+# baseline (needed for blue/green seeding and post-autoscale backups). Default
+# to 300 GB so the instance has headroom before autoscaling kicks in.  The
+# max_storage ceiling (1 TB) still applies, and Pulumi ignores upward drift
+# from autoscaling when max_allocated_storage is set.
+rds_defaults["storage"] = mitlearn_config.get_int("db_allocated_storage") or 300
+# Provisioned IOPS / throughput reduce the time for full-baseline snapshots
+# (blue/green seeding, first backup after autoscale). gp3 baselines are
+# 3,000 IOPS / 125 MB/s; these values roughly halve snapshot duration.
+if db_iops := mitlearn_config.get_int("db_iops"):
+    rds_defaults["iops"] = db_iops
+if db_storage_throughput := mitlearn_config.get_int("db_storage_throughput"):
+    rds_defaults["storage_throughput"] = db_storage_throughput
 mitlearn_db_config = OLPostgresDBConfig(
     instance_name=f"ol-mitlearn-db-{stack_info.env_suffix}",
     password=rds_password,
