@@ -247,7 +247,7 @@ class OLMariaDBConfig(OLDBConfig):
         # static parameter and takes effect on the next restart (or blue/green cutover).
         {
             "name": "rds.optimized_writes",
-            "value": "ENABLED",
+            "value": "AUTO",
             "apply_method": "pending-reboot",
         },
     ]
