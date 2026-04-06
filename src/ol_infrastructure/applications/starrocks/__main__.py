@@ -109,7 +109,7 @@ starrocks_root_password_secret = kubernetes.core.v1.Secret(
 # Configure Vault integration for OIDC credentials using OLEKSAuthBinding
 starrocks_auth_binding = OLEKSAuthBinding(
     OLEKSAuthBindingConfig(
-        application_name="starrocks",
+        application_name=f"starrocks-{stack_info.env_prefix}",
         namespace=namespace,
         stack_info=stack_info,
         aws_config=aws_config,
