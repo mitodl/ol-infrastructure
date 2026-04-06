@@ -249,6 +249,16 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         ],
         stages=["QA", "Production"],
     ),
+    "starrocks-substructure": SimplePulumiParams(
+        app_name="starrocks_substructure",
+        pulumi_project_path="substructure/starrocks/",
+        stack_prefix="substructure.starrocks",
+        pulumi_project_name="ol-infrastructure-substructure-starrocks",
+        deployment_groups=[
+            "lakehouse",
+        ],
+        stages=["QA", "Production"],
+    ),
     "tika": SimplePulumiParams(
         app_name="tika",
         pulumi_project_path="applications/tika/",

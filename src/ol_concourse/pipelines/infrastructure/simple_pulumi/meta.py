@@ -162,6 +162,7 @@ if __name__ == "__main__":
         "opensearch",
         "qdrant-cloud",
         "starrocks",
+        "starrocks-substructure",
         "tika",
         "vector-log-proxy",
         "xpro-partner-dns",
