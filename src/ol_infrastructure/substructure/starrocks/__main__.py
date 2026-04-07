@@ -1,7 +1,18 @@
 """Configure Vault dynamic database credentials for StarRocks.
 
 StarRocks exposes a MySQL-compatible protocol on port 9030 (the FE query port).
-Vault uses the MySQL database plugin to manage dynamic credentials.
+The built-in Vault MySQL plugin cannot be used because StarRocks only supports
+COM_STMT_PREPARE for SELECT statements, returning error 1295 for all DDL and
+privilege-management statements (CREATE USER, GRANT, DROP USER). Vault's MySQL
+plugin uses COM_STMT_PREPARE for all creation/revocation statements, causing a
+nil-pointer panic in the plugin.
+
+Instead, we use a custom database plugin (vault-plugin-database-starrocks) that
+sends all statements via COM_QUERY (db.ExecContext with no bind parameters),
+which StarRocks supports for all statement types.
+
+The plugin binary must be present at /var/lib/vault/plugins/ on the Vault server
+before this stack is applied.  The Vault AMI build downloads it automatically.
 
 StarRocks privilege SQL differs from standard MySQL:
   - GRANT uses the StarRocks model: GRANT priv ON ALL TABLES IN ...
@@ -13,10 +24,14 @@ over the VPC. Configure starrocks:fe_host to an internally routable address
 (e.g. an internal NLB DNS name or a stable VPC-accessible hostname).
 """
 
+import json
+
+import pulumi
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 
 from bridge.lib.magic_numbers import ONE_MONTH_SECONDS
+from bridge.lib.versions import VAULT_PLUGIN_STARROCKS_SHA256
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 
@@ -109,28 +124,51 @@ starrocks_vault_mount = vault.Mount(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
-starrocks_db_connection = vault.database.SecretBackendConnection(
+# Register the custom StarRocks database plugin in Vault's plugin catalog.
+# The binary must already be present at /var/lib/vault/plugins/ on the Vault
+# server (placed there by the Vault AMI build).
+starrocks_plugin = vault.Plugin(
+    f"starrocks-{stack_info.env_suffix}-vault-database-plugin",
+    type="database",
+    name="starrocks-database-plugin",
+    command="vault-plugin-database-starrocks",
+    sha256=VAULT_PLUGIN_STARROCKS_SHA256,
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
+# Configure the StarRocks connection using generic.Secret because the Pulumi
+# vault provider's SecretBackendConnection resource only supports built-in
+# plugin names (mysql, mysql_rds, etc.) via dedicated blocks. Our custom
+# plugin is configured by writing directly to the Vault API path.
+#
+# disable_read=True is required because Vault redacts the password field in GET
+# responses, which would cause a perpetual diff on every Pulumi plan.
+starrocks_db_connection = vault.generic.Secret(
     f"starrocks-{stack_info.env_suffix}-vault-database-connection",
-    backend=starrocks_vault_mount.path,
-    name="starrocks",
-    verify_connection=starrocks_config.get_bool("verify_connection") or False,
-    allowed_roles=sorted(starrocks_role_statements.keys()),
-    data={
-        "username": db_admin_username,
-        "password": db_admin_password,
-    },
-    # Use the plain mysql plugin (not mysql_rds) — StarRocks is not on RDS.
-    # No tls_ca since this is an internal VPC connection.
-    mysql={
-        "connection_url": connection_url,
-        "username": db_admin_username,
-        "password": db_admin_password,
-        "username_template": '{{printf "v-%.8s-%.8s-%.20s" (.DisplayName) (.RoleName) (random 20) | truncate 32}}',  # noqa: E501
-    },
+    path=pulumi.Output.concat(starrocks_vault_mount.path, "/config/starrocks"),
+    disable_read=True,
+    data_json=pulumi.Output.all(connection_url, db_admin_password).apply(
+        lambda args: json.dumps(
+            {
+                "plugin_name": "starrocks-database-plugin",
+                "connection_url": args[0],
+                "username": db_admin_username,
+                "password": args[1],
+                "allowed_roles": sorted(starrocks_role_statements.keys()),
+                "verify_connection": (
+                    starrocks_config.get_bool("verify_connection") or False
+                ),
+                "username_template": (
+                    '{{printf "v-%.8s-%.8s-%.20s"'
+                    " (.DisplayName) (.RoleName) (random 20) | truncate 32}}"
+                ),
+            }
+        )
+    ),
     opts=ResourceOptions(
         parent=starrocks_vault_mount,
         delete_before_replace=True,
-        depends_on=[starrocks_vault_mount],
+        depends_on=[starrocks_vault_mount, starrocks_plugin],
     ),
 )
 
