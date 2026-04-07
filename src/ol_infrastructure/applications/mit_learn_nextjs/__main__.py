@@ -128,6 +128,18 @@ new_color = colors.apply(lambda c: c["new_color"])
 active_color = colors.apply(lambda c: c["active_color"])
 last_active_resolved = colors.apply(lambda c: c["last_active"])
 
+stay_updated_hubspot_form_ids = {
+    "ci": "4f423dc7-5b08-430b-a9fb-920b7f9597ed",
+    "qa": "4f423dc7-5b08-430b-a9fb-920b7f9597ed",
+    "production": "a5d18493-dcdb-4482-ad10-16ab66a35526",
+}
+
+try:
+    stay_updated_hubspot_form_id = stay_updated_hubspot_form_ids[stack_info.env_suffix]
+except KeyError as exc:
+    msg = f"Unsupported MIT Learn Next.js environment: {stack_info.env_suffix}"
+    raise ValueError(msg) from exc
+
 raw_env_vars = {
     # Env vars available only on server
     "MITOL_NOINDEX": nextjs_config.get("mitol_noindex"),
@@ -155,11 +167,13 @@ raw_env_vars = {
     "NEXT_PUBLIC_POSTHOG_API_KEY": nextjs_config.require("posthog_api_key"),
     "NEXT_PUBLIC_POSTHOG_PROJECT_ID": nextjs_config.require("posthog_project_id"),
     "NEXT_PUBLIC_POSTHOG_UI_HOST": "https://us.posthog.com",
+    "NEXT_PUBLIC_RECAPTCHA_SITE_KEY": nextjs_config.get("recaptcha_site_key"),
     "NEXT_PUBLIC_SENTRY_DSN": nextjs_config.require("sentry_dsn"),
     "NEXT_PUBLIC_SENTRY_ENV": nextjs_config.require("sentry_env"),
     "NEXT_PUBLIC_SENTRY_PROFILES_SAMPLE_RATE": "0.25",
     "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE": "0.1",
     "NEXT_PUBLIC_SITE_NAME": "MIT Learn",
+    "NEXT_PUBLIC_STAY_UPDATED_HUBSPOT_FORM_ID": stay_updated_hubspot_form_id,
     "NEXT_PUBLIC_VERSION": MIT_LEARN_NEXTJS_DOCKER_TAG,
     "NEXT_PUBLIC_FEATURE_product_page_courses": "false",
     "NEXT_PUBLIC_FEATURE_article_viewer": "true",
