@@ -963,8 +963,8 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                     "lastName": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
                     "fullName": "http://schemas.microsoft.com/identity/claims/displayname",
                 },
-                want_assertions_encrypted=False,
-                want_assertions_signed=False,
+                want_assertions_encrypted=True,
+                want_assertions_signed=True,
             ),
             org=istanbul_aydin_org,
         )
