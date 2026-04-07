@@ -32,6 +32,9 @@ from ol_infrastructure.substructure.aws.eks.keda import setup_keda
 from ol_infrastructure.substructure.aws.eks.nvidia import setup_nvidia
 from ol_infrastructure.substructure.aws.eks.nvme_setup import setup_nvme_local_storage
 from ol_infrastructure.substructure.aws.eks.starrocks import setup_starrocks
+from ol_infrastructure.substructure.aws.eks.typesense_operator import (
+    setup_typesense_operator,
+)
 
 env_config = Config("environment")
 
@@ -334,3 +337,10 @@ if stack_info.env_prefix == "data":
         k8s_provider=k8s_provider,
         k8s_labels=k8s_global_labels,
     )
+
+# Setup Typesense operator
+setup_typesense_operator(
+    cluster_name=cluster_name,
+    cluster_stack=cluster_stack,
+    k8s_provider=k8s_provider,
+)
