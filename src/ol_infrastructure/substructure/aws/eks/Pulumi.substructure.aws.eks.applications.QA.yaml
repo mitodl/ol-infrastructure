@@ -4,3 +4,4 @@ encryptedkey: AQICAHgQW+3bag/cl2fPG3dPdqAPbfcsZuwI7rETXZsx85HRpgFFRRmQuuIOIQtVCt
 config:
   environment:business_unit: operations
   environment:target_vpc: applications_vpc
+  typesense:enable_operator: true
