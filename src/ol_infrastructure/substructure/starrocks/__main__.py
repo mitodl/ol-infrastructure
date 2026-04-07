@@ -123,6 +123,8 @@ starrocks_db_connection = vault.database.SecretBackendConnection(
     # No tls_ca since this is an internal VPC connection.
     mysql={
         "connection_url": connection_url,
+        "username": db_admin_username,
+        "password": db_admin_password,
         "username_template": '{{printf "v-%.8s-%.8s-%.20s" (.DisplayName) (.RoleName) (random 20) | truncate 32}}',  # noqa: E501
     },
     opts=ResourceOptions(
