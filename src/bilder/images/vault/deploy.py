@@ -155,6 +155,15 @@ STARROCKS_PLUGIN_URL = (
     f"/releases/download/v{VAULT_PLUGIN_STARROCKS_VERSION}/{STARROCKS_PLUGIN_NAME}"
 )
 
+files.directory(
+    name="Ensure Vault plugin directory exists",
+    path=str(PLUGIN_DIRECTORY),
+    present=True,
+    mode="755",
+    user=vault.name,
+    group=vault.name,
+)
+
 files.download(
     name="Download StarRocks Vault database plugin",
     src=STARROCKS_PLUGIN_URL,
