@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+working_dir=$(pwd)
+
 # TODO: Change this to just pass in env vars instead of writing out the json and yaml files.
 # This will require some small tweaks to the pull_input_data.py script to read from env vars instead of requiring files.
 mkdir /opt/gurobi
@@ -28,11 +30,18 @@ CUSTOMER_ID_FOR_COURSE=$(echo "${CUSTOMER_ID_FOR_COURSES}" | uv run python -c "i
 
 # shellcheck disable=SC2086
 uv run python scripts/pull_input_data.py --google-ads-yaml=google-ads.yaml --customer-id=${CUSTOMER_ID_FOR_COURSE} --output-course=${COURSE_NAME} --datasets=ads_reports
+
 # shellcheck disable=SC2086
-uv run python scripts/run_pipeline.py --course ${COURSE_NAME} | tee "optimization_pipeline.log"
+uv run python scripts/run_pipeline.py --course ${COURSE_NAME} --time-limit="1800.0" 2>&1 | tee "optimization_pipeline.log"
+
+echo "Pipeline finished. Checking for warnings in the log..."
 
 # Pipe warnings to an output. If that output exists, we want to emit a slack message about it.
-warning_result=$(grep -i -A 3 "warning" optimization_pipeline.log)
-if [ -n "$warning_result" ]
-then echo "$warning_result" > optimization_pipeline_output/warnings.txt
+# Messages emitted by our push script use "WARNING" over stdout.
+warning_result=$(grep -A 3 "WARNING" optimization_pipeline.log || true)
+echo "Warnings check complete."
+if [ -n "$warning_result" ]; then
+  echo "Warnings found in the log"
+  echo "$warning_result" > "$working_dir"/optimization_pipeline_output/warnings.txt
 fi
+echo "Pipeline execution complete."

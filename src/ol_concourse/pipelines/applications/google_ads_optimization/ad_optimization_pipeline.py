@@ -90,10 +90,7 @@ def ad_optimization_pipeline() -> Pipeline:
                     platform=Platform.linux,
                     image_resource=AnonymousResource(
                         type="registry-image",
-                        source={
-                            "repository": "alpine",
-                            "tag": "3",
-                        },
+                        source=RegistryImage(repository="debian", tag="12-slim"),
                     ),
                     run=Command(
                         path="bash",
