@@ -14,6 +14,15 @@ policy_definition = {
                 "cloudwatch:PutMetricData",
             ],
             "Resource": "*",
-        }
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "autoscaling:DescribeAutoScalingInstances",
+                "autoscaling:DescribeLifecycleHooks",
+                "autoscaling:CompleteLifecycleAction",
+            ],
+            "Resource": "*",
+        },
     ],
 }

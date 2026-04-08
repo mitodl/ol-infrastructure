@@ -1,0 +1,14 @@
+[Unit]
+Description=Concourse worker spot interruption watcher
+Documentation=https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-interruptions.html
+After=concourse.service
+BindsTo=concourse.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/concourse-worker-spot-watch
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

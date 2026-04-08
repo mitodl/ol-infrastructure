@@ -1,0 +1,14 @@
+[Unit]
+Description=Concourse worker ASG lifecycle hook handler
+Documentation=https://docs.aws.amazon.com/autoscaling/ec2/userguide/lifecycle-hooks.html
+After=concourse.service
+BindsTo=concourse.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/concourse-worker-lifecycle-hook
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -7,7 +7,7 @@ from pathlib import Path
 import yaml
 from pyinfra import host
 from pyinfra.api.util import get_template
-from pyinfra.operations import files
+from pyinfra.operations import files, systemd
 
 from bilder.components.alloy.models import AlloyConfig
 from bilder.components.alloy.steps import install_and_configure_alloy
@@ -83,6 +83,7 @@ VERSIONS = {
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
     "traefik": os.environ.get("TRAEFIK_VERSION", TRAEFIK_VERSION),
 }
+FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 CONCOURSE_WEB_NODE_TYPE = "web"
 CONCOURSE_WORKER_NODE_TYPE = "worker"
@@ -184,6 +185,7 @@ concourse_config_map = {
         baggageclaim_bind_ip="0.0.0.0",  # noqa: S104
         baggageclaim_driver="overlay",
         bind_ip="0.0.0.0",  # noqa: S104
+        connection_drain_timeout="5m",
         container_runtime="containerd",
         containerd_dns_server="8.8.8.8",
         containerd_max_containers=0,  # Don't set a limit on the number of containers
@@ -258,7 +260,10 @@ vault_template_map = {
 }
 
 # Install Concourse
-install_baseline_packages(packages=["curl", "btrfs-progs"])
+install_baseline_packages(
+    packages=["curl", "btrfs-progs"]
+    + (["awscli"] if node_type == CONCOURSE_WORKER_NODE_TYPE else [])
+)
 concourse_install_changed = install_concourse(concourse_base_config)
 concourse_config_changed = configure_concourse(concourse_config)
 
@@ -290,7 +295,6 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: SLF001
     )
 
     # Install Traefik
-    FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
 
     # Deploy main team OIDC config so CONCOURSE_MAIN_TEAM_CONFIG persists
     # across restarts
@@ -423,6 +427,47 @@ if host.get_fact(HasSystemd):
                 concourse_config.tsa_public_key_path,
             ]
         )
+        # Install drain helper used by both spot-watch and lifecycle-hook services
+        worker_scripts = [
+            ("concourse-worker-drain", "755"),
+            ("concourse-worker-spot-watch", "755"),
+            ("concourse-worker-lifecycle-hook", "755"),
+        ]
+        for script_name, script_mode in worker_scripts:
+            files.put(
+                name=f"Upload {script_name} script",
+                src=str(FILES_DIRECTORY.joinpath(script_name)),
+                dest=f"/usr/local/bin/{script_name}",
+                user="root",
+                group="root",
+                mode=script_mode,
+            )
+        worker_service_files = [
+            "concourse-worker-spot-watch.service",
+            "concourse-worker-lifecycle-hook.service",
+        ]
+        worker_services_changed = False
+        for service_file in worker_service_files:
+            result = files.put(
+                name=f"Upload {service_file} systemd unit",
+                src=str(FILES_DIRECTORY.joinpath(service_file)),
+                dest=f"/etc/systemd/system/{service_file}",
+                user="root",
+                group="root",
+                mode="644",
+            )
+            worker_services_changed = worker_services_changed or result.changed
+        for service_name in [
+            "concourse-worker-spot-watch",
+            "concourse-worker-lifecycle-hook",
+        ]:
+            systemd.service(
+                name=f"Enable and start {service_name}",
+                service=service_name,
+                running=True,
+                enabled=True,
+                daemon_reload=worker_services_changed,
+            )
     service_configuration_watches(
         service_name="concourse",
         watched_files=watched_concourse_files,
