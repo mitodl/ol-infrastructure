@@ -4,7 +4,6 @@
 import base64
 import json
 import mimetypes
-import os
 import textwrap
 from pathlib import Path
 
@@ -80,6 +79,7 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
+    get_docker_image_tag,
     merge_otel_resource_attributes,
     parse_stack,
 )
@@ -130,11 +130,7 @@ k8s_global_labels = K8sGlobalLabels(
 ).model_dump()
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
-# Fail hard if LEARN_AI_DOCKER_TAG is not set
-if "LEARN_AI_DOCKER_TAG" not in os.environ:
-    msg = "LEARN_AI_DOCKER_TAG must be set"
-    raise OSError(msg)
-LEARN_AI_DOCKER_TAG = os.getenv("LEARN_AI_DOCKER_TAG")
+LEARN_AI_DOCKER_TAG = get_docker_image_tag("LEARN_AI")
 
 match stack_info.env_suffix:
     case "production":

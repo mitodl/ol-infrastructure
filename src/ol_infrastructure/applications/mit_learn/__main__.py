@@ -3,7 +3,6 @@
 import base64
 import json
 import mimetypes
-import os
 import textwrap
 from pathlib import Path
 from string import Template
@@ -86,6 +85,7 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
+    get_docker_image_tag,
     merge_otel_resource_attributes,
     parse_stack,
 )
@@ -1402,10 +1402,7 @@ secret_names, secret_resources = create_mitlearn_k8s_secrets(
     redis_cache=redis_cache,
 )
 
-if "MIT_LEARN_DOCKER_TAG" not in os.environ:
-    msg = "MIT_LEARN_DOCKER_TAG must be set."
-    raise OSError(msg)
-MIT_LEARN_DOCKER_TAG = os.environ["MIT_LEARN_DOCKER_TAG"]
+MIT_LEARN_DOCKER_TAG = get_docker_image_tag("MIT_LEARN")
 
 # Configure and deploy the mitlearn application using OLApplicationK8s
 mitlearn_k8s_app = OLApplicationK8s(

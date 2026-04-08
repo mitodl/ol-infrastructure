@@ -7,7 +7,6 @@
 """
 
 import json
-import os
 from pathlib import Path
 
 import pulumi_github as github
@@ -76,6 +75,7 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
+    get_docker_image_tag,
     merge_otel_resource_attributes,
     parse_stack,
 )
@@ -570,10 +570,7 @@ app_env_vars["POSTHOG_API_HOST"] = app_env_vars.pop(
 # carries organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(app_env_vars, k8s_app_labels)
 
-if "OCW_STUDIO_DOCKER_TAG" not in os.environ:
-    msg = "OCW_STUDIO_DOCKER_TAG must be set."
-    raise OSError(msg)
-OCW_STUDIO_DOCKER_TAG = os.environ["OCW_STUDIO_DOCKER_TAG"]
+OCW_STUDIO_DOCKER_TAG = get_docker_image_tag("OCW_STUDIO")
 
 ocw_studio_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(

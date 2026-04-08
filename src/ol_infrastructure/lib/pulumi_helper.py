@@ -1,5 +1,6 @@
 """Helpers for working with Pulumi stack names and stack references."""
 
+import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -101,3 +102,31 @@ def merge_otel_resource_attributes(
         env_vars["OTEL_RESOURCE_ATTRIBUTES"] = f"{base_otel},{k8s_label_attrs}"
     else:
         env_vars["OTEL_RESOURCE_ATTRIBUTES"] = k8s_label_attrs
+
+
+def get_docker_image_tag(app_prefix: str) -> str:
+    """Return the Docker image tag for an application from environment variables.
+
+    Reads ``{app_prefix}_DOCKER_TAG`` (a Git tag, e.g. ``v1.2.3``) or
+    ``{app_prefix}_DOCKER_SHA`` (a Git commit SHA, e.g. ``abc1234``).  Exactly
+    one of the two must be set; setting both is an error.
+
+    :param app_prefix: Upper-case application prefix, e.g. ``"MIT_LEARN"``.
+    :returns: The value of whichever variable is set.
+    :raises OSError: If both variables are set, or if neither is set.
+    """
+    tag_var = f"{app_prefix}_DOCKER_TAG"
+    sha_var = f"{app_prefix}_DOCKER_SHA"
+    tag_value = os.environ.get(tag_var)
+    sha_value = os.environ.get(sha_var)
+
+    if tag_value and sha_value:
+        msg = (
+            f"Cannot set both {tag_var} and {sha_var}. "
+            "Provide exactly one of a Git tag or a Git SHA."
+        )
+        raise OSError(msg)
+    if not tag_value and not sha_value:
+        msg = f"Either {tag_var} or {sha_var} must be set."
+        raise OSError(msg)
+    return tag_value or sha_value  # type: ignore[return-value]

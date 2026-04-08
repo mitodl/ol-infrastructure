@@ -1,6 +1,5 @@
 """Pulumi program for deploying the MIT Learn Next.js application to Kubernetes."""
 
-import os
 from typing import Any
 
 import pulumi_kubernetes as kubernetes
@@ -27,6 +26,7 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
+    get_docker_image_tag,
     merge_otel_resource_attributes,
     parse_stack,
 )
@@ -35,10 +35,7 @@ stack_info = parse_stack()
 
 cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
 # Assume the application image URI comes from a separate image build stack
-if "MIT_LEARN_NEXTJS_DOCKER_TAG" not in os.environ:
-    msg = "MIT_LEARN_NEXTJS_DOCKER_TAG environment varibale must be set."
-    raise OSError(msg)
-MIT_LEARN_NEXTJS_DOCKER_TAG = os.environ["MIT_LEARN_NEXTJS_DOCKER_TAG"]
+MIT_LEARN_NEXTJS_DOCKER_TAG = get_docker_image_tag("MIT_LEARN_NEXTJS")
 
 app_image = ecr_image_uri(f"mitodl/mit-learn-nextjs-app:{MIT_LEARN_NEXTJS_DOCKER_TAG}")
 

@@ -7,7 +7,6 @@
 
 import base64
 import json
-import os
 from pathlib import Path
 
 import pulumi_fastly as fastly
@@ -81,6 +80,7 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
+    get_docker_image_tag,
     merge_otel_resource_attributes,
     parse_stack,
 )
@@ -506,10 +506,7 @@ if k8s_deploy:
     # carries organizational metadata regardless of stack environment.
     merge_otel_resource_attributes(app_env_vars, k8s_app_labels)
 
-    if "XPRO_DOCKER_TAG" not in os.environ:
-        msg = "XPRO_DOCKER_TAG must be set."
-        raise OSError(msg)
-    XPRO_DOCKER_TAG = os.environ["XPRO_DOCKER_TAG"]
+    XPRO_DOCKER_TAG = get_docker_image_tag("XPRO")
 
     xpro_k8s_app = OLApplicationK8s(
         ol_app_k8s_config=OLApplicationK8sConfig(

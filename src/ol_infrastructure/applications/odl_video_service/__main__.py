@@ -8,7 +8,6 @@
 """
 
 import json
-import os
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
@@ -73,6 +72,7 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
+    get_docker_image_tag,
     merge_otel_resource_attributes,
     parse_stack,
 )
@@ -786,10 +786,7 @@ app_env_vars.update(k8s_extra_vars)
 # signals carry organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(app_env_vars, k8s_app_labels)
 
-if "ODL_VIDEO_SERVICE_DOCKER_TAG" not in os.environ:
-    msg = "ODL_VIDEO_SERVICE_DOCKER_TAG must be set."
-    raise OSError(msg)
-ODL_VIDEO_SERVICE_DOCKER_TAG = os.environ["ODL_VIDEO_SERVICE_DOCKER_TAG"]
+ODL_VIDEO_SERVICE_DOCKER_TAG = get_docker_image_tag("ODL_VIDEO_SERVICE")
 
 # NGINX configuration for K8s (HTTP only — APISIX handles TLS)
 ovs_domains = ovs_config.get_object("domains") or [ovs_config.get("default_domain")]
