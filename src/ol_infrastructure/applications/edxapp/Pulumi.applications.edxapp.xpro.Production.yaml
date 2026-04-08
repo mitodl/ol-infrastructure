@@ -32,7 +32,7 @@ config:
   edxapp:business_unit: mitxpro
   edxapp:db_password:
     secure: v1:U83x0i6WAndxuOLK:XsAILALTGbtjCqGJllcqg3EaOM0FF/SNmuiMAK2r3E9X5joW26kjOQzYUcKr0slkHBv8RUEr3xA=
-  edxapp:db_use_blue_green: true
+  edxapp:db_use_blue_green: "true"
   edxapp:dns_zone: xpro
   edxapp:default_module_class: xmodule.hidden_block.HiddenBlock
   edxapp:domains:
@@ -40,7 +40,7 @@ config:
     preview: preview.xpro.mit.edu
     studio: studio.xpro.mit.edu
   edxapp:marketing_domain: xpro.mit.edu
-  edxapp:move_db: true
+  edxapp:move_db: "true"
   edxapp:edx_forum_secrets:
     secure: v1:YHqAWSdn7TNUn7d+:IBgiGsl4r8vymID8NV43rnfJy+qsJSXm/jXaWWALUfF9zXqRO4zJZhLS0d+etijGVwaZnF8v5zXlo+EczFrCe7ICHpS85zHgifbfDcw=
   edxapp:enable_notes: "True"
@@ -54,7 +54,7 @@ config:
   edxapp:github_org_api_url: https://github.mit.edu/api/v3/orgs/xpro
   edxapp:google_analytics_id: UA-5145472-38
   edxapp:product: xpro
-  edxapp:enable_xqueue: false
+  edxapp:enable_xqueue: "false"
   edxapp:mail_domain: edxapp-mail-production.xpro.mit.edu
   edxapp:sender_email_address: support@xpro.mit.edu
   edxapp:worker_instance_type: "m7a.medium"
@@ -105,8 +105,12 @@ config:
   meilisearch:deploy: "true"
   meilisearch:enabled: "false"
   meilisearch:domain: meilisearch.xpro.mit.edu
-  meilisearch:replica_count: 1
+  meilisearch:replica_count: "1"
   meilisearch:pv_size: 100Gi
   meilisearch:cpu_request: "250m"
   meilisearch:memory_request: "4Gi"
   meilisearch:memory_limit: "4Gi"
+  typesense:deploy: "true"
+  typesense:enabled: "false"
+  typesense:bootstrap_key:
+    secure: v1:tCCP9DtDKgEJfll5:zTkEhO/k0UrKTX9vGNtf7mzzN7cgPqUDqL+Zkj/UkSsgGI1SCuHwcM5mKgMxbn1105WSiEwZx1TlckpqdKTOhoqHURBbLl4dgnlYNiixePI=

@@ -27,6 +27,7 @@ from ol_infrastructure.applications.edxapp.k8s_secrets import create_k8s_secrets
 from ol_infrastructure.applications.edxapp.meilisearch import (
     create_meilisearch_resources,
 )
+from ol_infrastructure.applications.edxapp.typesense import create_typesense_resources
 from ol_infrastructure.components.aws.cache import OLAmazonCache
 from ol_infrastructure.components.aws.database import OLAmazonDB
 from ol_infrastructure.components.aws.eks import (
@@ -1385,6 +1386,13 @@ def create_k8s_resources(  # noqa: C901
 
     # Meilisearch
     _meilisearch_helm_release = create_meilisearch_resources(
+        stack_info=stack_info,
+        namespace=namespace,
+        k8s_global_labels=k8s_global_labels,
+    )
+
+    # Typesense
+    _typesense_cluster_crd = create_typesense_resources(
         stack_info=stack_info,
         namespace=namespace,
         k8s_global_labels=k8s_global_labels,
