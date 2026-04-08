@@ -351,7 +351,7 @@ def create_k8s_resources(  # noqa: C901
     def _make_vector_sidecar(service: str) -> kubernetes.core.v1.ContainerArgs:
         return kubernetes.core.v1.ContainerArgs(
             name="vector",
-            image="timberio/vector:0.34.1-alpine",
+            image=cached_image_uri("timberio/vector:0.34.1-alpine"),
             security_context=kubernetes.core.v1.SecurityContextArgs(
                 run_as_group=0,
                 run_as_user=0,
