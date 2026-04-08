@@ -33,16 +33,18 @@ from ol_infrastructure.components.aws.eks import (
     OLEKSTrustRole,
     OLEKSTrustRoleConfig,
 )
+from ol_infrastructure.components.services.apisix import (
+    OLApisixRoute,
+    OLApisixRouteConfig,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
+)
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.k8s import (
     GranianConfig,
-    OLApisixRoute,
-    OLApisixRouteConfig,
-    OLApisixSharedPlugins,
-    OLApisixSharedPluginsConfig,
     OLApplicationK8s,
     OLApplicationK8sConfig,
 )

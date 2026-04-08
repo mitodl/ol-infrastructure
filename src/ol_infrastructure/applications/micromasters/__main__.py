@@ -40,13 +40,15 @@ from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.components.services.apisix import (
+    OLApisixRoute,
+    OLApisixRouteConfig,
+)
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.k8s import (
-    OLApisixRoute,
-    OLApisixRouteConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
