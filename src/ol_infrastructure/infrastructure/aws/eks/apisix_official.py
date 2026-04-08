@@ -35,6 +35,7 @@ def setup_apisix(
     cluster: eks.Cluster,
     lb_controller,
     fastly_provider: fastly.Provider,
+    vpa_release: kubernetes.helm.v3.Release,
 ):
     """
     Configure and install the Apache APISIX ingress controller.
@@ -60,6 +61,7 @@ def setup_apisix(
     :param cluster: The EKS cluster object.
     :param lb_controller: The AWS Load Balancer Controller.
     :param fastly_provider: The Fastly provider instance.
+    :param vpa_release: The VPA Helm release; ensures VPA CRDs exist before the VPA object is created.
     """
     apisix_domains = eks_config.get_object("apisix_domains") or []
 
@@ -89,7 +91,7 @@ def setup_apisix(
         ).ipv6_cidr_blocks,
     ).apply(lambda blocks: [*blocks[0], *blocks[1]])
 
-    kubernetes.helm.v3.Release(
+    apisix_helm_release = kubernetes.helm.v3.Release(
         f"{cluster_name}-apisix-official-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
             name="apache-apisix",
@@ -319,6 +321,14 @@ def setup_apisix(
                         },
                     },
                 },
+                # --- Pod Disruption Budget ---
+                # Protect against simultaneous evictions during VPA-triggered pod restarts,
+                # node drains, and rolling updates. With minReplicas=3, maxUnavailable=1
+                # ensures at least 2 APISIX pods are always serving traffic.
+                "podDisruptionBudget": {
+                    "enabled": True,
+                    "maxUnavailable": 1,
+                },
                 # --- Metrics ---
                 "metrics": {
                     "serviceMonitor": {
@@ -451,5 +461,60 @@ def setup_apisix(
             provider=k8s_provider,
             parent=apisix_gateway,
             depends_on=[apisix_gateway, apisix_gateway_svc],
+        ),
+    )
+
+    # Create a VerticalPodAutoscaler for the APISIX gateway deployment.
+    #
+    # VPA manages memory sizing only; CPU-based horizontal scaling is handled by the HPA
+    # (targetCPUUtilizationPercentage: 50, minReplicas: 3, maxReplicas: 5). Splitting
+    # authority this way avoids the known HPA/VPA conflict: VPA adjusting CPU requests
+    # would distort the CPU utilization percentage that the HPA observes.
+    #
+    # updateMode "InPlaceOrRecreate" attempts to resize memory without evicting the pod
+    # (K8s 1.33+, VPA 1.6+), falling back to eviction only when an in-place update is
+    # not possible. The PodDisruptionBudget (maxUnavailable: 1) ensures at most one pod
+    # is disrupted at a time if eviction is needed, protecting gateway availability.
+    kubernetes.apiextensions.CustomResource(
+        f"{cluster_name}-apisix-vpa",
+        api_version="autoscaling.k8s.io/v1",
+        kind="VerticalPodAutoscaler",
+        metadata={
+            "name": "apache-apisix",
+            "namespace": "operations",
+        },
+        spec={
+            "targetRef": {
+                "apiVersion": "apps/v1",
+                "kind": "Deployment",
+                "name": "apache-apisix",
+            },
+            "updatePolicy": {
+                "updateMode": "InPlaceOrRecreate",
+            },
+            "resourcePolicy": {
+                "containerPolicies": [
+                    {
+                        "containerName": "apisix",
+                        # Only control memory so the HPA retains full authority
+                        # over CPU requests and therefore replica count decisions.
+                        "controlledResources": ["memory"],
+                        "controlledValues": "RequestsAndLimits",
+                        "minAllowed": {
+                            "memory": eks_config.get("apisix_memory") or "400Mi",
+                        },
+                        "maxAllowed": {
+                            "memory": "3Gi",
+                        },
+                    }
+                ]
+            },
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=operations_namespace,
+            # vpa_release ensures the autoscaling.k8s.io CRDs are installed first.
+            # apisix_helm_release ensures the target Deployment exists before VPA targets it.
+            depends_on=[vpa_release, apisix_helm_release],
         ),
     )
