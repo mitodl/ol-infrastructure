@@ -131,7 +131,7 @@ class GranianConfig(BaseModel):
     ``OLApplicationK8sConfig`` enforces this constraint at stack evaluation time.
     """
 
-    interface: Literal["wsgi", "asgi"] = "wsgi"
+    interface: Literal["wsgi", "asgi", "asginl"] = "wsgi"
     host: str = "0.0.0.0"  # noqa: S104
     port: Annotated[int, Field(ge=1, le=65535)] = DEFAULT_WSGI_PORT
     workers: PositiveInt = 2
