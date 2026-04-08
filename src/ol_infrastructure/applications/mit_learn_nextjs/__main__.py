@@ -167,7 +167,6 @@ raw_env_vars = {
     "NEXT_PUBLIC_POSTHOG_API_KEY": nextjs_config.require("posthog_api_key"),
     "NEXT_PUBLIC_POSTHOG_PROJECT_ID": nextjs_config.require("posthog_project_id"),
     "NEXT_PUBLIC_POSTHOG_UI_HOST": "https://us.posthog.com",
-    "NEXT_PUBLIC_RECAPTCHA_SITE_KEY": nextjs_config.get("recaptcha_site_key"),
     "NEXT_PUBLIC_SENTRY_DSN": nextjs_config.require("sentry_dsn"),
     "NEXT_PUBLIC_SENTRY_ENV": nextjs_config.require("sentry_env"),
     "NEXT_PUBLIC_SENTRY_PROFILES_SAMPLE_RATE": "0.25",
@@ -220,6 +219,19 @@ for k, v in raw_env_vars.items():
             value=v,
         )
     )
+
+env_vars.append(
+    kubernetes.core.v1.EnvVarArgs(
+        name="NEXT_PUBLIC_RECAPTCHA_SITE_KEY",
+        value_from=kubernetes.core.v1.EnvVarSourceArgs(
+            secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                name="mitopen-static-secret",
+                key="RECAPTCHA_SITE_KEY",
+                optional=True,
+            ),
+        ),
+    )
+)
 
 
 # Create separate PVCs for blue and green deployments
