@@ -166,7 +166,7 @@ if stack_info.name != "CI":
     _base_vault_policy = (_POLICY_DIR / "superset_server_policy.hcl").read_text(
         encoding="utf-8"
     )
-    superset_vault_policy_kwargs: dict[str, str | Path] = {
+    superset_vault_policy_kwargs: dict[str, Any] = {
         "vault_policy_text": (
             _base_vault_policy
             + f'\npath "{starrocks_vault_mount_path}/creds/readonly" {{\n'
@@ -548,18 +548,17 @@ oidc_secret = OLVaultK8SSecret(
 # StarRocks only has QA and Production substructure stacks; skip on CI.
 starrocks_creds_secret_name: str | None = None
 if stack_info.name != "CI":
-    _starrocks_creds_secret_name = (
+    starrocks_creds_secret_name = (
         "superset-starrocks-creds"  # pragma: allowlist secret  # noqa: S105
     )
-    starrocks_creds_secret_name = _starrocks_creds_secret_name
     starrocks_creds_secret = OLVaultK8SSecret(
         f"superset-starrocks-creds-{stack_info.env_suffix}",
         resource_config=OLVaultK8SDynamicSecretConfig(
-            name=_starrocks_creds_secret_name,
+            name=starrocks_creds_secret_name,
             namespace=superset_namespace,
             labels=k8s_global_labels,
             dest_secret_labels=k8s_global_labels,
-            dest_secret_name=_starrocks_creds_secret_name,
+            dest_secret_name=starrocks_creds_secret_name,
             mount=starrocks_vault_mount_path,
             path="creds/readonly",
             exclude_raw=True,
