@@ -223,16 +223,7 @@ micromasters_vault_backend_role = vault.aws.SecretBackendRole(
 micromasters_db_security_group = ec2.SecurityGroup(
     f"micromasters-db-access-{stack_info.env_suffix}",
     description=f"Access control for the MicroMasters App DB in {stack_info.name}",
-    ingress=[
-        ec2.SecurityGroupIngressArgs(
-            protocol="tcp",
-            from_port=DEFAULT_POSTGRES_PORT,
-            to_port=DEFAULT_POSTGRES_PORT,
-            cidr_blocks=["0.0.0.0/0"],
-            ipv6_cidr_blocks=["::/0"],
-            description="Allow access over the public internet from Heroku",
-        )
-    ],
+    ingress=[],
     egress=[
         ec2.SecurityGroupEgressArgs(
             from_port=0,

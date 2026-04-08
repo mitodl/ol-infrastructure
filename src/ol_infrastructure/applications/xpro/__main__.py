@@ -234,14 +234,6 @@ db_ingress_rules = [
         security_groups=[data_vpc["security_groups"]["integrator"]],
         cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"],
     ),
-    ec2.SecurityGroupIngressArgs(
-        protocol="tcp",
-        from_port=DEFAULT_POSTGRES_PORT,
-        to_port=DEFAULT_POSTGRES_PORT,
-        cidr_blocks=["0.0.0.0/0"],
-        ipv6_cidr_blocks=["::/0"],
-        description="Allow access over the public internet from Heroku",
-    ),
 ]
 if k8s_deploy:
     db_ingress_rules.append(
