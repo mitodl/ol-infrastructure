@@ -74,10 +74,10 @@ config:
   edxapp:github_org_api_url: https://github.mit.edu/api/v3/orgs/MITx-Studio2LMS-ci
   edxapp:google_analytics_id: ""
   edxapp:mail_domain: edxapp-mail-ci.mitx.mit.edu
-  edxapp:move_db: true
+  edxapp:move_db: "true"
   edxapp:sender_email_address: mitx-support+ci@mit.edu
   edxapp:target_vpc: residential_mitx_vpc
-  edxapp:enable_xqueue: true
+  edxapp:enable_xqueue: "true"
   edxapp:xqueue_domain: xqueue.mitx.ci.odl.mit.edu
   mongodb:atlas_project_id: 617858f961f3016e0ade73e7
   vault:address: https://vault-ci.odl.mit.edu
@@ -128,10 +128,12 @@ config:
   meilisearch:deploy: "true"
   meilisearch:enabled: "true"
   meilisearch:domain: meilisearch-ci.mitx.mit.edu
-  meilisearch:replica_count: 1
+  meilisearch:replica_count: "1"
   meilisearch:pv_size: 10Gi
   meilisearch:cpu_request: "250m"
   meilisearch:memory_request: "1Gi"
   meilisearch:memory_limit: "1Gi"
   typesense:deploy: "true"
   typesense:enabled: "false"
+  typesense:bootstrap_key:
+    secure: v1:z0HcchgIyTOU/9e1:VVxPqu4YxYmnTbJVmwRe3UQgGV9dWUjDVNb665loD89WWtqBlT9PrQZhQW6hTmtVSio6CbI/4sFBEjYUEFzf8yH8caC/wabpOR5Gbypp1h0=

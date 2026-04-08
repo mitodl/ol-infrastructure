@@ -44,7 +44,7 @@ config:
   edxapp:mit_learn_domain: ci.learn.mit.edu
   edxapp:marketing_domain: xpro-ci.odl.mit.edu
   edxapp:product: xpro
-  edxapp:move_db: true
+  edxapp:move_db: "true"
   edxapp:edx_forum_secrets:
     secure: v1:QSW6gq7cQ6t65Glo:OGJ5X4YYEi2ZdyrpnML25p10mQrodNNLaF5zyV1242ZcQz1TkRsTdpmv9HghIhgHxykYd2NK7kyRkvphd5pfI56xAg/de/8PuHNuPx5kg3IZCrFktYuE2Nyzjxhg7aGHNhA6JQEf95925WPwAG3V
   edxapp:elb_healthcheck_interval: "30"
@@ -62,7 +62,7 @@ config:
   edxapp:google_analytics_id: ""
   edxapp:mail_domain: edxapp-mail-ci.xpro.mit.edu
   edxapp:sender_email_address: support@edxapp-mail-ci.xpro.mit.edu
-  edxapp:enable_xqueue: false
+  edxapp:enable_xqueue: "false"
   edxapp:k8s_replicas:
     webapp:
       cms:
@@ -108,10 +108,12 @@ config:
   meilisearch:deploy: "true"
   meilisearch:enabled: "true"
   meilisearch:domain: meilisearch-ci.xpro.mit.edu
-  meilisearch:replica_count: 1
+  meilisearch:replica_count: "1"
   meilisearch:pv_size: 10Gi
   meilisearch:cpu_request: "250m"
   meilisearch:memory_request: "1Gi"
   meilisearch:memory_limit: "1Gi"
   typesense:deploy: "true"
   typesense:enabled: "false"
+  typesense:bootstrap_key:
+    secure: v1:hcjVLbhLxeouRxCw:OBqqga8VHRf0SwBng2rWWGd4GqQV7q6Wpl9WbDcGOH8dyfoFGNHvSyIdvYABM2leeC4xkyYN+A3nAREyArq6mr2IHKy3nHHcKAWn/2adQ40=

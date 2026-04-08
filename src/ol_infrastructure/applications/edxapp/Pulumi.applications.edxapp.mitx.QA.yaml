@@ -74,11 +74,11 @@ config:
     ora_grading: ora-grading
   edxapp:github_org_api_url: https://github.mit.edu/api/v3/orgs/MITx-Studio2LMS-rc
   edxapp:google_analytics_id: ""
-  edxapp:move_db: true
+  edxapp:move_db: "true"
   edxapp:mail_domain: edxapp-mail-qa.mitx.mit.edu
   edxapp:sender_email_address: mitx-support+qa@mit.edu
   edxapp:target_vpc: residential_mitx_vpc
-  edxapp:enable_xqueue: true
+  edxapp:enable_xqueue: "true"
   edxapp:xqueue_domain: xqueue.mitx.qa.odl.mit.edu
   mongodb:atlas_project_id: 61a8f2d2c263e144f50f13b4
   vault:address: https://vault-qa.odl.mit.edu
@@ -129,10 +129,12 @@ config:
   meilisearch:deploy: "true"
   meilisearch:enabled: "true"
   meilisearch:domain: meilisearch-mitx-qa.mitx.mit.edu
-  meilisearch:replica_count: 1
+  meilisearch:replica_count: "1"
   meilisearch:pv_size: 10Gi
   meilisearch:cpu_request: "250m"
   meilisearch:memory_request: "1Gi"
   meilisearch:memory_limit: "1Gi"
   typesense:deploy: "true"
   typesense:enabled: "false"
+  typesense:bootstrap_key:
+    secure: v1:9mjLSEadatYpmU9K:TTiq9gAtOyKOoex43LD7gj/FlCIUomsETCRrt1XQkJgANLkbynjlSj64KDB7J5pZsaIX9FwvTudb/NAv6mbQ2tcrYhoa+zCwgz4+xTq3eYQ=

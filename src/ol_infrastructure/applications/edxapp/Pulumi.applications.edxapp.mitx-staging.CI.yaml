@@ -63,10 +63,10 @@ config:
   edxapp:github_org_api_url: https://github.mit.edu/api/v3/orgs/mitx-staging-ci
   edxapp:google_analytics_id: ""
   edxapp:mail_domain: edxapp-mail-staging-ci.mitx.mit.edu
-  edxapp:move_db: true
+  edxapp:move_db: "true"
   edxapp:sender_email_address: mitx-support+staging-ci@mit.edu
   edxapp:target_vpc: residential_mitx_staging_vpc
-  edxapp:enable_xqueue: true
+  edxapp:enable_xqueue: "true"
   edxapp:xqueue_domain: xqueue.mitx-staging-ci.odl.mit.edu
   mongodb:atlas_project_id: 6193f02d576a70760e8bcb02
   vault:address: https://vault-ci.odl.mit.edu
@@ -117,10 +117,12 @@ config:
   meilisearch:deploy: "true"
   meilisearch:enabled: "true"
   meilisearch:domain: meilisearch-staging-ci.mitx.mit.edu
-  meilisearch:replica_count: 1
+  meilisearch:replica_count: "1"
   meilisearch:pv_size: 10Gi
   meilisearch:cpu_request: "250m"
   meilisearch:memory_request: "1Gi"
   meilisearch:memory_limit: "1Gi"
   typesense:deploy: "true"
   typesense:enabled: "false"
+  typesense:bootstrap_key:
+    secure: v1:y04vN0z80H+bcJIs:l6LS1eJrokgNnyWpCbV/7G0yzG72mv1dtGOWvWljZUdUUTA5oEd7pZj/8OeOWDPqUxnnWvM5lRi+AhA8TmZxvvx73fhzu02tgraOilYsuBU=

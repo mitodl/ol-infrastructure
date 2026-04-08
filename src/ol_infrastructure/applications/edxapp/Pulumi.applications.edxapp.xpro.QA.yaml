@@ -39,7 +39,7 @@ config:
     preview: preview-rc.xpro.mit.edu
     studio: studio-rc.xpro.mit.edu
   edxapp:marketing_domain: rc.xpro.mit.edu
-  edxapp:move_db: true
+  edxapp:move_db: "true"
   edxapp:edx_forum_secrets:
     secure: v1:Tpg1BEYCoSw2D6HQ:yGnhmeKYzo+EetdiUpY/7VzE9vq+OtX/O02d6ugQwMI3D57r3yvxtsY3u+lRYwr0R2yvvVr/Lhm9xXQ3EfycxNtpOUxviHCFsL5wXLA=
   edxapp:elb_healthcheck_interval: "30"
@@ -56,7 +56,7 @@ config:
   edxapp:product: xpro
   edxapp:mail_domain: edxapp-mail-qa.xpro.mit.edu
   edxapp:sender_email_address: support@edxapp-mail-qa.xpro.mit.edu
-  edxapp:enable_xqueue: false
+  edxapp:enable_xqueue: "false"
   redis:instance_type: cache.r7g.large
   mongodb:atlas_project_id: 61a8f5e33456732be1fbb699
   vault:address: https://vault-qa.odl.mit.edu
@@ -105,10 +105,12 @@ config:
   meilisearch:deploy: "true"
   meilisearch:enabled: "true"
   meilisearch:domain: meilisearch-rc.xpro.mit.edu
-  meilisearch:replica_count: 1
+  meilisearch:replica_count: "1"
   meilisearch:pv_size: 10Gi
   meilisearch:cpu_request: "250m"
   meilisearch:memory_request: "1Gi"
   meilisearch:memory_limit: "1Gi"
   typesense:deploy: "true"
   typesense:enabled: "false"
+  typesense:bootstrap_key:
+    secure: v1:A8WvY7o//RDKohX7:tXV9NlMbjAkzLuQykqQomNxvZ1ZSWQlnkwk6Bcsw0fg0ig4sVNiHanUtkrovJaxKyun5XjuqM0bPBRiJvQrxkfbf1wsqxCvsypnKVEvrQ/U=

@@ -41,7 +41,7 @@ config:
   edxapp:business_unit: residential-staging
   edxapp:db_password:
     secure: v1:ZWtTTF60+1g61/XW:K9osJstG/oeHJvYXOUQS6KSIUuTcQFgR1cjECmosVk7BPLCJMPkzlLviW7swdiUhUIPErfyYNqs=
-  edxapp:db_use_blue_green: false
+  edxapp:db_use_blue_green: "false"
   edxapp:dns_zone: mitx
   edxapp:domains:
     lms: staging.mitx.mit.edu
@@ -62,11 +62,11 @@ config:
     ora_grading: ora-grading
   edxapp:github_org_api_url: https://github.mit.edu/api/v3/orgs/mitx-staging
   edxapp:google_analytics_id: ""
-  edxapp:move_db: true
+  edxapp:move_db: "true"
   edxapp:mail_domain: edxapp-mail-staging-production.mitx.mit.edu
   edxapp:sender_email_address: mitx-support+staging@mit.edu
   edxapp:target_vpc: residential_mitx_staging_vpc
-  edxapp:enable_xqueue: true
+  edxapp:enable_xqueue: "true"
   edxapp:xqueue_domain: xqueue.mitx-staging-prod.odl.mit.edu
   edxapp:web_instance_type: general_purpose_xlarge
   edxapp:worker_instance_type: "m7a.xlarge"
@@ -120,10 +120,12 @@ config:
   meilisearch:deploy: "true"
   meilisearch:enabled: "false"
   meilisearch:domain: meilisearch-staging.mitx.mit.edu
-  meilisearch:replica_count: 1
+  meilisearch:replica_count: "1"
   meilisearch:pv_size: 100Gi
   meilisearch:cpu_request: "250m"
   meilisearch:memory_request: "4Gi"
   meilisearch:memory_limit: "4Gi"
   typesense:deploy: "true"
   typesense:enabled: "false"
+  typesense:bootstrap_key:
+    secure: v1:Wpp+qWm4Ln5toRHy:qHBx1Th7dWTghihKa88fUzu6xr5z5DkQYyb8v3pjqFTK4Yd6EIs5xCK6xk9We3WBnCEmxElnxyT8w3SyQprqLTpzerj4C3Kd1xY4OO7glMI=
