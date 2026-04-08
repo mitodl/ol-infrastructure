@@ -38,6 +38,7 @@ config:
   mitlearn:k8s_cutover: "true"
   mitlearn:learn_ai_recommendation_endpoint: "https://api.rc.learn.mit.edu/ai/http/recommendation_agent/"
   mitlearn:learn_ai_syllabus_endpoint: "https://api.rc.learn.mit.edu/ai/http/syllabus_agent/"
+  mitlearn:hubspot_portal_id: "23128026"
   mitlearn:legacy_frontend_domain: "mitopen-ci.odl.mit.edu"
   mitlearn:nextjs_heroku_domain: "next.ci.learn.mit.edu"
   mitlearn:posthog_proxy: "ph.ol.mit.edu"

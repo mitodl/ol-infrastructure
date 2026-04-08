@@ -35,6 +35,7 @@ config:
   mitlearn:k8s_deploy: "true"
   mitlearn:learn_ai_recommendation_endpoint: "https://api.rc.learn.mit.edu/ai/http/recommendation_agent/"
   mitlearn:learn_ai_syllabus_endpoint: "https://api.rc.learn.mit.edu/ai/http/syllabus_agent/"
+  mitlearn:hubspot_portal_id: "23128026"
   mitlearn:legacy_api_domain: "api.mitopen-rc.mit.edu"
   mitlearn:legacy_frontend_domain: "mitopen-rc.odl.mit.edu"
   mit_learn:min_replicas: 4
