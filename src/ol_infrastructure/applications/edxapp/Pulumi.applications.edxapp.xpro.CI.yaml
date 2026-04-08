@@ -113,3 +113,5 @@ config:
   meilisearch:cpu_request: "250m"
   meilisearch:memory_request: "1Gi"
   meilisearch:memory_limit: "1Gi"
+  typesense:deploy: "true"
+  typesense:enabled: "false"
