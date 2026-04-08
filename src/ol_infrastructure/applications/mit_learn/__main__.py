@@ -588,7 +588,7 @@ mitlearn_db_config = OLPostgresDBConfig(
     engine_major_version="15",
     tags=aws_config.tags,
     db_name="mitopen",
-    public_access=True,
+    public_access=False,
     use_blue_green=mitlearn_config.get_bool("db_use_blue_green") or False,
     **rds_defaults,
 )

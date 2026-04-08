@@ -257,7 +257,7 @@ micromasters_db_config = OLPostgresDBConfig(
     tags=aws_config.tags,
     db_name="micromasters",
     engine_major_version="15",
-    public_access=True,
+    public_access=False,
     **rds_defaults,
 )
 micromasters_db_config.parameter_overrides.append(

@@ -272,7 +272,7 @@ xpro_db_config = OLPostgresDBConfig(
     engine_major_version="17",
     tags=aws_config.tags,
     db_name="xpro",
-    public_access=True,
+    public_access=False,
     parameter_overrides=[{"name": "password_encryption", "value": "md5"}],
     **defaults(stack_info)["rds"],
 )
