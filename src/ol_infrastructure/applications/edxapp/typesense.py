@@ -29,7 +29,7 @@ def create_typesense_resources(
 
     typesense_bootstrap_key_name = "typesense-bootstrap-key"
     typesense_bootstrap_key = kubernetes.core.v1.Secret(
-        f"ol-{stack_info.env_prefix}-edxapp-typesesnse-bootstrap-key-{stack_info.env_suffix}",
+        f"ol-{stack_info.env_prefix}-edxapp-typesense-bootstrap-key-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=typesense_bootstrap_key_name,
             namespace=namespace,
