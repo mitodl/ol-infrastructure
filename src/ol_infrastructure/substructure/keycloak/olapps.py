@@ -44,6 +44,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         access_code_lifespan="30m",
         access_code_lifespan_user_action="15m",
         attributes={
+            "actionTokenGeneratedByUserLifespan.verify-email": "86400",
             "business_unit": f"operations-{env_name}",
         },
         display_name="MIT Learn",
