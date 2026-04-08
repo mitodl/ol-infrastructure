@@ -1237,6 +1237,7 @@ init_container = kubernetes.core.v1.ContainerArgs(
 app_container = kubernetes.core.v1.ContainerArgs(
     name="ovs-app",
     image=ODL_VIDEO_SERVICE_IMAGE,
+    command=["uwsgi"],
     args=["uwsgi.ini"],
     ports=[
         kubernetes.core.v1.ContainerPortArgs(
