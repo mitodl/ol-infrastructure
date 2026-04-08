@@ -129,4 +129,10 @@ def get_docker_image_tag(app_prefix: str) -> str:
     if not tag_value and not sha_value:
         msg = f"Either {tag_var} or {sha_var} must be set."
         raise OSError(msg)
-    return tag_value or sha_value  # type: ignore[return-value]
+    if tag_value:
+        return tag_value
+    if sha_value:
+        return sha_value
+
+    msg = f"Either {tag_var} or {sha_var} must be set."
+    raise OSError(msg)
