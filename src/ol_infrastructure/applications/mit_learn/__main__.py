@@ -85,7 +85,7 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
-    get_docker_image_tag,
+    docker_image_config_kwargs,
     merge_otel_resource_attributes,
     parse_stack,
 )
@@ -1402,8 +1402,6 @@ secret_names, secret_resources = create_mitlearn_k8s_secrets(
     redis_cache=redis_cache,
 )
 
-MIT_LEARN_DOCKER_TAG = get_docker_image_tag("MIT_LEARN")
-
 # Configure and deploy the mitlearn application using OLApplicationK8s
 mitlearn_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
@@ -1421,7 +1419,7 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_security_group_id=mitlearn_app_security_group.id,
         application_security_group_name=mitlearn_app_security_group.name,
         application_image_repository="mitodl/mit-learn-app",
-        application_docker_tag=MIT_LEARN_DOCKER_TAG,
+        **docker_image_config_kwargs("MIT_LEARN"),
         application_cmd_array=["uwsgi"],
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         granian_config=GranianConfig(

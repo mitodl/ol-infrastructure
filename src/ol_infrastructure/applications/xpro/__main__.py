@@ -80,7 +80,7 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
-    get_docker_image_tag,
+    docker_image_config_kwargs,
     merge_otel_resource_attributes,
     parse_stack,
 )
@@ -506,8 +506,6 @@ if k8s_deploy:
     # carries organizational metadata regardless of stack environment.
     merge_otel_resource_attributes(app_env_vars, k8s_app_labels)
 
-    XPRO_DOCKER_TAG = get_docker_image_tag("XPRO")
-
     xpro_k8s_app = OLApplicationK8s(
         ol_app_k8s_config=OLApplicationK8sConfig(
             project_root=Path(__file__).parent,
@@ -522,7 +520,7 @@ if k8s_deploy:
             application_security_group_id=xpro_app_security_group.id,
             application_security_group_name=xpro_app_security_group.name,
             application_image_repository="mitodl/xpro-app",
-            application_docker_tag=XPRO_DOCKER_TAG,
+            **docker_image_config_kwargs("XPRO"),
             application_cmd_array=["uwsgi"],
             application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
             vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,

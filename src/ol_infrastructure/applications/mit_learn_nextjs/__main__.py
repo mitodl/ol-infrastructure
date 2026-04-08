@@ -26,6 +26,7 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
+    format_docker_image_ref,
     get_docker_image_tag,
     merge_otel_resource_attributes,
     parse_stack,
@@ -37,7 +38,9 @@ cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info
 # Assume the application image URI comes from a separate image build stack
 MIT_LEARN_NEXTJS_DOCKER_TAG = get_docker_image_tag("MIT_LEARN_NEXTJS")
 
-app_image = ecr_image_uri(f"mitodl/mit-learn-nextjs-app:{MIT_LEARN_NEXTJS_DOCKER_TAG}")
+app_image = ecr_image_uri(
+    format_docker_image_ref("mitodl/mit-learn-nextjs-app", "MIT_LEARN_NEXTJS")
+)
 
 k8s_app_labels = K8sAppLabels(
     product=Product.mitlearn,

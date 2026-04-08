@@ -72,7 +72,7 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
-    get_docker_image_tag,
+    format_docker_image_ref,
     merge_otel_resource_attributes,
     parse_stack,
 )
@@ -786,7 +786,9 @@ app_env_vars.update(k8s_extra_vars)
 # signals carry organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(app_env_vars, k8s_app_labels)
 
-ODL_VIDEO_SERVICE_DOCKER_TAG = get_docker_image_tag("ODL_VIDEO_SERVICE")
+ODL_VIDEO_SERVICE_IMAGE = format_docker_image_ref(
+    "mitodl/odl-video-service-app", "ODL_VIDEO_SERVICE"
+)
 
 # NGINX configuration for K8s (HTTP only — APISIX handles TLS)
 ovs_domains = ovs_config.get_object("domains") or [ovs_config.get("default_domain")]
@@ -1212,7 +1214,7 @@ nginx_volume_mounts: list[kubernetes.core.v1.VolumeMountArgs] = [
 # Init container for migrations and collectstatic
 init_container = kubernetes.core.v1.ContainerArgs(
     name="ovs-init",
-    image=f"mitodl/odl-video-service-app:{ODL_VIDEO_SERVICE_DOCKER_TAG}",
+    image=ODL_VIDEO_SERVICE_IMAGE,
     command=["/bin/bash", "-c"],
     args=[
         "python3 manage.py migrate --noinput && "
@@ -1234,8 +1236,7 @@ init_container = kubernetes.core.v1.ContainerArgs(
 # Main app container (uWSGI)
 app_container = kubernetes.core.v1.ContainerArgs(
     name="ovs-app",
-    image=f"mitodl/odl-video-service-app:{ODL_VIDEO_SERVICE_DOCKER_TAG}",
-    command=["uwsgi"],
+    image=ODL_VIDEO_SERVICE_IMAGE,
     args=["uwsgi.ini"],
     ports=[
         kubernetes.core.v1.ContainerPortArgs(
@@ -1430,7 +1431,7 @@ celery_deployment = kubernetes.apps.v1.Deployment(
                 containers=[
                     kubernetes.core.v1.ContainerArgs(
                         name="ovs-celery",
-                        image=f"mitodl/odl-video-service-app:{ODL_VIDEO_SERVICE_DOCKER_TAG}",
+                        image=ODL_VIDEO_SERVICE_IMAGE,
                         command=["celery"],
                         args=[
                             "-A",
