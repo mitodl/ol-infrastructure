@@ -1432,7 +1432,7 @@ mitlearn_k8s_app = OLApplicationK8s(
             enable_metrics=True,
             interface="asginl",
             backlog=None,
-            log_level="debug",
+            log_level=mitlearn_config.get("granian_log_level") or "info",
             application_module="main.asgi:application",
             runtime_mode=None,
         )
