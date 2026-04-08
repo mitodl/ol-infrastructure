@@ -1,5 +1,6 @@
 apache-superset[cors,thumbnails,prophet,trino]>=6,<7
 authlib
+starrocks
 celery-redbeat
 duckdb
 flask-caching

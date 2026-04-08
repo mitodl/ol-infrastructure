@@ -156,6 +156,20 @@ superset_parliament_config: dict[str, Any] = {
     "RESOURCE_MISMATCH": {},
 }
 
+_POLICY_DIR = Path(__file__).parent
+
+# StarRocks dynamic DB mount is environment-specific; build the Vault policy
+# text dynamically so the exact mount path is baked in without wildcards.
+starrocks_vault_mount_path = f"database-starrocks-{stack_info.env_suffix}"
+_base_vault_policy = (_POLICY_DIR / "superset_server_policy.hcl").read_text(
+    encoding="utf-8"
+)
+superset_vault_policy_text = (
+    _base_vault_policy + f'\npath "{starrocks_vault_mount_path}/creds/readonly" {{\n'
+    '  capabilities = ["read"]\n'
+    "}\n"
+)
+
 superset_app = OLEKSAuthBinding(
     OLEKSAuthBindingConfig(
         application_name="superset",
@@ -164,7 +178,7 @@ superset_app = OLEKSAuthBinding(
         aws_config=aws_config,
         iam_policy_document=superset_policy_document,
         parliament_config=superset_parliament_config,
-        vault_policy_path=Path(__file__).parent.joinpath("superset_server_policy.hcl"),
+        vault_policy_text=superset_vault_policy_text,
         cluster_name=cluster_stack.require_output("cluster_name"),
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
@@ -520,12 +534,34 @@ oidc_secret = OLVaultK8SSecret(
     opts=ResourceOptions(delete_before_replace=True, depends_on=vault_k8s_resources),
 )
 
+# StarRocks dynamic credentials from Vault -> Kubernetes Secret env
+# Provides rotating read-only credentials for the StarRocks connection.
+starrocks_creds_secret_name = (
+    "superset-starrocks-creds"  # pragma: allowlist secret  # noqa: S105
+)
+starrocks_creds_secret = OLVaultK8SSecret(
+    f"superset-starrocks-creds-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SDynamicSecretConfig(
+        name="superset-starrocks-creds",
+        namespace=superset_namespace,
+        labels=k8s_global_labels,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name=starrocks_creds_secret_name,
+        mount=starrocks_vault_mount_path,
+        path="creds/readonly",
+        exclude_raw=True,
+        templates={
+            "STARROCKS_USER": "{{ .Secrets.username }}",
+            "STARROCKS_PASS": "{{ .Secrets.password }}",
+        },
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(delete_before_replace=True, depends_on=vault_k8s_resources),
+)
+
 ########################################
 # Superset Helm chart on Kubernetes    #
 ########################################
-
-# Governance policy files live alongside this Pulumi project.
-_POLICY_DIR = Path(__file__).parent
 
 # Mount the OL Data Platform logo as a ConfigMap so it is always present in
 # the running pods, independent of image build caching.
@@ -609,6 +645,7 @@ superset_chart = kubernetes.helm.v3.Release(
                 redis_secret_name,
                 db_creds_secret_name,
                 oidc_secret_name,
+                starrocks_creds_secret_name,
             ],
             # Connections (non-secret parts)
             "supersetNode": {
