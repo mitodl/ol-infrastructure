@@ -8,7 +8,6 @@ MicroMasters application.
 import base64
 import json
 import mimetypes
-import os
 import textwrap
 from pathlib import Path
 
@@ -83,6 +82,7 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
+    docker_image_config_kwargs,
     merge_otel_resource_attributes,
     parse_stack,
 )
@@ -455,11 +455,6 @@ micromasters_heroku_configassociation = heroku.app.ConfigAssociation(
 
 
 if micromasters_config.get_bool("deploy_k8s"):
-    if "MICROMASTERS_DOCKER_TAG" not in os.environ:
-        msg = "MICROMASTERS_DOCKER_TAG must be set."
-        raise OSError(msg)
-    MICROMASTERS_DOCKER_TAG = os.environ["MICROMASTERS_DOCKER_TAG"]
-
     vault_config = Config("vault")
     redis_config = Config("redis")
     cluster_stack = StackReference(
@@ -1028,7 +1023,7 @@ if micromasters_config.get_bool("deploy_k8s"):
             application_security_group_id=micromasters_app_security_group.id,
             application_security_group_name=micromasters_app_security_group.name,
             application_image_repository="mitodl/micromasters-app",
-            application_docker_tag=MICROMASTERS_DOCKER_TAG,
+            **docker_image_config_kwargs("MICROMASTERS"),
             application_cmd_array=["uwsgi"],
             application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
             vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,

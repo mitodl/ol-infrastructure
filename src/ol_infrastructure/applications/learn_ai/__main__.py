@@ -4,7 +4,6 @@
 import base64
 import json
 import mimetypes
-import os
 import textwrap
 from pathlib import Path
 
@@ -80,6 +79,8 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
+    docker_image_config_kwargs,
+    format_docker_image_ref,
     merge_otel_resource_attributes,
     parse_stack,
 )
@@ -129,12 +130,6 @@ k8s_global_labels = K8sGlobalLabels(
     ou=BusinessUnit.mit_learn, service=Services.mit_learn, stack=stack_info
 ).model_dump()
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
-
-# Fail hard if LEARN_AI_DOCKER_TAG is not set
-if "LEARN_AI_DOCKER_TAG" not in os.environ:
-    msg = "LEARN_AI_DOCKER_TAG must be set"
-    raise OSError(msg)
-LEARN_AI_DOCKER_TAG = os.getenv("LEARN_AI_DOCKER_TAG")
 
 match stack_info.env_suffix:
     case "production":
@@ -760,7 +755,7 @@ learn_ai_app_k8s = OLApplicationK8s(
         application_security_group_name=Output.from_input("learn-ai-app"),
         application_service_account_name=learn_ai_service_account.metadata.name,
         application_image_repository="mitodl/learn-ai-app",
-        application_docker_tag=LEARN_AI_DOCKER_TAG,
+        **docker_image_config_kwargs("LEARN_AI"),
         application_min_replicas=learn_ai_config.get("min_replicas") or 2,
         application_cmd_array=["uvicorn"],
         application_arg_array=[
@@ -852,7 +847,9 @@ learn_ai_app_k8s = OLApplicationK8s(
 )
 
 # Reconstruct variables needed for Celery deployment
-application_image_repository_and_tag = f"mitodl/learn-ai-app:{LEARN_AI_DOCKER_TAG}"
+application_image_repository_and_tag = format_docker_image_ref(
+    "mitodl/learn-ai-app", "LEARN_AI"
+)
 
 learn_ai_deployment_env_vars = []
 for k, v in (learn_ai_config.require_object("env_vars") or {}).items():

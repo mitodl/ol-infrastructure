@@ -7,7 +7,6 @@
 """
 
 import json
-import os
 from pathlib import Path
 
 import pulumi_github as github
@@ -76,6 +75,7 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
+    docker_image_config_kwargs,
     merge_otel_resource_attributes,
     parse_stack,
 )
@@ -570,11 +570,6 @@ app_env_vars["POSTHOG_API_HOST"] = app_env_vars.pop(
 # carries organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(app_env_vars, k8s_app_labels)
 
-if "OCW_STUDIO_DOCKER_TAG" not in os.environ:
-    msg = "OCW_STUDIO_DOCKER_TAG must be set."
-    raise OSError(msg)
-OCW_STUDIO_DOCKER_TAG = os.environ["OCW_STUDIO_DOCKER_TAG"]
-
 ocw_studio_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
         project_root=Path(__file__).parent,
@@ -589,7 +584,7 @@ ocw_studio_k8s_app = OLApplicationK8s(
         application_security_group_id=ocw_studio_app_security_group.id,
         application_security_group_name=ocw_studio_app_security_group.name,
         application_image_repository="mitodl/ocw-studio-app",
-        application_docker_tag=OCW_STUDIO_DOCKER_TAG,
+        **docker_image_config_kwargs("OCW_STUDIO"),
         application_cmd_array=["uwsgi"],
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
