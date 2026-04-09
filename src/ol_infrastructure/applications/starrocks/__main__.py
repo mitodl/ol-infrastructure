@@ -227,6 +227,42 @@ if not starrocks_config.get_bool("use_be") and not starrocks_config.get_bool("us
     )
     raise ValueError(msg)
 
+# SSL for client connections to the FE MySQL port (9030).
+#
+# Requires StarRocks >= 3.4.1. When enabled:
+#   - cert-manager adds a PKCS12 keystore to the TLS secret.
+#   - FE pods mount the secret and configure fe.conf with the keystore path/password.
+#   - Set ssl_force_secure_transport=true only after updating all clients (e.g. Vault
+#     JDBC URL) to use useSSL=true, as it rejects plain-text connections.
+# Note: once PR #732 in starrocks-kubernetes-operator merges, CN pods will additionally
+#   need cnEnvVars FE_TLS_MODE=skip-verify (or preferred) for the operator's internal
+#   CN→FE MySQL connection to use TLS.
+ssl_enabled = starrocks_config.get_bool("ssl_enabled") or False
+ssl_force_secure_transport = (
+    starrocks_config.get_bool("ssl_force_secure_transport") or False
+)
+# Defined here (rather than alongside OLCertManagerCert) so the SSL FE spec block and
+# the cert-manager call below can both reference the same secret name.
+starrocks_tls_secret_name = f"{stack_info.env_prefix}-starrocks-tls-secret"
+
+ssl_keystore_password_secret: kubernetes.core.v1.Secret | None = None
+ssl_keystore_password: Output[str] | None = None
+ssl_keystore_password_secret_name: str | None = None
+if ssl_enabled:
+    ssl_keystore_password = starrocks_config.require_secret("ssl_keystore_password")
+    ssl_keystore_password_secret_name = (
+        f"{stack_info.env_prefix}-starrocks-ssl-keystore-password"
+    )
+    ssl_keystore_password_secret = kubernetes.core.v1.Secret(
+        f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-ssl-keystore-password-secret",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=ssl_keystore_password_secret_name,
+            namespace=namespace,
+            labels=k8s_app_labels.model_dump(),
+        ),
+        string_data={"password": ssl_keystore_password},
+    )
+
 # Ref: https://github.com/StarRocks/starrocks-kubernetes-operator/blob/main/helm-charts/charts/kube-starrocks/charts/starrocks/values.yaml
 fe_config = starrocks_config.get_object("fe_config") or {}
 starrocks_values: dict[str, Any] = {
@@ -350,6 +386,47 @@ if starrocks_config.get_bool("use_cn"):
         ),
     }
 
+# When SSL is enabled, extend the FE spec with:
+#   1. A secrets mount for the TLS secret (cert-manager populates with keystore.p12).
+#   2. A complete fe.conf that includes the default settings plus the four ssl_* params.
+#
+# The default config block below mirrors STARROCKS_CHART_VERSION 1.11.4 defaults from
+# starrocks/values.yaml so the operator generates the same fe.conf as an unmodified
+# chart install, with SSL settings appended.
+#
+# NOTE: The keystore password appears in fe.conf (→ K8s ConfigMap). This is an inherent
+# limitation of StarRocks' SSL design; the password protects the keystore file itself,
+# not user credentials. Keep it scoped as a Pulumi config secret.
+_SSL_FE_CONFIG_BASE = (
+    "LOG_DIR = ${STARROCKS_HOME}/log\n"
+    'DATE = "$(date +%Y%m%d-%H%M%S)"\n'
+    'JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true -Xmx8192m -XX:+UseG1GC'
+    ' -Xlog:gc*:${LOG_DIR}/fe.gc.log.$DATE:time"\n'
+    "http_port = 8030\n"
+    "rpc_port = 9020\n"
+    "query_port = 9030\n"
+    "edit_log_port = 9010\n"
+    "mysql_service_nio_enabled = true\n"
+    "sys_log_level = INFO\n"
+    "min_graceful_exit_time_second = 25\n"
+)
+
+if ssl_enabled and ssl_keystore_password is not None:
+    _force_str = "TRUE" if ssl_force_secure_transport else "FALSE"
+    fe_spec = cast(dict[str, Any], starrocks_values["starrocksFESpec"])
+    fe_spec["secrets"] = [
+        {"name": starrocks_tls_secret_name, "mountPath": "/etc/starrocks/ssl"}
+    ]
+    fe_spec["config"] = ssl_keystore_password.apply(
+        lambda pwd: (
+            _SSL_FE_CONFIG_BASE
+            + "ssl_keystore_location = /etc/starrocks/ssl/keystore.p12\n"
+            + f"ssl_keystore_password = {pwd}\n"
+            + f"ssl_key_password = {pwd}\n"
+            + f"ssl_force_secure_transport = {_force_str}\n"
+        )
+    )
+
 starrocks_release = kubernetes.helm.v3.Release(
     f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
@@ -370,7 +447,6 @@ starrocks_release = kubernetes.helm.v3.Release(
     ),
 )
 
-starrocks_tls_secret_name = f"{stack_info.env_prefix}-starrocks-tls-secret"
 cert_manager_certificate = OLCertManagerCert(
     f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-tls-cert",
     cert_config=OLCertManagerCertConfig(
@@ -380,6 +456,12 @@ cert_manager_certificate = OLCertManagerCert(
         create_apisixtls_resource=True,
         dest_secret_name=starrocks_tls_secret_name,
         dns_names=[starrocks_config.require("domain")],
+        pkcs12_keystore_password_secret_name=ssl_keystore_password_secret_name,
+    ),
+    opts=ResourceOptions(
+        depends_on=[ssl_keystore_password_secret]
+        if ssl_keystore_password_secret
+        else []
     ),
 )
 

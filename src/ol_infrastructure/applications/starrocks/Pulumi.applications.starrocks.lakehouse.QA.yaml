@@ -32,3 +32,7 @@ config:
     memory_request: 8Gi
     memory_limit: 8Gi
   starrocks:enable_data_lake_integration: "true"
+  # To enable SSL on the FE MySQL port (9030), set the following and run pulumi up:
+  #   starrocks:ssl_enabled: "true"
+  #   starrocks:ssl_keystore_password: (set with: pulumi config set --secret starrocks:ssl_keystore_password)
+  #   starrocks:ssl_force_secure_transport: "false"  # set true only after updating all clients (e.g. Vault JDBC URL) to use useSSL=true
