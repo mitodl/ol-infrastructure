@@ -1054,10 +1054,12 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
             SamlIdpConfig(
                 idp_alias="UCV",
                 idp_display_name="Universidad Cesar Vallejo",
-                org_saml_metadata_url="https://accounts.google.com/o/saml2/idp?idpid=C01o9h2jh",
+                org_saml_metadata_xml=Path(__file__)
+                .parent.joinpath("files/olapps/ucv_metadata.xml")
+                .read_text(),
                 principal_type="ATTRIBUTE",
                 principal_attribute="Email",
-                name_id_format=NameIdFormat.persistent,
+                name_id_format=NameIdFormat.email,
                 keycloak_url=keycloak_url,
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
