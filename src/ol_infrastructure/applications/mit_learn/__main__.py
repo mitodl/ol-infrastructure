@@ -530,25 +530,8 @@ mitlearn_db_security_group = ec2.SecurityGroup(
             # Airbyte isn't using pod security groups in Kubernetes. This is a
             # workaround to allow for data integration from the data Kubernetes
             # cluster. (TMM 2025-05-16)
-            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"].apply(
-                lambda pod_cidrs: [
-                    # Grant access from Hightouch for certificate sync
-                    "54.196.30.169/32",
-                    "52.72.201.213/32",
-                    "18.213.226.96/32",
-                    "3.224.126.197/32",
-                    "3.217.26.199/32",
-                    # This is in order to allow Vault to resolve the connection over the
-                    # public internet due to being located in a separate VPC. The public
-                    # access is toggled to ON because of Hightouch, so the default
-                    # resolution outside of the VPC that the DB lives in is to go over
-                    # the public net. Because Vault couldn't reach the DB it couldn't
-                    # create credentials. (TMM 2025-09-08)
-                    "0.0.0.0/0",
-                    *pod_cidrs,
-                ]
-            ),
-            description="Allow access over the public internet from Heroku.",
+            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"],
+            description="Allow access from data VPC pod subnets.",
         )
     ],
     egress=[

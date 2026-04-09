@@ -107,6 +107,7 @@ vector_log_proxy_stack = StackReference(
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
+vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 aws_config = AWSBase(
     tags={
         "OU": "mitxpro",
@@ -231,16 +232,12 @@ db_ingress_rules = [
         protocol="tcp",
         from_port=DEFAULT_POSTGRES_PORT,
         to_port=DEFAULT_POSTGRES_PORT,
-        security_groups=[data_vpc["security_groups"]["integrator"]],
+        security_groups=[
+            data_vpc["security_groups"]["integrator"],
+            vault_stack.require_output("vault_server")["security_group"],
+        ],
         cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"],
-    ),
-    ec2.SecurityGroupIngressArgs(
-        protocol="tcp",
-        from_port=DEFAULT_POSTGRES_PORT,
-        to_port=DEFAULT_POSTGRES_PORT,
-        cidr_blocks=["0.0.0.0/0"],
-        ipv6_cidr_blocks=["::/0"],
-        description="Allow access over the public internet from Heroku",
+        description="Allow data VPC integrator and Vault to access the database",
     ),
 ]
 if k8s_deploy:
@@ -367,7 +364,6 @@ if k8s_deploy:
     cluster_substructure_stack = StackReference(
         f"substructure.aws.eks.applications.{stack_info.name}"
     )
-    vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
     k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 
     k8s_app_labels = K8sAppLabels(

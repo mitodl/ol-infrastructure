@@ -106,6 +106,7 @@ vector_log_proxy_stack = StackReference(
 )
 micromasters_vpc = network_stack.require_output("applications_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
+vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 micromasters_environment = f"micromasters-{stack_info.env_suffix}"
 
 fastly_provider = get_fastly_provider()
@@ -230,9 +231,11 @@ micromasters_db_security_group = ec2.SecurityGroup(
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
-            cidr_blocks=["0.0.0.0/0"],
-            ipv6_cidr_blocks=["::/0"],
-            description="Allow access over the public internet from Heroku",
+            security_groups=[
+                vault_stack.require_output("vault_server")["security_group"],
+            ],
+            cidr_blocks=micromasters_vpc["k8s_pod_subnet_cidrs"],
+            description="Allow Vault and in-VPC app pods to access the database",
         )
     ],
     egress=[
