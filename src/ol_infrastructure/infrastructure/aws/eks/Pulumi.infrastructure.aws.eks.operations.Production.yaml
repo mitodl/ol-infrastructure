@@ -29,8 +29,8 @@ config:
         ol.mit.edu/core_node: true
       disk_size_gb: 500
       scaling:
-        desired: 5
-        min: 4
+        desired: 4
+        min: 3
         max: 7
       version:
       tags: {}
