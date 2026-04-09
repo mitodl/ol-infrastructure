@@ -18,7 +18,7 @@ from pydantic import (
     model_validator,
 )
 
-from ol_infrastructure.components.services.k8s import OLApisixPluginConfig
+from ol_infrastructure.components.services.apisix import OLApisixPluginConfig
 
 
 class OLApisixHTTPRouteConfig(BaseModel):

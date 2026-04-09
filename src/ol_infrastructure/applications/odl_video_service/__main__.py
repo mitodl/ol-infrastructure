@@ -41,13 +41,13 @@ from ol_infrastructure.components.aws.mediaconvert import (
     OLMediaConvert,
 )
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.components.services.apisix import (
+    OLApisixRoute,
+    OLApisixRouteConfig,
+)
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
-)
-from ol_infrastructure.components.services.k8s import (
-    OLApisixRoute,
-    OLApisixRouteConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
