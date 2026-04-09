@@ -323,11 +323,12 @@ def setup_apisix(
                 },
                 # --- Pod Disruption Budget ---
                 # Protect against simultaneous evictions during VPA-triggered pod restarts,
-                # node drains, and rolling updates. With minReplicas=3, maxUnavailable=1
-                # ensures at least 2 APISIX pods are always serving traffic.
+                # node drains, and rolling updates. minAvailable=2 guarantees at least 2
+                # APISIX pods are always serving while permitting more disruptions as the
+                # HPA scales the replica count above the 3-pod floor.
                 "podDisruptionBudget": {
                     "enabled": True,
-                    "maxUnavailable": 1,
+                    "minAvailable": 2,
                 },
                 # --- Metrics ---
                 "metrics": {
