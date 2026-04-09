@@ -110,8 +110,14 @@ starrocks_role_statements: dict[str, dict[str, list[str]]] = {
 # which are the dynamically-generated credential placeholders).
 # db_host is an Output[str] from the applications stack reference, so we
 # resolve it via .apply() rather than an f-string.
+#
+# tls=skip-verify encrypts the connection but skips server certificate name
+# verification because Vault connects via the NLB's AWS hostname, which does
+# not match the cert's SAN (lakehouse[.qa].starrocks.ol.mit.edu).
+ssl_enabled = starrocks_config.get_bool("ssl_enabled") or False
+_tls_param = "?tls=skip-verify" if ssl_enabled else ""
 connection_url = db_host.apply(
-    lambda host: f"{{{{username}}}}:{{{{password}}}}@tcp({host}:{db_port})/"
+    lambda host: f"{{{{username}}}}:{{{{password}}}}@tcp({host}:{db_port})/{_tls_param}"
 )
 
 starrocks_vault_mount = vault.Mount(

@@ -7,3 +7,4 @@ config:
   starrocks:applications_stack_name: applications.starrocks.lakehouse.Production
   starrocks:db_admin_username: root
   starrocks:verify_connection: "false"
+  starrocks:ssl_enabled: "true"
