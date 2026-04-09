@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Gracefully retire the concourse worker by sending SIGUSR2 and waiting for it to exit.
+# Used by both the spot interruption handler and ASG lifecycle hook handler.
+#
+# Environment:
+#   DRAIN_TIMEOUT  - seconds to wait for concourse to finish retiring (default: 300)
+set -euo pipefail
+
+DRAIN_TIMEOUT=${DRAIN_TIMEOUT:-300}
+
+log() {
+    echo "[concourse-worker-drain] $*" | systemd-cat -t concourse-worker-drain -p info
+}
+
+CONCOURSE_PID=$(systemctl show --property=MainPID concourse.service --value 2>/dev/null || echo 0)
+
+if [ "${CONCOURSE_PID:-0}" -gt 0 ]; then
+    log "Sending SIGUSR2 to concourse worker (PID ${CONCOURSE_PID}) to initiate graceful retirement"
+    kill -USR2 "${CONCOURSE_PID}" 2>/dev/null || true
+
+    log "Waiting up to ${DRAIN_TIMEOUT}s for concourse worker to finish retiring"
+    timeout "${DRAIN_TIMEOUT}" tail --pid="${CONCOURSE_PID}" -f /dev/null 2>/dev/null || true
+    log "Drain complete (or timeout reached)"
+else
+    log "Concourse worker is not running, nothing to drain"
+fi

@@ -18,6 +18,7 @@ import pulumi_vault as vault
 import yaml
 from pulumi import Config, Output, StackReference, export
 from pulumi_aws import ec2, get_caller_identity, iam, route53
+from pulumi_aws.autoscaling import LifecycleHook
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
@@ -788,6 +789,19 @@ for worker_def in concourse_config.get_object("workers") or []:
         tg_config=ol_worker_target_group_config,
         asg_config=ol_worker_asg_config,
         lt_config=ol_worker_launch_config,
+    )
+
+    # Lifecycle hook gives workers up to 10 minutes to finish running builds and
+    # gracefully retire before the ASG terminates the instance. The on-instance
+    # concourse-worker-lifecycle-hook service detects "Terminating:Wait" and calls
+    # complete-lifecycle-action when the drain is done (or times out at 540s).
+    LifecycleHook(
+        f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}-drain-hook",
+        auto_scaling_group_name=ol_worker_as_setup.auto_scale_group.name,
+        default_result="CONTINUE",
+        heartbeat_timeout=600,
+        lifecycle_transition="autoscaling:EC2_INSTANCE_TERMINATING",
+        name=f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}-drain",
     )
 
 
