@@ -504,7 +504,7 @@ def setup_apisix(
                             "memory": eks_config.get("apisix_memory") or "400Mi",
                         },
                         "maxAllowed": {
-                            "memory": "3Gi",
+                            "memory": eks_config.get("apisix_max_memory") or "3Gi",
                         },
                     }
                 ]
