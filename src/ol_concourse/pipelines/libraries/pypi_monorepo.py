@@ -65,6 +65,7 @@ def monorepo_publish_pipeline(  # noqa: PLR0913
     source_root: str = "src",
     shared_paths: list[str] | None = None,
     check_every: str = "15m",
+    task_params: dict[str, str] | None = None,
 ) -> Pipeline:
     """Build a publish pipeline with one job per package directory.
 
@@ -105,7 +106,8 @@ def monorepo_publish_pipeline(  # noqa: PLR0913
                         ),
                         inputs=[Input(name=repo_resource.name)],
                         outputs=[Output(name=repo_resource.name)],
-                        params={
+                        params=task_params
+                        or {
                             "TWINE_USERNAME": "((pypi_creds.username))",
                             "TWINE_PASSWORD": "((pypi_creds.password))",
                         },

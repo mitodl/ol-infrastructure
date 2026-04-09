@@ -1,4 +1,4 @@
-"""Generate a publish pipeline for all packages in the ol-django monorepo."""
+"""Generate a release pipeline for all packages in the ol-django monorepo."""
 
 from pathlib import Path
 
@@ -9,6 +9,7 @@ from ol_concourse.pipelines.libraries.pypi_monorepo import (
 )
 
 SOURCE_REPO_URI = "https://github.com/mitodl/ol-django"
+SOURCE_REPO_SSH_URI = "git@github.com:mitodl/ol-django.git"
 EXPECTED_ARG_COUNT = 2
 
 
@@ -22,12 +23,47 @@ def pipeline_from_source(
         source_repo_uri=SOURCE_REPO_URI,
         package_dirs=packages,
         shared_paths=["pyproject.toml", "uv.lock"],
-        build_command_factory=lambda _dir, dist_name, repo_name: (
+        task_params={
+            "GIT_SSH_KEY": "((github.odlbot_private_ssh_key))",
+            "GIT_USER_NAME": "odl-bot",
+            "GIT_USER_EMAIL": "odl-devops@mit.edu",
+        },
+        build_command_factory=lambda dir_name, dist_name, repo_name: (
             f"""
-            cd {repo_name};
-            uv build --package {dist_name};
-            uvx twine check dist/*
-            uvx twine upload --skip-existing --non-interactive dist/*
+            cd {repo_name}
+
+            # Skip if this is already a release commit to avoid re-triggering
+            last_msg=$(git log -1 --format=%s)
+            if echo "$last_msg" | grep -qE '^Release .+/v'; then
+                echo "Skipping: already a release commit"
+                exit 0
+            fi
+
+            # Install git and openssh (not present in debian-slim base image)
+            apt-get update -qq
+            apt-get install -y -q --no-install-recommends git openssh-client
+
+            # Configure git identity for the release commit
+            git config --global user.name "$GIT_USER_NAME"
+            git config --global user.email "$GIT_USER_EMAIL"
+
+            # Configure SSH so the release script can push to GitHub
+            mkdir -p ~/.ssh
+            echo "$GIT_SSH_KEY" > ~/.ssh/id_ed25519
+            chmod 600 ~/.ssh/id_ed25519
+            ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+
+            # Switch the remote to SSH for push access
+            git remote set-url origin {SOURCE_REPO_SSH_URI}
+
+            # Run the full release process for this package:
+            #   - validates that changelog.d/ entries exist
+            #   - bumps the version (date-based with incremental builds)
+            #   - merges changelog.d/ entries into CHANGELOG.md
+            #   - commits and tags the release ({dist_name}/v{{version}})
+            #   - pushes the commit and tag, which triggers GitHub Actions to
+            #     build and publish the package to PyPI
+            uv run scripts/release.py create --app {dir_name} --push
             """
         ),
     )
