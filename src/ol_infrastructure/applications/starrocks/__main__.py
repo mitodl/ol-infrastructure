@@ -390,13 +390,18 @@ if starrocks_config.get_bool("use_cn"):
 #   1. A secrets mount for the TLS secret (cert-manager populates with keystore.p12).
 #   2. A complete fe.conf that includes the default settings plus the four ssl_* params.
 #
-# The default config block below mirrors STARROCKS_CHART_VERSION 1.11.4 defaults from
-# starrocks/values.yaml so the operator generates the same fe.conf as an unmodified
-# chart install, with SSL settings appended.
+# Setting starrocksFESpec.config replaces the chart's default fe.conf entirely, so we
+# must reproduce the defaults here. The block below is sourced from the starrocks Helm
+# chart defaults and must be reviewed whenever STARROCKS_CHART_VERSION is bumped.
+# Ref: starrocks/values.yaml starrocksFESpec.config in the operator Helm chart.
 #
 # NOTE: The keystore password appears in fe.conf (→ K8s ConfigMap). This is an inherent
 # limitation of StarRocks' SSL design; the password protects the keystore file itself,
 # not user credentials. Keep it scoped as a Pulumi config secret.
+assert STARROCKS_CHART_VERSION == "1.11.4", (  # noqa: S101
+    f"_SSL_FE_CONFIG_BASE was sourced from chart 1.11.4; review defaults for"
+    f" {STARROCKS_CHART_VERSION} before deploying with SSL enabled"
+)
 _SSL_FE_CONFIG_BASE = (
     "LOG_DIR = ${STARROCKS_HOME}/log\n"
     'DATE = "$(date +%Y%m%d-%H%M%S)"\n'
@@ -411,6 +416,30 @@ _SSL_FE_CONFIG_BASE = (
     "min_graceful_exit_time_second = 25\n"
 )
 
+
+def _build_fe_ssl_config(pwd: str, force_str: str) -> str:
+    """Build the fe.conf string with SSL settings appended.
+
+    Validates the keystore password to prevent fe.conf corruption: StarRocks'
+    config parser is line-oriented, so embedded newlines or leading/trailing
+    whitespace would break the generated config file and prevent FE startup.
+    """
+    if "\n" in pwd or "\r" in pwd:
+        msg = "starrocks:ssl_keystore_password must not contain newline characters"
+        raise ValueError(msg)
+    pwd = pwd.strip()
+    if not pwd:
+        msg = "starrocks:ssl_keystore_password must not be empty or whitespace-only"
+        raise ValueError(msg)
+    return (
+        _SSL_FE_CONFIG_BASE
+        + "ssl_keystore_location = /etc/starrocks/ssl/keystore.p12\n"
+        + f"ssl_keystore_password = {pwd}\n"
+        + f"ssl_key_password = {pwd}\n"
+        + f"ssl_force_secure_transport = {force_str}\n"
+    )
+
+
 if ssl_enabled and ssl_keystore_password is not None:
     _force_str = "TRUE" if ssl_force_secure_transport else "FALSE"
     fe_spec = cast(dict[str, Any], starrocks_values["starrocksFESpec"])
@@ -418,13 +447,7 @@ if ssl_enabled and ssl_keystore_password is not None:
         {"name": starrocks_tls_secret_name, "mountPath": "/etc/starrocks/ssl"}
     ]
     fe_spec["config"] = ssl_keystore_password.apply(
-        lambda pwd: (
-            _SSL_FE_CONFIG_BASE
-            + "ssl_keystore_location = /etc/starrocks/ssl/keystore.p12\n"
-            + f"ssl_keystore_password = {pwd}\n"
-            + f"ssl_key_password = {pwd}\n"
-            + f"ssl_force_secure_transport = {_force_str}\n"
-        )
+        lambda pwd: _build_fe_ssl_config(pwd, _force_str)
     )
 
 starrocks_release = kubernetes.helm.v3.Release(
