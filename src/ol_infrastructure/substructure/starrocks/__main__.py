@@ -69,8 +69,13 @@ starrocks_role_statements: dict[str, dict[str, list[str]]] = {
             # Grant access to query internal StarRocks tables
             "GRANT USAGE ON CATALOG default_catalog TO USER '{{name}}'@'%';",
             "GRANT SELECT ON ALL TABLES IN ALL DATABASES TO USER '{{name}}'@'%';",
-            # Grant access to the Iceberg data lake catalog
+            # Grant access to the Iceberg data lake catalog.
+            # USAGE makes the catalog visible; SET CATALOG switches the session
+            # context so the subsequent table-level SELECT grant applies to
+            # databases/tables inside the Iceberg catalog rather than default_catalog.
             "GRANT USAGE ON CATALOG ol_data_lake_iceberg TO USER '{{name}}'@'%';",
+            "SET CATALOG ol_data_lake_iceberg;",
+            "GRANT SELECT ON ALL TABLES IN ALL DATABASES TO USER '{{name}}'@'%';",
         ],
         "revoke": ["DROP USER '{{name}}'@'%';"],
         "renew": [],
