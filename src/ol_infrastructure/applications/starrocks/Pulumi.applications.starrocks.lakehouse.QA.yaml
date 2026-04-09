@@ -7,7 +7,7 @@ config:
   vault_server:env_namespace: operations.qa
   starrocks:root_password:
     secure: v1:IBmxL0ibUx/t/yPf:rgmpR1MHcJ95I8exxEk0VBQGw1PrZqM+HHuBpLPcv4kzErS53rmyjgO1JQPt6xhK7wXzM6DiB53hx1O0u6Xdiz+3RQ5fKdOiXNu/SnA+fUI=
-  starrocks:oidc_enabled: false
+  starrocks:oidc_enabled: "false"
   starrocks:fe_config:
     replicas: 3
     cpu_request: 1000m
@@ -15,7 +15,7 @@ config:
     memory_limit: 8Gi
     storage: 100Gi
     log_storage: 100Gi
-  starrocks:use_be: false
+  starrocks:use_be: "false"
   starrocks:be_config:
     replicas: 3
     cpu_request: 1000m
@@ -23,7 +23,7 @@ config:
     memory_limit: 8Gi
     storage: 1Ti
     log_storage: 100Gi
-  starrocks:use_cn: true
+  starrocks:use_cn: "true"
   starrocks:cn_config:
     min_replicas: 1
     max_replicas: 10
@@ -36,3 +36,7 @@ config:
   #   starrocks:ssl_enabled: "true"
   #   starrocks:ssl_keystore_password: (set with: pulumi config set --secret starrocks:ssl_keystore_password)
   #   starrocks:ssl_force_secure_transport: "false"  # set true only after updating all clients (e.g. Vault JDBC URL) to use useSSL=true
+
+  starrocks:ssl_enabled: "true"
+  starrocks:ssl_keystore_password:
+    secure: v1:UCHYHsGETfCN/DnL:ubV+0rJePAFL4JupZ65N/Utf+ZMdzFy0lGS4OEDyqfSZfnZ587k6AvMOITqITKHhmxuApncP0wM=

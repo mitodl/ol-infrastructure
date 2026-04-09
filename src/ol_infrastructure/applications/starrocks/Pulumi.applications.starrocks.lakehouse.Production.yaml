@@ -37,4 +37,8 @@ config:
   #   starrocks:ssl_enabled: "true"
   #   starrocks:ssl_keystore_password: (set with: pulumi config set --secret starrocks:ssl_keystore_password)
   #   starrocks:ssl_force_secure_transport: "false"  # set true only after updating all clients (e.g. Vault JDBC URL) to use useSSL=true
+
+  starrocks:ssl_enabled: "true"
+  starrocks:ssl_keystore_password:
+    secure: v1:h7Hv+CSf6Hhk1mVg:Il+DfHH3nUPLk+SZFSQJwOfwt7h+Ses5dBlUYi3byc59bMaVNFVXsoaft1T9+g8cTLhPcGRazE8=
 encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAGAR6Wy6ogn0XZN4ap3danEAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMOwyeMVh8a3LlZ+aUAgEQgDsC6RLHjfbCViHhNrhOaZnm7sGi95HvI1+vIvxObzU7NUO01mB+ajFCXdwCEGOWaZEqPPq67rthKBvkiw==
