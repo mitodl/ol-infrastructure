@@ -185,6 +185,8 @@ def create_mitlearn_k8s_secrets(
             "QDRANT_API_KEY_V2": '{{ index .Secrets "qdrant" "api_key_v2" }}',
             "POSTHOG_PROJECT_API_KEY": '{{ index .Secrets "posthog" "project_api_key" }}',
             "POSTHOG_PERSONAL_API_KEY": '{{ index .Secrets "posthog" "personal_api_key" }}',
+            "RECAPTCHA_SECRET_KEY": '{{ index .Secrets "recaptcha" "secret_key" }}',
+            "RECAPTCHA_SITE_KEY": '{{ index .Secrets "recaptcha" "site_key" }}',
             "SEE_API_CLIENT_ID": '{{ index .Secrets "see_api_client" "id" }}',
             "SEE_API_CLIENT_SECRET": '{{ index .Secrets "see_api_client" "secret" }}',
             # Top-level keys can use `get .Secrets "key"`

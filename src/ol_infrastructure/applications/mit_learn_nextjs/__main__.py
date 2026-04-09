@@ -128,6 +128,18 @@ new_color = colors.apply(lambda c: c["new_color"])
 active_color = colors.apply(lambda c: c["active_color"])
 last_active_resolved = colors.apply(lambda c: c["last_active"])
 
+stay_updated_hubspot_form_ids = {
+    "ci": "4f423dc7-5b08-430b-a9fb-920b7f9597ed",
+    "qa": "4f423dc7-5b08-430b-a9fb-920b7f9597ed",
+    "production": "a5d18493-dcdb-4482-ad10-16ab66a35526",
+}
+
+try:
+    stay_updated_hubspot_form_id = stay_updated_hubspot_form_ids[stack_info.env_suffix]
+except KeyError as exc:
+    msg = f"Unsupported MIT Learn Next.js environment: {stack_info.env_suffix}"
+    raise ValueError(msg) from exc
+
 raw_env_vars = {
     # Env vars available only on server
     "MITOL_NOINDEX": nextjs_config.get("mitol_noindex"),
@@ -160,6 +172,7 @@ raw_env_vars = {
     "NEXT_PUBLIC_SENTRY_PROFILES_SAMPLE_RATE": "0.25",
     "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE": "0.1",
     "NEXT_PUBLIC_SITE_NAME": "MIT Learn",
+    "NEXT_PUBLIC_STAY_UPDATED_HUBSPOT_FORM_ID": stay_updated_hubspot_form_id,
     "NEXT_PUBLIC_VERSION": MIT_LEARN_NEXTJS_DOCKER_TAG,
     "NEXT_PUBLIC_FEATURE_product_page_courses": "false",
     "NEXT_PUBLIC_FEATURE_article_viewer": "true",
@@ -206,6 +219,19 @@ for k, v in raw_env_vars.items():
             value=v,
         )
     )
+
+env_vars.append(
+    kubernetes.core.v1.EnvVarArgs(
+        name="NEXT_PUBLIC_RECAPTCHA_SITE_KEY",
+        value_from=kubernetes.core.v1.EnvVarSourceArgs(
+            secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                name="mitopen-static-secret",
+                key="RECAPTCHA_SITE_KEY",
+                optional=True,
+            ),
+        ),
+    )
+)
 
 
 # Create separate PVCs for blue and green deployments
