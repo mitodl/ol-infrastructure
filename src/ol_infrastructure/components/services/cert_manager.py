@@ -16,6 +16,11 @@ class OLCertManagerCertConfig(BaseModel):
     dest_secret_name: str
     dns_names: list[str]
     letsencrypt_env: Literal["staging", "production"] = "production"
+    # When set, cert-manager will add a PKCS12 keystore (keystore.p12) and truststore
+    # (truststore.p12) to the TLS secret. The keystore password is read from the named
+    # K8s Secret. Required for StarRocks SSL (which uses Java's JSSE / PKCS12 format).
+    pkcs12_keystore_password_secret_name: str | None = None
+    pkcs12_keystore_password_secret_key: str = "password"  # noqa: S105
     usages: list[
         Literal[
             "any",
@@ -77,6 +82,29 @@ class OLCertManagerCert(pulumi.ComponentResource):
         # Ref: https://github.com/apache/apisix-ingress-controller/blob/adc70f3de2e745a29306fc155721a639a6367b6d/pkg/providers/translation/util.go#L35
         # Ref: https://cert-manager.io/docs/usage/certificate/
         # Ref: https://cert-manager.io/docs/reference/api-docs/#cert-manager.io/v1.Certificate
+        cert_spec: dict[str, object] = {
+            "issuerRef": {
+                "group": "cert-manager.io",
+                "name": f"letsencrypt-{cert_config.letsencrypt_env}",
+                "kind": "ClusterIssuer",
+            },
+            "secretName": cert_config.dest_secret_name,
+            "dnsNames": cert_config.dns_names,
+            "usages": cert_config.usages,
+        }
+        if cert_config.pkcs12_keystore_password_secret_name is not None:
+            # When set, cert-manager adds keystore.p12 (server cert + private key) and
+            # truststore.p12 (CA chain) to the TLS secret alongside tls.crt / tls.key.
+            # Ref: https://cert-manager.io/docs/usage/certificate/#keystores
+            cert_spec["keystores"] = {
+                "pkcs12": {
+                    "create": True,
+                    "passwordSecretRef": {
+                        "name": cert_config.pkcs12_keystore_password_secret_name,
+                        "key": cert_config.pkcs12_keystore_password_secret_key,
+                    },
+                }
+            }
         self.certificate_resource = kubernetes.apiextensions.CustomResource(
             f"ol-cert-manager-certificate-{self.resource_name}",
             api_version="cert-manager.io/v1",
@@ -86,16 +114,7 @@ class OLCertManagerCert(pulumi.ComponentResource):
                 "namespace": cert_config.k8s_namespace,
                 "labels": cert_config.k8s_labels,
             },
-            spec={
-                "issuerRef": {
-                    "group": "cert-manager.io",
-                    "name": f"letsencrypt-{cert_config.letsencrypt_env}",
-                    "kind": "ClusterIssuer",
-                },
-                "secretName": cert_config.dest_secret_name,
-                "dnsNames": cert_config.dns_names,
-                "usages": cert_config.usages,
-            },
+            spec=cert_spec,
             opts=resource_options,
         )
 
