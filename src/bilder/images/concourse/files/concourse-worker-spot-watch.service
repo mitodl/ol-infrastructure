@@ -2,7 +2,6 @@
 Description=Concourse worker spot interruption watcher
 Documentation=https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-interruptions.html
 After=concourse.service
-BindsTo=concourse.service
 
 [Service]
 Type=simple

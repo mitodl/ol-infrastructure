@@ -20,9 +20,16 @@ policy_definition = {
             "Action": [
                 "autoscaling:DescribeAutoScalingInstances",
                 "autoscaling:DescribeLifecycleHooks",
-                "autoscaling:CompleteLifecycleAction",
             ],
             "Resource": "*",
+        },
+        {
+            "Effect": "Allow",
+            "Action": ["autoscaling:CompleteLifecycleAction"],
+            "Resource": "*",
+            "Condition": {
+                "StringLike": {"autoscaling:AutoScalingGroupName": "concourse-worker-*"}
+            },
         },
     ],
 }
