@@ -26,10 +26,7 @@ policy_definition = {
         {
             "Effect": "Allow",
             "Action": ["autoscaling:CompleteLifecycleAction"],
-            "Resource": "*",
-            "Condition": {
-                "StringLike": {"autoscaling:AutoScalingGroupName": "concourse-worker-*"}
-            },
+            "Resource": "arn:aws:autoscaling:*:*:autoScalingGroup:*:autoScalingGroupName/concourse-worker-*",  # noqa: E501
         },
     ],
 }
