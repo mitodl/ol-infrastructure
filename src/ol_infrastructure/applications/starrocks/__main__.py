@@ -398,10 +398,12 @@ if starrocks_config.get_bool("use_cn"):
 # NOTE: The keystore password appears in fe.conf (→ K8s ConfigMap). This is an inherent
 # limitation of StarRocks' SSL design; the password protects the keystore file itself,
 # not user credentials. Keep it scoped as a Pulumi config secret.
-assert STARROCKS_CHART_VERSION == "1.11.4", (  # noqa: S101
-    f"_SSL_FE_CONFIG_BASE was sourced from chart 1.11.4; review defaults for"
-    f" {STARROCKS_CHART_VERSION} before deploying with SSL enabled"
-)
+if ssl_enabled and STARROCKS_CHART_VERSION != "1.11.4":
+    msg = (
+        f"_SSL_FE_CONFIG_BASE was sourced from chart 1.11.4; review defaults for"
+        f" {STARROCKS_CHART_VERSION} before deploying with SSL enabled"
+    )
+    raise ValueError(msg)
 _SSL_FE_CONFIG_BASE = (
     "LOG_DIR = ${STARROCKS_HOME}/log\n"
     'DATE = "$(date +%Y%m%d-%H%M%S)"\n'
