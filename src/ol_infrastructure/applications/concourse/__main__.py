@@ -797,7 +797,7 @@ for worker_def in concourse_config.get_object("workers") or []:
     # complete-lifecycle-action when the drain is done (or times out at 540s).
     LifecycleHook(
         f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}-drain-hook",
-        auto_scaling_group_name=ol_worker_as_setup.auto_scale_group.name,
+        autoscaling_group_name=ol_worker_as_setup.auto_scale_group.name,
         default_result="CONTINUE",
         heartbeat_timeout=600,
         lifecycle_transition="autoscaling:EC2_INSTANCE_TERMINATING",
