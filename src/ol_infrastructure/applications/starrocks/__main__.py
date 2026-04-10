@@ -446,9 +446,11 @@ if starrocks_config.get_bool("use_cn"):
 # NOTE: The SSL keystore password appears in fe.conf (→ K8s ConfigMap). This is
 # an inherent limitation of StarRocks' SSL design; the password protects the
 # keystore file itself, not user credentials. Keep it scoped as a Pulumi secret.
-if (ssl_enabled or starrocks_config.get_bool("use_cn")) and (
-    STARROCKS_CHART_VERSION != "1.11.4"
-):
+if (
+    ssl_enabled
+    or starrocks_config.get_bool("use_cn")
+    or starrocks_config.get_bool("use_be")
+) and (STARROCKS_CHART_VERSION != "1.11.4"):
     msg = (
         f"_FE_CONFIG_BASE was sourced from chart 1.11.4; review defaults for"
         f" {STARROCKS_CHART_VERSION} before deploying with SSL or CN enabled"
@@ -475,12 +477,42 @@ def _build_fe_config(pwd: str | None, force_str: str, bucket_name: str | None) -
     Both sections are optional and can be combined.  When neither is active the
     caller should not set starrocksFESpec.config at all (chart defaults apply).
 
+    run_mode is always set explicitly:
+      - shared_data  when use_cn=true  (CN nodes, S3-backed tablet storage)
+      - shared_nothing when use_be=true (BE nodes, local disk storage)
+    This prevents silent run_mode mismatches if existing FE meta was created
+    under a different mode — StarRocks aborts on startup when run_mode in
+    fe.conf disagrees with the mode recorded in its BDB metadata.
+
     SSL keystore password is validated here to prevent fe.conf corruption:
     StarRocks' config parser is line-oriented, so embedded newlines or
     leading/trailing whitespace would silently break the generated file and
     prevent FE startup.
     """
     conf = _FE_CONFIG_BASE
+
+    if bucket_name is not None:
+        # shared_data (CN) mode: FE manages all tablet storage in S3.
+        # run_mode must be set before SSL so StarRocks reads it early.
+        # aws_s3_use_instance_profile=true works for both EC2 instance profiles
+        # and EKS IRSA — StarRocks uses the AWS SDK default credential chain.
+        # enable_load_volume_from_conf defaults to false in StarRocks >= 3.4.1
+        # and must be set explicitly so FE bootstraps the built-in storage volume
+        # from these fe.conf settings on first startup.
+        conf += (
+            "run_mode = shared_data\n"
+            "cloud_native_meta_port = 6090\n"
+            "cloud_native_storage_type = S3\n"
+            f"aws_s3_path = {bucket_name}\n"
+            f"aws_s3_region = {aws_region}\n"
+            f"aws_s3_endpoint = https://s3.{aws_region}.amazonaws.com\n"
+            "aws_s3_use_instance_profile = true\n"
+            "enable_load_volume_from_conf = true\n"
+        )
+    else:
+        # shared_nothing (BE) mode: explicit to prevent ambiguity and guard
+        # against accidental run_mode migration if use_cn is ever toggled.
+        conf += "run_mode = shared_nothing\n"
 
     if pwd is not None:
         if "\n" in pwd or "\r" in pwd:
@@ -497,29 +529,14 @@ def _build_fe_config(pwd: str | None, force_str: str, bucket_name: str | None) -
             f"ssl_force_secure_transport = {force_str}\n"
         )
 
-    if bucket_name is not None:
-        # Shared-data (CN) mode: FE manages all tablet storage in S3.
-        # aws_s3_use_instance_profile=true works for both EC2 instance profiles
-        # and EKS IRSA — StarRocks uses the AWS SDK default credential chain
-        # when this flag is set.
-        # enable_load_volume_from_conf defaults to false in StarRocks >= 3.4.1
-        # and must be set explicitly so FE bootstraps the built-in storage volume
-        # from these fe.conf settings on first startup.
-        conf += (
-            "run_mode = shared_data\n"
-            "cloud_native_meta_port = 6090\n"
-            "cloud_native_storage_type = S3\n"
-            f"aws_s3_path = {bucket_name}\n"
-            f"aws_s3_region = {aws_region}\n"
-            f"aws_s3_endpoint = https://s3.{aws_region}.amazonaws.com\n"
-            "aws_s3_use_instance_profile = true\n"
-            "enable_load_volume_from_conf = true\n"
-        )
-
     return conf
 
 
-_needs_fe_config = ssl_enabled or starrocks_config.get_bool("use_cn")
+_needs_fe_config = (
+    ssl_enabled
+    or starrocks_config.get_bool("use_cn")
+    or starrocks_config.get_bool("use_be")
+)
 if _needs_fe_config:
     _force_str = "TRUE" if ssl_force_secure_transport else "FALSE"
     fe_spec = cast(dict[str, Any], starrocks_values["starrocksFESpec"])
