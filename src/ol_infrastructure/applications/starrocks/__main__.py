@@ -53,6 +53,9 @@ stateful_workload_storage = require_stack_output_value(
 use_io_optimized_nodes = stateful_workload_storage["use_io_optimized_nodes"]
 starrocks_data_storage_class = stateful_workload_storage["storage_class"]
 
+kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
+s3_kms_key = kms_stack.require_output("kms_s3_data_analytics_key")
+
 starrocks_env = f"data-{stack_info.env_suffix}"
 aws_config = AWSBase(tags={"OU": "data", "Environment": starrocks_env})
 
@@ -215,35 +218,48 @@ if starrocks_config.get_bool("use_cn"):
         S3BucketConfig(
             tags=aws_config.tags,
             bucket_name=shared_data_bucket_name,
+            server_side_encryption_enabled=True,
+            kms_key_id=s3_kms_key["id"],
+            bucket_key_enabled=True,
         ),
         opts=ResourceOptions(parent=starrocks_auth_binding),
     )
     iam.RolePolicy(
         f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-shared-data-s3-policy",
         role=starrocks_auth_binding.irsa_role.name,
-        policy=json.dumps(
-            {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Action": [
-                            "s3:GetObject",
-                            "s3:PutObject",
-                            "s3:DeleteObject",
-                        ],
-                        "Resource": f"arn:aws:s3:::{shared_data_bucket_name}/*",
-                    },
-                    {
-                        "Effect": "Allow",
-                        "Action": [
-                            "s3:ListBucket",
-                            "s3:GetBucketLocation",
-                        ],
-                        "Resource": f"arn:aws:s3:::{shared_data_bucket_name}",
-                    },
-                ],
-            }
+        policy=s3_kms_key["arn"].apply(
+            lambda kms_arn: json.dumps(
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:GetObject",
+                                "s3:PutObject",
+                                "s3:DeleteObject",
+                            ],
+                            "Resource": f"arn:aws:s3:::{shared_data_bucket_name}/*",
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:ListBucket",
+                                "s3:GetBucketLocation",
+                            ],
+                            "Resource": f"arn:aws:s3:::{shared_data_bucket_name}",
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "kms:GenerateDataKey",
+                                "kms:Decrypt",
+                            ],
+                            "Resource": kms_arn,
+                        },
+                    ],
+                }
+            )
         ),
         opts=ResourceOptions(parent=starrocks_auth_binding),
     )
