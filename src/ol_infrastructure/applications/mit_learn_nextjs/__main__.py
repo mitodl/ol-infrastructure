@@ -268,7 +268,8 @@ mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
         lambda c: kubernetes.meta.v1.ObjectMetaArgs(
             name=f"mit-learn-nextjs-build-{c}",
             namespace=learn_namespace,
-            labels=k8s_app_labels | {"deployment-color": c},
+            labels=k8s_app_labels
+            | {"deployment-color": c, f"{c}-version": MIT_LEARN_NEXTJS_DOCKER_TAG},
         )
     ),
     spec=new_color.apply(
@@ -278,7 +279,11 @@ mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
             active_deadline_seconds=1200,
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=k8s_app_labels | {"deployment-color": c}
+                    labels=k8s_app_labels
+                    | {
+                        "deployment-color": c,
+                        f"{c}-version": MIT_LEARN_NEXTJS_DOCKER_TAG,
+                    },
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     restart_policy="OnFailure",
@@ -322,7 +327,10 @@ mit_learn_nextjs_build_job = kubernetes.batch.v1.Job(
 # Helper function to create a deployment for a specific color
 def create_deployment_for_color(color: str) -> kubernetes.apps.v1.Deployment:
     """Create a blue or green deployment."""
-    color_labels = k8s_app_labels | {"deployment-color": color}
+    color_labels = k8s_app_labels | {
+        "deployment-color": color,
+        f"{color}-version": MIT_LEARN_NEXTJS_DOCKER_TAG,
+    }
     pvc_name = f"nextjs-build-cache-efs-{color}"
 
     volume = kubernetes.core.v1.VolumeArgs(
