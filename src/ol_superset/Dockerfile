@@ -2,23 +2,23 @@ ARG SUPERSET_TAG=6.0.0
 ARG NL_EXPLORER_SHA=fb4e6bba3706564f77fee695e661702dcd78bd6b
 
 # Stage 1: build the NL Explorer frontend
-FROM node:20-slim AS nl-explorer-frontend
-ARG NL_EXPLORER_SHA
+# FROM node:20-slim AS nl-explorer-frontend
+# ARG NL_EXPLORER_SHA
 # hadolint ignore=DL3008
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git && rm -rf /var/lib/apt/lists/*
-RUN git clone https://github.com/mitodl/superset-nl-explorer.git /build/nl-explorer && \
-    git -C /build/nl-explorer checkout "${NL_EXPLORER_SHA}"
-WORKDIR /build/nl-explorer/frontend
-RUN npm ci && npm run build
+# RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git && rm -rf /var/lib/apt/lists/*
+# RUN git clone https://github.com/mitodl/superset-nl-explorer.git /build/nl-explorer && \
+#     git -C /build/nl-explorer checkout "${NL_EXPLORER_SHA}"
+# WORKDIR /build/nl-explorer/frontend
+# RUN npm ci && npm run build
 
 FROM apache/superset:${SUPERSET_TAG}
 COPY --link requirements.txt /tmp/requirements.txt
 # Copy extension manifest + compiled frontend assets into the image
-COPY --from=nl-explorer-frontend /build/nl-explorer/extension.json /app/extensions/nl-explorer/extension.json
-COPY --from=nl-explorer-frontend /build/nl-explorer/dist/ /app/extensions/nl-explorer/dist/
+# COPY --from=nl-explorer-frontend /build/nl-explorer/extension.json /app/extensions/nl-explorer/extension.json
+# COPY --from=nl-explorer-frontend /build/nl-explorer/dist/ /app/extensions/nl-explorer/dist/
 USER root
 WORKDIR /app
 # hadolint ignore=DL3008
-RUN chmod 1777 /tmp && apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+RUN chmod 1777 /tmp && apt-get update && apt-get install -y --no-install-recommends git libmariadb-dev build-essential pkg-config && rm -rf /var/lib/apt/lists/*
 RUN uv pip install --no-cache-dir -r /tmp/requirements.txt
 USER superset

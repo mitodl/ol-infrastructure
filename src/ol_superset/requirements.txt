@@ -1,6 +1,7 @@
 apache-superset[cors,thumbnails,prophet,trino]>=6,<7
 authlib
 starrocks
+mysqlclient
 celery-redbeat
 duckdb
 flask-caching
@@ -11,4 +12,4 @@ playwright
 psycopg2-binary
 redis
 shillelagh[all]
-superset-nl-explorer @ git+https://github.com/mitodl/superset-nl-explorer.git@fb4e6bba3706564f77fee695e661702dcd78bd6b
+# superset-nl-explorer @ git+https://github.com/mitodl/superset-nl-explorer.git@fb4e6bba3706564f77fee695e661702dcd78bd6b
