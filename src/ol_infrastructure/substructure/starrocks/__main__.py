@@ -1,4 +1,4 @@
-"""Configure Vault dynamic database credentials for StarRocks.
+"""Configure Vault dynamic database credentials and StarRocks cluster state.
 
 StarRocks exposes a MySQL-compatible protocol on port 9030 (the FE query port).
 The built-in Vault MySQL plugin cannot be used because StarRocks only supports
@@ -14,19 +14,23 @@ which StarRocks supports for all statement types.
 The plugin binary must be present at /var/lib/vault/plugins/ on the Vault server
 before this stack is applied.  The Vault AMI build downloads it automatically.
 
-StarRocks privilege SQL differs from standard MySQL:
-  - GRANT uses the StarRocks model: GRANT priv ON ALL TABLES IN ...
-  - DROP USER uses 'user'@'host' format
-  - Catalog-level grants needed for Iceberg catalog access
+Privilege model: native StarRocks roles (readonly / app / admin) own the full
+privilege definitions and are created by the roles-setup Command resource below.
+Vault-issued dynamic users are assigned the matching native role at creation time
+via GRANT <role> TO USER, keeping the Vault create statements minimal.
 
 Connectivity: Vault must be able to reach the StarRocks FE MySQL port (9030)
 over the VPC. Configure starrocks:fe_host to an internally routable address
 (e.g. an internal NLB DNS name or a stable VPC-accessible hostname).
+The SQL setup Command resources require the mysql client on the Pulumi runner
+(Concourse worker) and network access to the same NLB endpoint.
 """
 
+import hashlib
 import json
 
 import pulumi
+import pulumi_command as command
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 
@@ -55,27 +59,18 @@ db_admin_password = applications_stack.require_output("root_password_secret")
 db_port = starrocks_config.get_int("fe_mysql_port") or STARROCKS_MYSQL_PORT
 db_admin_username = starrocks_config.require("db_admin_username")
 
-# StarRocks-compatible SQL role statements.
+# StarRocks-compatible SQL role statements for Vault dynamic credentials.
 # Each list entry is executed as a separate statement in the same connection.
 #
-# StarRocks privilege model differences from MySQL:
-#  - Table grants: GRANT priv ON ALL TABLES IN ALL DATABASES TO USER 'u'@'h'
-#  - Catalog grants: GRANT USAGE ON CATALOG <name> TO USER 'u'@'h'
-#  - Drop: DROP USER 'u'@'%' (same syntax as MySQL)
+# Privilege definitions live on the native StarRocks roles (readonly / app /
+# admin), which are created and maintained by the roles-setup Command resource
+# below.  Vault-issued users are created with a password and then assigned the
+# matching native role; dropping the user at revocation time is sufficient.
 starrocks_role_statements: dict[str, dict[str, list[str]]] = {
     "readonly": {
         "create": [
             "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';",
-            # Grant access to query internal StarRocks tables
-            "GRANT USAGE ON CATALOG default_catalog TO USER '{{name}}'@'%';",
-            "GRANT SELECT ON ALL TABLES IN ALL DATABASES TO USER '{{name}}'@'%';",
-            # Grant access to the Iceberg data lake catalog.
-            # USAGE makes the catalog visible; SET CATALOG switches the session
-            # context so the subsequent table-level SELECT grant applies to
-            # databases/tables inside the Iceberg catalog rather than default_catalog.
-            "GRANT USAGE ON CATALOG ol_data_lake_iceberg TO USER '{{name}}'@'%';",
-            "SET CATALOG ol_data_lake_iceberg;",
-            "GRANT SELECT ON ALL TABLES IN ALL DATABASES TO USER '{{name}}'@'%';",
+            "GRANT readonly TO USER '{{name}}'@'%';",
         ],
         "revoke": ["DROP USER '{{name}}'@'%';"],
         "renew": [],
@@ -84,9 +79,7 @@ starrocks_role_statements: dict[str, dict[str, list[str]]] = {
     "app": {
         "create": [
             "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';",
-            "GRANT USAGE ON CATALOG default_catalog TO USER '{{name}}'@'%';",
-            "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN ALL DATABASES TO USER '{{name}}'@'%';",  # noqa: E501
-            "GRANT USAGE ON CATALOG ol_data_lake_iceberg TO USER '{{name}}'@'%';",
+            "GRANT app TO USER '{{name}}'@'%';",
         ],
         "revoke": ["DROP USER '{{name}}'@'%';"],
         "renew": [],
@@ -95,13 +88,7 @@ starrocks_role_statements: dict[str, dict[str, list[str]]] = {
     "admin": {
         "create": [
             "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';",
-            # NODE_PRIV allows cluster management operations (ALTER SYSTEM, etc.)
-            "GRANT NODE_PRIV ON *.* TO USER '{{name}}'@'%';",
-            # Full DML + DDL on all databases in the default catalog
-            "GRANT ALL ON ALL TABLES IN ALL DATABASES TO USER '{{name}}'@'%';",
-            "GRANT ALL ON ALL DATABASES TO USER '{{name}}'@'%';",
-            "GRANT USAGE ON CATALOG default_catalog TO USER '{{name}}'@'%';",
-            "GRANT USAGE ON CATALOG ol_data_lake_iceberg TO USER '{{name}}'@'%';",
+            "GRANT admin TO USER '{{name}}'@'%';",
         ],
         "revoke": ["DROP USER '{{name}}'@'%';"],
         "renew": [],
@@ -200,6 +187,211 @@ for role_name, role_defs in starrocks_role_statements.items():
             delete_before_replace=True,
             depends_on=[starrocks_db_connection],
         ),
+    )
+
+# ============================================================================
+# StarRocks SQL setup via local.Command
+#
+# Each Command resource pipes SQL through the mysql CLI using environment
+# variables for credentials (MYSQL_PWD / STARROCKS_HOST) so that secrets
+# never appear in the command string, process list, or Pulumi state.
+#
+# The same SQL is re-applied on both create and update, which is safe because:
+#   - CREATE ... IF NOT EXISTS and CREATE ROLE IF NOT EXISTS are no-ops when
+#     the object already exists.
+#   - GRANT is idempotent in StarRocks (re-granting an existing privilege is
+#     silently ignored).
+#   - ALTER CATALOG SET patches only the listed properties in-place.
+#
+# Triggers are a SHA-256 hash of the SQL string; any config change
+# (e.g. aws_region) causes the update command to re-run automatically.
+# ============================================================================
+
+CATALOG_NAME = "ol_data_lake_iceberg"
+
+# mysql CLI base command: host and password come from environment variables,
+# not from the command string, so they are not stored in Pulumi's state logs.
+_ssl_flag = " --ssl-mode=REQUIRED" if ssl_enabled else ""
+_mysql_client = (
+    f'mysql -h"$STARROCKS_HOST" -P{db_port} -u{db_admin_username}{_ssl_flag}'
+)
+# Two stdin-pipe helpers so that multi-statement SQL is always sent through
+# COM_QUERY without --force: _exec_sql runs $STARROCKS_SQL (create/update),
+# _exec_delete_sql runs $STARROCKS_DELETE_SQL (delete).  Using separate env
+# vars lets each Command resource carry both payloads in its environment dict.
+_exec_sql = f"printf '%s' \"$STARROCKS_SQL\" | {_mysql_client}"
+_exec_delete_sql = f"printf '%s' \"$STARROCKS_DELETE_SQL\" | {_mysql_client}"
+
+# Environment shared by all Command resources: credentials never appear in the
+# create/update/delete strings (they are masked as Pulumi secrets in the env dict).
+_mysql_env: dict[str, pulumi.Input[str]] = {
+    "MYSQL_PWD": db_admin_password,
+    "STARROCKS_HOST": db_host,
+}
+
+enable_data_lake = starrocks_config.get_bool("enable_data_lake_integration") or False
+oidc_enabled = starrocks_config.get_bool("oidc_enabled") or False
+
+# --- Iceberg catalog --------------------------------------------------------
+catalog_setup: command.local.Command | None = None
+if enable_data_lake:
+    aws_region = starrocks_config.get("aws_region") or "us-east-1"
+
+    # CREATE IF NOT EXISTS is a no-op when the catalog already exists.
+    # ALTER CATALOG SET updates the mutable connection properties in-place,
+    # avoiding a drop/recreate that would interrupt running queries.
+    # NOTE: 'type' and 'iceberg.catalog.type' are structural; they can only be
+    # set at CREATE time and are intentionally excluded from the ALTER block.
+    # NOTE: ALTER CATALOG SET only updates the properties listed; it does NOT
+    # remove other properties that may have been set outside this code (e.g. a
+    # stale iam_role_arn from an earlier manual CREATE). If a property needs to
+    # be cleared, the catalog must be dropped and recreated manually.
+    #
+    # Credential chain: use_instance_profile=false with no explicit key/role
+    # instructs StarRocks to fall through to the AWS SDK default credential
+    # chain.  On EKS with IRSA the pod already has AWS_ROLE_ARN +
+    # AWS_WEB_IDENTITY_TOKEN_FILE injected; the SDK resolves them automatically
+    # without a second sts:AssumeRole call.  Setting iam_role_arn here would
+    # cause StarRocks to attempt a nested AssumeRole and fail with a 403.
+    _catalog_conn_props = (
+        f'    "aws.glue.use_instance_profile" = "false",\n'
+        f'    "aws.glue.region" = "{aws_region}",\n'
+        f'    "aws.s3.use_instance_profile" = "false",\n'
+        f'    "aws.s3.region" = "{aws_region}"'
+    )
+    _catalog_sql = (
+        f"CREATE EXTERNAL CATALOG IF NOT EXISTS {CATALOG_NAME}\n"
+        f"COMMENT 'MIT OL Data Lake Iceberg Catalog"
+        f" (AWS Glue / {stack_info.env_suffix})'\n"
+        f"PROPERTIES(\n"
+        f'    "type" = "iceberg",\n'
+        f'    "iceberg.catalog.type" = "glue",\n'
+        f"{_catalog_conn_props}\n"
+        f");\n"
+        f"ALTER CATALOG {CATALOG_NAME} SET (\n"
+        f"{_catalog_conn_props}\n"
+        f");"
+    )
+
+    catalog_setup = command.local.Command(
+        f"starrocks-{stack_info.env_suffix}-catalog-setup",
+        create=_exec_sql,
+        update=_exec_sql,
+        delete=_exec_delete_sql,
+        environment={
+            **_mysql_env,
+            "STARROCKS_SQL": _catalog_sql,
+            "STARROCKS_DELETE_SQL": f"DROP CATALOG IF EXISTS {CATALOG_NAME};",
+        },
+        triggers=[hashlib.sha256(_catalog_sql.encode()).hexdigest()],
+        opts=ResourceOptions(depends_on=[starrocks_db_connection]),
+    )
+
+# --- Native StarRocks roles -------------------------------------------------
+# Permanent roles for OIDC-authenticated users and direct database access.
+# These parallel the Vault dynamic credential roles (readonly / app / admin)
+# but are database-level roles rather than per-session Vault-issued users.
+#
+# GRANT is idempotent in StarRocks: re-granting an existing privilege is a
+# no-op, so this block is safe to re-apply on every `pulumi up`.
+#
+# Iceberg catalog grants are appended when enable_data_lake_integration is
+# true.  SET CATALOG switches the session context so the subsequent table-level
+# GRANT applies to the Iceberg catalog's databases rather than default_catalog.
+#
+# LIMITATION: these GRANTs are additive.  If enable_data_lake_integration is
+# later set to false the Iceberg catalog grants already on the roles are NOT
+# automatically revoked.  A manual REVOKE USAGE ON CATALOG + REVOKE on tables
+# is required to remove them (or DROP + recreate the roles via pulumi destroy
+# followed by pulumi up).
+_base_roles_sql = """\
+CREATE ROLE IF NOT EXISTS readonly;
+CREATE ROLE IF NOT EXISTS app;
+CREATE ROLE IF NOT EXISTS admin;
+
+GRANT USAGE ON CATALOG default_catalog TO ROLE readonly;
+GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE readonly;
+
+GRANT USAGE ON CATALOG default_catalog TO ROLE app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN ALL DATABASES TO ROLE app;
+
+GRANT NODE_PRIV ON *.* TO ROLE admin;
+GRANT USAGE ON CATALOG default_catalog TO ROLE admin;
+GRANT ALL ON ALL TABLES IN ALL DATABASES TO ROLE admin;
+GRANT ALL ON ALL DATABASES TO ROLE admin;"""
+
+_iceberg_roles_sql = f"""
+GRANT USAGE ON CATALOG {CATALOG_NAME} TO ROLE readonly;
+SET CATALOG {CATALOG_NAME};
+GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE readonly;
+SET CATALOG default_catalog;
+
+GRANT USAGE ON CATALOG {CATALOG_NAME} TO ROLE app;
+SET CATALOG {CATALOG_NAME};
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN ALL DATABASES TO ROLE app;
+SET CATALOG default_catalog;
+
+GRANT USAGE ON CATALOG {CATALOG_NAME} TO ROLE admin;
+SET CATALOG {CATALOG_NAME};
+GRANT ALL ON ALL TABLES IN ALL DATABASES TO ROLE admin;
+SET CATALOG default_catalog;"""
+
+_roles_sql = _base_roles_sql + (_iceberg_roles_sql if enable_data_lake else "")
+_role_deps: list[pulumi.Resource] = [starrocks_db_connection]
+if catalog_setup is not None:
+    _role_deps.append(catalog_setup)
+
+_roles_drop_sql = (
+    "DROP ROLE IF EXISTS readonly; DROP ROLE IF EXISTS app; DROP ROLE IF EXISTS admin;"
+)
+
+command.local.Command(
+    f"starrocks-{stack_info.env_suffix}-roles-setup",
+    create=_exec_sql,
+    update=_exec_sql,
+    delete=_exec_delete_sql,
+    environment={
+        **_mysql_env,
+        "STARROCKS_SQL": _roles_sql,
+        "STARROCKS_DELETE_SQL": _roles_drop_sql,
+    },
+    triggers=[hashlib.sha256(_roles_sql.encode()).hexdigest()],
+    opts=ResourceOptions(depends_on=_role_deps),
+)
+
+# --- OIDC authentication chain ----------------------------------------------
+# Sets the StarRocks FE runtime authentication chain to include OIDC when
+# oidc_enabled=true.  This is a runtime FE config change; for persistence
+# across FE restarts the applications stack Helm values must also set
+# authentication_chain in fe.conf (otherwise the change reverts on restart).
+#
+# Authorization: StarRocks uses its native privilege model for OIDC-
+# authenticated sessions the same as for password-authenticated ones.  OIDC
+# users must be pre-created in StarRocks (CREATE USER ... IDENTIFIED WITH
+# authentication_oidc) and assigned roles or grants before they can access
+# data.  This substructure creates the role objects (see roles-setup above)
+# but not the individual user-to-role mappings; those are managed separately.
+if oidc_enabled:
+    _auth_chain_enabled = "authentication_starrocks,authentication_oidc"
+    _oidc_sql = (
+        f'ADMIN SET FRONTEND CONFIG ("authentication_chain" = "{_auth_chain_enabled}");'
+    )
+    _oidc_disable_sql = (
+        "ADMIN SET FRONTEND CONFIG"
+        ' ("authentication_chain" = "authentication_starrocks");'
+    )
+    command.local.Command(
+        f"starrocks-{stack_info.env_suffix}-oidc-setup",
+        create=_exec_sql,
+        update=_exec_sql,
+        delete=_exec_delete_sql,
+        environment={
+            **_mysql_env,
+            "STARROCKS_SQL": _oidc_sql,
+            "STARROCKS_DELETE_SQL": _oidc_disable_sql,
+        },
+        triggers=[hashlib.sha256(_oidc_sql.encode()).hexdigest()],
+        opts=ResourceOptions(depends_on=[starrocks_db_connection]),
     )
 
 export("vault_mount_path", mount_point)

@@ -162,8 +162,8 @@ if starrocks_config.get_bool("oidc_enabled"):
 # StarRocks FE/CN pods (which use the annotated "starrocks" service account) can call
 # the Glue Data Catalog API and read Iceberg data from the corresponding S3 buckets.
 #
-# After deploying, create the catalog in StarRocks by running the SQL exported as
-# the "iceberg_catalog_sql" stack output (e.g. via the FE MySQL-compatible port 9030).
+# The Iceberg external catalog is created and maintained by the substructure stack
+# (substructure/starrocks) using the pulumi-command local.Command resource.
 if starrocks_config.get_bool("enable_data_lake_integration"):
     aws_region = starrocks_config.get("aws_region") or "us-east-1"
     data_warehouse_stack = StackReference(
@@ -176,25 +176,6 @@ if starrocks_config.get_bool("enable_data_lake_integration"):
         ),
         role=starrocks_auth_binding.irsa_role.name,
         opts=ResourceOptions(parent=starrocks_auth_binding),
-    )
-    export(
-        "iceberg_catalog_sql",
-        # Uses the default AWS SDK credential chain (no instance profile, no explicit
-        # role assumption). On EKS with IRSA, the pod already runs as the trust role
-        # via AWS_ROLE_ARN + AWS_WEB_IDENTITY_TOKEN_FILE; specifying iam_role_arn
-        # causes StarRocks to re-assume the same role and fail with a 403. Leaving
-        # both use_instance_profile=false and iam_role_arn unset lets the SDK pick up
-        # the web identity token credentials already in the environment.
-        f"""CREATE EXTERNAL CATALOG ol_data_lake_iceberg
-COMMENT 'MIT OL Data Lake Iceberg Catalog (AWS Glue / {stack_info.env_suffix})'
-PROPERTIES(
-    "type" = "iceberg",
-    "iceberg.catalog.type" = "glue",
-    "aws.glue.use_instance_profile" = "false",
-    "aws.glue.region" = "{aws_region}",
-    "aws.s3.use_instance_profile" = "false",
-    "aws.s3.region" = "{aws_region}"
-);""",
     )
 
 # AWS Java SDK v1 (bundled with StarRocks 4.x) does not automatically resolve
