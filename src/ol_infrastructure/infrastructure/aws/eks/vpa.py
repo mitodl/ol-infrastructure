@@ -64,11 +64,15 @@ def setup_vpa(
                         "requests": {"cpu": "50m", "memory": "200Mi"},
                         "limits": {"memory": "200Mi"},
                     },
-                    # Must be true for the admission controller to register its
-                    # mutating webhook. Without this, VPA recommendations are
-                    # never applied to pods at creation time (eviction still
-                    # works, but replacement pods come back with old resources).
-                    "registerWebhook": True,
+                    # certGen (the chart default) is the preferred TLS strategy.
+                    # A pre-install hook job creates the vpa-tls-certs Secret
+                    # (self-signed CA + cert/key), Helm creates the
+                    # MutatingWebhookConfiguration, and a post-install hook patches
+                    # the caBundle into it.  registerWebhook is left at its default
+                    # (false) so the admission controller does not attempt to manage
+                    # the webhook itself — that path would require granting it
+                    # cluster-wide delete on mutatingwebhookconfigurations, which is
+                    # a significant privilege escalation risk.
                     # Ignore failures so a VPA webhook outage does not block pod
                     # creation cluster-wide. Pods will simply start without VPA
                     # mutation applied and the next eviction cycle will correct them.
