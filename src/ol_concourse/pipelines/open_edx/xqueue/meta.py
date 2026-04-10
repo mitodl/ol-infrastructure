@@ -1,6 +1,5 @@
 import sys
 
-from bridge.settings.openedx.types import OpenEdxSupportedRelease
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
@@ -16,6 +15,8 @@ from ol_concourse.lib.models.pipeline import (
     TaskStep,
 )
 from ol_concourse.lib.resources import git_repo
+
+from bridge.settings.openedx.types import OpenEdxSupportedRelease
 
 pipeline_code = git_repo(
     name=Identifier("xqueue-pipeline-code"),

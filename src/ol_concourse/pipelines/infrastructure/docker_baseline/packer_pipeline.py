@@ -1,9 +1,10 @@
-from ol_concourse.pipelines.jobs import packer_jobs
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
 from ol_concourse.lib.resource_types import hashicorp_resource
 from ol_concourse.lib.resources import git_repo, github_release, hashicorp_release
+
 from ol_concourse.pipelines.constants import PACKER_WATCHED_PATHS
+from ol_concourse.pipelines.jobs import packer_jobs
 
 hashicorp_release_resource = hashicorp_resource()
 vector_release = github_release(Identifier("vector-release"), "vectordotdev", "vector")

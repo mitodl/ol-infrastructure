@@ -1,8 +1,9 @@
-from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import Identifier, Pipeline
 from ol_concourse.lib.resources import git_repo
+
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
+from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 
 # Simple services that follow well defined patterns (CI -> QA -> Production)
 simple_resource_types = []

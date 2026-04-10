@@ -1,10 +1,8 @@
 import sys
 import textwrap
 
-from bridge.lib.versions import KEYCLOAK_VERSION
 from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.containers import container_build_task
-from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
@@ -27,7 +25,10 @@ from ol_concourse.lib.resources import (
     registry_image,
     s3_object,
 )
+
+from bridge.lib.versions import KEYCLOAK_VERSION
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
+from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 
 
 def build_keycloak_substructure_pipeline() -> PipelineFragment:

@@ -32,6 +32,7 @@ from ol_concourse.lib.models.pipeline import (
     TaskStep,
 )
 from ol_concourse.lib.resources import git_repo
+
 from ol_concourse.pipelines.open_edx.grader_images.build_pipeline import (
     GRADER_PIPELINES,
 )

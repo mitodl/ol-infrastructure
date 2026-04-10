@@ -1,14 +1,15 @@
 import sys
 
-from ol_concourse.pipelines.jobs import packer_jobs, pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
 from ol_concourse.lib.resources import git_repo, github_release
+
 from ol_concourse.pipelines.constants import (
     PACKER_WATCHED_PATHS,
     PULUMI_CODE_PATH,
     PULUMI_WATCHED_PATHS,
 )
+from ol_concourse.pipelines.jobs import packer_jobs, pulumi_jobs_chain
 
 #############
 # RESOURCES #

@@ -1,15 +1,6 @@
 # ruff: noqa: E501
 import sys
 
-from bridge.settings.openedx.accessors import (
-    fetch_application_version,
-    filter_deployments_by_release,
-)
-from bridge.settings.openedx.types import (
-    OpenEdxApplication,
-    OpenEdxSupportedRelease,
-)
-from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
@@ -29,7 +20,17 @@ from ol_concourse.lib.models.pipeline import (
     TaskStep,
 )
 from ol_concourse.lib.resources import git_repo, github_release, registry_image
+
+from bridge.settings.openedx.accessors import (
+    fetch_application_version,
+    filter_deployments_by_release,
+)
+from bridge.settings.openedx.types import (
+    OpenEdxApplication,
+    OpenEdxSupportedRelease,
+)
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
+from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 
 
 def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001

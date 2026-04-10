@@ -14,6 +14,7 @@ from ol_concourse.lib.models.pipeline import (
     TaskStep,
 )
 from ol_concourse.lib.resources import git_repo
+
 from ol_concourse.pipelines.libraries.configuration import PIPELINE_CONFIGS
 
 # Resource for the ol-concourse code itself

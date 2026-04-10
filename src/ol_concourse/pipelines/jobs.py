@@ -11,6 +11,8 @@ from functools import partial
 from ol_concourse.lib.jobs.infrastructure import (
     packer_jobs,
     pulumi_job,
+)
+from ol_concourse.lib.jobs.infrastructure import (
     pulumi_jobs_chain as _pulumi_jobs_chain,
 )
 

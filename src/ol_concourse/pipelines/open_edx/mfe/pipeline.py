@@ -6,19 +6,6 @@ from collections import defaultdict
 from itertools import chain
 from typing import Literal
 
-from pydantic import BaseModel
-
-from bridge.settings.github.team_members import DEVOPS_MIT
-from bridge.settings.openedx.accessors import fetch_applications_by_type
-from bridge.settings.openedx.types import (
-    DeploymentEnvRelease,
-    EnvStage,
-    OpenEdxApplicationVersion,
-    OpenEdxDeploymentName,
-    OpenEdxMicroFrontend,
-    OpenEdxSupportedRelease,
-)
-from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
@@ -37,6 +24,19 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resource_types import github_issues_resource, rclone
 from ol_concourse.lib.resources import git_repo, github_issues
+from pydantic import BaseModel
+
+from bridge.settings.github.team_members import DEVOPS_MIT
+from bridge.settings.openedx.accessors import fetch_applications_by_type
+from bridge.settings.openedx.types import (
+    DeploymentEnvRelease,
+    EnvStage,
+    OpenEdxApplicationVersion,
+    OpenEdxDeploymentName,
+    OpenEdxMicroFrontend,
+    OpenEdxSupportedRelease,
+)
+from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_concourse.pipelines.constants import GH_ISSUES_DEFAULT_REPOSITORY
 
 

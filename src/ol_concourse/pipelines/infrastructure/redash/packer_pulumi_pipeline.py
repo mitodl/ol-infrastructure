@@ -1,8 +1,9 @@
-from ol_concourse.pipelines.jobs import packer_jobs, pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
 from ol_concourse.lib.resources import git_repo, registry_image
+
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
+from ol_concourse.pipelines.jobs import packer_jobs, pulumi_jobs_chain
 
 redash_container_resource = registry_image(
     name=Identifier("redash-container"),

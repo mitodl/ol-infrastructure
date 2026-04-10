@@ -20,6 +20,7 @@ from ol_concourse.lib.models.pipeline import (
     TaskStep,
 )
 from ol_concourse.lib.resources import git_repo, ssh_git_repo
+
 from ol_concourse.pipelines.libraries.configuration import PIPELINE_CONFIGS
 
 

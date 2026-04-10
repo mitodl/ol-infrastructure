@@ -3,7 +3,6 @@
 import sys
 
 from ol_concourse.lib.containers import container_build_task
-from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     GetStep,
@@ -13,10 +12,12 @@ from ol_concourse.lib.models.pipeline import (
     PutStep,
 )
 from ol_concourse.lib.resources import git_repo, registry_image
+
 from ol_concourse.pipelines.constants import (
     PULUMI_CODE_PATH,
     PULUMI_WATCHED_PATHS,
 )
+from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 
 
 def build_kubewatch_webhook_handler_pipeline() -> PipelineFragment:
