@@ -13,9 +13,13 @@ from pydantic import BaseModel, model_validator
 
 from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
-from ol_concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
-from ol_concourse.lib.resources import git_repo, registry_image
-from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
+from ol_concourse.lib.models.pipeline import Duration, GetStep, Identifier, Pipeline
+from ol_concourse.lib.resources import git_repo, github_issues, registry_image
+from ol_concourse.pipelines.constants import (
+    GH_ISSUES_DEFAULT_REPOSITORY,
+    PULUMI_CODE_PATH,
+    PULUMI_WATCHED_PATHS,
+)
 
 
 class DockerImageConfig(BaseModel):
@@ -56,6 +60,13 @@ class SimplePulumiParams(BaseModel):
         branch: Git branch to watch (default: "main").
         docker_image: Optional Docker image configuration for apps that depend on
                      external Docker images.
+        prior_stage_stack: Full stack name of the preceding stage that runs in a
+                          different Concourse environment (e.g. QA stack when this
+                          pipeline only runs the Production stage in prod Concourse).
+                          When set, a GitHub issues trigger resource is added so this
+                          pipeline gates on the prior stage's deployment issue being
+                          closed, preserving the same promotion workflow used within a
+                          single chained pipeline.
     """
 
     app_name: str
@@ -68,6 +79,7 @@ class SimplePulumiParams(BaseModel):
     additional_watched_paths: list[str] = []
     branch: str = "main"
     docker_image: DockerImageConfig | None = None
+    prior_stage_stack: str | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -249,6 +261,10 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         ],
         stages=["QA", "Production"],
     ),
+    # The substructure stack makes direct TCP connections to the StarRocks NLB, which
+    # is internal to the data VPC.  Each ops VPC is only peered with its same-env data
+    # VPC, so the QA stage must run in QA Concourse and Production in prod Concourse.
+    # See starrocks-substructure-qa below for the QA-Concourse entry.
     "starrocks-substructure": SimplePulumiParams(
         app_name="starrocks_substructure",
         pulumi_project_path="substructure/starrocks/",
@@ -257,7 +273,18 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         deployment_groups=[
             "lakehouse",
         ],
-        stages=["QA", "Production"],
+        stages=["Production"],
+        prior_stage_stack="substructure.starrocks.lakehouse.QA",
+    ),
+    "starrocks-substructure-qa": SimplePulumiParams(
+        app_name="starrocks_substructure",
+        pulumi_project_path="substructure/starrocks/",
+        stack_prefix="substructure.starrocks",
+        pulumi_project_name="ol-infrastructure-substructure-starrocks",
+        deployment_groups=[
+            "lakehouse",
+        ],
+        stages=["QA"],
     ),
     "tika": SimplePulumiParams(
         app_name="tika",
@@ -341,6 +368,33 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 f"{docker_image_resource.name}/tag"
             )
 
+    # Build cross-environment GitHub issue gate if this pipeline continues a chain
+    # that started in a different Concourse environment.  The prior stage's deployment
+    # posts a GitHub issue on success; this pipeline watches for it to be closed before
+    # allowing the first job here to run, preserving the normal promotion gate.
+    cross_env_custom_deps: dict[int, list[GetStep]] = {}
+    cross_env_resources = []
+    if params.prior_stage_stack:
+        prior_trigger = github_issues(
+            auth_method="token",
+            name=Identifier(
+                f"github-issues-{params.prior_stage_stack.lower()}-trigger"
+            ),
+            repository=GH_ISSUES_DEFAULT_REPOSITORY,
+            issue_title_template=(
+                f"[bot] Pulumi {params.pulumi_project_name}"
+                f" {params.prior_stage_stack} deployed."
+            ),
+            issue_prefix=(
+                f"[bot] Pulumi {params.pulumi_project_name}"
+                f" {params.prior_stage_stack} deployed."
+            ),
+            issue_state="closed",
+            poll_frequency=Duration("15m"),
+        )
+        cross_env_resources.append(prior_trigger)
+        cross_env_custom_deps = {0: [GetStep(get=prior_trigger.name, trigger=True)]}
+
     # Determine stack names to use
     if params.auto_discover_stacks:
         # Auto-discover stacks from the repository
@@ -382,6 +436,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                     ),
                     dependencies=docker_dependencies,
                     env_vars_from_files=docker_env_vars_from_files or None,
+                    custom_dependencies=cross_env_custom_deps or None,
                 )
 
                 # Collect resources and jobs
@@ -390,7 +445,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 all_jobs.extend(group_fragment.jobs)
 
             # Combine all fragments
-            all_pipeline_resources = [pulumi_code, *all_resources]
+            all_pipeline_resources = [pulumi_code, *cross_env_resources, *all_resources]
             if docker_image_resource:
                 all_pipeline_resources.append(docker_image_resource)
 
@@ -410,9 +465,14 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 ),
                 dependencies=docker_dependencies,
                 env_vars_from_files=docker_env_vars_from_files or None,
+                custom_dependencies=cross_env_custom_deps or None,
             )
 
-            all_pipeline_resources = [pulumi_code, *pulumi_fragment.resources]
+            all_pipeline_resources = [
+                pulumi_code,
+                *cross_env_resources,
+                *pulumi_fragment.resources,
+            ]
             if docker_image_resource:
                 all_pipeline_resources.append(docker_image_resource)
 
@@ -435,9 +495,14 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             project_source_path=PULUMI_CODE_PATH.joinpath(params.pulumi_project_path),
             dependencies=docker_dependencies,
             env_vars_from_files=docker_env_vars_from_files or None,
+            custom_dependencies=cross_env_custom_deps or None,
         )
 
-        all_pipeline_resources = [pulumi_code, *pulumi_fragment.resources]
+        all_pipeline_resources = [
+            pulumi_code,
+            *cross_env_resources,
+            *pulumi_fragment.resources,
+        ]
         if docker_image_resource:
             all_pipeline_resources.append(docker_image_resource)
 

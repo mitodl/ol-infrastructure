@@ -3,8 +3,15 @@
 This meta pipeline automatically generates and updates individual pipelines for
 applications that follow the simple Pulumi-only pattern (no build steps, just
 infrastructure deployment across CI/QA/Production).
+
+Two Concourse environments are supported via --env:
+  production (default): registers pipelines for the production Concourse instance.
+  qa: registers pipelines for the QA Concourse instance (needed for any stack whose
+      local.Command resources require direct VPC-level access to QA infrastructure,
+      e.g. starrocks-substructure-qa which connects to the QA data-VPC NLB).
 """
 
+import argparse
 import sys
 
 from ol_concourse.lib.models.pipeline import (
@@ -74,11 +81,15 @@ def meta_job(app_name: str) -> Job:
     )
 
 
-def meta_pipeline(app_names: list[str]) -> Pipeline:
+def meta_pipeline(
+    app_names: list[str], extra_args: list[str] | None = None
+) -> Pipeline:
     """Generate the meta-pipeline that manages all simple Pulumi app pipelines.
 
     Args:
         app_names: List of application names to manage.
+        extra_args: Extra CLI arguments forwarded to meta.py in the self-update task
+            (e.g. ``["--env", "qa"]`` so QA Concourse regenerates its own definition).
 
     Returns:
         A Pipeline that manages all individual app pipelines.
@@ -129,6 +140,7 @@ def meta_pipeline(app_names: list[str]) -> Pipeline:
                                 "../simple-pulumi-pipeline-definitions/src/"
                                 "ol_concourse/pipelines/infrastructure/simple_pulumi/"
                                 "meta.py",
+                                *(extra_args or []),
                             ],
                         ),
                     ),
@@ -148,7 +160,23 @@ def meta_pipeline(app_names: list[str]) -> Pipeline:
 
 
 if __name__ == "__main__":
-    app_names = [
+    parser = argparse.ArgumentParser(
+        description="Generate the simple-pulumi meta pipeline definition."
+    )
+    parser.add_argument(
+        "--env",
+        choices=["production", "qa"],
+        default="production",
+        help=(
+            "Target Concourse environment. 'production' (default) generates the "
+            "pipeline for the production Concourse instance. 'qa' generates a "
+            "pipeline for the QA Concourse instance, which includes apps whose "
+            "local.Command resources need direct access to QA VPC infrastructure."
+        ),
+    )
+    cli_args = parser.parse_args()
+
+    production_app_names = [
         "airbyte",
         "bootcamps",
         "celery-monitoring",
@@ -168,9 +196,26 @@ if __name__ == "__main__":
         "xpro-partner-dns",
     ]
 
-    pipeline_json = meta_pipeline(app_names).model_dump_json(indent=2)
+    qa_app_names = [
+        "starrocks-substructure-qa",
+    ]
+
+    if cli_args.env == "qa":
+        app_names = qa_app_names
+        extra_args: list[str] | None = ["--env", "qa"]
+        fly_target = "qa-inf"
+    else:
+        app_names = production_app_names
+        extra_args = None
+        fly_target = "pr-inf"
+
+    pipeline_json = meta_pipeline(app_names, extra_args=extra_args).model_dump_json(
+        indent=2
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)
     print()  # noqa: T201
-    print("fly -t pr-inf sp -p simple-pulumi-meta -c definition.json")  # noqa: T201
+    print(  # noqa: T201
+        f"fly -t {fly_target} sp -p simple-pulumi-meta -c definition.json"
+    )
