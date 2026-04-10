@@ -1,4 +1,4 @@
-import sys  # noqa: INP001
+import sys
 
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,

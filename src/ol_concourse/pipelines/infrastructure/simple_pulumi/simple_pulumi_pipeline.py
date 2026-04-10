@@ -9,17 +9,17 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, model_validator
-
-from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import Duration, GetStep, Identifier, Pipeline
 from ol_concourse.lib.resources import git_repo, github_issues, registry_image
+from pydantic import BaseModel, model_validator
+
 from ol_concourse.pipelines.constants import (
     GH_ISSUES_DEFAULT_REPOSITORY,
     PULUMI_CODE_PATH,
     PULUMI_WATCHED_PATHS,
 )
+from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 
 
 class DockerImageConfig(BaseModel):

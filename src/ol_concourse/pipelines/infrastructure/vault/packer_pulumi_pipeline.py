@@ -1,4 +1,3 @@
-from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     GetStep,
@@ -7,11 +6,13 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resource_types import hashicorp_resource
 from ol_concourse.lib.resources import git_repo, hashicorp_release
+
 from ol_concourse.pipelines.constants import (
     PACKER_WATCHED_PATHS,
     PULUMI_CODE_PATH,
     PULUMI_WATCHED_PATHS,
 )
+from ol_concourse.pipelines.jobs import packer_jobs, pulumi_jobs_chain
 
 vault_release = hashicorp_release(Identifier("vault-release"), "vault")
 vault_image_code = git_repo(

@@ -1138,6 +1138,15 @@ wheels = [
 ]
 
 [[package]]
+name = "ol-concourse"
+version = "0.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/95/9f/e361c4e8379ed963da837930313df47ad3115b3ef563191b0690c9e7d7b5/ol_concourse-0.6.0.tar.gz", hash = "sha256:688d7509810dcda0d1c588e1065462f5bac03a73a4e3ad4b882483aee17a3ef5", size = 38143, upload-time = "2026-04-10T17:31:21.299Z" }
+
+[[package]]
 name = "ol-infrastructure"
 version = "0.1.0"
 source = { editable = "." }
@@ -1148,6 +1157,7 @@ dependencies = [
     { name = "httpx" },
     { name = "hvac", extra = ["parser"] },
     { name = "kubernetes" },
+    { name = "ol-concourse" },
     { name = "packaging" },
     { name = "parliament" },
     { name = "pulumi" },
@@ -1200,6 +1210,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.0,<0.29" },
     { name = "hvac", extras = ["parser"], specifier = ">=2.0.0,<3" },
     { name = "kubernetes", specifier = ">=34.1.0" },
+    { name = "ol-concourse", specifier = ">=0.6.0,<0.7" },
     { name = "packaging", specifier = ">=24.2" },
     { name = "parliament", git = "https://github.com/mitodl/parliament" },
     { name = "pulumi", specifier = ">=3.39.1,<4" },
