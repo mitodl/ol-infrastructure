@@ -21,7 +21,7 @@ pipeline_code = git_repo(
     name=Identifier("notes-pipeline-code"),
     uri="https://github.com/mitodl/ol-infrastructure",
     paths=[
-        "src/ol_concourse/lib/",
+        "pyproject.toml",
         "src/ol_concourse/pipelines/open_edx/edx_notes_v3/",
         "src/bridge/settings/openedx/",
     ],

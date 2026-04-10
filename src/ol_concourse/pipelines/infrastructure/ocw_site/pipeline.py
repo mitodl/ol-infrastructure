@@ -1,4 +1,4 @@
-from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
+from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
 from ol_concourse.lib.resources import git_repo

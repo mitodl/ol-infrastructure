@@ -22,7 +22,7 @@ pipeline_code = git_repo(
     uri="https://github.com/mitodl/ol-infrastructure",
     paths=[
         "src/bridge/settings/openedx/",
-        "src/ol_concourse/lib/",
+        "pyproject.toml",
         "src/ol_concourse/pipelines/open_edx/xqueue/",
     ],
 )

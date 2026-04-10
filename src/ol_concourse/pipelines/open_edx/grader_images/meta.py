@@ -37,7 +37,7 @@ from ol_concourse.pipelines.open_edx.grader_images.build_pipeline import (
 )
 
 _PIPELINE_CODE_PATHS = [
-    "src/ol_concourse/lib/",
+    "pyproject.toml",
     "src/ol_concourse/pipelines/open_edx/grader_images/",
 ]
 

@@ -1,4 +1,4 @@
-from ol_concourse.lib.jobs.infrastructure import packer_jobs
+from ol_concourse.pipelines.jobs import packer_jobs
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
 from ol_concourse.lib.resource_types import hashicorp_resource

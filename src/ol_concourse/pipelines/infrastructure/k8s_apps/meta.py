@@ -64,7 +64,7 @@ def meta_pipeline(app_names: list[str]) -> Pipeline:
         branch="main",
         paths=[
             "src/ol_concourse/pipelines/infrastructure/k8s_apps/",
-            "src/ol_concourse/lib/",
+            "pyproject.toml",
             "src/ol_concourse/pipelines/constants.py",
         ],
     )

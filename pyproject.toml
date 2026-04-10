@@ -24,6 +24,7 @@ dependencies = [
     "pulumi-vault>=7,<8",
     "pulumi_consul>=3.5.0,<4",
     "pydantic>=2,<3",
+    "ol-concourse @ git+https://github.com/mitodl/ol-concourse.git#subdirectory=pipeline_lib",
     "pyinfra~=3.0",
     "pulumi-mongodbatlas>=4,<5",
     "bcrypt>=5,<6",
@@ -214,6 +215,7 @@ convention = "pep257"
 inline-quotes = "double"
 
 [tool.ruff.lint.per-file-ignores]
+"src/ol_concourse/**" = ["INP001"]
 "scripts/**" = ["T201", "ERA001", "B", "BLE001", "PLR", "E501", "G004", "FBT", "C90", "INP001"]
 "tests/**" = ["S101", "PLR2004", "RUF059", "S106", "SLF001", "ERA001"]
 "test_*.py" = ["S101"]

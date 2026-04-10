@@ -100,7 +100,7 @@ def meta_pipeline(
         branch="main",
         paths=[
             "src/ol_concourse/pipelines/infrastructure/simple_pulumi/",
-            "src/ol_concourse/lib/",
+            "pyproject.toml",
             "src/ol_concourse/pipelines/constants.py",
         ],
     )

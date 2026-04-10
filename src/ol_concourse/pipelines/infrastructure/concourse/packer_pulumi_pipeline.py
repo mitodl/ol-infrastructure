@@ -1,6 +1,6 @@
 import sys
 
-from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
+from ol_concourse.pipelines.jobs import packer_jobs, pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
 from ol_concourse.lib.resources import git_repo, github_release

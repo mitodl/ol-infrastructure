@@ -11,7 +11,7 @@ from typing import Any
 
 from pydantic import BaseModel, model_validator
 
-from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
+from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import Duration, GetStep, Identifier, Pipeline
 from ol_concourse.lib.resources import git_repo, github_issues, registry_image

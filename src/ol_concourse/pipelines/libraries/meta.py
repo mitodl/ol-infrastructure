@@ -23,7 +23,7 @@ ol_concourse_repo = git_repo(
     branch="main",
     paths=[
         "src/ol_concourse/pipelines/libraries/",
-        "src/ol_concourse/lib/",
+        "pyproject.toml",
     ],
 )
 

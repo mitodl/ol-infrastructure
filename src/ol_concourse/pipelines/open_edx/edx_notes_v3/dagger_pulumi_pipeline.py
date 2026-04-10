@@ -4,7 +4,7 @@ import sys
 from bridge.settings.openedx.accessors import filter_deployments_by_release
 from bridge.settings.openedx.types import DeploymentEnvRelease, OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
-from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
+from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
