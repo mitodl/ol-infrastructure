@@ -1,13 +1,14 @@
 """Helpers for working with Pulumi stack names and stack references."""
 
+import logging
 import os
 from dataclasses import dataclass
 from typing import Any
 
-import pulumi
-import pulumi.log
 from pulumi import StackReference, get_stack
 from pulumi.runtime import sync_await
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -122,9 +123,13 @@ def get_docker_image_tag(app_prefix: str) -> str:
     sha_var = f"{app_prefix}_DOCKER_SHA"
     tag_value = os.environ.get(tag_var)
     sha_value = os.environ.get(sha_var)
-    pulumi.log.info(
-        f"get_docker_image_tag({app_prefix!r}): "
-        f"{tag_var}={tag_value!r}, {sha_var}={sha_value!r}"
+    log.info(
+        "get_docker_image_tag(%r): %s=%r, %s=%r",
+        app_prefix,
+        tag_var,
+        tag_value,
+        sha_var,
+        sha_value,
     )
 
     if tag_value and sha_value:
