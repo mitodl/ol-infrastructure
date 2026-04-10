@@ -211,7 +211,10 @@ CATALOG_NAME = "ol_data_lake_iceberg"
 
 # mysql CLI base command: host and password come from environment variables,
 # not from the command string, so they are not stored in Pulumi's state logs.
-_ssl_flag = " --ssl-mode=REQUIRED" if ssl_enabled else ""
+# MariaDB client (used in the Pulumi runner image) does not support
+# --ssl-mode=REQUIRED (MySQL 5.7.11+ syntax); use --ssl instead.  SSL is on
+# by default in the MariaDB client, so --skip-ssl is used to disable it.
+_ssl_flag = " --ssl" if ssl_enabled else " --skip-ssl"
 _mysql_client = (
     f'mysql -h"$STARROCKS_HOST" -P{db_port} -u{db_admin_username}{_ssl_flag}'
 )
