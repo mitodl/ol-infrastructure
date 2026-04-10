@@ -209,14 +209,18 @@ for role_name, role_defs in starrocks_role_statements.items():
 
 CATALOG_NAME = "ol_data_lake_iceberg"
 
-# mysql CLI base command: host and password come from environment variables,
-# not from the command string, so they are not stored in Pulumi's state logs.
+# mysql CLI base command: host comes from an environment variable; the password is
+# passed via --password so that the MariaDB client receives it as a flag rather than
+# reading MYSQL_PWD (which MariaDB does not support).  Both are expanded by the shell
+# at runtime from the environment dict — the literal "$MYSQL_PWD" reference stored in
+# Pulumi state never contains the resolved secret value.
 # MariaDB client (used in the Pulumi runner image) does not support
 # --ssl-mode=REQUIRED (MySQL 5.7.11+ syntax); use --ssl instead.  SSL is on
 # by default in the MariaDB client, so --skip-ssl is used to disable it.
 _ssl_flag = " --ssl" if ssl_enabled else " --skip-ssl"
 _mysql_client = (
-    f'mysql -h"$STARROCKS_HOST" -P{db_port} -u{db_admin_username}{_ssl_flag}'
+    f'mysql -h"$STARROCKS_HOST" -P{db_port}'
+    f' -u{db_admin_username} --password="$MYSQL_PWD"{_ssl_flag}'
 )
 # Two stdin-pipe helpers so that multi-statement SQL is always sent through
 # COM_QUERY without --force: _exec_sql runs $STARROCKS_SQL (create/update),
