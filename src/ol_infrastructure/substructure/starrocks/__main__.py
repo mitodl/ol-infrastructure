@@ -209,25 +209,42 @@ for role_name, role_defs in starrocks_role_statements.items():
 
 CATALOG_NAME = "ol_data_lake_iceberg"
 
-# mysql CLI base command: host comes from an environment variable; the password is
-# passed via --password so that the MariaDB client receives it as a flag rather than
-# reading MYSQL_PWD (which MariaDB does not support).  Both are expanded by the shell
-# at runtime from the environment dict — the literal "$MYSQL_PWD" reference stored in
-# Pulumi state never contains the resolved secret value.
-# MariaDB client (used in the Pulumi runner image) does not support
-# --ssl-mode=REQUIRED (MySQL 5.7.11+ syntax); use --ssl instead.  SSL is on
-# by default in the MariaDB client, so --skip-ssl is used to disable it.
+# MariaDB client (used in the Pulumi runner image) quirks:
+#   1. Does not support --ssl-mode=REQUIRED (MySQL 5.7.11+ syntax).
+#   2. Does not read MYSQL_PWD from the environment.
+#   3. With a password present and --ssl, it verifies the server certificate
+#      by default, which fails against internal-CA certs.
+#
+# Solution: write a --defaults-extra-file at runtime containing the password
+# and ssl-verify-server-cert=OFF.  The file is written from $MYSQL_PWD (a
+# shell variable expanded from the Pulumi secrets env dict) so the secret
+# value is never stored in Pulumi state.  The temp file is removed after the
+# mysql invocation regardless of exit status.
 _ssl_flag = " --ssl" if ssl_enabled else " --skip-ssl"
+_mysql_opts_setup = (
+    "_pwfile=$(mktemp)"
+    " && printf '[client]\\npassword=%s\\nssl-verify-server-cert=OFF\\n'"
+    ' "$MYSQL_PWD" > "$_pwfile"'
+)
+_mysql_opts_cleanup = '_rc=$?; rm -f "$_pwfile"; exit $_rc'
 _mysql_client = (
-    f'mysql -h"$STARROCKS_HOST" -P{db_port}'
-    f' -u{db_admin_username} --password="$MYSQL_PWD"{_ssl_flag}'
+    f'mysql --defaults-extra-file="$_pwfile" -h"$STARROCKS_HOST" -P{db_port}'
+    f" -u{db_admin_username}{_ssl_flag}"
 )
 # Two stdin-pipe helpers so that multi-statement SQL is always sent through
 # COM_QUERY without --force: _exec_sql runs $STARROCKS_SQL (create/update),
 # _exec_delete_sql runs $STARROCKS_DELETE_SQL (delete).  Using separate env
 # vars lets each Command resource carry both payloads in its environment dict.
-_exec_sql = f"printf '%s' \"$STARROCKS_SQL\" | {_mysql_client}"
-_exec_delete_sql = f"printf '%s' \"$STARROCKS_DELETE_SQL\" | {_mysql_client}"
+_exec_sql = (
+    f"{_mysql_opts_setup}"
+    f" && printf '%s' \"$STARROCKS_SQL\" | {_mysql_client}"
+    f"; {_mysql_opts_cleanup}"
+)
+_exec_delete_sql = (
+    f"{_mysql_opts_setup}"
+    f" && printf '%s' \"$STARROCKS_DELETE_SQL\" | {_mysql_client}"
+    f"; {_mysql_opts_cleanup}"
+)
 
 # Environment shared by all Command resources: credentials never appear in the
 # create/update/delete strings (they are masked as Pulumi secrets in the env dict).
