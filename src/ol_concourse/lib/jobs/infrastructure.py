@@ -376,7 +376,7 @@ def pulumi_job(  # noqa: PLR0913
             PutStep(
                 inputs="all",
                 put=pulumi_resource.name,
-                get_params={"skip_implicit_get": True},
+                no_get=True,
                 params={
                     "env_os": {
                         "AWS_DEFAULT_REGION": "us-east-1",
