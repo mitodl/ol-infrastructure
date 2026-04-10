@@ -71,6 +71,7 @@ starrocks_role_statements: dict[str, dict[str, list[str]]] = {
         "create": [
             "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';",
             "GRANT readonly TO USER '{{name}}'@'%';",
+            "ALTER USER '{{name}}'@'%' DEFAULT ROLE readonly;",
         ],
         "revoke": ["DROP USER '{{name}}'@'%';"],
         "renew": [],
@@ -80,6 +81,7 @@ starrocks_role_statements: dict[str, dict[str, list[str]]] = {
         "create": [
             "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';",
             "GRANT app TO USER '{{name}}'@'%';",
+            "ALTER USER '{{name}}'@'%' DEFAULT ROLE app;",
         ],
         "revoke": ["DROP USER '{{name}}'@'%';"],
         "renew": [],
@@ -89,6 +91,7 @@ starrocks_role_statements: dict[str, dict[str, list[str]]] = {
         "create": [
             "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';",
             "GRANT admin TO USER '{{name}}'@'%';",
+            "ALTER USER '{{name}}'@'%' DEFAULT ROLE admin;",
         ],
         "revoke": ["DROP USER '{{name}}'@'%';"],
         "renew": [],
