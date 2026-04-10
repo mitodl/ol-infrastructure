@@ -418,6 +418,37 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             )
             raise ValueError(msg)
 
+        # Filter discovered stacks to only the configured stages.  This ensures
+        # that stages=["Production"] works correctly even when auto_discover_stacks
+        # is enabled (which would otherwise include all stage YAML files on disk).
+        # An empty stages list means "all stages" (no filtering).
+        if params.stages:
+            allowed = set(params.stages)
+            if isinstance(discovered_stacks, dict):
+                discovered_stacks = {
+                    group: [
+                        s
+                        for s in stacks
+                        if any(s.endswith(f".{stage}") for stage in allowed)
+                    ]
+                    for group, stacks in discovered_stacks.items()
+                }
+                # Drop any groups that became empty after filtering
+                discovered_stacks = {g: s for g, s in discovered_stacks.items() if s}
+            else:
+                discovered_stacks = [
+                    s
+                    for s in discovered_stacks
+                    if any(s.endswith(f".{stage}") for stage in allowed)
+                ]
+        if not discovered_stacks:
+            msg = (
+                f"No stacks discovered for {app_name} at {project_full_path} "
+                f"with prefix {params.stack_prefix} after filtering for "
+                f"stages {params.stages}"
+            )
+            raise ValueError(msg)
+
         # If deployment groups are used, create separate chains for parallel execution
         if isinstance(discovered_stacks, dict):
             all_resource_types = []
