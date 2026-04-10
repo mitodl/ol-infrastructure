@@ -539,8 +539,9 @@ mitlearn_db_security_group = ec2.SecurityGroup(
             from_port=0,
             to_port=0,
             protocol="-1",
-            cidr_blocks=["0.0.0.0/32"],
-            ipv6_cidr_blocks=["::/0"],
+            cidr_blocks=[apps_vpc["cidr"]],
+            ipv6_cidr_blocks=[apps_vpc["cidr_v6"]],
+            description="Allow all outbound traffic within the applications VPC",
         )
     ],
     tags=aws_config.tags,

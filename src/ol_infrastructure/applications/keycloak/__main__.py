@@ -258,6 +258,16 @@ keycloak_database_security_group = ec2.SecurityGroup(
     ],
     vpc_id=target_vpc_id,
     tags=aws_config.tags,
+    egress=[
+        ec2.SecurityGroupEgressArgs(
+            from_port=0,
+            to_port=0,
+            protocol="-1",
+            cidr_blocks=[target_vpc["cidr"]],
+            ipv6_cidr_blocks=[target_vpc["cidr_v6"]],
+            description="Allow all outbound traffic within the VPC",
+        )
+    ],
 )
 
 # Database
