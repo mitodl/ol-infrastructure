@@ -414,7 +414,9 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                 params={"skip_download": True},
             ),
             LoadVarStep(
-                load_var="image_tag", file=f"{app_ci_image.name}/tag", reveal=True
+                load_var="image_digest",
+                file=f"{app_ci_image.name}/digest",
+                reveal=True,
             ),
         ],
         additional_post_steps=[
@@ -439,7 +441,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         if pipeline_parameters.purge_fastly_cache
         else [],
         additional_env_vars={
-            f"{app_name.replace('-', '_').upper()}_DOCKER_TAG": "((.:image_tag))",
+            f"{app_name.replace('-', '_').upper()}_DOCKER_SHA": "((.:image_digest))",
         },
         slack_url_path="eks.slack_url",
     )
