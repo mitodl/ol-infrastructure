@@ -2,7 +2,7 @@ ARG SUPERSET_TAG=6.0.0
 ARG NL_EXPLORER_SHA=fb4e6bba3706564f77fee695e661702dcd78bd6b
 
 # Stage 1: build the NL Explorer frontend
-FROM node:20-slim AS nl-explorer-frontend
+FROM node:24-slim@sha256:d8e448a56fc63242f70026718378bd4b00f8c82e78d20eefb199224a4d8e33d8 AS nl-explorer-frontend
 ARG NL_EXPLORER_SHA
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git && rm -rf /var/lib/apt/lists/*
