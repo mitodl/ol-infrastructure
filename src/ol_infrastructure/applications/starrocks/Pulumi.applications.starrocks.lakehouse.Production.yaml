@@ -34,7 +34,11 @@ config:
     memory_limit: 16Gi
   starrocks:enable_data_lake_integration: "true"
   starrocks:ssl_enabled: "true"
-  starrocks:ssl_force_secure_transport: "true"
+  # ssl_force_secure_transport is intentionally false: the StarRocks operator
+  # (chart 1.11.4) does not support TLS for its internal FE MySQL connections.
+  # Re-enable once operator PR #732 merges and the chart version is bumped.
+  # External clients (Vault, Superset) already use --ssl / tls=skip-verify.
+  starrocks:ssl_force_secure_transport: "false"
   starrocks:ssl_keystore_password:
     secure: v1:h7Hv+CSf6Hhk1mVg:Il+DfHH3nUPLk+SZFSQJwOfwt7h+Ses5dBlUYi3byc59bMaVNFVXsoaft1T9+g8cTLhPcGRazE8=
 encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAGAR6Wy6ogn0XZN4ap3danEAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMOwyeMVh8a3LlZ+aUAgEQgDsC6RLHjfbCViHhNrhOaZnm7sGi95HvI1+vIvxObzU7NUO01mB+ajFCXdwCEGOWaZEqPPq67rthKBvkiw==
