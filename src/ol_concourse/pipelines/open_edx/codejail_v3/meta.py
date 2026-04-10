@@ -24,6 +24,7 @@ pipeline_code = git_repo(
     paths=[
         "src/bridge/settings/openedx/",
         "pyproject.toml",
+        "src/ol_concourse/pipelines/jobs.py",
         "src/ol_concourse/pipelines/open_edx/codejail_v3/",
     ],
 )

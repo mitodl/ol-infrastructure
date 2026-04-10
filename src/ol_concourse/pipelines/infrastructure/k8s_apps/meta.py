@@ -66,6 +66,7 @@ def meta_pipeline(app_names: list[str]) -> Pipeline:
             "src/ol_concourse/pipelines/infrastructure/k8s_apps/",
             "pyproject.toml",
             "src/ol_concourse/pipelines/constants.py",
+            "src/ol_concourse/pipelines/jobs.py",
         ],
     )
     pipeline_jobs = [meta_job(app_name) for app_name in app_names]

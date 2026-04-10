@@ -102,6 +102,7 @@ def meta_pipeline(
             "src/ol_concourse/pipelines/infrastructure/simple_pulumi/",
             "pyproject.toml",
             "src/ol_concourse/pipelines/constants.py",
+            "src/ol_concourse/pipelines/jobs.py",
         ],
     )
 

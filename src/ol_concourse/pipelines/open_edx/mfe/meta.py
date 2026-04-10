@@ -79,6 +79,7 @@ def meta_pipeline() -> Pipeline:
         paths=[
             "src/ol_concourse/pipelines/open_edx/mfe/",
             "pyproject.toml",
+            "src/ol_concourse/pipelines/jobs.py",
             "src/bridge/settings/openedx/",
         ],
     )
