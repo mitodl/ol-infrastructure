@@ -1,5 +1,6 @@
 """Deploy the StarRocks application to the data EKS cluster."""
 
+import json
 from pathlib import Path
 from typing import Any, cast
 
@@ -12,6 +13,7 @@ from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
 )
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.apisix_gateway_api import (
     OLApisixHTTPRoute,
     OLApisixHTTPRouteConfig,
@@ -165,7 +167,6 @@ if starrocks_config.get_bool("oidc_enabled"):
 # The Iceberg external catalog is created and maintained by the substructure stack
 # (substructure/starrocks) using the pulumi-command local.Command resource.
 if starrocks_config.get_bool("enable_data_lake_integration"):
-    aws_region = starrocks_config.get("aws_region") or "us-east-1"
     data_warehouse_stack = StackReference(
         f"infrastructure.aws.data_warehouse.{stack_info.name}"
     )
@@ -192,6 +193,59 @@ if starrocks_config.get_bool("enable_data_lake_integration"):
             "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
             " -Daws.roleSessionName=starrocks-glue"
         )
+    )
+
+# Shared-data (CN) mode requires an S3 bucket for persistent cluster state.
+# The bucket name follows the pattern ol-starrocks-<env_prefix>-<env_suffix>,
+# e.g. ol-starrocks-lakehouse-qa.
+#
+# The IRSA role already covers Glue + data-lake S3 (read); here we add an
+# inline policy granting full read/write on the dedicated shared-data bucket so
+# FE and CN pods can write tablet data, metadata snapshots, and compaction
+# output without relying on the broader data-lake policy.
+aws_region = starrocks_config.get("aws_region") or "us-east-1"
+shared_data_bucket: OLBucket | None = None
+shared_data_bucket_name: str | None = None
+if starrocks_config.get_bool("use_cn"):
+    shared_data_bucket_name = (
+        f"ol-starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}"
+    )
+    shared_data_bucket = OLBucket(
+        f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-shared-data-bucket",
+        S3BucketConfig(
+            tags=aws_config.tags,
+            bucket_name=shared_data_bucket_name,
+        ),
+        opts=ResourceOptions(parent=starrocks_auth_binding),
+    )
+    iam.RolePolicy(
+        f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-shared-data-s3-policy",
+        role=starrocks_auth_binding.irsa_role.name,
+        policy=json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "s3:GetObject",
+                            "s3:PutObject",
+                            "s3:DeleteObject",
+                        ],
+                        "Resource": f"arn:aws:s3:::{shared_data_bucket_name}/*",
+                    },
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "s3:ListBucket",
+                            "s3:GetBucketLocation",
+                        ],
+                        "Resource": f"arn:aws:s3:::{shared_data_bucket_name}",
+                    },
+                ],
+            }
+        ),
+        opts=ResourceOptions(parent=starrocks_auth_binding),
     )
 
 if starrocks_config.get_bool("use_be") and starrocks_config.get_bool("use_cn"):
@@ -367,25 +421,24 @@ if starrocks_config.get_bool("use_cn"):
         ),
     }
 
-# When SSL is enabled, extend the FE spec with:
-#   1. A secrets mount for the TLS secret (cert-manager populates with keystore.p12).
-#   2. A complete fe.conf that includes the default settings plus the four ssl_* params.
-#
-# Setting starrocksFESpec.config replaces the chart's default fe.conf entirely, so we
-# must reproduce the defaults here. The block below is sourced from the starrocks Helm
-# chart defaults and must be reviewed whenever STARROCKS_CHART_VERSION is bumped.
+# When SSL or CN shared-data mode is active we must supply a complete fe.conf
+# because setting starrocksFESpec.config replaces the chart's default fe.conf
+# entirely.  The base config below is sourced from the starrocks Helm chart
+# defaults and must be reviewed whenever STARROCKS_CHART_VERSION is bumped.
 # Ref: starrocks/values.yaml starrocksFESpec.config in the operator Helm chart.
 #
-# NOTE: The keystore password appears in fe.conf (→ K8s ConfigMap). This is an inherent
-# limitation of StarRocks' SSL design; the password protects the keystore file itself,
-# not user credentials. Keep it scoped as a Pulumi config secret.
-if ssl_enabled and STARROCKS_CHART_VERSION != "1.11.4":
+# NOTE: The SSL keystore password appears in fe.conf (→ K8s ConfigMap). This is
+# an inherent limitation of StarRocks' SSL design; the password protects the
+# keystore file itself, not user credentials. Keep it scoped as a Pulumi secret.
+if (ssl_enabled or starrocks_config.get_bool("use_cn")) and (
+    STARROCKS_CHART_VERSION != "1.11.4"
+):
     msg = (
-        f"_SSL_FE_CONFIG_BASE was sourced from chart 1.11.4; review defaults for"
-        f" {STARROCKS_CHART_VERSION} before deploying with SSL enabled"
+        f"_FE_CONFIG_BASE was sourced from chart 1.11.4; review defaults for"
+        f" {STARROCKS_CHART_VERSION} before deploying with SSL or CN enabled"
     )
     raise ValueError(msg)
-_SSL_FE_CONFIG_BASE = (
+_FE_CONFIG_BASE = (
     "LOG_DIR = ${STARROCKS_HOME}/log\n"
     'DATE = "$(date +%Y%m%d-%H%M%S)"\n'
     'JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true -Xmx8192m -XX:+UseG1GC'
@@ -400,38 +453,71 @@ _SSL_FE_CONFIG_BASE = (
 )
 
 
-def _build_fe_ssl_config(pwd: str, force_str: str) -> str:
-    """Build the fe.conf string with SSL settings appended.
+def _build_fe_config(pwd: str | None, force_str: str, bucket_name: str | None) -> str:
+    """Assemble a complete fe.conf from optional SSL and shared-data sections.
 
-    Validates the keystore password to prevent fe.conf corruption: StarRocks'
-    config parser is line-oriented, so embedded newlines or leading/trailing
-    whitespace would break the generated config file and prevent FE startup.
+    Both sections are optional and can be combined.  When neither is active the
+    caller should not set starrocksFESpec.config at all (chart defaults apply).
+
+    SSL keystore password is validated here to prevent fe.conf corruption:
+    StarRocks' config parser is line-oriented, so embedded newlines or
+    leading/trailing whitespace would silently break the generated file and
+    prevent FE startup.
     """
-    if "\n" in pwd or "\r" in pwd:
-        msg = "starrocks:ssl_keystore_password must not contain newline characters"
-        raise ValueError(msg)
-    pwd = pwd.strip()
-    if not pwd:
-        msg = "starrocks:ssl_keystore_password must not be empty or whitespace-only"
-        raise ValueError(msg)
-    return (
-        _SSL_FE_CONFIG_BASE
-        + "ssl_keystore_location = /etc/starrocks/ssl/keystore.p12\n"
-        + f"ssl_keystore_password = {pwd}\n"
-        + f"ssl_key_password = {pwd}\n"
-        + f"ssl_force_secure_transport = {force_str}\n"
-    )
+    conf = _FE_CONFIG_BASE
+
+    if pwd is not None:
+        if "\n" in pwd or "\r" in pwd:
+            msg = "starrocks:ssl_keystore_password must not contain newline characters"
+            raise ValueError(msg)
+        pwd = pwd.strip()
+        if not pwd:
+            msg = "starrocks:ssl_keystore_password must not be empty or whitespace-only"
+            raise ValueError(msg)
+        conf += (
+            "ssl_keystore_location = /etc/starrocks/ssl/keystore.p12\n"
+            f"ssl_keystore_password = {pwd}\n"
+            f"ssl_key_password = {pwd}\n"
+            f"ssl_force_secure_transport = {force_str}\n"
+        )
+
+    if bucket_name is not None:
+        # Shared-data (CN) mode: FE manages all tablet storage in S3.
+        # aws_s3_use_instance_profile=true works for both EC2 instance profiles
+        # and EKS IRSA — StarRocks uses the AWS SDK default credential chain
+        # when this flag is set.
+        # enable_load_volume_from_conf defaults to false in StarRocks >= 3.4.1
+        # and must be set explicitly so FE bootstraps the built-in storage volume
+        # from these fe.conf settings on first startup.
+        conf += (
+            "run_mode = shared_data\n"
+            "cloud_native_meta_port = 6090\n"
+            "cloud_native_storage_type = S3\n"
+            f"aws_s3_path = {bucket_name}\n"
+            f"aws_s3_region = {aws_region}\n"
+            f"aws_s3_endpoint = https://s3.{aws_region}.amazonaws.com\n"
+            "aws_s3_use_instance_profile = true\n"
+            "enable_load_volume_from_conf = true\n"
+        )
+
+    return conf
 
 
-if ssl_enabled and ssl_keystore_password is not None:
+_needs_fe_config = ssl_enabled or starrocks_config.get_bool("use_cn")
+if _needs_fe_config:
     _force_str = "TRUE" if ssl_force_secure_transport else "FALSE"
     fe_spec = cast(dict[str, Any], starrocks_values["starrocksFESpec"])
-    fe_spec["secrets"] = [
-        {"name": starrocks_tls_secret_name, "mountPath": "/etc/starrocks/ssl"}
-    ]
-    fe_spec["config"] = ssl_keystore_password.apply(
-        lambda pwd: _build_fe_ssl_config(pwd, _force_str)
-    )
+
+    if ssl_enabled and ssl_keystore_password is not None:
+        fe_spec["secrets"] = [
+            {"name": starrocks_tls_secret_name, "mountPath": "/etc/starrocks/ssl"}
+        ]
+        fe_spec["config"] = ssl_keystore_password.apply(
+            lambda pwd: _build_fe_config(pwd, _force_str, shared_data_bucket_name)
+        )
+    else:
+        # CN-only path (no SSL): no Output dependencies, build synchronously.
+        fe_spec["config"] = _build_fe_config(None, _force_str, shared_data_bucket_name)
 
 starrocks_release = kubernetes.helm.v3.Release(
     f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-helm-release",
@@ -538,3 +624,9 @@ export(
 # Export the root password as a secret so the substructure/starrocks stack can
 # reference it via StackReference to prime the Vault database connection.
 export("root_password_secret", starrocks_config.require_secret("root_password"))
+
+if shared_data_bucket is not None:
+    export(
+        "shared_data_bucket_name",
+        shared_data_bucket.bucket_v2.bucket,
+    )
