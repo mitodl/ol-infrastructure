@@ -237,15 +237,13 @@ catalog_setup: command.local.Command | None = None
 if enable_data_lake:
     aws_region = starrocks_config.get("aws_region") or "us-east-1"
 
-    # CREATE IF NOT EXISTS is a no-op when the catalog already exists.
-    # ALTER CATALOG SET updates the mutable connection properties in-place,
-    # avoiding a drop/recreate that would interrupt running queries.
-    # NOTE: 'type' and 'iceberg.catalog.type' are structural; they can only be
-    # set at CREATE time and are intentionally excluded from the ALTER block.
-    # NOTE: ALTER CATALOG SET only updates the properties listed; it does NOT
-    # remove other properties that may have been set outside this code (e.g. a
-    # stale iam_role_arn from an earlier manual CREATE). If a property needs to
-    # be cleared, the catalog must be dropped and recreated manually.
+    # CREATE IF NOT EXISTS is idempotent: it is a no-op when the catalog
+    # already exists with any set of properties.  StarRocks has no ALTER CATALOG
+    # statement for updating properties in-place; the only way to change catalog
+    # properties after creation is to DROP and re-CREATE the catalog.  If
+    # properties need to change, manually run
+    #   DROP CATALOG IF EXISTS <name>;
+    # against the FE, then run `pulumi up` to recreate it via this command.
     #
     # Credential chain: use_instance_profile=false with no explicit key/role
     # instructs StarRocks to fall through to the AWS SDK default credential
@@ -266,9 +264,6 @@ if enable_data_lake:
         f"PROPERTIES(\n"
         f'    "type" = "iceberg",\n'
         f'    "iceberg.catalog.type" = "glue",\n'
-        f"{_catalog_conn_props}\n"
-        f");\n"
-        f"ALTER CATALOG {CATALOG_NAME} SET (\n"
         f"{_catalog_conn_props}\n"
         f");"
     )
