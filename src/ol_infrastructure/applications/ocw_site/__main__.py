@@ -82,7 +82,7 @@ audit_log_bucket_config = S3BucketConfig(
     bucket_name=audit_log_bucket_name,
     versioning_enabled=True,
     server_side_encryption_enabled=True,
-    sse_algorithm="aws:kms",
+    sse_algorithm="AES256",
     lifecycle_rules=[
         s3.BucketLifecycleConfigurationRuleArgs(
             id="transition-old-audit-logs",
