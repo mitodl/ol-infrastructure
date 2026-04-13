@@ -235,11 +235,16 @@ class OLApisixOIDCResources(ComponentResource):
             opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
         )
 
-        cookie_config = {}
+        session_cookie_config: dict[str, Any] = {}
         if oidc_config.oidc_session_cookie_domain:
-            cookie_config["session"] = {
-                "cookie": {"domain": oidc_config.oidc_session_cookie_domain}
-            }
+            session_cookie_config.setdefault("session", {}).setdefault("cookie", {})[
+                "domain"
+            ] = oidc_config.oidc_session_cookie_domain
+
+        if oidc_config.oidc_session_cookie_lifetime:
+            session_cookie_config.setdefault("session", {}).setdefault("cookie", {})[
+                "lifetime"
+            ] = oidc_config.oidc_session_cookie_lifetime
 
         self.base_oidc_config = {
             "scope": oidc_config.oidc_scope,
@@ -249,15 +254,8 @@ class OLApisixOIDCResources(ComponentResource):
             "renew_access_token_on_expiry": oidc_config.oidc_renew_access_token_on_expiry,
             "logout_path": oidc_config.oidc_logout_path,
             "post_logout_redirect_uri": oidc_config.oidc_post_logout_redirect_uri,
-            **cookie_config,
+            **session_cookie_config,
         }
-
-        if oidc_config.oidc_session_cookie_lifetime:
-            self.base_oidc_config["session_cookie_lifetime"] = {
-                "cookie": {
-                    "lifetime": 60 * oidc_config.oidc_session_cookie_lifetime,
-                },
-            }
 
         if oidc_config.oidc_session_contents:
             self.base_oidc_config["session_contents"] = (
