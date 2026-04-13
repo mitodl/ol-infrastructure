@@ -218,6 +218,11 @@ def mfe_job(  # noqa: C901, PLR0915
             f"{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx "
             f"{mfe_build_dir.name}/common-mfe-config.env.jsx"
         )
+        coordinator_source = (
+            "SidebarAIDrawerCoordinator.ulmo.jsx"
+            if open_edx.release_name == OpenEdxSupportedRelease.ulmo
+            else "SidebarAIDrawerCoordinator.jsx"
+        )
         copy_ai_drawer_components = [
             (
                 f"echo 'Copying AIDrawerManagerSidebar.jsx...' && "
@@ -226,9 +231,10 @@ def mfe_job(  # noqa: C901, PLR0915
                 f"{mfe_build_dir.name}/AIDrawerManagerSidebar.jsx"
             ),
             (
-                f"echo 'Copying SidebarAIDrawerCoordinator.jsx...' && "
+                f"echo 'Copying {coordinator_source} "
+                f"as SidebarAIDrawerCoordinator.jsx...' && "
                 f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
-                f"SidebarAIDrawerCoordinator.jsx "
+                f"{coordinator_source} "
                 f"{mfe_build_dir.name}/SidebarAIDrawerCoordinator.jsx"
             ),
         ]
