@@ -951,6 +951,19 @@ for purpose in ("draft", "live", "test"):
                 name="Strip cookies and authorization.",
                 type="recv",
             ),
+            *(
+                [
+                    fastly.ServiceVclSnippetArgs(
+                        content=snippets_dir.joinpath(
+                            "image_optimization.vcl"
+                        ).read_text(),
+                        name="Image Optimization",
+                        type="recv",
+                    )
+                ]
+                if fastly_image_optimization_enabled
+                else []
+            ),
         ],
         logging_https=[
             fastly.ServiceVclLoggingHttpArgs(
