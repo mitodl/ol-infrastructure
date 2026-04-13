@@ -10,6 +10,13 @@ path "secret-operations/sso/open_metadata/*" {
 path "secret-operations/sso/open_metadata" {
   capabilities = ["read"]
 }
+# Connector credentials for OpenMetadata ingestion pipelines
+path "secret-operations/open-metadata/connectors/*" {
+  capabilities = ["read"]
+}
+path "secret-operations/open-metadata/connectors" {
+  capabilities = ["read", "list"]
+}
 # vault-secrets-operator is a little more particular about
 # managing its own leases, give it the permissions it needs
 # for dynamic secret renwals / revocation without giving
