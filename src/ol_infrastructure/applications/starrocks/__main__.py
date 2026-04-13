@@ -347,7 +347,12 @@ starrocks_values: dict[str, Any] = {
                 "cpu": fe_config.get("cpu_request", "8000m"),
                 "memory": fe_config.get("memory_request", "16Gi"),
             },
-            "limits": {"memory": fe_config.get("memory_limit", "16Gi")},
+            "limits": {
+                "cpu": fe_config.get(
+                    "cpu_limit", fe_config.get("cpu_request", "8000m")
+                ),
+                "memory": fe_config.get("memory_limit", "16Gi"),
+            },
         },
         "storageSpec": {
             "name": f"{stack_info.env_prefix}-fe-storage",
@@ -380,7 +385,12 @@ if starrocks_config.get_bool("use_be"):
                 "cpu": be_config.get("cpu_request", "16000m"),
                 "memory": be_config.get("memory_request", "32Gi"),
             },
-            "limits": {"memory": be_config.get("memory_limit", "32Gi")},
+            "limits": {
+                "cpu": be_config.get(
+                    "cpu_limit", be_config.get("cpu_request", "16000m")
+                ),
+                "memory": be_config.get("memory_limit", "32Gi"),
+            },
         },
         "storageSpec": {
             "name": f"{stack_info.env_prefix}-be-storage",
@@ -416,7 +426,12 @@ if starrocks_config.get_bool("use_cn"):
                 "cpu": cn_config.get("cpu_request", "16000m"),
                 "memory": cn_config.get("memory_request", "32Gi"),
             },
-            "limits": {"memory": cn_config.get("memory_limit", "32Gi")},
+            "limits": {
+                "cpu": cn_config.get(
+                    "cpu_limit", cn_config.get("cpu_request", "16000m")
+                ),
+                "memory": cn_config.get("memory_limit", "32Gi"),
+            },
         },
         "autoScalingPolicy": {
             "minReplicas": cn_config.get("min_replicas", 1),
