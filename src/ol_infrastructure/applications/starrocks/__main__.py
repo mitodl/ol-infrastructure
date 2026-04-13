@@ -342,10 +342,12 @@ starrocks_values: dict[str, Any] = {
         },
         "resources": {
             "requests": {
-                "cpu": fe_config.get("cpu_request", "2000m"),
-                "memory": fe_config.get("memory_request", "8Gi"),
+                # StarRocks recommends 8 CPU cores and 16 GB RAM per FE node.
+                # Ref: https://docs.starrocks.io/docs/deployment/plan_cluster/
+                "cpu": fe_config.get("cpu_request", "8000m"),
+                "memory": fe_config.get("memory_request", "16Gi"),
             },
-            "limits": {"memory": fe_config.get("memory_limit", "8Gi")},
+            "limits": {"memory": fe_config.get("memory_limit", "16Gi")},
         },
         "storageSpec": {
             "name": f"{stack_info.env_prefix}-fe-storage",
@@ -372,10 +374,13 @@ if starrocks_config.get_bool("use_be"):
         "runAsNonRoot": True,
         "resources": {
             "requests": {
-                "cpu": be_config.get("cpu_request", "2000m"),
-                "memory": be_config.get("memory_request", "8Gi"),
+                # StarRocks recommends 16 CPU cores and 64 GB RAM per BE node.
+                # 32Gi is used as a practical minimum; increase for large datasets.
+                # Ref: https://docs.starrocks.io/docs/deployment/plan_cluster/
+                "cpu": be_config.get("cpu_request", "16000m"),
+                "memory": be_config.get("memory_request", "32Gi"),
             },
-            "limits": {"memory": be_config.get("memory_limit", "8Gi")},
+            "limits": {"memory": be_config.get("memory_limit", "32Gi")},
         },
         "storageSpec": {
             "name": f"{stack_info.env_prefix}-be-storage",
@@ -405,10 +410,13 @@ if starrocks_config.get_bool("use_cn"):
         "runAsNonRoot": True,
         "resources": {
             "requests": {
-                "cpu": cn_config.get("cpu_request", "2000m"),
-                "memory": cn_config.get("memory_request", "8Gi"),
+                # StarRocks recommends 16 CPU cores and 64 GB RAM per CN node.
+                # 32Gi is used as a practical minimum; increase for large datasets.
+                # Ref: https://docs.starrocks.io/docs/deployment/plan_cluster/
+                "cpu": cn_config.get("cpu_request", "16000m"),
+                "memory": cn_config.get("memory_request", "32Gi"),
             },
-            "limits": {"memory": cn_config.get("memory_limit", "8Gi")},
+            "limits": {"memory": cn_config.get("memory_limit", "32Gi")},
         },
         "autoScalingPolicy": {
             "minReplicas": cn_config.get("min_replicas", 1),
@@ -456,10 +464,18 @@ if (
         f" {STARROCKS_CHART_VERSION} before deploying with SSL or CN enabled"
     )
     raise ValueError(msg)
+# Set JVM heap to 87.5 % of the container memory limit to leave headroom for
+# off-heap allocations (metaspace, code cache, direct buffers, GC overhead).
+# Configurable via starrocks:fe_config:jvm_heap_mb so operators can tune it
+# when the container memory limit is changed in the stack YAML.
+_fe_memory_limit_gi = int(str(fe_config.get("memory_limit", "16Gi")).rstrip("Gi"))
+fe_jvm_heap_mb: int = fe_config.get(
+    "jvm_heap_mb", int(_fe_memory_limit_gi * 1024 * 0.875)
+)
 _FE_CONFIG_BASE = (
     "LOG_DIR = ${STARROCKS_HOME}/log\n"
     'DATE = "$(date +%Y%m%d-%H%M%S)"\n'
-    'JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true -Xmx8192m -XX:+UseG1GC'
+    f'JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true -Xmx{fe_jvm_heap_mb}m -XX:+UseG1GC'
     ' -Xlog:gc*:${LOG_DIR}/fe.gc.log.$DATE:time"\n'
     "http_port = 8030\n"
     "rpc_port = 9020\n"
