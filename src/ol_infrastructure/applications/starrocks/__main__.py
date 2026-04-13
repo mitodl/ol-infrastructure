@@ -472,6 +472,15 @@ _fe_memory_limit_gi = int(str(fe_config.get("memory_limit", "16Gi")).rstrip("Gi"
 fe_jvm_heap_mb: int = fe_config.get(
     "jvm_heap_mb", int(_fe_memory_limit_gi * 1024 * 0.875)
 )
+# new_planner_optimize_timeout is the per-query optimizer time budget (ms).
+# StarRocks default is 3000 ms, which is often too short when the FE must
+# fetch Iceberg/Hive partition metadata from AWS Glue before it can finish
+# planning.  30 s is a reasonable ceiling for data-lake workloads; lower it
+# if you want fail-fast behaviour for purely local queries.
+# Configurable via starrocks:fe_config:planner_optimize_timeout_ms.
+fe_planner_optimize_timeout_ms: int = fe_config.get(
+    "planner_optimize_timeout_ms", 30000
+)
 _FE_CONFIG_BASE = (
     "LOG_DIR = ${STARROCKS_HOME}/log\n"
     'DATE = "$(date +%Y%m%d-%H%M%S)"\n'
@@ -484,6 +493,7 @@ _FE_CONFIG_BASE = (
     "mysql_service_nio_enabled = true\n"
     "sys_log_level = INFO\n"
     "min_graceful_exit_time_second = 25\n"
+    f"new_planner_optimize_timeout = {fe_planner_optimize_timeout_ms}\n"
 )
 
 

@@ -16,6 +16,9 @@ config:
     memory_limit: 16Gi
     # 87.5% of 16Gi container limit; leaves ~2Gi headroom for JVM off-heap memory.
     jvm_heap_mb: 14336
+    # Raise optimizer timeout to tolerate slow AWS Glue metadata responses.
+    # StarRocks default is 3000 ms.
+    planner_optimize_timeout_ms: 30000
     storage: 100Gi
     log_storage: 100Gi
   starrocks:use_be: "false"
