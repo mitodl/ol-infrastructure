@@ -19,7 +19,7 @@ spec:
     spec:
       initContainers:
       - name: bootstrap
-        image: learnai-app
+        image: mitodl/learn-ai-app:latest
         imagePullPolicy: IfNotPresent
         command:
         - /bin/sh
@@ -40,7 +40,7 @@ spec:
           mountPath: /src/staticfiles
       containers:
       - name: app
-        image: learnai-app
+        image: mitodl/learn-ai-app:latest
         imagePullPolicy: IfNotPresent
         command:
         - granian
@@ -124,7 +124,7 @@ spec:
     spec:
       containers:
       - name: celery
-        image: learnai-app
+        image: mitodl/learn-ai-app:latest
         imagePullPolicy: IfNotPresent
         command:
         - celery
@@ -175,7 +175,7 @@ spec:
     spec:
       containers:
       - name: celery
-        image: learnai-app
+        image: mitodl/learn-ai-app:latest
         imagePullPolicy: IfNotPresent
         command:
         - celery
@@ -226,7 +226,7 @@ spec:
     spec:
       containers:
       - name: celery-beat
-        image: learnai-app
+        image: mitodl/learn-ai-app:latest
         imagePullPolicy: IfNotPresent
         command:
         - celery

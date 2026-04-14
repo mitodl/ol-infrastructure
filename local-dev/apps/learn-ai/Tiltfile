@@ -4,7 +4,7 @@
 load('ext://restart_process', 'docker_build_with_restart')
 
 APP_DIR = os.path.abspath('../../../learn-ai')
-IMAGE = 'learnai-app'
+IMAGE = 'mitodl/learn-ai-app'
 NAMESPACE = 'learn-ai'
 DEPLOY_NAME = 'learnai-webapp'
 

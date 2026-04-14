@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
       - name: nextjs
-        image: mitlearn-nextjs-app
+        image: mitodl/mit-learn-nextjs-app:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3000

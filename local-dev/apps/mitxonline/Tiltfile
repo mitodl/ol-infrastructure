@@ -2,7 +2,7 @@
 # Builds the mitxonline Django app (uwsgi) and deploys it to the mitxonline namespace.
 
 APP_DIR = os.path.abspath('../../../mitxonline')
-IMAGE = 'mitxonline-app'
+IMAGE = 'mitodl/mitxonline-app'
 NAMESPACE = 'mitxonline'
 DEPLOY_NAME = 'mitxonline-webapp'
 

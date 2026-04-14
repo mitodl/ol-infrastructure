@@ -33,9 +33,6 @@ docker_build(
         # Touch reload sentinel — granian watches for this.
         run("touch /tmp/tilt-reload"),
     ],
-    tag="local",
-    # Use the local k3d registry so k8s can pull without an external registry.
-    extra_tag="localhost:5000/mitodl/mit-learn-app:local",
 )
 
 # ─────────────────────────────────────────────────────────────

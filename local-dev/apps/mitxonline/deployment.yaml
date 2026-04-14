@@ -20,7 +20,7 @@ spec:
     spec:
       initContainers:
       - name: bootstrap
-        image: mitxonline-app
+        image: mitodl/mitxonline-app:latest
         imagePullPolicy: IfNotPresent
         command:
         - /bin/sh
@@ -40,7 +40,7 @@ spec:
           mountPath: /src/staticfiles
       containers:
       - name: app
-        image: mitxonline-app
+        image: mitodl/mitxonline-app:latest
         imagePullPolicy: IfNotPresent
         command:
         - uwsgi
@@ -125,7 +125,7 @@ spec:
     spec:
       containers:
       - name: celery
-        image: mitxonline-app
+        image: mitodl/mitxonline-app:latest
         imagePullPolicy: IfNotPresent
         command:
         - celery
@@ -176,7 +176,7 @@ spec:
     spec:
       containers:
       - name: celery-beat
-        image: mitxonline-app
+        image: mitodl/mitxonline-app:latest
         imagePullPolicy: IfNotPresent
         command:
         - celery

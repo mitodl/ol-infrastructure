@@ -18,7 +18,7 @@ spec:
     spec:
       initContainers:
       - name: bootstrap
-        image: odlvideo-app
+        image: mitodl/odl-video-service-app:latest
         imagePullPolicy: IfNotPresent
         command:
         - /bin/sh
@@ -36,7 +36,7 @@ spec:
           mountPath: /src/staticfiles
       containers:
       - name: app
-        image: odlvideo-app
+        image: mitodl/odl-video-service-app:latest
         imagePullPolicy: IfNotPresent
         command:
         - uwsgi
@@ -120,7 +120,7 @@ spec:
     spec:
       containers:
       - name: celery
-        image: odlvideo-app
+        image: mitodl/odl-video-service-app:latest
         imagePullPolicy: IfNotPresent
         command:
         - celery
@@ -169,7 +169,7 @@ spec:
     spec:
       containers:
       - name: celery-beat
-        image: odlvideo-app
+        image: mitodl/odl-video-service-app:latest
         imagePullPolicy: IfNotPresent
         command:
         - celery

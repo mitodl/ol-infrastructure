@@ -1,7 +1,7 @@
 # odl-video-service Tiltfile
 
 APP_DIR = os.path.abspath('../../../odl-video-service')
-IMAGE = 'odlvideo-app'
+IMAGE = 'mitodl/odl-video-service-app'
 NAMESPACE = 'odl-video-service'
 DEPLOY_NAME = 'odlvideo-webapp'
 
