@@ -1,0 +1,564 @@
+# MIT Learn Local Development Environment
+
+A fully local, Kubernetes-based development environment for the MIT Learn application stack, running in [k3d](https://k3d.io) with [Tilt](https://tilt.dev) for live development and Pulumi for shared infrastructure.
+
+---
+
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Prerequisites](#prerequisites)
+3. [Quick Start](#quick-start)
+4. [Architecture](#architecture)
+5. [Directory Structure](#directory-structure)
+6. [How It Works](#how-it-works)
+7. [Working with Apps](#working-with-apps)
+8. [Seeding Data](#seeding-data)
+9. [Configuration Reference](#configuration-reference)
+10. [Adding a New App](#adding-a-new-app)
+11. [Modifying Shared Infrastructure](#modifying-shared-infrastructure)
+12. [Teardown](#teardown)
+13. [Troubleshooting](#troubleshooting)
+
+---
+
+## Overview
+
+This environment runs four applications as Kubernetes workloads inside a local k3d cluster:
+
+| App | Local URL | Description |
+|-----|-----------|-------------|
+| mit-learn (frontend) | `https://learn.mit.dev` | Next.js frontend |
+| mit-learn (backend) | `https://api.learn.mit.dev` | Django/granian API |
+| learn-ai | `https://ai.learn.mit.dev` | Django AI proxy service |
+| mitxonline | `https://mitxonline.mit.dev` | MITx Online LMS (Django/uwsgi) |
+| odl-video-service | `https://video.odl.mit.dev` | ODL Video Service (Django/uwsgi) |
+| Keycloak SSO | `https://sso.ol.mit.dev` | Identity provider (olapps realm) |
+
+All hostnames use a `.dev` TLD that mirrors production (`.edu` → `.dev`), so URLs, CSRF cookies, and OIDC redirect URIs behave identically to deployed environments.
+
+**Design goals:**
+- `setup.sh` does the minimum necessary outside the cluster (k3d, certs, /etc/hosts). Everything else is in-cluster.
+- Pulumi owns all in-cluster shared resources. Tilt owns app deployments.
+- Live source sync for Django apps (no container rebuild needed for Python changes).
+- Pre-built image fallback when a source repo is not checked out.
+
+---
+
+## Prerequisites
+
+Install these tools before running setup:
+
+| Tool | Version | Install |
+|------|---------|---------|
+| Docker Desktop | ≥ 4.x (8 GB RAM allocated) | https://docs.docker.com/desktop/ |
+| kubectl | ≥ 1.28 | `brew install kubectl` |
+| k3d | ≥ 5.7 | `brew install k3d` |
+| Tilt | ≥ 0.33 | https://docs.tilt.dev/install.html |
+| Helm | ≥ 3.14 | `brew install helm` |
+| mkcert | ≥ 1.4 | `brew install mkcert` |
+| Pulumi CLI | ≥ 3.x | `brew install pulumi` |
+
+> **Docker memory:** The cluster runs PostgreSQL, Redis, APISIX, Keycloak, Qdrant, and up to four Django apps. Allocate at least 8 GB to Docker Desktop (Settings → Resources).
+
+---
+
+## Quick Start
+
+### 1. One-time bootstrap
+
+From the `ol-infrastructure` repo root:
+
+```bash
+./local-dev/scripts/setup.sh
+```
+
+This will:
+1. Check all prerequisites
+2. Create the `mit-learn-dev` k3d cluster with a local image registry on port 5000
+3. Generate a wildcard TLS certificate with `mkcert` (trusted by your OS)
+4. Add all `.dev` hostnames to `/etc/hosts` (requires `sudo`)
+
+### 2. Configure Tilt
+
+```bash
+cp tilt_config.json.example tilt_config.json
+# Edit tilt_config.json — see Configuration Reference below
+```
+
+At minimum, review `enabled_apps` to enable only the services you need.
+
+### 3. Install Python dependencies for the Pulumi infra stack
+
+```bash
+cd local-dev/infra
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt   # or: pulumi install
+cd ../..
+```
+
+### 4. Start the environment
+
+```bash
+tilt up
+```
+
+Tilt will:
+1. Run `pulumi up` to deploy shared infrastructure (Postgres, Redis, APISIX, Keycloak, etc.)
+2. Build Docker images for any checked-out app repos
+3. Apply all app manifests (Deployments, Services, ConfigMaps, APISIX routes)
+4. Watch for source changes and sync them live
+
+Open the Tilt UI at `http://localhost:10350` to monitor deployments and trigger seeds.
+
+---
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  k3d cluster: mit-learn-dev                                   │
+│                                                               │
+│  ┌──────────┐  ┌──────────────────────────────────────────┐  │
+│  │operations│  │           local-infra                    │  │
+│  │          │  │  PostgreSQL (CNPG)  Redis  Qdrant         │  │
+│  │  APISIX  │  │  Keycloak  LiteLLM  Mailpit              │  │
+│  └────┬─────┘  └──────────────────────────────────────────┘  │
+│       │                                                       │
+│       │  routes traffic by hostname                          │
+│       ├──────────────────────────────────────────────────┐   │
+│       │                                                  │   │
+│  ┌────▼──────┐  ┌───────────┐  ┌──────────┐  ┌────────┐ │   │
+│  │ mit-learn │  │ learn-ai  │  │mitxonline│  │  odl-  │ │   │
+│  │  (ns)     │  │   (ns)    │  │   (ns)   │  │ video  │ │   │
+│  │ Next.js   │  │ granian   │  │  uwsgi   │  │  uwsgi │ │   │
+│  │ Django    │  │ Celery×2  │  │  Celery  │  │ Celery │ │   │
+│  │ Celery×3  │  │           │  │          │  │        │ │   │
+│  └───────────┘  └───────────┘  └──────────┘  └────────┘ │   │
+└──────────────────────────────────────────────────────────────┘
+         ▲
+         │  HTTPS (mkcert TLS, trusted by OS)
+    Developer browser / curl
+```
+
+### Key design decisions
+
+**Ownership boundary:** `setup.sh` owns only the k3d cluster, TLS certificates, and `/etc/hosts`. _All_ in-cluster resources are owned by either Pulumi (shared infra) or Tilt (app manifests). This prevents drift and conflicts.
+
+**APISIX as ingress:** Traefik is disabled in k3d. APISIX handles all ingress, TLS termination, and OIDC authentication (via the `openid-connect` plugin). Each app's `apisix-routes.yaml` declares its `ApisixRoute` and `ApisixTls` CRDs.
+
+**Shared database cluster:** All apps share one CloudNativePG (CNPG) cluster in the `local-infra` namespace with isolated databases (`mitlearn`, `learnai`, `mitxonline`, `odlvideo`, `keycloak`, `litellm`). This keeps memory usage low. The `per_app_databases` toggle (Phase 6A, not yet implemented) will allow fully isolated CNPG clusters per namespace.
+
+**TLS:** mkcert generates a wildcard certificate for all `.dev` domains. The cert is read by Pulumi at stack evaluation time and stored as `local-dev-tls` Kubernetes Secrets in every app namespace. APISIX's `ApisixTls` CRs reference these secrets.
+
+**Keycloak realm:** The `olapps` realm mirrors production, including the fake-Touchstone SAML IdP, all OIDC clients, and organizations support. Test users: `admin@odl.local`, `student@odl.local`, `prof@odl.local` (password: `localdev123`).
+
+---
+
+## Directory Structure
+
+```
+ol-infrastructure/
+├── Tiltfile                          # Root entry point; wires all app Tiltfiles
+├── tilt_config.json.example          # Developer config template (copy → tilt_config.json)
+│
+└── local-dev/
+    ├── cluster/
+    │   └── k3d-config.yaml           # k3d cluster definition (ports, registry, no Traefik)
+    │
+    ├── scripts/
+    │   ├── setup.sh                  # One-time bootstrap (cluster, certs, /etc/hosts)
+    │   ├── teardown.sh               # Cluster teardown
+    │   └── seed.sh                   # CLI seeding wrapper (kubectl exec into pods)
+    │
+    ├── certs/                        # mkcert output (gitignored)
+    │   ├── local-dev.pem
+    │   ├── local-dev-key.pem
+    │   └── rootCA.pem
+    │
+    ├── infra/                        # Pulumi stack — shared in-cluster infrastructure
+    │   ├── Pulumi.yaml
+    │   ├── Pulumi.local-dev.infra.Dev.yaml   # Stack config (domains, secrets, chart versions)
+    │   ├── __main__.py               # All shared resources: CNPG, Redis, APISIX, Keycloak operator
+    │   ├── local_dev_keycloak.py     # Keycloak olapps realm (mirrors production olapps.py)
+    │   └── requirements.txt
+    │
+    └── apps/
+        ├── mit-learn/                # Django backend manifests
+        │   ├── Tiltfile
+        │   ├── deployment.yaml       # Web + 3 Celery workers + Beat
+        │   ├── secrets.yaml
+        │   ├── apisix-routes.yaml    # Routes for api.learn.mit.dev
+        │   └── configmaps/
+        │       ├── app-env.yaml      # Non-secret env vars
+        │       └── nginx.yaml        # nginx sidecar config
+        │
+        ├── mit-learn-nextjs/         # Next.js frontend manifests
+        │   ├── Tiltfile              # docker_build with NEXT_PUBLIC_* build args
+        │   ├── deployment.yaml
+        │   └── apisix-routes.yaml    # Route for learn.mit.dev
+        │
+        ├── learn-ai/                 # Django AI proxy manifests
+        │   ├── Tiltfile
+        │   ├── deployment.yaml       # Web + 2 Celery workers + Beat
+        │   ├── secrets.yaml
+        │   ├── apisix-routes.yaml    # Route for ai.learn.mit.dev
+        │   └── configmaps/
+        │
+        ├── mitxonline/               # MITx Online LMS manifests
+        │   ├── Tiltfile
+        │   ├── deployment.yaml       # Web + Celery + Beat
+        │   ├── secrets.yaml
+        │   ├── apisix-routes.yaml    # Route for mitxonline.mit.dev
+        │   └── configmaps/
+        │
+        └── odl-video-service/        # ODL Video Service manifests
+            ├── Tiltfile
+            ├── deployment.yaml       # Web + Celery + Beat
+            ├── secrets.yaml
+            ├── apisix-routes.yaml    # Route for video.odl.mit.dev
+            └── configmaps/
+```
+
+---
+
+## How It Works
+
+### Startup sequence
+
+```
+tilt up
+  │
+  ├── pulumi up (local-dev/infra/)
+  │     Deploys: CNPG operator → PostgreSQL cluster → Redis → cert-manager
+  │              → Qdrant → LiteLLM → Mailpit → APISIX
+  │              → Keycloak operator → Keycloak instance → olapps realm
+  │
+  └── for each enabled app:
+        ├── docker build (if source repo present, else pull prebuilt image)
+        ├── kubectl apply configmaps/ secrets.yaml deployment.yaml
+        │     initContainer: migrate + collectstatic + data-specific seeds
+        └── kubectl apply apisix-routes.yaml
+              APISIX picks up new routes → app reachable at its .dev URL
+```
+
+### Live updates (Django apps)
+
+When a `.py` file changes in a checked-out app repo, Tilt syncs it directly into the running container without a rebuild. The granian/uwsgi process sees the change and reloads. This is typically sub-second.
+
+When `requirements.txt` changes, Tilt runs `pip install -r requirements.txt` inside the container and then restarts the process.
+
+### Pre-built image fallback
+
+If an app repo is not cloned on your machine, Tilt uses the pre-built ECR image at the tag listed in `tilt_config.json` under `prebuilt_tags`. You can work on mit-learn without having learn-ai checked out.
+
+### Next.js rebuilds
+
+The Next.js frontend requires a **full Docker build** when source changes (because `NEXT_PUBLIC_*` env vars are baked in at compile time). Tilt will rebuild the image automatically but this is slow (~2–3 minutes). For active frontend development, consider running `yarn dev` locally against `https://api.learn.mit.dev`.
+
+---
+
+## Working with Apps
+
+### Enable/disable apps
+
+Edit `tilt_config.json`:
+
+```json
+{
+  "enabled_apps": ["mit-learn", "learn-ai"]
+}
+```
+
+Only the listed apps will be deployed. Shared infrastructure always runs.
+
+### Access logs
+
+```bash
+# Web pod
+kubectl logs -n mit-learn deploy/mitlearn-webapp -c app -f
+
+# Celery worker
+kubectl logs -n mit-learn deploy/mitlearn-worker-default -f
+
+# APISIX ingress
+kubectl logs -n operations deploy/apisix -f
+```
+
+### Run management commands
+
+```bash
+kubectl exec -n mit-learn deploy/mitlearn-webapp -- python manage.py shell
+kubectl exec -n learn-ai deploy/learnai-webapp -- python manage.py dbshell
+```
+
+### Connect to PostgreSQL directly
+
+```bash
+kubectl exec -n local-infra local-pg-1 -- psql -U app -d mitlearn
+```
+
+### Inspect emails (Mailpit)
+
+All outbound email is captured by Mailpit. Access the web UI:
+
+```bash
+kubectl port-forward -n local-infra svc/mailpit 8025:8025
+open http://localhost:8025
+```
+
+---
+
+## Seeding Data
+
+Bootstrap seeds (migrations, `collectstatic`, fixture loads) run automatically in the `initContainer` on first deploy. Additional enrichment seeds are available as **manual Tilt resources** — they never run automatically.
+
+### From the Tilt UI
+
+In the Tilt UI at `http://localhost:10350`, find resources labeled `seed` and click the play button.
+
+### From the command line
+
+```bash
+# Trigger a specific seed
+tilt trigger seed-mit-learn-fixtures
+
+# Or use seed.sh directly
+./local-dev/scripts/seed.sh --app mit-learn
+./local-dev/scripts/seed.sh --app mit-learn --cmd "backpopulate_ocw_data"
+./local-dev/scripts/seed.sh --list
+```
+
+### Available seeds per app
+
+| App | Seed label | What it does |
+|-----|-----------|--------------|
+| mit-learn | `seed-mit-learn-fixtures` | Load platforms, schools, departments, offered_by |
+| mit-learn | `seed-mit-learn-qdrant` | Create Qdrant vector collections |
+| mit-learn | `seed-mit-learn-opensearch` | Recreate OpenSearch index |
+| mit-learn | `seed-mit-learn-ocw` | Backpopulate OCW learning resources |
+| mit-learn | `seed-mit-learn-mitxonline` | Backpopulate MITx Online resources |
+| learn-ai | `seed-learn-ai-checkpoints` | Backpopulate tutor checkpoints |
+| mitxonline | `seed-mitxonline-instance` | Full instance setup (superuser, courses, products) |
+| mitxonline | `seed-mitxonline-course-data` | Populate test course data |
+| mitxonline | `seed-mitxonline-income-thresholds` | Load country income thresholds |
+| odl-video-service | `seed-ovs-presets` | Create encoding presets (requires real AWS creds) |
+
+---
+
+## Configuration Reference
+
+`tilt_config.json` (copy from `tilt_config.json.example`):
+
+```json
+{
+  "enabled_apps": ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"],
+
+  "per_app_databases": false,
+
+  "prebuilt_tags": {
+    "mit-learn": "0.62.0",
+    "mit-learn-nextjs": "0.62.0",
+    "learn-ai": "0.28.3",
+    "mitxonline": "1.144.5",
+    "odl-video-service": "0.85.0"
+  }
+}
+```
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `enabled_apps` | all four | Apps to deploy. Omit any to skip it entirely. |
+| `per_app_databases` | `false` | `true` deploys isolated CNPG + Redis per namespace (Phase 6A). |
+| `prebuilt_tags` | see file | Image tags used when the app repo is not checked out locally. |
+
+### Pulumi stack config
+
+`local-dev/infra/Pulumi.local-dev.infra.Dev.yaml` controls shared infra settings:
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `keycloak_hostname` | `sso.ol.mit.dev` | Keycloak ingress hostname |
+| `tls_cert_path` | `local-dev/certs/local-dev.pem` | mkcert cert (relative to repo root) |
+| `*_client_secret` | `local-dev-*-secret` | OIDC client secrets (change these if needed) |
+| `apisix_version` | `2.12.0` | APISIX Helm chart version |
+| `cnpg_version` | `0.23.0` | CloudNativePG operator Helm chart version |
+| `keycloak_operator_version` | `26.0.7` | Official Keycloak Operator version |
+
+---
+
+## Adding a New App
+
+### 1. Create the app manifests directory
+
+```
+local-dev/apps/<app-name>/
+├── Tiltfile
+├── deployment.yaml       # Deployment(s) + Service
+├── secrets.yaml          # Placeholder k8s Secrets
+├── apisix-routes.yaml    # ApisixTls + ApisixRoute
+└── configmaps/
+    ├── app-env.yaml      # Non-secret env vars
+    └── nginx.yaml        # (if using nginx sidecar)
+```
+
+Use an existing app (e.g., `learn-ai/`) as a template.
+
+### 2. Add the app database to the CNPG cluster
+
+In `local-dev/infra/__main__.py`, add to `postInitSQL`:
+
+```python
+"CREATE DATABASE myapp OWNER app;",
+```
+
+### 3. Copy the TLS secret to the new namespace
+
+In `__main__.py`, add:
+
+```python
+tls_secret_myapp = _tls_secret(
+    "local-dev-tls-myapp", "my-app", _app_namespaces["my-app"]
+)
+```
+
+And add `"my-app"` to the namespace loop near the top of `__main__.py`.
+
+### 4. Add the Keycloak OIDC client (if needed)
+
+In `local_dev_keycloak.py`, add a new client and call `_make_oidc_secret()` to create the OIDC credentials Secret in the app namespace.
+
+### 5. Register in the root Tiltfile
+
+In `Tiltfile`, add an entry to the `APPS` list:
+
+```python
+{
+    "name": "my-app",
+    "dir": "my-app",              # sibling repo directory name
+    "namespace": "my-app",
+    "deploy_name": "myapp-webapp",
+    "image_backend": "mitodl/my-app",
+    "prebuilt_tag_backend": "1.0.0",
+    "tiltfile": "./local-dev/apps/my-app/Tiltfile",
+    "seed_commands": [
+        {
+            "label": "seed-myapp-data",
+            "description": "Load initial data",
+            "cmd": "python manage.py loaddata initial_data",
+        },
+    ],
+},
+```
+
+### 6. Add hosts and DNS
+
+In `setup.sh`, add the hostname to `HOSTS` and ensure it's covered by a `MKCERT_DOMAINS` wildcard. Re-run `setup.sh` to update `/etc/hosts` and regenerate the cert.
+
+---
+
+## Modifying Shared Infrastructure
+
+Shared infrastructure is managed by the Pulumi stack in `local-dev/infra/`. Changes here affect all apps.
+
+```bash
+cd local-dev/infra
+pulumi preview   # See what would change
+pulumi up        # Apply changes
+```
+
+Tilt also runs `pulumi up` automatically when infra files change. You can also trigger it manually from the Tilt UI (`local-infra` resource).
+
+### Common modifications
+
+**Change a Helm chart version:** Edit the version in `Pulumi.local-dev.infra.Dev.yaml` and run `pulumi up`.
+
+**Add a new shared service:** Add it to `__main__.py`. Use the existing Qdrant or Redis blocks as a reference.
+
+**Modify the Keycloak realm:** Edit `local_dev_keycloak.py`. On `pulumi up`, pulumi-keycloak will diff the realm state and apply only what changed. Test users, clients, and IdP config are all managed here.
+
+---
+
+## Teardown
+
+```bash
+# Remove the cluster (keeps certs and /etc/hosts)
+./local-dev/scripts/teardown.sh
+
+# Remove everything including certs
+./local-dev/scripts/teardown.sh --remove-certs
+
+# Remove everything including /etc/hosts entries
+./local-dev/scripts/teardown.sh --remove-certs --remove-hosts
+```
+
+> Pulumi state is stored in `local-dev/infra/.pulumi/` (file backend, gitignored). Deleting the cluster without running `pulumi destroy` first will leave orphaned Pulumi state. Run `pulumi destroy` before `teardown.sh` if you want a clean slate.
+
+---
+
+## Troubleshooting
+
+### `tilt up` fails on `local-infra` (Pulumi errors)
+
+```bash
+cd local-dev/infra
+pulumi up --logtostderr -v=3   # Verbose output
+```
+
+Common causes:
+- **kubeconfig not set:** Ensure `k3d kubeconfig merge mit-learn-dev --kubeconfig-merge-default` has been run, or set `ol-local-dev-infra:kubeconfig` in `Pulumi.local-dev.infra.Dev.yaml`.
+- **Cert files missing:** Run `setup.sh --skip-hosts` to regenerate certs without touching `/etc/hosts`.
+
+### App pod stuck in `Init:CrashLoopBackOff`
+
+The initContainer runs migrations; check its logs:
+
+```bash
+kubectl logs -n <namespace> <pod-name> -c bootstrap
+```
+
+Common causes:
+- Database not ready yet (CNPG takes ~30s on first run — Tilt will retry automatically).
+- Missing required env var — check the configmap and secrets against the app's `settings.py`.
+
+### APISIX returns 404 for a hostname
+
+```bash
+# Check that ApisixRoute was picked up
+kubectl get apisixroute -n <namespace>
+
+# Check APISIX ingress controller logs
+kubectl logs -n operations deploy/apisix-ingress-controller -f
+```
+
+The ingress controller watches for `ApisixRoute` CRDs and syncs them to the APISIX data plane. A restart of the ingress controller pod often resolves sync issues.
+
+### Keycloak login loop / OIDC errors
+
+Keycloak takes 60–90 seconds to start on first boot (database schema migration). Check its readiness:
+
+```bash
+kubectl get pod -n local-infra -l app=keycloak
+kubectl logs -n local-infra -l app=keycloak -f
+```
+
+Also verify the `olapps` realm was provisioned by Pulumi:
+
+```bash
+cd local-dev/infra && pulumi stack output
+```
+
+### TLS certificate not trusted
+
+```bash
+mkcert -install   # Install the mkcert root CA into your OS trust store
+```
+
+Then restart your browser. The cert was generated with the correct wildcard SANs but the root CA must be in your OS trust store.
+
+### Docker image build fails (Next.js)
+
+The Next.js build needs ~4 GB of memory. If it OOMs:
+- Increase Docker Desktop memory to 10+ GB
+- Or use a prebuilt image by removing `mit-learn` from `enabled_apps` in `tilt_config.json` and letting Tilt use the `prebuilt_tags` value instead
