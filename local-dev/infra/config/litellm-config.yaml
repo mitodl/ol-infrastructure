@@ -2,14 +2,14 @@ model_list:
   - model_name: gpt-4o-mini
     litellm_params:
       model: openai/gpt-4o-mini
-      api_key: os.environ/OPENAI_API_KEY
+      api_key: os.environ/OPENAI_API_KEY  # pragma: allowlist secret
   - model_name: gpt-4o
     litellm_params:
       model: openai/gpt-4o
-      api_key: os.environ/OPENAI_API_KEY
+      api_key: os.environ/OPENAI_API_KEY  # pragma: allowlist secret
   - model_name: text-embedding-ada-002
     litellm_params:
       model: openai/text-embedding-ada-002
-      api_key: os.environ/OPENAI_API_KEY
+      api_key: os.environ/OPENAI_API_KEY  # pragma: allowlist secret
 general_settings:
   database_url: postgresql://app:localdev@local-pg-rw.local-infra.svc.cluster.local/litellm  # pragma: allowlist secret
