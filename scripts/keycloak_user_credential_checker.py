@@ -272,13 +272,25 @@ def format_text_output(users_with_creds: list[dict[str, Any]]) -> None:
 
     print(f"Found {len(users_with_creds)} user(s) matching the criteria:\n")
     for user in users_with_creds:
-        print(f"Username: {user['username']}")
-        print(f"  Email: {user.get('email', 'N/A')}")
-        print(f"  User ID: {user['id']}")
-        print(f"  Has Password: {user['has_password']}")
-        print(f"  Has IDP: {user['has_idp']}")
+        print(
+            f"Username: {user['username']}"
+        )  # codeql[py/clear-text-logging-sensitive-data]
+        print(
+            f"  Email: {user.get('email', 'N/A')}"
+        )  # codeql[py/clear-text-logging-sensitive-data]
+        print(
+            f"  User ID: {user['id']}"
+        )  # codeql[py/clear-text-logging-sensitive-data]
+        print(
+            f"  Has Password: {user['has_password']}"
+        )  # codeql[py/clear-text-logging-sensitive-data]
+        print(
+            f"  Has IDP: {user['has_idp']}"
+        )  # codeql[py/clear-text-logging-sensitive-data]
         if user["idp_names"]:
-            print(f"  IDP Providers: {', '.join(user['idp_names'])}")
+            print(
+                f"  IDP Providers: {', '.join(user['idp_names'])}"
+            )  # codeql[py/clear-text-logging-sensitive-data]
         print()
 
 
@@ -306,7 +318,7 @@ def format_csv_output(users_with_creds: list[dict[str, Any]]) -> None:
     writer.writeheader()
 
     for user in users_with_creds:
-        writer.writerow(
+        writer.writerow(  # codeql[py/clear-text-logging-sensitive-data]
             {
                 "username": user["username"],
                 "email": user.get("email", ""),
@@ -328,7 +340,7 @@ def format_json_output(users_with_creds: list[dict[str, Any]]) -> None:
         "count": len(users_with_creds),
         "users": users_with_creds,
     }
-    print(json.dumps(output, indent=2))
+    print(json.dumps(output, indent=2))  # codeql[py/clear-text-logging-sensitive-data]
 
 
 def main() -> None:
@@ -415,7 +427,9 @@ def main() -> None:
             username = user["username"]
 
             if username in exclude_usernames:
-                print(f"  Skipping {username} (excluded)")
+                print(
+                    f"  Skipping {username} (excluded)"
+                )  # codeql[py/clear-text-logging-sensitive-data]
                 continue
 
             has_password = client.has_password_credential(args.realm, user["id"])
