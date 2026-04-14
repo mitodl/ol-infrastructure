@@ -126,6 +126,10 @@ spec:
           initialDelaySeconds: 30
           periodSeconds: 30
           failureThreshold: 3
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
 
         # nginx reverse proxy (serves static files, proxies to granian)
       - name: nginx
@@ -152,6 +156,9 @@ spec:
           name: mitlearn-nginx-conf
       - name: static-files
         emptyDir: {}
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
 
 ---
 # ─────────────────────────────────────────────────────────────
@@ -202,6 +209,14 @@ spec:
             memory: 512Mi
           limits:
             memory: 1Gi
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
 ---
 # ─────────────────────────────────────────────────────────────
 # Celery Worker — edx_content queue
@@ -251,6 +266,14 @@ spec:
             memory: 512Mi
           limits:
             memory: 1Gi
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
 ---
 # ─────────────────────────────────────────────────────────────
 # Celery Worker — embeddings queue
@@ -300,6 +323,14 @@ spec:
             memory: 512Mi
           limits:
             memory: 1Gi
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
 ---
 # ─────────────────────────────────────────────────────────────
 # Celery Beat (scheduler)
@@ -346,6 +377,14 @@ spec:
             memory: 256Mi
           limits:
             memory: 512Mi
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
 ---
 # ─────────────────────────────────────────────────────────────
 # Service (ClusterIP) — web

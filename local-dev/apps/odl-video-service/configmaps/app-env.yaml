@@ -21,6 +21,10 @@ data:
   USE_X_FORWARDED_HOST: "True"
   USE_X_FORWARDED_PORT: "True"
 
+  # mkcert root CA — trusts the local wildcard TLS cert for inter-pod HTTPS
+  REQUESTS_CA_BUNDLE: "/etc/ssl/local-dev/rootCA.pem"
+  SSL_CERT_FILE: "/etc/ssl/local-dev/rootCA.pem"
+
   # Redis
   REDIS_URL: "redis://redis-master.local-infra.svc.cluster.local:6379/0"
   CELERY_BROKER_URL: "redis://redis-master.local-infra.svc.cluster.local:6379/1"

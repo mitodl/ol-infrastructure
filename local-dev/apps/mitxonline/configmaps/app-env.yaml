@@ -15,6 +15,10 @@ data:
   USE_X_FORWARDED_HOST: "True"
   USE_X_FORWARDED_PORT: "True"
 
+  # mkcert root CA — trusts the local wildcard TLS cert for inter-pod HTTPS
+  REQUESTS_CA_BUNDLE: "/etc/ssl/local-dev/rootCA.pem"
+  SSL_CERT_FILE: "/etc/ssl/local-dev/rootCA.pem"
+
   # Site config
   SITE_NAME: "MITx Online"
   MITX_ONLINE_ENVIRONMENT: "local"

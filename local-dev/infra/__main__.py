@@ -146,6 +146,19 @@ def _tls_secret(resource_name: str, namespace: str, parent) -> k8s.core.v1.Secre
     )
 
 
+_ca_cert_content = _ca_cert_path.read_text()
+
+
+def _ca_configmap(resource_name: str, namespace: str, parent) -> k8s.core.v1.ConfigMap:
+    """ConfigMap exposing the mkcert root CA so containers can trust local TLS."""
+    return k8s.core.v1.ConfigMap(
+        resource_name,
+        metadata={"name": "mkcert-root-ca", "namespace": namespace},
+        data={"rootCA.pem": _ca_cert_content},
+        opts=_k8s(parent=parent),
+    )
+
+
 tls_secret = _tls_secret("local-dev-tls", "local-infra", local_infra_ns)
 tls_secret_ops = _tls_secret("local-dev-tls-operations", "operations", operations_ns)
 # Per-app-namespace copies — required for ApisixTls in those namespaces.
@@ -160,6 +173,23 @@ tls_secret_mitxonline = _tls_secret(
 )
 tls_secret_odl_video = _tls_secret(
     "local-dev-tls-odl-video-service",
+    "odl-video-service",
+    _app_namespaces["odl-video-service"],
+)
+
+# mkcert root CA ConfigMaps — one per app namespace so containers can trust
+# the local wildcard TLS cert when making HTTPS requests (e.g. to Keycloak).
+ca_cm_mit_learn = _ca_configmap(
+    "mkcert-root-ca-mit-learn", "mit-learn", _app_namespaces["mit-learn"]
+)
+ca_cm_learn_ai = _ca_configmap(
+    "mkcert-root-ca-learn-ai", "learn-ai", _app_namespaces["learn-ai"]
+)
+ca_cm_mitxonline = _ca_configmap(
+    "mkcert-root-ca-mitxonline", "mitxonline", _app_namespaces["mitxonline"]
+)
+ca_cm_odl_video = _ca_configmap(
+    "mkcert-root-ca-odl-video",
     "odl-video-service",
     _app_namespaces["odl-video-service"],
 )

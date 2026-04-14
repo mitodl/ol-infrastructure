@@ -14,6 +14,10 @@ data:
   USE_X_FORWARDED_HOST: "True"
   USE_X_FORWARDED_PORT: "True"
 
+  # mkcert root CA — trusts the local wildcard TLS cert for inter-pod HTTPS
+  REQUESTS_CA_BUNDLE: "/etc/ssl/local-dev/rootCA.pem"
+  SSL_CERT_FILE: "/etc/ssl/local-dev/rootCA.pem"
+
   # Keycloak/OIDC
   KEYCLOAK_BASE_URL: "https://sso.ol.mit.dev"
   KEYCLOAK_REALM_NAME: "olapps"

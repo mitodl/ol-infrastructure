@@ -74,6 +74,9 @@ spec:
         volumeMounts:
         - name: static-files
           mountPath: /src/staticfiles
+        - name: mkcert-root-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
       - name: nginx
         image: nginx:1.25-alpine
         ports:
@@ -97,6 +100,9 @@ spec:
           name: learnai-nginx-conf
       - name: static-files
         emptyDir: {}
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
 ---
 # Celery worker — default queue
 apiVersion: apps/v1
@@ -140,6 +146,14 @@ spec:
             memory: 512Mi
           limits:
             memory: 2Gi
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
 ---
 # Celery worker — edx_content queue
 apiVersion: apps/v1
@@ -183,6 +197,14 @@ spec:
             memory: 512Mi
           limits:
             memory: 2Gi
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
 ---
 # Celery beat scheduler
 apiVersion: apps/v1
@@ -224,6 +246,14 @@ spec:
             memory: 256Mi
           limits:
             memory: 512Mi
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
 ---
 # Service (nginx sidecar is the HTTP frontend)
 apiVersion: v1

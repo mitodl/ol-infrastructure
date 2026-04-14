@@ -34,6 +34,8 @@ spec:
           value: "0.0.0.0"
         - name: NODE_ENV
           value: "production"
+        - name: NODE_EXTRA_CA_CERTS
+          value: /etc/ssl/local-dev/rootCA.pem
         resources:
           requests:
             cpu: 100m
@@ -46,6 +48,14 @@ spec:
             port: 3000
           initialDelaySeconds: 15
           periodSeconds: 10
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
 ---
 # Service
 apiVersion: v1

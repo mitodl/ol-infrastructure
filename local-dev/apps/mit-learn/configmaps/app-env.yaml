@@ -29,6 +29,11 @@ data:
   MITOL_APP_BASE_URL: "https://learn.mit.dev"
   MITOL_API_BASE_URL: "https://api.learn.mit.dev"
 
+  # mkcert root CA — trusts the local wildcard TLS cert for inter-pod HTTPS
+  # (e.g. Django OIDC token exchange with Keycloak at sso.ol.mit.dev)
+  REQUESTS_CA_BUNDLE: "/etc/ssl/local-dev/rootCA.pem"
+  SSL_CERT_FILE: "/etc/ssl/local-dev/rootCA.pem"
+
   # ── Domain / CORS / CSRF ───────────────────────────────────────────────────
   CSRF_COOKIE_DOMAIN: ".mit.dev"
   SESSION_COOKIE_DOMAIN: ".mit.dev"
