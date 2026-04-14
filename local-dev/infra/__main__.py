@@ -779,11 +779,9 @@ keycloak_operator_crds = k8s.yaml.v2.ConfigGroup(
 
 # Fetch the operator deployment manifest and patch namespace to local-infra
 # before passing to ConfigGroup (yaml.v2 dropped transformations support).
-_kc_resp = requests.get(f"{_kc_base}/kubernetes.yml", timeout=30)  # noqa: S113
+_kc_resp = requests.get(f"{_kc_base}/kubernetes.yml", timeout=30)
 _kc_resp.raise_for_status()
-_kc_resources = [
-    doc for doc in pyyaml.safe_load_all(_kc_resp.text) if doc is not None
-]
+_kc_resources = [doc for doc in pyyaml.safe_load_all(_kc_resp.text) if doc is not None]
 for _doc in _kc_resources:
     if _doc.get("metadata") and _doc["kind"] not in (
         "ClusterRole",
