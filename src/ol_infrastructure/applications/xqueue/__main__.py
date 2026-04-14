@@ -249,11 +249,11 @@ ol_app_k8s_config = OLApplicationK8sConfig(
     init_collectstatic=False,
     application_port=XQUEUE_SERVICE_PORT,  # xqueue listens directly on 8040
     resource_requests={
-        "cpu": "500m",
-        "memory": "512Mi",
+        "cpu": "10m",
+        "memory": "192Mi",
     },
     resource_limits={
-        "memory": "512Mi",
+        "memory": "192Mi",
     },
     probe_configs={
         "liveness_probe": kubernetes.core.v1.ProbeArgs(
