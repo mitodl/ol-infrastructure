@@ -1029,7 +1029,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             content_type="application/json",
             format=build_fastly_log_format_string(
                 additional_static_fields={
-                    "application": stack_info.env_prefix,
+                    "application": Application.mit_learn,
                     "environment": stack_info.env_suffix,
                 }
             ),
