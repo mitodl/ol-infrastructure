@@ -297,6 +297,11 @@ connector_configs: dict[str, dict[str, str]] = {
         "OM_TRINO_PASSWORD": '{{ get .Secrets "password" }}',
         "OM_TRINO_CATALOG": '{{ get .Secrets "catalog" }}',
     },
+    "iceberg": {
+        "OM_ICEBERG_CATALOG_NAME": '{{ get .Secrets "catalog_name" }}',
+        "OM_ICEBERG_WAREHOUSE": '{{ get .Secrets "warehouse" }}',
+        "OM_ICEBERG_CATALOG_URI": '{{ get .Secrets "catalog_uri" }}',
+    },
 }
 
 connector_secrets: list[OLVaultK8SSecret] = []
