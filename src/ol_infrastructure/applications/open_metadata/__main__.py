@@ -290,7 +290,14 @@ oidc_config_secret = OLVaultK8SSecret(
 # secret-operations/open-metadata/connectors/<connector-name>
 # and synced to K8s secrets in the open-metadata namespace.
 # Add entries to connector_configs for each source system.
-connector_configs: dict[str, dict[str, str]] = {}
+connector_configs: dict[str, dict[str, str]] = {
+    "trino": {
+        "OM_TRINO_HOST_PORT": '{{ get .Secrets "host_port" }}',
+        "OM_TRINO_USERNAME": '{{ get .Secrets "username" }}',
+        "OM_TRINO_PASSWORD": '{{ get .Secrets "password" }}',
+        "OM_TRINO_CATALOG": '{{ get .Secrets "catalog" }}',
+    },
+}
 
 connector_secrets: list[OLVaultK8SSecret] = []
 connector_secret_names: list[str] = []
