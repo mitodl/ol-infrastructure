@@ -218,6 +218,7 @@ def create_identity(  # noqa: PLR0913
         "keycloak-local",
         url=keycloak_url,
         realm="master",
+        client_id="admin-cli",  # built-in admin client for username/password auth
         username="admin",
         password="admin",  # noqa: S106  # pragma: allowlist secret
         initial_login=True,
