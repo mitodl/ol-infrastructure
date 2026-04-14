@@ -101,6 +101,104 @@ install_tool_hint() {
     esac
 }
 
+# Returns 0 if running inside WSL2.
+is_wsl() {
+    [[ -n "${WSL_DISTRO_NAME:-}" ]] || grep -qi microsoft /proc/version 2>/dev/null
+}
+
+# Ensures /etc/wsl.conf has [network] generateHosts = false so that WSL does
+# not overwrite /etc/hosts on every restart.  Prints 'ok' (already set) or
+# 'changed' (file was updated) and exits with 0 in both cases.
+_wsl_conf_disable_generate_hosts() {
+    local tmppy
+    tmppy=$(mktemp /tmp/wsl_conf_update.XXXXXX.py)
+    # Single-quoted heredoc prevents bash from expanding anything inside.
+    cat > "$tmppy" << 'PYEOF'
+import re, sys
+
+path = sys.argv[1]
+try:
+    with open(path) as f:
+        content = f.read()
+except FileNotFoundError:
+    content = ""
+
+if re.search(r"generateHosts\s*=\s*false", content, re.IGNORECASE):
+    print("ok")
+    sys.exit(0)
+
+if re.search(r"generateHosts\s*=\s*\w+", content, re.IGNORECASE):
+    content = re.sub(
+        r"(generateHosts\s*=\s*)\w+", r"\1false", content, flags=re.IGNORECASE
+    )
+elif re.search(r"^\[network\]", content, re.MULTILINE | re.IGNORECASE):
+    content = re.sub(
+        r"(\[network\][^\n]*\n)",
+        lambda m: m.group(0) + "generateHosts = false\n",
+        content,
+        flags=re.IGNORECASE,
+    )
+else:
+    if content and not content.endswith("\n"):
+        content += "\n"
+    content += "\n[network]\ngenerateHosts = false\n"
+
+with open(path, "w") as f:
+    f.write(content)
+print("changed")
+PYEOF
+    local result
+    result=$(sudo python3 "$tmppy" /etc/wsl.conf)
+    rm -f "$tmppy"
+    echo "$result"
+}
+
+# Attempts to write $HOSTS_BLOCK to the Windows hosts file (readable from WSL
+# at the standard mount path).  Falls back to printed instructions when the
+# file is not writable (requires Windows admin elevation).
+_update_windows_hosts() {
+    local block="$1"
+    local win_hosts
+    win_hosts=$(wslpath -u 'C:\Windows\System32\drivers\etc\hosts' 2>/dev/null) \
+        || win_hosts="/mnt/c/Windows/System32/drivers/etc/hosts"
+
+    if [[ ! -f "$win_hosts" ]]; then
+        warn "Windows hosts file not found at '${win_hosts}'. Add entries manually."
+        return
+    fi
+
+    # Idempotent: remove any existing block first.
+    if grep -q "# BEGIN mit-learn-dev local-dev" "$win_hosts" 2>/dev/null; then
+        python3 -c "
+import re
+with open('${win_hosts}', 'r') as f:
+    content = f.read()
+content = re.sub(
+    r'# BEGIN mit-learn-dev local-dev.*?# END mit-learn-dev local-dev\n?',
+    '',
+    content,
+    flags=re.DOTALL,
+)
+content = content.rstrip('\n') + '\n'
+with open('${win_hosts}', 'w') as f:
+    f.write(content)
+" 2>/dev/null || true
+    fi
+
+    if echo "$block" >> "$win_hosts" 2>/dev/null; then
+        ok "Windows hosts file updated (${win_hosts})."
+    else
+        warn "Windows hosts file is not writable (requires Windows admin elevation)."
+        warn "Add the block below to C:\\Windows\\System32\\drivers\\etc\\hosts manually,"
+        warn "or paste into an elevated Windows PowerShell:"
+        echo ""
+        printf "    Add-Content \$env:windir\\\\System32\\\\drivers\\\\etc\\\\hosts -Value @\"\n"
+        echo "$block"
+        printf '"@\n'
+        echo ""
+    fi
+}
+
 # ---------------------------------------------------------------------------
 # 1. Validate prerequisites
 # ---------------------------------------------------------------------------
@@ -185,6 +283,18 @@ else
     cp "$(mkcert -CAROOT)/rootCA.pem" "${CERT_DIR}/rootCA.pem"
     ok "mkcert CA cert copied to ${CERT_DIR}/rootCA.pem"
 
+    # WSL: the mkcert CA installed above only covers the Linux trust store.
+    # Windows browsers need the same root CA imported into Windows.
+    if is_wsl; then
+        win_ca_path=$(wslpath -w "${CERT_DIR}/rootCA.pem" 2>/dev/null) \
+            || win_ca_path="${CERT_DIR}/rootCA.pem"
+        warn "WSL detected: Windows browsers need the mkcert root CA trusted on Windows."
+        warn "Run in an elevated Windows PowerShell:"
+        echo ""
+        echo "    certutil -addstore Root '${win_ca_path}'"
+        echo ""
+    fi
+
     rm -rf "${_KEYTOOL_SHIM}"
 fi
 
@@ -229,6 +339,21 @@ with open('/etc/hosts', 'w') as f:
 
     echo "${HOSTS_BLOCK}" | sudo tee -a /etc/hosts > /dev/null
     ok "/etc/hosts updated with ${#HOSTS[@]} entries."
+
+    # WSL: prevent /etc/hosts from being regenerated on WSL restart, and mirror
+    # the same entries into the Windows hosts file so that Windows browsers can
+    # resolve the .dev hostnames (Docker Desktop forwards 127.0.0.1 from WSL).
+    if is_wsl; then
+        log "WSL detected: updating wsl.conf and Windows hosts file..."
+        wsl_result=$(_wsl_conf_disable_generate_hosts)
+        if [[ "$wsl_result" == "ok" ]]; then
+            ok "wsl.conf already has generateHosts = false."
+        else
+            warn "Updated /etc/wsl.conf: [network] generateHosts = false"
+            warn "Run 'wsl --shutdown' in Windows PowerShell, then reopen this terminal."
+        fi
+        _update_windows_hosts "${HOSTS_BLOCK}"
+    fi
 fi
 
 # ---------------------------------------------------------------------------

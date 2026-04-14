@@ -29,6 +29,45 @@ log()  { echo "▶ $*"; }
 ok()   { echo "  ✓ $*"; }
 warn() { echo "  ⚠ $*"; }
 
+is_wsl() {
+    [[ -n "${WSL_DISTRO_NAME:-}" ]] || grep -qi microsoft /proc/version 2>/dev/null
+}
+
+_remove_windows_hosts() {
+    local win_hosts
+    win_hosts=$(wslpath -u 'C:\Windows\System32\drivers\etc\hosts' 2>/dev/null) \
+        || win_hosts="/mnt/c/Windows/System32/drivers/etc/hosts"
+
+    if [[ ! -f "$win_hosts" ]]; then
+        return
+    fi
+
+    if ! grep -q "# BEGIN mit-learn-dev local-dev" "$win_hosts" 2>/dev/null; then
+        ok "No Windows hosts entries to remove."
+        return
+    fi
+
+    if python3 -c "
+import re
+with open('${win_hosts}', 'r') as f:
+    content = f.read()
+content = re.sub(
+    r'# BEGIN mit-learn-dev local-dev.*?# END mit-learn-dev local-dev\n?',
+    '',
+    content,
+    flags=re.DOTALL,
+)
+with open('${win_hosts}', 'w') as f:
+    f.write(content)
+" 2>/dev/null; then
+        ok "Windows hosts entries removed (${win_hosts})."
+    else
+        warn "Could not remove Windows hosts entries (requires Windows admin rights)."
+        warn "Remove the '# BEGIN mit-learn-dev local-dev' block manually from"
+        warn "C:\\Windows\\System32\\drivers\\etc\\hosts"
+    fi
+}
+
 log "Destroying k3d cluster '${CLUSTER_NAME}'..."
 if k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
     k3d cluster delete "${CLUSTER_NAME}"
@@ -57,6 +96,11 @@ with open('/etc/hosts', 'w') as f:
         ok "/etc/hosts entries removed."
     else
         warn "No /etc/hosts block found — nothing to remove."
+    fi
+
+    if is_wsl; then
+        log "WSL detected: removing Windows hosts entries..."
+        _remove_windows_hosts
     fi
 fi
 

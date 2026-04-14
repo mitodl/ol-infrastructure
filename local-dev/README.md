@@ -61,6 +61,15 @@ Install these tools before running setup:
 
 > **Docker memory:** The cluster runs PostgreSQL, Valkey, APISIX, Keycloak, Qdrant, and up to four Django apps. Allocate at least 8 GB to Docker Desktop (Settings → Resources).
 
+### Windows (WSL2)
+
+Install all tools listed above **inside WSL** (not on Windows), then note these additional requirements:
+
+- **Docker Desktop WSL integration:** Settings → Resources → WSL Integration → enable your distro. The k3d cluster runs inside WSL; Docker Desktop forwards `127.0.0.1` to Windows so browsers can reach it.
+- **`/etc/hosts` persistence:** WSL regenerates `/etc/hosts` by default on every restart. `setup.sh` adds `generateHosts = false` to `/etc/wsl.conf` automatically. If it does, run `wsl --shutdown` in Windows PowerShell then reopen your terminal before proceeding.
+- **Windows hosts file:** Your Windows browser resolves DNS from `C:\Windows\System32\drivers\etc\hosts`, not WSL's `/etc/hosts`. `setup.sh` attempts to update the Windows hosts file automatically; if it cannot (the file requires Windows admin elevation), it prints the entries and an `Add-Content` PowerShell command to paste into an elevated terminal.
+- **TLS trust on Windows:** The mkcert root CA installed in WSL is not trusted by Windows. After running `setup.sh`, run the `certutil` command it prints in an **elevated** Windows PowerShell to add the CA to the Windows Root certificate store, then restart your browser.
+
 ---
 
 ## Quick Start
@@ -78,6 +87,8 @@ This will:
 2. Create the `mit-learn-dev` k3d cluster with a local image registry on port 5000
 3. Generate a wildcard TLS certificate with `mkcert` (trusted by your OS)
 4. Add all `.dev` hostnames to `/etc/hosts` (requires `sudo`)
+
+> **WSL2 users:** If `setup.sh` reports that `/etc/wsl.conf` was updated, run `wsl --shutdown` in Windows PowerShell and reopen your WSL terminal before continuing. The script also prints any Windows hosts entries or a `certutil` command that need to be applied in an elevated Windows PowerShell.
 
 ### 2. Configure Tilt
 
@@ -572,3 +583,35 @@ Then restart your browser. The cert was generated with the correct wildcard SANs
 The Next.js build needs ~4 GB of memory. If it OOMs:
 - Increase Docker Desktop memory to 10+ GB
 - Or use a prebuilt image by removing `mit-learn` from `enabled_apps` in `tilt_config.json` and letting Tilt use the `prebuilt_tags` value instead
+
+---
+
+## WSL2-specific issues
+
+### `/etc/hosts` entries disappear after WSL restart
+
+WSL2 regenerates `/etc/hosts` by default. `setup.sh` sets `generateHosts = false` in `/etc/wsl.conf` automatically, but the change only takes effect after restarting WSL. From Windows PowerShell run:
+
+```powershell
+wsl --shutdown
+```
+
+Then reopen your WSL terminal. If `setup.sh` has already run, the entries will persist from that point on.
+
+### Windows browser can't resolve `.dev` hostnames
+
+Your Windows browser reads `C:\Windows\System32\drivers\etc\hosts`, not WSL's `/etc/hosts`. `setup.sh` attempts to write the same block to the Windows hosts file directly. If it couldn't (requires Windows admin elevation), re-run `setup.sh` and paste the printed `Add-Content` command into an **elevated** Windows PowerShell.
+
+### TLS certificate not trusted in Windows browser
+
+The mkcert root CA is installed in the WSL Linux trust store only. Windows browsers need the CA imported into the Windows Root store. Run the `certutil` command printed by `setup.sh` in an **elevated** Windows PowerShell:
+
+```powershell
+certutil -addstore Root '<path printed by setup.sh>'
+```
+
+Then restart your browser. If you no longer have the output, the path is `rootCA.pem` inside the `local-dev/certs/` directory, which you can convert to a Windows path from WSL with:
+
+```bash
+wslpath -w local-dev/certs/rootCA.pem
+```
