@@ -22,11 +22,11 @@ data:
   KEYCLOAK_BASE_URL: "https://sso.ol.mit.dev"
   KEYCLOAK_REALM_NAME: "olapps"
 
-  # Redis (cluster-local)
-  REDIS_URL: "redis://redis-master.local-infra.svc.cluster.local:6379/0"
-  REDIS_DOMAIN: "redis://redis-master.local-infra.svc.cluster.local:6379/0"
-  CELERY_BROKER_URL: "redis://redis-master.local-infra.svc.cluster.local:6379/1"
-  CELERY_RESULT_BACKEND: "redis://redis-master.local-infra.svc.cluster.local:6379/1"
+  # Valkey (cluster-local)
+  REDIS_URL: "redis://valkey.local-infra.svc.cluster.local:6379/0"
+  REDIS_DOMAIN: "redis://valkey.local-infra.svc.cluster.local:6379/0"
+  CELERY_BROKER_URL: "redis://valkey.local-infra.svc.cluster.local:6379/1"
+  CELERY_RESULT_BACKEND: "redis://valkey.local-infra.svc.cluster.local:6379/1"
 
   # AI proxy (local LiteLLM in local-infra)
   AI_PROXY_URL: "http://litellm.local-infra.svc.cluster.local:4000"

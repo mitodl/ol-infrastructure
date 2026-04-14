@@ -8,7 +8,7 @@ the cluster itself, mkcert certificates, and /etc/hosts entries.
 Services provisioned:
   - cert-manager (Helm) — future certificate management
   - CloudNativePG operator (Helm) + shared PostgreSQL Cluster
-  - Redis StatefulSet
+  - Valkey StatefulSet
   - APISIX (Helm, standalone mode) in operations namespace
   - Qdrant (vector DB) Deployment
   - OpenSearch (Helm) for search
@@ -301,23 +301,23 @@ pg_cluster = k8s.apiextensions.CustomResource(
 )
 
 # ---------------------------------------------------------------------------
-# Redis StatefulSet
+# Valkey StatefulSet
 # ---------------------------------------------------------------------------
 
-redis_sts = k8s.apps.v1.StatefulSet(
-    "redis",
-    metadata={"name": "redis", "namespace": "local-infra"},
+valkey_sts = k8s.apps.v1.StatefulSet(
+    "valkey",
+    metadata={"name": "valkey", "namespace": "local-infra"},
     spec={
         "replicas": 1,
-        "selector": {"matchLabels": {"app": "redis"}},
-        "serviceName": "redis",
+        "selector": {"matchLabels": {"app": "valkey"}},
+        "serviceName": "valkey",
         "template": {
-            "metadata": {"labels": {"app": "redis"}},
+            "metadata": {"labels": {"app": "valkey"}},
             "spec": {
                 "containers": [
                     {
-                        "name": "redis",
-                        "image": "redis:7-alpine",
+                        "name": "valkey",
+                        "image": "valkey/valkey:8-alpine",
                         "ports": [{"containerPort": 6379}],
                         "resources": {
                             "requests": {"cpu": "50m", "memory": "64Mi"},
@@ -331,15 +331,15 @@ redis_sts = k8s.apps.v1.StatefulSet(
     opts=_k8s(parent=local_infra_ns),
 )
 
-redis_svc = k8s.core.v1.Service(
-    "redis-svc",
-    metadata={"name": "redis", "namespace": "local-infra"},
+valkey_svc = k8s.core.v1.Service(
+    "valkey-svc",
+    metadata={"name": "valkey", "namespace": "local-infra"},
     spec={
-        "selector": {"app": "redis"},
+        "selector": {"app": "valkey"},
         "ports": [{"port": 6379, "targetPort": 6379}],
         "clusterIP": "None",  # headless for StatefulSet
     },
-    opts=_k8s(parent=redis_sts),
+    opts=_k8s(parent=valkey_sts),
 )
 
 # ---------------------------------------------------------------------------
@@ -912,7 +912,7 @@ create_olapps_dev_realm(
 # ---------------------------------------------------------------------------
 
 pulumi.export("keycloak_url", keycloak_url)
-pulumi.export("redis_host", "redis.local-infra.svc.cluster.local")
+pulumi.export("valkey_host", "valkey.local-infra.svc.cluster.local")
 pulumi.export("postgres_host", "local-pg-rw.local-infra.svc.cluster.local")
 pulumi.export("qdrant_url", "http://qdrant.local-infra.svc.cluster.local:6333")
 pulumi.export(

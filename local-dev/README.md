@@ -59,7 +59,7 @@ Install these tools before running setup:
 | mkcert | ≥ 1.4 | `brew install mkcert` |
 | Pulumi CLI | ≥ 3.x | `brew install pulumi` |
 
-> **Docker memory:** The cluster runs PostgreSQL, Redis, APISIX, Keycloak, Qdrant, and up to four Django apps. Allocate at least 8 GB to Docker Desktop (Settings → Resources).
+> **Docker memory:** The cluster runs PostgreSQL, Valkey, APISIX, Keycloak, Qdrant, and up to four Django apps. Allocate at least 8 GB to Docker Desktop (Settings → Resources).
 
 ---
 
@@ -105,7 +105,7 @@ tilt up
 ```
 
 Tilt will:
-1. Run `pulumi up` to deploy shared infrastructure (Postgres, Redis, APISIX, Keycloak, etc.)
+1. Run `pulumi up` to deploy shared infrastructure (Postgres, Valkey, APISIX, Keycloak, etc.)
 2. Build Docker images for any checked-out app repos
 3. Apply all app manifests (Deployments, Services, ConfigMaps, APISIX routes)
 4. Watch for source changes and sync them live
@@ -122,7 +122,7 @@ Open the Tilt UI at `http://localhost:10350` to monitor deployments and trigger 
 │                                                               │
 │  ┌──────────┐  ┌──────────────────────────────────────────┐  │
 │  │operations│  │           local-infra                    │  │
-│  │          │  │  PostgreSQL (CNPG)  Redis  Qdrant         │  │
+│  │          │  │  PostgreSQL (CNPG)  Valkey  Qdrant         │  │
 │  │  APISIX  │  │  Keycloak  LiteLLM  Mailpit              │  │
 │  └────┬─────┘  └──────────────────────────────────────────┘  │
 │       │                                                       │
@@ -180,7 +180,7 @@ ol-infrastructure/
     ├── infra/                        # Pulumi stack — shared in-cluster infrastructure
     │   ├── Pulumi.yaml
     │   ├── Pulumi.local-dev.infra.Dev.yaml   # Stack config (domains, secrets, chart versions)
-    │   ├── __main__.py               # All shared resources: CNPG, Redis, APISIX, Keycloak operator
+    │   ├── __main__.py               # All shared resources: CNPG, Valkey, APISIX, Keycloak operator
     │   ├── local_dev_keycloak.py     # Keycloak olapps realm (mirrors production olapps.py)
     │   └── requirements.txt
     │
@@ -231,7 +231,7 @@ ol-infrastructure/
 tilt up
   │
   ├── pulumi up (local-dev/infra/)
-  │     Deploys: CNPG operator → PostgreSQL cluster → Redis → cert-manager
+  │     Deploys: CNPG operator → PostgreSQL cluster → Valkey → cert-manager
   │              → Qdrant → LiteLLM → Mailpit → APISIX
   │              → Keycloak operator → Keycloak instance → olapps realm
   │
@@ -370,7 +370,7 @@ tilt trigger seed-mit-learn-fixtures
 | Key | Default | Description |
 |-----|---------|-------------|
 | `enabled_apps` | all four | Apps to deploy. Omit any to skip it entirely. |
-| `per_app_databases` | `false` | `true` deploys isolated CNPG + Redis per namespace (Phase 6A). |
+| `per_app_databases` | `false` | `true` deploys isolated CNPG + Valkey per namespace (Phase 6A). |
 | `prebuilt_tags` | see file | Image tags used when the app repo is not checked out locally. |
 
 ### Pulumi stack config
@@ -474,7 +474,7 @@ Tilt also runs `pulumi up` automatically when infra files change. You can also t
 
 **Change a Helm chart version:** Edit the version in `Pulumi.local-dev.infra.Dev.yaml` and run `pulumi up`.
 
-**Add a new shared service:** Add it to `__main__.py`. Use the existing Qdrant or Redis blocks as a reference.
+**Add a new shared service:** Add it to `__main__.py`. Use the existing Qdrant or Valkey blocks as a reference.
 
 **Modify the Keycloak realm:** Edit `local_dev_keycloak.py`. On `pulumi up`, pulumi-keycloak will diff the realm state and apply only what changed. Test users, clients, and IdP config are all managed here.
 

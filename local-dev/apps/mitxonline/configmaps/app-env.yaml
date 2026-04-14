@@ -35,10 +35,10 @@ data:
   KEYCLOAK_REALM_NAME: "olapps"
   KEYCLOAK_DISCOVERY_URL: "https://sso.ol.mit.dev/realms/olapps/.well-known/openid-configuration"
 
-  # Redis
-  REDIS_URL: "redis://redis-master.local-infra.svc.cluster.local:6379/0"
-  CELERY_BROKER_URL: "redis://redis-master.local-infra.svc.cluster.local:6379/1"
-  CELERY_RESULT_BACKEND: "redis://redis-master.local-infra.svc.cluster.local:6379/1"
+  # Valkey
+  REDIS_URL: "redis://valkey.local-infra.svc.cluster.local:6379/0"
+  CELERY_BROKER_URL: "redis://valkey.local-infra.svc.cluster.local:6379/1"
+  CELERY_RESULT_BACKEND: "redis://valkey.local-infra.svc.cluster.local:6379/1"
 
   # Email
   EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"

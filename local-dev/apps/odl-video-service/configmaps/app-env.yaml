@@ -25,9 +25,9 @@ data:
   REQUESTS_CA_BUNDLE: "/etc/ssl/local-dev/rootCA.pem"
   SSL_CERT_FILE: "/etc/ssl/local-dev/rootCA.pem"
 
-  # Redis
-  REDIS_URL: "redis://redis-master.local-infra.svc.cluster.local:6379/0"
-  CELERY_BROKER_URL: "redis://redis-master.local-infra.svc.cluster.local:6379/1"
+  # Valkey
+  REDIS_URL: "redis://valkey.local-infra.svc.cluster.local:6379/0"
+  CELERY_BROKER_URL: "redis://valkey.local-infra.svc.cluster.local:6379/1"
   REDIS_MAX_CONNECTIONS: "65000"
 
   # AWS stub values (no real S3 in local dev — videos won't transcode)
