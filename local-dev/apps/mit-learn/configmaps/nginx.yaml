@@ -1,0 +1,40 @@
+---
+# nginx config for the mit-learn webapp sidecar.
+# Serves static files directly and proxies all other requests to granian (port 8061).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mitlearn-nginx-conf
+  namespace: mit-learn
+data:
+  default.conf: |
+    server {
+        listen 8060 default_server;
+        server_name _;
+
+        gzip on;
+        gzip_comp_level 2;
+        gzip_min_length 512;
+
+        location = /.well-known/dnt-policy.txt {
+            return 204;
+        }
+
+        location /static/ {
+            alias /src/staticfiles/;
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+
+        location / {
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-Forwarded-Port 443;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_pass http://127.0.0.1:8061;
+            proxy_redirect off;
+            client_max_body_size 25M;
+        }
+    }
