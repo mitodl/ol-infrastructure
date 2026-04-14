@@ -4,7 +4,7 @@ Provisions:
   - Keycloak Operator (official keycloak-k8s-resources manifests)
   - Keycloak CustomResource (CR) instance backed by the shared CNPG cluster
   - APISIX routing (ApisixRoute + ApisixTls) for the Keycloak hostname
-  - olapps realm via the pulumi-keycloak provider (local_dev_keycloak.py)
+  - olapps realm via the pulumi-keycloak provider (keycloak.py)
 """
 
 from collections.abc import Callable
@@ -20,6 +20,8 @@ from pulumi import Output, ResourceOptions
 
 @dataclass
 class IdentityResources:
+    """Resources created by the identity (Keycloak) module."""
+
     operator_crds: k8s.yaml.v2.ConfigGroup
     operator: k8s.yaml.v2.ConfigGroup
     instance: k8s.apiextensions.CustomResource
