@@ -139,10 +139,16 @@ else
     ok "Cluster '${CLUSTER_NAME}' created."
 fi
 
-# Merge kubeconfig
+# Merge into default kubeconfig and rename the context to 'local-dev' for clarity.
 k3d kubeconfig merge "${CLUSTER_NAME}" --kubeconfig-merge-default &>/dev/null
-kubectl config use-context "k3d-${CLUSTER_NAME}" &>/dev/null
-ok "kubectl context set to k3d-${CLUSTER_NAME}"
+# k3d names the context k3d-<cluster>; rename to the canonical 'local-dev'.
+if kubectl config get-contexts "local-dev" &>/dev/null; then
+    # Context already exists with the right name — ensure it points at this cluster.
+    kubectl config delete-context "local-dev" &>/dev/null || true
+fi
+kubectl config rename-context "k3d-${CLUSTER_NAME}" "local-dev" &>/dev/null
+kubectl config use-context "local-dev"
+ok "kubectl context 'local-dev' registered and active."
 
 # ---------------------------------------------------------------------------
 # 3. TLS certificates via mkcert
