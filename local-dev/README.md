@@ -357,13 +357,17 @@ tilt trigger seed-mit-learn-fixtures
 
   "per_app_databases": false,
 
-  "prebuilt_tags": {
-    "mit-learn": "0.62.0",
-    "mit-learn-nextjs": "0.62.0",
-    "learn-ai": "0.28.3",
-    "mitxonline": "1.144.5",
-    "odl-video-service": "0.85.0"
-  }
+  "prebuilt_tags": [
+    "mit-learn=0.62.0",
+    "mit-learn-nextjs=0.62.0",
+    "learn-ai=0.28.3",
+    "mitxonline=1.144.5",
+    "odl-video-service=0.85.0"
+  ],
+
+  "openai_api_key": "",
+  "langsmith_api_key": "",
+  "canvas_ai_token": ""
 }
 ```
 
@@ -371,7 +375,10 @@ tilt trigger seed-mit-learn-fixtures
 |-----|---------|-------------|
 | `enabled_apps` | all four | Apps to deploy. Omit any to skip it entirely. |
 | `per_app_databases` | `false` | `true` deploys isolated CNPG + Valkey per namespace (Phase 6A). |
-| `prebuilt_tags` | see file | Image tags used when the app repo is not checked out locally. |
+| `prebuilt_tags` | see file | `["app=tag"]` list of image tags used when the app repo is not checked out locally. |
+| `openai_api_key` | `""` | OpenAI API key — required for learn-ai vector search and LiteLLM. |
+| `langsmith_api_key` | `""` | LangSmith API key for tracing (optional). |
+| `canvas_ai_token` | `""` | Canvas AI token (optional). |
 
 ### Pulumi stack config
 

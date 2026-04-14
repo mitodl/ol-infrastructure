@@ -8,12 +8,22 @@
 config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service")
 config.define_bool("per_app_databases", usage="Deploy isolated DB/Valkey per app namespace")
 config.define_string("openedx_mode", usage="qa (default) or local (Tutor)")
-config.define_string_list("prebuilt_tags", usage="Prebuilt image tag overrides per app, e.g. mit-learn=0.62.0")
+config.define_string_list("prebuilt_tags", usage="Prebuilt image tag overrides per app, e.g. mit-learn=0.62.0 learn-ai=0.28.3")
+config.define_string("openai_api_key", usage="OpenAI API key for AI/embedding features (optional)")
+config.define_string("langsmith_api_key", usage="LangSmith API key for tracing (optional)")
+config.define_string("canvas_ai_token", usage="Canvas AI token (optional)")
 cfg = config.parse()
 
 enabled_apps = cfg.get("enabled_apps", ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"])
 per_app_databases = cfg.get("per_app_databases", False)
 openedx_mode = cfg.get("openedx_mode", "qa")
+
+# Parse prebuilt_tags list (["app=tag", ...]) into a lookup dict.
+prebuilt_tags = {
+    kv.split("=")[0]: kv.split("=")[1]
+    for kv in cfg.get("prebuilt_tags", [])
+    if "=" in kv
+}
 
 # Workspace root: directory that contains ol-infrastructure and sibling app repos.
 # Override with MITOL_WORKSPACE_ROOT environment variable.
@@ -36,8 +46,8 @@ APPS = [
         "deploy_name": "mitlearn-webapp",
         "image_backend": "mitodl/mit-learn-app",
         "image_frontend": "mitodl/mit-learn-nextjs-app",
-        "prebuilt_tag_backend": cfg.get("prebuilt_tags", {}).get("mit-learn", "0.62.0"),
-        "prebuilt_tag_frontend": cfg.get("prebuilt_tags", {}).get("mit-learn-nextjs", "0.62.0"),
+        "prebuilt_tag_backend": prebuilt_tags.get("mit-learn", "0.62.0"),
+        "prebuilt_tag_frontend": prebuilt_tags.get("mit-learn-nextjs", "0.62.0"),
         "tiltfile": "./local-dev/apps/mit-learn/Tiltfile",
         "tiltfile_frontend": "./local-dev/apps/mit-learn-nextjs/Tiltfile",
         # Seeding commands; executed inside the web pod via `kubectl exec`.
@@ -77,7 +87,7 @@ APPS = [
         "namespace": "learn-ai",
         "deploy_name": "learnai-webapp",
         "image_backend": "mitodl/learn-ai-app",
-        "prebuilt_tag_backend": cfg.get("prebuilt_tags", {}).get("learn-ai", "0.28.3"),
+        "prebuilt_tag_backend": prebuilt_tags.get("learn-ai", "0.28.3"),
         "tiltfile": "./local-dev/apps/learn-ai/Tiltfile",
         "seed_commands": [
             {
@@ -93,7 +103,7 @@ APPS = [
         "namespace": "mitxonline",
         "deploy_name": "mitxonline-webapp",
         "image_backend": "mitodl/mitxonline-app",
-        "prebuilt_tag_backend": cfg.get("prebuilt_tags", {}).get("mitxonline", "1.144.5"),
+        "prebuilt_tag_backend": prebuilt_tags.get("mitxonline", "1.144.5"),
         "tiltfile": "./local-dev/apps/mitxonline/Tiltfile",
         "seed_commands": [
             {
@@ -119,7 +129,7 @@ APPS = [
         "namespace": "odl-video-service",
         "deploy_name": "odlvideo-webapp",
         "image_backend": "mitodl/odl-video-service-app",
-        "prebuilt_tag_backend": cfg.get("prebuilt_tags", {}).get("odl-video-service", "0.85.0"),
+        "prebuilt_tag_backend": prebuilt_tags.get("odl-video-service", "0.85.0"),
         "tiltfile": "./local-dev/apps/odl-video-service/Tiltfile",
         "seed_commands": [
             {
