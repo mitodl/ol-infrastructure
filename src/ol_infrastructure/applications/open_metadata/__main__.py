@@ -285,6 +285,40 @@ oidc_config_secret = OLVaultK8SSecret(
     ),
 )
 
+# Connector credentials for OpenMetadata ingestion pipelines.
+# Each connector's credentials are stored in Vault under
+# secret-operations/open-metadata/connectors/<connector-name>
+# and synced to K8s secrets in the open-metadata namespace.
+# Add entries to connector_configs for each source system.
+connector_configs: dict[str, dict[str, str]] = {}
+
+connector_secrets: list[OLVaultK8SSecret] = []
+connector_secret_names: list[str] = []
+for connector_name, templates in connector_configs.items():
+    secret_name = f"om-connector-{connector_name}"
+    secret_config = OLVaultK8SStaticSecretConfig(
+        name=f"openmetadata-connector-{connector_name}",
+        namespace=open_metadata_namespace,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name=secret_name,
+        labels=k8s_global_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path=f"open-metadata/connectors/{connector_name}",
+        templates=templates,
+        vaultauth=vault_k8s_resources.auth_name,
+    )
+    connector_secret = OLVaultK8SSecret(
+        f"open-metadata-{stack_info.name}-connector-{connector_name}-secret",
+        secret_config,
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            parent=vault_k8s_resources,
+        ),
+    )
+    connector_secrets.append(connector_secret)
+    connector_secret_names.append(secret_name)
+
 # Install the openmetadata helm chart
 # https://github.com/mitodl/ol-infrastructure/issues/2680
 open_metadata_application = kubernetes.helm.v3.Release(
@@ -378,6 +412,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         "name": oidc_config_secret_name,
                     },
                 },
+                *[{"secretRef": {"name": name}} for name in connector_secret_names],
             ],
         },
         skip_await=False,
@@ -385,7 +420,12 @@ open_metadata_application = kubernetes.helm.v3.Release(
     opts=ResourceOptions(
         parent=vault_k8s_resources,
         delete_before_replace=True,
-        depends_on=[open_metadata_db, db_creds_secret, oidc_config_secret],
+        depends_on=[
+            open_metadata_db,
+            db_creds_secret,
+            oidc_config_secret,
+            *connector_secrets,
+        ],
     ),
 )
 
