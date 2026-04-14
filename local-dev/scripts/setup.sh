@@ -154,7 +154,16 @@ else
 
     mkdir -p "${CERT_DIR}"
 
-    # Trust the mkcert CA system-wide (requires sudo on Linux for /usr/local/share)
+    # mkcert calls keytool on every invocation to check/update the Java trust store.
+    # On sdkman-managed JDKs the keytool binary can lack execute permission, aborting
+    # the script. Inject a no-op keytool shim at the front of PATH for all mkcert
+    # calls in this block, and clear JAVA_HOME so the resolved path isn't used either.
+    _KEYTOOL_SHIM=$(mktemp -d)
+    printf '#!/usr/bin/env bash\nexit 0\n' > "${_KEYTOOL_SHIM}/keytool"
+    chmod +x "${_KEYTOOL_SHIM}/keytool"
+    PATH="${_KEYTOOL_SHIM}:${PATH}"
+    export JAVA_HOME=""
+
     mkcert -install
     ok "mkcert CA trusted."
 
@@ -169,6 +178,8 @@ else
     # Also copy the mkcert root CA to certs/ so Pulumi can reference it.
     cp "$(mkcert -CAROOT)/rootCA.pem" "${CERT_DIR}/rootCA.pem"
     ok "mkcert CA cert copied to ${CERT_DIR}/rootCA.pem"
+
+    rm -rf "${_KEYTOOL_SHIM}"
 fi
 
 # ---------------------------------------------------------------------------
