@@ -26,6 +26,8 @@ from typing import Any
 import pulumi
 import pulumi_keycloak as keycloak
 import pulumi_kubernetes as k8s
+import requests
+import yaml as pyyaml
 from local_dev_keycloak import create_olapps_dev_realm
 from pulumi import Config, Output, ResourceOptions
 
@@ -765,25 +767,39 @@ mailpit_svc = k8s.core.v1.Service(
 _kc_version = keycloak_operator_version
 _kc_base = f"https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/{_kc_version}/kubernetes"
 
-keycloak_operator = k8s.yaml.v2.ConfigGroup(
-    "keycloak-operator",
+# Install CRDs first (cluster-scoped, no namespace patching needed)
+keycloak_operator_crds = k8s.yaml.v2.ConfigGroup(
+    "keycloak-operator-crds",
     files=[
         f"{_kc_base}/keycloaks.k8s.keycloak.org-v1.yml",
         f"{_kc_base}/keycloakrealmimports.k8s.keycloak.org-v1.yml",
-        f"{_kc_base}/kubernetes.yml",
     ],
-    # Redirect all namespaced resources to local-infra; CRDs are cluster-scoped
-    # and will not be affected by this (they have no namespace field).
-    transformations=[
-        lambda obj, _opts: (
-            obj["metadata"].__setitem__("namespace", "local-infra")
-            if obj.get("metadata")
-            and obj["kind"]
-            not in ("ClusterRole", "ClusterRoleBinding", "CustomResourceDefinition")
-            else None
-        )
-    ],
-    opts=_k8s(parent=local_infra_ns),
+    opts=_k8s(parent=local_infra_ns, delete_before_replace=False),
+)
+
+# Fetch the operator deployment manifest and patch namespace to local-infra
+# before passing to ConfigGroup (yaml.v2 dropped transformations support).
+_kc_resp = requests.get(f"{_kc_base}/kubernetes.yml", timeout=30)  # noqa: S113
+_kc_resp.raise_for_status()
+_kc_resources = [
+    doc for doc in pyyaml.safe_load_all(_kc_resp.text) if doc is not None
+]
+for _doc in _kc_resources:
+    if _doc.get("metadata") and _doc["kind"] not in (
+        "ClusterRole",
+        "ClusterRoleBinding",
+        "CustomResourceDefinition",
+    ):
+        _doc["metadata"]["namespace"] = "local-infra"
+
+keycloak_operator = k8s.yaml.v2.ConfigGroup(
+    "keycloak-operator",
+    objs=_kc_resources,
+    opts=_k8s(
+        parent=local_infra_ns,
+        delete_before_replace=False,
+        depends_on=[keycloak_operator_crds],
+    ),
 )
 
 # Keycloak admin credentials Secret — referenced by the Keycloak CR.
