@@ -55,7 +55,7 @@ apisix_oidc_session_secret = config.require_secret("apisix_oidc_session_secret")
 
 cert_manager_version = config.get("cert_manager_version") or "v1.16.2"
 cnpg_version = config.get("cnpg_version") or "0.23.0"
-apisix_version = config.get("apisix_version") or "2.12.0"
+apisix_version = config.get("apisix_version") or "2.13.0"
 keycloak_operator_version = config.get("keycloak_operator_version") or "26.0.7"
 
 # Resolve certificate file paths relative to repo root (two levels up from
@@ -398,6 +398,14 @@ apisix_release = k8s.helm.v3.Release(
                         "role": "traditional",
                         "role_traditional": {
                             "config_provider": "yaml",
+                        },
+                        # Provide a minimal bootstrap apisix.yaml so workers
+                        # receive valid (empty) configuration on first start and
+                        # pass the readiness probe. Without this the standalone
+                        # config_provider has no #END-terminated file and every
+                        # worker logs "has not received configuration".
+                        "standalone": {
+                            "config": "routes: []\n#END\n",
                         },
                     },
                     "ssl": {
