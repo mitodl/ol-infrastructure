@@ -247,6 +247,7 @@ cnpg_release = k8s.helm.v3.Release(
             repo="https://cloudnative-pg.github.io/charts",
         ),
         cleanup_on_fail=True,
+        timeout=600,
         values={
             "replicaCount": 1,
             "resources": {
@@ -370,6 +371,7 @@ apisix_release = k8s.helm.v3.Release(
             repo="https://apache.github.io/apisix-helm-chart",
         ),
         cleanup_on_fail=True,
+        timeout=600,
         values=Output.all(
             admin=apisix_admin_key,
             viewer=apisix_viewer_key,
@@ -504,6 +506,7 @@ opensearch_release = k8s.helm.v3.Release(
             repo="https://opensearch-project.github.io/helm-charts",
         ),
         cleanup_on_fail=True,
+        timeout=600,
         values={
             "singleNode": True,
             "replicas": 1,
