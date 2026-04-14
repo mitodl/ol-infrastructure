@@ -30,9 +30,9 @@ declare -A APP_NAMESPACE=(
 
 declare -A APP_DEPLOY=(
     [mit-learn]="mitlearn-webapp"
-    [learn-ai]="learn-ai-webapp"
+    [learn-ai]="learnai-webapp"
     [mitxonline]="mitxonline-webapp"
-    [odl-video-service]="ovs-webapp"
+    [odl-video-service]="odlvideo-webapp"
 )
 
 # Default seed commands run when --app is given without --cmd.

@@ -1,0 +1,38 @@
+# mitxonline Tiltfile
+# Builds the mitxonline Django app (uwsgi) and deploys it to the mitxonline namespace.
+
+APP_DIR = os.path.abspath('../../../mitxonline')
+IMAGE = 'mitxonline-app'
+NAMESPACE = 'mitxonline'
+DEPLOY_NAME = 'mitxonline-webapp'
+
+docker_build(
+    IMAGE,
+    context=APP_DIR,
+    dockerfile=APP_DIR + '/Dockerfile',
+    live_update=[
+        sync(APP_DIR + '/mitxonline', '/src/mitxonline'),
+        sync(APP_DIR + '/main', '/src/main'),
+        run(
+            'cd /src && pip install -r requirements.txt',
+            trigger=[APP_DIR + '/requirements.txt'],
+        ),
+    ],
+)
+
+k8s_yaml([
+    'configmaps/app-env.yaml',
+    'configmaps/nginx.yaml',
+    'secrets.yaml',
+    'deployment.yaml',
+    'apisix-routes.yaml',
+])
+
+k8s_resource(
+    DEPLOY_NAME,
+    port_forwards=['8010:8010'],
+    labels=['mitxonline'],
+)
+
+k8s_resource('mitxonline-celery', labels=['mitxonline'])
+k8s_resource('mitxonline-celery-beat', labels=['mitxonline'])

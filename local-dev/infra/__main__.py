@@ -158,6 +158,11 @@ tls_secret_learn_ai = _tls_secret(
 tls_secret_mitxonline = _tls_secret(
     "local-dev-tls-mitxonline", "mitxonline", _app_namespaces["mitxonline"]
 )
+tls_secret_odl_video = _tls_secret(
+    "local-dev-tls-odl-video-service",
+    "odl-video-service",
+    _app_namespaces["odl-video-service"],
+)
 
 # ---------------------------------------------------------------------------
 # cert-manager (Helm) — installed for future use; not used for mkcert signing
@@ -246,6 +251,7 @@ pg_cluster = k8s.apiextensions.CustomResource(
                     "CREATE DATABASE mitlearn OWNER app;",
                     "CREATE DATABASE learnai OWNER app;",
                     "CREATE DATABASE mitxonline OWNER app;",
+                    "CREATE DATABASE odlvideo OWNER app;",
                     "CREATE DATABASE keycloak OWNER app;",
                     "CREATE DATABASE litellm OWNER app;",
                 ],

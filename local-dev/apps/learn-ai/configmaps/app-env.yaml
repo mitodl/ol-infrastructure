@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: learn-ai-env
+  namespace: learn-ai
+data:
+  DJANGO_SETTINGS_MODULE: "main.settings"
+  MITOL_APP_BASE_URL: "https://ai.learn.mit.dev"
+  MITOL_DB_DISABLE_SSL: "True"
+  MITOL_USE_S3: "False"
+  DEBUG: "True"
+  ALLOWED_HOSTS: "*"
+  USE_X_FORWARDED_HOST: "True"
+  USE_X_FORWARDED_PORT: "True"
+
+  # Keycloak/OIDC
+  KEYCLOAK_BASE_URL: "https://keycloak.mit.dev"
+  KEYCLOAK_REALM_NAME: "olapps"
+
+  # Redis (cluster-local)
+  REDIS_URL: "redis://redis-master.local-infra.svc.cluster.local:6379/0"
+  REDIS_DOMAIN: "redis://redis-master.local-infra.svc.cluster.local:6379/0"
+  CELERY_BROKER_URL: "redis://redis-master.local-infra.svc.cluster.local:6379/1"
+  CELERY_RESULT_BACKEND: "redis://redis-master.local-infra.svc.cluster.local:6379/1"
+
+  # AI proxy (local LiteLLM in local-infra)
+  AI_PROXY_URL: "http://litellm.local-infra.svc.cluster.local:4000"
+  AI_PROXY_CLASS: "main.ai.proxy.LiteLLMProxy"
+
+  # mit-learn API (for AI to call back)
+  MIT_LEARN_API_PROXY_BASE_URL: "http://mitlearn-webapp.mit-learn.svc.cluster.local:8060/api/"
+
+  # Email (Mailpit)
+  EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
+  EMAIL_HOST: "mailpit.local-infra.svc.cluster.local"
+  EMAIL_PORT: "1025"
+  EMAIL_USE_TLS: "False"
+
+  # Feature flags
+  FEATURE_LEARN_AI_ENABLED: "True"
