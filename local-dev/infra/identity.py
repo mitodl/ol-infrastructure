@@ -221,7 +221,8 @@ def create_identity(  # noqa: PLR0913
         client_id="admin-cli",  # built-in admin client for username/password auth
         username="admin",
         password="admin",  # noqa: S106  # pragma: allowlist secret
-        initial_login=True,
+        tls_insecure_skip_verify=True,  # mkcert CA not trusted by provider runtime
+        initial_login=False,  # Keycloak must be ready before realm resources run
         opts=ResourceOptions(depends_on=[instance]),
     )
 
