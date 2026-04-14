@@ -6,7 +6,7 @@ metadata:
   namespace: mitxonline
 spec:
   hosts:
-    - "mitxonline.mit.dev"
+  - "mitxonline.mit.dev"
   secret:
     name: local-dev-tls
     namespace: mitxonline
@@ -18,27 +18,27 @@ metadata:
   namespace: mitxonline
 spec:
   http:
-    - name: public
-      match:
-        hosts:
-          - "mitxonline.mit.dev"
-        paths:
-          - "/*"
-      backends:
-        - serviceName: mitxonline-webapp
-          servicePort: 8010
-      plugins:
-        - name: openid-connect
-          enable: true
-          config:
-            client_id: "ol-mitxonline-client"
-            client_secret: "local-dev-mitxonline-client-secret"
-            discovery: "https://sso.ol.mit.dev/realms/olapps/.well-known/openid-configuration"
-            scope: "openid profile email"
-            redirect_uri: "https://mitxonline.mit.dev/oidc/callback"
-            logout_path: "/logout"
-            post_logout_redirect_uri: "/"
-            unauth_action: "pass"
-            session:
-              secret: "local-dev-mitxonline-session-32c!!"
-            ssl_verify: false
+  - name: public
+    match:
+      hosts:
+      - "mitxonline.mit.dev"
+      paths:
+      - "/*"
+    backends:
+    - serviceName: mitxonline-webapp
+      servicePort: 8010
+    plugins:
+    - name: openid-connect
+      enable: true
+      config:
+        client_id: "ol-mitxonline-client"
+        client_secret: "local-dev-mitxonline-client-secret"
+        discovery: "https://sso.ol.mit.dev/realms/olapps/.well-known/openid-configuration"
+        scope: "openid profile email"
+        redirect_uri: "https://mitxonline.mit.dev/oidc/callback"
+        logout_path: "/logout"
+        post_logout_redirect_uri: "/"
+        unauth_action: "pass"
+        session:
+          secret: "local-dev-mitxonline-session-32c!!"
+        ssl_verify: false

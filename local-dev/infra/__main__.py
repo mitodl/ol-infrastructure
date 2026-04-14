@@ -25,9 +25,8 @@ from pathlib import Path
 import pulumi
 import pulumi_keycloak as keycloak
 import pulumi_kubernetes as k8s
-from pulumi import Config, Output, ResourceOptions
-
 from local_dev_keycloak import create_olapps_dev_realm
+from pulumi import Config, Output, ResourceOptions
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -38,9 +37,7 @@ config = Config()
 kubeconfig_path = config.get("kubeconfig") or ""
 tls_cert_path = config.get("tls_cert_path") or "local-dev/certs/local-dev.pem"
 tls_key_path = config.get("tls_key_path") or "local-dev/certs/local-dev-key.pem"
-mkcert_ca_cert_path = (
-    config.get("mkcert_ca_cert_path") or "local-dev/certs/rootCA.pem"
-)
+mkcert_ca_cert_path = config.get("mkcert_ca_cert_path") or "local-dev/certs/rootCA.pem"
 
 keycloak_hostname = config.get("keycloak_hostname") or "sso.ol.mit.dev"
 keycloak_url = config.get("keycloak_url") or f"https://{keycloak_hostname}"
@@ -127,6 +124,7 @@ for _ns_name in ("mit-learn", "learn-ai", "mitxonline", "odl-video-service"):
 # ApisixTls by looking up the Secret in the route's namespace.
 # No cert-manager ClusterIssuer is needed: mkcert already did the signing.
 
+
 # Read cert files at Pulumi evaluation time. These files are created by
 # setup.sh before `pulumi up` is run.
 def _read_file_b64(path: Path) -> str:
@@ -135,6 +133,7 @@ def _read_file_b64(path: Path) -> str:
 
 _tls_cert_b64 = _read_file_b64(_cert_path)
 _tls_key_b64 = _read_file_b64(_key_path)
+
 
 def _tls_secret(resource_name: str, namespace: str, parent) -> k8s.core.v1.Secret:
     return k8s.core.v1.Secret(
@@ -471,9 +470,7 @@ opensearch_release = k8s.helm.v3.Release(
             },
             "persistence": {"size": "5Gi"},
             # Disable security for local dev.
-            "config": {
-                "opensearch.yml": "plugins.security.disabled: true\n"
-            },
+            "config": {"opensearch.yml": "plugins.security.disabled: true\n"},
             "extraEnvs": [
                 {"name": "DISABLE_INSTALL_DEMO_CONFIG", "value": "true"},
                 {"name": "DISABLE_SECURITY_PLUGIN", "value": "true"},
@@ -694,9 +691,13 @@ keycloak_operator = k8s.yaml.v2.ConfigGroup(
     # Redirect all namespaced resources to local-infra; CRDs are cluster-scoped
     # and will not be affected by this (they have no namespace field).
     transformations=[
-        lambda obj, opts: obj["metadata"].__setitem__("namespace", "local-infra")
-        if obj.get("metadata") and obj["kind"] not in ("ClusterRole", "ClusterRoleBinding", "CustomResourceDefinition")
-        else None
+        lambda obj, opts: (
+            obj["metadata"].__setitem__("namespace", "local-infra")
+            if obj.get("metadata")
+            and obj["kind"]
+            not in ("ClusterRole", "ClusterRoleBinding", "CustomResourceDefinition")
+            else None
+        )
     ],
     opts=_k8s(parent=local_infra_ns),
 )
@@ -755,7 +756,10 @@ keycloak_instance = k8s.apiextensions.CustomResource(
         },
         "additionalOptions": [
             # Use Mailpit for local email delivery.
-            {"name": "spi-email-smtp-host", "value": "mailpit.local-infra.svc.cluster.local"},
+            {
+                "name": "spi-email-smtp-host",
+                "value": "mailpit.local-infra.svc.cluster.local",
+            },
             {"name": "spi-email-smtp-port", "value": "1025"},
             {"name": "spi-email-smtp-auth", "value": "false"},
             {"name": "spi-email-smtp-ssl", "value": "false"},
@@ -789,7 +793,12 @@ keycloak_instance = k8s.apiextensions.CustomResource(
     },
     opts=_k8s(
         parent=local_infra_ns,
-        depends_on=[keycloak_operator, pg_cluster, mailpit_deployment, keycloak_admin_secret],
+        depends_on=[
+            keycloak_operator,
+            pg_cluster,
+            mailpit_deployment,
+            keycloak_admin_secret,
+        ],
     ),
 )
 
@@ -890,7 +899,9 @@ pulumi.export("keycloak_url", keycloak_url)
 pulumi.export("redis_host", "redis.local-infra.svc.cluster.local")
 pulumi.export("postgres_host", "local-pg-rw.local-infra.svc.cluster.local")
 pulumi.export("qdrant_url", "http://qdrant.local-infra.svc.cluster.local:6333")
-pulumi.export("opensearch_url", "http://opensearch-master.local-infra.svc.cluster.local:9200")
+pulumi.export(
+    "opensearch_url", "http://opensearch-master.local-infra.svc.cluster.local:9200"
+)
 pulumi.export("tika_url", "http://tika.local-infra.svc.cluster.local:9998")
 pulumi.export("litellm_url", "http://litellm.local-infra.svc.cluster.local:4000")
 pulumi.export("mailpit_ui_url", "http://mailpit.local-infra.svc.cluster.local:8025")

@@ -9,7 +9,7 @@ metadata:
   namespace: mit-learn
 spec:
   hosts:
-    - "learn.mit.dev"
+  - "learn.mit.dev"
   secret:
     name: local-dev-tls
     namespace: mit-learn
@@ -24,19 +24,19 @@ metadata:
   namespace: mit-learn
 spec:
   http:
-    - name: frontend
-      match:
-        hosts:
-          - "learn.mit.dev"
-        paths:
-          - "/*"
-      backends:
-        - serviceName: mitlearn-nextjs
-          servicePort: 3000
-      plugins:
-        - name: response-rewrite
-          enable: true
-          config:
-            headers:
-              set:
-                Referrer-Policy: "origin"
+  - name: frontend
+    match:
+      hosts:
+      - "learn.mit.dev"
+      paths:
+      - "/*"
+    backends:
+    - serviceName: mitlearn-nextjs
+      servicePort: 3000
+    plugins:
+    - name: response-rewrite
+      enable: true
+      config:
+        headers:
+          set:
+            Referrer-Policy: "origin"

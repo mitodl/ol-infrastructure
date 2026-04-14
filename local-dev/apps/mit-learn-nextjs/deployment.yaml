@@ -21,31 +21,31 @@ spec:
         app: mitlearn-nextjs
     spec:
       containers:
-        - name: nextjs
-          image: mitlearn-nextjs-app
-          imagePullPolicy: IfNotPresent
-          ports:
-            - containerPort: 3000
-              name: http
-          env:
-            - name: PORT
-              value: "3000"
-            - name: HOSTNAME
-              value: "0.0.0.0"
-            - name: NODE_ENV
-              value: "production"
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              memory: 1Gi
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 3000
-            initialDelaySeconds: 15
-            periodSeconds: 10
+      - name: nextjs
+        image: mitlearn-nextjs-app
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: PORT
+          value: "3000"
+        - name: HOSTNAME
+          value: "0.0.0.0"
+        - name: NODE_ENV
+          value: "production"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 1Gi
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 15
+          periodSeconds: 10
 ---
 # Service
 apiVersion: v1
@@ -59,6 +59,6 @@ spec:
   selector:
     app: mitlearn-nextjs
   ports:
-    - name: http
-      port: 3000
-      targetPort: http
+  - name: http
+    port: 3000
+    targetPort: http

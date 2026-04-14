@@ -1,3 +1,4 @@
+---
 config:
   # Path to the kubeconfig for the k3d cluster.
   # Defaults to ${HOME}/.kube/config if not set.

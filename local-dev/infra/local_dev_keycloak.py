@@ -23,7 +23,7 @@ from ol_infrastructure.substructure.keycloak.org_flows import (
 )
 
 
-def create_olapps_dev_realm(  # noqa: PLR0913, PLR0915
+def create_olapps_dev_realm(  # noqa: PLR0913
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     k8s_provider: k8s.Provider,
@@ -99,7 +99,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913, PLR0915
         # Use Mailpit for local SMTP.
         smtp_server=keycloak.RealmSmtpServerArgs(
             auth=keycloak.RealmSmtpServerAuthArgs(
-                password="",  # noqa: S106
+                password="",
                 username="",
             ),
             from_="noreply@mit.dev",
@@ -341,9 +341,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913, PLR0915
                 client_secret=client_secret_value,
                 realm_id=client.realm_id,
                 realm_name="olapps",
-                url=client.realm_id.apply(
-                    lambda rid: f"{keycloak_url}/realms/{rid}"
-                ),
+                url=client.realm_id.apply(lambda rid: f"{keycloak_url}/realms/{rid}"),
                 secret=session_secret_value,
             ).apply(
                 lambda args: {
@@ -579,7 +577,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913, PLR0915
             enabled=True,
             email_verified=True,
             initial_password=keycloak.UserInitialPasswordArgs(
-                value="localdev123",  # noqa: S106
+                value="localdev123",
                 temporary=False,
             ),
             opts=kc_opts,

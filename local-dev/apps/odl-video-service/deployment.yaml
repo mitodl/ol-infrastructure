@@ -17,82 +17,82 @@ spec:
         app: odlvideo-webapp
     spec:
       initContainers:
-        - name: bootstrap
-          image: odlvideo-app
-          imagePullPolicy: IfNotPresent
-          command:
-            - /bin/sh
-            - -c
-            - |
-              python manage.py collectstatic --noinput --clear
-              python manage.py migrate --noinput
-          envFrom:
-            - configMapRef:
-                name: odlvideo-env
-            - secretRef:
-                name: odlvideo-secrets
-          volumeMounts:
-            - name: static-files
-              mountPath: /src/staticfiles
-      containers:
-        - name: app
-          image: odlvideo-app
-          imagePullPolicy: IfNotPresent
-          command:
-            - uwsgi
-            - --http-socket
-            - 0.0.0.0:8089
-            - --module
-            - odl_video.wsgi:application
-            - --workers
-            - "2"
-            - --threads
-            - "2"
-          ports:
-            - containerPort: 8089
-              name: uwsgi
-          envFrom:
-            - configMapRef:
-                name: odlvideo-env
-            - secretRef:
-                name: odlvideo-secrets
-          resources:
-            requests:
-              cpu: 250m
-              memory: 512Mi
-            limits:
-              memory: 1Gi
-          readinessProbe:
-            tcpSocket:
-              port: 8089
-            initialDelaySeconds: 20
-            periodSeconds: 10
-          volumeMounts:
-            - name: static-files
-              mountPath: /src/staticfiles
-        - name: nginx
-          image: nginx:1.25-alpine
-          ports:
-            - containerPort: 8088
-              name: http
-          volumeMounts:
-            - name: nginx-conf
-              mountPath: /etc/nginx/conf.d/default.conf
-              subPath: default.conf
-            - name: static-files
-              mountPath: /src/staticfiles
-          resources:
-            requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              memory: 128Mi
-      volumes:
-        - name: nginx-conf
-          configMap:
-            name: odlvideo-nginx-conf
+      - name: bootstrap
+        image: odlvideo-app
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/sh
+        - -c
+        - |
+          python manage.py collectstatic --noinput --clear
+          python manage.py migrate --noinput
+        envFrom:
+        - configMapRef:
+            name: odlvideo-env
+        - secretRef:
+            name: odlvideo-secrets
+        volumeMounts:
         - name: static-files
-          emptyDir: {}
+          mountPath: /src/staticfiles
+      containers:
+      - name: app
+        image: odlvideo-app
+        imagePullPolicy: IfNotPresent
+        command:
+        - uwsgi
+        - --http-socket
+        - 0.0.0.0:8089
+        - --module
+        - odl_video.wsgi:application
+        - --workers
+        - "2"
+        - --threads
+        - "2"
+        ports:
+        - containerPort: 8089
+          name: uwsgi
+        envFrom:
+        - configMapRef:
+            name: odlvideo-env
+        - secretRef:
+            name: odlvideo-secrets
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            memory: 1Gi
+        readinessProbe:
+          tcpSocket:
+            port: 8089
+          initialDelaySeconds: 20
+          periodSeconds: 10
+        volumeMounts:
+        - name: static-files
+          mountPath: /src/staticfiles
+      - name: nginx
+        image: nginx:1.25-alpine
+        ports:
+        - containerPort: 8088
+          name: http
+        volumeMounts:
+        - name: nginx-conf
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: default.conf
+        - name: static-files
+          mountPath: /src/staticfiles
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 128Mi
+      volumes:
+      - name: nginx-conf
+        configMap:
+          name: odlvideo-nginx-conf
+      - name: static-files
+        emptyDir: {}
 ---
 # Celery worker
 apiVersion: apps/v1
@@ -113,27 +113,27 @@ spec:
         app: odlvideo-celery
     spec:
       containers:
-        - name: celery
-          image: odlvideo-app
-          imagePullPolicy: IfNotPresent
-          command:
-            - celery
-            - -A
-            - odl_video.celery:app
-            - worker
-            - -c
-            - "2"
-          envFrom:
-            - configMapRef:
-                name: odlvideo-env
-            - secretRef:
-                name: odlvideo-secrets
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              memory: 1Gi
+      - name: celery
+        image: odlvideo-app
+        imagePullPolicy: IfNotPresent
+        command:
+        - celery
+        - -A
+        - odl_video.celery:app
+        - worker
+        - -c
+        - "2"
+        envFrom:
+        - configMapRef:
+            name: odlvideo-env
+        - secretRef:
+            name: odlvideo-secrets
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 1Gi
 ---
 # Celery beat scheduler
 apiVersion: apps/v1
@@ -154,25 +154,25 @@ spec:
         app: odlvideo-celery-beat
     spec:
       containers:
-        - name: celery-beat
-          image: odlvideo-app
-          imagePullPolicy: IfNotPresent
-          command:
-            - celery
-            - -A
-            - odl_video.celery:app
-            - beat
-          envFrom:
-            - configMapRef:
-                name: odlvideo-env
-            - secretRef:
-                name: odlvideo-secrets
-          resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              memory: 256Mi
+      - name: celery-beat
+        image: odlvideo-app
+        imagePullPolicy: IfNotPresent
+        command:
+        - celery
+        - -A
+        - odl_video.celery:app
+        - beat
+        envFrom:
+        - configMapRef:
+            name: odlvideo-env
+        - secretRef:
+            name: odlvideo-secrets
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            memory: 256Mi
 ---
 apiVersion: v1
 kind: Service
@@ -185,6 +185,6 @@ spec:
   selector:
     app: odlvideo-webapp
   ports:
-    - name: http
-      port: 8088
-      targetPort: http
+  - name: http
+    port: 8088
+    targetPort: http

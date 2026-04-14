@@ -28,20 +28,20 @@ registries:
 # Expose HTTPS and HTTP on host ports 443/80 so that *.mit.dev ingress routes
 # are reachable without a port suffix.
 ports:
-  - port: 80:80
-    nodeFilters:
-      - loadbalancer
-  - port: 443:443
-    nodeFilters:
-      - loadbalancer
+- port: 80:80
+  nodeFilters:
+  - loadbalancer
+- port: 443:443
+  nodeFilters:
+  - loadbalancer
 
 # Disable Traefik — APISIX Ingress Controller replaces it.
 options:
   k3s:
     extraArgs:
-      - arg: --disable=traefik
-        nodeFilters:
-          - server:*
+    - arg: --disable=traefik
+      nodeFilters:
+      - server:*
 
 kubeAPI:
   hostIP: "0.0.0.0"
