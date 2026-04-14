@@ -602,23 +602,31 @@ ocw_studio_k8s_app = OLApplicationK8s(
                 queue_name="default",
                 redis_host=redis_cache.address,
                 redis_password=redis_config.require("password"),
+                resource_requests={"cpu": "50m", "memory": "768Mi"},
+                resource_limits={"memory": "768Mi"},
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="publish",
                 redis_host=redis_cache.address,
                 redis_password=redis_config.require("password"),
+                resource_requests={"cpu": "50m", "memory": "768Mi"},
+                resource_limits={"memory": "768Mi"},
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="batch",
                 redis_host=redis_cache.address,
                 redis_password=redis_config.require("password"),
+                resource_requests={"cpu": "50m", "memory": "768Mi"},
+                resource_limits={"memory": "768Mi"},
             ),
         ],
         celery_beat_config=OLApplicationK8sCeleryBeatConfig(
-            scheduler="celery.beat.PersistentScheduler"
+            scheduler="celery.beat.PersistentScheduler",
+            resource_requests={"cpu": "10m", "memory": "384Mi"},
+            resource_limits={"memory": "384Mi"},
         ),
-        resource_requests={"cpu": "250m", "memory": "1Gi"},
-        resource_limits={"memory": "2Gi"},
+        resource_requests={"cpu": "100m", "memory": "1Gi"},
+        resource_limits={"memory": "1Gi"},
         # App lacks health check endpoints so we use nginx's
         probe_configs={
             "liveness_probe": kubernetes.core.v1.ProbeArgs(
