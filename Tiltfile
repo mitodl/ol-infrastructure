@@ -146,7 +146,7 @@ APPS = [
 # ---------------------------------------------------------------------------
 local_resource(
     "local-infra",
-    cmd="pulumi up --yes --skip-preview --stack local-dev.infra.Dev",
+    cmd="PULUMI_CONFIG_PASSPHRASE='' pulumi up --yes --skip-preview --stack local-dev.infra.Dev",
     dir="./local-dev/infra",
     deps=["./local-dev/infra"],
     labels=["infra"],

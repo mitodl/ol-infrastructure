@@ -232,11 +232,17 @@ log "Checking Pulumi local-dev/infra stack..."
 
 INFRA_DIR="${REPO_ROOT}/local-dev/infra"
 if [[ -d "${INFRA_DIR}" ]]; then
+    # Ensure the local state backend directory exists before any pulumi command.
+    mkdir -p "${INFRA_DIR}/.pulumi"
     (
         cd "${INFRA_DIR}"
-        # Use local filesystem state (no AWS credentials needed)
-        if ! pulumi stack ls --json 2>/dev/null | python3 -c "import json,sys; stacks=[s['name'] for s in json.load(sys.stdin)]; sys.exit(0 if 'local-dev.infra.Dev' in stacks else 1)" 2>/dev/null; then
-            pulumi stack init local-dev.infra.Dev --secrets-provider=passphrase 2>/dev/null || true
+        # PULUMI_CONFIG_PASSPHRASE="" uses an empty passphrase for the local
+        # secrets provider — avoids interactive prompts in local dev.
+        export PULUMI_CONFIG_PASSPHRASE=""
+        # Init the stack if it doesn't exist yet.
+        if ! pulumi stack ls --json 2>/dev/null \
+            | python3 -c "import json,sys; stacks=[s['name'] for s in json.load(sys.stdin)]; sys.exit(0 if 'local-dev.infra.Dev' in stacks else 1)" 2>/dev/null; then
+            pulumi stack init local-dev.infra.Dev --secrets-provider=passphrase
         fi
     )
     ok "Pulumi infra stack ready."
