@@ -394,18 +394,16 @@ apisix_release = k8s.helm.v3.Release(
                 },
                 "apisix": {
                     "deployment": {
-                        "mode": "standalone",
+                        # Use traditional mode (same as production): Admin API
+                        # backed by YAML storage. The ingress controller pushes
+                        # routes via Admin API rather than reading the YAML
+                        # directly. Workers show "has not received configuration"
+                        # until the ingress controller delivers the first sync —
+                        # failureThreshold below gives it time to do so.
+                        "mode": "traditional",
                         "role": "traditional",
                         "role_traditional": {
                             "config_provider": "yaml",
-                        },
-                        # Provide a minimal bootstrap apisix.yaml so workers
-                        # receive valid (empty) configuration on first start and
-                        # pass the readiness probe. Without this the standalone
-                        # config_provider has no #END-terminated file and every
-                        # worker logs "has not received configuration".
-                        "standalone": {
-                            "config": "routes: []\n#END\n",
                         },
                     },
                     "ssl": {
@@ -414,21 +412,66 @@ apisix_release = k8s.helm.v3.Release(
                     },
                     "admin": {
                         "enabled": True,
+                        "ip": "0.0.0.0",  # noqa: S104
+                        "port": 9180,
+                        "servicePort": 9180,
                         "credentials": {
                             "admin": args["admin"],
                             "viewer": args["viewer"],
                         },
+                        "allow": {
+                            "ipList": ["0.0.0.0/0"],
+                        },
                     },
+                },
+                # Disable etcd — not needed with config_provider: yaml
+                "etcd": {
+                    "enabled": False,
+                },
+                # Allow 5 min for ingress controller to push first config
+                # before the readiness probe gives up (chicken-egg on startup).
+                "readinessProbe": {
+                    "initialDelaySeconds": 10,
+                    "periodSeconds": 10,
+                    "timeoutSeconds": 1,
+                    "failureThreshold": 30,
                 },
                 "ingress-controller": {
                     "enabled": True,
                     "config": {
-                        "apisix": {
-                            "serviceName": "apache-apisix-admin",
-                            "serviceNamespace": "operations",
+                        "execADCTimeout": "60s",
+                        "provider": {
+                            "type": "apisix-standalone",
                         },
                         "kubernetes": {
                             "ingressClass": "apache-apisix",
+                            "enableGatewayAPI": True,
+                        },
+                    },
+                    "apisix": {
+                        "adminService": {
+                            "name": "apache-apisix-admin",
+                            "namespace": "operations",
+                            "port": 9180,
+                        },
+                    },
+                    "gatewayProxy": {
+                        "createDefault": True,
+                        "publishService": "apache-apisix-gateway",
+                        "provider": {
+                            "type": "ControlPlane",
+                            "controlPlane": {
+                                "service": {
+                                    "name": "apache-apisix-admin",
+                                    "port": 9180,
+                                },
+                                "auth": {
+                                    "type": "AdminKey",
+                                    "adminKey": {
+                                        "value": args["admin"],
+                                    },
+                                },
+                            },
                         },
                     },
                 },
