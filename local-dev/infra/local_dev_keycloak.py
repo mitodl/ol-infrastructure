@@ -14,7 +14,7 @@ import json
 
 import pulumi_keycloak as keycloak
 import pulumi_kubernetes as k8s
-from pulumi import Output, ResourceOptions
+from pulumi import InvokeOptions, Output, ResourceOptions
 
 from ol_infrastructure.substructure.keycloak.org_flows import (
     create_organization_browser_flows,
@@ -519,9 +519,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         opts=kc_opts.merge(ResourceOptions(delete_before_replace=True)),
     )
 
-    from pulumi import InvokeOptions  # noqa: PLC0415
-
-    realm_management_client = keycloak.openid.get_client(
+    realm_management_client = keycloak.openid.get_client_output(
         realm_id=realm.id,
         client_id="realm-management",
         opts=InvokeOptions(provider=keycloak_provider),
@@ -586,7 +584,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         )
         if is_admin:
             # Assign realm-admin role to admin user.
-            realm_admin_role = keycloak.get_role(
+            realm_admin_role = keycloak.get_role_output(
                 realm_id=realm.id,
                 name="admin",
                 opts=InvokeOptions(provider=keycloak_provider),
