@@ -1027,7 +1027,12 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             ),
             name=f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-https-logging-args",
             content_type="application/json",
-            format=build_fastly_log_format_string(additional_static_fields={}),
+            format=build_fastly_log_format_string(
+                additional_static_fields={
+                    "application": "mit-learn",
+                    "environment": stack_info.env_suffix,
+                }
+            ),
             format_version=2,
             header_name="Authorization",
             header_value=f"Basic {encoded_fastly_proxy_credentials}",
