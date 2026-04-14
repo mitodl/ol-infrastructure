@@ -72,7 +72,9 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         registration_email_as_username=True,
         # Disabled for local dev — avoids email verification friction.
         verify_email=False,
-        password_policy="length(8) and notUsername and notEmail",  # noqa: S106
+        password_policy=(  # pragma: allowlist secret  # noqa: S106
+            "length(8) and notUsername and notEmail"
+        ),
         security_defenses=keycloak.RealmSecurityDefensesArgs(
             brute_force_detection=keycloak.RealmSecurityDefensesBruteForceDetectionArgs(
                 failure_reset_time_seconds=43200,
@@ -324,7 +326,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         "organization",
     ]
 
-    def _make_oidc_secret(
+    def _make_oidc_secret(  # noqa: PLR0913
         resource_name: str,
         namespace: str,
         secret_name: str,

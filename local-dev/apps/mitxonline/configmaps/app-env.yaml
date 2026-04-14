@@ -46,8 +46,8 @@ data:
   MAILGUN_SENDER_DOMAIN: "local.dev"
   MAILGUN_KEY: "local-dev-stub-mailgun-key"
   # Required OpenEdX API credentials (stub — OpenEdX integration degraded locally)
-  OPENEDX_API_CLIENT_ID: "local-dev-openedx-client-id"
-  OPENEDX_API_CLIENT_SECRET: "local-dev-openedx-client-secret"
+  OPENEDX_API_CLIENT_ID: "local-dev-openedx-client-id"  # pragma: allowlist secret
+  OPENEDX_API_CLIENT_SECRET: "local-dev-openedx-client-secret"  # pragma: allowlist secret
 
   # Unified Ecommerce (optional — disable if not running)
   UNIFIED_ECOMMERCE_URL: ""

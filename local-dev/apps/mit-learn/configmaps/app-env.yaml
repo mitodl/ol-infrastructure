@@ -60,7 +60,6 @@ data:
   MITOL_EMAIL_TLS: "False"
   MITOL_FROM_EMAIL: "MIT Learn <noreply@mit.dev>"
   MITOL_NOTIFICATION_EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
-  MITOL_ADMIN_EMAIL: "admin@odl.local"
 
   # ── Database ───────────────────────────────────────────────────────────────
   # DATABASE_URL is set in secrets (contains password).

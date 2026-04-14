@@ -21,6 +21,7 @@ Services provisioned:
 
 import base64
 from pathlib import Path
+from typing import Any
 
 import pulumi
 import pulumi_keycloak as keycloak
@@ -69,7 +70,7 @@ _ca_cert_path = _repo_root / mkcert_ca_cert_path
 # Kubernetes Provider
 # ---------------------------------------------------------------------------
 
-k8s_provider_opts: dict = {}
+k8s_provider_opts: dict[str, Any] = {}
 if kubeconfig_path:
     k8s_provider_opts["kubeconfig"] = kubeconfig_path
 
@@ -220,7 +221,7 @@ cnpg_release = k8s.helm.v3.Release(
 pg_credentials = k8s.core.v1.Secret(
     "pg-credentials",
     metadata={"name": "pg-app-credentials", "namespace": "local-infra"},
-    string_data={"username": "app", "password": "localdev"},
+    string_data={"username": "app", "password": "localdev"},  # pragma: allowlist secret
     opts=_k8s(parent=local_infra_ns),
 )
 
@@ -446,7 +447,7 @@ k8s.core.v1.Service(
 )
 
 # ---------------------------------------------------------------------------
-# OpenSearch (Helm)
+# OpenSearch (Helm)  # noqa: ERA001
 # ---------------------------------------------------------------------------
 
 opensearch_release = k8s.helm.v3.Release(
@@ -528,23 +529,9 @@ litellm_config_cm = k8s.core.v1.ConfigMap(
     "litellm-config",
     metadata={"name": "litellm-config", "namespace": "local-infra"},
     data={
-        "config.yaml": """\
-model_list:
-  - model_name: gpt-4o-mini
-    litellm_params:
-      model: openai/gpt-4o-mini
-      api_key: os.environ/OPENAI_API_KEY
-  - model_name: gpt-4o
-    litellm_params:
-      model: openai/gpt-4o
-      api_key: os.environ/OPENAI_API_KEY
-  - model_name: text-embedding-ada-002
-    litellm_params:
-      model: openai/text-embedding-ada-002
-      api_key: os.environ/OPENAI_API_KEY
-general_settings:
-  database_url: postgresql://app:localdev@local-pg-rw.local-infra.svc.cluster.local/litellm
-"""
+        "config.yaml": (
+            Path(__file__).parent / "config" / "litellm-config.yaml"
+        ).read_text(),
     },
     opts=_k8s(parent=local_infra_ns),
 )
@@ -691,7 +678,7 @@ keycloak_operator = k8s.yaml.v2.ConfigGroup(
     # Redirect all namespaced resources to local-infra; CRDs are cluster-scoped
     # and will not be affected by this (they have no namespace field).
     transformations=[
-        lambda obj, opts: (
+        lambda obj, _opts: (
             obj["metadata"].__setitem__("namespace", "local-infra")
             if obj.get("metadata")
             and obj["kind"]
@@ -711,12 +698,11 @@ keycloak_admin_secret = k8s.core.v1.Secret(
     },
     string_data={
         "username": "admin",
-        "password": "admin",
+        "password": "admin",  # pragma: allowlist secret
     },
     opts=_k8s(parent=local_infra_ns),
 )
 
-# Keycloak instance CR.
 keycloak_instance = k8s.apiextensions.CustomResource(
     "keycloak-instance",
     api_version="k8s.keycloak.org/v2alpha1",
@@ -732,7 +718,7 @@ keycloak_instance = k8s.apiextensions.CustomResource(
         },
         "http": {
             "httpEnabled": True,
-            "tlsSecret": "local-dev-tls",
+            "tlsSecret": "local-dev-tls",  # pragma: allowlist secret
         },
         "db": {
             "vendor": "postgres",
@@ -875,7 +861,7 @@ keycloak_provider = keycloak.Provider(
     url=keycloak_url,
     realm="master",
     username="admin",
-    password="admin",
+    password="admin",  # noqa: S106  # pragma: allowlist secret
     initial_login=True,
     opts=ResourceOptions(depends_on=[keycloak_instance]),
 )

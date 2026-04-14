@@ -152,7 +152,7 @@ Open the Tilt UI at `http://localhost:10350` to monitor deployments and trigger 
 
 **TLS:** mkcert generates a wildcard certificate for all `.dev` domains. The cert is read by Pulumi at stack evaluation time and stored as `local-dev-tls` Kubernetes Secrets in every app namespace. APISIX's `ApisixTls` CRs reference these secrets.
 
-**Keycloak realm:** The `olapps` realm mirrors production, including the fake-Touchstone SAML IdP, all OIDC clients, and organizations support. Test users: `admin@odl.local`, `student@odl.local`, `prof@odl.local` (password: `localdev123`).
+**Keycloak realm:** The `olapps` realm mirrors production, including the fake-Touchstone SAML IdP, all OIDC clients, and organizations support. Test users: `admin@odl.local`, `student@odl.local`, `prof@odl.local` (password: `localdev123`).  <!-- pragma: allowlist secret -->
 
 ---
 

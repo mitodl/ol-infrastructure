@@ -18,85 +18,85 @@ spec:
         app: learnai-webapp
     spec:
       initContainers:
-        - name: bootstrap
-          image: learnai-app
-          imagePullPolicy: IfNotPresent
-          command:
-            - /bin/sh
-            - -c
-            - |
-              python manage.py collectstatic --noinput --clear
-              python manage.py migrate --noinput
-              python manage.py createcachetable
-              RUN_DATA_MIGRATIONS=true python manage.py migrate --noinput
-              python manage.py loaddata initial_llm_models
-          envFrom:
-            - configMapRef:
-                name: learn-ai-env
-            - secretRef:
-                name: learn-ai-secrets
-          volumeMounts:
-            - name: static-files
-              mountPath: /src/staticfiles
-      containers:
-        - name: app
-          image: learnai-app
-          imagePullPolicy: IfNotPresent
-          command:
-            - granian
-            - --interface
-            - asgi
-            - --host
-            - 0.0.0.0
-            - --port
-            - "8001"
-            - main.asgi:application
-          ports:
-            - containerPort: 8001
-              name: granian
-          envFrom:
-            - configMapRef:
-                name: learn-ai-env
-            - secretRef:
-                name: learn-ai-secrets
-          resources:
-            requests:
-              cpu: 250m
-              memory: 1Gi
-            limits:
-              memory: 2Gi
-          readinessProbe:
-            httpGet:
-              path: /health/
-              port: 8001
-            initialDelaySeconds: 15
-            periodSeconds: 10
-          volumeMounts:
-            - name: static-files
-              mountPath: /src/staticfiles
-        - name: nginx
-          image: nginx:1.25-alpine
-          ports:
-            - containerPort: 8000
-              name: http
-          volumeMounts:
-            - name: nginx-conf
-              mountPath: /etc/nginx/conf.d/default.conf
-              subPath: default.conf
-            - name: static-files
-              mountPath: /src/staticfiles
-          resources:
-            requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              memory: 128Mi
-      volumes:
-        - name: nginx-conf
-          configMap:
-            name: learnai-nginx-conf
+      - name: bootstrap
+        image: learnai-app
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/sh
+        - -c
+        - |
+          python manage.py collectstatic --noinput --clear
+          python manage.py migrate --noinput
+          python manage.py createcachetable
+          RUN_DATA_MIGRATIONS=true python manage.py migrate --noinput
+          python manage.py loaddata initial_llm_models
+        envFrom:
+        - configMapRef:
+            name: learn-ai-env
+        - secretRef:
+            name: learn-ai-secrets
+        volumeMounts:
         - name: static-files
-          emptyDir: {}
+          mountPath: /src/staticfiles
+      containers:
+      - name: app
+        image: learnai-app
+        imagePullPolicy: IfNotPresent
+        command:
+        - granian
+        - --interface
+        - asgi
+        - --host
+        - 0.0.0.0
+        - --port
+        - "8001"
+        - main.asgi:application
+        ports:
+        - containerPort: 8001
+          name: granian
+        envFrom:
+        - configMapRef:
+            name: learn-ai-env
+        - secretRef:
+            name: learn-ai-secrets
+        resources:
+          requests:
+            cpu: 250m
+            memory: 1Gi
+          limits:
+            memory: 2Gi
+        readinessProbe:
+          httpGet:
+            path: /health/
+            port: 8001
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        volumeMounts:
+        - name: static-files
+          mountPath: /src/staticfiles
+      - name: nginx
+        image: nginx:1.25-alpine
+        ports:
+        - containerPort: 8000
+          name: http
+        volumeMounts:
+        - name: nginx-conf
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: default.conf
+        - name: static-files
+          mountPath: /src/staticfiles
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 128Mi
+      volumes:
+      - name: nginx-conf
+        configMap:
+          name: learnai-nginx-conf
+      - name: static-files
+        emptyDir: {}
 ---
 # Celery worker — default queue
 apiVersion: apps/v1
@@ -117,29 +117,29 @@ spec:
         app: learnai-celery-default
     spec:
       containers:
-        - name: celery
-          image: learnai-app
-          imagePullPolicy: IfNotPresent
-          command:
-            - celery
-            - -A
-            - main.celery:app
-            - worker
-            - -Q
-            - default
-            - -c
-            - "2"
-          envFrom:
-            - configMapRef:
-                name: learn-ai-env
-            - secretRef:
-                name: learn-ai-secrets
-          resources:
-            requests:
-              cpu: 100m
-              memory: 512Mi
-            limits:
-              memory: 2Gi
+      - name: celery
+        image: learnai-app
+        imagePullPolicy: IfNotPresent
+        command:
+        - celery
+        - -A
+        - main.celery:app
+        - worker
+        - -Q
+        - default
+        - -c
+        - "2"
+        envFrom:
+        - configMapRef:
+            name: learn-ai-env
+        - secretRef:
+            name: learn-ai-secrets
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            memory: 2Gi
 ---
 # Celery worker — edx_content queue
 apiVersion: apps/v1
@@ -160,29 +160,29 @@ spec:
         app: learnai-celery-edx-content
     spec:
       containers:
-        - name: celery
-          image: learnai-app
-          imagePullPolicy: IfNotPresent
-          command:
-            - celery
-            - -A
-            - main.celery:app
-            - worker
-            - -Q
-            - edx_content
-            - -c
-            - "2"
-          envFrom:
-            - configMapRef:
-                name: learn-ai-env
-            - secretRef:
-                name: learn-ai-secrets
-          resources:
-            requests:
-              cpu: 100m
-              memory: 512Mi
-            limits:
-              memory: 2Gi
+      - name: celery
+        image: learnai-app
+        imagePullPolicy: IfNotPresent
+        command:
+        - celery
+        - -A
+        - main.celery:app
+        - worker
+        - -Q
+        - edx_content
+        - -c
+        - "2"
+        envFrom:
+        - configMapRef:
+            name: learn-ai-env
+        - secretRef:
+            name: learn-ai-secrets
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            memory: 2Gi
 ---
 # Celery beat scheduler
 apiVersion: apps/v1
@@ -203,27 +203,27 @@ spec:
         app: learnai-celery-beat
     spec:
       containers:
-        - name: celery-beat
-          image: learnai-app
-          imagePullPolicy: IfNotPresent
-          command:
-            - celery
-            - -A
-            - main.celery:app
-            - beat
-            - --scheduler
-            - celery.beat.PersistentScheduler
-          envFrom:
-            - configMapRef:
-                name: learn-ai-env
-            - secretRef:
-                name: learn-ai-secrets
-          resources:
-            requests:
-              cpu: 50m
-              memory: 256Mi
-            limits:
-              memory: 512Mi
+      - name: celery-beat
+        image: learnai-app
+        imagePullPolicy: IfNotPresent
+        command:
+        - celery
+        - -A
+        - main.celery:app
+        - beat
+        - --scheduler
+        - celery.beat.PersistentScheduler
+        envFrom:
+        - configMapRef:
+            name: learn-ai-env
+        - secretRef:
+            name: learn-ai-secrets
+        resources:
+          requests:
+            cpu: 50m
+            memory: 256Mi
+          limits:
+            memory: 512Mi
 ---
 # Service (nginx sidecar is the HTTP frontend)
 apiVersion: v1
@@ -237,6 +237,6 @@ spec:
   selector:
     app: learnai-webapp
   ports:
-    - name: http
-      port: 8000
-      targetPort: http
+  - name: http
+    port: 8000
+    targetPort: http

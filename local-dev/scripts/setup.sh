@@ -58,15 +58,13 @@ KEY_FILE="${CERT_DIR}/local-dev-key.pem"
 # ---------------------------------------------------------------------------
 SKIP_HOSTS=false
 SKIP_CERTS=false
-REINSTALL_TOOLS=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --skip-hosts)   SKIP_HOSTS=true;      shift ;;
-        --skip-certs)   SKIP_CERTS=true;      shift ;;
-        --reinstall-tools) REINSTALL_TOOLS=true; shift ;;
+        --skip-hosts)   SKIP_HOSTS=true;  shift ;;
+        --skip-certs)   SKIP_CERTS=true;  shift ;;
         -h|--help)
-            echo "Usage: setup.sh [--skip-hosts] [--skip-certs] [--reinstall-tools]"
+            echo "Usage: setup.sh [--skip-hosts] [--skip-certs]"
             exit 0
             ;;
         *) echo "Unknown argument: $1" >&2; exit 1 ;;
@@ -162,10 +160,10 @@ else
 
     # Generate wildcard certs covering all local hostnames.
     # Use explicit output file names so Pulumi can reliably reference them.
-    (cd "${CERT_DIR}" && mkcert \
-        -cert-file local-dev.pem \
-        -key-file local-dev-key.pem \
-        "${MKCERT_DOMAINS[@]}")
+    mkcert \
+        -cert-file "${CERT_FILE}" \
+        -key-file "${KEY_FILE}" \
+        "${MKCERT_DOMAINS[@]}"
     ok "Certificates written to ${CERT_DIR}/"
 
     # Also copy the mkcert root CA to certs/ so Pulumi can reference it.
