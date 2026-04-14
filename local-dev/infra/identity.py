@@ -128,6 +128,11 @@ def create_identity(  # noqa: PLR0913
                     "key": "password",
                 },
             },
+            "bootstrapAdmin": {
+                "user": {
+                    "secret": "keycloak-admin-credentials"  # pragma: allowlist secret
+                },
+            },
             "ingress": {"enabled": False},  # Routed through APISIX.
             "features": {"enabled": ["organization"]},
             "additionalOptions": [

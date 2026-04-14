@@ -86,7 +86,7 @@ _k8s = make_resource_opts(k8s_provider)
 # Orchestration
 # ---------------------------------------------------------------------------
 
-namespaces = create_namespaces(k8s_provider, _k8s)
+namespaces = create_namespaces(_k8s)
 
 tls = create_tls_resources(
     _k8s,

@@ -9,7 +9,6 @@ APP_NAMESPACES = ("mit-learn", "learn-ai", "mitxonline", "odl-video-service")
 
 
 def create_namespaces(
-    k8s_provider: k8s.Provider,
     _k8s: Callable[..., ResourceOptions],
 ) -> dict[str, k8s.core.v1.Namespace]:
     """Create all namespaces required by the local-dev stack.

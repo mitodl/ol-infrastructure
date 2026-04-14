@@ -20,7 +20,7 @@ def make_resource_opts(k8s_provider: k8s.Provider) -> Callable[..., ResourceOpti
     def _k8s(
         parent=None,
         depends_on=None,
-        delete_before_replace: bool | None = None,
+        delete_before_replace: bool | None = None,  # noqa: FBT001
     ) -> ResourceOptions:
         return ResourceOptions(
             provider=k8s_provider,
