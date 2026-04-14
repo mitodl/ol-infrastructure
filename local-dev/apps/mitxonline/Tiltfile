@@ -1,24 +1,28 @@
 # mitxonline Tiltfile
 # Builds the mitxonline Django app (uwsgi) and deploys it to the mitxonline namespace.
+# When the sibling mitxonline repo is not checked out, Tilt uses the prebuilt
+# DockerHub image (mitodl/mitxonline-app:latest) without attempting a local build.
 
-APP_DIR = os.path.abspath('../../../mitxonline')
+workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
+APP_DIR = os.path.join(workspace_root, "mitxonline")
 IMAGE = 'mitodl/mitxonline-app'
 NAMESPACE = 'mitxonline'
 DEPLOY_NAME = 'mitxonline-webapp'
 
-docker_build(
-    IMAGE,
-    context=APP_DIR,
-    dockerfile=APP_DIR + '/Dockerfile',
-    live_update=[
-        sync(APP_DIR + '/mitxonline', '/src/mitxonline'),
-        sync(APP_DIR + '/main', '/src/main'),
-        run(
-            'cd /src && pip install -r requirements.txt',
-            trigger=[APP_DIR + '/requirements.txt'],
-        ),
-    ],
-)
+if os.path.exists(os.path.join(APP_DIR, '.git')):
+    docker_build(
+        IMAGE,
+        context=APP_DIR,
+        dockerfile=APP_DIR + '/Dockerfile',
+        live_update=[
+            sync(APP_DIR + '/mitxonline', '/src/mitxonline'),
+            sync(APP_DIR + '/main', '/src/main'),
+            run(
+                'cd /src && pip install -r requirements.txt',
+                trigger=[APP_DIR + '/requirements.txt'],
+            ),
+        ],
+    )
 
 k8s_yaml([
     'configmaps/app-env.yaml',

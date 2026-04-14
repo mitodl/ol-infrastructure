@@ -11,7 +11,7 @@
 #   - Install in-cluster resources (Pulumi owns all of those; run `tilt up`)
 #
 # Usage:
-#   ./local-dev/scripts/setup.sh [--skip-hosts] [--skip-certs] [--reinstall-tools]
+#   ./local-dev/scripts/setup.sh [--skip-hosts] [--skip-certs]
 
 set -euo pipefail
 
@@ -168,7 +168,6 @@ else
 
     # Also copy the mkcert root CA to certs/ so Pulumi can reference it.
     cp "$(mkcert -CAROOT)/rootCA.pem" "${CERT_DIR}/rootCA.pem"
-    cp "$(mkcert -CAROOT)/rootCA-key.pem" "${CERT_DIR}/rootCA-key.pem"
     ok "mkcert CA cert copied to ${CERT_DIR}/rootCA.pem"
 fi
 

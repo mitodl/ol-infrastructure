@@ -129,11 +129,27 @@ for _ns_name in ("mit-learn", "learn-ai", "mitxonline", "odl-video-service"):
 # Read cert files at Pulumi evaluation time. These files are created by
 # setup.sh before `pulumi up` is run.
 def _read_file_b64(path: Path) -> str:
-    return base64.b64encode(path.read_bytes()).decode()
+    try:
+        return base64.b64encode(path.read_bytes()).decode()
+    except FileNotFoundError as e:
+        msg = (
+            f"Certificate file not found: {path}\n"
+            "Run ./local-dev/scripts/setup.sh to generate local TLS certificates."
+        )
+        raise SystemExit(msg) from e
 
 
 _tls_cert_b64 = _read_file_b64(_cert_path)
 _tls_key_b64 = _read_file_b64(_key_path)
+
+try:
+    _ca_cert_content = _ca_cert_path.read_text()
+except FileNotFoundError as e:
+    msg = (
+        f"mkcert root CA not found: {_ca_cert_path}\n"
+        "Run ./local-dev/scripts/setup.sh to generate local TLS certificates."
+    )
+    raise SystemExit(msg) from e
 
 
 def _tls_secret(resource_name: str, namespace: str, parent) -> k8s.core.v1.Secret:
@@ -144,9 +160,6 @@ def _tls_secret(resource_name: str, namespace: str, parent) -> k8s.core.v1.Secre
         data={"tls.crt": _tls_cert_b64, "tls.key": _tls_key_b64},
         opts=_k8s(parent=parent),
     )
-
-
-_ca_cert_content = _ca_cert_path.read_text()
 
 
 def _ca_configmap(resource_name: str, namespace: str, parent) -> k8s.core.v1.ConfigMap:

@@ -15,27 +15,13 @@ config:
 
   # OIDC client secrets for local dev (plaintext, never commit real secrets)
   # These are default local-only values; override in your local tilt_config.json
-  ol-local-dev-infra:mitlearn_client_secret:
-    secure: false
-    value: "local-dev-mitlearn-secret"
-  ol-local-dev-infra:learn_ai_client_secret:
-    secure: false
-    value: "local-dev-learn-ai-secret"
-  ol-local-dev-infra:mitxonline_client_secret:
-    secure: false
-    value: "local-dev-mitxonline-secret"
-  ol-local-dev-infra:unified_ecommerce_client_secret:
-    secure: false
-    value: "local-dev-unified-ecommerce-secret"
-  ol-local-dev-infra:apisix_admin_key:
-    secure: false
-    value: "local-dev-apisix-admin-key"
-  ol-local-dev-infra:apisix_viewer_key:
-    secure: false
-    value: "local-dev-apisix-viewer-key"
-  ol-local-dev-infra:apisix_oidc_session_secret:
-    secure: false
-    value: "local-dev-apisix-oidc-session-secret"
+  ol-local-dev-infra:mitlearn_client_secret: "local-dev-mitlearn-secret"  # pragma: allowlist secret
+  ol-local-dev-infra:learn_ai_client_secret: "local-dev-learn-ai-secret"  # pragma: allowlist secret
+  ol-local-dev-infra:mitxonline_client_secret: "local-dev-mitxonline-secret"  # pragma: allowlist secret
+  ol-local-dev-infra:unified_ecommerce_client_secret: "local-dev-unified-ecommerce-secret"  # pragma: allowlist secret
+  ol-local-dev-infra:apisix_admin_key: "local-dev-apisix-admin-key"
+  ol-local-dev-infra:apisix_viewer_key: "local-dev-apisix-viewer-key"
+  ol-local-dev-infra:apisix_oidc_session_secret: "local-dev-apisix-oidc-session-secret"  # pragma: allowlist secret
 
   # Helm chart versions
   ol-local-dev-infra:cert_manager_version: "v1.16.2"

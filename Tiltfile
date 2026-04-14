@@ -6,8 +6,9 @@
 # Developer configuration
 # ---------------------------------------------------------------------------
 config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service")
-config.define_bool("per_app_databases", usage="Deploy isolated DB/Redis per app namespace")
+config.define_bool("per_app_databases", usage="Deploy isolated DB/Valkey per app namespace")
 config.define_string("openedx_mode", usage="qa (default) or local (Tutor)")
+config.define_string_list("prebuilt_tags", usage="Prebuilt image tag overrides per app, e.g. mit-learn=0.62.0")
 cfg = config.parse()
 
 enabled_apps = cfg.get("enabled_apps", ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"])
@@ -145,17 +146,6 @@ local_resource(
 # Per-app deployment + manual seed resources
 # ---------------------------------------------------------------------------
 for app in [a for a in APPS if a["name"] in enabled_apps]:
-    repo_path = os.path.join(workspace_root, app["dir"])
-    repo_available = os.path.exists(os.path.join(repo_path, ".git"))
-
-    # Export image tag env var so the app's Tiltfile can read it.
-    if repo_available:
-        os.environ["LOCAL_IMAGE_TAG_" + app["name"].upper().replace("-", "_")] = "local"
-    else:
-        os.environ["LOCAL_IMAGE_TAG_" + app["name"].upper().replace("-", "_")] = (
-            app["prebuilt_tag_backend"]
-        )
-
     if os.path.exists(app["tiltfile"]):
         include(app["tiltfile"])
 
@@ -167,7 +157,7 @@ for app in [a for a in APPS if a["name"] in enabled_apps]:
     # These are never auto-run; trigger them from the Tilt UI or with:
     #   tilt trigger seed-<app>-<label>
     # or via:
-    #   ./local-dev/scripts/seed.sh --app <app> --command <label>
+    #   ./local-dev/scripts/seed.sh --app <app> --cmd <label>
     for seed in app.get("seed_commands", []):
         exec_cmd = (
             "kubectl exec -n {ns} deploy/{deploy} -- {cmd}".format(

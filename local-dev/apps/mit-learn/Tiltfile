@@ -1,8 +1,8 @@
 # mit-learn Tiltfile
 # Manages docker build, k8s resources, and live-update for the mit-learn application.
 # Loaded by the root Tiltfile via include().
-
-load("ext://restart_process", "docker_build_with_restart")
+# When the sibling mit-learn repo is not checked out, Tilt uses the prebuilt
+# DockerHub image (mitodl/mit-learn-app:latest) without attempting a local build.
 
 NAMESPACE = "mit-learn"
 IMAGE = "mitodl/mit-learn-app"
@@ -12,28 +12,29 @@ MIT_LEARN_DIR = os.path.join(config.main_dir, "../mit-learn")
 # Docker Build
 # ─────────────────────────────────────────────────────────────
 
-docker_build(
-    IMAGE,
-    context=MIT_LEARN_DIR,
-    dockerfile=os.path.join(MIT_LEARN_DIR, "Dockerfile"),
-    # Live update: sync Python source changes and trigger granian reload.
-    live_update=[
-        sync(
-            os.path.join(MIT_LEARN_DIR),
-            "/src",
-        ),
-        # Reinstall Python deps if pyproject.toml or uv.lock changes.
-        run(
-            "cd /src && uv sync --frozen",
-            trigger=[
-                os.path.join(MIT_LEARN_DIR, "pyproject.toml"),
-                os.path.join(MIT_LEARN_DIR, "uv.lock"),
-            ],
-        ),
-        # Touch reload sentinel — granian watches for this.
-        run("touch /tmp/tilt-reload"),
-    ],
-)
+if os.path.exists(os.path.join(MIT_LEARN_DIR, ".git")):
+    docker_build(
+        IMAGE,
+        context=MIT_LEARN_DIR,
+        dockerfile=os.path.join(MIT_LEARN_DIR, "Dockerfile"),
+        # Live update: sync Python source changes and trigger granian reload.
+        live_update=[
+            sync(
+                os.path.join(MIT_LEARN_DIR),
+                "/src",
+            ),
+            # Reinstall Python deps if pyproject.toml or uv.lock changes.
+            run(
+                "cd /src && uv sync --frozen",
+                trigger=[
+                    os.path.join(MIT_LEARN_DIR, "pyproject.toml"),
+                    os.path.join(MIT_LEARN_DIR, "uv.lock"),
+                ],
+            ),
+            # Touch reload sentinel — granian watches for this.
+            run("touch /tmp/tilt-reload"),
+        ],
+    )
 
 # ─────────────────────────────────────────────────────────────
 # Kubernetes Resources

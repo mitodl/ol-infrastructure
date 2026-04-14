@@ -6,4 +6,4 @@ description: >
   Provisions all in-cluster operators, services, and Keycloak realm.
   Uses the local k3d cluster with a file-based state backend.
 backend:
-  url: file://${PWD}/.pulumi
+  url: file://.pulumi

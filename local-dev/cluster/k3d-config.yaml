@@ -28,10 +28,10 @@ registries:
 # Expose HTTPS and HTTP on host ports 443/80 so that *.mit.dev ingress routes
 # are reachable without a port suffix.
 ports:
-- port: 80:80
+- port: 80:30080
   nodeFilters:
   - loadbalancer
-- port: 443:443
+- port: 443:30443
   nodeFilters:
   - loadbalancer
 

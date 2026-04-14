@@ -1,26 +1,4 @@
 ---
-# APISIX OIDC plugin config shared across learn-ai routes
-apiVersion: apisix.apache.org/v2
-kind: ApisixPluginConfig
-metadata:
-  name: learnai-oidc-config
-  namespace: learn-ai
-spec:
-  plugins:
-  - name: openid-connect
-    enable: true
-    config:
-      client_id: "ol-learn-ai-client"
-      client_secret: "local-dev-learn-ai-client-secret"  # pragma: allowlist secret
-      discovery: "https://sso.ol.mit.dev/realms/olapps/.well-known/openid-configuration"
-      scope: "openid profile email"
-      redirect_uri: "https://ai.learn.mit.dev/oidc/callback"
-      logout_path: "/logout"
-      post_logout_redirect_uri: "/"
-      session:
-        secret: "local-dev-learnai-oidc-session-32c!"  # pragma: allowlist secret
-      ssl_verify: false
----
 # TLS secret reference for ai.learn.mit.dev
 apiVersion: apisix.apache.org/v2
 kind: ApisixTls
@@ -56,7 +34,7 @@ spec:
       enable: true
       config:
         client_id: "ol-learn-ai-client"
-        client_secret: "local-dev-learn-ai-client-secret"  # pragma: allowlist secret
+        client_secret: "local-dev-learn-ai-secret"  # pragma: allowlist secret
         discovery: "https://sso.ol.mit.dev/realms/olapps/.well-known/openid-configuration"
         scope: "openid profile email"
         redirect_uri: "https://ai.learn.mit.dev/oidc/callback"

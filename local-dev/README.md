@@ -483,14 +483,17 @@ Tilt also runs `pulumi up` automatically when infra files change. You can also t
 ## Teardown
 
 ```bash
-# Remove the cluster (keeps certs and /etc/hosts)
+# Remove the cluster, certs, and /etc/hosts entries (default — removes everything)
 ./local-dev/scripts/teardown.sh
 
-# Remove everything including certs
-./local-dev/scripts/teardown.sh --remove-certs
+# Keep certs (useful if you want to reuse them on next setup)
+./local-dev/scripts/teardown.sh --keep-certs
 
-# Remove everything including /etc/hosts entries
-./local-dev/scripts/teardown.sh --remove-certs --remove-hosts
+# Keep /etc/hosts entries
+./local-dev/scripts/teardown.sh --keep-hosts
+
+# Keep both certs and /etc/hosts entries
+./local-dev/scripts/teardown.sh --keep-certs --keep-hosts
 ```
 
 > Pulumi state is stored in `local-dev/infra/.pulumi/` (file backend, gitignored). Deleting the cluster without running `pulumi destroy` first will leave orphaned Pulumi state. Run `pulumi destroy` before `teardown.sh` if you want a clean slate.
