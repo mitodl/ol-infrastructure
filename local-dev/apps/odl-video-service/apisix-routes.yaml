@@ -5,6 +5,7 @@ metadata:
   name: odlvideo-tls
   namespace: odl-video-service
 spec:
+  ingressClassName: apache-apisix
   hosts:
   - "video.odl.mit.dev"
   secret:
@@ -18,6 +19,7 @@ metadata:
   name: odlvideo-route
   namespace: odl-video-service
 spec:
+  ingressClassName: apache-apisix
   http:
   - name: public
     match:

@@ -37,6 +37,7 @@ metadata:
   name: mitlearn-tls
   namespace: mit-learn
 spec:
+  ingressClassName: apache-apisix
   hosts:
   - api.learn.mit.dev
   secret:
@@ -55,6 +56,7 @@ metadata:
   name: mitlearn-route-no-prefix
   namespace: mit-learn
 spec:
+  ingressClassName: apache-apisix
   http:
   - name: passauth
     priority: 0
@@ -143,6 +145,7 @@ metadata:
   name: mitlearn-route-prefix
   namespace: mit-learn
 spec:
+  ingressClassName: apache-apisix
   http:
   - name: passauth
     priority: 0

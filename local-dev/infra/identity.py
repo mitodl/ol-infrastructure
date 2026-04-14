@@ -173,6 +173,7 @@ def create_identity(  # noqa: PLR0913
         kind="ApisixRoute",
         metadata={"name": "keycloak-route", "namespace": "local-infra"},
         spec={
+            "ingressClassName": "apache-apisix",
             "http": [
                 {
                     "name": "keycloak",
@@ -181,7 +182,7 @@ def create_identity(  # noqa: PLR0913
                         "paths": ["/*"],
                     },
                     "backends": [
-                        {"serviceName": "keycloak-service", "servicePort": 80}
+                        {"serviceName": "keycloak-service", "servicePort": 8080}
                     ],
                     "plugins": [
                         {
@@ -191,7 +192,7 @@ def create_identity(  # noqa: PLR0913
                         }
                     ],
                 }
-            ]
+            ],
         },
         opts=_k8s(parent=local_infra_ns, depends_on=[apisix_release, instance]),
     )
@@ -202,6 +203,7 @@ def create_identity(  # noqa: PLR0913
         kind="ApisixTls",
         metadata={"name": "keycloak-tls", "namespace": "local-infra"},
         spec={
+            "ingressClassName": "apache-apisix",
             "hosts": [keycloak_hostname],
             "secret": {"name": "local-dev-tls", "namespace": "local-infra"},
         },

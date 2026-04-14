@@ -5,6 +5,7 @@ metadata:
   name: mitxonline-tls
   namespace: mitxonline
 spec:
+  ingressClassName: apache-apisix
   hosts:
   - "mitxonline.mit.dev"
   secret:
@@ -17,6 +18,7 @@ metadata:
   name: mitxonline-route
   namespace: mitxonline
 spec:
+  ingressClassName: apache-apisix
   http:
   - name: public
     match:

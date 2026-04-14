@@ -8,6 +8,7 @@ metadata:
   name: mitlearn-nextjs-tls
   namespace: mit-learn
 spec:
+  ingressClassName: apache-apisix
   hosts:
   - "learn.mit.dev"
   secret:
@@ -23,6 +24,7 @@ metadata:
   name: mitlearn-nextjs-route
   namespace: mit-learn
 spec:
+  ingressClassName: apache-apisix
   http:
   - name: frontend
     match:

@@ -6,6 +6,7 @@ metadata:
   name: learnai-tls
   namespace: learn-ai
 spec:
+  ingressClassName: apache-apisix
   hosts:
   - "ai.learn.mit.dev"
   secret:
@@ -19,6 +20,7 @@ metadata:
   name: learnai-route
   namespace: learn-ai
 spec:
+  ingressClassName: apache-apisix
   http:
   - name: public
     match:
