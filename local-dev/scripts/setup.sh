@@ -25,29 +25,26 @@ CLUSTER_NAME="mit-learn-dev"
 # Pattern: production domain with .edu → .dev
 # ---------------------------------------------------------------------------
 HOSTS=(
-    # mit-learn
-    "learn.mit.dev"
+    # mit-learn backend (Django/granian)
     "api.learn.mit.dev"
+    # mit-learn frontend (Next.js)
+    "learn.mit.dev"
     # learn-ai
-    "learn-ai.ol.mit.dev"
-    "api.learn-ai.ol.mit.dev"
+    "ai.learn.mit.dev"
     # mitxonline
     "mitxonline.mit.dev"
-    "api.mitxonline.mit.dev"
     # odl-video-service
     "video.odl.mit.dev"
     # Keycloak SSO
-    "sso.ol.mit.dev"
+    "keycloak.mit.dev"
 )
 
 # mkcert wildcard SANs — one wildcard per subdomain level needed.
 MKCERT_DOMAINS=(
-    "*.mit.dev"
-    "*.learn.mit.dev"
+    "*.mit.dev"           # keycloak.mit.dev, learn.mit.dev, mitxonline.mit.dev
+    "*.learn.mit.dev"     # api.learn.mit.dev, ai.learn.mit.dev
     "*.mitxonline.mit.dev"
-    "*.ol.mit.dev"
-    "*.learn-ai.ol.mit.dev"
-    "*.odl.mit.dev"
+    "*.odl.mit.dev"       # video.odl.mit.dev
 )
 
 # Output cert files (mkcert names them from the first domain, replacing * with _)

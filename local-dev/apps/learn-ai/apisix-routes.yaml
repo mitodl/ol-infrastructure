@@ -30,7 +30,6 @@ metadata:
 spec:
   hosts:
     - "ai.learn.mit.dev"
-    - "*.learn.mit.dev"
   secret:
     name: local-dev-tls
     namespace: learn-ai

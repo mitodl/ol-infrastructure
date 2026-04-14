@@ -1,0 +1,64 @@
+---
+# mit-learn Next.js frontend Deployment
+# Runs the production Next.js server (yarn start) on port 3000.
+# NEXT_PUBLIC_* env vars are baked into the image at build time via docker build args.
+# See Tiltfile for the build arg values.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mitlearn-nextjs
+  namespace: mit-learn
+  labels:
+    app: mitlearn-nextjs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mitlearn-nextjs
+  template:
+    metadata:
+      labels:
+        app: mitlearn-nextjs
+    spec:
+      containers:
+        - name: nextjs
+          image: mitlearn-nextjs-app
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: PORT
+              value: "3000"
+            - name: HOSTNAME
+              value: "0.0.0.0"
+            - name: NODE_ENV
+              value: "production"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mitlearn-nextjs
+  namespace: mit-learn
+  labels:
+    app: mitlearn-nextjs
+spec:
+  selector:
+    app: mitlearn-nextjs
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http

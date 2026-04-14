@@ -38,6 +38,7 @@ APPS = [
         "prebuilt_tag_backend": cfg.get("prebuilt_tags", {}).get("mit-learn", "0.62.0"),
         "prebuilt_tag_frontend": cfg.get("prebuilt_tags", {}).get("mit-learn-nextjs", "0.62.0"),
         "tiltfile": "./local-dev/apps/mit-learn/Tiltfile",
+        "tiltfile_frontend": "./local-dev/apps/mit-learn-nextjs/Tiltfile",
         # Seeding commands; executed inside the web pod via `kubectl exec`.
         # bootstrap runs automatically on first deploy (see apps/mit-learn/Tiltfile);
         # the entries here are optional / on-demand enrichment tasks.
@@ -158,6 +159,10 @@ for app in [a for a in APPS if a["name"] in enabled_apps]:
     if os.path.exists(app["tiltfile"]):
         include(app["tiltfile"])
 
+    # Include frontend Tiltfile if defined and present (e.g., mit-learn Next.js)
+    frontend_tiltfile = app.get("tiltfile_frontend", "")
+    if frontend_tiltfile and os.path.exists(frontend_tiltfile):
+        include(frontend_tiltfile)
     # Register one manual-trigger Tilt resource per seed command.
     # These are never auto-run; trigger them from the Tilt UI or with:
     #   tilt trigger seed-<app>-<label>
