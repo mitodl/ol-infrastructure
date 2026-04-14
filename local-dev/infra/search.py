@@ -95,9 +95,7 @@ def create_search(
                     "limits": {"memory": "1Gi"},
                 },
                 "persistence": {"size": "5Gi"},
-                "config": {
-                    "opensearch.yml": "plugins.security.disabled: true\n"
-                },
+                "config": {"opensearch.yml": "plugins.security.disabled: true\n"},
                 "extraEnvs": [
                     {"name": "DISABLE_INSTALL_DEMO_CONFIG", "value": "true"},
                     {"name": "DISABLE_SECURITY_PLUGIN", "value": "true"},

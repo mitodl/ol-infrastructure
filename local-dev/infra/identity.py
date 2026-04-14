@@ -14,9 +14,8 @@ import pulumi_keycloak as keycloak
 import pulumi_kubernetes as k8s
 import requests
 import yaml as pyyaml
-from pulumi import Output, ResourceOptions
-
 from keycloak import create_olapps_dev_realm
+from pulumi import Output, ResourceOptions
 
 
 @dataclass
@@ -62,11 +61,9 @@ def create_identity(  # noqa: PLR0913
 
     # Fetch the operator deployment manifest and patch namespace to local-infra
     # before passing to ConfigGroup (yaml.v2 dropped transformations support).
-    resp = requests.get(f"{kc_base}/kubernetes.yml", timeout=30)  # noqa: S113
+    resp = requests.get(f"{kc_base}/kubernetes.yml", timeout=30)
     resp.raise_for_status()
-    kc_resources = [
-        doc for doc in pyyaml.safe_load_all(resp.text) if doc is not None
-    ]
+    kc_resources = [doc for doc in pyyaml.safe_load_all(resp.text) if doc is not None]
     for doc in kc_resources:
         if doc.get("metadata") and doc["kind"] not in (
             "ClusterRole",
@@ -194,9 +191,7 @@ def create_identity(  # noqa: PLR0913
                 }
             ]
         },
-        opts=_k8s(
-            parent=local_infra_ns, depends_on=[apisix_release, instance]
-        ),
+        opts=_k8s(parent=local_infra_ns, depends_on=[apisix_release, instance]),
     )
 
     k8s.apiextensions.CustomResource(
@@ -208,9 +203,7 @@ def create_identity(  # noqa: PLR0913
             "hosts": [keycloak_hostname],
             "secret": {"name": "local-dev-tls", "namespace": "local-infra"},
         },
-        opts=_k8s(
-            parent=local_infra_ns, depends_on=[apisix_release, tls_secret]
-        ),
+        opts=_k8s(parent=local_infra_ns, depends_on=[apisix_release, tls_secret]),
     )
 
     # Keycloak provider + olapps realm.

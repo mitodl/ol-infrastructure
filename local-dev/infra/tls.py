@@ -10,9 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pulumi_kubernetes as k8s
-from pulumi import ResourceOptions
-
 from helpers import read_file_b64
+from pulumi import ResourceOptions
 
 
 @dataclass
@@ -68,24 +67,18 @@ def create_tls_resources(
             opts=_k8s(parent=parent),
         )
 
-    tls_secret = _tls_secret(
-        "local-dev-tls", "local-infra", namespaces["local-infra"]
-    )
+    tls_secret = _tls_secret("local-dev-tls", "local-infra", namespaces["local-infra"])
     tls_secret_ops = _tls_secret(
         "local-dev-tls-operations", "operations", namespaces["operations"]
     )
 
     app_namespaces = ("mit-learn", "learn-ai", "mitxonline", "odl-video-service")
     app_tls_secrets = {
-        ns: _tls_secret(
-            f"local-dev-tls-{ns}", ns, namespaces[ns]
-        )
+        ns: _tls_secret(f"local-dev-tls-{ns}", ns, namespaces[ns])
         for ns in app_namespaces
     }
     app_ca_configmaps = {
-        ns: _ca_configmap(
-            f"mkcert-root-ca-{ns}", ns, namespaces[ns]
-        )
+        ns: _ca_configmap(f"mkcert-root-ca-{ns}", ns, namespaces[ns])
         for ns in app_namespaces
     }
 
