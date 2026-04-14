@@ -12,7 +12,7 @@ spec:
       config:
         client_id: "ol-learn-ai-client"
         client_secret: "local-dev-learn-ai-client-secret"
-        discovery: "https://keycloak.mit.dev/realms/olapps/.well-known/openid-configuration"
+        discovery: "https://sso.ol.mit.dev/realms/olapps/.well-known/openid-configuration"
         scope: "openid profile email"
         redirect_uri: "https://ai.learn.mit.dev/oidc/callback"
         logout_path: "/logout"
@@ -57,7 +57,7 @@ spec:
           config:
             client_id: "ol-learn-ai-client"
             client_secret: "local-dev-learn-ai-client-secret"
-            discovery: "https://keycloak.mit.dev/realms/olapps/.well-known/openid-configuration"
+            discovery: "https://sso.ol.mit.dev/realms/olapps/.well-known/openid-configuration"
             scope: "openid profile email"
             redirect_uri: "https://ai.learn.mit.dev/oidc/callback"
             logout_path: "/logout"

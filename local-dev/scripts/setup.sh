@@ -36,14 +36,15 @@ HOSTS=(
     # odl-video-service
     "video.odl.mit.dev"
     # Keycloak SSO
-    "keycloak.mit.dev"
+    "sso.ol.mit.dev"
 )
 
 # mkcert wildcard SANs — one wildcard per subdomain level needed.
 MKCERT_DOMAINS=(
-    "*.mit.dev"           # keycloak.mit.dev, learn.mit.dev, mitxonline.mit.dev
+    "*.mit.dev"           # learn.mit.dev, mitxonline.mit.dev
     "*.learn.mit.dev"     # api.learn.mit.dev, ai.learn.mit.dev
     "*.mitxonline.mit.dev"
+    "*.ol.mit.dev"        # sso.ol.mit.dev
     "*.odl.mit.dev"       # video.odl.mit.dev
 )
 

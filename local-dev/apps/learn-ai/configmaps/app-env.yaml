@@ -14,7 +14,7 @@ data:
   USE_X_FORWARDED_PORT: "True"
 
   # Keycloak/OIDC
-  KEYCLOAK_BASE_URL: "https://keycloak.mit.dev"
+  KEYCLOAK_BASE_URL: "https://sso.ol.mit.dev"
   KEYCLOAK_REALM_NAME: "olapps"
 
   # Redis (cluster-local)

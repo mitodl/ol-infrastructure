@@ -33,7 +33,7 @@ spec:
           config:
             client_id: "ol-mitxonline-client"
             client_secret: "local-dev-mitxonline-client-secret"
-            discovery: "https://keycloak.mit.dev/realms/olapps/.well-known/openid-configuration"
+            discovery: "https://sso.ol.mit.dev/realms/olapps/.well-known/openid-configuration"
             scope: "openid profile email"
             redirect_uri: "https://mitxonline.mit.dev/oidc/callback"
             logout_path: "/logout"

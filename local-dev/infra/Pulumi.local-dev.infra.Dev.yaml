@@ -9,8 +9,8 @@ config:
   ol-local-dev-infra:mkcert_ca_cert_path: "local-dev/certs/rootCA.pem"
 
   # Domain configuration
-  ol-local-dev-infra:keycloak_hostname: "keycloak.mit.dev"
-  ol-local-dev-infra:keycloak_url: "https://keycloak.mit.dev"
+  ol-local-dev-infra:keycloak_hostname: "sso.ol.mit.dev"
+  ol-local-dev-infra:keycloak_url: "https://sso.ol.mit.dev"
 
   # OIDC client secrets for local dev (plaintext, never commit real secrets)
   # These are default local-only values; override in your local tilt_config.json

@@ -27,9 +27,9 @@ data:
   EXPOSE_OIDC_LOGIN: "True"
 
   # Keycloak
-  KEYCLOAK_BASE_URL: "https://keycloak.mit.dev"
+  KEYCLOAK_BASE_URL: "https://sso.ol.mit.dev"
   KEYCLOAK_REALM_NAME: "olapps"
-  KEYCLOAK_DISCOVERY_URL: "https://keycloak.mit.dev/realms/olapps/.well-known/openid-configuration"
+  KEYCLOAK_DISCOVERY_URL: "https://sso.ol.mit.dev/realms/olapps/.well-known/openid-configuration"
 
   # Redis
   REDIS_URL: "redis://redis-master.local-infra.svc.cluster.local:6379/0"
