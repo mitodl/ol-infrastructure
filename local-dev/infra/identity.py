@@ -107,6 +107,10 @@ def create_identity(  # noqa: PLR0913
         },
         spec={
             "instances": 1,
+            "image": (
+                "mitodl/keycloak"
+                "@sha256:4475afe3c385da6bd240a4a2811fa1231dd3365497ca78c017327c7c4e0ea1e2"
+            ),
             "hostname": {
                 "hostname": keycloak_hostname,
             },
