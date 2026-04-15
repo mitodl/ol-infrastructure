@@ -209,7 +209,7 @@ def _build_interpolated_config_dict(
         ]
         config["TYPESENSE_COLLECTION_PREFIX"] = "openedx_"
         if typesense_config.get_bool("forum_search_enabled", False):
-            config["FOURM_SEARCH_BACKEND"] = "forum.search.typesense.TypesenseBackend"
+            config["FORUM_SEARCH_BACKEND"] = "forum.search.typesense.TypesenseBackend"
         if typesense_config.get_bool("course_search_enabled", False):
             config["SEARCH_ENGINE"] = "search.typesense.TypesenseEngine"
 
