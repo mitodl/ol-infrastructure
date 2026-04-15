@@ -127,6 +127,8 @@ def create_ingress(
                             "execADCTimeout": "60s",
                             "provider": {
                                 "type": "apisix-standalone",
+                                "syncPeriod": "1m",
+                                "initSyncDelay": "1m",
                             },
                             "kubernetes": {
                                 "ingressClass": "apache-apisix",

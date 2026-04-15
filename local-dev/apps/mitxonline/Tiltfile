@@ -13,6 +13,7 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
     docker_build(
         IMAGE,
         context=APP_DIR,
+        target='production',
         dockerfile=APP_DIR + '/Dockerfile',
         live_update=[
             sync(APP_DIR + '/mitxonline', '/src/mitxonline'),

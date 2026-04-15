@@ -68,7 +68,7 @@ spec:
             memory: 1Gi
         readinessProbe:
           httpGet:
-            path: /health/
+            path: /health/readiness
             port: 8011
           initialDelaySeconds: 20
           periodSeconds: 10
