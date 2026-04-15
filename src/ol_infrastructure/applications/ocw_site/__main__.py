@@ -959,7 +959,7 @@ for purpose in ("draft", "live", "test"):
                         ).read_text(),
                         name="Image Optimization",
                         type="recv",
-                        priority=1000
+                        priority=1000,
                     )
                 ]
                 if fastly_image_optimization_enabled
