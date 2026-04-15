@@ -15,7 +15,7 @@ path "secret-operations/open-metadata/connectors/*" {
   capabilities = ["read"]
 }
 path "secret-operations/open-metadata/connectors" {
-  capabilities = ["read", "list"]
+  capabilities = ["read"]
 }
 # vault-secrets-operator is a little more particular about
 # managing its own leases, give it the permissions it needs

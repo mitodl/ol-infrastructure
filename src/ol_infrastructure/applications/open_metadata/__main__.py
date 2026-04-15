@@ -3,7 +3,7 @@ from string import Template
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference
+from pulumi import Config, Output, ResourceOptions, StackReference
 from pulumi_aws import ec2, get_caller_identity
 
 from bridge.lib.magic_numbers import (
@@ -210,7 +210,7 @@ open_metadata_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
     "open-metadata-vault-k8s-auth-backend-role",
     role_name="open-metadata",
     backend=cluster_stack.require_output("vault_auth_endpoint"),
-    bound_service_account_names=["*"],
+    bound_service_account_names=["open-metadata-vault"],
     bound_service_account_namespaces=[open_metadata_namespace],
     token_policies=[open_metadata_vault_policy.name],
 )
@@ -290,7 +290,7 @@ oidc_config_secret = OLVaultK8SSecret(
 # secret-operations/open-metadata/connectors/<connector-name>
 # and synced to K8s secrets in the open-metadata namespace.
 # Add entries to connector_configs for each source system.
-connector_configs: dict[str, dict[str, str]] = {}
+connector_configs: dict[str, dict[str, str | Output[str]]] = {}
 
 connector_secrets: list[OLVaultK8SSecret] = []
 connector_secret_names: list[str] = []
