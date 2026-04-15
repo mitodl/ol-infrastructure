@@ -78,6 +78,7 @@ class OpenEdxVars(BaseModel):
     appzi_url: str | None = None
     enable_auto_language_selection: Literal["true", "false"] | None = None
     enable_tagging_taxonomy_pages: Literal["true", "false"] | None = None
+    enable_course_import_in_library: Literal["true", "false"] | None = None
 
     @property
     def release_name(self) -> OpenEdxSupportedRelease:
@@ -146,6 +147,7 @@ def mfe_params(
         ),
         "ENABLE_AUTO_LANGUAGE_SELECTION": (open_edx.enable_auto_language_selection),
         "ENABLE_TAGGING_TAXONOMY_PAGES": (open_edx.enable_tagging_taxonomy_pages),
+        "ENABLE_COURSE_IMPORT_IN_LIBRARY": (open_edx.enable_course_import_in_library),
         "PARAGON_THEME_URLS": "{}",
         "ENABLE_JUMPNAV": open_edx.enable_jumpnav,
         "ENABLE_AI_DRAWER_SLOT": open_edx.enable_ai_drawer_slot,
