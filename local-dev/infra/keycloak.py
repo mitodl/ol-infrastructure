@@ -19,7 +19,6 @@ from pulumi import InvokeOptions, Output, ResourceOptions
 from ol_infrastructure.substructure.keycloak.org_flows import (
     create_organization_browser_flows,
     create_organization_first_broker_login_flows,
-    create_organization_scope,
 )
 
 
@@ -55,7 +54,6 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         display_name="MIT Learn",
         display_name_html="<b>MIT Learn</b>",
         enabled=True,
-        login_theme="ol-learn",
         duplicate_emails_allowed=False,
         otp_policy=keycloak.RealmOtpPolicyArgs(
             algorithm="HmacSHA256",
@@ -129,7 +127,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     for alias, default in [
         ("CONFIGURE_TOTP", False),
         ("VERIFY_EMAIL", False),  # disabled for local dev
-        ("UPDATE_EMAIL", False),
+        # UPDATE_EMAIL was removed in Keycloak 26 — omit to avoid validation error.
         ("UPDATE_PASSWORD", False),
     ]:
         keycloak.RequiredAction(
@@ -306,7 +304,9 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         opts=kc_opts,
     )
 
-    create_organization_scope(realm.id, "olapps", kc_opts)
+    # Keycloak 26 auto-creates the "organization" client scope (and its mapper)
+    # when organizations_enabled=True on the realm. Skip create_organization_scope
+    # to avoid a 409 Conflict on the first pulumi apply.
 
     # -------------------------------------------------------------------------
     # Clients + k8s Secrets (replacing Vault secrets)
@@ -580,17 +580,20 @@ def create_olapps_dev_realm(  # noqa: PLR0913
             opts=kc_opts,
         )
         if is_admin:
-            # Assign realm-admin role to admin user.
-            realm_admin_role = keycloak.get_role_output(
+            # Create an admin role in the olapps realm and assign it.
+            # (Keycloak only has 'admin' in the master realm by default.)
+            admin_role = keycloak.Role(
+                "olapps-admin-role",
                 realm_id=realm.id,
                 name="admin",
-                opts=InvokeOptions(provider=keycloak_provider),
+                description="Local dev admin role",
+                opts=kc_opts,
             )
             keycloak.UserRoles(
                 f"test-user-{username}-roles",
                 realm_id=realm.id,
                 user_id=user.id,
-                role_ids=[realm_admin_role.id],
+                role_ids=[admin_role.id],
                 opts=kc_opts,
             )
 
