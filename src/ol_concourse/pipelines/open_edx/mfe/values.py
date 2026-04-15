@@ -132,6 +132,7 @@ mitxonline = [
         enable_ai_drawer_slot="true",
         enable_auto_language_selection="true",
         enable_tagging_taxonomy_pages="true",
+        enable_course_import_in_library="true",
     ),
     OpenEdxVars(
         about_us_url="https://rc.mitxonline.mit.edu/about-us/",
