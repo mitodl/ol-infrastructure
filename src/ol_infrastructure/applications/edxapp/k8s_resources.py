@@ -440,6 +440,8 @@ def create_k8s_resources(  # noqa: C901
         lms_edxapp_config_sources[secrets.translations_providers_secret_name] = (
             secrets.translations_providers
         )
+    if secrets.typesense:
+        lms_edxapp_config_sources[secrets.typesense_secret_name] = secrets.typesense
     lms_edxapp_secret_names = [
         secrets.db_creds_secret_name,
         secrets.db_connections_secret_name,
@@ -456,6 +458,8 @@ def create_k8s_resources(  # noqa: C901
         lms_edxapp_secret_names.append(secrets.lms_oauth_secret_name)
     if secrets.translations_providers:
         lms_edxapp_secret_names.append(secrets.translations_providers_secret_name)
+    if secrets.typesense:
+        lms_edxapp_secret_names.append(secrets.typesense_secret_name)
     lms_edxapp_configmap_names = [
         configmaps.general_config_name,
         configmaps.interpolated_config_name,
@@ -724,6 +728,8 @@ def create_k8s_resources(  # noqa: C901
         )
     if secrets.meilisearch:
         cms_edxapp_config_sources[secrets.meilisearch_secret_name] = secrets.meilisearch
+    if secrets.typesense:
+        cms_edxapp_config_sources[secrets.typesense_secret_name] = secrets.typesense
     cms_edxapp_secret_names = [
         secrets.db_creds_secret_name,
         secrets.db_connections_secret_name,
@@ -741,6 +747,8 @@ def create_k8s_resources(  # noqa: C901
         cms_edxapp_secret_names.append(secrets.translations_providers_secret_name)
     if secrets.meilisearch:
         cms_edxapp_secret_names.append(secrets.meilisearch_secret_name)
+    if secrets.typesense:
+        cms_edxapp_secret_names.append(secrets.typesense_secret_name)
     cms_edxapp_configmap_names = [
         configmaps.general_config_name,
         configmaps.interpolated_config_name,

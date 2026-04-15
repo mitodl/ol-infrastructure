@@ -193,6 +193,26 @@ def _build_interpolated_config_dict(
         "ECOMMERCE_PUBLIC_URL_ROOT": domains["lms"],
     }
 
+    # Ref: https://docs.openedx.org/en/latest/site_ops/how-tos/use_typesense_search_backend.html
+    typesense_config = Config("typesense")
+    if typesense_config.get_bool("enabled"):
+        config["TYPESENSE_ENABLED"] = True
+        # Typical URL:
+        # mitxonline-ts-sts-0.mitxonline-ts-sts-svc:8108
+        # Ref: https://docs.openedx.org/en/latest/site_ops/how-tos/use_typesense_search_backend.html#clustered-typesense
+        # "For clustered Typesense, it is best to provide urls to all the
+        # nodes to TYPESENSE_URLS, rather than putting it behind a load balancer.
+        # This allows the Typesense client to manage load balancing and fallbacks itself."
+        config["TYPESENSE_URLS"] = [
+            f"http://{stack_info.env_prefix}-ts-sts-{i}.{stack_info.env_prefix}-ts-sts-svc:8108"
+            for i in range(typesense_config.get_int("replicas", 3))
+        ]
+        config["TYPESENSE_COLLECTION_PREFIX"] = "openedx_"
+        if typesense_config.get_bool("forum_search_enabled", False):
+            config["FOURM_SEARCH_BACKEND"] = "forum.search.typesense.TypesenseBackend"
+        if typesense_config.get_bool("course_search_enabled", False):
+            config["SEARCH_ENGINE"] = "search.typesense.TypesenseEngine"
+
     # Residential-specific configuration (mitx, mitx-staging)
     if stack_info.env_prefix in ["mitx", "mitx-staging"]:
         # Add Canvas and MIT IDP to CORS whitelist for residential deployments
