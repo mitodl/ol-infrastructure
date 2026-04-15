@@ -305,6 +305,8 @@ for connector_name, templates in connector_configs.items():
         mount="secret-operations",
         mount_type="kv-v1",
         path=f"open-metadata/connectors/{connector_name}",
+        restart_target_kind="Deployment",
+        restart_target_name="openmetadata",
         templates=templates,
         vaultauth=vault_k8s_resources.auth_name,
     )
