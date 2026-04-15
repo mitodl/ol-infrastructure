@@ -111,11 +111,12 @@ def create_identity(  # noqa: PLR0913
                 "mitodl/keycloak"
                 "@sha256:4475afe3c385da6bd240a4a2811fa1231dd3365497ca78c017327c7c4e0ea1e2"
             ),
-            # startOptimized=False forces kc.sh to rebuild on startup so that
-            # runtime feature flags (e.g. organization) are incorporated. The
-            # mitodl/keycloak image is pre-built with different defaults so
-            # --optimized causes an immediate crash due to build-time mismatch.
-            "startOptimized": False,
+            # The image is pre-built (kc.sh build was run during Docker build).
+            # startOptimized=True uses that build; False would re-run kc.sh build
+            # on every pod start (slow). The image already has organization baked
+            # in, so we do NOT set features.enabled here — that would cause a
+            # build-time options mismatch and crash with --optimized.
+            "startOptimized": True,
             "hostname": {
                 "hostname": keycloak_hostname,
             },
@@ -123,6 +124,8 @@ def create_identity(  # noqa: PLR0913
                 "httpEnabled": True,
                 "tlsSecret": "local-dev-tls",  # pragma: allowlist secret
             },
+            # KC 26: use proxy.headers instead of the deprecated KC_PROXY env var.
+            "proxy": {"headers": "xforwarded"},
             "db": {
                 "vendor": "postgres",
                 "host": "local-pg-rw.local-infra.svc.cluster.local",
@@ -143,8 +146,19 @@ def create_identity(  # noqa: PLR0913
                 },
             },
             "ingress": {"enabled": False},  # Routed through APISIX.
-            "features": {"enabled": ["organization"]},
             "additionalOptions": [
+                # Explicitly select the OL freemarker login SPI. The image ships
+                # two custom implementations; without this the jcputney freemarker
+                # override is used by default and causes an NPE in KC 26.5.
+                {"name": "spi-login--provider", "value": "ol-freemarker"},
+                # Prevent Infinispan sticky-session cookies from destabilising
+                # single-instance deployments.
+                {
+                    "name": (
+                        "spi-sticky-session-encoder-infinispan-should-attach-route"
+                    ),
+                    "value": "false",
+                },
                 {
                     "name": "spi-email-smtp-host",
                     "value": "mailpit.local-infra.svc.cluster.local",
@@ -165,8 +179,17 @@ def create_identity(  # noqa: PLR0913
                             {
                                 "name": "keycloak",
                                 "env": [
-                                    {"name": "KC_HOSTNAME_STRICT", "value": "false"},
-                                    {"name": "KC_PROXY", "value": "edge"},
+                                    # Image has OTel compiled in at build time.
+                                    # Without a receiver, SDK init timeouts
+                                    # destabilise the pod.
+                                    {
+                                        "name": "OTEL_SDK_DISABLED",
+                                        "value": "true",
+                                    },
+                                    {
+                                        "name": "KC_HOSTNAME_STRICT",
+                                        "value": "false",
+                                    },
                                 ],
                             }
                         ]
