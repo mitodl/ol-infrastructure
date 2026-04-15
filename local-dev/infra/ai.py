@@ -70,8 +70,8 @@ def create_ai_services(
                                 }
                             ],
                             "resources": {
-                                "requests": {"cpu": "50m", "memory": "128Mi"},
-                                "limits": {"memory": "512Mi"},
+                                "requests": {"cpu": "50m", "memory": "256Mi"},
+                                "limits": {"memory": "2Gi"},
                             },
                         }
                     ],
