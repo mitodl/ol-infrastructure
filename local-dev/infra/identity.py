@@ -111,6 +111,11 @@ def create_identity(  # noqa: PLR0913
                 "mitodl/keycloak"
                 "@sha256:4475afe3c385da6bd240a4a2811fa1231dd3365497ca78c017327c7c4e0ea1e2"
             ),
+            # startOptimized=False forces kc.sh to rebuild on startup so that
+            # runtime feature flags (e.g. organization) are incorporated. The
+            # mitodl/keycloak image is pre-built with different defaults so
+            # --optimized causes an immediate crash due to build-time mismatch.
+            "startOptimized": False,
             "hostname": {
                 "hostname": keycloak_hostname,
             },
