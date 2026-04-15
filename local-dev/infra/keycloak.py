@@ -98,12 +98,9 @@ def create_olapps_dev_realm(  # noqa: PLR0913
                 x_xss_protection="1; mode=block",
             ),
         ),
-        # Use Mailpit for local SMTP.
+        # Use Mailpit for local SMTP. No auth needed — omitting auth block
+        # entirely avoids a provider panic when empty credentials are passed.
         smtp_server=keycloak.RealmSmtpServerArgs(
-            auth=keycloak.RealmSmtpServerAuthArgs(
-                password="",
-                username="",
-            ),
             from_="noreply@mit.dev",
             from_display_name="MIT Learn Local",
             host="mailpit.local-infra.svc.cluster.local",
