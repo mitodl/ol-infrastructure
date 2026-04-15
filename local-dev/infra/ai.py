@@ -60,7 +60,18 @@ def create_ai_services(
                                             "optional": True,
                                         }
                                     },
-                                }
+                                },
+                                # Master key must match AI_PROXY_AUTH_TOKEN.
+                                {
+                                    "name": "LITELLM_MASTER_KEY",
+                                    # pragma: allowlist secret
+                                    "value": "local-dev-litellm-master-key",
+                                },
+                                {
+                                    "name": "LITELLM_SALT_KEY",
+                                    # pragma: allowlist secret
+                                    "value": "local-dev-litellm-master-key",
+                                },
                             ],
                             "volumeMounts": [
                                 {

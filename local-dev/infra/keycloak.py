@@ -320,7 +320,8 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         "roles",
         "web-origins",
         "ol-profile",
-        "organization",
+        # KC 26 auto-attaches "organization" as an optional scope when
+        # organizations_enabled=True — adding it as default causes 409 Conflict.
     ]
 
     def _make_oidc_secret(  # noqa: PLR0913

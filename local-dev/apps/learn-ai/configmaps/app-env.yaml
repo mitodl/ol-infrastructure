@@ -30,7 +30,7 @@ data:
 
   # AI proxy (local LiteLLM in local-infra)
   AI_PROXY_URL: "http://litellm.local-infra.svc.cluster.local:4000"
-  AI_PROXY_CLASS: "main.ai.proxy.LiteLLMProxy"
+  AI_PROXY_CLASS: "LiteLLMProxy"
 
   # mit-learn API (for AI to call back)
   MIT_LEARN_API_PROXY_BASE_URL: "http://mitlearn-webapp.mit-learn.svc.cluster.local:8060/api/"
