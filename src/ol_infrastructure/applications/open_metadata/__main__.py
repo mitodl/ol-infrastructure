@@ -1,9 +1,11 @@
+import json
 from pathlib import Path
 from string import Template
+from typing import Any
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference
+from pulumi import Config, Output, ResourceOptions, StackReference
 from pulumi_aws import ec2, get_caller_identity
 
 from bridge.lib.magic_numbers import (
@@ -12,6 +14,8 @@ from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
 )
 from bridge.lib.versions import OPEN_METADATA_VERSION
+from bridge.secrets import sops as _bridge_sops
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.eks import (
     OLEKSGateway,
@@ -44,6 +48,10 @@ from ol_infrastructure.lib.ol_types import (
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
+
+# Resolve the bridge secrets directory once at module level using the sops
+# module's own __file__ — the same base path read_yaml_secrets uses internally.
+_BRIDGE_SECRETS_DIR = Path(_bridge_sops.__file__).parent
 
 setup_vault_provider()
 stack_info = parse_stack()
@@ -285,6 +293,97 @@ oidc_config_secret = OLVaultK8SSecret(
     ),
 )
 
+# Connector credentials for OpenMetadata ingestion pipelines.
+# Credentials are read from SOPS-encrypted bridge secrets, written to a
+# dedicated Vault mount, and synced into K8s secrets via vault-secrets-operator.
+# Guard against missing secrets files (e.g. CI/Production stacks not yet
+# provisioned) so pulumi preview/up does not fail with a missing-file error.
+# When the file is absent, no Vault resources or K8s secrets are created for
+# connectors, avoiding destructive overwrites of existing Vault data.
+open_metadata_connector_secrets_path = (
+    _BRIDGE_SECRETS_DIR / f"open_metadata/secrets.{stack_info.env_suffix}.yaml"
+)
+open_metadata_connector_secrets: dict[str, Any] = {}
+if open_metadata_connector_secrets_path.exists():
+    _raw_secrets = read_yaml_secrets(open_metadata_connector_secrets_path)
+    if not isinstance(_raw_secrets, dict):
+        msg = (
+            f"Failed to decrypt {open_metadata_connector_secrets_path}: "
+            f"expected a dict but got {type(_raw_secrets).__name__}. "
+            "Check that sops can decrypt the file and that AWS KMS is accessible."
+        )
+        raise TypeError(msg)
+    open_metadata_connector_secrets = _raw_secrets
+
+connector_secrets: list[OLVaultK8SSecret] = []
+connector_secret_names: list[str] = []
+
+if open_metadata_connector_secrets:
+    open_metadata_connector_vault_mount = vault.Mount(
+        f"open-metadata-connector-vault-mount-{stack_info.env_suffix}",
+        description="Static connector credentials for OpenMetadata ingestion pipelines",
+        path="secret-open-metadata",
+        type="kv",
+        opts=ResourceOptions(parent=vault_k8s_resources),
+    )
+
+    open_metadata_connector_vault_secret = vault.generic.Secret(
+        f"open-metadata-connector-vault-secret-{stack_info.env_suffix}",
+        path="secret-open-metadata/connectors",
+        data_json=Output.secret(json.dumps(open_metadata_connector_secrets)),
+        opts=ResourceOptions(
+            depends_on=[open_metadata_connector_vault_mount],
+            parent=vault_k8s_resources,
+        ),
+    )
+
+    # Each entry maps connector name → K8s env var → Vault template.
+    # Uses nested index syntax because secrets are stored as a map-of-maps.
+    # Only include connectors whose top-level key exists in the secrets file
+    # so CI/Production stacks without a given connector's credentials don't
+    # create a K8s secret with unresolvable Vault template references.
+    _all_connector_configs: dict[str, dict[str, str | Output[str]]] = {
+        "trino": {
+            "OM_TRINO_HOST_PORT": '{{ index .Secrets "trino" "host_port" }}',
+            "OM_TRINO_USERNAME": '{{ index .Secrets "trino" "login_email" }}',
+            "OM_TRINO_PASSWORD": '{{ index .Secrets "trino" "password" }}',
+            "OM_TRINO_CATALOG": '{{ index .Secrets "trino" "catalog" }}',
+        },
+    }
+    connector_configs = {
+        name: templates
+        for name, templates in _all_connector_configs.items()
+        if name in open_metadata_connector_secrets
+    }
+
+    for connector_name, templates in connector_configs.items():
+        secret_name = f"om-connector-{connector_name}"
+        secret_config = OLVaultK8SStaticSecretConfig(
+            name=f"openmetadata-connector-{connector_name}",
+            namespace=open_metadata_namespace,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=secret_name,
+            labels=k8s_global_labels,
+            mount="secret-open-metadata",
+            mount_type="kv-v1",
+            path="connectors",
+            restart_target_kind="Deployment",
+            restart_target_name="openmetadata",
+            templates=templates,
+            vaultauth=vault_k8s_resources.auth_name,
+        )
+        connector_secret = OLVaultK8SSecret(
+            f"open-metadata-{stack_info.name}-connector-{connector_name}-secret",
+            secret_config,
+            opts=ResourceOptions(
+                delete_before_replace=True,
+                parent=vault_k8s_resources,
+                depends_on=[open_metadata_connector_vault_secret],
+            ),
+        )
+        connector_secrets.append(connector_secret)
+        connector_secret_names.append(secret_name)
+
 # Install the openmetadata helm chart
 # https://github.com/mitodl/ol-infrastructure/issues/2680
 open_metadata_application = kubernetes.helm.v3.Release(
@@ -378,6 +477,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         "name": oidc_config_secret_name,
                     },
                 },
+                *[{"secretRef": {"name": name}} for name in connector_secret_names],
             ],
         },
         skip_await=False,
@@ -385,7 +485,12 @@ open_metadata_application = kubernetes.helm.v3.Release(
     opts=ResourceOptions(
         parent=vault_k8s_resources,
         delete_before_replace=True,
-        depends_on=[open_metadata_db, db_creds_secret, oidc_config_secret],
+        depends_on=[
+            open_metadata_db,
+            db_creds_secret,
+            oidc_config_secret,
+            *connector_secrets,
+        ],
     ),
 )
 
