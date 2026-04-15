@@ -65,6 +65,11 @@ data:
   MITOL_EMAIL_TLS: "False"
   MITOL_FROM_EMAIL: "MIT Learn <noreply@mit.dev>"
   MITOL_NOTIFICATION_EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
+  # Mailgun settings are required by settings.py even when using SMTP.
+  # Stub values prevent ImproperlyConfigured at startup; actual Mailgun
+  # is not used in local dev (Mailpit handles all outbound email).
+  MAILGUN_SENDER_DOMAIN: "ol.mit.dev"
+  MAILGUN_FROM_EMAIL: "MIT Learn <noreply@ol.mit.dev>"
 
   # ── Database ───────────────────────────────────────────────────────────────
   # DATABASE_URL is set in secrets (contains password).
