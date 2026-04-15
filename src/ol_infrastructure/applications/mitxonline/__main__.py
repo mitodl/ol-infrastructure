@@ -509,7 +509,7 @@ secret_names, secret_resources = create_mitxonline_k8s_secrets(
     redis_cache=redis_cache,
 )
 
-mitxonline_web_memory_limit = "1500Mi"
+mitxonline_web_memory_limit = "1200Mi"
 
 mitxonline_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
@@ -551,20 +551,20 @@ mitxonline_k8s_app = OLApplicationK8s(
                 queue_name="celery",
                 redis_host=redis_cache.address,
                 redis_password=redis_config.require("password"),
-                resource_requests={"cpu": "250m", "memory": "4Gi"},
-                resource_limits={"memory": "4Gi"},
+                resource_requests={"cpu": "100m", "memory": "2Gi"},
+                resource_limits={"memory": "2Gi"},
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="hubspot_sync",
                 redis_host=redis_cache.address,
                 redis_password=redis_config.require("password"),
-                resource_requests={"cpu": "250m", "memory": "4Gi"},
-                resource_limits={"memory": "4Gi"},
+                resource_requests={"cpu": "100m", "memory": "1Gi"},
+                resource_limits={"memory": "1Gi"},
             ),
         ],
         celery_beat_config=OLApplicationK8sCeleryBeatConfig(
-            resource_requests={"cpu": "100m", "memory": "512Mi"},
-            resource_limits={"memory": "512Mi"},
+            resource_requests={"cpu": "10m", "memory": "384Mi"},
+            resource_limits={"memory": "384Mi"},
         ),
         resource_requests={"cpu": "250m", "memory": mitxonline_web_memory_limit},
         resource_limits={"memory": mitxonline_web_memory_limit},

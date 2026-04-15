@@ -1037,8 +1037,8 @@ if micromasters_config.get_bool("deploy_k8s"):
             import_uwsgi_config=True,
             init_migrations=False,
             init_collectstatic=True,
-            resource_requests={"cpu": "250m", "memory": "1500Mi"},
-            resource_limits={"memory": "1500Mi"},
+            resource_requests={"cpu": "250m", "memory": "2000Mi"},
+            resource_limits={"memory": "2000Mi"},
             celery_worker_configs=[
                 OLApplicationK8sCeleryWorkerConfig(
                     application_name="micromasters.celery:app",
@@ -1046,6 +1046,8 @@ if micromasters_config.get_bool("deploy_k8s"):
                     queues=["search"],
                     redis_host=redis_cache.address,
                     redis_password=redis_config.require("password"),
+                    resource_requests={"cpu": "50m", "memory": "512Mi"},
+                    resource_limits={"memory": "512Mi"},
                 ),
                 OLApplicationK8sCeleryWorkerConfig(
                     application_name="micromasters.celery:app",
@@ -1053,6 +1055,8 @@ if micromasters_config.get_bool("deploy_k8s"):
                     queues=["exams"],
                     redis_host=redis_cache.address,
                     redis_password=redis_config.require("password"),
+                    resource_requests={"cpu": "50m", "memory": "512Mi"},
+                    resource_limits={"memory": "512Mi"},
                 ),
                 OLApplicationK8sCeleryWorkerConfig(
                     application_name="micromasters.celery:app",
@@ -1060,6 +1064,8 @@ if micromasters_config.get_bool("deploy_k8s"):
                     queues=["dashboard"],
                     redis_host=redis_cache.address,
                     redis_password=redis_config.require("password"),
+                    resource_requests={"cpu": "50m", "memory": "512Mi"},
+                    resource_limits={"memory": "512Mi"},
                 ),
                 OLApplicationK8sCeleryWorkerConfig(
                     application_name="micromasters.celery:app",
@@ -1067,6 +1073,8 @@ if micromasters_config.get_bool("deploy_k8s"):
                     queues=["default"],
                     redis_host=redis_cache.address,
                     redis_password=redis_config.require("password"),
+                    resource_requests={"cpu": "50m", "memory": "512Mi"},
+                    resource_limits={"memory": "512Mi"},
                 ),
             ],
             probe_configs={
