@@ -210,8 +210,6 @@ for role_name, role_defs in starrocks_role_statements.items():
 # (e.g. aws_region) causes the update command to re-run automatically.
 # ============================================================================
 
-CATALOG_NAME = "ol_data_lake_iceberg"
-
 # MariaDB client (used in the Pulumi runner image) quirks:
 #   1. Does not support --ssl-mode=REQUIRED (MySQL 5.7.11+ syntax).
 #   2. Does not read MYSQL_PWD from the environment.
@@ -262,6 +260,7 @@ oidc_enabled = starrocks_config.get_bool("oidc_enabled") or False
 # --- Iceberg catalog --------------------------------------------------------
 catalog_setup: command.local.Command | None = None
 if enable_data_lake:
+    CATALOG_NAME = f"ol_data_lake_{stack_info.env_suffix}"
     aws_region = starrocks_config.get("aws_region") or "us-east-1"
 
     # CREATE IF NOT EXISTS is idempotent: it is a no-op when the catalog
@@ -286,8 +285,8 @@ if enable_data_lake:
     )
     _catalog_sql = (
         f"CREATE EXTERNAL CATALOG IF NOT EXISTS {CATALOG_NAME}\n"
-        f"COMMENT 'MIT OL Data Lake Iceberg Catalog"
-        f" (AWS Glue / {stack_info.env_suffix})'\n"
+        f"COMMENT 'MIT OL Data Lake {stack_info.name} Iceberg Catalog"
+        f" (AWS Glue / {stack_info.name})'\n"
         f"PROPERTIES(\n"
         f'    "type" = "iceberg",\n'
         f'    "iceberg.catalog.type" = "glue",\n'
