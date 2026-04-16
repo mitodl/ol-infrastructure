@@ -36,26 +36,6 @@ prebuilt_tags = {
 workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 
 # ---------------------------------------------------------------------------
-# Domain substitution helper
-# ---------------------------------------------------------------------------
-def k8s_yaml_with_domain(paths):
-    """Apply k8s YAML files, substituting root_domain for the default 'mit.dev'.
-
-    When root_domain is the default, files are applied as-is.  When overridden,
-    each file is processed through sed before being applied so that all hostname,
-    URL, and cookie-domain references are updated consistently.
-    """
-    if root_domain == "mit.dev":
-        k8s_yaml(paths)
-        return
-    for p in paths:
-        content = str(local(
-            "sed 's/mit\\.dev/{rd}/g' {p}".format(rd=root_domain, p=p),
-            quiet=True,
-        ))
-        k8s_yaml(blob(content))
-
-# ---------------------------------------------------------------------------
 # Application registry
 #
 # seed_commands: list of shell commands run via `kubectl exec` into the web

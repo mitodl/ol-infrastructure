@@ -147,4 +147,3 @@ fi
 
 echo ""
 echo "Teardown complete. Run ./local-dev/scripts/setup.sh to start fresh."
-
