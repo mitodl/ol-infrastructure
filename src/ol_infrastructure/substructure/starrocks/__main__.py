@@ -312,7 +312,10 @@ if enable_data_lake:
                     "STARROCKS_DELETE_SQL": f"DROP CATALOG IF EXISTS {_catalog_name};",
                 },
                 triggers=[hashlib.sha256(_catalog_sql.encode()).hexdigest()],
-                opts=ResourceOptions(depends_on=[starrocks_db_connection]),
+                opts=ResourceOptions(
+                    delete_before_replace=True,
+                    depends_on=[starrocks_db_connection],
+                ),
             )
         )
         _iceberg_roles_sql += (
@@ -386,7 +389,7 @@ command.local.Command(
         "STARROCKS_DELETE_SQL": _roles_drop_sql,
     },
     triggers=[hashlib.sha256(_roles_sql.encode()).hexdigest()],
-    opts=ResourceOptions(depends_on=_role_deps),
+    opts=ResourceOptions(delete_before_replace=True, depends_on=_role_deps),
 )
 
 # --- OIDC authentication chain ----------------------------------------------
@@ -421,7 +424,10 @@ if oidc_enabled:
             "STARROCKS_DELETE_SQL": _oidc_disable_sql,
         },
         triggers=[hashlib.sha256(_oidc_sql.encode()).hexdigest()],
-        opts=ResourceOptions(depends_on=[starrocks_db_connection]),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=[starrocks_db_connection],
+        ),
     )
 
 export("vault_mount_path", mount_point)
