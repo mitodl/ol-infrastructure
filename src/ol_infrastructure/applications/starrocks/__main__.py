@@ -174,7 +174,7 @@ if starrocks_config.get_bool("oidc_enabled"):
 #
 # The Iceberg external catalogs are created and maintained by the substructure stack
 # (substructure/starrocks) using the pulumi-command local.Command resource.
-_DATA_LAKE_ENVS = ("qa", "production")
+_DATA_LAKE_ENVS = ("QA", "Production")
 
 if starrocks_config.get_bool("enable_data_lake_integration"):
     for _data_lake_env in _DATA_LAKE_ENVS:
