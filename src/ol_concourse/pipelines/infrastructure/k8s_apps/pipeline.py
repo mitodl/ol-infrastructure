@@ -743,7 +743,15 @@ def build_app_pipeline(app_name: str) -> Pipeline:
 
     release_container_fragment = PipelineFragment(
         resource_types=[release_resource_type(), github_deployments_resource()],
-        resources=[release_res, release_gate, release_issue, deployment_rc, deployment_prod, app_rc_image, docker_rc_image],
+        resources=[
+            release_res,
+            release_gate,
+            release_issue,
+            deployment_rc,
+            deployment_prod,
+            app_rc_image,
+            docker_rc_image,
+        ],
         jobs=[release_image_build_job],
     )
 
