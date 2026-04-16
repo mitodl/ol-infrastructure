@@ -49,6 +49,7 @@ from ol_infrastructure.components.services.cert_manager import (
 )
 from ol_infrastructure.components.services.k8s import (
     OLApplicationK8s,
+    OLApplicationK8sCeleryBeatConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
 )
@@ -1077,6 +1078,11 @@ if micromasters_config.get_bool("deploy_k8s"):
                     resource_limits={"memory": "512Mi"},
                 ),
             ],
+            celery_beat_config=OLApplicationK8sCeleryBeatConfig(
+                application_name="micromasters.celery:app",
+                resource_requests={"cpu": "10m", "memory": "384Mi"},
+                resource_limits={"memory": "384Mi"},
+            ),
             probe_configs={
                 "liveness_probe": kubernetes.core.v1.ProbeArgs(
                     http_get=kubernetes.core.v1.HTTPGetActionArgs(
