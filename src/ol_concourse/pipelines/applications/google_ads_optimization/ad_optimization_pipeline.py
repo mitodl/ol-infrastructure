@@ -59,6 +59,7 @@ def ad_optimization_pipeline() -> Pipeline:
                         "SEMRUSH_API_KEY": "((google_ads_optimization.semrush_api_key))",
                         "GRAFANA_USERNAME": "((grafana.metrics_write_user))",
                         "GRAFANA_TOKEN": "((grafana.metrics_write_token))",
+                        "GRAFANA_URL": "((grafana.metrics_url))",
                     },
                     run=Command(
                         path="bash",
