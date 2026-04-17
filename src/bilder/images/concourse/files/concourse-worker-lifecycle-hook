@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Poll the EC2 autoscaling API for an ASG scale-in lifecycle hook.
+# When the instance enters "Terminating:Wait", drain the concourse worker
+# and then complete the lifecycle action so AWS can proceed with termination.
+#
+# This provides a controlled 10-minute window for builds to complete before
+# the ASG terminates the instance, complementing the 2-minute spot interruption window.
+set -euo pipefail
+
+POLL_INTERVAL=${POLL_INTERVAL:-10}
+# Leave headroom for the lifecycle hook API call after draining.
+DRAIN_TIMEOUT=${DRAIN_TIMEOUT:-540}
+TOKEN_URL="http://169.254.169.254/latest/api/token"
+METADATA_BASE="http://169.254.169.254/latest/meta-data"
+
+log() {
+    echo "[concourse-worker-lifecycle-hook] $*" | systemd-cat -t concourse-worker-lifecycle-hook -p info
+}
+
+get_imds_token() {
+    curl -s -X PUT "${TOKEN_URL}" \
+        -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" \
+        --connect-timeout 2 --max-time 5 2>/dev/null || echo ""
+}
+
+TOKEN=$(get_imds_token)
+INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: ${TOKEN}" \
+    --connect-timeout 2 --max-time 5 \
+    "${METADATA_BASE}/instance-id" 2>/dev/null)
+REGION=$(curl -s -H "X-aws-ec2-metadata-token: ${TOKEN}" \
+    --connect-timeout 2 --max-time 5 \
+    "${METADATA_BASE}/placement/region" 2>/dev/null)
+
+if [ -z "${INSTANCE_ID}" ] || [ -z "${REGION}" ]; then
+    log "Could not retrieve instance metadata; lifecycle hook handler exiting"
+    exit 1
+fi
+
+log "Monitoring ASG lifecycle state for instance ${INSTANCE_ID} in ${REGION}"
+
+while true; do
+    LIFECYCLE_STATE=$(aws autoscaling describe-auto-scaling-instances \
+        --instance-ids "${INSTANCE_ID}" \
+        --region "${REGION}" \
+        --query 'AutoScalingInstances[0].LifecycleState' \
+        --output text 2>/dev/null || echo "Unknown")
+
+    if [ "${LIFECYCLE_STATE}" = "Terminating:Wait" ]; then
+        log "Instance is in Terminating:Wait state — starting graceful drain"
+
+        ASG_NAME=$(aws autoscaling describe-auto-scaling-instances \
+            --instance-ids "${INSTANCE_ID}" \
+            --region "${REGION}" \
+            --query 'AutoScalingInstances[0].AutoScalingGroupName' \
+            --output text 2>/dev/null || echo "")
+
+        HOOK_NAME=$(aws autoscaling describe-lifecycle-hooks \
+            --auto-scaling-group-name "${ASG_NAME}" \
+            --region "${REGION}" \
+            --query 'LifecycleHooks[?LifecycleTransition==`autoscaling:EC2_INSTANCE_TERMINATING`].LifecycleHookName | [0]' \
+            --output text 2>/dev/null || echo "")
+
+        DRAIN_TIMEOUT="${DRAIN_TIMEOUT}" /usr/local/bin/concourse-worker-drain
+
+        if [ -n "${HOOK_NAME}" ] && [ "${HOOK_NAME}" != "None" ] && [ -n "${ASG_NAME}" ]; then
+            log "Completing lifecycle hook '${HOOK_NAME}' for ASG '${ASG_NAME}'"
+            aws autoscaling complete-lifecycle-action \
+                --auto-scaling-group-name "${ASG_NAME}" \
+                --lifecycle-hook-name "${HOOK_NAME}" \
+                --lifecycle-action-result CONTINUE \
+                --instance-id "${INSTANCE_ID}" \
+                --region "${REGION}" 2>/dev/null || \
+                log "Warning: failed to complete lifecycle hook (AWS may have already timed it out)"
+        fi
+
+        log "Lifecycle hook handling complete"
+        exit 0
+    fi
+
+    sleep "${POLL_INTERVAL}"
+done

@@ -23,7 +23,7 @@ OL_INFRASTRUCTURE_REPO = git_repo(
     uri="https://github.com/mitodl/ol-infrastructure",
     branch="main",
     paths=[
-        "src/ol_concourse/lib/",
+        "pyproject.toml",
         "src/ol_concourse/pipelines/libraries/",
         "src/ol_concourse/pipelines/open_edx/open_edx_plugins/",
     ],

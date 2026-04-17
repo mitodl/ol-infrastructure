@@ -14,6 +14,19 @@ policy_definition = {
                 "cloudwatch:PutMetricData",
             ],
             "Resource": "*",
-        }
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "autoscaling:DescribeAutoScalingInstances",
+                "autoscaling:DescribeLifecycleHooks",
+            ],
+            "Resource": "*",
+        },
+        {
+            "Effect": "Allow",
+            "Action": ["autoscaling:CompleteLifecycleAction"],
+            "Resource": "arn:aws:autoscaling:*:*:autoScalingGroup:*:autoScalingGroupName/concourse-worker-*",  # noqa: E501
+        },
     ],
 }

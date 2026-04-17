@@ -4,3 +4,4 @@ encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAFZr4tUKdkL5a5xOk
 config:
   environment:business_unit: residential
   environment:target_vpc: residential_mitx_vpc
+  typesense:enable_operator: true

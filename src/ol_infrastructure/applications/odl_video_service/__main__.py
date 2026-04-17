@@ -8,7 +8,6 @@
 """
 
 import json
-import os
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
@@ -42,13 +41,13 @@ from ol_infrastructure.components.aws.mediaconvert import (
     OLMediaConvert,
 )
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.components.services.apisix import (
+    OLApisixRoute,
+    OLApisixRouteConfig,
+)
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
-)
-from ol_infrastructure.components.services.k8s import (
-    OLApisixRoute,
-    OLApisixRouteConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -73,6 +72,7 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
+    format_docker_image_ref,
     merge_otel_resource_attributes,
     parse_stack,
 )
@@ -786,10 +786,9 @@ app_env_vars.update(k8s_extra_vars)
 # signals carry organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(app_env_vars, k8s_app_labels)
 
-if "ODL_VIDEO_SERVICE_DOCKER_TAG" not in os.environ:
-    msg = "ODL_VIDEO_SERVICE_DOCKER_TAG must be set."
-    raise OSError(msg)
-ODL_VIDEO_SERVICE_DOCKER_TAG = os.environ["ODL_VIDEO_SERVICE_DOCKER_TAG"]
+ODL_VIDEO_SERVICE_IMAGE = format_docker_image_ref(
+    "mitodl/odl-video-service-app", "ODL_VIDEO_SERVICE"
+)
 
 # NGINX configuration for K8s (HTTP only — APISIX handles TLS)
 ovs_domains = ovs_config.get_object("domains") or [ovs_config.get("default_domain")]
@@ -1215,7 +1214,7 @@ nginx_volume_mounts: list[kubernetes.core.v1.VolumeMountArgs] = [
 # Init container for migrations and collectstatic
 init_container = kubernetes.core.v1.ContainerArgs(
     name="ovs-init",
-    image=f"mitodl/odl-video-service-app:{ODL_VIDEO_SERVICE_DOCKER_TAG}",
+    image=ODL_VIDEO_SERVICE_IMAGE,
     command=["/bin/bash", "-c"],
     args=[
         "python3 manage.py migrate --noinput && "
@@ -1237,7 +1236,7 @@ init_container = kubernetes.core.v1.ContainerArgs(
 # Main app container (uWSGI)
 app_container = kubernetes.core.v1.ContainerArgs(
     name="ovs-app",
-    image=f"mitodl/odl-video-service-app:{ODL_VIDEO_SERVICE_DOCKER_TAG}",
+    image=ODL_VIDEO_SERVICE_IMAGE,
     command=["uwsgi"],
     args=["uwsgi.ini"],
     ports=[
@@ -1433,7 +1432,7 @@ celery_deployment = kubernetes.apps.v1.Deployment(
                 containers=[
                     kubernetes.core.v1.ContainerArgs(
                         name="ovs-celery",
-                        image=f"mitodl/odl-video-service-app:{ODL_VIDEO_SERVICE_DOCKER_TAG}",
+                        image=ODL_VIDEO_SERVICE_IMAGE,
                         command=["celery"],
                         args=[
                             "-A",

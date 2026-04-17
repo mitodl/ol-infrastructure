@@ -233,6 +233,7 @@ def create_mitxonline_k8s_secrets(
                 "MITOL_GOOGLE_SHEETS_DRIVE_CLIENT_SECRET": '{{ index .Secrets "google-sheets" "drive-client-secret" }}',
                 "MITOL_GOOGLE_SHEETS_ENROLLMENT_CHANGE_SHEET_ID": '{{ index .Secrets "google-sheets" "enrollment-change-sheet-id" }}',
                 "MITOL_HUBSPOT_API_PRIVATE_TOKEN": '{{ index .Secrets "hubspot" "private-api-token" }}',
+                "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN": '{{ index .Secrets "hubspot" "uai-private-api-token" }}',
                 "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY": '{{ index .Secrets "cybersource" "access-key" }}',
                 "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_ID": '{{ index .Secrets "cybersource" "merchant-id" }}',
                 "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET": '{{ index .Secrets "cybersource" "merchant-secret" }}',

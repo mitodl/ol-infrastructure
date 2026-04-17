@@ -27,11 +27,18 @@ from ol_infrastructure.applications.edxapp.k8s_secrets import create_k8s_secrets
 from ol_infrastructure.applications.edxapp.meilisearch import (
     create_meilisearch_resources,
 )
+from ol_infrastructure.applications.edxapp.typesense import create_typesense_resources
 from ol_infrastructure.components.aws.cache import OLAmazonCache
 from ol_infrastructure.components.aws.database import OLAmazonDB
 from ol_infrastructure.components.aws.eks import (
     OLEKSTrustRole,
     OLEKSTrustRoleConfig,
+)
+from ol_infrastructure.components.services.apisix import (
+    OLApisixRoute,
+    OLApisixRouteConfig,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -39,10 +46,6 @@ from ol_infrastructure.components.services.cert_manager import (
 )
 from ol_infrastructure.components.services.k8s import (
     GranianConfig,
-    OLApisixRoute,
-    OLApisixRouteConfig,
-    OLApisixSharedPlugins,
-    OLApisixSharedPluginsConfig,
     OLApplicationK8s,
     OLApplicationK8sConfig,
 )
@@ -350,7 +353,7 @@ def create_k8s_resources(  # noqa: C901
     def _make_vector_sidecar(service: str) -> kubernetes.core.v1.ContainerArgs:
         return kubernetes.core.v1.ContainerArgs(
             name="vector",
-            image="timberio/vector:0.34.1-alpine",
+            image=cached_image_uri("timberio/vector:0.34.1-alpine"),
             security_context=kubernetes.core.v1.SecurityContextArgs(
                 run_as_group=0,
                 run_as_user=0,
@@ -1385,6 +1388,13 @@ def create_k8s_resources(  # noqa: C901
 
     # Meilisearch
     _meilisearch_helm_release = create_meilisearch_resources(
+        stack_info=stack_info,
+        namespace=namespace,
+        k8s_global_labels=k8s_global_labels,
+    )
+
+    # Typesense
+    _typesense_cluster_crd = create_typesense_resources(
         stack_info=stack_info,
         namespace=namespace,
         k8s_global_labels=k8s_global_labels,

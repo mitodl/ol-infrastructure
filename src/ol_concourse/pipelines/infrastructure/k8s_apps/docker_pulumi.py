@@ -4,11 +4,8 @@
 import sys
 from typing import Any
 
-from pydantic import BaseModel, model_validator
-
 from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.containers import container_build_task
-from ol_concourse.lib.jobs.infrastructure import pulumi_job, pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
@@ -30,7 +27,10 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resource_types import pulumi_provisioner_resource
 from ol_concourse.lib.resources import git_repo, pulumi_provisioner, registry_image
+from pydantic import BaseModel, model_validator
+
 from ol_concourse.pipelines.constants import PULUMI_WATCHED_PATHS
+from ol_concourse.pipelines.jobs import pulumi_job, pulumi_jobs_chain
 
 
 class AppPipelineParams(BaseModel):
@@ -414,7 +414,9 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                 params={"skip_download": True},
             ),
             LoadVarStep(
-                load_var="image_tag", file=f"{app_ci_image.name}/tag", reveal=True
+                load_var="image_digest",
+                file=f"{app_ci_image.name}/digest",
+                reveal=True,
             ),
         ],
         additional_post_steps=[
@@ -439,7 +441,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         if pipeline_parameters.purge_fastly_cache
         else [],
         additional_env_vars={
-            f"{app_name.replace('-', '_').upper()}_DOCKER_TAG": "((.:image_tag))",
+            f"{app_name.replace('-', '_').upper()}_DOCKER_SHA": "((.:image_digest))",
         },
         slack_url_path="eks.slack_url",
     )

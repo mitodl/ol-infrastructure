@@ -37,6 +37,7 @@ from bridge.lib.versions import (
     PROMETHEUS_OPERATOR_CRD_VERSION,
     TRAEFIK_CHART_VERSION,
     VAULT_SECRETS_OPERATOR_CHART_VERSION,
+    VPA_CHART_VERSION,
 )
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.infrastructure.aws.eks.apisix_official import (
@@ -51,6 +52,7 @@ from ol_infrastructure.infrastructure.aws.eks.traefik import setup_traefik
 from ol_infrastructure.infrastructure.aws.eks.vault_secrets_operator import (
     setup_vault_secrets_operator,
 )
+from ol_infrastructure.infrastructure.aws.eks.vpa import setup_vpa
 from ol_infrastructure.lib.aws.eks_helper import (
     access_entry_opts,
     get_cluster_version,
@@ -143,6 +145,7 @@ VERSIONS = {
     "VAULT_SECRETS_OPERATOR_CHART": os.environ.get(
         "VAULT_SECRETS_OPERATOR_CHART", VAULT_SECRETS_OPERATOR_CHART_VERSION
     ),
+    "VPA_CHART": os.environ.get("VPA_CHART", VPA_CHART_VERSION),
     # K8S version is special, retrieve it from the AWS APIs
     "KUBERNETES": os.environ.get("KUBERNETES", get_cluster_version()),
     "PROMETHEUS_OPERATOR": os.environ.get(
@@ -1012,6 +1015,19 @@ gateway_api_crds = setup_traefik(
     fastly_provider=fastly_provider,
 )
 
+############################################################
+# Install VPA and configure APISIX with vertical autoscaling
+############################################################
+vpa_release = setup_vpa(
+    cluster_name=cluster_name,
+    cluster=cluster,
+    k8s_provider=k8s_provider,
+    node_groups=node_groups,
+    k8s_global_labels=k8s_global_labels,
+    operations_tolerations=operations_tolerations,
+    versions=VERSIONS,
+)
+
 setup_apisix(
     cluster_name=cluster_name,
     k8s_provider=k8s_provider,
@@ -1028,8 +1044,8 @@ setup_apisix(
     cluster=cluster,
     lb_controller=lb_controller,
     fastly_provider=fastly_provider,
+    vpa_release=vpa_release,
 )
-
 
 ############################################################
 # Install and configure metrics-server

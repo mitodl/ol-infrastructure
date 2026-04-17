@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-substructure-starrocks
+runtime: python
+description: Vault dynamic database credentials for StarRocks
+backend:
+  url: s3://mitol-pulumi-state/

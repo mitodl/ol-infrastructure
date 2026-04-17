@@ -4,7 +4,6 @@
 import base64
 import json
 import mimetypes
-import os
 import textwrap
 from pathlib import Path
 
@@ -36,12 +35,7 @@ from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisC
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services import appdb
-from ol_infrastructure.components.services.cert_manager import (
-    OLCertManagerCert,
-    OLCertManagerCertConfig,
-)
-from ol_infrastructure.components.services.k8s import (
-    GranianConfig,
+from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixPluginConfig,
@@ -49,6 +43,13 @@ from ol_infrastructure.components.services.k8s import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+)
+from ol_infrastructure.components.services.cert_manager import (
+    OLCertManagerCert,
+    OLCertManagerCertConfig,
+)
+from ol_infrastructure.components.services.k8s import (
+    GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryBeatConfig,
     OLApplicationK8sCeleryWorkerConfig,
@@ -80,6 +81,8 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
+    docker_image_config_kwargs,
+    format_docker_image_ref,
     merge_otel_resource_attributes,
     parse_stack,
 )
@@ -129,12 +132,6 @@ k8s_global_labels = K8sGlobalLabels(
     ou=BusinessUnit.mit_learn, service=Services.mit_learn, stack=stack_info
 ).model_dump()
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
-
-# Fail hard if LEARN_AI_DOCKER_TAG is not set
-if "LEARN_AI_DOCKER_TAG" not in os.environ:
-    msg = "LEARN_AI_DOCKER_TAG must be set"
-    raise OSError(msg)
-LEARN_AI_DOCKER_TAG = os.getenv("LEARN_AI_DOCKER_TAG")
 
 match stack_info.env_suffix:
     case "production":
@@ -760,7 +757,7 @@ learn_ai_app_k8s = OLApplicationK8s(
         application_security_group_name=Output.from_input("learn-ai-app"),
         application_service_account_name=learn_ai_service_account.metadata.name,
         application_image_repository="mitodl/learn-ai-app",
-        application_docker_tag=LEARN_AI_DOCKER_TAG,
+        **docker_image_config_kwargs("LEARN_AI"),
         application_min_replicas=learn_ai_config.get("min_replicas") or 2,
         application_cmd_array=["uvicorn"],
         application_arg_array=[
@@ -789,8 +786,8 @@ learn_ai_app_k8s = OLApplicationK8s(
         import_nginx_config=True,
         # Nginx resources (defaults from component are fine)
         # App container resources
-        resource_requests={"cpu": "250m", "memory": "1600Mi"},
-        resource_limits={"memory": "1600Mi"},
+        resource_requests={"cpu": "100m", "memory": "1000Mi"},
+        resource_limits={"memory": "1000Mi"},
         init_migrations=True,
         init_collectstatic=True,  # Assuming createcachetable is not needed or handled elsewhere
         celery_worker_configs=[
@@ -799,20 +796,22 @@ learn_ai_app_k8s = OLApplicationK8s(
                 redis_host=redis_cache.address,
                 redis_database_index="1",
                 redis_password=redis_config.require("password"),
-                resource_requests={"cpu": "100m", "memory": "2500Mi"},
-                resource_limits={"memory": "2500Mi"},
+                resource_requests={"cpu": "100m", "memory": "1000Mi"},
+                resource_limits={"memory": "1000Mi"},
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="edx_content",
                 redis_host=redis_cache.address,
                 redis_database_index="1",
                 redis_password=redis_config.require("password"),
-                resource_requests={"cpu": "100m", "memory": "2500Mi"},
-                resource_limits={"memory": "2500Mi"},
+                resource_requests={"cpu": "100m", "memory": "1000Mi"},
+                resource_limits={"memory": "1000Mi"},
             ),
         ],
         celery_beat_config=OLApplicationK8sCeleryBeatConfig(
-            scheduler="celery.beat.PersistentScheduler"
+            scheduler="celery.beat.PersistentScheduler",
+            resource_requests={"cpu": "10m", "memory": "384Mi"},
+            resource_limits={"memory": "384Mi"},
         ),
         hpa_scaling_metrics=[
             kubernetes.autoscaling.v2.MetricSpecArgs(
@@ -852,7 +851,9 @@ learn_ai_app_k8s = OLApplicationK8s(
 )
 
 # Reconstruct variables needed for Celery deployment
-application_image_repository_and_tag = f"mitodl/learn-ai-app:{LEARN_AI_DOCKER_TAG}"
+application_image_repository_and_tag = format_docker_image_ref(
+    "mitodl/learn-ai-app", "LEARN_AI"
+)
 
 learn_ai_deployment_env_vars = []
 for k, v in (learn_ai_config.require_object("env_vars") or {}).items():

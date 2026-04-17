@@ -3,7 +3,6 @@
 import base64
 import json
 import mimetypes
-import os
 import textwrap
 from pathlib import Path
 from string import Template
@@ -42,12 +41,7 @@ from ol_infrastructure.components.aws.cache import (
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
-from ol_infrastructure.components.services.cert_manager import (
-    OLCertManagerCert,
-    OLCertManagerCertConfig,
-)
-from ol_infrastructure.components.services.k8s import (
-    GranianConfig,
+from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixPluginConfig,
@@ -55,6 +49,13 @@ from ol_infrastructure.components.services.k8s import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+)
+from ol_infrastructure.components.services.cert_manager import (
+    OLCertManagerCert,
+    OLCertManagerCertConfig,
+)
+from ol_infrastructure.components.services.k8s import (
+    GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryBeatConfig,
     OLApplicationK8sCeleryWorkerConfig,
@@ -86,6 +87,7 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
+    docker_image_config_kwargs,
     merge_otel_resource_attributes,
     parse_stack,
 )
@@ -528,25 +530,8 @@ mitlearn_db_security_group = ec2.SecurityGroup(
             # Airbyte isn't using pod security groups in Kubernetes. This is a
             # workaround to allow for data integration from the data Kubernetes
             # cluster. (TMM 2025-05-16)
-            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"].apply(
-                lambda pod_cidrs: [
-                    # Grant access from Hightouch for certificate sync
-                    "54.196.30.169/32",
-                    "52.72.201.213/32",
-                    "18.213.226.96/32",
-                    "3.224.126.197/32",
-                    "3.217.26.199/32",
-                    # This is in order to allow Vault to resolve the connection over the
-                    # public internet due to being located in a separate VPC. The public
-                    # access is toggled to ON because of Hightouch, so the default
-                    # resolution outside of the VPC that the DB lives in is to go over
-                    # the public net. Because Vault couldn't reach the DB it couldn't
-                    # create credentials. (TMM 2025-09-08)
-                    "0.0.0.0/0",
-                    *pod_cidrs,
-                ]
-            ),
-            description="Allow access over the public internet from Heroku.",
+            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"],
+            description="Allow access from data VPC pod subnets.",
         )
     ],
     egress=[
@@ -567,6 +552,19 @@ rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["instance_size"] = (
     mitlearn_config.get("db_instance_size") or rds_defaults["instance_size"]
 )
+# Pre-provision storage to avoid autoscaling events that force a full snapshot
+# baseline (needed for blue/green seeding and post-autoscale backups). Default
+# to 300 GB so the instance has headroom before autoscaling kicks in.  The
+# max_storage ceiling (1 TB) still applies, and Pulumi ignores upward drift
+# from autoscaling when max_allocated_storage is set.
+rds_defaults["storage"] = mitlearn_config.get_int("db_allocated_storage") or 300
+# Provisioned IOPS / throughput reduce the time for full-baseline snapshots
+# (blue/green seeding, first backup after autoscale). gp3 baselines are
+# 3,000 IOPS / 125 MB/s; these values roughly halve snapshot duration.
+if db_iops := mitlearn_config.get_int("db_iops"):
+    rds_defaults["iops"] = db_iops
+if db_storage_throughput := mitlearn_config.get_int("db_storage_throughput"):
+    rds_defaults["storage_throughput"] = db_storage_throughput
 mitlearn_db_config = OLPostgresDBConfig(
     instance_name=f"ol-mitlearn-db-{stack_info.env_suffix}",
     password=rds_password,
@@ -575,7 +573,7 @@ mitlearn_db_config = OLPostgresDBConfig(
     engine_major_version="15",
     tags=aws_config.tags,
     db_name="mitopen",
-    public_access=True,
+    public_access=False,
     use_blue_green=mitlearn_config.get_bool("db_use_blue_green") or False,
     **rds_defaults,
 )
@@ -1029,7 +1027,12 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             ),
             name=f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-https-logging-args",
             content_type="application/json",
-            format=build_fastly_log_format_string(additional_static_fields={}),
+            format=build_fastly_log_format_string(
+                additional_static_fields={
+                    "application": Application.mit_learn,
+                    "environment": stack_info.env_suffix,
+                }
+            ),
             format_version=2,
             header_name="Authorization",
             header_value=f"Basic {encoded_fastly_proxy_credentials}",
@@ -1389,11 +1392,6 @@ secret_names, secret_resources = create_mitlearn_k8s_secrets(
     redis_cache=redis_cache,
 )
 
-if "MIT_LEARN_DOCKER_TAG" not in os.environ:
-    msg = "MIT_LEARN_DOCKER_TAG must be set."
-    raise OSError(msg)
-MIT_LEARN_DOCKER_TAG = os.environ["MIT_LEARN_DOCKER_TAG"]
-
 # Configure and deploy the mitlearn application using OLApplicationK8s
 mitlearn_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
@@ -1411,10 +1409,18 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_security_group_id=mitlearn_app_security_group.id,
         application_security_group_name=mitlearn_app_security_group.name,
         application_image_repository="mitodl/mit-learn-app",
-        application_docker_tag=MIT_LEARN_DOCKER_TAG,
+        **docker_image_config_kwargs("MIT_LEARN"),
         application_cmd_array=["uwsgi"],
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
-        granian_config=GranianConfig(workers=2, enable_metrics=True)
+        granian_config=GranianConfig(
+            workers=1,
+            enable_metrics=True,
+            interface="asginl",
+            backlog=None,
+            log_level=mitlearn_config.get("granian_log_level") or "info",
+            application_module="main.asgi:application",
+            runtime_mode=None,
+        )
         if mitlearn_config.get_bool("use_granian")
         else None,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,

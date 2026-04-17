@@ -1,5 +1,3 @@
-from bridge.settings.openedx.types import OpenEdxSupportedRelease
-from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
@@ -15,6 +13,9 @@ from ol_concourse.lib.models.pipeline import (
     TaskStep,
 )
 from ol_concourse.lib.resources import git_repo
+
+from bridge.settings.openedx.types import OpenEdxSupportedRelease
+from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_concourse.pipelines.open_edx.mfe.values import deployments
 
 
@@ -77,7 +78,8 @@ def meta_pipeline() -> Pipeline:
         branch="main",
         paths=[
             "src/ol_concourse/pipelines/open_edx/mfe/",
-            "src/ol_concourse/lib/",
+            "pyproject.toml",
+            "src/ol_concourse/pipelines/jobs.py",
             "src/bridge/settings/openedx/",
         ],
     )

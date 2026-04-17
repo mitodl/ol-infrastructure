@@ -8,7 +8,6 @@
 
 import json
 import mimetypes
-import os
 import textwrap
 from pathlib import Path
 
@@ -40,12 +39,7 @@ from ol_infrastructure.components.aws.cache import (
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
-from ol_infrastructure.components.services.cert_manager import (
-    OLCertManagerCert,
-    OLCertManagerCertConfig,
-)
-from ol_infrastructure.components.services.k8s import (
-    GranianConfig,
+from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixPluginConfig,
@@ -53,6 +47,13 @@ from ol_infrastructure.components.services.k8s import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+)
+from ol_infrastructure.components.services.cert_manager import (
+    OLCertManagerCert,
+    OLCertManagerCertConfig,
+)
+from ol_infrastructure.components.services.k8s import (
+    GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryBeatConfig,
     OLApplicationK8sCeleryWorkerConfig,
@@ -86,6 +87,7 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
+    docker_image_config_kwargs,
     merge_otel_resource_attributes,
     parse_stack,
 )
@@ -507,11 +509,7 @@ secret_names, secret_resources = create_mitxonline_k8s_secrets(
     redis_cache=redis_cache,
 )
 
-if "MITXONLINE_DOCKER_TAG" not in os.environ:
-    msg = "MITXONLINE_DOCKER_TAG must be set."
-    raise OSError(msg)
-MITXONLINE_DOCKER_TAG = os.environ["MITXONLINE_DOCKER_TAG"]
-mitxonline_web_memory_limit = "1500Mi"
+mitxonline_web_memory_limit = "1200Mi"
 
 mitxonline_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
@@ -528,7 +526,7 @@ mitxonline_k8s_app = OLApplicationK8s(
         application_security_group_id=mitxonline_app_security_group.id,
         application_security_group_name=mitxonline_app_security_group.name,
         application_image_repository="mitodl/mitxonline-app",
-        application_docker_tag=MITXONLINE_DOCKER_TAG,
+        **docker_image_config_kwargs("MITXONLINE"),
         application_cmd_array=["uwsgi"],
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         granian_config=GranianConfig(
@@ -553,20 +551,20 @@ mitxonline_k8s_app = OLApplicationK8s(
                 queue_name="celery",
                 redis_host=redis_cache.address,
                 redis_password=redis_config.require("password"),
-                resource_requests={"cpu": "250m", "memory": "4Gi"},
-                resource_limits={"memory": "4Gi"},
+                resource_requests={"cpu": "100m", "memory": "2Gi"},
+                resource_limits={"memory": "2Gi"},
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="hubspot_sync",
                 redis_host=redis_cache.address,
                 redis_password=redis_config.require("password"),
-                resource_requests={"cpu": "250m", "memory": "4Gi"},
-                resource_limits={"memory": "4Gi"},
+                resource_requests={"cpu": "100m", "memory": "1Gi"},
+                resource_limits={"memory": "1Gi"},
             ),
         ],
         celery_beat_config=OLApplicationK8sCeleryBeatConfig(
-            resource_requests={"cpu": "100m", "memory": "512Mi"},
-            resource_limits={"memory": "512Mi"},
+            resource_requests={"cpu": "10m", "memory": "384Mi"},
+            resource_limits={"memory": "384Mi"},
         ),
         resource_requests={"cpu": "250m", "memory": mitxonline_web_memory_limit},
         resource_limits={"memory": mitxonline_web_memory_limit},

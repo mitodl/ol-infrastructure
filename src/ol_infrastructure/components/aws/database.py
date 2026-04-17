@@ -89,6 +89,13 @@ class OLDBConfig(AWSBase):
     security_groups: list[SecurityGroup]
     storage: PositiveInt = PositiveInt(50)
     storage_type: StorageType = StorageType.ssd
+    # Provisioned IOPS for gp3 (3,000-16,000) or io1 (1,000-256,000).
+    # gp3 baseline is 3,000 IOPS at no extra cost; provisioning above that
+    # speeds up full-baseline snapshots (blue/green seeding, post-autoscale).
+    iops: int | None = None
+    # Provisioned throughput in MB/s for gp3 only (125-1,000 MB/s).
+    # gp3 baseline is 125 MB/s; higher values shorten snapshot duration.
+    storage_throughput: int | None = None
     subnet_group_name: str | pulumi.Output[str]
     take_final_snapshot: bool = True
     use_blue_green: bool = False
@@ -205,8 +212,10 @@ class OLPostgresDBConfig(OLDBConfig):
         },
         # WAL settings for logical replication
         # max_wal_senders: Maximum concurrent WAL sender processes
-        # Recommended: replicas + logical replication slots + 2
-        {"name": "max_wal_senders", "value": 10, "apply_method": "pending-reboot"},
+        # Recommended: replicas + logical replication slots + 2.
+        # 20 is a safe default for instances that use blue/green deployments or
+        # read replicas; AWS will auto-raise the value if it proves too low.
+        {"name": "max_wal_senders", "value": 20, "apply_method": "pending-reboot"},
         # max_replication_slots: Maximum replication slots
         # Each logical replication connection needs one slot
         {
@@ -242,13 +251,21 @@ class OLMariaDBConfig(OLDBConfig):
         # slow_query_log / long_query_time names).
         {"name": "log_slow_query", "value": 1},
         {"name": "log_slow_query_time", "value": 2},
+        # Enable RDS Optimized Writes, which replaces the InnoDB doublewrite buffer with
+        # a more efficient write path. Requires gp3/io1 storage (the default). This is a
+        # static parameter and takes effect on the next restart (or blue/green cutover).
+        {
+            "name": "rds.optimized_writes",
+            "value": "AUTO",
+            "apply_method": "pending-reboot",
+        },
     ]
 
 
 class OLAmazonDB(pulumi.ComponentResource):
     """Create an RDS instance with sane defaults and manage associated resources."""
 
-    def __init__(  # noqa: C901
+    def __init__(  # noqa: C901, PLR0915
         self, db_config: OLDBConfig, opts: pulumi.ResourceOptions | None = None
     ):
         """Create an RDS instance, parameter group, and optionally read replica.
@@ -300,6 +317,67 @@ class OLAmazonDB(pulumi.ComponentResource):
                     pulumi.ResourceOptions(ignore_changes=["engine_version"]),
                 )
 
+        # Create an IAM role for Enhanced Monitoring when a non-zero interval is set.
+        # This role allows the RDS service to publish OS-level metrics to CloudWatch.
+        enhanced_monitoring_role_arn = None
+        if db_config.enhanced_monitoring_interval > 0:
+            enhanced_monitoring_role = iam.Role(
+                f"{db_config.instance_name}-enhanced-monitoring-role",
+                assume_role_policy=json.dumps(
+                    {
+                        "Version": "2012-10-17",
+                        "Statement": [
+                            {
+                                "Effect": "Allow",
+                                "Principal": {
+                                    "Service": "monitoring.rds.amazonaws.com"
+                                },
+                                "Action": "sts:AssumeRole",
+                            }
+                        ],
+                    }
+                ),
+                name_prefix=f"{db_config.instance_name}-rds-enhanced-monitoring-"[
+                    :IAM_ROLE_NAME_PREFIX_MAX_LENGTH
+                ],
+                tags=db_config.tags,
+                opts=resource_options,
+            )
+            iam.RolePolicyAttachment(
+                f"{db_config.instance_name}-enhanced-monitoring-policy",
+                role=enhanced_monitoring_role.name,
+                policy_arn=(
+                    "arn:aws:iam::aws:policy/service-role/"
+                    "AmazonRDSEnhancedMonitoringRole"
+                ),
+                opts=resource_options,
+            )
+            enhanced_monitoring_role_arn = enhanced_monitoring_role.arn
+
+        # Determine whether the enhanced monitoring role ARN is being added, removed, or
+        # replaced. enhanced_monitoring_role_arn is a pulumi.Output[str] and cannot be
+        # compared synchronously, so we derive the expected IAM role name prefix from
+        # the instance name and compare it against the role name embedded in the current
+        # MonitoringRoleArn from AWS. If the current role name does not start with the
+        # expected prefix the role is different and a blue/green update is needed.
+        expected_monitoring_role_prefix = (
+            f"{db_config.instance_name}-rds-enhanced-monitoring-"[
+                :IAM_ROLE_NAME_PREFIX_MAX_LENGTH
+            ]
+        )
+        current_monitoring_arn = (
+            current_db_state.get("MonitoringRoleArn", "") if current_db_state else ""
+        )
+        monitoring_role_arn_changed = (
+            enhanced_monitoring_role_arn is not None
+        ) != bool(current_monitoring_arn) or (
+            enhanced_monitoring_role_arn is not None
+            and bool(current_monitoring_arn)
+            and not current_monitoring_arn.split("/")[-1].startswith(
+                expected_monitoring_role_prefix
+            )
+        )
+
         # There are a handful of cases that will trigger a blue/green update when that
         # is enabled. Those include:
         # - DB Engine Version: Upgrading or downgrading the major or minor version of
@@ -336,6 +414,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                     db_config.multi_az != current_db_state.get("MultiAZ"),
                     db_config.storage_type != current_db_state.get("StorageType"),
                     db_config.instance_size != current_db_state.get("DBInstanceClass"),
+                    monitoring_role_arn_changed,
                 )
             )
         ):
@@ -397,43 +476,6 @@ class OLAmazonDB(pulumi.ComponentResource):
             parameters=db_config.parameter_overrides,
         )
 
-        # Create an IAM role for Enhanced Monitoring when a non-zero interval is set.
-        # This role allows the RDS service to publish OS-level metrics to CloudWatch.
-        enhanced_monitoring_role_arn = None
-        if db_config.enhanced_monitoring_interval > 0:
-            enhanced_monitoring_role = iam.Role(
-                f"{db_config.instance_name}-enhanced-monitoring-role",
-                assume_role_policy=json.dumps(
-                    {
-                        "Version": "2012-10-17",
-                        "Statement": [
-                            {
-                                "Effect": "Allow",
-                                "Principal": {
-                                    "Service": "monitoring.rds.amazonaws.com"
-                                },
-                                "Action": "sts:AssumeRole",
-                            }
-                        ],
-                    }
-                ),
-                name_prefix=f"{db_config.instance_name}-rds-enhanced-monitoring-"[
-                    :IAM_ROLE_NAME_PREFIX_MAX_LENGTH
-                ],
-                tags=db_config.tags,
-                opts=resource_options,
-            )
-            iam.RolePolicyAttachment(
-                f"{db_config.instance_name}-enhanced-monitoring-policy",
-                role=enhanced_monitoring_role.name,
-                policy_arn=(
-                    "arn:aws:iam::aws:policy/service-role/"
-                    "AmazonRDSEnhancedMonitoringRole"
-                ),
-                opts=resource_options,
-            )
-            enhanced_monitoring_role_arn = enhanced_monitoring_role.arn
-
         # Only pass the retention period when Performance Insights is enabled.
         pi_retention_period = (
             db_config.performance_insights_retention_period
@@ -474,7 +516,9 @@ class OLAmazonDB(pulumi.ComponentResource):
             publicly_accessible=db_config.public_access,
             skip_final_snapshot=not db_config.take_final_snapshot,
             storage_encrypted=True,
+            storage_throughput=db_config.storage_throughput,
             storage_type=db_config.storage_type.value,
+            iops=db_config.iops,
             tags=db_config.tags,
             username=db_config.username,
             vpc_security_group_ids=[group.id for group in db_config.security_groups],

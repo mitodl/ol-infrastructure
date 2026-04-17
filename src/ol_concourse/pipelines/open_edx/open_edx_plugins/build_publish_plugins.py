@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from ol_concourse.lib.models.pipeline import Pipeline
+
 from ol_concourse.pipelines.libraries.pypi_monorepo import (
     discover_python_packages,
     monorepo_publish_pipeline,

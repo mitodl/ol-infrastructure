@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Poll the EC2 instance metadata service for a spot interruption notice.
+# When one is detected, immediately initiate a graceful concourse worker
+# retirement so running builds can complete before the instance is reclaimed.
+set -euo pipefail
+
+POLL_INTERVAL=${POLL_INTERVAL:-5}
+TERMINATION_TIME_URL="http://169.254.169.254/latest/meta-data/spot/termination-time"
+TOKEN_URL="http://169.254.169.254/latest/api/token"
+
+log() {
+    echo "[concourse-worker-spot-watch] $*" | systemd-cat -t concourse-worker-spot-watch -p info
+}
+
+get_imds_token() {
+    curl -s -X PUT "${TOKEN_URL}" \
+        -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" \
+        --connect-timeout 2 --max-time 5 2>/dev/null || echo ""
+}
+
+log "Starting spot interruption watch (poll interval: ${POLL_INTERVAL}s)"
+
+while true; do
+    TOKEN=$(get_imds_token)
+
+    if [ -n "${TOKEN}" ]; then
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "X-aws-ec2-metadata-token: ${TOKEN}" \
+            --connect-timeout 2 --max-time 5 \
+            "${TERMINATION_TIME_URL}" 2>/dev/null || echo "000")
+    else
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            --connect-timeout 2 --max-time 5 \
+            "${TERMINATION_TIME_URL}" 2>/dev/null || echo "000")
+    fi
+
+    if [ "${HTTP_CODE}" = "200" ]; then
+        log "Spot interruption notice detected — initiating graceful worker retirement"
+        /usr/local/bin/concourse-worker-drain
+        log "Drain complete; waiting for OS shutdown"
+        # Sleep indefinitely; systemd will stop this service when the OS shuts down.
+        sleep infinity
+    fi
+
+    sleep "${POLL_INTERVAL}"
+done

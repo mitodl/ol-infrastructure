@@ -7,7 +7,6 @@
 
 import base64
 import json
-import os
 from pathlib import Path
 
 import pulumi_fastly as fastly
@@ -81,6 +80,7 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
+    docker_image_config_kwargs,
     merge_otel_resource_attributes,
     parse_stack,
 )
@@ -107,6 +107,7 @@ vector_log_proxy_stack = StackReference(
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
+vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 aws_config = AWSBase(
     tags={
         "OU": "mitxpro",
@@ -231,16 +232,12 @@ db_ingress_rules = [
         protocol="tcp",
         from_port=DEFAULT_POSTGRES_PORT,
         to_port=DEFAULT_POSTGRES_PORT,
-        security_groups=[data_vpc["security_groups"]["integrator"]],
+        security_groups=[
+            data_vpc["security_groups"]["integrator"],
+            vault_stack.require_output("vault_server")["security_group"],
+        ],
         cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"],
-    ),
-    ec2.SecurityGroupIngressArgs(
-        protocol="tcp",
-        from_port=DEFAULT_POSTGRES_PORT,
-        to_port=DEFAULT_POSTGRES_PORT,
-        cidr_blocks=["0.0.0.0/0"],
-        ipv6_cidr_blocks=["::/0"],
-        description="Allow access over the public internet from Heroku",
+        description="Allow data VPC integrator and Vault to access the database",
     ),
 ]
 if k8s_deploy:
@@ -272,7 +269,7 @@ xpro_db_config = OLPostgresDBConfig(
     engine_major_version="17",
     tags=aws_config.tags,
     db_name="xpro",
-    public_access=True,
+    public_access=False,
     parameter_overrides=[{"name": "password_encryption", "value": "md5"}],
     **defaults(stack_info)["rds"],
 )
@@ -367,7 +364,6 @@ if k8s_deploy:
     cluster_substructure_stack = StackReference(
         f"substructure.aws.eks.applications.{stack_info.name}"
     )
-    vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
     k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 
     k8s_app_labels = K8sAppLabels(
@@ -506,11 +502,6 @@ if k8s_deploy:
     # carries organizational metadata regardless of stack environment.
     merge_otel_resource_attributes(app_env_vars, k8s_app_labels)
 
-    if "XPRO_DOCKER_TAG" not in os.environ:
-        msg = "XPRO_DOCKER_TAG must be set."
-        raise OSError(msg)
-    XPRO_DOCKER_TAG = os.environ["XPRO_DOCKER_TAG"]
-
     xpro_k8s_app = OLApplicationK8s(
         ol_app_k8s_config=OLApplicationK8sConfig(
             project_root=Path(__file__).parent,
@@ -525,7 +516,7 @@ if k8s_deploy:
             application_security_group_id=xpro_app_security_group.id,
             application_security_group_name=xpro_app_security_group.name,
             application_image_repository="mitodl/xpro-app",
-            application_docker_tag=XPRO_DOCKER_TAG,
+            **docker_image_config_kwargs("XPRO"),
             application_cmd_array=["uwsgi"],
             application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
             vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
@@ -544,10 +535,14 @@ if k8s_deploy:
                     worker_name="default",
                     redis_host=redis_cache.address,
                     redis_password=redis_config.require("password"),
+                    resource_requests={"cpu": "100m", "memory": "1200Mi"},
+                    resource_limits={"memory": "1200Mi"},
                 ),
             ],
             celery_beat_config=OLApplicationK8sCeleryBeatConfig(
                 application_name="mitxpro.celery:app",
+                resource_requests={"cpu": "10m", "memory": "384Mi"},
+                resource_limits={"memory": "384Mi"},
             ),
             resource_requests={"cpu": "250m", "memory": "2Gi"},
             resource_limits={"memory": "2Gi"},

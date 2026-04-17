@@ -31,17 +31,17 @@ config:
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 100
-      instance_type: c5n.large
+      instance_type: c5n.xlarge
       gpu: false
       labels:
-        node_size: c5n.large
+        node_size: c5n.xlarge
         ondemand: true
         ol.mit.edu/core_node: true
         ol.mit.edu/gpu_node: false
       node_group_options: {}
       scaling:
-        desired: 4
-        max: 6
+        desired: 3
+        max: 5
         min: 3
       tags:
         cluster: residential-ci

@@ -9,16 +9,16 @@ from pulumi import Config, ResourceOptions, StackReference
 
 from bridge.lib.versions import TIKA_CHART_VERSION
 from bridge.secrets.sops import read_yaml_secrets
-from ol_infrastructure.components.services.cert_manager import (
-    OLCertManagerCert,
-    OLCertManagerCertConfig,
-)
-from ol_infrastructure.components.services.k8s import (
+from ol_infrastructure.components.services.apisix import (
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+)
+from ol_infrastructure.components.services.cert_manager import (
+    OLCertManagerCert,
+    OLCertManagerCertConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,

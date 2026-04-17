@@ -43,9 +43,9 @@ config:
         ol.mit.edu/core_node: true
       node_group_options: {}
       scaling:
-        desired: 5
-        max: 7
-        min: 4
+        desired: 3
+        max: 5
+        min: 3
       tags: {}
       taints: {}
       version:

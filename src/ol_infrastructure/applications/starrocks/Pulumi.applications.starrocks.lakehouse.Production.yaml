@@ -8,20 +8,25 @@ config:
   vault_server:env_namespace: operations.production
   starrocks:root_password:
     secure: v1:MXN6eaFDcXOtWfo8:JMrltk28ycvV6h6tG/8eiTOSkIBUBoxlshNtocbb0AJ7GCFgVdjkuf+XWUrKZOe+on8Vmip2e7Q= # set with: pulumi config set --secret starrocks:root_password
-  starrocks:oidc_enabled: "true"
+  starrocks:oidc_enabled: "false"
   starrocks:fe_config:
     replicas: 3
-    cpu_request: 2000m
+    cpu_request: 8000m
     memory_request: 16Gi
     memory_limit: 16Gi
+    # 87.5% of 16Gi container limit; leaves ~2Gi headroom for JVM off-heap memory.
+    jvm_heap_mb: 14336
+    # Raise optimizer timeout to tolerate slow AWS Glue metadata responses.
+    # StarRocks default is 3000 ms.
+    planner_optimize_timeout_ms: 30000
     storage: 100Gi
     log_storage: 100Gi
   starrocks:use_be: "false"
   starrocks:be_config:
     replicas: 3
-    cpu_request: 2000m
-    memory_request: 16Gi
-    memory_limit: 16Gi
+    cpu_request: 16000m
+    memory_request: 32Gi
+    memory_limit: 32Gi
     storage: 1Ti
     log_storage: 100Gi
   starrocks:use_cn: "true"
@@ -29,8 +34,16 @@ config:
     min_replicas: 2
     max_replicas: 20
     cpu_target_utilization_percentage: 80
-    cpu_request: 2000m
-    memory_request: 16Gi
-    memory_limit: 16Gi
+    cpu_request: 16000m
+    memory_request: 32Gi
+    memory_limit: 32Gi
   starrocks:enable_data_lake_integration: "true"
+  starrocks:ssl_enabled: "true"
+  # ssl_force_secure_transport is intentionally false: the StarRocks operator
+  # (chart 1.11.4) does not support TLS for its internal FE MySQL connections.
+  # Re-enable once operator PR #732 merges and the chart version is bumped.
+  # External clients (Vault, Superset) already use --ssl / tls=skip-verify.
+  starrocks:ssl_force_secure_transport: "false"
+  starrocks:ssl_keystore_password:
+    secure: v1:h7Hv+CSf6Hhk1mVg:Il+DfHH3nUPLk+SZFSQJwOfwt7h+Ses5dBlUYi3byc59bMaVNFVXsoaft1T9+g8cTLhPcGRazE8=
 encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAGAR6Wy6ogn0XZN4ap3danEAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMOwyeMVh8a3LlZ+aUAgEQgDsC6RLHjfbCViHhNrhOaZnm7sGi95HvI1+vIvxObzU7NUO01mB+ajFCXdwCEGOWaZEqPPq67rthKBvkiw==

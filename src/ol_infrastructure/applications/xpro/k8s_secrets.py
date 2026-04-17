@@ -271,7 +271,6 @@ def create_xpro_k8s_secrets(
                 "DEFERRAL_REQUEST_WORKSHEET_ID": '{{ get .Secrets "deferral_worksheet_id" }}',
                 "DRIVE_OUTPUT_FOLDER_ID": '{{ get .Secrets "folder_id" }}',
                 "DRIVE_SERVICE_ACCOUNT_CREDS": '{{ get .Secrets "service_account_creds" }}',
-                "DRIVE_SHARED_ID": '{{ get .Secrets "drive_shared_id" }}',
                 "ENROLLMENT_CHANGE_SHEET_ID": '{{ get .Secrets "enroll_change_sheet_id" }}',
                 "REFUND_REQUEST_WORKSHEET_ID": '{{ get .Secrets "refund_worksheet_id" }}',
                 "SHEETS_ADMIN_EMAILS": '{{ get .Secrets "admin_emails" }}',

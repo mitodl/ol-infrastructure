@@ -6,19 +6,6 @@ from collections import defaultdict
 from itertools import chain
 from typing import Literal
 
-from pydantic import BaseModel
-
-from bridge.settings.github.team_members import DEVOPS_MIT
-from bridge.settings.openedx.accessors import fetch_applications_by_type
-from bridge.settings.openedx.types import (
-    DeploymentEnvRelease,
-    EnvStage,
-    OpenEdxApplicationVersion,
-    OpenEdxDeploymentName,
-    OpenEdxMicroFrontend,
-    OpenEdxSupportedRelease,
-)
-from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
@@ -37,6 +24,19 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resource_types import github_issues_resource, rclone
 from ol_concourse.lib.resources import git_repo, github_issues
+from pydantic import BaseModel
+
+from bridge.settings.github.team_members import DEVOPS_MIT
+from bridge.settings.openedx.accessors import fetch_applications_by_type
+from bridge.settings.openedx.types import (
+    DeploymentEnvRelease,
+    EnvStage,
+    OpenEdxApplicationVersion,
+    OpenEdxDeploymentName,
+    OpenEdxMicroFrontend,
+    OpenEdxSupportedRelease,
+)
+from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_concourse.pipelines.constants import GH_ISSUES_DEFAULT_REPOSITORY
 
 
@@ -78,6 +78,7 @@ class OpenEdxVars(BaseModel):
     appzi_url: str | None = None
     enable_auto_language_selection: Literal["true", "false"] | None = None
     enable_tagging_taxonomy_pages: Literal["true", "false"] | None = None
+    enable_course_import_in_library: Literal["true", "false"] | None = None
 
     @property
     def release_name(self) -> OpenEdxSupportedRelease:
@@ -146,6 +147,7 @@ def mfe_params(
         ),
         "ENABLE_AUTO_LANGUAGE_SELECTION": (open_edx.enable_auto_language_selection),
         "ENABLE_TAGGING_TAXONOMY_PAGES": (open_edx.enable_tagging_taxonomy_pages),
+        "ENABLE_COURSE_IMPORT_IN_LIBRARY": (open_edx.enable_course_import_in_library),
         "PARAGON_THEME_URLS": "{}",
         "ENABLE_JUMPNAV": open_edx.enable_jumpnav,
         "ENABLE_AI_DRAWER_SLOT": open_edx.enable_ai_drawer_slot,
@@ -218,6 +220,11 @@ def mfe_job(  # noqa: C901, PLR0915
             f"{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx "
             f"{mfe_build_dir.name}/common-mfe-config.env.jsx"
         )
+        coordinator_source = (
+            "SidebarAIDrawerCoordinator.ulmo.jsx"
+            if open_edx.release_name == OpenEdxSupportedRelease.ulmo
+            else "SidebarAIDrawerCoordinator.jsx"
+        )
         copy_ai_drawer_components = [
             (
                 f"echo 'Copying AIDrawerManagerSidebar.jsx...' && "
@@ -226,9 +233,10 @@ def mfe_job(  # noqa: C901, PLR0915
                 f"{mfe_build_dir.name}/AIDrawerManagerSidebar.jsx"
             ),
             (
-                f"echo 'Copying SidebarAIDrawerCoordinator.jsx...' && "
+                f"echo 'Copying {coordinator_source} "
+                f"as SidebarAIDrawerCoordinator.jsx...' && "
                 f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
-                f"SidebarAIDrawerCoordinator.jsx "
+                f"{coordinator_source} "
                 f"{mfe_build_dir.name}/SidebarAIDrawerCoordinator.jsx"
             ),
         ]

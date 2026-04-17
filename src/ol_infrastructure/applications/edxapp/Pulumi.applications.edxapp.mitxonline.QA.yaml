@@ -52,7 +52,7 @@ config:
     "--authenticated"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["teams.enable_teams_app", "--create", "--superusers", "--staff"]
-  edxapp:use_extracted_html_block: false
+  edxapp:use_extracted_html_block: "false"
   edxapp:business_unit: mitxonline
   edxapp:db_password:
     secure: v1:xHUw5WC3aN02zuAj:0BozwDxrtF0OA7wkYuv4R4CCnSHYdgXt+vi6/3eP9zwJgHgQO20+8sQfg7rXPC9SIUobEA==
@@ -143,10 +143,14 @@ config:
     secure: v1:968LG3OeHgn0GLl3:jqXqyqgWXGThSNiqEpqZeEuAZwVTCZdh1KbmExlITfC+4ImSDC+55gIpiLOST9vWciDK2wF5ZMJQrM9eY/c2SwaLH5EhoRsGcPAExuFDrxXE8eZGYb60AYXGWjOpxy2peQyPYiydnjBQGQGI+QgqG7v8ylk/YjiWEURpENwvGIUwr1w9SodgugeNL8WexzBiUiXiHUgQJg==
   edxapp:k8s_vpc: applications_vpc
   meilisearch:deploy: "true"
-  meilisearch:enabled: "false"  # Keep this disabled until we get a plan in place for Libraries V2 adoption
+  meilisearch:enabled: "false" # Keep this disabled until we get a plan in place for Libraries V2 adoption
   meilisearch:domain: meilisearch.courses.rc.learn.mit.edu
-  meilisearch:replica_count: 1
+  meilisearch:replica_count: "1"
   meilisearch:pv_size: 10Gi
   meilisearch:cpu_request: "250m"
   meilisearch:memory_request: "4Gi"
   meilisearch:memory_limit: "4Gi"
+  typesense:deploy: "true"
+  typesense:enabled: "false"
+  typesense:bootstrap_key:
+    secure: v1:Vc3NR0Nwh4t5F4yQ:4xcl9T5cuxUM8qVaj+l7upvIiGuupp9NR7QC+ZPQTa5txMWMCeyC6MUIzhGgtw9Wh4tKRGEwkebDhBG46i2SfC24r1T4BrrmpSTxJTaCf0o=

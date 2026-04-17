@@ -41,7 +41,13 @@ from bilder.components.vector.steps import (
 )
 from bilder.facts.has_systemd import HasSystemd
 from bridge.lib.magic_numbers import HOURS_IN_MONTH, VAULT_CLUSTER_PORT, VAULT_HTTP_PORT
-from bridge.lib.versions import CONSUL_VERSION, TRAEFIK_VERSION, VAULT_VERSION
+from bridge.lib.versions import (
+    CONSUL_VERSION,
+    TRAEFIK_VERSION,
+    VAULT_PLUGIN_STARROCKS_SHA256,
+    VAULT_PLUGIN_STARROCKS_VERSION,
+    VAULT_VERSION,
+)
 from bridge.secrets.sops import set_env_secrets
 
 VERSIONS = {
@@ -140,6 +146,32 @@ files.put(
     src=str(FILES_DIRECTORY.joinpath("raft_backup.sh")),
     dest="/usr/sbin/raft_backup.sh",
     mode="0700",
+)
+
+PLUGIN_DIRECTORY = Path("/var/lib/vault/plugins/")
+STARROCKS_PLUGIN_NAME = "vault-plugin-database-starrocks"
+STARROCKS_PLUGIN_URL = (
+    "https://github.com/mitodl/vault-plugin-database-starrocks"
+    f"/releases/download/v{VAULT_PLUGIN_STARROCKS_VERSION}/{STARROCKS_PLUGIN_NAME}"
+)
+
+files.directory(
+    name="Ensure Vault plugin directory exists",
+    path=str(PLUGIN_DIRECTORY),
+    present=True,
+    mode="755",
+    user=vault.name,
+    group=vault.name,
+)
+
+files.download(
+    name="Download StarRocks Vault database plugin",
+    src=STARROCKS_PLUGIN_URL,
+    dest=str(PLUGIN_DIRECTORY / STARROCKS_PLUGIN_NAME),
+    sha256sum=VAULT_PLUGIN_STARROCKS_SHA256,
+    mode="755",
+    user=vault.name,
+    group=vault.name,
 )
 
 # Install vector

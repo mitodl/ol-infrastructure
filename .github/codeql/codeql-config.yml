@@ -1,0 +1,8 @@
+---
+# CodeQL configuration for GitHub Code Scanning.
+# See: https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/customizing-your-advanced-setup-for-code-scanning#using-a-custom-configuration-file
+
+paths-ignore:
+  # This is an intentional admin audit tool that outputs user credential
+  # metadata by design. Exclude it from all CodeQL scanning.
+- scripts/keycloak_user_credential_checker.py

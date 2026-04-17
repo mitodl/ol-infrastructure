@@ -1,12 +1,9 @@
 import React, { useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { getConfig } from '@edx/frontend-platform';
-import { useModel } from '@src/generic/model-store';
 
 import Sidebar from './src/courseware/course/sidebar/Sidebar';
-import NewSidebar from './src/courseware/course/new-sidebar/Sidebar';
 import SidebarContext from './src/courseware/course/sidebar/SidebarContext';
-import NewSidebarContext from './src/courseware/course/new-sidebar/SidebarContext';
 import AIDrawerManagerSidebar from './AIDrawerManagerSidebar';
 
 const AI_DRAWER_MESSAGE_TYPES = [
@@ -15,13 +12,7 @@ const AI_DRAWER_MESSAGE_TYPES = [
 ];
 
 const SidebarAIDrawerCoordinator = ({ courseId }) => {
-    const {
-        isNewDiscussionSidebarViewEnabled,
-    } = useModel('courseHomeMeta', courseId);
-
-    const oldContextValue = useContext(SidebarContext);
-    const newContextValue = useContext(NewSidebarContext);
-    const contextValue = isNewDiscussionSidebarViewEnabled ? newContextValue : oldContextValue;
+    const contextValue = useContext(SidebarContext);
     const currentSidebar = contextValue?.currentSidebar ?? null;
     const toggleSidebar = contextValue?.toggleSidebar ?? (() => {});
     const shouldDisplayFullScreen = contextValue?.shouldDisplayFullScreen ?? false;
@@ -91,7 +82,7 @@ const SidebarAIDrawerCoordinator = ({ courseId }) => {
 
     return (
         <>
-            {currentSidebar !== null && (isNewDiscussionSidebarViewEnabled ? <NewSidebar /> : <Sidebar />)}
+            {currentSidebar !== null && <Sidebar />}
             <div
                 className={`ai-drawer-wrapper ml-0 ml-xl-4 align-top ${
                     shouldDisplayFullScreen ? 'ai-drawer-wrapper-fullscreen' : ''

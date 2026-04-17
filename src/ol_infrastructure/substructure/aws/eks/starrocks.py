@@ -106,10 +106,10 @@ def setup_starrocks(
                     "resources": {
                         "requests": {
                             "cpu": "10m",
-                            "memory": "128Mi",
+                            "memory": "256Mi",
                         },
                         "limits": {
-                            "memory": "128Mi",
+                            "memory": "512Mi",
                         },
                     },
                 },

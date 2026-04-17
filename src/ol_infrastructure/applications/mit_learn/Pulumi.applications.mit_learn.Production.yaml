@@ -5,6 +5,7 @@ config:
 
   mitlearn:api_domain: "api.learn.mit.edu"
   mitlearn:db_instance_size: db.m7g.2xlarge
+  mitlearn:db_allocated_storage: 400
   mitlearn:db_password:
     secure: v1:siGmu4+ZCOqekx7l:4Pdgv4fKZIjWJPAcZDBdpvZ0mUW10SUcX/9ZatsnZbR/euYoklo8dTTFu4i/5kTnJHHYot1QK3xS+gk++lHZfneBoC9qBR+l2qzlvvNBoN8=
   mitlearn:db_use_blue_green: true

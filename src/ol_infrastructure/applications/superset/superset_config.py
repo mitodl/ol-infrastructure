@@ -1,12 +1,14 @@
 # ruff: noqa: ERA001
 import logging
 import os
+import re
 from ssl import CERT_OPTIONAL
 
 from celery.schedules import crontab
 from flask import g
 from flask_appbuilder.security.manager import AUTH_OAUTH
 from flask_caching.backends.rediscache import RedisCache
+from sqlalchemy.engine import URL
 from superset.security import SupersetSecurityManager
 from superset.utils.encrypt import SQLAlchemyUtilsAdapter
 
@@ -560,3 +562,88 @@ JINJA_CONTEXT_ADDONS = {"current_user_email": current_user_email}
 #             ),
 #         }
 #     }
+
+
+# ---------------------------------------------------
+# Dynamic Credential Interpolation (Vault / K8s)
+# ---------------------------------------------------
+# Analytical databases can store ${ENV_VAR_NAME} placeholders in their
+# SQLAlchemy URI (username, password, host, or database fields) instead of
+# hard-coded credentials.  At connection time, DB_CONNECTION_MUTATOR resolves
+# those placeholders from the process environment, where Vault Secrets Operator
+# injects short-lived dynamic credentials as Kubernetes secret environment
+# variables.
+#
+# Example SQLAlchemy URI entered in the Superset UI:
+#   postgresql+psycopg2://${STARROCKS_DB_USER}:${STARROCKS_DB_PASS}@host:5432/db
+#
+# The corresponding env vars must be present in the container (provided via a
+# VaultStaticSecret / VaultDynamicSecret K8s resource mounted as envFrom).
+
+_ENV_VAR_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+def _interpolate_env_vars(value: str | None) -> str | None:
+    """Replace every ${VAR_NAME} token with os.environ[VAR_NAME].
+
+    Tokens whose corresponding environment variable is absent are left
+    unchanged and a warning is emitted so operators can diagnose
+    misconfigured secret mounts quickly.
+    """
+    if value is None or not _ENV_VAR_PATTERN.search(value):
+        return value
+
+    def _replace(match: re.Match[str]) -> str:
+        var_name = match.group(1)
+        env_value = os.environ.get(var_name)
+        if env_value is None:
+            logging.warning(
+                "DB_CONNECTION_MUTATOR: environment variable '%s' not found; "
+                "leaving placeholder unreplaced in URI",
+                var_name,
+            )
+            return match.group(0)
+        return env_value
+
+    return _ENV_VAR_PATTERN.sub(_replace, value)
+
+
+def DB_CONNECTION_MUTATOR(  # noqa: N802
+    uri: URL,
+    params: dict[str, object],
+    username: str,  # noqa: ARG001
+    security_manager: object,  # noqa: ARG001
+    source: object,  # noqa: ARG001
+) -> tuple[URL, dict[str, object]]:
+    """Interpolate ${ENV_VAR_NAME} placeholders in analytical DB connection URIs.
+
+    Called by Superset immediately before each SQLAlchemy engine is created for
+    an analytical (non-metadata) database.  Replaces placeholder tokens in the
+    URI components with values sourced from the process environment so that
+    Vault dynamic credentials (rotated by Vault Secrets Operator) are always
+    current without requiring the connection string to be updated in the UI.
+
+    Only URIs that contain at least one ${...} token incur any overhead; all
+    other connections pass through unchanged.
+    """
+    raw_username = uri.username
+    raw_password = str(uri.password) if uri.password else None
+    raw_host = uri.host
+    raw_database = uri.database
+
+    components = [raw_username, raw_password, raw_host, raw_database]
+    if not any(_ENV_VAR_PATTERN.search(c) for c in components if c is not None):
+        return uri, params
+
+    new_username = _interpolate_env_vars(raw_username)
+    new_password = _interpolate_env_vars(raw_password)
+    new_host = _interpolate_env_vars(raw_host)
+    new_database = _interpolate_env_vars(raw_database)
+
+    uri = uri.set(
+        username=new_username,
+        password=new_password,
+        host=new_host,
+        database=new_database,
+    )
+    return uri, params

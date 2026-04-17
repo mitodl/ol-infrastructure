@@ -34,16 +34,16 @@ from ol_infrastructure.components.applications.eks import (
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
-from ol_infrastructure.components.services.cert_manager import (
-    OLCertManagerCert,
-    OLCertManagerCertConfig,
-)
-from ol_infrastructure.components.services.k8s import (
+from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
+)
+from ol_infrastructure.components.services.cert_manager import (
+    OLCertManagerCert,
+    OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
