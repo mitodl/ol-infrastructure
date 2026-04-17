@@ -625,8 +625,8 @@ ocw_studio_k8s_app = OLApplicationK8s(
             resource_requests={"cpu": "10m", "memory": "384Mi"},
             resource_limits={"memory": "384Mi"},
         ),
-        resource_requests={"cpu": "100m", "memory": "1250Mi"},
-        resource_limits={"memory": "1250Mi"},
+        resource_requests={"cpu": "100m", "memory": "1Gi"},
+        resource_limits={"memory": "3Gi"},
         # App lacks health check endpoints so we use nginx's
         probe_configs={
             "liveness_probe": kubernetes.core.v1.ProbeArgs(
