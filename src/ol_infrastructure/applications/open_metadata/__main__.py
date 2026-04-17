@@ -296,10 +296,6 @@ oidc_config_secret = OLVaultK8SSecret(
 # Connector credentials for OpenMetadata ingestion pipelines.
 # Credentials are read from SOPS-encrypted bridge secrets, written to a
 # dedicated Vault mount, and synced into K8s secrets via vault-secrets-operator.
-# Guard against missing secrets files (e.g. CI/Production stacks not yet
-# provisioned) so pulumi preview/up does not fail with a missing-file error.
-# When the file is absent, no Vault resources or K8s secrets are created for
-# connectors, avoiding destructive overwrites of existing Vault data.
 open_metadata_connector_secrets_path = (
     _BRIDGE_SECRETS_DIR / f"open_metadata/secrets.{stack_info.env_suffix}.yaml"
 )
@@ -315,74 +311,72 @@ if open_metadata_connector_secrets_path.exists():
         raise TypeError(msg)
     open_metadata_connector_secrets = _raw_secrets
 
+open_metadata_connector_vault_mount = vault.Mount(
+    f"open-metadata-connector-vault-mount-{stack_info.env_suffix}",
+    description="Static connector credentials for OpenMetadata ingestion pipelines",
+    path="secret-open-metadata",
+    type="kv",
+    opts=ResourceOptions(parent=vault_k8s_resources),
+)
+
+open_metadata_connector_vault_secret = vault.generic.Secret(
+    f"open-metadata-connector-vault-secret-{stack_info.env_suffix}",
+    path="secret-open-metadata/connectors",
+    data_json=Output.secret(json.dumps(open_metadata_connector_secrets)),
+    opts=ResourceOptions(
+        depends_on=[open_metadata_connector_vault_mount],
+        parent=vault_k8s_resources,
+    ),
+)
+
+# Each entry maps connector name → K8s env var → Vault template.
+# Uses nested index syntax because secrets are stored as a map-of-maps.
+# Only include connectors whose top-level key exists in the secrets file
+# so stacks without a given connector's credentials don't create a K8s
+# secret with unresolvable Vault template references.
+_all_connector_configs: dict[str, dict[str, str | Output[str]]] = {
+    "trino": {
+        "OM_TRINO_HOST_PORT": '{{ index .Secrets "trino" "host_port" }}',
+        "OM_TRINO_USERNAME": '{{ index .Secrets "trino" "login_email" }}',
+        "OM_TRINO_PASSWORD": '{{ index .Secrets "trino" "password" }}',
+        "OM_TRINO_CATALOG": '{{ index .Secrets "trino" "catalog" }}',
+    },
+}
+connector_configs = {
+    name: templates
+    for name, templates in _all_connector_configs.items()
+    if name in open_metadata_connector_secrets
+}
+
 connector_secrets: list[OLVaultK8SSecret] = []
 connector_secret_names: list[str] = []
-
-if open_metadata_connector_secrets:
-    open_metadata_connector_vault_mount = vault.Mount(
-        f"open-metadata-connector-vault-mount-{stack_info.env_suffix}",
-        description="Static connector credentials for OpenMetadata ingestion pipelines",
-        path="secret-open-metadata",
-        type="kv",
-        opts=ResourceOptions(parent=vault_k8s_resources),
+for connector_name, templates in connector_configs.items():
+    secret_name = f"om-connector-{connector_name}"
+    secret_config = OLVaultK8SStaticSecretConfig(
+        name=f"openmetadata-connector-{connector_name}",
+        namespace=open_metadata_namespace,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name=secret_name,
+        labels=k8s_global_labels,
+        mount="secret-open-metadata",
+        mount_type="kv-v1",
+        path="connectors",
+        restart_target_kind="Deployment",
+        restart_target_name="openmetadata",
+        templates=templates,
+        vaultauth=vault_k8s_resources.auth_name,
     )
-
-    open_metadata_connector_vault_secret = vault.generic.Secret(
-        f"open-metadata-connector-vault-secret-{stack_info.env_suffix}",
-        path="secret-open-metadata/connectors",
-        data_json=Output.secret(json.dumps(open_metadata_connector_secrets)),
+    connector_secret = OLVaultK8SSecret(
+        f"open-metadata-{stack_info.name}-connector-{connector_name}-secret",
+        secret_config,
         opts=ResourceOptions(
-            depends_on=[open_metadata_connector_vault_mount],
+            delete_before_replace=True,
             parent=vault_k8s_resources,
+            depends_on=[open_metadata_connector_vault_secret],
         ),
     )
-
-    # Each entry maps connector name → K8s env var → Vault template.
-    # Uses nested index syntax because secrets are stored as a map-of-maps.
-    # Only include connectors whose top-level key exists in the secrets file
-    # so CI/Production stacks without a given connector's credentials don't
-    # create a K8s secret with unresolvable Vault template references.
-    _all_connector_configs: dict[str, dict[str, str | Output[str]]] = {
-        "trino": {
-            "OM_TRINO_HOST_PORT": '{{ index .Secrets "trino" "host_port" }}',
-            "OM_TRINO_USERNAME": '{{ index .Secrets "trino" "login_email" }}',
-            "OM_TRINO_PASSWORD": '{{ index .Secrets "trino" "password" }}',
-            "OM_TRINO_CATALOG": '{{ index .Secrets "trino" "catalog" }}',
-        },
-    }
-    connector_configs = {
-        name: templates
-        for name, templates in _all_connector_configs.items()
-        if name in open_metadata_connector_secrets
-    }
-
-    for connector_name, templates in connector_configs.items():
-        secret_name = f"om-connector-{connector_name}"
-        secret_config = OLVaultK8SStaticSecretConfig(
-            name=f"openmetadata-connector-{connector_name}",
-            namespace=open_metadata_namespace,
-            dest_secret_labels=k8s_global_labels,
-            dest_secret_name=secret_name,
-            labels=k8s_global_labels,
-            mount="secret-open-metadata",
-            mount_type="kv-v1",
-            path="connectors",
-            restart_target_kind="Deployment",
-            restart_target_name="openmetadata",
-            templates=templates,
-            vaultauth=vault_k8s_resources.auth_name,
-        )
-        connector_secret = OLVaultK8SSecret(
-            f"open-metadata-{stack_info.name}-connector-{connector_name}-secret",
-            secret_config,
-            opts=ResourceOptions(
-                delete_before_replace=True,
-                parent=vault_k8s_resources,
-                depends_on=[open_metadata_connector_vault_secret],
-            ),
-        )
-        connector_secrets.append(connector_secret)
-        connector_secret_names.append(secret_name)
+    connector_secrets.append(connector_secret)
+    connector_secret_names.append(secret_name)
 
 # Install the openmetadata helm chart
 # https://github.com/mitodl/ol-infrastructure/issues/2680
