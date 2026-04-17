@@ -19,10 +19,14 @@ def _auth_headers() -> dict[str, str]:
     }
 
 
-async def _latest_release_tag(session: aiohttp.ClientSession, repo_slug: str) -> str | None:
+async def _latest_release_tag(
+    session: aiohttp.ClientSession, repo_slug: str
+) -> str | None:
     """Return the most recent YYYY.MM.DD.N tag, or None if none exists."""
     url = f"{GITHUB_API}/repos/{repo_slug}/tags"
-    async with session.get(url, headers=_auth_headers(), params={"per_page": "100"}) as resp:
+    async with session.get(
+        url, headers=_auth_headers(), params={"per_page": "100"}
+    ) as resp:
         resp.raise_for_status()
         tags = await resp.json()
 
@@ -64,7 +68,9 @@ async def commits_since_last_tag(repo_slug: str) -> list[dict]:
     # Exclude the tag commit itself when using a base SHA
     if latest_tag and raw_commits:
         tag_sha_prefix = params.get("sha", "")
-        raw_commits = [c for c in raw_commits if not c["sha"].startswith(tag_sha_prefix)]
+        raw_commits = [
+            c for c in raw_commits if not c["sha"].startswith(tag_sha_prefix)
+        ]
 
     return [
         {

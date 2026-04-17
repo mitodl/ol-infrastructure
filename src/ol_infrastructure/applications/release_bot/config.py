@@ -8,7 +8,7 @@ from dataclasses import dataclass
 @dataclass
 class AppConfig:
     pipeline: str
-    repo: str    # "mitodl/mit-learn"
+    repo: str  # "mitodl/mit-learn"
     branch: str  # "main" or "master"
 
 
