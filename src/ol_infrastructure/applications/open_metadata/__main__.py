@@ -287,8 +287,8 @@ oidc_config_secret = OLVaultK8SSecret(
 
 # Connector credentials for OpenMetadata ingestion pipelines.
 # Each connector's credentials are stored in Vault under
-# secret-operations/open-metadata/connectors/<connector-name>
-# and synced to K8s secrets in the open-metadata namespace.
+# secret-openmetadata/connectors and synced to K8s secrets
+# in the open-metadata namespace via vault-secrets-operator.
 # Add entries to connector_configs for each source system.
 connector_configs: dict[str, dict[str, str | Output[str]]] = {}
 
@@ -302,9 +302,9 @@ for connector_name, templates in connector_configs.items():
         dest_secret_labels=k8s_global_labels,
         dest_secret_name=secret_name,
         labels=k8s_global_labels,
-        mount="secret-operations",
+        mount="secret-openmetadata",
         mount_type="kv-v1",
-        path=f"open-metadata/connectors/{connector_name}",
+        path="connectors",
         restart_target_kind="Deployment",
         restart_target_name="openmetadata",
         templates=templates,
