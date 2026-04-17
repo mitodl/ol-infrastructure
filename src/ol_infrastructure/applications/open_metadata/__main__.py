@@ -314,14 +314,14 @@ if open_metadata_connector_secrets_path.exists():
 open_metadata_connector_vault_mount = vault.Mount(
     f"open-metadata-connector-vault-mount-{stack_info.env_suffix}",
     description="Static connector credentials for OpenMetadata ingestion pipelines",
-    path="secret-open-metadata",
+    path="secret-openmetadata",
     type="kv",
     opts=ResourceOptions(parent=vault_k8s_resources),
 )
 
 open_metadata_connector_vault_secret = vault.generic.Secret(
     f"open-metadata-connector-vault-secret-{stack_info.env_suffix}",
-    path="secret-open-metadata/connectors",
+    path="secret-openmetadata/connectors",
     data_json=Output.secret(json.dumps(open_metadata_connector_secrets)),
     opts=ResourceOptions(
         depends_on=[open_metadata_connector_vault_mount],
@@ -358,7 +358,7 @@ for connector_name, templates in connector_configs.items():
         dest_secret_labels=k8s_global_labels,
         dest_secret_name=secret_name,
         labels=k8s_global_labels,
-        mount="secret-open-metadata",
+        mount="secret-openmetadata",
         mount_type="kv-v1",
         path="connectors",
         restart_target_kind="Deployment",
