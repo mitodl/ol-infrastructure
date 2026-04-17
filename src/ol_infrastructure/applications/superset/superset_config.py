@@ -277,7 +277,8 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
             role_keys = list(role_keys_obj) if isinstance(role_keys_obj, list) else []
             roles = self._get_roles_from_keycloak_roles(role_keys)
             if roles:
-                self.update_user(user, role=roles)
+                user.roles = roles
+                self.update_user(user)
 
         # Return user if found/created and active
         if user and user.is_active:
