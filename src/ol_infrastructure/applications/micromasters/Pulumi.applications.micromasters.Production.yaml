@@ -7,7 +7,6 @@ config:
   consul:scheme: https
   micromasters:db_password:
     secure: v1:KuHLKayQ3w6kG9M6:lh+RY/EMrc92HVO60psz6lD6DlYAmf5wWHdWr80yY/Q+L54KMGytwmTLi59lo8xfBZveqwS7S5MyT2U=
-  micromasters:deploy_k8s: "true"
   micromasters:frontend_domain: micromasters.odl.mit.edu
   micromasters:backend_domain: micromasters-backend.odl.mit.edu
   micromasters:vars:
