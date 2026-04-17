@@ -946,9 +946,9 @@ for purpose in ("draft", "live", "test"):
             ),
             fastly.ServiceVclSnippetArgs(
                 content=snippets_dir.joinpath(
-                    "strip_cookies_and_authorization.vcl"
+                    "strip_cookies_and_authorization_and_user_io.vcl"
                 ).read_text(),
-                name="Strip cookies and authorization.",
+                name="Strip cookies and authorization and user provided io header.",
                 type="recv",
             ),
             *(
@@ -959,6 +959,7 @@ for purpose in ("draft", "live", "test"):
                         ).read_text(),
                         name="Image Optimization",
                         type="recv",
+                        priority=1000,
                     )
                 ]
                 if fastly_image_optimization_enabled
