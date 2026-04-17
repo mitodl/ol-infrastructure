@@ -38,9 +38,7 @@ cluster_stack = StackReference(
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 bot_secrets = read_yaml_secrets(
-    Path(
-        f"release_bot/secrets.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml"
-    )
+    Path(f"release_bot/secrets.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
 )
 
 bot_config = Config("release_bot")

@@ -4,12 +4,12 @@ import asyncio
 import logging
 import os
 
+import config
+import github
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.async_app import AsyncApp
 
 import concourse
-import config
-import github
 
 log = logging.getLogger(__name__)
 
@@ -49,7 +49,9 @@ async def cmd_release_notes(ack, respond, command):
         await respond(f"❌ Failed to fetch release notes for `{app_name}`.")
         return
     if not commits:
-        await respond(f"*Release notes for `{app_name}`*\n_(no commits since last release)_")
+        await respond(
+            f"*Release notes for `{app_name}`*\n_(no commits since last release)_"
+        )
         return
     lines = [f"• `{c['sha'][:8]}` {c['message'].splitlines()[0]}" for c in commits]
     await respond(f"*Release notes for `{app_name}`*\n" + "\n".join(lines))

@@ -32,6 +32,7 @@ RELEASE_VERSION_RE = re.compile(r"^\d{4}\.\d{2}\.\d{2}\.\d+$")
 def _is_release_image(image_tag: str) -> bool:
     return bool(RELEASE_VERSION_RE.match(image_tag))
 
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -489,25 +490,35 @@ def format_slack_message(  # noqa: C901
     image_tag = image.rsplit(":", 1)[-1] if ":" in image else ""
     app_name = name  # deployment name used as app identifier
     if _is_release_image(image_tag):
-        blocks.append({
-            "type": "actions",
-            "elements": [{
-                "type": "button",
-                "text": {"type": "plain_text", "text": "🚀 Promote to Production"},
-                "style": "primary",
-                "action_id": "promote_production",
-                "value": f"{app_name}:{image_tag}",
-                "confirm": {
-                    "title": {"type": "plain_text", "text": "Promote to Production?"},
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"Deploy `{image_tag}` of `{app_name}` to Production?",
-                    },
-                    "confirm": {"type": "plain_text", "text": "Promote"},
-                    "deny": {"type": "plain_text", "text": "Cancel"},
-                },
-            }],
-        })
+        blocks.append(
+            {
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "🚀 Promote to Production",
+                        },
+                        "style": "primary",
+                        "action_id": "promote_production",
+                        "value": f"{app_name}:{image_tag}",
+                        "confirm": {
+                            "title": {
+                                "type": "plain_text",
+                                "text": "Promote to Production?",
+                            },
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": f"Deploy `{image_tag}` of `{app_name}` to Production?",
+                            },
+                            "confirm": {"type": "plain_text", "text": "Promote"},
+                            "deny": {"type": "plain_text", "text": "Cancel"},
+                        },
+                    }
+                ],
+            }
+        )
 
     return {
         "text": title,  # Fallback text for notifications

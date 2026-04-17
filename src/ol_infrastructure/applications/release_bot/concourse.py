@@ -8,7 +8,7 @@ import aiohttp
 CONCOURSE_URL = os.environ.get("CONCOURSE_URL", "https://cicd.odl.mit.edu")
 CONCOURSE_TEAM = os.environ.get("CONCOURSE_TEAM", "main")
 CONCOURSE_USER = os.environ.get("CONCOURSE_USER", "")
-CONCOURSE_PASS = os.environ.get("CONCOURSE_PASSWORD", "")  # noqa: S105
+CONCOURSE_PASS = os.environ.get("CONCOURSE_PASSWORD", "")
 
 _token: str | None = None
 _token_expiry: float = 0.0
