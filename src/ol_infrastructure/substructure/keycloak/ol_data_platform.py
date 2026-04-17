@@ -200,9 +200,10 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0913, PLR0915
         )
 
     # Grant the service account the ol_platform_admin Superset client role so that
-    # client_credentials tokens include it. Superset's AUTH_ROLES_SYNC_AT_LOGIN
-    # syncs roles from the JWT at login time, which would otherwise downgrade the
-    # service account to Public (the default for a token with no Superset roles).
+    # client_credentials JWTs include it in the role_keys claim (via the
+    # UserClientRoleProtocolMapper on the ol_roles scope). Superset's
+    # CustomSsoSecurityManager.load_user_jwt syncs roles from role_keys on every
+    # JWT request, which maps ol_platform_admin → Admin via AUTH_ROLES_MAPPING.
     if "ol_platform_admin" in ol_data_platform_superset_client_role_refs:
         keycloak.openid.ClientServiceAccountRole(
             "ol-superset-service-account-platform-admin",
