@@ -316,10 +316,10 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                         "resources": {
                             "requests": {
                                 "cpu": "100m",
-                                "memory": "64Mi",
+                                "memory": "128Mi",
                             },
                             "limits": {
-                                "memory": "64Mi",
+                                "memory": "128Mi",
                             },
                         },
                     },

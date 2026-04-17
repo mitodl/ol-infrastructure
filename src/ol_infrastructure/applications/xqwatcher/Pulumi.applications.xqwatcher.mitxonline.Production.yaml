@@ -36,3 +36,15 @@ config:
           memory_limit: 1Gi
           timeout: 60
           image_pull_policy: always
+    mitx-686xgrader:
+      CONNECTIONS: 5
+      HANDLERS:
+      - HANDLER: xqueue_watcher.containergrader.ContainerGrader
+        KWARGS:
+          grader_root: /graders/
+          image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/mitodl/graders-mit-686x:latest
+          backend: kubernetes
+          cpu_limit: 1000m
+          memory_limit: 1Gi
+          timeout: 60
+          image_pull_policy: always
