@@ -210,8 +210,6 @@ for role_name, role_defs in starrocks_role_statements.items():
 # (e.g. aws_region) causes the update command to re-run automatically.
 # ============================================================================
 
-CATALOG_NAME = "ol_data_lake_iceberg"
-
 # MariaDB client (used in the Pulumi runner image) quirks:
 #   1. Does not support --ssl-mode=REQUIRED (MySQL 5.7.11+ syntax).
 #   2. Does not read MYSQL_PWD from the environment.
@@ -259,55 +257,84 @@ _mysql_env: dict[str, pulumi.Input[str]] = {
 enable_data_lake = starrocks_config.get_bool("enable_data_lake_integration") or False
 oidc_enabled = starrocks_config.get_bool("oidc_enabled") or False
 
-# --- Iceberg catalog --------------------------------------------------------
-catalog_setup: command.local.Command | None = None
+# --- Iceberg catalogs -------------------------------------------------------
+# Both QA and Production catalogs are registered in every StarRocks instance.
+# Production datasets are more complete, so having them available in QA
+# simplifies testing against Superset without requiring a separate environment.
+#
+# CREATE IF NOT EXISTS is idempotent: it is a no-op when the catalog
+# already exists with any set of properties.  StarRocks has no ALTER CATALOG
+# statement for updating properties in-place; the only way to change catalog
+# properties after creation is to DROP and re-CREATE the catalog.  If
+# properties need to change, manually run
+#   DROP CATALOG IF EXISTS <name>;
+# against the FE, then run `pulumi up` to recreate it via this command.
+#
+# Credential chain: use_instance_profile=false with no explicit key/role
+# instructs StarRocks to fall through to the AWS SDK default credential
+# chain.  On EKS with IRSA the pod already has AWS_ROLE_ARN +
+# AWS_WEB_IDENTITY_TOKEN_FILE injected; the SDK resolves them automatically
+# without a second sts:AssumeRole call.  Setting iam_role_arn here would
+# cause StarRocks to attempt a nested AssumeRole and fail with a 403.
+_DATA_LAKE_ENVS = ["qa", "production"]
+catalog_setups: list[command.local.Command] = []
+_iceberg_roles_sql = ""
 if enable_data_lake:
     aws_region = starrocks_config.get("aws_region") or "us-east-1"
-
-    # CREATE IF NOT EXISTS is idempotent: it is a no-op when the catalog
-    # already exists with any set of properties.  StarRocks has no ALTER CATALOG
-    # statement for updating properties in-place; the only way to change catalog
-    # properties after creation is to DROP and re-CREATE the catalog.  If
-    # properties need to change, manually run
-    #   DROP CATALOG IF EXISTS <name>;
-    # against the FE, then run `pulumi up` to recreate it via this command.
-    #
-    # Credential chain: use_instance_profile=false with no explicit key/role
-    # instructs StarRocks to fall through to the AWS SDK default credential
-    # chain.  On EKS with IRSA the pod already has AWS_ROLE_ARN +
-    # AWS_WEB_IDENTITY_TOKEN_FILE injected; the SDK resolves them automatically
-    # without a second sts:AssumeRole call.  Setting iam_role_arn here would
-    # cause StarRocks to attempt a nested AssumeRole and fail with a 403.
     _catalog_conn_props = (
         f'    "aws.glue.use_instance_profile" = "false",\n'
         f'    "aws.glue.region" = "{aws_region}",\n'
         f'    "aws.s3.use_instance_profile" = "false",\n'
         f'    "aws.s3.region" = "{aws_region}"'
     )
-    _catalog_sql = (
-        f"CREATE EXTERNAL CATALOG IF NOT EXISTS {CATALOG_NAME}\n"
-        f"COMMENT 'MIT OL Data Lake Iceberg Catalog"
-        f" (AWS Glue / {stack_info.env_suffix})'\n"
-        f"PROPERTIES(\n"
-        f'    "type" = "iceberg",\n'
-        f'    "iceberg.catalog.type" = "glue",\n'
-        f"{_catalog_conn_props}\n"
-        f");"
-    )
 
-    catalog_setup = command.local.Command(
-        f"starrocks-{stack_info.env_suffix}-catalog-setup",
-        create=_exec_sql,
-        update=_exec_sql,
-        delete=_exec_delete_sql,
-        environment={
-            **_mysql_env,
-            "STARROCKS_SQL": _catalog_sql,
-            "STARROCKS_DELETE_SQL": f"DROP CATALOG IF EXISTS {CATALOG_NAME};",
-        },
-        triggers=[hashlib.sha256(_catalog_sql.encode()).hexdigest()],
-        opts=ResourceOptions(depends_on=[starrocks_db_connection]),
-    )
+    for _catalog_env in _DATA_LAKE_ENVS:
+        _catalog_name = f"ol_data_lake_{_catalog_env}"
+        _catalog_sql = (
+            f"CREATE EXTERNAL CATALOG IF NOT EXISTS {_catalog_name}\n"
+            f"COMMENT 'MIT OL Data Lake {_catalog_env.capitalize()} Iceberg Catalog"
+            f" (AWS Glue)'\n"
+            f"PROPERTIES(\n"
+            f'    "type" = "iceberg",\n'
+            f'    "iceberg.catalog.type" = "glue",\n'
+            f"{_catalog_conn_props}\n"
+            f");"
+        )
+        catalog_setups.append(
+            command.local.Command(
+                f"starrocks-{stack_info.env_suffix}-catalog-setup-{_catalog_env}",
+                create=_exec_sql,
+                update=_exec_sql,
+                delete=_exec_delete_sql,
+                environment={
+                    **_mysql_env,
+                    "STARROCKS_SQL": _catalog_sql,
+                    "STARROCKS_DELETE_SQL": f"DROP CATALOG IF EXISTS {_catalog_name};",
+                },
+                triggers=[hashlib.sha256(_catalog_sql.encode()).hexdigest()],
+                opts=ResourceOptions(
+                    delete_before_replace=True,
+                    depends_on=[starrocks_db_connection],
+                ),
+            )
+        )
+        _iceberg_roles_sql += (
+            f"\nGRANT USAGE ON CATALOG {_catalog_name} TO ROLE readonly;"
+            f"\nSET CATALOG {_catalog_name};"
+            f"\nGRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE readonly;"
+            f"\nSET CATALOG default_catalog;"
+            f"\n"
+            f"\nGRANT USAGE ON CATALOG {_catalog_name} TO ROLE app;"
+            f"\nSET CATALOG {_catalog_name};"
+            "\nGRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN ALL DATABASES"
+            " TO ROLE app;"
+            f"\nSET CATALOG default_catalog;"
+            f"\n"
+            f"\nGRANT USAGE ON CATALOG {_catalog_name} TO ROLE admin;"
+            f"\nSET CATALOG {_catalog_name};"
+            f"\nGRANT ALL ON ALL TABLES IN ALL DATABASES TO ROLE admin;"
+            f"\nSET CATALOG default_catalog;"
+        )
 
 # --- Native StarRocks roles -------------------------------------------------
 # Permanent roles for OIDC-authenticated users and direct database access.
@@ -344,26 +371,8 @@ GRANT USAGE ON CATALOG default_catalog TO ROLE admin;
 GRANT ALL ON ALL TABLES IN ALL DATABASES TO ROLE admin;
 GRANT ALL ON ALL DATABASES TO ROLE admin;"""
 
-_iceberg_roles_sql = f"""
-GRANT USAGE ON CATALOG {CATALOG_NAME} TO ROLE readonly;
-SET CATALOG {CATALOG_NAME};
-GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE readonly;
-SET CATALOG default_catalog;
-
-GRANT USAGE ON CATALOG {CATALOG_NAME} TO ROLE app;
-SET CATALOG {CATALOG_NAME};
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN ALL DATABASES TO ROLE app;
-SET CATALOG default_catalog;
-
-GRANT USAGE ON CATALOG {CATALOG_NAME} TO ROLE admin;
-SET CATALOG {CATALOG_NAME};
-GRANT ALL ON ALL TABLES IN ALL DATABASES TO ROLE admin;
-SET CATALOG default_catalog;"""
-
-_roles_sql = _base_roles_sql + (_iceberg_roles_sql if enable_data_lake else "")
-_role_deps: list[pulumi.Resource] = [starrocks_db_connection]
-if catalog_setup is not None:
-    _role_deps.append(catalog_setup)
+_roles_sql = _base_roles_sql + _iceberg_roles_sql
+_role_deps: list[pulumi.Resource] = [starrocks_db_connection, *catalog_setups]
 
 _roles_drop_sql = (
     "DROP ROLE IF EXISTS readonly; DROP ROLE IF EXISTS app; DROP ROLE IF EXISTS admin;"
@@ -380,7 +389,7 @@ command.local.Command(
         "STARROCKS_DELETE_SQL": _roles_drop_sql,
     },
     triggers=[hashlib.sha256(_roles_sql.encode()).hexdigest()],
-    opts=ResourceOptions(depends_on=_role_deps),
+    opts=ResourceOptions(delete_before_replace=True, depends_on=_role_deps),
 )
 
 # --- OIDC authentication chain ----------------------------------------------
@@ -415,7 +424,10 @@ if oidc_enabled:
             "STARROCKS_DELETE_SQL": _oidc_disable_sql,
         },
         triggers=[hashlib.sha256(_oidc_sql.encode()).hexdigest()],
-        opts=ResourceOptions(depends_on=[starrocks_db_connection]),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=[starrocks_db_connection],
+        ),
     )
 
 export("vault_mount_path", mount_point)

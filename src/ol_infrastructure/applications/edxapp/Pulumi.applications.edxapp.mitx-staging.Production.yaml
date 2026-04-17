@@ -123,8 +123,8 @@ config:
   meilisearch:replica_count: "1"
   meilisearch:pv_size: 100Gi
   meilisearch:cpu_request: "250m"
-  meilisearch:memory_request: "4Gi"
-  meilisearch:memory_limit: "4Gi"
+  meilisearch:memory_request: "1Gi"
+  meilisearch:memory_limit: "1Gi"
   typesense:deploy: "true"
   typesense:enabled: "false"
   typesense:bootstrap_key:

@@ -163,24 +163,32 @@ if starrocks_config.get_bool("oidc_enabled"):
     )
 
 # Iceberg catalog integration via AWS Glue
-# When enabled, the IRSA role is granted the data-lake query-engine policy so that
-# StarRocks FE/CN pods (which use the annotated "starrocks" service account) can call
-# the Glue Data Catalog API and read Iceberg data from the corresponding S3 buckets.
+# When enabled, the IRSA role is granted the data-lake query-engine policy for each
+# environment so that StarRocks FE/CN pods (which use the annotated "starrocks" service
+# account) can call the Glue Data Catalog API and read Iceberg data from the
+# corresponding S3 buckets.
 #
-# The Iceberg external catalog is created and maintained by the substructure stack
+# Both QA and production catalogs are registered in every StarRocks instance
+# (see substructure/starrocks _DATA_LAKE_ENVS), so the IRSA role needs query-engine
+# access to both environments' Glue catalogs and S3 buckets.
+#
+# The Iceberg external catalogs are created and maintained by the substructure stack
 # (substructure/starrocks) using the pulumi-command local.Command resource.
+_DATA_LAKE_ENVS = ("QA", "Production")
+
 if starrocks_config.get_bool("enable_data_lake_integration"):
-    data_warehouse_stack = StackReference(
-        f"infrastructure.aws.data_warehouse.{stack_info.name}"
-    )
-    iam.RolePolicyAttachment(
-        f"starrocks-data-lake-policy-{stack_info.env_suffix}",
-        policy_arn=data_warehouse_stack.require_output(
-            "data_lake_query_engine_iam_policy_arn"
-        ),
-        role=starrocks_auth_binding.irsa_role.name,
-        opts=ResourceOptions(parent=starrocks_auth_binding),
-    )
+    for _data_lake_env in _DATA_LAKE_ENVS:
+        _dw_stack = StackReference(
+            f"infrastructure.aws.data_warehouse.{_data_lake_env}"
+        )
+        iam.RolePolicyAttachment(
+            f"starrocks-data-lake-policy-{stack_info.env_suffix}-{_data_lake_env}",
+            policy_arn=_dw_stack.require_output(
+                "data_lake_query_engine_iam_policy_arn"
+            ),
+            role=starrocks_auth_binding.irsa_role.name,
+            opts=ResourceOptions(parent=starrocks_auth_binding),
+        )
 
 # AWS Java SDK v1 (bundled with StarRocks 4.x) does not automatically resolve
 # AWS_ROLE_ARN + AWS_WEB_IDENTITY_TOKEN_FILE env vars through the default credential
