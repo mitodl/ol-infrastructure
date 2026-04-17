@@ -160,7 +160,10 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
 
         # Expand through AUTH_ROLES_MAPPING so the JWT path is consistent with
         # the OAuth path (which FAB expands via AUTH_ROLES_MAPPING automatically).
-        for superset_role_name in self._expand_role_keys(role_keys):
+        # Use dict.fromkeys to deduplicate while preserving order — Keycloak can
+        # emit the same client role twice when it is assigned both directly and
+        # via a composite realm role.
+        for superset_role_name in dict.fromkeys(self._expand_role_keys(role_keys)):
             superset_role = self.find_role(superset_role_name)
             if superset_role:
                 roles.append(superset_role)
