@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-release-bot
+runtime: python
+description: Slack release bot — thin adapter between Slack commands and the Concourse/GitHub APIs
+backend:
+  url: s3://mitol-pulumi-state/

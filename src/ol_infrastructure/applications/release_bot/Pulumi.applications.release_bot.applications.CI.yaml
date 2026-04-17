@@ -1,0 +1,6 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: ""
+config:
+  vault:address: https://vault-ci.odl.mit.edu
+  release_bot:concourse_url: https://cicd.odl.mit.edu
