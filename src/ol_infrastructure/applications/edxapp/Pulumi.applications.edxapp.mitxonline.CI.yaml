@@ -152,4 +152,4 @@ config:
   typesense:deploy: "true"
   typesense:enabled: "true"
   typesense:course_search_enabled: "true"
-  typesense:forum_search_enabled: "true"
+  typesense:forum_search_enabled: "false"
