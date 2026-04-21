@@ -36,13 +36,13 @@ cat > "${HOME}/.sup/config.yml" <<EOF
 superset_instances:
   superset-qa:
     url: ${SUPERSET_QA_URL}
-    auth_method: client_credentials
+    auth_method: oauth
     oauth_token_url: ${SUPERSET_QA_OAUTH_TOKEN_URL}
     oauth_client_id: ${SUPERSET_QA_CLIENT_ID}
     oauth_client_secret: ${SUPERSET_QA_CLIENT_SECRET}
   superset-production:
     url: ${SUPERSET_PRODUCTION_URL}
-    auth_method: client_credentials
+    auth_method: oauth
     oauth_token_url: ${SUPERSET_PRODUCTION_OAUTH_TOKEN_URL}
     oauth_client_id: ${SUPERSET_PRODUCTION_CLIENT_ID}
     oauth_client_secret: ${SUPERSET_PRODUCTION_CLIENT_SECRET}
