@@ -1151,7 +1151,6 @@ env_vars = {
     "NODE_MODULES_CACHE": "False",
     "OCW_BASE_URL": "https://ocw.mit.edu/",
     "OCW_CONTENT_BUCKET_NAME": "ocw-content-storage",
-    "OCW_LIVE_BUCKET": "ocw-content-live-production",
     "OCW_UPLOAD_IMAGE_ONLY": "True",
     "OLL_ALT_URL": "https://openlearninglibrary.mit.edu/courses",
     "OLL_API_ACCESS_TOKEN_URL": "https://openlearninglibrary.mit.edu/oauth2/access_token/",
