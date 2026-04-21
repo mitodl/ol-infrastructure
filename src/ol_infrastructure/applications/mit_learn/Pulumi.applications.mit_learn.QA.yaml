@@ -79,6 +79,7 @@ config:
     XPRO_COURSES_API_URL: "https://rc.xpro.mit.edu/api/courses/"
     MITPE_API_ENABLED: "true"
     OCW_ITERATOR_CHUNK_SIZE: 300
+    OCW_LIVE_BUCKET: "ocw-content-live-qa"
     OIDC_ENDPOINT: "https://sso-qa.ol.mit.edu/realms/olapps"
     OPENTELEMETRY_ENABLED: "true"
     OPENTELEMETRY_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces"

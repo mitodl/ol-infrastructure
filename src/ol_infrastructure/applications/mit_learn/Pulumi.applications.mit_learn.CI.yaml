@@ -75,6 +75,7 @@ config:
     MITOL_SUPPORT_EMAIL: "odl-learn-ci-support@mit.edu" # Need to verify
     MITPE_API_ENABLED: "true"
     OCW_ITERATOR_CHUNK_SIZE: 300
+    OCW_LIVE_BUCKET: "ocw-content-live-production"
     OIDC_ENDPOINT: "https://sso-ci.ol.mit.edu/realms/olapps"
     OVS_API_BASE_URL: "https://video-rc.odl.mit.edu"
     OPENSEARCH_INDEX: "mitlearn-ci"
