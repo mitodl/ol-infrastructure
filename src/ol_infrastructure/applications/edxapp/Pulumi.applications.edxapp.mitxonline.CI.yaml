@@ -150,6 +150,6 @@ config:
   meilisearch:memory_request: "1Gi"
   meilisearch:memory_limit: "1Gi"
   typesense:deploy: "true"
-  typesense:enabled: "false"
-  typesense:bootstrap_key:
-    secure: v1:9n3O89ID5lZ1AQJC:oNMWFAClYYNjULnDE6NOR5+Pj6anL+qrJ1ZijGE1DGljrYmY8xBsWBNrPOmBOjI0ej1uHIr3+cPRlEVyaR83aoEH8vWWEBprkbr3TbLHGkA=
+  typesense:enabled: "true"
+  typesense:course_search_enabled: "true"
+  typesense:forum_search_enabled: "false"

@@ -7,7 +7,7 @@ CONSUL_VERSION = "1.22.6"
 # renovate: datasource=pypi depName=jupyterhub packageName=jupyterhub
 JUPYTERHUB_VERSION = "5.4.4"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
-KEYCLOAK_VERSION = "26.6.0"
+KEYCLOAK_VERSION = "26.6.1"
 # renovate: datasource=docker depName=leek packageName=kodhive/leek
 LEEK_VERSION = "0.7.7"
 MEILISEARCH_VERSION = (
@@ -28,7 +28,7 @@ VECTOR_VERSION = "0.40.1"
 
 # EKS Specific Versions
 # renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/charts
-AIRBYTE_CHART_VERSION = "2.0.19"
+AIRBYTE_CHART_VERSION = "2.1.0"
 # renovate: datasource=helm depName=superset packageName=superset registryUrl=https://apache.github.io/superset
 SUPERSET_CHART_VERSION = "0.15.2"
 # renovate: datasource=helm depName=tika packageName=tika registryUrl=https://apache.jfrog.io/artifactory/tika
@@ -42,7 +42,7 @@ AWS_NODE_TERMINATION_HANDLER_CHART_VERSION = "0.27.2"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager
 CERT_MANAGER_CHART_VERSION = "v1.16.1"
 # renovate: datasource=helm depName=dagster packageName=dagster registryUrl=https://dagster-io.github.io/helm
-DAGSTER_CHART_VERSION = "1.13.0"
+DAGSTER_CHART_VERSION = "1.13.1"
 # renovate: datasource=aws-eks-addon depName=ebs-csi-driver
 EBS_CSI_DRIVER_VERSION = "v1.40.1-eksbuild.1"
 # renovate: datasource=aws-eks-addon depName=efs-csi-driver
@@ -66,7 +66,7 @@ STARROCKS_OPERATOR_CHART_VERSION = "1.11.4"
 # renovate: datasource=helm depName=operator packageName=starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
 STARROCKS_CHART_VERSION = "1.11.4"
 # renovate: datasource=docker depName=starrocks packageName=starrocks/fe-ubuntu
-STARROCKS_VERSION = "4.0.8"
+STARROCKS_VERSION = "4.1.0"
 # renovate: datasource=github-releases depName=starrocks-vault-plugin packageName=mitodl/vault-plugin-database-starrocks
 VAULT_PLUGIN_STARROCKS_VERSION = "0.1.0"
 VAULT_PLUGIN_STARROCKS_SHA256 = "3a737897b3c37eb61cab0b6b2804bd711dde7d31b308cf325f88138c0a111955"  # pragma: allowlist secret
@@ -84,7 +84,7 @@ VANTAGE_K8S_AGENT_CHART_VERSION = "1.4.1"
 # renovate: datasource=helm depName=vault-secrets-operator packageName=vault-secrets-operator registryUrl=https://helm.releases.hashicorp.com
 VAULT_SECRETS_OPERATOR_CHART_VERSION = "1.3.0"
 # renovate: datasource=docker depName=nginx
-NGINX_VERSION = "1.29.8"
+NGINX_VERSION = "1.30.0"
 # renovate: datasource=github-releases depName=prometheus-operator packageName=prometheus-operator/prometheus-operator
 PROMETHEUS_OPERATOR_CRD_VERSION = "v0.90.1"
 # renovate: datasource=github-releases depName=keycloak-k8s-resources packageName=keycloak/keycloak-k8s-resources
@@ -92,7 +92,7 @@ KEYCLOAK_OPERATOR_CRD_VERSION = "26.2.4"
 # renovate: datasource=helm depName=jupyterhub packageName=jupyterhub registryUrl=https://hub.jupyter.org/helm-chart
 JUPYTERHUB_CHART_VERSION = "4.3.3"
 # renovate: datasource=helm depName=k8s-monitoring packageName=k8s-monitoring registryUrl=https://grafana.github.io/helm-charts
-GRAFANA_K8S_MONITORING_CHART_VERSION = "4.0.1"
+GRAFANA_K8S_MONITORING_CHART_VERSION = "4.0.2"
 # renovate: datasource=helm depName=dcgm-exporter packageName=dcgm-exporter registryUrl=https://nvidia.github.io/dcgm-exporter/helm-charts
 NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.8.1"
 # renovate: datasource=helm depName=nvidia-device-plugin packageName=nvidia-device-plugin registryUrl=https://nvidia.github.io/k8s-device-plugin

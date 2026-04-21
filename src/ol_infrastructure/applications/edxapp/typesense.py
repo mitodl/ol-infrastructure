@@ -1,7 +1,12 @@
+"""Typesense custom resource definition"""
+
+from pathlib import Path
+
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, ResourceOptions
 
 from bridge.lib.versions import TYPESENSE_VERSION
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
@@ -27,6 +32,10 @@ def create_typesense_resources(
     if not typesense_config.get_bool("deploy"):
         return None
 
+    secrets = read_yaml_secrets(
+        Path(f"edxapp/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
+    )
+
     typesense_bootstrap_key_name = "typesense-bootstrap-key"
     typesense_bootstrap_key = kubernetes.core.v1.Secret(
         f"ol-{stack_info.env_prefix}-edxapp-typesense-bootstrap-key-{stack_info.env_suffix}",
@@ -36,7 +45,7 @@ def create_typesense_resources(
             labels=k8s_global_labels,
         ),
         string_data={
-            "typesense-api-key": typesense_config.require("bootstrap_key"),
+            "typesense-api-key": secrets["typesense_bootstrap_key"],
         },
         opts=ResourceOptions(),
     )

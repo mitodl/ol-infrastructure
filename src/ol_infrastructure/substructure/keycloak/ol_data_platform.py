@@ -7,7 +7,7 @@ import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 
-def create_ol_data_platform_realm(  # noqa: PLR0913, PLR0915
+def create_ol_data_platform_realm(  # noqa: C901, PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     env_name: str,
@@ -197,6 +197,27 @@ def create_ol_data_platform_realm(  # noqa: PLR0913, PLR0915
             client_id=realm_mgmt_client.id,
             role=role,
             opts=resource_options,
+        )
+
+    # Grant the service account the ol_platform_admin Superset client role so that
+    # client_credentials JWTs include it in the role_keys claim (via the
+    # UserClientRoleProtocolMapper on the ol_roles scope). Superset's
+    # CustomSsoSecurityManager.load_user_jwt syncs roles from role_keys on every
+    # JWT request, which maps ol_platform_admin → Admin via AUTH_ROLES_MAPPING.
+    if "ol_platform_admin" in ol_data_platform_superset_client_role_refs:
+        keycloak.openid.ClientServiceAccountRole(
+            "ol-superset-service-account-platform-admin",
+            realm_id=ol_data_platform_realm.id,
+            service_account_user_id=ol_data_platform_superset_client.service_account_user_id,
+            client_id=ol_data_platform_superset_client.id,
+            role="ol_platform_admin",
+            opts=resource_options.merge(
+                ResourceOptions(
+                    depends_on=[
+                        ol_data_platform_superset_client_role_refs["ol_platform_admin"]
+                    ]
+                )
+            ),
         )
 
     # Create public client for CLI/interactive OAuth flows (no client secret needed)

@@ -1,7 +1,0 @@
----
-secretsprovider: awskms://alias/PulumiSecrets
-encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQFHX8NeFBgzOtLe0bAQRdfNAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMAqeEBKyVc9S1hpKGAgEQgDtR+br5Bn9xsp7zQRvB5msRL5i2cAlu2+x9Vj0mQRdnwRcGLctTB9zTu3wrqa0GyvRniqy8GVW8nfxaSA==
-config:
-  aws:region: us-east-1
-  environment:business_unit: residential
-  environment:vpc_reference: residential_mitx_vpc
