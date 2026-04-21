@@ -113,3 +113,9 @@ config:
   keycloak_realm:ol-platform-engineering-grafana-client-secret:
     secure: v1:rAIQutctJKUBe/rV:VV0DhdOXs5U+zCqXE/bOTjqe98nBvo/Kkdfnf0JJjzFwI9gxOIBXwSmwoyP2XsIi7+VVVLVzfCHVcvay
   keycloak_realm:olapps_email_tmeme: ol-learn
+  keycloak_realm:ol-mit-ovs-redirect-uris:
+  - "https://video-ci.odl.mit.edu/auth/complete/keycloak/"
+  keycloak_realm:ol-mit-ovs-logout-uris:
+  - "https://video-ci.odl.mit.edu/"
+  keycloak_realm:ol-mit-ovs-web-origins:
+  - "https://video-ci.odl.mit.edu"
