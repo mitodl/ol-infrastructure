@@ -1,8 +1,0 @@
----
-secretsprovider: awskms://alias/infrastructure-secrets-ci
-encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQF8EoHlv9WrkSOk7EBLpMbaAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMllnGO85z35cBlbIyAgEQgDslfKlbuXa/5oqD/TSBUWFzu6hMcCfPvnd3DA/G5Ob6cNZdyOEdkh/vqmS56l9E7CCZisONpx9/gNR9PA==
-config:
-  aws:region: us-east-1
-  environment:business_unit: residential-staging
-  environment:vpc_reference: residential_mitx_staging_vpc
-  consul:instance_type: burstable_nano
