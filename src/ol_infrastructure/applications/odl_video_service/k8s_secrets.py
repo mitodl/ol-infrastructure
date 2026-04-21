@@ -251,7 +251,28 @@ def create_ovs_k8s_secrets(
     secret_names.append(mailgun_secret_name)
     secret_resources.append(mailgun_secret)
 
-    # 7. Shibboleth SP cert/key secrets (only when Shibboleth is enabled)
+    # 7. Keycloak OIDC credentials for django-social-auth
+    keycloak_secret_name, keycloak_secret = _create_static_secret(
+        stack_info=stack_info,
+        secret_base_name="ovs-keycloak-sso",  # pragma: allowlist secret
+        namespace=ovs_namespace,
+        labels=k8s_global_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/ovs",
+        templates={
+            "SOCIAL_AUTH_KEYCLOAK_KEY": '{{ get .Secrets "client_id" }}',
+            "SOCIAL_AUTH_KEYCLOAK_SECRET": '{{ get .Secrets "client_secret" }}',  # pragma: allowlist secret
+            "SOCIAL_AUTH_KEYCLOAK_PUBLIC_KEY": '{{ get .Secrets "realm_public_key" }}',
+            "SOCIAL_AUTH_KEYCLOAK_AUTHORIZATION_URL": '{{ printf "%s/protocol/openid-connect/auth" (get .Secrets "url") }}',
+            "SOCIAL_AUTH_KEYCLOAK_ACCESS_TOKEN_URL": '{{ printf "%s/protocol/openid-connect/token" (get .Secrets "url") }}',
+        },
+        vaultauth=vaultauth,
+    )
+    secret_names.append(keycloak_secret_name)
+    secret_resources.append(keycloak_secret)
+
+    # 8. Shibboleth SP cert/key secrets (only when Shibboleth is enabled)
     if use_shibboleth:
         shib_certs_secret_name, shib_certs_secret = _create_static_secret(
             stack_info=stack_info,
