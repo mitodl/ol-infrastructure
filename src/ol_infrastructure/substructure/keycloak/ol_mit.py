@@ -449,7 +449,15 @@ def create_ol_mit_realm(  # noqa: PLR0913
             realm_id=ol_mit_ovs_client.realm_id,
             realm_name="ol-mit",
             realm_public_key=ol_mit_ovs_client.realm_id.apply(
-                fetch_realm_public_key_partial
+                # social_core.backends.keycloak.KeycloakOAuth2 expects raw base64
+                # key material without PEM headers — it wraps the key itself in
+                # public_key(). fetch_realm_public_key returns a full PEM string,
+                # so strip the headers here.
+                lambda realm_id: (
+                    fetch_realm_public_key_partial(realm_id)
+                    .removeprefix("-----BEGIN PUBLIC KEY-----\n")
+                    .removesuffix("\n-----END PUBLIC KEY-----")
+                )
             ),
         ).apply(json.dumps),
     )
