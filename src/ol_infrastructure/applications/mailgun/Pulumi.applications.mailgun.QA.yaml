@@ -16,6 +16,10 @@ config:
     managed: false
     smtp_password:
       secure: v1:HD6nU74Fw4Nf7YEM:yKlyytz0XlnlpdVv58nsC8Tnz7E5u1t32iRx7zTZLDENyGvrTf8oFXWWOUCGhSFloCHk7UgV8wsYswyc/4TtFuRH
+  - name: micromasters-rc-mail.odl.mit.edu
+    managed: false
+    smtp_password:
+      secure: v1:G8/cgENX7pbgctwq:Ji8PsBKFVacT1CH+lHQJxxsGUA9UUrNB8M3ghrdPfJ2sS043GFqm4bKPaHwyCEPcPKRwmocO6mDEf4Px+yDkoCLI
   - name: mitxonline-rc-mail.mitxonline.mit.edu
     managed: false
     smtp_password:
@@ -28,7 +32,3 @@ config:
     managed: false
     smtp_password:
       secure: v1:HdZvG7Cx9zOx/eFN:X6DwFs12fUpsfbKOOmBhaHARv6f0jJx4Y4BuFSxGrjs37tVhyyfmmNfd1J/1dPjcPEf87CTPU2A8Pn3xYWClj4v1
-  - name: micromasters-rc-mail.odl.mit.edu
-    managed: false
-    smtp_password:
-      secure: v1:G8/cgENX7pbgctwq:Ji8PsBKFVacT1CH+lHQJxxsGUA9UUrNB8M3ghrdPfJ2sS043GFqm4bKPaHwyCEPcPKRwmocO6mDEf4Px+yDkoCLI
