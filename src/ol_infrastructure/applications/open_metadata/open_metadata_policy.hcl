@@ -11,10 +11,10 @@ path "secret-operations/sso/open_metadata" {
   capabilities = ["read"]
 }
 # Connector credentials for OpenMetadata ingestion pipelines
-path "secret-open-metadata/connectors" {
+path "secret-openmetadata/connectors" {
   capabilities = ["read"]
 }
-path "secret-open-metadata/connectors/*" {
+path "secret-openmetadata/connectors/*" {
   capabilities = ["read"]
 }
 # vault-secrets-operator is a little more particular about
