@@ -313,6 +313,7 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: SLF001
     )
 
     traefik_config = TraefikConfig(
+        version=VERSIONS["traefik"],
         static_configuration=traefik_static.TraefikStaticConfig.model_validate(
             yaml.safe_load(
                 FILES_DIRECTORY.joinpath("traefik", "static_config.yaml").read_text()
