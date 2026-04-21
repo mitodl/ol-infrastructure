@@ -1,8 +1,13 @@
 import httpx
 import pulumi
 
-MAILGUN_API_BASE = "https://api.mailgun.net"
+MAILGUN_API_BASE_US = "https://api.mailgun.net"
+MAILGUN_API_BASE_EU = "https://api.eu.mailgun.net"
 HTTP_OK = 200
+
+
+def _api_base(region: str) -> str:
+    return MAILGUN_API_BASE_EU if region == "eu" else MAILGUN_API_BASE_US
 
 
 def mailgun_domain_opts(
@@ -10,6 +15,7 @@ def mailgun_domain_opts(
     api_key: str,
     *,
     managed: bool,
+    region: str = "us",
 ) -> pulumi.ResourceOptions:
     """Return ResourceOptions for a Mailgun domain resource.
 
@@ -22,8 +28,9 @@ def mailgun_domain_opts(
     the stack config so subsequent runs skip the API call.
 
     :param domain_name: The Mailgun domain name, e.g. ``mail.learn.mit.edu``
-    :param api_key: Mailgun API key (US region)
+    :param api_key: Mailgun API key
     :param managed: Whether the domain is already under Pulumi management
+    :param region: Mailgun region, either ``"us"`` (default) or ``"eu"``
 
     :returns: ResourceOptions with import_ set if the domain exists and is not yet
         managed
@@ -33,11 +40,11 @@ def mailgun_domain_opts(
         return pulumi.ResourceOptions()
 
     resp = httpx.get(
-        f"{MAILGUN_API_BASE}/v4/domains/{domain_name}",
+        f"{_api_base(region)}/v4/domains/{domain_name}",
         auth=("api", api_key),
     )
     if resp.status_code == HTTP_OK:
-        return pulumi.ResourceOptions(import_=f"us:{domain_name}")
+        return pulumi.ResourceOptions(import_=f"{region}:{domain_name}")
     return pulumi.ResourceOptions()
 
 
@@ -47,6 +54,7 @@ def mailgun_credential_opts(
     api_key: str,
     *,
     managed: bool,
+    region: str = "us",
 ) -> pulumi.ResourceOptions:
     """Return ResourceOptions for a Mailgun DomainCredential resource.
 
@@ -59,8 +67,9 @@ def mailgun_credential_opts(
 
     :param domain_name: The Mailgun domain name, e.g. ``mail.learn.mit.edu``
     :param login: The credential login without the domain suffix, e.g. ``no-reply``
-    :param api_key: Mailgun API key (US region)
+    :param api_key: Mailgun API key
     :param managed: Whether the credential is already under Pulumi management
+    :param region: Mailgun region, either ``"us"`` (default) or ``"eu"``
 
     :returns: ResourceOptions with import_ set if applicable; always includes
         ignore_changes=["password"]
@@ -70,14 +79,14 @@ def mailgun_credential_opts(
         return pulumi.ResourceOptions(ignore_changes=["password"])
 
     resp = httpx.get(
-        f"{MAILGUN_API_BASE}/v3/{domain_name}/credentials",
+        f"{_api_base(region)}/v3/{domain_name}/credentials",
         auth=("api", api_key),
     )
     if resp.status_code == HTTP_OK:
         logins = {item["login"] for item in resp.json().get("items", [])}
         if f"{login}@{domain_name}" in logins:
             return pulumi.ResourceOptions(
-                import_=f"us:{login}@{domain_name}",
+                import_=f"{region}:{login}@{domain_name}",
                 ignore_changes=["password"],
             )
     return pulumi.ResourceOptions(ignore_changes=["password"])

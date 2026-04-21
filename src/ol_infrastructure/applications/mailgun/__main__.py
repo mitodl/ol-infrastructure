@@ -29,6 +29,7 @@ thirty_minutes = 60 * 30
 for domain_cfg in domains:
     name: str = domain_cfg["name"]
     managed: bool = domain_cfg.get("managed", False)
+    region: str = domain_cfg.get("region", "us")
 
     zone_id = lookup_zone_id_from_domain(name)
     if zone_id is None:
@@ -44,7 +45,7 @@ for domain_cfg in domains:
         force_dkim_authority=domain_cfg.get("force_dkim_authority", False),
         name=name,
         open_tracking=domain_cfg.get("open_tracking", True),
-        region=domain_cfg.get("region", "us"),
+        region=region,
         smtp_password=domain_cfg["smtp_password"],
         spam_action=domain_cfg.get("spam_action", "disabled"),
         use_automatic_sender_security=domain_cfg.get(
@@ -52,7 +53,7 @@ for domain_cfg in domains:
         ),
         web_scheme=domain_cfg.get("web_scheme", "https"),
         wildcard=domain_cfg.get("wildcard", False),
-        opts=mailgun_domain_opts(name, api_key, managed=managed),
+        opts=mailgun_domain_opts(name, api_key, managed=managed, region=region),
     )
 
     # --- SMTP credentials (one or more per domain) ---
@@ -63,7 +64,9 @@ for domain_cfg in domains:
             domain=mg_domain.id,
             login=login,
             password=cred["smtp_password"],
-            opts=mailgun_credential_opts(name, login, api_key, managed=managed),
+            opts=mailgun_credential_opts(
+                name, login, api_key, managed=managed, region=region
+            ),
         )
 
     # --- Route53 records ---
