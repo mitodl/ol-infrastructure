@@ -144,9 +144,6 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
     def _get_roles_from_keycloak_roles(self, role_keys: list[str]) -> list[object]:
         """Map Keycloak role_keys to Superset roles.
 
-        Handles special case for service accounts that need Alpha role
-        for API access but don't have role_keys in their JWT.
-
         Args:
             role_keys: List of Keycloak role keys from JWT token
 
@@ -163,7 +160,10 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
 
         # Expand through AUTH_ROLES_MAPPING so the JWT path is consistent with
         # the OAuth path (which FAB expands via AUTH_ROLES_MAPPING automatically).
-        for superset_role_name in self._expand_role_keys(role_keys):
+        # Use dict.fromkeys to deduplicate while preserving order — Keycloak can
+        # emit the same client role twice when it is assigned both directly and
+        # via a composite realm role.
+        for superset_role_name in dict.fromkeys(self._expand_role_keys(role_keys)):
             superset_role = self.find_role(superset_role_name)
             if superset_role:
                 roles.append(superset_role)
@@ -195,17 +195,12 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
             return None
 
         try:
-            # Service accounts don't have role_keys
-            # Assign Alpha role for API access
-            if username.startswith("service-account-"):
-                logging.info(
-                    "Detected service account: %s, assigning Alpha role",
-                    username,
-                )
-                roles = [self.find_role("Alpha")]
-            else:
-                # Get roles from Keycloak role_keys claim
-                roles = self._get_roles_from_keycloak_roles(role_keys)
+            # Get roles from Keycloak role_keys claim.
+            # Service accounts carry role_keys in their client-credentials JWT
+            # (the ol_platform_admin client role is assigned to the service account
+            # in Keycloak, surfaced via UserClientRoleProtocolMapper), so they go
+            # through the same path as regular users.
+            roles = self._get_roles_from_keycloak_roles(role_keys)
 
             # Ensure at least one role
             if not roles:
@@ -219,7 +214,7 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
                 "Creating new user from JWT: username=%s, email=%s, roles=%s",
                 username,
                 email,
-                [r.name for r in roles if r],
+                [getattr(r, "name", str(r)) for r in roles if r],
             )
 
             user = self.add_user(
@@ -276,6 +271,17 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
                 username,
             )
             user = self._create_user_from_jwt(jwt_data)
+        elif user.is_active:
+            # Sync roles on every JWT request, mirroring AUTH_ROLES_SYNC_AT_LOGIN
+            # for the OAuth path. This ensures role changes in Keycloak (including
+            # granting the service account ol_platform_admin) take effect without
+            # requiring the user record to be deleted and recreated.
+            role_keys_obj = jwt_data.get("role_keys", [])
+            role_keys = list(role_keys_obj) if isinstance(role_keys_obj, list) else []
+            roles = self._get_roles_from_keycloak_roles(role_keys)
+            if roles:
+                user.roles = roles
+                self.update_user(user)
 
         # Return user if found/created and active
         if user and user.is_active:

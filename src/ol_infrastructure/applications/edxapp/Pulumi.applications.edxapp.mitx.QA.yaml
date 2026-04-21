@@ -136,5 +136,3 @@ config:
   meilisearch:memory_limit: "1Gi"
   typesense:deploy: "true"
   typesense:enabled: "false"
-  typesense:bootstrap_key:
-    secure: v1:9mjLSEadatYpmU9K:TTiq9gAtOyKOoex43LD7gj/FlCIUomsETCRrt1XQkJgANLkbynjlSj64KDB7J5pZsaIX9FwvTudb/NAv6mbQ2tcrYhoa+zCwgz4+xTq3eYQ=
