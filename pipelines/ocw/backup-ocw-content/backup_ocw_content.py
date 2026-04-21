@@ -1,14 +1,13 @@
-"""Concourse pipeline to back up OCW content S3 buckets.
+"""Concourse pipeline to back up OCW production content S3 buckets.
 
 Syncs draft and live OCW content buckets to their backup counterparts every 6
 hours using the mitodl/concourse-s3-sync-resource.
 
-Deploy with (substituting the appropriate environment vars file):
+Deploy with:
 
     fly -t <target> set-pipeline \\
-        -p backup-ocw-content-<env> \\
-        -c definition.json \\
-        -l vars-backup-<env>.yml
+        -p backup-ocw-content-production \\
+        -c definition.json
 """
 
 import sys
@@ -35,8 +34,8 @@ draft_backup = Resource(
     type="s3-sync",
     check_every="never",
     source={
-        "bucket": "((draft_destination_bucket_name))",
-        "source_bucket": "((draft_source_bucket_name))",
+        "bucket": "ocw-content-backup-draft-production",
+        "source_bucket": "ocw-content-draft-production",
     },
 )
 
@@ -45,8 +44,8 @@ live_backup = Resource(
     type="s3-sync",
     check_every="never",
     source={
-        "bucket": "((live_destination_bucket_name))",
-        "source_bucket": "((live_source_bucket_name))",
+        "bucket": "ocw-content-backup-live-production",
+        "source_bucket": "ocw-content-live-production",
     },
 )
 
