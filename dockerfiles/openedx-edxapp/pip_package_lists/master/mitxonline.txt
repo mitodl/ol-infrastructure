@@ -12,7 +12,7 @@ ol-openedx-course-structure-api
 ol-openedx-logging
 ol-openedx-sentry
 openedx-scorm-xblock
-ol-social-auth==0.2.0
+ol-social-auth==0.2.1
 pydantic-settings==2.13.1
 
 # Experimental Plugins for AI features
