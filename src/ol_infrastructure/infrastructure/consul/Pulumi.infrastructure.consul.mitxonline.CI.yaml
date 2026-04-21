@@ -1,7 +1,0 @@
----
-secretsprovider: awskms://alias/infrastructure-secrets-ci
-encryptedkey: AQICAHjEYf3gV5ZTnviCJcHwGnUuLzld5EuYumgMrRde6bvXUgG73PTfwclsj8dK9LvX0UduAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMrlk7j5vEC2uehJLmAgEQgDtYHAXyIixcJXOtRZHtDBnKqam2kqQILYCU1Y4ULx6Tu08HdvzzEfG6KdJWrQHDDCFmpOZEUaYZSPeVgw==
-config:
-  aws:region: us-east-1
-  environment:business_unit: mitxonline
-  environment:vpc_reference: mitxonline_vpc

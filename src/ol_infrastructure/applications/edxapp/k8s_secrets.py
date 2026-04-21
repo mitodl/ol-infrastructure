@@ -50,6 +50,7 @@ class EdxappSecrets:
     git_export_ssh_key: OLVaultK8SSecret
     translations_providers: OLVaultK8SSecret | None
     meilisearch: OLVaultK8SSecret | None
+    typesense: OLVaultK8SSecret | None
 
     db_creds_secret_name: str
     db_connections_secret_name: str
@@ -64,6 +65,7 @@ class EdxappSecrets:
     git_export_ssh_key_secret_name: str
     translations_providers_secret_name: str | None
     meilisearch_secret_name: str | None
+    typesense_secret_name: str | None
 
 
 def create_k8s_secrets(
@@ -126,6 +128,7 @@ def create_k8s_secrets(
         "14-translations-providers-yaml"  # pragma: allowlist secret
     )
     meilisearch_secret_name = "15-meilisearch-yaml"  # pragma: allowlist secret
+    typesense_secret_name = "16-typesense-yaml"  # pragma: allowlist secret
 
     # Database credentials secret (dynamic - depends on DB outputs)
     db_creds_secret = Output.all(
@@ -411,6 +414,23 @@ def create_k8s_secrets(
     else:
         meilisearch_secret = None
 
+    typesense_config = Config("typesense")
+    if typesense_config.get_bool("enabled"):
+        typesense_secret = builder.create_static(
+            name="typesense",
+            resource_name="typesense-secret",
+            secret_name=typesense_secret_name,
+            mount=f"secret-{stack_info.env_prefix}",
+            path="edxapp",
+            templates={
+                "16-typesense-secrets.yaml": textwrap.dedent("""
+                    TYPESENSE_API_KEY: {{ get .Secrets "typesense_bootstrap_key" }}
+                """),
+            },
+        )
+    else:
+        typesense_secret = None
+
     # Return dataclass with all secrets
     return EdxappSecrets(
         db_creds=db_creds_secret,
@@ -426,6 +446,7 @@ def create_k8s_secrets(
         git_export_ssh_key=git_export_ssh_key_secret,
         translations_providers=translations_providers_secret,
         meilisearch=meilisearch_secret,
+        typesense=typesense_secret,
         db_creds_secret_name=db_creds_secret_name,
         db_connections_secret_name=db_connections_secret_name,
         mongo_db_creds_secret_name=mongo_db_creds_secret_name,
@@ -441,4 +462,5 @@ def create_k8s_secrets(
         if stack_info.env_prefix == "mitxonline"
         else None,
         meilisearch_secret_name=meilisearch_secret_name,
+        typesense_secret_name=typesense_secret_name,
     )
