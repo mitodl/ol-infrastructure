@@ -17,8 +17,9 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 stack_info = parse_stack()
 mailgun_config = Config("mailgun")
+ol_mailgun_config = Config("ol_mailgun")
 api_key = mailgun_config.require("apiKey")
-domains: list[dict[str, Any]] = mailgun_config.require_object("domains")
+domains: list[dict[str, Any]] = ol_mailgun_config.require_object("domains")
 
 # DMARC policy record value - uniform across all Mailgun-managed domains
 DMARC_RECORD_VALUE = (

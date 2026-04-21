@@ -2,15 +2,17 @@
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagGh/2FT3ynJ51zKmy6z5DKiAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMZcPvTgTh8V4NmZjzAgEQgDvZMFi+hrnWyzwrnmQeqTxBX17Ozpo5B2XW2L/kRiExcLukvFlKJRlgSj5FxfaS7gqa+mqEX/CnUbg6qw==
 config:
-  mailgun:domains:
+  mailgun:apiKey:
+    secure: v1:TGRuSIF5S/RFs7WV:mKFRsfrFEm1rojLaZKhSECQ5SybPTzJg6elPgdB4JOzkEQTGUIMvgNATG5kFrelsQ4c9509ApUY88yltwb/l8PFV
+  ol_mailgun:domains:
   - name: mail.sso-ci.ol.mit.edu
     managed: false
+    smtp_password:
+      secure: v1:C5SUGEkvUBayullo:yLWXV8TPquZyD2DcBhXMEZ36lLJjTSvoVHPuxOzOAqDOi0pSvxesHakvRmqo56qcizI0WoFgS7HYBMrVyE4JJD/8
     credentials:
     - login: mitlearn-support
       smtp_password:
         secure: v1:AuaERC3E6kwZidX4:FwmpKimOO8VQvtel0puC/Zz/lDrArm27fZTRLEcg3wJfKIefQzM5GgKNQhrolZAdIstUwIjCnCAzNMV4FuAV29+S
-    smtp_password:
-      secure: v1:C5SUGEkvUBayullo:yLWXV8TPquZyD2DcBhXMEZ36lLJjTSvoVHPuxOzOAqDOi0pSvxesHakvRmqo56qcizI0WoFgS7HYBMrVyE4JJD/8
   - name: mitxonline-ci-mail.mitxonline.mit.edu
     managed: false
     smtp_password:

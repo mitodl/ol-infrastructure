@@ -3,7 +3,7 @@ encryptionsalt: v1:tpn96ot40Z4=:v1:Jwj0tmffGMlWJzIu:RJQDvm+3deBu6011y3tjtI+3wLlM
 config:
   mailgun:apiKey:
     secure: v1:nWcIY984Q+9bMOWB:fuboWRtkQpIcC7y0ND4m3FOHCPLonHmkt0FMm2O1QqyW2D5tt5+WHqHZbJPTUbyfbG4NYtFqKU1VqoVm+ZyQTPux
-  mailgun:domains:
+  ol_mailgun:domains:
   - name: mail-rc.learn.mit.edu
     managed: false
     smtp_password:
