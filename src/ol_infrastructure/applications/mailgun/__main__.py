@@ -1,3 +1,6 @@
+from typing import Any
+
+import pulumi
 import pulumi_mailgun as mailgun
 from pulumi import Config
 from pulumi_aws import route53
@@ -15,7 +18,7 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 stack_info = parse_stack()
 mailgun_config = Config("mailgun")
 api_key = mailgun_config.require("apiKey")
-domains = mailgun_config.require_object("domains")
+domains: list[dict[str, Any]] = mailgun_config.require_object("domains")
 
 # DMARC policy record value - uniform across all Mailgun-managed domains
 DMARC_RECORD_VALUE = (
@@ -46,7 +49,7 @@ for domain_cfg in domains:
         name=name,
         open_tracking=domain_cfg.get("open_tracking", True),
         region=region,
-        smtp_password=domain_cfg["smtp_password"],
+        smtp_password=pulumi.Output.secret(domain_cfg["smtp_password"]),
         spam_action=domain_cfg.get("spam_action", "disabled"),
         use_automatic_sender_security=domain_cfg.get(
             "use_automatic_sender_security", True
@@ -63,7 +66,7 @@ for domain_cfg in domains:
             f"ol-mailgun-credential-{login}-{name}",
             domain=mg_domain.id,
             login=login,
-            password=cred["smtp_password"],
+            password=pulumi.Output.secret(cred["smtp_password"]),
             opts=mailgun_credential_opts(
                 name, login, api_key, managed=managed, region=region
             ),
