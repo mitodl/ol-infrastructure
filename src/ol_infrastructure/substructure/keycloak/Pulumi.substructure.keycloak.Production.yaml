@@ -113,3 +113,9 @@ config:
     secure: v1:MiHrklsdHBBmM+x/:AKedvrwKVQYvoPpZat06SQ12Bzem8a7EGwPh0411HuW2PCMaU+yfDWebdmQ4msGLJPua
   keycloak_realm:ubsu-client-secret:
     secure: v1:pFUmPxSvnsIbE8nR:+FrZrRdidnTh5SU05bqIM3WWWF8iawzfx8aUMVwItpI=
+  keycloak_realm:ol-mit-ovs-redirect-uris:
+  - "https://video.odl.mit.edu/auth/complete/keycloak/"
+  keycloak_realm:ol-mit-ovs-logout-uris:
+  - "https://video.odl.mit.edu/"
+  keycloak_realm:ol-mit-ovs-web-origins:
+  - "https://video.odl.mit.edu"

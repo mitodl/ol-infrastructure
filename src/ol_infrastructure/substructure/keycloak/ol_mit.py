@@ -10,8 +10,11 @@ Authentication is exclusively through MIT Touchstone (SAML). Local accounts are
 reserved for break-glass administrative access; there is no public registration.
 """
 
+import json
+
 import pulumi_keycloak as keycloak
-from pulumi import Config, ResourceOptions
+import pulumi_vault as vault
+from pulumi import Config, Output, ResourceOptions
 
 
 def create_ol_mit_realm(  # noqa: PLR0913
@@ -23,8 +26,8 @@ def create_ol_mit_realm(  # noqa: PLR0913
     mit_email_username: str,
     mit_email_host: str,
     mit_touchstone_cert: str,
-    session_secret: str,  # noqa: ARG001
-    fetch_realm_public_key_partial,  # noqa: ARG001
+    session_secret: str,
+    fetch_realm_public_key_partial,
 ):
     """Create the OL MIT realm for MIT-internal applications.
 
@@ -393,5 +396,63 @@ def create_ol_mit_realm(  # noqa: PLR0913
         extra_config={"syncMode": "INHERIT"},
         opts=resource_options,
     )
+
+    # ODL VIDEO SERVICE [START]
+    ol_mit_ovs_client = keycloak.openid.Client(
+        "ol-mit-ovs-client",
+        name="ol-mit-ovs-client",
+        realm_id=ol_mit_realm.id,
+        client_id="odl-video-app",
+        client_secret=keycloak_realm_config.get("ol-mit-ovs-client-secret"),
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        # Enabled to allow password-based auth for admin/testing workflows.
+        direct_access_grants_enabled=True,
+        service_accounts_enabled=False,
+        valid_redirect_uris=keycloak_realm_config.get_object(
+            "ol-mit-ovs-redirect-uris"
+        ),
+        valid_post_logout_redirect_uris=keycloak_realm_config.get_object(
+            "ol-mit-ovs-logout-uris"
+        ),
+        web_origins=keycloak_realm_config.get_object("ol-mit-ovs-web-origins"),
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+
+    # The OVS pipeline (assign_user_groups) reads the `user_groups` claim to map
+    # Keycloak groups to Django is_staff / is_superuser flags.
+    keycloak.openid.GroupMembershipProtocolMapper(
+        "ol-mit-ovs-user-groups-mapper",
+        realm_id=ol_mit_realm.id,
+        client_id=ol_mit_ovs_client.id,
+        name="user_groups",
+        claim_name="user_groups",
+        full_path=True,
+        add_to_id_token=True,
+        add_to_access_token=True,
+        add_to_userinfo=True,
+        opts=resource_options,
+    )
+
+    vault.generic.Secret(
+        "ol-mit-ovs-client-vault-oidc-credentials",
+        path="secret-operations/sso/ovs",
+        data_json=Output.all(
+            url=ol_mit_ovs_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
+            client_id=ol_mit_ovs_client.client_id,
+            client_secret=ol_mit_ovs_client.client_secret,
+            secret=session_secret,
+            realm_id=ol_mit_ovs_client.realm_id,
+            realm_name="ol-mit",
+            realm_public_key=ol_mit_ovs_client.realm_id.apply(
+                fetch_realm_public_key_partial
+            ),
+        ).apply(json.dumps),
+    )
+    # ODL VIDEO SERVICE [END]
 
     return ol_mit_realm

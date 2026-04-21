@@ -126,3 +126,9 @@ config:
   keycloak_realm:session_secret:
     secure: v1:9Y54vvxTRbuuDCro:dXlzvu2/QqxZyEA1iG/elwzgP3xAQSVChqh/c5bXsLmz3j6hDzBlgBzlp9pIbxVk/+1GhYKrIgsULgU=
   keycloak_realm:olapps_email_tmeme: ol-learn
+  keycloak_realm:ol-mit-ovs-redirect-uris:
+  - "https://video-rc.odl.mit.edu/auth/complete/keycloak/"
+  keycloak_realm:ol-mit-ovs-logout-uris:
+  - "https://video-rc.odl.mit.edu/"
+  keycloak_realm:ol-mit-ovs-web-origins:
+  - "https://video-rc.odl.mit.edu"
