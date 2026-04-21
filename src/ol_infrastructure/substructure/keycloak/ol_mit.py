@@ -398,10 +398,6 @@ def create_ol_mit_realm(  # noqa: PLR0913
     )
 
     # ODL VIDEO SERVICE [START]
-    # Note: `ol-mit-ovs-client-secret` must be set in stack config before deploying:
-    #   pulumi config set --secret keycloak_realm:ol-mit-ovs-client-secret <value>
-    # If absent, Keycloak auto-generates a secret; the Vault secret at
-    # secret-operations/sso/ovs will always capture the live value regardless.
     ol_mit_ovs_client = keycloak.openid.Client(
         "ol-mit-ovs-client",
         name="ol-mit-ovs-client",
