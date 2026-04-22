@@ -3,8 +3,32 @@ encryptionsalt: v1:1H9lnzZG79Q=:v1:/NIoxYp1G0jWpCYy:VmVozP1hULB00aVmsuavkdExnF4A
 config:
   mailgun:apiKey:
     secure: v1:fTYoaQ/6JGd1Tqv6:795fMzh+r4jM5ocXjBr89E7iJksrZ6jcgwLRE1zL32UdrDU0uCH2/6bzIeywwMB7n0dNAgcY21GeOhLsvvJbqIq2
-  mitlearn:smtp_noreply_password:
-    secure: v1:S7hfaPBQJRmWU/xA:X/Nr8eBehG92yO10kw4qzgS7a8zbTpLUHH7sc0+OC6aoVU+SfI6dA3jP7RVlD4r9
-  mitlearn:smtp_postmaster_password:
-    secure: v1:O4DhmVsi/7AzwnYZ:pmml6w71HazaD+SbsRmDzk7GrZoMHdq1kBmxnHzPFMZCOU/xwIDqaL53eNFeBLFc
-  mitlearn:url: mail.learn.mit.edu
+  ol_mailgun:domains:
+  - name: discussions-mail.odl.mit.edu
+    managed: false
+  - name: mail.learn.mit.edu
+    managed: false
+    smtp_password:
+      secure: v1:O4DhmVsi/7AzwnYZ:pmml6w71HazaD+SbsRmDzk7GrZoMHdq1kBmxnHzPFMZCOU/xwIDqaL53eNFeBLFc
+    credentials:
+    - login: no-reply
+      smtp_password:
+        secure: v1:S7hfaPBQJRmWU/xA:X/Nr8eBehG92yO10kw4qzgS7a8zbTpLUHH7sc0+OC6aoVU+SfI6dA3jP7RVlD4r9
+  - name: mail.mitxonline.mit.edu
+    managed: false
+  - name: mail.open.mit.edu
+    managed: false
+  - name: mail.sso.ol.mit.edu
+    managed: false
+  - name: micromasters.odl.mit.edu
+    managed: false
+  - name: ocw.mail.odl.mit.edu
+    managed: false
+  - name: video-mail.odl.mit.edu
+    managed: false
+  - name: video.odl.mit.edu
+    managed: false
+  - name: xpro-mail.odl.mit.edu
+    managed: false
+  - name: xpro.mit.edu
+    managed: false
