@@ -255,6 +255,16 @@ xpro_db_security_group = ec2.SecurityGroup(
     f"xpro-db-access-{stack_info.env_suffix}",
     description=f"Access control for the xpro DB in {stack_info.name}",
     ingress=db_ingress_rules,
+    egress=[
+        ec2.SecurityGroupEgressArgs(
+            from_port=0,
+            to_port=0,
+            protocol="-1",
+            cidr_blocks=[apps_vpc["cidr"]],
+            ipv6_cidr_blocks=[apps_vpc["cidr_v6"]],
+            description="Allow all outbound traffic within the applications VPC",
+        )
+    ],
     tags=aws_config.merged_tags(
         {"name": f"xpro-db-access-applications-{stack_info.env_suffix}"}
     ),
