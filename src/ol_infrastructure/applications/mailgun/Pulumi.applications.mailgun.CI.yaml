@@ -6,22 +6,22 @@ config:
     secure: v1:TGRuSIF5S/RFs7WV:mKFRsfrFEm1rojLaZKhSECQ5SybPTzJg6elPgdB4JOzkEQTGUIMvgNATG5kFrelsQ4c9509ApUY88yltwb/l8PFV
   ol_mailgun:domains:
   - name: mail.sso-ci.ol.mit.edu
-    managed: false
+    managed: true
     smtp_password:
       secure: v1:C5SUGEkvUBayullo:yLWXV8TPquZyD2DcBhXMEZ36lLJjTSvoVHPuxOzOAqDOi0pSvxesHakvRmqo56qcizI0WoFgS7HYBMrVyE4JJD/8
     credentials:
     - login: mitlearn-support
       smtp_password:
-        secure: v1:AuaERC3E6kwZidX4:FwmpKimOO8VQvtel0puC/Zz/lDrArm27fZTRLEcg3wJfKIefQzM5GgKNQhrolZAdIstUwIjCnCAzNMV4FuAV29+S
+        secure: v1:94GXINK8Wm5D7vGz:OHFjrKEhXpcTvwZlIdUQ8/zM5DEzxFeJrng2AOepJXJUSGqXh3Gkgo6I/6Kdw5I=
   - name: mitxonline-ci-mail.mitxonline.mit.edu
-    managed: false
+    managed: true
     smtp_password:
       secure: v1:MnsS0pJsfbUindyB:HuhvZEu9EjVVisylRqa/tXu7ijMQjApbSHBCHMBzR2YG+KBmk17zaPiq1XlIEM7DzYEky0hosIzorL1sZ+pHoI8t
   - name: ocw-ci.mail.odl.mit.edu
-    managed: false
+    managed: true
     smtp_password:
       secure: v1:MSBKMQQuMjvwv6hY:YFTIkmAPzl5C8JXkF1R4HVM4jWkGHrAjgS/oBTxHQW5r5ksEUPgJueHYdoD9pak6vyFpi3bVQvGmREAKnm6ILbMO
   - name: xpro-ci-mail.odl.mit.edu
-    managed: false
+    managed: true
     smtp_password:
       secure: v1:7w4zTE6+CEv/9Xs7:KPx0v7xCZ7w/wkW0WQ6O42s7+73OhmePDVAmqJxDYWDBNp50FrPJQkASKiyT5oTkwhXvo03HMnKqgz+D5gOEl2gH

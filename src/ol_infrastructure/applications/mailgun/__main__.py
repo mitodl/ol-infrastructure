@@ -44,12 +44,12 @@ for domain_cfg in domains:
         click_tracking=domain_cfg.get("click_tracking", True),
         dkim_key_size=domain_cfg.get("dkim_key_size", 2048),
         dkim_selector=domain_cfg.get("dkim_selector", "mx"),
-        force_dkim_authority=domain_cfg.get("force_dkim_authority", False),
+        force_dkim_authority=domain_cfg.get("force_dkim_authority", True),
         name=name,
         open_tracking=domain_cfg.get("open_tracking", True),
         region=region,
         smtp_password=pulumi.Output.secret(domain_cfg["smtp_password"]),
-        spam_action=domain_cfg.get("spam_action", "disabled"),
+        spam_action=domain_cfg.get("spam_action", "block"),
         use_automatic_sender_security=domain_cfg.get(
             "use_automatic_sender_security", True
         ),
@@ -96,6 +96,7 @@ for domain_cfg in domains:
             )
         ],
         zone_id=zone_id,
+        allow_overwrite=True,
         opts=route53_record_opts(
             zone_id, f"mx._domainkey.{name}", "TXT", managed=managed
         ),

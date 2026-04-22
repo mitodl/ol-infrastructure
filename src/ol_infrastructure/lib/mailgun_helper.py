@@ -8,6 +8,23 @@ HTTP_NOT_FOUND = 404
 _REQUEST_TIMEOUT = 10.0  # seconds
 
 
+# Properties the Mailgun API never returns when reading back a domain.
+# They are ForceNew in the provider schema, so leaving them out of ignore_changes
+# would cause Pulumi to plan a replacement whenever state has nil for them.
+_DOMAIN_IGNORE_CHANGES = [
+    "clickTracking",
+    "dkimKeySize",
+    "dkimSelector",
+    "forceDkimAuthority",
+    "openTracking",
+    "smtpPassword",
+    "spamAction",
+    "useAutomaticSenderSecurity",
+    "webScheme",
+    "wildcard",
+]
+
+
 def _api_base(region: str) -> str:
     return MAILGUN_API_BASE_EU if region == "eu" else MAILGUN_API_BASE_US
 
@@ -39,7 +56,7 @@ def mailgun_domain_opts(
     :rtype: pulumi.ResourceOptions
     """
     if managed:
-        return pulumi.ResourceOptions()
+        return pulumi.ResourceOptions(ignore_changes=_DOMAIN_IGNORE_CHANGES)
 
     try:
         resp = httpx.get(
@@ -55,9 +72,12 @@ def mailgun_domain_opts(
         raise RuntimeError(msg) from exc
 
     if resp.status_code == HTTP_OK:
-        return pulumi.ResourceOptions(import_=f"{region}:{domain_name}")
+        return pulumi.ResourceOptions(
+            import_=f"{region}:{domain_name}",
+            ignore_changes=_DOMAIN_IGNORE_CHANGES,
+        )
     if resp.status_code == HTTP_NOT_FOUND:
-        return pulumi.ResourceOptions()
+        return pulumi.ResourceOptions(ignore_changes=_DOMAIN_IGNORE_CHANGES)
     msg = (
         f"Unexpected Mailgun API response for domain {domain_name!r}: "
         f"HTTP {resp.status_code}. Check that the API key is valid and has "
