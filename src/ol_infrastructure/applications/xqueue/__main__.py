@@ -249,7 +249,7 @@ ol_app_k8s_config = OLApplicationK8sConfig(
     init_collectstatic=False,
     application_port=XQUEUE_SERVICE_PORT,  # xqueue listens directly on 8040
     resource_requests={
-        "cpu": "10m",
+        "cpu": "100m",
         "memory": "192Mi",
     },
     resource_limits={
