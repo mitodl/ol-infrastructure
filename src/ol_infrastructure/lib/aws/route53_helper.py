@@ -35,10 +35,15 @@ def zone_id_map() -> dict[str, str]:
 
 def lookup_zone_id_from_domain(domain: str) -> str | None:
     zones_by_domain = zone_id_map()
+    best_zone: str | None = None
     for zone in zones_by_domain:
-        if domain.endswith(zone):
-            return zones_by_domain[zone].split("/")[-1]
-    return None
+        if (domain == zone or domain.endswith("." + zone)) and (
+            best_zone is None or len(zone) > len(best_zone)
+        ):
+            best_zone = zone
+    if best_zone is None:
+        return None
+    return zones_by_domain[best_zone].split("/")[-1]
 
 
 def zone_opts(domain: str) -> pulumi.ResourceOptions:

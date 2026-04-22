@@ -4,6 +4,8 @@ import pulumi
 MAILGUN_API_BASE_US = "https://api.mailgun.net"
 MAILGUN_API_BASE_EU = "https://api.eu.mailgun.net"
 HTTP_OK = 200
+HTTP_NOT_FOUND = 404
+_REQUEST_TIMEOUT = 10.0  # seconds
 
 
 def _api_base(region: str) -> str:
@@ -39,13 +41,29 @@ def mailgun_domain_opts(
     if managed:
         return pulumi.ResourceOptions()
 
-    resp = httpx.get(
-        f"{_api_base(region)}/v4/domains/{domain_name}",
-        auth=("api", api_key),
-    )
+    try:
+        resp = httpx.get(
+            f"{_api_base(region)}/v4/domains/{domain_name}",
+            auth=("api", api_key),
+            timeout=_REQUEST_TIMEOUT,
+        )
+    except httpx.TimeoutException as exc:
+        msg = f"Timed out querying Mailgun API for domain {domain_name!r}"
+        raise RuntimeError(msg) from exc
+    except httpx.RequestError as exc:
+        msg = f"Error contacting Mailgun API for domain {domain_name!r}: {exc}"
+        raise RuntimeError(msg) from exc
+
     if resp.status_code == HTTP_OK:
         return pulumi.ResourceOptions(import_=f"{region}:{domain_name}")
-    return pulumi.ResourceOptions()
+    if resp.status_code == HTTP_NOT_FOUND:
+        return pulumi.ResourceOptions()
+    msg = (
+        f"Unexpected Mailgun API response for domain {domain_name!r}: "
+        f"HTTP {resp.status_code}. Check that the API key is valid and has "
+        f"sufficient permissions."
+    )
+    raise RuntimeError(msg)
 
 
 def mailgun_credential_opts(
@@ -78,10 +96,24 @@ def mailgun_credential_opts(
     if managed:
         return pulumi.ResourceOptions(ignore_changes=["password"])
 
-    resp = httpx.get(
-        f"{_api_base(region)}/v3/{domain_name}/credentials",
-        auth=("api", api_key),
-    )
+    try:
+        resp = httpx.get(
+            f"{_api_base(region)}/v3/{domain_name}/credentials",
+            auth=("api", api_key),
+            timeout=_REQUEST_TIMEOUT,
+        )
+    except httpx.TimeoutException as exc:
+        msg = f"Timed out querying Mailgun credentials API for domain {domain_name!r}"
+        raise RuntimeError(msg) from exc
+    except httpx.RequestError as exc:
+        msg = (
+            f"Error contacting Mailgun credentials API for domain "
+            f"{domain_name!r}: {exc}"
+        )
+        raise RuntimeError(msg) from exc
+
+    if resp.status_code == HTTP_NOT_FOUND:
+        return pulumi.ResourceOptions(ignore_changes=["password"])
     if resp.status_code == HTTP_OK:
         logins = {item["login"] for item in resp.json().get("items", [])}
         if f"{login}@{domain_name}" in logins:
@@ -89,4 +121,10 @@ def mailgun_credential_opts(
                 import_=f"{region}:{login}@{domain_name}",
                 ignore_changes=["password"],
             )
-    return pulumi.ResourceOptions(ignore_changes=["password"])
+        return pulumi.ResourceOptions(ignore_changes=["password"])
+    msg = (
+        f"Unexpected Mailgun API response for credentials on domain "
+        f"{domain_name!r} (login {login!r}): HTTP {resp.status_code}. "
+        f"Check that the API key is valid and has sufficient permissions."
+    )
+    raise RuntimeError(msg)

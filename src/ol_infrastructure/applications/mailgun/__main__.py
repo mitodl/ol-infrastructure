@@ -13,9 +13,7 @@ from ol_infrastructure.lib.mailgun_helper import (
     mailgun_credential_opts,
     mailgun_domain_opts,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
 
-stack_info = parse_stack()
 mailgun_config = Config("mailgun")
 ol_mailgun_config = Config("ol_mailgun")
 api_key = mailgun_config.require("apiKey")
