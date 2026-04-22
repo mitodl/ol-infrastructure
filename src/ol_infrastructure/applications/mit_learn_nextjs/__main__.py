@@ -129,8 +129,8 @@ active_color = colors.apply(lambda c: c["active_color"])
 last_active_resolved = colors.apply(lambda c: c["last_active"])
 
 stay_updated_hubspot_form_ids = {
-    "ci": "4f423dc7-5b08-430b-a9fb-920b7f9597ed",
-    "qa": "4f423dc7-5b08-430b-a9fb-920b7f9597ed",
+    "ci": "f201f3af-c2c0-4b7d-b297-ddbb75912cc1",
+    "qa": "f201f3af-c2c0-4b7d-b297-ddbb75912cc1",
     "production": "a5d18493-dcdb-4482-ad10-16ab66a35526",
 }
 
