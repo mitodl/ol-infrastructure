@@ -124,6 +124,8 @@ vector_log_proxy_stack = StackReference(
 )
 monitoring_stack = StackReference("infrastructure.monitoring")
 dns_stack = StackReference("infrastructure.aws.dns")
+ocw_site_stack = StackReference(f"applications.ocw_site.{stack_info.name}")
+ocw_site_buckets = ocw_site_stack.require_output("ocw_site_buckets")
 qdrant_cloud_stack = StackReference(
     f"infrastructure.qdrant_cloud.mitlearn.{stack_info.name}"
 )
@@ -853,8 +855,8 @@ for k, v in mimetypes.types_map.items():
 fastly_shielding_enabled = mitlearn_config.get_bool("enable_fastly_shielding") or False
 bucket_backend_name = "MIT Learn S3 Media Storage"
 ocw_courses_bucket_backend_name = "OCW S3 Courses"
-ocw_courses_bucket_fqdn = (
-    f"ocw-content-live-{stack_info.env_suffix}.s3.us-east-1.amazonaws.com"
+ocw_courses_bucket_fqdn = ocw_site_buckets["buckets"]["live"].apply(
+    lambda name: f"{name}.s3.us-east-1.amazonaws.com"
 )
 mitlearn_fastly_service = fastly.ServiceVcl(
     f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}",

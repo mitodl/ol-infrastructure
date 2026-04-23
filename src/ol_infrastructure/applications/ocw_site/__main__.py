@@ -1053,14 +1053,14 @@ for purpose in ("draft", "live", "test"):
 export(
     "ocw_site_buckets",
     {
-        "buckets": [
-            draft_bucket_name,
-            draft_backup_bucket_name,
-            draft_offline_bucket_name,
-            live_bucket_name,
-            live_backup_bucket_name,
-            live_offline_bucket_name,
-        ],
+        "buckets": {
+            "draft": draft_bucket_name,
+            "draft_backup": draft_backup_bucket_name,
+            "draft_offline": draft_offline_bucket_name,
+            "live": live_bucket_name,
+            "live_backup": live_backup_bucket_name,
+            "live_offline": live_offline_bucket_name,
+        },
         "policy": s3_bucket_iam_policy.name,
         "fastly_draft_service_id": fastly_distributions["draft"].id,
         "fastly_live_service_id": fastly_distributions["live"].id,
