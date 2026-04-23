@@ -53,6 +53,7 @@ config:
     COURSE_ARCHIVE_BUCKET_NAME: "ol-data-lake-landing-zone-qa"
     CELERY_WORKER_CONCURRENCY: 1
     CREATE_OCW_LEARNING_MATERIALS: "true"
+    COOKIE_TOMBSTONES: '[{"name":"csrftoken","domain":"rc.learn.mit.edu","path":"/"}]'
     CSRF_COOKIE_NAME: "learn_rc_csrftoken"
     DEBUG: "false"
     EDX_LEARNING_COURSE_BUCKET_NAME: "edxorg-production-edxapp-courses"
