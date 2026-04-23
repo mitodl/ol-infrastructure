@@ -16,6 +16,12 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions
 
+from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
+    NameIdFormat,
+    SamlIdpConfig,
+    onboard_saml_idp,
+)
+
 
 def create_ol_mit_realm(  # noqa: PLR0913
     keycloak_provider: keycloak.Provider,
@@ -25,7 +31,6 @@ def create_ol_mit_realm(  # noqa: PLR0913
     mit_email_password: str,
     mit_email_username: str,
     mit_email_host: str,
-    mit_touchstone_cert: str,
     session_secret: str,
     fetch_realm_public_key_partial,
 ):
@@ -314,87 +319,35 @@ def create_ol_mit_realm(  # noqa: PLR0913
     )
 
     # MIT Touchstone SAML identity provider
-    # The Touchstone SP entity ID is derived from this realm's well-known URL.
-    # principal_attribute carries the MIT eduPersonPrincipalName OID (Kerberos
-    # principal, e.g. jsmith@MIT.EDU) which provides a stable, unique username
-    # that will align with LDAP when federation is introduced later.
-
-    touchstone_sso_url = (
-        keycloak_realm_config.get("ol-mit-touchstone-single-sign-on-service-url")
-        or "https://idp.mit.edu/idp/profile/SAML2/POST/SSO"
-    )
-    touchstone_cert = (
-        keycloak_realm_config.get("ol-mit-touchstone-sig-cert") or mit_touchstone_cert
-    )
-
-    ol_mit_touchstone_saml_idp = keycloak.saml.IdentityProvider(
-        "ol-mit-touchstone-idp",
-        realm=ol_mit_realm.id,
-        alias="touchstone-idp",
-        display_name="MIT Touchstone",
-        entity_id=f"{keycloak_url}/realms/ol-mit",
-        name_id_policy_format="Unspecified",
-        force_authn=False,
-        post_binding_response=True,
-        post_binding_authn_request=True,
-        # Use the MIT eduPersonPrincipalName as the stable identifier so that the
-        # resulting Keycloak username will match the eventual LDAP uid attribute.
-        principal_type="ATTRIBUTE",
-        principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
-        single_sign_on_service_url=touchstone_sso_url,
-        trust_email=True,
-        validate_signature=True,
-        signing_certificate=touchstone_cert,
-        want_assertions_encrypted=True,
-        want_assertions_signed=True,
-        first_broker_login_flow_alias=ol_mit_touchstone_first_login_flow.alias,
-        opts=resource_options,
-    )
-
-    # Attribute mappers — import standard MIT Touchstone SAML attributes into
-    # the corresponding Keycloak user profile fields.
-    keycloak.AttributeImporterIdentityProviderMapper(
-        "ol-mit-touchstone-saml-email-attribute",
-        name="ol-mit-touchstone-saml-email-attribute",
-        realm=ol_mit_realm.id,
-        attribute_name="mail",
-        identity_provider_alias=ol_mit_touchstone_saml_idp.alias,
-        user_attribute="email",
-        extra_config={"syncMode": "INHERIT"},
-        opts=resource_options,
-    )
-
-    keycloak.AttributeImporterIdentityProviderMapper(
-        "ol-mit-touchstone-saml-last-name-attribute",
-        name="ol-mit-touchstone-saml-last-name-attribute",
-        realm=ol_mit_realm.id,
-        attribute_name="sn",
-        identity_provider_alias=ol_mit_touchstone_saml_idp.alias,
-        user_attribute="lastName",
-        extra_config={"syncMode": "INHERIT"},
-        opts=resource_options,
-    )
-
-    keycloak.AttributeImporterIdentityProviderMapper(
-        "ol-mit-touchstone-saml-first-name-attribute",
-        name="ol-mit-touchstone-saml-first-name-attribute",
-        realm=ol_mit_realm.id,
-        attribute_name="givenName",
-        identity_provider_alias=ol_mit_touchstone_saml_idp.alias,
-        user_attribute="firstName",
-        extra_config={"syncMode": "INHERIT"},
-        opts=resource_options,
-    )
-
-    keycloak.AttributeImporterIdentityProviderMapper(
-        "ol-mit-touchstone-saml-full-name-attribute",
-        name="ol-mit-touchstone-saml-full-name-attribute",
-        realm=ol_mit_realm.id,
-        attribute_name="displayName",
-        identity_provider_alias=ol_mit_touchstone_saml_idp.alias,
-        user_attribute="fullName",
-        extra_config={"syncMode": "INHERIT"},
-        opts=resource_options,
+    # Uses the Okta metadata endpoint so that the cert and SSO URL are resolved
+    # at deploy time and Keycloak can auto-refresh them at runtime.
+    onboard_saml_idp(
+        SamlIdpConfig(
+            idp_alias="touchstone-idp",
+            idp_display_name="MIT Touchstone",
+            org_saml_metadata_url=(
+                keycloak_realm_config.get("ol-mit-touchstone-metadata-url")
+                or "https://okta.mit.edu/app/exk128ohli7aTT5xA698/sso/saml/metadata"
+            ),
+            keycloak_url=keycloak_url,
+            realm_id=ol_mit_realm.id,
+            realm_name="ol-mit",
+            first_login_flow=ol_mit_touchstone_first_login_flow,
+            resource_options=resource_options,
+            # Use the MIT eduPersonPrincipalName as the stable identifier so that
+            # the resulting Keycloak username will match the eventual LDAP uid.
+            principal_type="ATTRIBUTE",
+            principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
+            attribute_name_map={
+                "email": "mail",
+                "lastName": "sn",
+                "firstName": "givenName",
+                "fullName": "displayName",
+            },
+            want_assertions_encrypted=True,
+            want_assertions_signed=True,
+            name_id_format=NameIdFormat.unspecified,
+        )
     )
 
     # ODL VIDEO SERVICE [START]

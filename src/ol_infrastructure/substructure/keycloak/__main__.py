@@ -112,7 +112,6 @@ create_ol_mit_realm(
     mit_email_password,
     mit_email_username,
     mit_email_host,
-    mit_touchstone_cert,
     session_secret,
     fetch_realm_public_key_partial,
 )
