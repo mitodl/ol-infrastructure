@@ -60,6 +60,10 @@ config:
     ENABLE_INFINITE_CORRIDOR: "true"
     GA_G_TRACKING_ID: "" # Missing?
     GA_TRACKING_ID: "" # Missing?
+    GTM_TRACKING_ID: "GTM-NMJ2CT6T"
+    GTM_AUTH: "TVdLeYWP6BLCRsILCebafA"
+    GTM_PREVIEW: "env-1"
+    GTM_COOKIES_WIN: "x"
     INDEXING_API_USERNAME: "od_mm_prod_api"
     KEYCLOAK_BASE_URL: "https://sso.ol.mit.edu"
     KEYCLOAK_REALM_NAME: "olapps"
