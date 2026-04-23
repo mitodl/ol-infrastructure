@@ -54,6 +54,7 @@ config:
     AWS_S3_PREFIX: "media"
     CANVAS_COURSE_BUCKET_NAME: "ol-data-lake-landing-zone-production"
     CELERY_WORKER_CONCURRENCY: 1
+    COOKIE_TOMBSTONES: '[{"name":"csrftoken","domain":"learn.mit.edu","path":"/"}]'
     CSRF_COOKIE_NAME: "learn_csrftoken"
     DEBUG: "false"
     EDX_LEARNING_COURSE_BUCKET_NAME: "edxorg-production-edxapp-courses"
