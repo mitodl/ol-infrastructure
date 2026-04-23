@@ -1400,6 +1400,86 @@ dagster_run_worker_pdb = kubernetes.policy.v1.PodDisruptionBudget(
     opts=ResourceOptions(depends_on=[dagster_helm_release, dagster_user_code_release]),
 )
 
+# VPA for Dagster run worker pods.
+#
+# Run workers are launched as unique Kubernetes Jobs per pipeline run, so a fixed
+# targetRef pointing to a single controller is not possible. VPA's selector field
+# (VPA 1.x+) matches pods by label across all those Jobs. The VPA admission
+# controller webhook injects VPA-recommended resources at pod creation, so new
+# runs start with appropriately-sized memory based on historical usage. The updater
+# then resizes running pods in-place as memory demand grows.
+#
+# updateMode "InPlaceOrRecreate" attempts to resize container resources in-place
+# (K8s 1.33+, VPA 1.6+) to avoid evicting long-running job pods — eviction with
+# restartPolicy: Never would fail the Job and force Dagster to restart the run from
+# the beginning. In-place resize is always possible for memory increases, so
+# eviction should be rare.
+#
+# Memory only is controlled here. The static per-code-location CPU configuration
+# already handles CPU sizing adequately, and mixing VPA CPU control with the
+# static CPU limits in each code location's run_k8s_config would create conflicts.
+#
+# minAllowed keeps VPA from reducing memory below the lowest configured request.
+# maxAllowed caps the request recommendation; limits scale proportionally from the
+# original limit/request ratio up to this ceiling (e.g., a 4:1 ratio pod with a
+# 16 Gi request cap has a ~64 Gi limit ceiling, which is well above any OOM spike
+# observed in practice). In practice VPA will only recommend these higher values
+# when runs actually approach their current limits.
+#
+# The VPA CRDs are installed by the data EKS cluster stack
+# (infrastructure.aws.eks.data.*) which runs before the application stack.
+dagster_run_worker_vpa = kubernetes.apiextensions.CustomResource(
+    f"dagster-run-worker-vpa-{stack_info.env_suffix}",
+    api_version="autoscaling.k8s.io/v1",
+    kind="VerticalPodAutoscaler",
+    metadata={
+        "name": "dagster-run-worker",
+        "namespace": dagster_namespace,
+        "labels": k8s_global_labels.model_dump(),
+    },
+    spec={
+        # Label selector instead of targetRef: matches all run_worker pods
+        # regardless of which unique per-run Job created them.
+        "selector": {
+            "matchLabels": {
+                "app.kubernetes.io/component": "run_worker",
+                "app.kubernetes.io/name": "dagster",
+            }
+        },
+        "updatePolicy": {
+            "updateMode": "InPlaceOrRecreate",
+        },
+        "resourcePolicy": {
+            "containerPolicies": [
+                {
+                    "containerName": "dagster",
+                    # Scale both requests and limits proportionally so that
+                    # VPA-recommended increases actually raise the OOM kill
+                    # threshold (limit), not just the scheduling guarantee
+                    # (request).
+                    "controlledResources": ["memory"],
+                    "controlledValues": "RequestsAndLimits",
+                    "minAllowed": {
+                        # Floor matches the lowest memory request configured
+                        # across all code locations.
+                        "memory": "1Gi",
+                    },
+                    "maxAllowed": {
+                        # Cap requests at 16 Gi; proportionally scaled limits
+                        # (e.g., 4:1 ratio → 64 Gi ceiling) stay comfortably
+                        # above the largest static limit (32 Gi for
+                        # legacy_openedx) to give VPA room to help.
+                        "memory": "16Gi",
+                    },
+                }
+            ]
+        },
+    },
+    opts=ResourceOptions(
+        depends_on=[dagster_helm_release, dagster_user_code_release],
+    ),
+)
+
 # APISix route configuration
 dagster_tls_secret_name = "dagster-tls-pair"  # pragma: allowlist secret # noqa: S105
 cert_manager_certificate = OLCertManagerCert(
