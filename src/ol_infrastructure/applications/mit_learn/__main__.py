@@ -995,10 +995,12 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             declare local var.is_ocw_courses_request BOOL;
             set var.is_ocw_courses_request = false;
             if (req.url.path ~ "^/courses/o/") {
-              set var.is_ocw_courses_request = true;
               set req.url = regsub(
                 req.url, "^/courses/o/", "/ocw-course-v3/courses/"
               );
+            }
+            if (req.url.path ~ "^/ocw-course-v3/courses/") {
+              set var.is_ocw_courses_request = true;
               set req.url = querystring.remove(req.url);
               if (req.url !~ "\.[^/]+$") {
                 set req.url = regsub(req.url, "/?$", "/index.html");
