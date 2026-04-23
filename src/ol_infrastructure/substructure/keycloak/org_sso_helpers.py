@@ -84,6 +84,7 @@ class SamlIdpConfig(BaseModel):
     authn_context_comparison_type: str | None = (
         None  # Optional, comparison type for authn context
     )
+    realm_name: str = "olapps"  # Used to construct the SP entity_id
 
     @model_validator(mode="after")
     def ensure_principal_types(self):
@@ -187,7 +188,7 @@ def onboard_saml_org(  # noqa: C901, PLR0912
     idp_kwargs = {
         "alias": keycloak_alias,
         "display_name": saml_config.idp_display_name,
-        "entity_id": f"{saml_config.keycloak_url}/realms/olapps",
+        "entity_id": f"{saml_config.keycloak_url}/realms/{saml_config.realm_name}",
         "first_broker_login_flow_alias": saml_config.first_login_flow.alias,
         "hide_on_login_page": True,
         "name_id_policy_format": saml_config.name_id_format,
@@ -223,6 +224,109 @@ def onboard_saml_org(  # noqa: C901, PLR0912
 
     org_idp = keycloak.saml.IdentityProvider(
         f"ol-apps-{resource_alias}-saml-idp",
+        **idp_kwargs,
+    )
+    for attr, args in mappers.items():
+        keycloak.AttributeImporterIdentityProviderMapper(
+            f"map-{resource_alias}-saml-{attr}-attribute",
+            realm=saml_config.realm_id,
+            identity_provider_alias=org_idp.alias,
+            **args,
+            opts=saml_config.resource_options,
+        )
+    if not mappers:
+        for attr, friendly_names in SAML_FRIENDLY_NAMES.items():
+            for friendly_name in friendly_names:
+                keycloak.AttributeImporterIdentityProviderMapper(
+                    f"map-{resource_alias}-saml-{friendly_name}-attribute",
+                    realm=saml_config.realm_id,
+                    attribute_friendly_name=friendly_name,
+                    identity_provider_alias=org_idp.alias,
+                    user_attribute=attr,
+                    extra_config={
+                        "syncMode": "INHERIT",
+                        "attribute.name.format": saml_config.mapper_attribute_format,
+                    },
+                    opts=saml_config.resource_options,
+                )
+
+
+def onboard_saml_idp(saml_config: SamlIdpConfig) -> None:  # noqa: C901
+    """Create a SAML IdP without org linkage.
+
+    Use this for realm-level IdPs that are not tied to a Keycloak organization,
+    e.g. a primary IdP in a realm that does not have organizations enabled.
+    """
+    resource_alias = saml_config.idp_alias
+    keycloak_alias = saml_config.idp_alias.lower()
+
+    metadata_source = (
+        saml_config.org_saml_metadata_xml or saml_config.org_saml_metadata_url
+    )
+    if metadata_source is None:
+        pulumi.log.error(f"No metadata source configured for {saml_config.idp_alias}")
+        return
+    saml_metadata = extract_saml_metadata(metadata_source)
+    if not saml_metadata:
+        pulumi.log.warn(
+            f"Skipping SAML IdP creation for {saml_config.idp_alias} due to "
+            f"inaccessible metadata source"
+        )
+        return
+    saml_args = generate_pulumi_args_dict(saml_metadata)
+
+    if saml_config.single_sign_on_service_url is not None:
+        saml_args["single_sign_on_service_url"] = saml_config.single_sign_on_service_url
+    if saml_config.single_logout_service_url is not None:
+        saml_args["single_logout_service_url"] = saml_config.single_logout_service_url
+    if saml_config.signing_certificate is not None:
+        saml_args["signing_certificate"] = saml_config.signing_certificate
+
+    mappers = get_saml_attribute_mappers(
+        metadata_source,
+        keycloak_alias,
+        saml_config.attribute_map,
+        saml_config.attribute_name_map,
+        saml_config.mapper_extra_config,
+    )
+
+    extra_config = {}
+    if saml_config.org_saml_metadata_url:
+        extra_config = {
+            "metadataDescriptorUrl": saml_config.org_saml_metadata_url,
+            "useMetadataDescriptorUrl": True,
+        }
+
+    idp_kwargs = {
+        "alias": keycloak_alias,
+        "display_name": saml_config.idp_display_name,
+        "entity_id": f"{saml_config.keycloak_url}/realms/{saml_config.realm_name}",
+        "first_broker_login_flow_alias": saml_config.first_login_flow.alias,
+        "name_id_policy_format": saml_config.name_id_format,
+        "post_binding_authn_request": saml_config.post_binding_authn_request,
+        "post_binding_response": True,
+        "principal_type": saml_config.principal_type,
+        "principal_attribute": saml_config.principal_attribute,
+        "realm": saml_config.realm_id,
+        "login_hint": saml_config.login_hint,
+        "sync_mode": "FORCE",
+        "trust_email": True,
+        "validate_signature": True,
+        "want_assertions_encrypted": saml_config.want_assertions_encrypted,
+        "opts": saml_config.resource_options,
+        "extra_config": extra_config,
+        **saml_args,
+    }
+
+    if saml_config.want_assertions_signed is not None:
+        idp_kwargs["want_assertions_signed"] = saml_config.want_assertions_signed
+    if saml_config.authn_context_comparison_type is not None:
+        idp_kwargs["authn_context_comparison_type"] = (
+            saml_config.authn_context_comparison_type
+        )
+
+    org_idp = keycloak.saml.IdentityProvider(
+        f"{resource_alias}-saml-idp",
         **idp_kwargs,
     )
     for attr, args in mappers.items():
