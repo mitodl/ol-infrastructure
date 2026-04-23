@@ -23,6 +23,7 @@ config:
     CELERY_TASK_ALWAYS_EAGER: "false"
     CANVAS_SYLLABUS_DEMO_READABLE_IDS: ["14566-kaleba:20211202", "34642-15.095_FA25"]
     CANVAS_TUTOR_DEMO_RUN_READABLE_IDS: ["14566-kaleba:20211202+canvas", "34642-15.095_FA25+canvas"]
+    COOKIE_TOMBSTONES: '[{"name":"csrftoken","domain":"rc.learn.mit.edu","path":"/"}]'
     CSRF_COOKIE_NAME: learn_ai_qa_csrftoken
     CSRF_COOKIE_DOMAIN: "rc.learn.mit.edu"
     CSRF_ALLOWED_ORIGINS: '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qa.ol.mit.edu",
