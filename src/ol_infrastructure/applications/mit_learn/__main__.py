@@ -1000,7 +1000,9 @@ mitlearn_fastly_service = fastly.ServiceVcl(
                 req.url, "^/courses/o/", "/ocw-course-v3/courses/"
               );
               set req.url = querystring.remove(req.url);
-              set req.url = regsub(req.url, "/$", "/index.html");
+              if (req.url !~ "\.[^/]+$") {
+                set req.url = regsub(req.url, "/?$", "/index.html");
+              }
               unset req.http.Cookie;
             }"""
             ),
