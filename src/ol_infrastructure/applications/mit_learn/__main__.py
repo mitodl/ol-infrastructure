@@ -124,6 +124,8 @@ vector_log_proxy_stack = StackReference(
 )
 monitoring_stack = StackReference("infrastructure.monitoring")
 dns_stack = StackReference("infrastructure.aws.dns")
+ocw_site_stack = StackReference(f"applications.ocw_site.{stack_info.name}")
+ocw_site_buckets = ocw_site_stack.require_output("ocw_site_buckets")
 qdrant_cloud_stack = StackReference(
     f"infrastructure.qdrant_cloud.mitlearn.{stack_info.name}"
 )
@@ -853,6 +855,10 @@ for k, v in mimetypes.types_map.items():
         gzip_settings["content_types"].add(v)
 fastly_shielding_enabled = mitlearn_config.get_bool("enable_fastly_shielding") or False
 bucket_backend_name = "MIT Learn S3 Media Storage"
+ocw_courses_bucket_backend_name = "OCW S3 Courses"
+ocw_courses_bucket_fqdn = ocw_site_buckets["buckets"]["live"].apply(
+    lambda name: f"{name}.s3.us-east-1.amazonaws.com"
+)
 mitlearn_fastly_service = fastly.ServiceVcl(
     f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}",
     name=f"MIT Learn {stack_info.env_suffix}",
@@ -881,6 +887,18 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             ssl_sni_hostname=f"{mitlearn_app_storage_bucket_name}.s3.us-east-1.amazonaws.com",
             use_ssl=True,
         ),
+        fastly.ServiceVclBackendArgs(
+            address=ocw_courses_bucket_fqdn,
+            name=ocw_courses_bucket_backend_name,
+            first_byte_timeout=30000,
+            override_host=ocw_courses_bucket_fqdn,
+            port=443,
+            request_condition="OCW course requests",
+            shield="iad-va-us" if fastly_shielding_enabled else None,
+            ssl_cert_hostname=ocw_courses_bucket_fqdn,
+            ssl_sni_hostname=ocw_courses_bucket_fqdn,
+            use_ssl=True,
+        ),
     ],
     gzips=[
         fastly.ServiceVclGzipArgs(
@@ -898,7 +916,12 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             name="Media asset requests",
             statement="var.is_media_request",
             type="REQUEST",
-        )
+        ),
+        fastly.ServiceVclConditionArgs(
+            name="OCW course requests",
+            statement="var.is_ocw_courses_request",
+            type="REQUEST",
+        ),
     ],
     dictionaries=[
         fastly.ServiceVclDictionaryArgs(name="path_redirects"),  # exact path redirects
@@ -966,6 +989,25 @@ mitlearn_fastly_service = fastly.ServiceVcl(
         ),
         fastly.ServiceVclSnippetArgs(
             content=textwrap.dedent(
+                r"""
+            declare local var.is_ocw_courses_request BOOL;
+            set var.is_ocw_courses_request = false;
+            if (req.url.path ~ "^/courses/o/") {
+              set var.is_ocw_courses_request = true;
+              set req.url = regsub(
+                req.url, "^/courses/o/", "/ocw-course-v3/courses/"
+              );
+              set req.url = querystring.remove(req.url);
+              set req.url = regsub(req.url, "/$", "/index.html");
+              unset req.http.Cookie;
+            }"""
+            ),
+            name="Route OCW courses to S3",
+            priority=200,
+            type="recv",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            content=textwrap.dedent(
                 f"""\
             if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
               unset bereq.http.Authorization;
@@ -977,11 +1019,31 @@ mitlearn_fastly_service = fastly.ServiceVcl(
         fastly.ServiceVclSnippetArgs(
             content=textwrap.dedent(
                 f"""\
+            if (req.backend == F_{ocw_courses_bucket_backend_name.replace(" ", "_")}) {{
+              unset bereq.http.Authorization;
+            }}"""
+            ),
+            name="Strip auth headers for OCW S3 miss requests",
+            type="miss",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            content=textwrap.dedent(
+                f"""\
             if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
               unset bereq.http.Authorization;
             }}"""
             ),
             name="Strip auth headers in S3 pass requests",
+            type="pass",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            content=textwrap.dedent(
+                f"""\
+            if (req.backend == F_{ocw_courses_bucket_backend_name.replace(" ", "_")}) {{
+              unset bereq.http.Authorization;
+            }}"""
+            ),
+            name="Strip auth headers for OCW S3 pass requests",
             type="pass",
         ),
         fastly.ServiceVclSnippetArgs(
