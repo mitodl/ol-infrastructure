@@ -1224,9 +1224,9 @@ requires-dist = [
     { name = "pulumi-aws-native", specifier = ">=1.25.0,<2" },
     { name = "pulumi-command", specifier = ">=1.0,<2" },
     { name = "pulumi-consul", specifier = ">=3.5.0,<4" },
-    { name = "pulumi-docker", specifier = ">=4.0.0,<5" },
+    { name = "pulumi-docker", specifier = ">=5,<6" },
     { name = "pulumi-eks", specifier = ">=4,<5" },
-    { name = "pulumi-fastly", specifier = ">=11,<12" },
+    { name = "pulumi-fastly", specifier = ">=12,<13" },
     { name = "pulumi-github", specifier = ">=6.0.0,<7" },
     { name = "pulumi-keycloak", specifier = ">=6.0.0,<7" },
     { name = "pulumi-mailgun", specifier = ">=3.0.0,<4" },
@@ -1590,16 +1590,16 @@ wheels = [
 
 [[package]]
 name = "pulumi-docker"
-version = "4.11.2"
+version = "5.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "parver" },
     { name = "pulumi" },
     { name = "semver" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/50/de/3b02e5b11c94c219601fbf684d045bb1af728d4a4ef3b5d2719a7ac643bd/pulumi_docker-4.11.2.tar.gz", hash = "sha256:c4c11b56b6c184256f59503c0b3763ffd435443c83bb8f0155d48b1d1cbe8b97", size = 120777, upload-time = "2026-04-01T20:57:10.924Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/20/b5/f9f2336aa5397bf9b7ed973bfe137ec9e491d00fd45ae9624d5a9c391388/pulumi_docker-5.0.0.tar.gz", hash = "sha256:5778f060bd7a3c598cfbcdabbab0fa9ee9d9f4e0feaa155bc7ba1eba1c74d5ef", size = 130790, upload-time = "2026-04-21T13:23:48.023Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/10/79/35faa6b1d9c529e373368efeb82fc02a97f8869160589bb59f08200de8fb/pulumi_docker-4.11.2-py3-none-any.whl", hash = "sha256:7a2455e042012ed6e03ff698609546dff5c241e99be46b60908cdcec39539d56", size = 141188, upload-time = "2026-04-01T20:57:09.223Z" },
+    { url = "https://files.pythonhosted.org/packages/93/7a/e502f0afd5331cdb471f135c412f0904ab0998152bd77fb7f7426ae84c3c/pulumi_docker-5.0.0-py3-none-any.whl", hash = "sha256:bca9ab7190c5eab45d4472d17f9b87672f20e3be8fbeb2e3f8653ad50ead1e7a", size = 151734, upload-time = "2026-04-21T13:23:46.809Z" },
 ]
 
 [[package]]
@@ -1620,16 +1620,16 @@ wheels = [
 
 [[package]]
 name = "pulumi-fastly"
-version = "11.5.0"
+version = "12.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "parver" },
     { name = "pulumi" },
     { name = "semver" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a4/db/2fd0e0f206a131d4250c98bdd69d4ec07b6e4333d74958f0876fa53209c0/pulumi_fastly-11.5.0.tar.gz", hash = "sha256:7f572b647bbf08487355e51c8d3088d4a08e71716ba99f955261fba06f163b30", size = 243951, upload-time = "2026-03-31T04:33:28.693Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/83/e7/6ad71d5ae26b6417c20e6d41f8b13fd1f916637b38edf38047a56aa12c76/pulumi_fastly-12.0.1.tar.gz", hash = "sha256:3da378e02b150fcfdd2352e4f7db53e801cd6d891b0b3f2af084201db296f112", size = 244534, upload-time = "2026-04-23T04:36:29.072Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4a/c5/ff00f1416695291ffc363364b106014d12cbbc1f550e307a5e0a26a9cfa6/pulumi_fastly-11.5.0-py3-none-any.whl", hash = "sha256:30d0e06e2d13c21b0423eaab85dc9e5d93570bec54b9fc962656e30230680f35", size = 370353, upload-time = "2026-03-31T04:33:26.585Z" },
+    { url = "https://files.pythonhosted.org/packages/0f/2d/4f16da1c88cf73dfb21ee9b2c1f5e056db37af51200b0343caafe0b0d51c/pulumi_fastly-12.0.1-py3-none-any.whl", hash = "sha256:f17f8256f59d3ee4f8f0be06e964109e068e76dd68531615b22da2c8790780a1", size = 370933, upload-time = "2026-04-23T04:36:27.207Z" },
 ]
 
 [[package]]
