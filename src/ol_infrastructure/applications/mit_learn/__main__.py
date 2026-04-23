@@ -124,7 +124,9 @@ vector_log_proxy_stack = StackReference(
 )
 monitoring_stack = StackReference("infrastructure.monitoring")
 dns_stack = StackReference("infrastructure.aws.dns")
-ocw_site_stack = StackReference(f"applications.ocw_site.{stack_info.name}")
+ocw_site_stack = StackReference(
+    f"applications.ocw_site.{stack_info.name if stack_info.name != 'CI' else 'QA'}"
+)
 ocw_site_buckets = ocw_site_stack.require_output("ocw_site_buckets")
 qdrant_cloud_stack = StackReference(
     f"infrastructure.qdrant_cloud.mitlearn.{stack_info.name}"
