@@ -921,7 +921,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
         ),
         fastly.ServiceVclConditionArgs(
             name="OCW course requests",
-            statement="var.is_ocw_courses_request",
+            statement="var.is_ocw_request",
             type="REQUEST",
         ),
     ],
@@ -992,15 +992,18 @@ mitlearn_fastly_service = fastly.ServiceVcl(
         fastly.ServiceVclSnippetArgs(
             content=textwrap.dedent(
                 r"""
-            declare local var.is_ocw_courses_request BOOL;
-            set var.is_ocw_courses_request = false;
+            declare local var.is_ocw_request BOOL;
+            set var.is_ocw_request = false;
             if (req.url.path ~ "^/courses/o/") {
               set req.url = regsub(
                 req.url, "^/courses/o/", "/ocw-course-v3/courses/"
               );
             }
-            if (req.url.path ~ "^/ocw-course-v3/courses/") {
-              set var.is_ocw_courses_request = true;
+            if (req.url.path ~ "^/static_shared/") {
+              set var.is_ocw_request = true;
+            }
+            if (req.url.path ~ "^/ocw-course-v3/") {
+              set var.is_ocw_request = true;
               set req.url = querystring.remove(req.url);
               if (req.url !~ "\.[^/]+$") {
                 set req.url = regsub(req.url, "/?$", "/index.html");
