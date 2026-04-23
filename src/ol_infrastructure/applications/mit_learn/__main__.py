@@ -996,6 +996,8 @@ mitlearn_fastly_service = fastly.ServiceVcl(
               set req.url = regsub(
                 req.url, "^/courses/o/", "/ocw-course-v3/courses/"
               );
+              set req.url = querystring.remove(req.url);
+              set req.url = regsub(req.url, "/$", "/index.html");
               unset req.http.Cookie;
             }"""
             ),
@@ -1018,8 +1020,6 @@ mitlearn_fastly_service = fastly.ServiceVcl(
                 f"""\
             if (req.backend == F_{ocw_courses_bucket_backend_name.replace(" ", "_")}) {{
               unset bereq.http.Authorization;
-              set bereq.url = querystring.remove(bereq.url);
-              set bereq.url = regsub(bereq.url, "/$", "/index.html");
             }}"""
             ),
             name="Strip auth headers for OCW S3 miss requests",
