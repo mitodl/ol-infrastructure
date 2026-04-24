@@ -327,7 +327,11 @@ def create_ol_mit_realm(  # noqa: PLR0913
             idp_display_name="MIT Touchstone",
             org_saml_metadata_url=(
                 keycloak_realm_config.get("ol-mit-touchstone-metadata-url")
-                or "https://okta.mit.edu/app/exk128ohli7aTT5xA698/sso/saml/metadata"
+                or (
+                    "https://okta.mit.edu/app/exk12ad6wcgegsrLi698/sso/saml/metadata"
+                    if stack_info.env_suffix == "production"
+                    else "https://okta.mit.edu/app/exk128ohli7aTT5xA698/sso/saml/metadata"
+                )
             ),
             keycloak_url=keycloak_url,
             realm_id=ol_mit_realm.id,
