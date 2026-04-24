@@ -916,6 +916,11 @@ server {{
     ssl_prefer_server_ciphers on;
     resolver 1.1.1.1;
 
+    # Propagate the real client-facing scheme set by APISix after TLS termination.
+    # Falls back to $scheme (the Nginx connection scheme) when the header is absent.
+    set $my_scheme $http_x_forwarded_proto;
+    if ($my_scheme = "") {{ set $my_scheme $scheme; }}
+
     location = /nginx-health {{
         access_log off;
         return 200 "healthy\n";
@@ -924,6 +929,9 @@ server {{
 
     location / {{
         include uwsgi_params;
+        # Pass the real scheme so Django's SECURE_PROXY_SSL_HEADER check succeeds
+        # and request.is_secure() / build_absolute_uri() return https:// URLs.
+        uwsgi_param HTTP_X_FORWARDED_PROTO $my_scheme;
         uwsgi_ignore_client_abort on;
         uwsgi_pass 127.0.0.1:8087;
     }}
