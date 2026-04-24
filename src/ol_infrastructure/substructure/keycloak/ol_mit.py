@@ -389,6 +389,21 @@ def create_ol_mit_realm(  # noqa: PLR0913
         opts=resource_options,
     )
 
+    # social_core.backends.keycloak.KeycloakOAuth2.user_data() decodes the access
+    # token and validates aud == client_id.  Keycloak does not include the client
+    # in the aud claim by default; this mapper re-enables it.
+    # See https://issues.redhat.com/browse/KEYCLOAK-6638
+    keycloak.openid.AudienceProtocolMapper(
+        "ol-mit-ovs-audience-mapper",
+        realm_id=ol_mit_realm.id,
+        client_id=ol_mit_ovs_client.id,
+        name="audience",
+        included_client_audience=ol_mit_ovs_client.client_id,
+        add_to_id_token=True,
+        add_to_access_token=True,
+        opts=resource_options,
+    )
+
     vault.generic.Secret(
         "ol-mit-ovs-client-vault-oidc-credentials",
         path="secret-operations/sso/ovs",
