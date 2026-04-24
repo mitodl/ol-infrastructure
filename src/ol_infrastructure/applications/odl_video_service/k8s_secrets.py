@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PLR0913, S105, S106, FBT001
+# ruff: noqa: E501, PLR0913, S105, S106
 """Manage Kubernetes secrets for the ODL Video Service application using Vault.
 
 This module defines functions to create Kubernetes secrets required by the OVS
@@ -99,7 +99,6 @@ def create_ovs_k8s_secrets(
     rds_endpoint: str,
     redis_auth_token: str,
     redis_cluster: OLAmazonCache,
-    use_shibboleth: bool,
 ) -> tuple[list[str], list[OLVaultK8SSecret | kubernetes.core.v1.Secret]]:
     """Create all Kubernetes secrets required by the ODL Video Service application.
 
@@ -112,7 +111,6 @@ def create_ovs_k8s_secrets(
         rds_endpoint: The endpoint address of the RDS instance (host:port).
         redis_auth_token: The auth token for the Redis cluster.
         redis_cluster: The Redis cache resource for connection details.
-        use_shibboleth: Whether Shibboleth is enabled for this environment.
 
     Returns:
         A tuple containing a list of the names of the created Kubernetes secrets
@@ -271,25 +269,5 @@ def create_ovs_k8s_secrets(
     )
     secret_names.append(keycloak_secret_name)
     secret_resources.append(keycloak_secret)
-
-    # 8. Shibboleth SP cert/key secrets (only when Shibboleth is enabled)
-    if use_shibboleth:
-        shib_certs_secret_name, shib_certs_secret = _create_static_secret(
-            stack_info=stack_info,
-            secret_base_name="ovs-shib-certs",  # pragma: allowlist secret
-            namespace=ovs_namespace,
-            labels=k8s_global_labels,
-            mount="secret-odl-video-service",
-            mount_type="kv-v2",
-            path="ovs-secrets",
-            templates={
-                "sp-cert.pem": '{{ index .Secrets "shibboleth" "sp_cert" }}',
-                "sp-key.pem": '{{ index .Secrets "shibboleth" "sp_key" }}',
-                "mit-md-cert.pem": '{{ index .Secrets "shibboleth" "mit_md_cert" }}',
-            },
-            vaultauth=vaultauth,
-        )
-        secret_names.append(shib_certs_secret_name)
-        secret_resources.append(shib_certs_secret)
 
     return secret_names, secret_resources
