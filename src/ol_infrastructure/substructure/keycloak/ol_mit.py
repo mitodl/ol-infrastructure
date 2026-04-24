@@ -14,7 +14,7 @@ import json
 
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions
+from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
     NameIdFormat,
@@ -359,7 +359,7 @@ def create_ol_mit_realm(  # noqa: PLR0913
         implicit_flow_enabled=False,
         # Enabled to allow password-based auth for admin/testing workflows.
         direct_access_grants_enabled=True,
-        service_accounts_enabled=False,
+        service_accounts_enabled=True,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-mit-ovs-redirect-uris"
         ),
@@ -369,6 +369,29 @@ def create_ol_mit_realm(  # noqa: PLR0913
         web_origins=keycloak_realm_config.get_object("ol-mit-ovs-web-origins"),
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
+
+    # Grant the service account realm-management roles for user and group management.
+    # These are consumed by the moira-to-keycloak migration management commands via
+    # the Keycloak admin API (client_credentials grant against /realms/master).
+    realm_management_client = keycloak.openid.get_client(
+        realm_id=ol_mit_realm.id,
+        client_id="realm-management",
+        opts=InvokeOptions(provider=keycloak_provider),
+    )
+    for resource_name, role in [
+        ("ol-mit-ovs-sa-manage-users", "manage-users"),
+        ("ol-mit-ovs-sa-view-users", "view-users"),
+        ("ol-mit-ovs-sa-query-users", "query-users"),
+        ("ol-mit-ovs-sa-query-groups", "query-groups"),
+    ]:
+        keycloak.openid.ClientServiceAccountRole(
+            resource_name,
+            realm_id=ol_mit_realm.id,
+            service_account_user_id=ol_mit_ovs_client.service_account_user_id,
+            client_id=realm_management_client.id,
+            role=role,
+            opts=resource_options,
+        )
 
     # The OVS pipeline (assign_user_groups) reads the `user_groups` claim to map
     # Keycloak groups to Django is_staff / is_superuser flags.
@@ -407,6 +430,7 @@ def create_ol_mit_realm(  # noqa: PLR0913
             url=ol_mit_ovs_client.realm_id.apply(
                 lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
             ),
+            server_url=keycloak_url,
             client_id=ol_mit_ovs_client.client_id,
             client_secret=ol_mit_ovs_client.client_secret,
             secret=session_secret,
