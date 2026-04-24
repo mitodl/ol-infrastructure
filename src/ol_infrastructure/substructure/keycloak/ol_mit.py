@@ -334,17 +334,13 @@ def create_ol_mit_realm(  # noqa: PLR0913
             realm_name="ol-mit",
             first_login_flow=ol_mit_touchstone_first_login_flow,
             resource_options=resource_options,
-            # Use the MIT eduPersonPrincipalName as the stable identifier so that
-            # the resulting Keycloak username will match the eventual LDAP uid.
-            principal_type="ATTRIBUTE",
-            principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
+            # Okta sends the email as the NameID (unspecified format); use SUBJECT
+            # as the principal since eduPersonPrincipalName arrives empty.
+            principal_type="SUBJECT",
             attribute_name_map={
-                "email": "mail",
-                "lastName": "sn",
-                "firstName": "givenName",
-                "fullName": "displayName",
+                "email": "email",
             },
-            want_assertions_encrypted=True,
+            want_assertions_encrypted=False,
             want_assertions_signed=True,
             name_id_format=NameIdFormat.unspecified,
         )
