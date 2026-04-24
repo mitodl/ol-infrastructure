@@ -343,6 +343,8 @@ def create_ol_mit_realm(  # noqa: PLR0913
             principal_type="SUBJECT",
             attribute_name_map={
                 "email": "email",
+                "firstName": "firstName",
+                "lastName": "lastName",
             },
             want_assertions_encrypted=False,
             want_assertions_signed=True,
