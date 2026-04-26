@@ -766,6 +766,13 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                 "podLabels": k8s_global_labels,
                 "resources": default_resources_definition,
             },
+            # manifestServer replaces connectorBuilderServer in chart 2.1+
+            # (connectorBuilderServer was removed; manifestServer is now enabled)
+            "manifestServer": {
+                "enabled": True,
+                "podLabels": k8s_global_labels,
+                "resources": default_resources_definition,
+            },
         },
         skip_await=True,
     ),
@@ -799,6 +806,32 @@ override_dynamicconfig_configmap_patch = kubernetes.core.v1.ConfigMapPatch(
         },
     ),
     data={"development.yaml": override_dynamicconfig_data},
+    opts=ResourceOptions(
+        parent=airbyte_helm_release,
+        depends_on=[airbyte_helm_release],
+        delete_before_replace=True,
+    ),
+)
+
+# Backward-compatibility patch for the 2.0→2.1 chart upgrade.
+# Chart 2.1 removed CONNECTOR_BUILDER_SERVER_API_HOST from the shared
+# env ConfigMap.  Pods that were deployed by chart 2.0 still reference
+# that key; if they restart during the rolling update they would fail
+# with "couldn't find key CONNECTOR_BUILDER_SERVER_API_HOST in ConfigMap".
+# Keeping the key present (as an empty string) allows those pods to
+# restart cleanly while the rollout progresses.  The key is harmless in
+# 2.1 because no chart template references it and the application falls
+# back to an empty default when the variable is unset.
+airbyte_env_configmap_patch = kubernetes.core.v1.ConfigMapPatch(
+    "airbyte-env-configmap-patch",
+    metadata=kubernetes.meta.v1.ObjectMetaPatchArgs(
+        name="airbyte-airbyte-env",
+        namespace=airbyte_namespace,
+        annotations={
+            "pulumi.com/patchForce": "true",
+        },
+    ),
+    data={"CONNECTOR_BUILDER_SERVER_API_HOST": ""},
     opts=ResourceOptions(
         parent=airbyte_helm_release,
         depends_on=[airbyte_helm_release],
