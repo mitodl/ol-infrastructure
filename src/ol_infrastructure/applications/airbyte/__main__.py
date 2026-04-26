@@ -667,6 +667,15 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                     "name": db_name,
                     "port": DEFAULT_POSTGRES_PORT,
                     "jdbcUrl": connection_string,
+                    # Chart v2.1 always injects CONFIG_DATABASE_REPLICA_USER and
+                    # CONFIG_DATABASE_REPLICA_PASSWORD from the same secret.  We
+                    # don't run a read replica, so point these keys at the
+                    # existing DATABASE_USER / DATABASE_PASSWORD values so the
+                    # bootloader pod can start successfully.
+                    "replica": {
+                        "userSecretKey": "DATABASE_USER",  # pragma: allowlist secret
+                        "passwordSecretKey": "DATABASE_PASSWORD",  # pragma: allowlist secret  # noqa: E501
+                    },
                 },
                 "storage": {
                     "type": "s3",
@@ -674,6 +683,8 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                         "log": airbyte_bucket_name,
                         "state": airbyte_bucket_name,
                         "workloadOutput": airbyte_bucket_name,
+                        "activityPayload": airbyte_bucket_name,
+                        "auditLogging": airbyte_bucket_name,
                     },
                     "s3": {
                         "region": aws_config.region,
@@ -770,6 +781,10 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
             # (connectorBuilderServer was removed; manifestServer is now enabled)
             "manifestServer": {
                 "enabled": True,
+                "podLabels": k8s_global_labels,
+                "resources": default_resources_definition,
+            },
+            "workloadApiServer": {
                 "podLabels": k8s_global_labels,
                 "resources": default_resources_definition,
             },
