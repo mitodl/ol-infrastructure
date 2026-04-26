@@ -683,6 +683,8 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                         "log": airbyte_bucket_name,
                         "state": airbyte_bucket_name,
                         "workloadOutput": airbyte_bucket_name,
+                        "activityPayload": airbyte_bucket_name,
+                        "auditLogging": airbyte_bucket_name,
                     },
                     "s3": {
                         "region": aws_config.region,
@@ -779,6 +781,10 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
             # (connectorBuilderServer was removed; manifestServer is now enabled)
             "manifestServer": {
                 "enabled": True,
+                "podLabels": k8s_global_labels,
+                "resources": default_resources_definition,
+            },
+            "workloadApiServer": {
                 "podLabels": k8s_global_labels,
                 "resources": default_resources_definition,
             },
