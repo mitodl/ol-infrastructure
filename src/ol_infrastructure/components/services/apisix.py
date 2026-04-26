@@ -126,11 +126,13 @@ class OLApisixRoute(ComponentResource):
     ) -> list[dict[str, Any]]:
         routes = []
         for route_config in route_configs:
-            route = {
+            route: dict[str, Any] = {
                 "name": route_config.route_name,
                 "priority": route_config.priority,
-                "plugin_config_name": route_config.shared_plugin_config_name,
-                "plugins": [p.model_dump(by_alias=True) for p in route_config.plugins],
+                "plugins": [
+                    p.model_dump(by_alias=True, exclude_none=True)
+                    for p in route_config.plugins
+                ],
                 "match": {
                     "hosts": route_config.hosts,
                     "paths": route_config.paths,
@@ -142,6 +144,8 @@ class OLApisixRoute(ComponentResource):
                     "read": route_config.timeout_read,
                 },
             }
+            if route_config.shared_plugin_config_name is not None:
+                route["plugin_config_name"] = route_config.shared_plugin_config_name
             if route_config.upstream:
                 route["upstreams"] = [{"name": route_config.upstream}]
             else:
