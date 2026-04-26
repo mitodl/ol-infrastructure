@@ -667,6 +667,15 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                     "name": db_name,
                     "port": DEFAULT_POSTGRES_PORT,
                     "jdbcUrl": connection_string,
+                    # Chart v2.1 always injects CONFIG_DATABASE_REPLICA_USER and
+                    # CONFIG_DATABASE_REPLICA_PASSWORD from the same secret.  We
+                    # don't run a read replica, so point these keys at the
+                    # existing DATABASE_USER / DATABASE_PASSWORD values so the
+                    # bootloader pod can start successfully.
+                    "replica": {
+                        "userSecretKey": "DATABASE_USER",  # pragma: allowlist secret
+                        "passwordSecretKey": "DATABASE_PASSWORD",  # pragma: allowlist secret  # noqa: E501
+                    },
                 },
                 "storage": {
                     "type": "s3",
