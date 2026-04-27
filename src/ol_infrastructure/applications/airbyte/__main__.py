@@ -709,11 +709,34 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                         "tags": [{"key": "OU", "value": "data"}],
                     },
                 },
-                "jobs": {
+                # In Airbyte chart v2 the v1 path global.jobs.resources was
+                # replaced by global.workloads.resources.  The v2 path controls:
+                #   mainContainer  → JOB_MAIN_CONTAINER_MEMORY_{LIMIT,REQUEST}
+                #                    (source / destination connector containers)
+                #   replication    → REPLICATION_ORCHESTRATOR_MEMORY_{LIMIT,REQUEST}
+                #                    (JVM orchestrator container)
+                # Running syncs have shown destination containers reaching ~1.8Gi
+                # and orchestrators hitting java.lang.OutOfMemoryError: Java heap
+                # space at the previous 2Gi ceiling.  Raising both to 4Gi gives
+                # the JVM adequate heap while keeping requests modest so Karpenter
+                # doesn't over-provision.
+                "workloads": {
                     "resources": {
-                        "limits": {"memory": "15Gi", "cpu": "4000m"},
-                        "requests": {"memory": "10Gi", "cpu": "2000m"},
+                        "mainContainer": {
+                            "memory": {"limit": "4Gi", "request": "2Gi"},
+                            "cpu": {"limit": "2", "request": "1"},
+                        },
+                        "replication": {
+                            "memory": {"limit": "4Gi", "request": "2Gi"},
+                            "cpu": {"limit": "2", "request": "1"},
+                        },
                     },
+                    "containerOrchestrator": {
+                        "secretName": "",
+                        "secretMountPath": "",
+                    },
+                },
+                "jobs": {
                     "kube": {"annotations": {"karpenter.sh/do-not-disrupt": "true"}},
                 },
             },
