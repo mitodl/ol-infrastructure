@@ -67,7 +67,7 @@ RUN useradd --home-dir /openedx --create-home --shell /bin/bash/ --uid ${APP_USE
 USER ${APP_USER_ID}
 
 # digest for docker.io/powerman/dockerize:0.19.0 --platform=linux/amd64
-COPY --from=docker.io/powerman/dockerize@sha256:e645b37f160acfc20d49f545a8b917e402a1a10a31839912945fa78e4a35416b /usr/local/bin/dockerize /usr/local/bin/dockerize
+COPY --from=docker.io/powerman/dockerize@sha256:e2c34e00f1f8a8886aea2508ef4d680343f90302d3dbf4d3c08cab43351b07cf /usr/local/bin/dockerize /usr/local/bin/dockerize
 COPY --chown=app:app --from=locales /openedx/locale /openedx/locale
 COPY --chown=app:app --from=code /openedx/edx-platform /openedx/edx-platform
 COPY --chown=app:app --from=code /openedx/nodeenv /openedx/nodeenv
