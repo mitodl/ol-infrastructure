@@ -515,7 +515,10 @@ def format_slack_message(  # noqa: C901
                             },
                             "text": {
                                 "type": "mrkdwn",
-                                "text": f"Deploy `{image_tag}` of `{app_name}` to Production?",
+                                "text": (
+                                    f"Deploy `{image_tag}` of "
+                                    f"`{app_name}` to Production?"
+                                ),
                             },
                             "confirm": {"type": "plain_text", "text": "Promote"},
                             "deny": {"type": "plain_text", "text": "Cancel"},
