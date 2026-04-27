@@ -42,9 +42,8 @@ const SLOT_IDS = {
 const addFooterSubSlotsOverride = (config) => {
   const currentYear = new Date().getFullYear();
   const accessibilityURL = process.env.ACCESSIBILITY_URL || 'https://accessibility.mit.edu/';
-  const contactUsURL = process.env.CONTACT_URL || 'mailto:mitlearn-support@mit.edu';
+  const contactUsURL = process.env.CONTACT_URL || 'https://support.learn.mit.edu';
   const copyRightText = 'Massachusetts Institute of Technology';
-  const supportURL = process.env.SUPPORT_URL || 'https://mitxonline.zendesk.com/hc/en-us';
   const footerLogo = <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={process.env.MIT_BASE_URL} />;
 
   const footerLegalLinks = [
@@ -65,20 +64,10 @@ const addFooterSubSlotsOverride = (config) => {
     },
     {
       url: contactUsURL,
-      title: 'Contact Us',
-      messageId: 'footer.links.contact.us',
+      title: 'Help',
+      messageId: 'footer.links.help',
     },
   ]
-
-  if (isMITxOnlineCourse()) {
-    footerLegalLinks.push(
-      {
-        url: supportURL,
-        title: 'Help',
-        messageId: 'footer.links.help',
-      }
-    );
-  }
 
   const footerSubSlotsConfig = {
     [SLOT_IDS.footer.desktop_left_links]: {
@@ -547,7 +536,7 @@ const addEnvOverrides = (config) => {
   if (!isMITxOnlineCourse()) {
     return {
       ...config,
-      SUPPORT_URL: process.env.CONTACT_URL || 'mailto:mitlearn-support@mit.edu',
+      SUPPORT_URL: process.env.CONTACT_URL || 'https://support.learn.mit.edu',
     }
   }
   return config;
