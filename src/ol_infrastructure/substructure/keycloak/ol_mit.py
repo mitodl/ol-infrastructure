@@ -31,6 +31,7 @@ def create_ol_mit_realm(  # noqa: PLR0913
     mit_email_password: str,
     mit_email_username: str,
     mit_email_host: str,
+    mit_ldap_bind_password: str,
     session_secret: str,
     fetch_realm_public_key_partial,
 ):
@@ -428,6 +429,119 @@ def create_ol_mit_realm(  # noqa: PLR0913
         add_to_access_token=True,
         opts=resource_options,
     )
+
+    # MIT LDAP FEDERATION [START]
+    # Read-only federation against MIT's Okta LDAP interface to enrich users
+    # already created via Touchstone SAML and to assign group memberships.
+    #
+    # The Okta LDAP interface only exposes ou=users at the base DN; groups are
+    # surfaced via the virtual memberOf attribute on each user entry.  The
+    # GET_GROUPS_FROM_USER_MEMBEROF_ATTRIBUTE strategy on the group mapper
+    # therefore avoids needing to walk group entries and is more efficient for
+    # this interface.
+    #
+    # Username linkage: Touchstone sends kerberos@mit.edu as the SAML NameID
+    # (SUBJECT principal); the LDAP uid attribute is also kerberos@mit.edu, so
+    # users created on first Touchstone login are automatically linked to their
+    # LDAP counterpart on the next sync / login.
+    #
+    # PREREQUISITE: The oleng service account must have "Read Groups" scope
+    # enabled in Okta Admin → Security → API → LDAP Interface before the group
+    # mapper can populate memberships.  The user-attribute sync works without
+    # that permission.
+    ol_mit_ldap = keycloak.ldap.UserFederation(
+        "ol-mit-ldap",
+        name="mit-ldap",
+        realm_id=ol_mit_realm.id,
+        connection_url="ldaps://mitprod.ldap.okta.com",
+        bind_dn="uid=oleng,dc=mitprod,dc=okta,dc=com",
+        bind_credential=mit_ldap_bind_password,
+        users_dn="ou=users,dc=mitprod,dc=okta,dc=com",
+        username_ldap_attribute="uid",
+        rdn_ldap_attribute="uid",
+        # uniqueIdentifier is the Okta-assigned immutable GUID for each user and
+        # is the correct stable identifier across renames / email changes.
+        uuid_ldap_attribute="uniqueIdentifier",
+        user_object_classes=["inetOrgPerson"],
+        edit_mode="READ_ONLY",
+        vendor="OTHER",
+        search_scope="ONE_LEVEL",
+        # MIT emails are validated by Touchstone; no re-verification needed.
+        trust_email=True,
+        sync_registrations=False,
+        import_enabled=True,
+        connection_pooling=True,
+        pagination=True,
+        use_truststore_spi="ONLY_FOR_LDAPS",
+        # Hourly delta sync picks up group-membership changes for users who have
+        # already logged in.  Full sync is disabled to avoid bulk-importing every
+        # MIT affiliate into Keycloak; users are provisioned on-demand via the
+        # Touchstone SAML first-login flow.
+        changed_sync_period=3600,
+        opts=resource_options,
+    )
+
+    # MIT-specific attribute mappers.  Standard attributes (username, email,
+    # firstName, lastName) are handled by the default mappers that Keycloak
+    # creates automatically when delete_default_mappers is not set.
+    for resource_name, mapper_name, ldap_attr, model_attr in [
+        (
+            "ol-mit-ldap-edu-person-principal-name-mapper",
+            "eduPersonPrincipalName",
+            "eduPersonPrincipalName",
+            "eduPersonPrincipalName",
+        ),
+        (
+            "ol-mit-ldap-display-name-mapper",
+            "displayName",
+            "displayName",
+            "displayName",
+        ),
+        (
+            "ol-mit-ldap-edu-person-primary-affiliation-mapper",
+            "eduPersonPrimaryAffiliation",
+            "eduPersonPrimaryAffiliation",
+            "eduPersonPrimaryAffiliation",
+        ),
+    ]:
+        keycloak.ldap.UserAttributeMapper(
+            resource_name,
+            realm_id=ol_mit_realm.id,
+            ldap_user_federation_id=ol_mit_ldap.id,
+            name=mapper_name,
+            ldap_attribute=ldap_attr,
+            user_model_attribute=model_attr,
+            read_only=True,
+            always_read_value_from_ldap=True,
+            is_mandatory_in_ldap=False,
+            opts=resource_options,
+        )
+
+    # Group mapper — resolves memberships from the virtual memberOf attribute
+    # rather than scanning group entries.  Groups in the Okta LDAP interface are
+    # exposed as groupOfUniqueNames under ou=groups once the oleng account has
+    # "Read Groups" permission; the mapper is registered now so no Pulumi change
+    # is required after that permission is granted.
+    keycloak.ldap.GroupMapper(
+        "ol-mit-ldap-group-mapper",
+        realm_id=ol_mit_realm.id,
+        ldap_user_federation_id=ol_mit_ldap.id,
+        name="group-mapper",
+        ldap_groups_dn="ou=groups,dc=mitprod,dc=okta,dc=com",
+        group_name_ldap_attribute="cn",
+        group_object_classes=["groupOfUniqueNames"],
+        membership_ldap_attribute="uniqueMember",
+        membership_user_ldap_attribute="uid",
+        membership_attribute_type="DN",
+        user_roles_retrieve_strategy="GET_GROUPS_FROM_USER_MEMBEROF_ATTRIBUTE",
+        memberof_ldap_attribute="memberOf",
+        mode="READ_ONLY",
+        preserve_group_inheritance=False,
+        drop_non_existing_groups_during_sync=True,
+        ignore_missing_groups=True,
+        opts=resource_options,
+    )
+    # MIT LDAP FEDERATION [END]
 
     vault.generic.Secret(
         "ol-mit-ovs-client-vault-oidc-credentials",
