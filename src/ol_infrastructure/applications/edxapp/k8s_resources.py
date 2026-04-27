@@ -94,6 +94,16 @@ def create_k8s_resources(  # noqa: C901
     lms_celery_deployment_name = f"{env_name}-edxapp-lms-celery"
     cms_celery_deployment_name = f"{env_name}-edxapp-cms-celery"
 
+    # All deployments that consume MariaDB credentials and need to restart on rotation.
+    # Includes both OLApplicationK8s-managed webapps and hand-rolled celery/batch deployments.
+    edxapp_db_restart_deployment_names = [
+        "lms-edxapp-app",  # LMS webapp (OLApplicationK8s application_name="lms-edxapp")
+        "cms-edxapp-app",  # CMS webapp (OLApplicationK8s application_name="cms-edxapp")
+        lms_celery_deployment_name,
+        cms_celery_deployment_name,
+        f"{env_name}-edxapp-lms-process-scheduled-emails",
+    ]
+
     aws_account = aws.get_caller_identity()
 
     replicas_dict = edxapp_config.require_object("k8s_replicas")
@@ -257,6 +267,7 @@ def create_k8s_resources(  # noqa: C901
         namespace=namespace,
         stack_info=stack_info,
         vault_k8s_resources=vault_k8s_resources,
+        restart_deployment_names=edxapp_db_restart_deployment_names,
     )
     configmaps = create_k8s_configmaps(
         stack_info=stack_info,
