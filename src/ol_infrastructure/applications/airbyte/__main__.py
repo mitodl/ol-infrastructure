@@ -658,6 +658,9 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                 "serviceAccountName": airbyte_service_account_name,
                 "deploymentMode": "oss",
                 "edition": "community",
+                # Airbyte 2.1 enables auth by default; we handle auth via OIDC
+                # at the APISix ingress layer, so disable the built-in auth.
+                "auth": {"enabled": False},
                 "database": {
                     "type": "external",
                     "secretName": app_db_creds_secret_name,
