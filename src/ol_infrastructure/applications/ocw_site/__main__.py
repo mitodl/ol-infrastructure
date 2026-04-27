@@ -26,6 +26,7 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.aws.route53_helper import (
     fastly_certificate_validation_records,
@@ -35,7 +36,7 @@ from ol_infrastructure.lib.fastly import (
     get_fastly_provider,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 
 ocw_site_config = Config("ocw_site")
 stack_info = parse_stack()
@@ -47,11 +48,11 @@ aws_config = AWSBase(
 )
 fastly_provider = get_fastly_provider()
 
-dns_stack = StackReference("infrastructure.aws.dns")
+dns_stack = StackReference(stack_ref(projects.DNS, "default"))
 ocw_zone = dns_stack.require_output("ocw")
 
 vector_log_proxy_stack = StackReference(
-    f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
+    stack_ref(projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}")
 )
 vector_log_proxy_domain = vector_log_proxy_stack.require_output(
     "vector_log_proxy_domain"
@@ -65,7 +66,7 @@ encoded_fastly_proxy_credentials = base64.b64encode(
     f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
 ).decode("utf8")
 
-monitoring_stack = StackReference("infrastructure.monitoring")
+monitoring_stack = StackReference(stack_ref(projects.MONITORING, "default"))
 fastly_access_logging_bucket = monitoring_stack.require_output(
     "fastly_access_logging_bucket"
 )

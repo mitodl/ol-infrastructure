@@ -26,13 +26,14 @@ from ol_infrastructure.components.aws.auto_scale_group import (
     OLTargetGroupConfig,
     TagSpecification,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.ec2_helper import (
     DiskTypes,
     InstanceTypes,
     default_egress_args,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 
 
 # Make cloud-init userdata
@@ -117,18 +118,18 @@ env_config = Config("environment")
 consul_config = Config("consul")
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 business_unit = env_config.get("business_unit") or "operations"
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-policy_stack = StackReference("infrastructure.aws.policies")
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
 destination_vpc = network_stack.require_output(env_config.require("vpc_reference"))
 peer_vpcs = destination_vpc["peers"].apply(
     lambda peers: {peer: network_stack.require_output(peer) for peer in peers}
 )
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": env_name})
 destination_vpc = network_stack.require_output(env_config.require("vpc_reference"))
-dns_stack = StackReference("infrastructure.aws.dns")
+dns_stack = StackReference(stack_ref(projects.DNS, "default"))
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 vpc_id = destination_vpc["id"]
-kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
+kms_stack = StackReference(stack_ref(projects.KMS, stack_info.name))
 kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
 consul_dns_name = f"consul-{env_name}.odl.mit.edu"
 

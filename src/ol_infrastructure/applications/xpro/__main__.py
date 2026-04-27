@@ -56,6 +56,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResourcesConfig,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     default_psg_egress_args,
@@ -83,6 +84,7 @@ from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
     merge_otel_resource_attributes,
     parse_stack,
+    stack_ref,
 )
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -99,15 +101,17 @@ fastly_provider = get_fastly_provider()
 stack_info = parse_stack()
 backend_domain = xpro_config.require("backend_domain")
 frontend_domain = xpro_config.require("frontend_domain")
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-monitoring_stack = StackReference("infrastructure.monitoring")
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+monitoring_stack = StackReference(stack_ref(projects.MONITORING, "default"))
 vector_log_proxy_stack = StackReference(
-    f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
+    stack_ref(projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}")
 )
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+vault_stack = StackReference(
+    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+)
 aws_config = AWSBase(
     tags={
         "OU": "mitxpro",
@@ -369,10 +373,10 @@ if k8s_deploy:
     redis_config = Config("redis")
 
     cluster_stack = StackReference(
-        f"infrastructure.aws.eks.applications.{stack_info.name}"
+        stack_ref(projects.EKS, f"applications.{stack_info.name}")
     )
     cluster_substructure_stack = StackReference(
-        f"substructure.aws.eks.applications.{stack_info.name}"
+        stack_ref(projects.EKS_SUB, f"applications.{stack_info.name}")
     )
     k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 

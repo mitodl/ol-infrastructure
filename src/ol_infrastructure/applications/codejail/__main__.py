@@ -6,6 +6,7 @@ import pulumi_kubernetes as kubernetes
 from pulumi import Config, StackReference
 
 from bridge.lib.magic_numbers import CODEJAIL_SERVICE_PORT
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     cached_image_uri,
     check_cluster_namespace,
@@ -16,17 +17,17 @@ from ol_infrastructure.lib.ol_types import (
     K8sGlobalLabels,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 
 stack_info = parse_stack()
 codejail_config = Config("codejail")
 
 target_cluster = codejail_config.require("target_cluster")
 cluster_stack = StackReference(
-    f"infrastructure.aws.eks.{target_cluster}.{stack_info.name}"
+    stack_ref(projects.EKS, f"{target_cluster}.{stack_info.name}")
 )
 edxapp_stack = StackReference(
-    f"applications.edxapp.{stack_info.env_prefix}.{stack_info.name}"
+    stack_ref(projects.EDXAPP, f"{stack_info.env_prefix}.{stack_info.name}")
 )
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"

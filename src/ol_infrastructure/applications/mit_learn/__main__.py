@@ -67,6 +67,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResourcesConfig,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     default_psg_egress_args,
@@ -90,6 +91,7 @@ from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
     merge_otel_resource_attributes,
     parse_stack,
+    stack_ref,
 )
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
@@ -108,28 +110,32 @@ vault_config = Config("vault")
 
 stack_info = parse_stack()
 
-cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
-cluster_substructure_stack = StackReference(
-    f"substructure.aws.eks.applications.{stack_info.name}"
+cluster_stack = StackReference(
+    stack_ref(projects.EKS, f"applications.{stack_info.name}")
 )
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+cluster_substructure_stack = StackReference(
+    stack_ref(projects.EKS_SUB, f"applications.{stack_info.name}")
+)
+vault_stack = StackReference(
+    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+)
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 
 vector_log_proxy_stack = StackReference(
-    f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
+    stack_ref(projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}")
 )
-monitoring_stack = StackReference("infrastructure.monitoring")
-dns_stack = StackReference("infrastructure.aws.dns")
+monitoring_stack = StackReference(stack_ref(projects.MONITORING, "default"))
+dns_stack = StackReference(stack_ref(projects.DNS, "default"))
 ocw_site_stack = StackReference(
-    f"applications.ocw_site.{stack_info.name if stack_info.name != 'CI' else 'QA'}"
+    stack_ref(projects.OCW_SITE, stack_info.name if stack_info.name != "CI" else "QA")
 )
 ocw_site_buckets = ocw_site_stack.require_output("ocw_site_buckets")
 qdrant_cloud_stack = StackReference(
-    f"infrastructure.qdrant_cloud.mitlearn.{stack_info.name}"
+    stack_ref(projects.QDRANT_CLOUD, f"mitlearn.{stack_info.name}")
 )
 
 qdrant_secrets = read_yaml_secrets(Path("qdrant_cloud/account.yaml"))

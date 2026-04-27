@@ -37,13 +37,14 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTP_PORT,
     DEFAULT_HTTPS_PORT,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.ec2_helper import (
     DiskTypes,
     InstanceTypes,
     is_valid_instance_type,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 
 
 class BlockDeviceMapping(BaseModel):
@@ -381,7 +382,7 @@ class OLAutoScaling(pulumi.ComponentResource):
         stack_info = parse_stack()
         kms_stack = pulumi.StackReference(
             name=f"asg_kms_stack_reference_{asg_config.asg_name}",
-            stack_name=f"infrastructure.aws.kms.{stack_info.name}",
+            stack_name=stack_ref(projects.KMS, stack_info.name),
         )
         for bdm in lt_config.block_device_mappings:
             if bdm.encrypted:

@@ -3,6 +3,9 @@ from typing import Literal
 
 from pulumi import Output, ResourceOptions, StackReference
 
+from ol_infrastructure.lib import pulumi_projects as projects
+from ol_infrastructure.lib.pulumi_helper import stack_ref
+
 
 @lru_cache
 def get_monitoring_sns_arn(level: Literal["warning", "critical"]) -> Output[str]:
@@ -15,6 +18,6 @@ def get_monitoring_sns_arn(level: Literal["warning", "critical"]) -> Output[str]
     # when we need it without getting duplicate resources.
     return StackReference(
         "implicit.infrastructure.monitoring",
-        stack_name="infrastructure.monitoring",
+        stack_name=stack_ref(projects.MONITORING, "default"),
         opts=ResourceOptions(delete_before_replace=True),
     ).require_output("opsgenie_sns_topics")[f"{level}_sns_topic_arn"]

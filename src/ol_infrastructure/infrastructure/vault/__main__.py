@@ -57,10 +57,11 @@ from ol_infrastructure.components.aws.auto_scale_group import (
     TagSpecification,
 )
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.ec2_helper import DiskTypes, InstanceTypes
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 
 ###############
 # Stack Setup #
@@ -68,14 +69,14 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 vault_config = Config("vault")
 stack_info = parse_stack()
 target_network = vault_config.require("target_vpc")
-ca_stack = StackReference("infrastructure.aws.private_ca")
+ca_stack = StackReference(stack_ref(projects.PRIVATE_CA, "default"))
 consul_stack = StackReference(
-    f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
+    stack_ref(projects.CONSUL_INFRA, f"{stack_info.env_prefix}.{stack_info.name}")
 )
-dns_stack = StackReference("infrastructure.aws.dns")
-kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-policy_stack = StackReference("infrastructure.aws.policies")
+dns_stack = StackReference(stack_ref(projects.DNS, "default"))
+kms_stack = StackReference(stack_ref(projects.KMS, stack_info.name))
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
 
 ##################
 # Variable Setup #

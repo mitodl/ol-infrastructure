@@ -28,6 +28,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
@@ -41,7 +42,7 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 
@@ -49,14 +50,16 @@ setup_vault_provider()
 stack_info = parse_stack()
 
 open_metadata_config = Config("open_metadata")
-dns_stack = StackReference("infrastructure.aws.dns")
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-policy_stack = StackReference("infrastructure.aws.policies")
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+dns_stack = StackReference(stack_ref(projects.DNS, "default"))
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
+vault_stack = StackReference(
+    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+)
 opensearch_stack = StackReference(
     f"infrastructure.aws.opensearch.open_metadata.{stack_info.name}"
 )
-cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
+cluster_stack = StackReference(stack_ref(projects.EKS, f"data.{stack_info.name}"))
 
 opensearch_cluster = opensearch_stack.require_output("cluster")
 apps_vpc = network_stack.require_output("applications_vpc")

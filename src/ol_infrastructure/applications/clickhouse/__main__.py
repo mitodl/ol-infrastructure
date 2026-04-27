@@ -41,6 +41,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
@@ -52,7 +53,11 @@ from ol_infrastructure.lib.ol_types import (
     K8sGlobalLabels,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack, require_stack_output_value
+from ol_infrastructure.lib.pulumi_helper import (
+    parse_stack,
+    require_stack_output_value,
+    stack_ref,
+)
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 setup_vault_provider()
@@ -62,9 +67,9 @@ vault_config = Config("vault")
 stack_info = parse_stack()
 
 vault_mount_stack = StackReference(
-    f"substructure.vault.static_mounts.operations.{stack_info.name}"
+    stack_ref(projects.VAULT_STATIC_MOUNTS, f"operations.{stack_info.name}")
 )
-cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
+cluster_stack = StackReference(stack_ref(projects.EKS, f"data.{stack_info.name}"))
 stateful_workload_storage = require_stack_output_value(
     cluster_stack, "stateful_workload_storage"
 )

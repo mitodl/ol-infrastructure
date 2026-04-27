@@ -24,9 +24,10 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import cached_image_uri, setup_k8s_provider
 from ol_infrastructure.lib.ol_types import AWSBase, K8sGlobalLabels, Services
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 ##################################
@@ -38,9 +39,9 @@ if Config("vault_server").get("env_namespace"):
 
 stack_info = parse_stack()
 vector_log_proxy_config = Config("vector_log_proxy")
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
 cluster_stack = StackReference(
-    f"infrastructure.aws.eks.{stack_info.env_prefix}.{stack_info.name}"
+    stack_ref(projects.EKS, f"{stack_info.env_prefix}.{stack_info.name}")
 )
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
