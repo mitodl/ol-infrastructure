@@ -658,6 +658,12 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                 "serviceAccountName": airbyte_service_account_name,
                 "deploymentMode": "oss",
                 "edition": "community",
+                # AWS SDK v1 (Java) uses AWS_REGION (not AWS_DEFAULT_REGION) in its
+                # EnvironmentVariableRegionProvider. Without this, WebIdentity/IRSA
+                # credential providers fall through to IMDS which is blocked in EKS.
+                "extraEnv": [
+                    {"name": "AWS_REGION", "value": aws_config.region},
+                ],
                 # Airbyte 2.1 enables auth by default; we handle auth via OIDC
                 # at the APISix ingress layer, so disable the built-in auth.
                 "auth": {"enabled": False},
