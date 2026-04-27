@@ -64,8 +64,12 @@ def parse_stack() -> StackInfo:
     project = pulumi.get_project()
 
     stack_name = stack.split(".")[-1]
-    namespace = stack.rsplit(".", 1)[0]  # equals stack when there are no dots
-    env_prefix = namespace.rsplit(".", 1)[-1] if namespace != stack_name else ""
+    # For project-scoped single-tenant stacks (e.g. "QA") there is no dot, so
+    # namespace is empty.  For legacy or multi-tenant stacks (e.g.
+    # "infrastructure.aws.network.QA" or "mitx.QA") namespace is everything
+    # before the trailing env segment.
+    namespace = stack.rsplit(".", 1)[0] if "." in stack else ""
+    env_prefix = namespace.rsplit(".", 1)[-1] if namespace else ""
 
     # Preserve the bare dotted name for legacy stacks so that existing
     # StackReference strings and resource tags continue to work unchanged
@@ -85,20 +89,30 @@ def parse_stack() -> StackInfo:
 
 
 def stack_ref(project_name: str, stack_name: str) -> str:
-    """Build a fully-qualified project-scoped DIY-backend stack reference string.
+    """Build a stack reference string that works both before and after migration.
 
-    Use this helper whenever constructing a :class:`pulumi.StackReference` that
-    crosses project boundaries.  It centralises the ``organization/`` prefix so
-    that call sites stay readable and the format is easy to update.
+    During Phase 1 this returns the legacy flat-namespace dotted format (e.g.
+    ``"infrastructure.aws.network.QA"``) for all projects that haven't been
+    renamed yet, so that existing stacks in the S3 backend continue to resolve.
+    Once a project's stacks are renamed (Phase 4) and its entry is removed from
+    :data:`ol_infrastructure.lib.pulumi_projects.LEGACY_PROJECT_PREFIXES`,
+    the helper switches to the project-scoped format
+    ``"organization/{project_name}/{stack_name}"``.
 
-    :param project_name: Pulumi project name as declared in ``Pulumi.yaml``
-        (the ``name:`` field), e.g. ``"ol-infrastructure-networking"``.
-        Use a constant from :mod:`ol_infrastructure.lib.pulumi_projects`.
-    :param stack_name: Short stack name after the project-scoped migration,
-        e.g. ``"QA"``, ``"mitx.Production"``, ``"operations.CI"``.
-    :returns: Fully-qualified reference string
-        ``"organization/{project_name}/{stack_name}"``.
+    :param project_name: Pulumi project name constant from
+        :mod:`ol_infrastructure.lib.pulumi_projects`.
+    :param stack_name: Short stack name, e.g. ``"QA"``, ``"mitx.Production"``,
+        ``"operations.CI"``.  Pass ``"default"`` for single-stack global
+        projects (DNS, IAM, POLICIES …).
+    :returns: Reference string suitable for :class:`pulumi.StackReference`.
     """
+    from ol_infrastructure.lib.pulumi_projects import (  # noqa: PLC0415
+        LEGACY_PROJECT_PREFIXES,
+    )
+
+    if project_name in LEGACY_PROJECT_PREFIXES:
+        prefix = LEGACY_PROJECT_PREFIXES[project_name]
+        return prefix if stack_name == "default" else f"{prefix}.{stack_name}"
     return f"organization/{project_name}/{stack_name}"
 
 
