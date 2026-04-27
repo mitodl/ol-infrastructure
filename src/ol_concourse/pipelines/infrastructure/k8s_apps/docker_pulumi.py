@@ -95,7 +95,11 @@ pipeline_params = {
         build_target="production",
         settings_dir="mitxpro",
     ),
-    "ocw-studio": AppPipelineParams(app_name="ocw-studio", repo_main_branch="master"),
+    "ocw-studio": AppPipelineParams(
+        app_name="ocw-studio",
+        repo_main_branch="master",
+        build_target="production",
+    ),
     "odl-video-service": AppPipelineParams(
         app_name="odl-video-service",
         repo_main_branch="master",
