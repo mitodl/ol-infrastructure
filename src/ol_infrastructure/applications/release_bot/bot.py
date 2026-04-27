@@ -4,12 +4,12 @@ import asyncio
 import logging
 import os
 
-import config
-import github
+import concourse_client as concourse
+import github_client as github
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.async_app import AsyncApp
 
-import concourse
+import config
 
 log = logging.getLogger(__name__)
 
@@ -149,7 +149,8 @@ async def cmd_hotfix(ack, respond, command):
         await respond(f"❌ Failed to trigger hotfix for `{app_name}`.")
         return
     await respond(
-        f"🔧 Hotfix triggered for `{app_name}` at `{commit_hash[:8]}`. Build: {build_url}"
+        f"🔧 Hotfix triggered for `{app_name}` at "
+        f"`{commit_hash[:8]}`. Build: {build_url}"
     )
 
 

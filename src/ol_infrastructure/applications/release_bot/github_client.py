@@ -2,6 +2,7 @@
 
 import os
 import re
+from typing import Any
 
 import aiohttp
 
@@ -36,7 +37,7 @@ async def _latest_release_tag(
     return None
 
 
-async def commits_since_last_tag(repo_slug: str) -> list[dict]:
+async def commits_since_last_tag(repo_slug: str) -> list[dict[str, Any]]:
     """Return commits on the default branch since the most recent YYYY.MM.DD.N tag.
 
     Uses the compare API (/compare/{tag}...{branch}) so only commits *after*
@@ -82,7 +83,7 @@ async def commits_since_last_tag(repo_slug: str) -> list[dict]:
     ]
 
 
-async def open_release_issues(repo_slug: str) -> list[dict]:
+async def open_release_issues(repo_slug: str) -> list[dict[str, Any]]:
     """Return open GitHub Issues labelled 'release'."""
     url = f"{GITHUB_API}/repos/{repo_slug}/issues"
     params = {"state": "open", "labels": "release", "per_page": "10"}
@@ -104,7 +105,11 @@ async def open_release_issues(repo_slug: str) -> list[dict]:
 
 
 async def close_release_issue(repo_slug: str, issue_number: int, comment: str) -> None:
-    """Add a comment and close the given issue (triggers Concourse production deploy)."""
+    """Add a comment and close the given issue (triggers Concourse production deploy).
+
+    Closing the release issue is the entire production promotion mechanism —
+    Concourse's github-issues resource polls for closed issues.
+    """
     async with aiohttp.ClientSession() as session:
         comment_url = f"{GITHUB_API}/repos/{repo_slug}/issues/{issue_number}/comments"
         async with session.post(
