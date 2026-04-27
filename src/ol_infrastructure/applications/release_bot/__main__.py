@@ -166,6 +166,12 @@ bot_deployment = kubernetes.apps.v1.Deployment(
         },
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
+        # Single replica is intentional: Slack Socket Mode maintains one persistent
+        # WebSocket per app-level token. Multiple replicas would each open a competing
+        # connection and Slack distributes events non-deterministically across them,
+        # meaning some interactions (e.g. button clicks) may silently be dropped by
+        # replicas that lack the right Bolt app state context. See the design doc in
+        # slack_release_bot_plan.md §"Design constraints".
         replicas=1,
         selector=kubernetes.meta.v1.LabelSelectorArgs(
             match_labels={"app": resource_name},

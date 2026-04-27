@@ -488,7 +488,12 @@ def format_slack_message(  # noqa: C901
     # Add "Promote to Production" button for RC (release version) deployments
     image = deployment_details.get("image", "")
     image_tag = image.rsplit(":", 1)[-1] if ":" in image else ""
-    app_name = name  # deployment name used as app identifier
+    # Prefer the ol.mit.edu/application label (set by OLApplicationK8s) since the
+    # Deployment name is typically "{app}-app" but REPOS_CONFIG keys are "{app}".
+    labels = deployment_details.get("labels", {})
+    app_name = labels.get("ol.mit.edu/application") or (
+        name[:-4] if name.endswith("-app") else name
+    )
     if _is_release_image(image_tag):
         blocks.append(
             {
