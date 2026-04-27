@@ -101,6 +101,7 @@ vector_log_proxy_stack = StackReference(
 )
 micromasters_vpc = network_stack.require_output("applications_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
+data_vpc = network_stack.require_output("data_vpc")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 micromasters_environment = f"micromasters-{stack_info.env_suffix}"
 
@@ -231,7 +232,21 @@ micromasters_db_security_group = ec2.SecurityGroup(
             ],
             cidr_blocks=micromasters_vpc["k8s_pod_subnet_cidrs"],
             description="Allow Vault and in-VPC app pods to access the database",
-        )
+        ),
+        ec2.SecurityGroupIngressArgs(
+            protocol="tcp",
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
+            security_groups=[
+                data_vpc["security_groups"]["orchestrator"],
+                data_vpc["security_groups"]["integrator"],
+            ],
+            # Airbyte isn't using pod security groups in Kubernetes. This is a
+            # workaround to allow for data integration from the data Kubernetes
+            # cluster.
+            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"],
+            description="Allow access from Airbyte in the data VPC",
+        ),
     ],
     egress=[
         ec2.SecurityGroupEgressArgs(
