@@ -134,3 +134,5 @@ config:
   - "https://video-rc.odl.mit.edu/"
   keycloak_realm:ol-mit-ovs-web-origins:
   - "https://video-rc.odl.mit.edu"
+  keycloak_realm:ol-mit-ldap-bind-password:
+    secure: v1:ReQKSODS/uYpvaq6:0G5qFul805Kbh/4YXurYnUEE9c9mudi712x1sYqi6Lqrj17T
