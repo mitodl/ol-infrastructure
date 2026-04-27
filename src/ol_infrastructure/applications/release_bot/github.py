@@ -37,40 +37,39 @@ async def _latest_release_tag(
 
 
 async def commits_since_last_tag(repo_slug: str) -> list[dict]:
-    """Return commits on the default branch since the most recent YYYY.MM.DD.N tag."""
+    """Return commits on the default branch since the most recent YYYY.MM.DD.N tag.
+
+    Uses the compare API (/compare/{tag}...{branch}) so only commits *after*
+    the tag are returned — the GET /commits?sha= endpoint returns history
+    *starting from* that SHA (i.e. ancestors), which is the opposite of what
+    we want.
+    """
     async with aiohttp.ClientSession() as session:
         latest_tag = await _latest_release_tag(session, repo_slug)
 
-        params: dict[str, str] = {"per_page": "50"}
         if latest_tag:
-            # Get the commit SHA for the tag so we can use `since`
-            url = f"{GITHUB_API}/repos/{repo_slug}/git/refs/tags/{latest_tag}"
-            async with session.get(url, headers=_auth_headers()) as resp:
+            # Resolve the default branch name for this repo
+            repo_url = f"{GITHUB_API}/repos/{repo_slug}"
+            async with session.get(repo_url, headers=_auth_headers()) as resp:
                 resp.raise_for_status()
-                ref_data = await resp.json()
-            tag_sha = ref_data["object"]["sha"]
+                repo_data = await resp.json()
+            default_branch = repo_data["default_branch"]
 
-            # If the tag points to a tag object (annotated tag), resolve to commit SHA
-            if ref_data["object"]["type"] == "tag":
-                tag_url = ref_data["object"]["url"]
-                async with session.get(tag_url, headers=_auth_headers()) as resp:
-                    resp.raise_for_status()
-                    tag_obj = await resp.json()
-                tag_sha = tag_obj["object"]["sha"]
-
-            params["sha"] = tag_sha
-
-        url = f"{GITHUB_API}/repos/{repo_slug}/commits"
-        async with session.get(url, headers=_auth_headers(), params=params) as resp:
-            resp.raise_for_status()
-            raw_commits = await resp.json()
-
-    # Exclude the tag commit itself when using a base SHA
-    if latest_tag and raw_commits:
-        tag_sha_prefix = params.get("sha", "")
-        raw_commits = [
-            c for c in raw_commits if not c["sha"].startswith(tag_sha_prefix)
-        ]
+            compare_url = (
+                f"{GITHUB_API}/repos/{repo_slug}/compare/"
+                f"{latest_tag}...{default_branch}"
+            )
+            async with session.get(compare_url, headers=_auth_headers()) as resp:
+                resp.raise_for_status()
+                compare_data = await resp.json()
+            raw_commits = compare_data["commits"]
+        else:
+            url = f"{GITHUB_API}/repos/{repo_slug}/commits"
+            async with session.get(
+                url, headers=_auth_headers(), params={"per_page": "50"}
+            ) as resp:
+                resp.raise_for_status()
+                raw_commits = await resp.json()
 
     return [
         {
