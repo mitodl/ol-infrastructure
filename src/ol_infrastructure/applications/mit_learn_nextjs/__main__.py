@@ -144,6 +144,10 @@ raw_env_vars = {
     # Env vars available only on server
     "MITOL_NOINDEX": nextjs_config.get("mitol_noindex"),
     "NEXT_PUBLIC_OPTIMIZE_IMAGES": nextjs_config.get("optimize_images"),
+    "GTM_TRACKING_ID": nextjs_config.get("gtm_tracking_id") or "",
+    "GTM_AUTH": nextjs_config.get("gtm_auth") or "",
+    "GTM_PREVIEW": nextjs_config.get("gtm_preview") or "",
+    "GTM_COOKIES_WIN": nextjs_config.get("gtm_cookies_win") or "",
     # Env vars available on client and server
     "NEXT_PUBLIC_APPZI_URL": nextjs_config.require("appzi_url"),
     "NEXT_PUBLIC_CSRF_COOKIE_NAME": nextjs_config.require("csrf_cookie_name"),
