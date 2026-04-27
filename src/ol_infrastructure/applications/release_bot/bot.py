@@ -5,11 +5,10 @@ import logging
 import os
 
 import concourse_client as concourse
+import config
 import github_client as github
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.async_app import AsyncApp
-
-import config
 
 log = logging.getLogger(__name__)
 
