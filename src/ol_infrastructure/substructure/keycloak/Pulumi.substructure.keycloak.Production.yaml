@@ -79,6 +79,8 @@ config:
   - "ol_data_engineer"
   - "ol_data_analyst"
   - "ol_researcher"
+  - "ol_instructor"
+  - "ol_business_analyst"
   keycloak_realm:ol-data-platform-openmetadata-redirect-uris: ["https://data.ol.mit.edu/*"]
   keycloak_realm:ol-data-platform-openmetadata-client-roles:
   - "open_metadata_admin"

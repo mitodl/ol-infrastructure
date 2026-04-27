@@ -42,6 +42,8 @@ config:
   - "ol_data_engineer"
   - "ol_data_analyst"
   - "ol_researcher"
+  - "ol_instructor"
+  - "ol_business_analyst"
   keycloak_realm:ol-data-platform-superset-client-secret:
     secure: v1:Ow95HN9yKnXBg5jX:CUoA/qBSeUF2w0FNYlEnC5OyvP8sg7S3efyvrX8J10Q8T16oxlO3MF3ROByGk12G
   keycloak_realm:ol-data-platform-superset-redirect-uris:
