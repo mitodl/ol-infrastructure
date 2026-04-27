@@ -787,9 +787,7 @@ ODL_VIDEO_SERVICE_IMAGE = format_docker_image_ref(
     "mitodl/odl-video-service-app", "ODL_VIDEO_SERVICE"
 )
 
-# NGINX configuration for K8s (HTTP only — APISIX handles TLS)
-ovs_domains = ovs_config.get_object("domains") or [ovs_config.get("default_domain")]
-server_names = " ".join(ovs_domains)
+# NGINX configuration for K8s (TLS terminated at nginx sidecar; certs from cert-manager)
 default_domain = ovs_config.get("default_domain")
 
 nginx_conf_content = f"""\
@@ -798,8 +796,8 @@ server {{
     listen [::]:443;
     server_name {default_domain};
 
-    ssl_certificate /etc/nginx/cert.pem;
-    ssl_certificate_key /etc/nginx/key.pem;
+    ssl_certificate /etc/nginx/tls/cert.pem;
+    ssl_certificate_key /etc/nginx/tls/key.pem;
     ssl_stapling on;
     ssl_stapling_verify on;
     ssl_session_timeout 1d;
@@ -906,6 +904,8 @@ env_from_sources = [
     for secret_name in secret_names
 ]
 
+tls_secret_name = "ovs-tls-pair"  # noqa: S105  # pragma: allowlist secret
+
 # Volume definitions
 volumes: list[kubernetes.core.v1.VolumeArgs] = [
     kubernetes.core.v1.VolumeArgs(
@@ -917,6 +917,16 @@ volumes: list[kubernetes.core.v1.VolumeArgs] = [
     kubernetes.core.v1.VolumeArgs(
         name="staticfiles",
         empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+    ),
+    kubernetes.core.v1.VolumeArgs(
+        name="tls-certs",
+        secret=kubernetes.core.v1.SecretVolumeSourceArgs(
+            secret_name=tls_secret_name,
+            items=[
+                kubernetes.core.v1.KeyToPathArgs(key="tls.crt", path="cert.pem"),
+                kubernetes.core.v1.KeyToPathArgs(key="tls.key", path="key.pem"),
+            ],
+        ),
     ),
 ]
 
@@ -943,6 +953,11 @@ nginx_volume_mounts: list[kubernetes.core.v1.VolumeMountArgs] = [
     kubernetes.core.v1.VolumeMountArgs(
         name="staticfiles",
         mount_path="/opt/odl-video-service/staticfiles",
+        read_only=True,
+    ),
+    kubernetes.core.v1.VolumeMountArgs(
+        name="tls-certs",
+        mount_path="/etc/nginx/tls",
         read_only=True,
     ),
 ]
@@ -1047,6 +1062,18 @@ nginx_sidecar = kubernetes.core.v1.ContainerArgs(
     ),
 )
 
+cert_manager_certificate = OLCertManagerCert(
+    f"ovs-cert-manager-certificate-{stack_info.env_suffix}",
+    cert_config=OLCertManagerCertConfig(
+        application_name="ovs",
+        k8s_namespace=ovs_namespace,
+        k8s_labels=k8s_app_labels,
+        create_apisixtls_resource=True,
+        dest_secret_name=tls_secret_name,
+        dns_names=[default_domain],
+    ),
+)
+
 # Deployment
 ovs_deployment = kubernetes.apps.v1.Deployment(
     f"ovs-deployment-{stack_info.env_suffix}",
@@ -1103,6 +1130,7 @@ ovs_deployment = kubernetes.apps.v1.Deployment(
             ovs_app_security_group,
             app_configmap,
             nginx_configmap,
+            cert_manager_certificate,
             *secret_resources,
         ]
     ),
@@ -1193,19 +1221,6 @@ celery_deployment = kubernetes.apps.v1.Deployment(
             app_configmap,
             *secret_resources,
         ]
-    ),
-)
-
-tls_secret_name = "ovs-tls-pair"  # noqa: S105  # pragma: allowlist secret
-cert_manager_certificate = OLCertManagerCert(
-    f"ovs-cert-manager-certificate-{stack_info.env_suffix}",
-    cert_config=OLCertManagerCertConfig(
-        application_name="ovs",
-        k8s_namespace=ovs_namespace,
-        k8s_labels=k8s_app_labels,
-        create_apisixtls_resource=True,
-        dest_secret_name=tls_secret_name,
-        dns_names=[default_domain],
     ),
 )
 
