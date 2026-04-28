@@ -44,50 +44,50 @@ bot_secrets = read_yaml_secrets(
 bot_config = Config("release_bot")
 concourse_url = bot_config.get("concourse_url") or "https://cicd.odl.mit.edu"
 
-REPOS_CONFIG = json.dumps(
-    {
-        "learn-ai": {
-            "pipeline": "learn-ai-pipeline",
-            "repo": "mitodl/learn-ai",
-            "branch": "main",
-        },
-        "micromasters": {
-            "pipeline": "micromasters-pipeline",
-            "repo": "mitodl/micromasters",
-            "branch": "master",
-        },
-        "mit-learn": {
-            "pipeline": "mit-learn-pipeline",
-            "repo": "mitodl/mit-learn",
-            "branch": "main",
-        },
-        "mit-learn-nextjs": {
-            "pipeline": "mit-learn-nextjs-pipeline",
-            "repo": "mitodl/mit-learn",
-            "branch": "main",
-        },
-        "mitxonline": {
-            "pipeline": "mitxonline-pipeline",
-            "repo": "mitodl/mitxonline",
-            "branch": "main",
-        },
-        "ocw-studio": {
-            "pipeline": "ocw-studio-pipeline",
-            "repo": "mitodl/ocw-studio",
-            "branch": "master",
-        },
-        "odl-video-service": {
-            "pipeline": "odl-video-service-pipeline",
-            "repo": "mitodl/odl-video-service",
-            "branch": "master",
-        },
-        "xpro": {
-            "pipeline": "xpro-pipeline",
-            "repo": "mitodl/mitxpro",
-            "branch": "master",
-        },
-    }
-)
+default_repos_config = {
+    "learn-ai": {
+        "pipeline": "learn-ai-pipeline",
+        "repo": "mitodl/learn-ai",
+        "branch": "main",
+    },
+    "micromasters": {
+        "pipeline": "micromasters-pipeline",
+        "repo": "mitodl/micromasters",
+        "branch": "master",
+    },
+    "mit-learn": {
+        "pipeline": "mit-learn-pipeline",
+        "repo": "mitodl/mit-learn",
+        "branch": "main",
+    },
+    "mit-learn-nextjs": {
+        "pipeline": "mit-learn-nextjs-pipeline",
+        "repo": "mitodl/mit-learn",
+        "branch": "main",
+    },
+    "mitxonline": {
+        "pipeline": "mitxonline-pipeline",
+        "repo": "mitodl/mitxonline",
+        "branch": "main",
+    },
+    "ocw-studio": {
+        "pipeline": "ocw-studio-pipeline",
+        "repo": "mitodl/ocw-studio",
+        "branch": "master",
+    },
+    "odl-video-service": {
+        "pipeline": "odl-video-service-pipeline",
+        "repo": "mitodl/odl-video-service",
+        "branch": "master",
+    },
+    "xpro": {
+        "pipeline": "xpro-pipeline",
+        "repo": "mitodl/mitxpro",
+        "branch": "master",
+    },
+}
+repos_config = bot_config.get_object("repos_config") or default_repos_config
+REPOS_CONFIG = json.dumps(repos_config)
 
 env_suffix_lower = stack_info.env_suffix.lower()
 resource_name = f"release-bot-{env_suffix_lower}"
