@@ -255,12 +255,23 @@ def create_ol_mit_realm(  # noqa: PLR0913
     # created fresh or linked to an existing account with the same Touchstone
     # principal.
     #
-    # NOTE: The auto-link step (idp-auto-link) silently links an incoming Touchstone
-    # identity to an existing local account that shares the same username/email.
-    # This is intentional for a Touchstone-only realm where the MIT Kerberos
-    # principal (eduPersonPrincipalName) is the canonical identifier.  Revisit this
-    # if MIT LDAP federation is later enabled for the same realm to avoid silent
-    # duplicate-linking.
+    # With LDAP federation enabled and import_enabled=True:
+    # - New users: idp-create-user-if-unique searches Keycloak AND LDAP.  When
+    #   the user is found in LDAP they are imported with federationLink=mit-ldap
+    #   before idp-auto-link runs, so the resulting account carries both the SAML
+    #   identity link and the LDAP federation link.  Group membership is resolved
+    #   at every subsequent login via the LDAP group mapper.
+    # - Existing users (logged in before LDAP federation was added): their
+    #   Keycloak record is already local (no federationLink).  The first-login
+    #   flow will not run again for them, so their account is never linked to
+    #   LDAP and groups will not be resolved automatically.
+    #
+    # REMEDIATION for existing users: run a one-time full LDAP sync after
+    # deploying the federation.  Keycloak will match each LDAP user to the
+    # existing local record by username and update the federationLink so that
+    # group resolution starts working on the next login:
+    #   POST /admin/realms/ol-mit/user-storage/<id>/sync?action=triggerFullSync
+    # or via Admin UI: User Federation → mit-ldap → Action → Sync all users.
 
     ol_mit_touchstone_first_login_flow = keycloak.authentication.Flow(
         "ol-mit-touchstone-first-login-flow",
