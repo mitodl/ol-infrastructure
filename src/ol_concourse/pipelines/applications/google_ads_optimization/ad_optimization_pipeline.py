@@ -5,6 +5,7 @@ from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
+    GetStep,
     Identifier,
     Input,
     Job,
@@ -19,7 +20,7 @@ from ol_concourse.lib.notifications import notification
 from ol_concourse.lib.resource_types import (
     slack_notification_resource as slack_notification_resource_type,
 )
-from ol_concourse.lib.resources import slack_notification
+from ol_concourse.lib.resources import schedule, slack_notification
 
 COURSES = ["ml", "gen_ai", "sys_think", "sys_eng"]
 
@@ -33,11 +34,14 @@ slack_notification_resource = slack_notification(
     Identifier("slack-notification"), url="((google_ads_optimization.slack_url))"
 )
 
+ad_optimization_schedule = schedule(Identifier("optimization-schedule"), interval="24h")
+
 
 def ad_optimization_pipeline() -> Pipeline:
     ad_optimization_object = Job(
         name=Identifier("ad-optimization"),
         plan=[
+            GetStep(get=ad_optimization_schedule.name, trigger=True),
             TaskStep(
                 task=Identifier("ad-optimization-pipeline"),
                 config=TaskConfig(
