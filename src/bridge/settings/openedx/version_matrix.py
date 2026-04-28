@@ -317,6 +317,7 @@ ReleaseMap: dict[
                 application="instructor",
                 application_type="MFE",
                 release="master",
+                branch_override="main",
             ),
             OpenEdxApplicationVersion(
                 application="learning",
@@ -385,6 +386,7 @@ ReleaseMap: dict[
                 application="instructor",
                 application_type="MFE",
                 release="master",
+                branch_override="main",
             ),
             OpenEdxApplicationVersion(
                 application="learner-dashboard",
@@ -459,6 +461,7 @@ ReleaseMap: dict[
                 application="instructor",
                 application_type="MFE",
                 release="master",
+                branch_override="main",
             ),
             OpenEdxApplicationVersion(
                 application="learning",
