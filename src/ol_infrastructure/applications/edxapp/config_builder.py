@@ -182,6 +182,7 @@ def build_base_general_config() -> ConfigDict:
         "ICP_LICENSE": None,
         "ICP_LICENSE_INFO": {},
         "ID_VERIFICATION_SUPPORT_LINK": "",
+        "INSTRUCTOR_MICROFRONTEND_URL": "/instructor",
         "INTEGRATED_CHANNELS_API_CHUNK_TRANSMISSION_LIMIT": {
             "SAP": 1,
         },

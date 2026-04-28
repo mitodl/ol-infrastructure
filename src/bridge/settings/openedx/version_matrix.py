@@ -314,6 +314,11 @@ ReleaseMap: dict[
                 release="master",
             ),
             OpenEdxApplicationVersion(
+                application="instructor",
+                application_type="MFE",
+                release="master",
+            ),
+            OpenEdxApplicationVersion(
                 application="learning",
                 application_type="MFE",
                 release="master",
@@ -373,6 +378,11 @@ ReleaseMap: dict[
             ),
             OpenEdxApplicationVersion(
                 application="gradebook",
+                application_type="MFE",
+                release="master",
+            ),
+            OpenEdxApplicationVersion(
+                application="instructor",
                 application_type="MFE",
                 release="master",
             ),
@@ -442,6 +452,11 @@ ReleaseMap: dict[
             ),
             OpenEdxApplicationVersion(
                 application="gradebook",
+                application_type="MFE",
+                release="master",
+            ),
+            OpenEdxApplicationVersion(
+                application="instructor",
                 application_type="MFE",
                 release="master",
             ),
