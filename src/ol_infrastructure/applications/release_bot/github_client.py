@@ -6,15 +6,22 @@ from typing import Any
 
 import aiohttp
 
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GITHUB_API = "https://api.github.com"
 
 _RELEASE_TAG_RE = re.compile(r"^\d{4}\.\d{2}\.\d{2}\.\d+$")
 
 
+def _github_token() -> str:
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    if not token:
+        msg = "GITHUB_TOKEN environment variable must be set"
+        raise RuntimeError(msg)
+    return token
+
+
 def _auth_headers() -> dict[str, str]:
     return {
-        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Authorization": f"Bearer {_github_token()}",
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
