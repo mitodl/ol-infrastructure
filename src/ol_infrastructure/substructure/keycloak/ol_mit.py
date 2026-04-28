@@ -519,6 +519,15 @@ def create_ol_mit_realm(  # noqa: PLR0913
             opts=resource_options,
         )
 
+    # Parent group for all LDAP-sourced groups.  The groups_path parameter on
+    # the group mapper requires this group to exist before the first sync runs.
+    ol_mit_moira_group = keycloak.Group(
+        "ol-mit-moira-group",
+        realm_id=ol_mit_realm.id,
+        name="moira",
+        opts=resource_options,
+    )
+
     # Group mapper — resolves memberships by querying group entries directly.
     # The Okta LDAP interface does NOT expose a virtual memberOf attribute on
     # user entries, so GET_GROUPS_FROM_USER_MEMBEROF_ATTRIBUTE cannot be used.
@@ -526,6 +535,9 @@ def create_ol_mit_realm(  # noqa: PLR0913
     # groupOfUniqueNames objects whose uniqueMember value equals the user's DN
     # (e.g. uid=tmacey@mit.edu,ou=users,dc=mitprod,dc=okta,dc=com), which is
     # how membership is actually stored in the Okta LDAP interface.
+    #
+    # All synced groups land under /moira to distinguish them from groups
+    # managed directly in Keycloak.
     keycloak.ldap.GroupMapper(
         "ol-mit-ldap-group-mapper",
         realm_id=ol_mit_realm.id,
@@ -538,11 +550,15 @@ def create_ol_mit_realm(  # noqa: PLR0913
         membership_user_ldap_attribute="uid",
         membership_attribute_type="DN",
         user_roles_retrieve_strategy="LOAD_GROUPS_BY_MEMBER_ATTRIBUTE",
+        groups_path="/moira",
         mode="READ_ONLY",
         preserve_group_inheritance=False,
         drop_non_existing_groups_during_sync=True,
         ignore_missing_groups=True,
-        opts=resource_options,
+        opts=ResourceOptions.merge(
+            resource_options,
+            ResourceOptions(depends_on=[ol_mit_moira_group]),
+        ),
     )
     # MIT LDAP FEDERATION [END]
 
