@@ -115,7 +115,7 @@ def ad_optimization_pipeline() -> Pipeline:
     )
     return Pipeline(
         jobs=[ad_optimization_object],
-        resources=[slack_notification_resource],
+        resources=[slack_notification_resource, ad_optimization_schedule],
         resource_types=[slack_notification_resource_type()],
     )
 
