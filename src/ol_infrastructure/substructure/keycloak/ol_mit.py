@@ -473,7 +473,15 @@ def create_ol_mit_realm(  # noqa: PLR0913
         # is the correct stable identifier across renames / email changes.
         uuid_ldap_attribute="uniqueIdentifier",
         user_object_classes=["inetOrgPerson"],
-        edit_mode="READ_ONLY",
+        # UNSYNCED rather than READ_ONLY: users are imported from LDAP into
+        # Keycloak's local DB, and writes go to the local copy only (never back
+        # to LDAP).  READ_ONLY causes a ReadOnlyException when the Touchstone
+        # SAML broker's afterFirstBrokerLogin flow tries to write basic
+        # attributes (firstName, lastName) onto the newly-linked user.  With
+        # UNSYNCED the local copy is writable; the hourly delta sync keeps it
+        # current from LDAP, and the group mapper still queries LDAP directly
+        # because the federationLink is preserved.
+        edit_mode="UNSYNCED",
         vendor="OTHER",
         search_scope="ONE_LEVEL",
         # Restrict to active accounts only; deprovisioned users have
