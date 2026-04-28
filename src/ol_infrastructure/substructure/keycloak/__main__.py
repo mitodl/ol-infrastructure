@@ -104,6 +104,9 @@ create_olapps_realm(
     session_secret,
     fetch_realm_public_key_partial,
 )
+mit_ldap_bind_password = keycloak_realm_config.require_secret(
+    "ol-mit-ldap-bind-password"
+)
 create_ol_mit_realm(
     keycloak_provider,
     keycloak_url,
@@ -112,6 +115,7 @@ create_ol_mit_realm(
     mit_email_password,
     mit_email_username,
     mit_email_host,
+    mit_ldap_bind_password,
     session_secret,
     fetch_realm_public_key_partial,
 )
