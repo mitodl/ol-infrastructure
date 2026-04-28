@@ -336,6 +336,7 @@ class EdxappConfigMaps:
     lms_interpolated: kubernetes.core.v1.ConfigMap
     uwsgi_ini: kubernetes.core.v1.ConfigMap
     waffle_flags_yaml: kubernetes.core.v1.ConfigMap
+    ssh_known_hosts: kubernetes.core.v1.ConfigMap
 
     general_config_name: str
     interpolated_config_name: str
@@ -345,6 +346,7 @@ class EdxappConfigMaps:
     lms_interpolated_config_name: str
     uwsgi_ini_config_name: str
     waffle_flags_yaml_config_name: str
+    ssh_known_hosts_config_name: str
 
 
 def create_k8s_configmaps(  # noqa: PLR0915
@@ -712,6 +714,25 @@ def create_k8s_configmaps(  # noqa: PLR0915
         },
     )
 
+    ssh_known_hosts_config_name = "ssh-known-hosts"
+    ssh_known_hosts_config_map = kubernetes.core.v1.ConfigMap(
+        f"ol-{stack_info.env_prefix}-edxapp-ssh-known-hosts-{stack_info.env_suffix}",
+        metadata={
+            "name": ssh_known_hosts_config_name,
+            "namespace": namespace,
+            "labels": k8s_global_labels,
+        },
+        data={
+            "known_hosts": (
+                "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\n"
+                "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=\n"
+                "github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=\n"
+                "github.mit.edu ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC2O4R+il6hakufwT11bancWV07CZsAiA/AjQpFNr1rbOOytHzBfQrli78iZigaJiBkRhLPztSxRDS3IWTMQUH5080GgJRIC+ksFk+JinfeoYVYiAC3zbIFjNEiXXkePHl/lCkfRjXwNnP+gdrSq6zo+AT3CERvjQsxaz5qglHQtqTFCBPfHcNIYkIurC0rWlGJ6KL4hKvI6bz6z8Y6Bz/bjrhRDlUxxjE3t83ZAJ2bJo4MMaK/uH1XbsOzVXsMw24PimyanLOH9RTDxUY+EoQ2X49MI1mYK3k/Vp3N2DjRVDVWONGssInON+PgZoG/pbYuU0VOh3qKYoLsLE9uV3dH\n"
+                "github.mit.edu ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBOhMLcf5HaMo5uFvtt5XYyvQeeAsZ3sPH6QApKUxmZiQcU1vvTCwGgssKzVpQQcdWeArRltjCxnD+p7iaVWuKls=\n"
+            ),
+        },
+    )
+
     return EdxappConfigMaps(
         general=general_config_map,
         interpolated=interpolated_config_map,
@@ -721,6 +742,7 @@ def create_k8s_configmaps(  # noqa: PLR0915
         lms_interpolated=lms_interpolated_config_map,
         uwsgi_ini=uwsgi_ini_config_map,
         waffle_flags_yaml=waffle_flags_yaml_config_map,
+        ssh_known_hosts=ssh_known_hosts_config_map,
         general_config_name=general_config_name,
         interpolated_config_name=interpolated_config_name,
         cms_general_config_name=cms_general_config_name,
@@ -729,4 +751,5 @@ def create_k8s_configmaps(  # noqa: PLR0915
         lms_interpolated_config_name=lms_interpolated_config_name,
         uwsgi_ini_config_name=uwsgi_ini_config_name,
         waffle_flags_yaml_config_name=waffle_flags_yaml_config_name,
+        ssh_known_hosts_config_name=ssh_known_hosts_config_name,
     )

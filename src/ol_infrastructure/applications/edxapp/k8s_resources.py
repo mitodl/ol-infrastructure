@@ -343,6 +343,12 @@ def create_k8s_resources(  # noqa: C901
             read_only=True,
         ),
         kubernetes.core.v1.VolumeMountArgs(
+            name=configmaps.ssh_known_hosts_config_name,
+            mount_path="/etc/ssh/ssh_known_hosts",
+            sub_path="known_hosts",
+            read_only=True,
+        ),
+        kubernetes.core.v1.VolumeMountArgs(
             name=configmaps.uwsgi_ini_config_name,
             mount_path="/openedx/edx-platform/uwsgi.ini",
             sub_path="uwsgi.ini",
@@ -522,6 +528,12 @@ def create_k8s_resources(  # noqa: C901
                 name=configmaps.waffle_flags_yaml_config_name,
                 config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
                     name=configmaps.waffle_flags_yaml_config_name,
+                ),
+            ),
+            kubernetes.core.v1.VolumeArgs(
+                name=configmaps.ssh_known_hosts_config_name,
+                config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                    name=configmaps.ssh_known_hosts_config_name,
                 ),
             ),
             kubernetes.core.v1.VolumeArgs(
@@ -811,6 +823,12 @@ def create_k8s_resources(  # noqa: C901
                 name=configmaps.waffle_flags_yaml_config_name,
                 config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
                     name=configmaps.waffle_flags_yaml_config_name,
+                ),
+            ),
+            kubernetes.core.v1.VolumeArgs(
+                name=configmaps.ssh_known_hosts_config_name,
+                config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                    name=configmaps.ssh_known_hosts_config_name,
                 ),
             ),
             kubernetes.core.v1.VolumeArgs(
