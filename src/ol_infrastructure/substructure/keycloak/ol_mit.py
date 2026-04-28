@@ -483,7 +483,14 @@ def create_ol_mit_realm(  # noqa: PLR0913
         # because the federationLink is preserved.
         edit_mode="UNSYNCED",
         vendor="OTHER",
-        search_scope="ONE_LEVEL",
+        # SUBTREE is required because Okta group entries are nested three
+        # levels under ou=groups (e.g.
+        # cn=ol-eng-developer,cn=<app-id>,ou=apps,ou=groups,...).
+        # ONE_LEVEL would only reach the immediate children of ou=groups
+        # (e.g. ou=apps itself) and never find actual group objects.
+        # Users are all direct children of ou=users, so SUBTREE has no
+        # downside for user searches.
+        search_scope="SUBTREE",
         # Restrict to active accounts only; deprovisioned users have
         # organizationalStatus set to a value other than ACTIVE.
         custom_user_search_filter="(organizationalStatus=ACTIVE)",
