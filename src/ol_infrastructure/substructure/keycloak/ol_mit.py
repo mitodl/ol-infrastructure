@@ -434,27 +434,26 @@ def create_ol_mit_realm(  # noqa: PLR0913
     # Read-only federation against MIT's Okta LDAP interface to enrich users
     # already created via Touchstone SAML and to assign group memberships.
     #
-    # The Okta LDAP interface only exposes ou=users at the base DN; groups are
-    # surfaced via the virtual memberOf attribute on each user entry.  The
-    # GET_GROUPS_FROM_USER_MEMBEROF_ATTRIBUTE strategy on the group mapper
-    # therefore avoids needing to walk group entries and is more efficient for
-    # this interface.
+    # The Okta LDAP interface exposes users under ou=users and groups under
+    # ou=groups.  User entries do NOT carry a virtual memberOf attribute, so the
+    # group mapper uses LOAD_GROUPS_BY_MEMBER_ATTRIBUTE to look up memberships
+    # by querying group entries directly.
     #
     # Username linkage: Touchstone sends kerberos@mit.edu as the SAML NameID
     # (SUBJECT principal); the LDAP uid attribute is also kerberos@mit.edu, so
     # users created on first Touchstone login are automatically linked to their
     # LDAP counterpart on the next sync / login.
     #
-    # PREREQUISITE: The oleng service account must have "Read Groups" scope
-    # enabled in Okta Admin → Security → API → LDAP Interface before the group
-    # mapper can populate memberships.  The user-attribute sync works without
-    # that permission.
+    # PREREQUISITE: The open-learning-ldap.service account must have "Read
+    # Groups" scope enabled in Okta Admin → Security → API → LDAP Interface
+    # before the group mapper can populate memberships.  The user-attribute
+    # sync works without that permission.
     ol_mit_ldap = keycloak.ldap.UserFederation(
         "ol-mit-ldap",
         name="mit-ldap",
         realm_id=ol_mit_realm.id,
         connection_url="ldaps://mitprod.ldap.okta.com",
-        bind_dn="uid=oleng,dc=mitprod,dc=okta,dc=com",
+        bind_dn="uid=open-learning-ldap.service,dc=mitprod,dc=okta,dc=com",
         bind_credential=mit_ldap_bind_password,
         users_dn="ou=users,dc=mitprod,dc=okta,dc=com",
         username_ldap_attribute="uid",
@@ -466,6 +465,9 @@ def create_ol_mit_realm(  # noqa: PLR0913
         edit_mode="READ_ONLY",
         vendor="OTHER",
         search_scope="ONE_LEVEL",
+        # Restrict to active accounts only; deprovisioned users have
+        # organizationalStatus set to a value other than ACTIVE.
+        custom_user_search_filter="(organizationalStatus=ACTIVE)",
         # MIT emails are validated by Touchstone; no re-verification needed.
         trust_email=True,
         sync_registrations=False,
@@ -517,11 +519,13 @@ def create_ol_mit_realm(  # noqa: PLR0913
             opts=resource_options,
         )
 
-    # Group mapper — resolves memberships from the virtual memberOf attribute
-    # rather than scanning group entries.  Groups in the Okta LDAP interface are
-    # exposed as groupOfUniqueNames under ou=groups once the oleng account has
-    # "Read Groups" permission; the mapper is registered now so no Pulumi change
-    # is required after that permission is granted.
+    # Group mapper — resolves memberships by querying group entries directly.
+    # The Okta LDAP interface does NOT expose a virtual memberOf attribute on
+    # user entries, so GET_GROUPS_FROM_USER_MEMBEROF_ATTRIBUTE cannot be used.
+    # Instead, LOAD_GROUPS_BY_MEMBER_ATTRIBUTE issues a search for
+    # groupOfUniqueNames objects whose uniqueMember value equals the user's DN
+    # (e.g. uid=tmacey@mit.edu,ou=users,dc=mitprod,dc=okta,dc=com), which is
+    # how membership is actually stored in the Okta LDAP interface.
     keycloak.ldap.GroupMapper(
         "ol-mit-ldap-group-mapper",
         realm_id=ol_mit_realm.id,
@@ -533,8 +537,7 @@ def create_ol_mit_realm(  # noqa: PLR0913
         membership_ldap_attribute="uniqueMember",
         membership_user_ldap_attribute="uid",
         membership_attribute_type="DN",
-        user_roles_retrieve_strategy="GET_GROUPS_FROM_USER_MEMBEROF_ATTRIBUTE",
-        memberof_ldap_attribute="memberOf",
+        user_roles_retrieve_strategy="LOAD_GROUPS_BY_MEMBER_ATTRIBUTE",
         mode="READ_ONLY",
         preserve_group_inheritance=False,
         drop_non_existing_groups_during_sync=True,
