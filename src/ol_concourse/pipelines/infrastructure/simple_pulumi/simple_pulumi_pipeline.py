@@ -158,13 +158,6 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             "src/bridge/lib/versions.py",
         ],
     ),
-    "bootcamps": SimplePulumiParams(
-        app_name="bootcamps",
-        pulumi_project_path="applications/bootcamps/",
-        stack_prefix="applications.bootcamps",
-        pulumi_project_name="ol-infrastructure-bootcamps-application",
-        additional_watched_paths=["src/bridge/lib/"],
-    ),
     "celery-monitoring": SimplePulumiParams(
         app_name="celery-monitoring",
         pulumi_project_path="applications/celery_monitoring/",

@@ -179,7 +179,6 @@ if __name__ == "__main__":
 
     production_app_names = [
         "airbyte",
-        "bootcamps",
         "celery-monitoring",
         "clickhouse",
         "data_warehouse",
