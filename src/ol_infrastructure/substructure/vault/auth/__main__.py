@@ -118,7 +118,7 @@ developer_role = jwt.AuthBackendRole(
         f"{vault_config.get('address')}/ui/vault/auth/oidc/oidc/callback",
     ],
     bound_audiences=[keycloak_config.get("client_id")],
-    user_claim="sub",
+    user_claim="email",
     role_type="oidc",
 )
 
@@ -133,7 +133,7 @@ admin_role = jwt.AuthBackendRole(
         f"{vault_config.get('address')}/ui/vault/auth/oidc/oidc/callback",
     ],
     bound_audiences=[keycloak_config.get("client_id")],
-    user_claim="sub",
+    user_claim="email",
     role_type="oidc",
     bound_claims={"roles": "admin, vault-admins"},
 )
