@@ -53,6 +53,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     cached_image_uri,
     check_cluster_namespace,
@@ -68,7 +69,7 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import StackInfo
+from ol_infrastructure.lib.pulumi_helper import StackInfo, stack_ref
 
 
 def create_k8s_resources(  # noqa: C901
@@ -121,7 +122,7 @@ def create_k8s_resources(  # noqa: C901
     release_info = OpenLearningOpenEdxDeployment.get_item(stack_info.env_prefix)
 
     opensearch_stack = StackReference(
-        f"infrastructure.aws.opensearch.{stack_info.env_prefix}.{stack_info.name}"
+        stack_ref(projects.OPENSEARCH, f"{stack_info.env_prefix}.{stack_info.name}")
     )
     opensearch_hostname = opensearch_stack.require_output("cluster")["endpoint"]
 

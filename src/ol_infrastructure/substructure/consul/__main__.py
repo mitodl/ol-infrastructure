@@ -5,11 +5,12 @@ from pulumi_consul import (
     PreparedQueryTemplateArgs,
 )
 
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.consul import get_consul_provider
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 
 stack_info = parse_stack()
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
 operations_vpc = network_stack.require_output("operations_vpc")
 consul_provider = get_consul_provider(stack_info).merge(
     ResourceOptions(delete_before_replace=True)

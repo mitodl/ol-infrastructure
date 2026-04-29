@@ -13,15 +13,18 @@ from pulumi_vault import (
 )
 
 from bridge.lib.magic_numbers import EIGHT_HOURS_SECONDS, ONE_MONTH_SECONDS
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.ol_types import AWSBase, Environment
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 vault_config = Config("vault")
 stack_info = parse_stack()
 keycloak_config = Config("keycloak")
 
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+vault_stack = StackReference(
+    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+)
 aws_config = AWSBase(tags={"OU": "operations", "Environment": stack_info.name})
 aws_account = get_caller_identity()
 

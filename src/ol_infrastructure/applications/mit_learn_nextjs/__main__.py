@@ -13,6 +13,7 @@ from ol_infrastructure.components.aws.eks import (
     OLEKSGatewayListenerConfig,
     OLEKSGatewayRouteConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     ecr_image_uri,
@@ -30,11 +31,14 @@ from ol_infrastructure.lib.pulumi_helper import (
     get_docker_image_tag,
     merge_otel_resource_attributes,
     parse_stack,
+    stack_ref,
 )
 
 stack_info = parse_stack()
 
-cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+cluster_stack = StackReference(
+    stack_ref(projects.EKS, f"applications.{stack_info.name}")
+)
 # Assume the application image URI comes from a separate image build stack
 MIT_LEARN_NEXTJS_DOCKER_TAG = get_docker_image_tag("MIT_LEARN_NEXTJS")
 

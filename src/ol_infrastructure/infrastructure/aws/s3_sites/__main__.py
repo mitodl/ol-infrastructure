@@ -7,10 +7,11 @@ from ol_infrastructure.components.aws.s3_cloudfront_site import (
     S3ServerlessSite,
     S3ServerlessSiteConfig,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib import pulumi_projects as projects
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 
 fifteen_minutes = 60 * 15
-dns_stack = StackReference("infrastructure.aws.dns")
+dns_stack = StackReference(stack_ref(projects.DNS, "default"))
 stack_info = parse_stack()
 
 if stack_info.env_suffix == "production":

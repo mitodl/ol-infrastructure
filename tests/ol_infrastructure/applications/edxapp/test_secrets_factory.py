@@ -32,6 +32,7 @@ def mock_stack_info() -> StackInfo:
         env_prefix="mitx",
         env_suffix="qa",
         full_name="infrastructure.aws.edxapp.mitx",
+        project_name="ol-application-edxapp",
     )
 
 

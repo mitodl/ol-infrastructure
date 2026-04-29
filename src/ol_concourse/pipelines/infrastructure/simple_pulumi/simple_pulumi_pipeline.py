@@ -122,7 +122,7 @@ def discover_pulumi_stacks(
     def get_stage_priority(stack_name: str) -> int:
         """Extract stage from stack name and return priority."""
         for stage, priority in stage_priority.items():
-            if stack_name.endswith(f".{stage}"):
+            if stack_name == stage or stack_name.endswith(f".{stage}"):
                 return priority
         return 999  # Unknown stages go last
 
@@ -429,7 +429,9 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                     group: [
                         s
                         for s in stacks
-                        if any(s.endswith(f".{stage}") for stage in allowed)
+                        if any(
+                            s == stage or s.endswith(f".{stage}") for stage in allowed
+                        )
                     ]
                     for group, stacks in discovered_stacks.items()
                 }
@@ -439,7 +441,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 discovered_stacks = [
                     s
                     for s in discovered_stacks
-                    if any(s.endswith(f".{stage}") for stage in allowed)
+                    if any(s == stage or s.endswith(f".{stage}") for stage in allowed)
                 ]
         if not discovered_stacks:
             msg = (

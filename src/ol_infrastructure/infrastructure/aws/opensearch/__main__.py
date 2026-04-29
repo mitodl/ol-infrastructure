@@ -7,6 +7,7 @@ import pulumi_aws as aws
 
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.ec2_helper import DiskTypes, default_egress_args
 from ol_infrastructure.lib.aws.iam_helper import (
     DEVOPS_ADMIN_USERNAMES,
@@ -14,7 +15,7 @@ from ol_infrastructure.lib.aws.iam_helper import (
     lint_iam_policy,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 from ol_infrastructure.lib.stack_defaults import defaults
 
 SEARCH_DOMAIN_NAME_MAX_LENGTH = 28
@@ -26,9 +27,9 @@ search_config = pulumi.Config("opensearch")
 env_config = pulumi.Config("environment")
 stack_info = parse_stack()
 
-network_stack = pulumi.StackReference(f"infrastructure.aws.network.{stack_info.name}")
+network_stack = pulumi.StackReference(stack_ref(projects.NETWORKING, stack_info.name))
 vault_stack = pulumi.StackReference(
-    f"infrastructure.vault.operations.{stack_info.name}"
+    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
 )
 
 #############
