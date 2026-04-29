@@ -39,6 +39,11 @@ path "aws-mitx/*" {
   capabilities = ["read", "list"]
 }
 
+# Generate AWS iAM creds
+path "aws-mitx/creds/*" {
+  capabilities = ["read", "list", "update"]
+}
+
 # Read Database readonly creds
 path "+/creds/" {
   capabilities = ["list"]
