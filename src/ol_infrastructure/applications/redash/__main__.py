@@ -43,19 +43,22 @@ from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 redash_config = Config("redash")
 stack_info = parse_stack()
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-consul_stack = StackReference(f"infrastructure.consul.data.{stack_info.name}")
-dns_stack = StackReference("infrastructure.aws.dns")
-policy_stack = StackReference("infrastructure.aws.policies")
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+consul_stack = StackReference(
+    stack_ref(projects.CONSUL_INFRA, f"data.{stack_info.name}")
+)
+dns_stack = StackReference(stack_ref(projects.DNS, "default"))
+policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
@@ -322,13 +325,15 @@ vault.generic.Secret(
 # Refer to DATASOUCE_MANAGEMENT.md
 if redash_config.get_bool("manage_datasources"):
     datasource_config_consul_keys = []
-    mitxonline_stack = StackReference(f"applications.mitxonline.{stack_info.name}")
+    mitxonline_stack = StackReference(stack_ref(projects.MITXONLINE, stack_info.name))
     odl_video_service_stack = StackReference(
-        f"applications.odl_video_service.{stack_info.name}"
+        stack_ref(projects.ODL_VIDEO_SERVICE, stack_info.name)
     )
-    ocw_studio_stack = StackReference(f"applications.ocw_studio.{stack_info.name}")
-    micromasters_stack = StackReference(f"applications.micromasters.{stack_info.name}")
-    bootcamps_stack = StackReference(f"applications.bootcamps.{stack_info.name}")
+    ocw_studio_stack = StackReference(stack_ref(projects.OCW_STUDIO, stack_info.name))
+    micromasters_stack = StackReference(
+        stack_ref(projects.MICROMASTERS, stack_info.name)
+    )
+    bootcamps_stack = StackReference(stack_ref(projects.BOOTCAMPS, stack_info.name))
     if stack_info.name == "QA":
         datasource_config_consul_keys.append(
             consul.KeysKeyArgs(

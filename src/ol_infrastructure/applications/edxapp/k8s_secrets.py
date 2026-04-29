@@ -29,6 +29,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
@@ -77,6 +78,7 @@ def create_k8s_secrets(
     namespace: str,
     stack_info: StackInfo,
     vault_k8s_resources: OLVaultK8SResources,
+    restart_deployment_names: list[str] | None = None,
 ) -> EdxappSecrets:
     """Create all Kubernetes secrets for edxapp using registry pattern.
 
@@ -92,6 +94,8 @@ def create_k8s_secrets(
         namespace: Kubernetes namespace for secrets
         stack_info: Stack information (env_prefix, env_suffix)
         vault_k8s_resources: Vault Kubernetes authentication resources
+        restart_deployment_names: Deployment names to restart when DB
+            credentials are rotated by Vault (dynamic secrets only).
 
     Returns:
         EdxappSecrets dataclass with all created secrets
@@ -131,6 +135,14 @@ def create_k8s_secrets(
     typesense_secret_name = "16-typesense-yaml"  # pragma: allowlist secret
 
     # Database credentials secret (dynamic - depends on DB outputs)
+    _db_restart_targets = (
+        [
+            OLVaultRestartTarget(kind="Deployment", name=n)
+            for n in restart_deployment_names
+        ]
+        if restart_deployment_names
+        else None
+    )
     db_creds_secret = Output.all(
         address=edxapp_db.db_instance.address,
         port=edxapp_db.db_instance.port,
@@ -151,6 +163,7 @@ def create_k8s_secrets(
                     )[0],
                 },
                 vaultauth=vault_k8s_resources.auth_name,
+                restart_targets=_db_restart_targets,
             ),
             opts=builder.get_common_options(),
         )
@@ -177,6 +190,7 @@ def create_k8s_secrets(
                     )[0],
                 },
                 vaultauth=vault_k8s_resources.auth_name,
+                restart_targets=_db_restart_targets,
             ),
             opts=builder.get_common_options(),
         )

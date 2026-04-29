@@ -12,15 +12,16 @@ from pulumi import (
 from pulumi_aws import athena, glue, iam, s3
 
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 
 current_aws_account = s3.get_canonical_user_id()
 data_warehouse_config = Config("data_warehouse")
 data_lake_query_engine_config = Config("data-lake-query-engine")
 stack_info = parse_stack()
-kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
+kms_stack = StackReference(stack_ref(projects.KMS, stack_info.name))
 aws_config = AWSBase(
     tags={
         "OU": "data",

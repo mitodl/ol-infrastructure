@@ -19,7 +19,7 @@ import pulumi_kubernetes as kubernetes
 from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_aws.acmpca import Certificate, CertificateValidityArgs
 from pulumi_vault import Mount, aws, database, generic, pkisecret
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from bridge.lib.magic_numbers import (
     DEFAULT_MONGODB_PORT,
@@ -628,6 +628,15 @@ class OLVaultPKIIntermediateRole(ComponentResource):
 
 # TODO: @Ardiea expand to include support for transformationRefs  # noqa: FIX002, TD002
 # https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
+
+
+class OLVaultRestartTarget(BaseModel):
+    """A single rolloutRestartTarget entry for the Vault Secrets Operator."""
+
+    kind: Literal["Deployment", "DaemonSet", "StatefulSet"]
+    name: str
+
+
 class OLVaultK8SSecretConfig(BaseModel):
     annotations: dict[str, str] | None = None
     dest_secret_annotations: dict[str, str] | None = None
@@ -651,9 +660,25 @@ class OLVaultK8SSecretConfig(BaseModel):
     mount_type: Literal["kv-v1", "kv-v2"] | None = None
     name: str
     refresh_after: str | None = None
-    # TODO: @Ardiea Add support for multiple restart targets  # noqa: FIX002, TD002
-    restart_target_kind: Literal["Deployment", "DaemonSet", "StatefulSet"] | None = None
-    restart_target_name: str | None = None
+    restart_targets: list[OLVaultRestartTarget] | None = Field(
+        default=None,
+        description=(
+            "List of Deployments, DaemonSets, or StatefulSets to rolling-restart when "
+            "the Vault Secrets Operator refreshes this secret. Prefer this over the "
+            "deprecated restart_target_kind/restart_target_name fields."
+        ),
+    )
+    # Deprecated: use restart_targets instead
+    restart_target_kind: Literal["Deployment", "DaemonSet", "StatefulSet"] | None = (
+        Field(
+            default=None,
+            description="Deprecated. Use restart_targets instead.",
+        )
+    )
+    restart_target_name: str | None = Field(
+        default=None,
+        description="Deprecated. Use restart_targets instead.",
+    )
     namespace: str
     path: str
     templates: dict[str, str | Output[str]] | None = None
@@ -661,12 +686,26 @@ class OLVaultK8SSecretConfig(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @model_validator(mode="after")
-    def restart_target_is_set(self):
-        if not all((self.restart_target_kind, self.restart_target_name)) and any(
-            (self.restart_target_kind, self.restart_target_name)
-        ):
+    def validate_restart_targets(self) -> "OLVaultK8SSecretConfig":
+        has_legacy = bool(self.restart_target_kind or self.restart_target_name)
+        has_new = bool(self.restart_targets)
+
+        if self.restart_targets is not None and not self.restart_targets:
+            msg = "restart_targets must be non-empty when provided."
+            raise ValueError(msg)
+
+        if has_legacy and has_new:
+            msg = (
+                "Cannot specify both restart_targets and the deprecated "
+                "restart_target_kind/restart_target_name fields. "
+                "Use restart_targets exclusively."
+            )
+            raise ValueError(msg)
+
+        if has_legacy and not all((self.restart_target_kind, self.restart_target_name)):
             msg = "Both restart_target_kind and restart_target_name must be set."
             raise ValueError(msg)
+
         return self
 
 
@@ -737,7 +776,14 @@ class OLVaultK8SSecret(ComponentResource):
             },
         }
 
-        if resource_config.restart_target_kind and resource_config.restart_target_name:
+        if resource_config.restart_targets:
+            secret_def["spec"]["rolloutRestartTargets"] = [
+                {"name": t.name, "kind": t.kind}
+                for t in resource_config.restart_targets
+            ]
+        elif (
+            resource_config.restart_target_kind and resource_config.restart_target_name
+        ):
             secret_def["spec"]["rolloutRestartTargets"] = [
                 {
                     "name": resource_config.restart_target_name,

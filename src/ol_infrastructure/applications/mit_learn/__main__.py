@@ -67,6 +67,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResourcesConfig,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     default_psg_egress_args,
@@ -90,6 +91,7 @@ from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
     merge_otel_resource_attributes,
     parse_stack,
+    stack_ref,
 )
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
@@ -108,24 +110,32 @@ vault_config = Config("vault")
 
 stack_info = parse_stack()
 
-cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
-cluster_substructure_stack = StackReference(
-    f"substructure.aws.eks.applications.{stack_info.name}"
+cluster_stack = StackReference(
+    stack_ref(projects.EKS, f"applications.{stack_info.name}")
 )
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+cluster_substructure_stack = StackReference(
+    stack_ref(projects.EKS_SUB, f"applications.{stack_info.name}")
+)
+vault_stack = StackReference(
+    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+)
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 
 vector_log_proxy_stack = StackReference(
-    f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
+    stack_ref(projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}")
 )
-monitoring_stack = StackReference("infrastructure.monitoring")
-dns_stack = StackReference("infrastructure.aws.dns")
+monitoring_stack = StackReference(stack_ref(projects.MONITORING, "default"))
+dns_stack = StackReference(stack_ref(projects.DNS, "default"))
+ocw_site_stack = StackReference(
+    stack_ref(projects.OCW_SITE, stack_info.name if stack_info.name != "CI" else "QA")
+)
+ocw_site_buckets = ocw_site_stack.require_output("ocw_site_buckets")
 qdrant_cloud_stack = StackReference(
-    f"infrastructure.qdrant_cloud.mitlearn.{stack_info.name}"
+    stack_ref(projects.QDRANT_CLOUD, f"mitlearn.{stack_info.name}")
 )
 
 qdrant_secrets = read_yaml_secrets(Path("qdrant_cloud/account.yaml"))
@@ -539,8 +549,9 @@ mitlearn_db_security_group = ec2.SecurityGroup(
             from_port=0,
             to_port=0,
             protocol="-1",
-            cidr_blocks=["0.0.0.0/32"],
-            ipv6_cidr_blocks=["::/0"],
+            cidr_blocks=[apps_vpc["cidr"]],
+            ipv6_cidr_blocks=[apps_vpc["cidr_v6"]],
+            description="Allow all outbound traffic within the applications VPC",
         )
     ],
     tags=aws_config.tags,
@@ -852,6 +863,10 @@ for k, v in mimetypes.types_map.items():
         gzip_settings["content_types"].add(v)
 fastly_shielding_enabled = mitlearn_config.get_bool("enable_fastly_shielding") or False
 bucket_backend_name = "MIT Learn S3 Media Storage"
+ocw_courses_bucket_backend_name = "OCW S3 Courses"
+ocw_courses_bucket_fqdn = ocw_site_buckets["buckets"]["live"].apply(
+    lambda name: f"{name}.s3.us-east-1.amazonaws.com"
+)
 mitlearn_fastly_service = fastly.ServiceVcl(
     f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}",
     name=f"MIT Learn {stack_info.env_suffix}",
@@ -880,6 +895,18 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             ssl_sni_hostname=f"{mitlearn_app_storage_bucket_name}.s3.us-east-1.amazonaws.com",
             use_ssl=True,
         ),
+        fastly.ServiceVclBackendArgs(
+            address=ocw_courses_bucket_fqdn,
+            name=ocw_courses_bucket_backend_name,
+            first_byte_timeout=30000,
+            override_host=ocw_courses_bucket_fqdn,
+            port=443,
+            request_condition="OCW course requests",
+            shield="iad-va-us" if fastly_shielding_enabled else None,
+            ssl_cert_hostname=ocw_courses_bucket_fqdn,
+            ssl_sni_hostname=ocw_courses_bucket_fqdn,
+            use_ssl=True,
+        ),
     ],
     gzips=[
         fastly.ServiceVclGzipArgs(
@@ -897,7 +924,12 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             name="Media asset requests",
             statement="var.is_media_request",
             type="REQUEST",
-        )
+        ),
+        fastly.ServiceVclConditionArgs(
+            name="OCW course requests",
+            statement="var.is_ocw_request",
+            type="REQUEST",
+        ),
     ],
     dictionaries=[
         fastly.ServiceVclDictionaryArgs(name="path_redirects"),  # exact path redirects
@@ -920,7 +952,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             action="set",
             destination="http.Strict-Transport-Security",
             name="Generated by force TLS and enable HSTS",
-            source='"max-age=300"',
+            source='"max-age=31536000"',
             type="response",
         ),
     ],
@@ -965,6 +997,32 @@ mitlearn_fastly_service = fastly.ServiceVcl(
         ),
         fastly.ServiceVclSnippetArgs(
             content=textwrap.dedent(
+                r"""
+            declare local var.is_ocw_request BOOL;
+            set var.is_ocw_request = false;
+            if (req.url.path ~ "^/courses/o/") {
+              set req.url = regsub(
+                req.url, "^/courses/o/", "/ocw-course-v3/courses/"
+              );
+            }
+            if (req.url.path ~ "^/static_shared/") {
+              set var.is_ocw_request = true;
+            }
+            if (req.url.path ~ "^/ocw-course-v3/") {
+              set var.is_ocw_request = true;
+              set req.url = querystring.remove(req.url);
+              if (req.url !~ "\.[^/]+$") {
+                set req.url = regsub(req.url, "/?$", "/index.html");
+              }
+              unset req.http.Cookie;
+            }"""
+            ),
+            name="Route OCW courses to S3",
+            priority=200,
+            type="recv",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            content=textwrap.dedent(
                 f"""\
             if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
               unset bereq.http.Authorization;
@@ -976,11 +1034,31 @@ mitlearn_fastly_service = fastly.ServiceVcl(
         fastly.ServiceVclSnippetArgs(
             content=textwrap.dedent(
                 f"""\
+            if (req.backend == F_{ocw_courses_bucket_backend_name.replace(" ", "_")}) {{
+              unset bereq.http.Authorization;
+            }}"""
+            ),
+            name="Strip auth headers for OCW S3 miss requests",
+            type="miss",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            content=textwrap.dedent(
+                f"""\
             if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
               unset bereq.http.Authorization;
             }}"""
             ),
             name="Strip auth headers in S3 pass requests",
+            type="pass",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            content=textwrap.dedent(
+                f"""\
+            if (req.backend == F_{ocw_courses_bucket_backend_name.replace(" ", "_")}) {{
+              unset bereq.http.Authorization;
+            }}"""
+            ),
+            name="Strip auth headers for OCW S3 pass requests",
             type="pass",
         ),
         fastly.ServiceVclSnippetArgs(
@@ -1151,7 +1229,6 @@ env_vars = {
     "NODE_MODULES_CACHE": "False",
     "OCW_BASE_URL": "https://ocw.mit.edu/",
     "OCW_CONTENT_BUCKET_NAME": "ocw-content-storage",
-    "OCW_LIVE_BUCKET": "ocw-content-live-production",
     "OCW_UPLOAD_IMAGE_ONLY": "True",
     "OLL_ALT_URL": "https://openlearninglibrary.mit.edu/courses",
     "OLL_API_ACCESS_TOKEN_URL": "https://openlearninglibrary.mit.edu/oauth2/access_token/",

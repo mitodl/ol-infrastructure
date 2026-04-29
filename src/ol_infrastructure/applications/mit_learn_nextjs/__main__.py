@@ -13,6 +13,7 @@ from ol_infrastructure.components.aws.eks import (
     OLEKSGatewayListenerConfig,
     OLEKSGatewayRouteConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     ecr_image_uri,
@@ -30,11 +31,14 @@ from ol_infrastructure.lib.pulumi_helper import (
     get_docker_image_tag,
     merge_otel_resource_attributes,
     parse_stack,
+    stack_ref,
 )
 
 stack_info = parse_stack()
 
-cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+cluster_stack = StackReference(
+    stack_ref(projects.EKS, f"applications.{stack_info.name}")
+)
 # Assume the application image URI comes from a separate image build stack
 MIT_LEARN_NEXTJS_DOCKER_TAG = get_docker_image_tag("MIT_LEARN_NEXTJS")
 
@@ -129,8 +133,8 @@ active_color = colors.apply(lambda c: c["active_color"])
 last_active_resolved = colors.apply(lambda c: c["last_active"])
 
 stay_updated_hubspot_form_ids = {
-    "ci": "4f423dc7-5b08-430b-a9fb-920b7f9597ed",
-    "qa": "4f423dc7-5b08-430b-a9fb-920b7f9597ed",
+    "ci": "f201f3af-c2c0-4b7d-b297-ddbb75912cc1",
+    "qa": "f201f3af-c2c0-4b7d-b297-ddbb75912cc1",
     "production": "a5d18493-dcdb-4482-ad10-16ab66a35526",
 }
 
@@ -144,6 +148,10 @@ raw_env_vars = {
     # Env vars available only on server
     "MITOL_NOINDEX": nextjs_config.get("mitol_noindex"),
     "NEXT_PUBLIC_OPTIMIZE_IMAGES": nextjs_config.get("optimize_images"),
+    "GTM_TRACKING_ID": nextjs_config.get("gtm_tracking_id") or "",
+    "GTM_AUTH": nextjs_config.get("gtm_auth") or "",
+    "GTM_PREVIEW": nextjs_config.get("gtm_preview") or "",
+    "GTM_COOKIES_WIN": nextjs_config.get("gtm_cookies_win") or "",
     # Env vars available on client and server
     "NEXT_PUBLIC_APPZI_URL": nextjs_config.require("appzi_url"),
     "NEXT_PUBLIC_CSRF_COOKIE_NAME": nextjs_config.require("csrf_cookie_name"),

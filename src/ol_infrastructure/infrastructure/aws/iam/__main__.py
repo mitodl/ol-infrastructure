@@ -3,12 +3,14 @@ import json
 from pulumi import ResourceOptions, StackReference, export
 from pulumi_aws import get_caller_identity, iam
 
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.iam_helper import (
     ADMIN_USERNAMES,
     EKS_ADMIN_USERNAMES,
     EKS_DEVELOPER_USERNAMES,
     IAM_POLICY_VERSION,
 )
+from ol_infrastructure.lib.pulumi_helper import stack_ref
 
 administrator_iam_group = iam.Group(
     "administrators-iam-group",
@@ -72,7 +74,7 @@ for developer in EKS_DEVELOPER_USERNAMES:
 
 
 account_id = get_caller_identity().account_id
-concourse_production_stack = StackReference("applications.concourse.Production")
+concourse_production_stack = StackReference(stack_ref(projects.CONCOURSE, "Production"))
 
 # The people or nodes assuming this role already have admin powers
 eks_cluster_creator_role = iam.Role(

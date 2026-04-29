@@ -55,6 +55,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResourcesConfig,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
@@ -75,6 +76,7 @@ from ol_infrastructure.lib.pulumi_helper import (
     format_docker_image_ref,
     merge_otel_resource_attributes,
     parse_stack,
+    stack_ref,
 )
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -88,10 +90,12 @@ k8s_cutover = ovs_config.get_bool("k8s_cutover") or False
 
 aws_account = get_caller_identity()
 
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-policy_stack = StackReference("infrastructure.aws.policies")
-dns_stack = StackReference("infrastructure.aws.dns")
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
+dns_stack = StackReference(stack_ref(projects.DNS, "default"))
+vault_stack = StackReference(
+    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+)
 
 target_vpc_name = ovs_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
 target_vpc = network_stack.require_output(target_vpc_name)
@@ -636,7 +640,6 @@ ovs_server_secrets = vault.generic.Secret(
 
 
 enabled_annotations = ovs_config.get_bool("feature_annotations")
-use_shibboleth = ovs_config.get_bool("use_shibboleth") or False
 
 # MediaConvert resources (needed by both EC2 and K8s paths)
 ovs_mediaconvert_config = MediaConvertConfig(
@@ -677,7 +680,6 @@ app_env_vars: dict[str, str | bool] = {
     "PORT": "8087",
     "REDIS_MAX_CONNECTIONS": redis_config.get("max_connections") or "65000",
     "STATUS_TOKEN": stack_info.env_suffix,
-    "USE_SHIBBOLETH": "True" if use_shibboleth else "False",
     "VIDEO_S3_BUCKET": ovs_config.get("s3_bucket_name") or "",
     "VIDEO_S3_SUBTITLE_BUCKET": ovs_config.get("s3_subtitle_bucket_name") or "",
     "VIDEO_S3_THUMBNAIL_BUCKET": ovs_config.get("s3_thumbnail_bucket_name") or "",
@@ -692,7 +694,9 @@ app_env_vars: dict[str, str | bool] = {
 
 vault_config = Config("vault")
 
-cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+cluster_stack = StackReference(
+    stack_ref(projects.EKS, f"applications.{stack_info.name}")
+)
 k8s_pod_subnet_cidrs = target_vpc["k8s_pod_subnet_cidrs"]
 
 k8s_app_labels = K8sAppLabels(
@@ -766,7 +770,6 @@ secret_names, secret_resources = create_ovs_k8s_secrets(
     rds_endpoint=rds_endpoint,
     redis_auth_token=redis_auth_token,
     redis_cluster=ovs_server_redis_cluster,
-    use_shibboleth=use_shibboleth,
 )
 
 # Merge stack-level config vars into the app env vars
@@ -790,19 +793,17 @@ ODL_VIDEO_SERVICE_IMAGE = format_docker_image_ref(
     "mitodl/odl-video-service-app", "ODL_VIDEO_SERVICE"
 )
 
-# NGINX configuration for K8s (HTTP only — APISIX handles TLS)
-ovs_domains = ovs_config.get_object("domains") or [ovs_config.get("default_domain")]
-server_names = " ".join(ovs_domains)
+# NGINX configuration for K8s (TLS terminated at nginx sidecar; certs from cert-manager)
 default_domain = ovs_config.get("default_domain")
 
-nginx_with_shib_conf = f"""\
+nginx_conf_content = f"""\
 server {{
     listen 443 ssl default_server;
-    listen [::]:443;
+    listen [::]:443 ssl default_server;
     server_name {default_domain};
 
-    ssl_certificate /etc/nginx/cert.pem;
-    ssl_certificate_key /etc/nginx/key.pem;
+    ssl_certificate /etc/nginx/tls/cert.pem;
+    ssl_certificate_key /etc/nginx/tls/key.pem;
     ssl_stapling on;
     ssl_stapling_verify on;
     ssl_session_timeout 1d;
@@ -813,108 +814,10 @@ server {{
     ssl_prefer_server_ciphers on;
     resolver 1.1.1.1;
 
-    # 1. Determine the 'real' scheme from the Ingress
+    # Propagate the real client-facing scheme set by APISix after TLS termination.
+    # Falls back to $scheme (the Nginx connection scheme) when the header is absent.
     set $my_scheme $http_x_forwarded_proto;
     if ($my_scheme = "") {{ set $my_scheme $scheme; }}
-
-    # 2. Map HTTPS variable for Shibboleth/uWSGI
-    set $my_https "";
-    if ($my_scheme = "https") {{ set $my_https "on"; }}
-
-    root /opt/odl-video-service/;
-
-    location /shibauthorizer {{
-        internal;
-        include fastcgi_params;
-        include shib_fastcgi_params;
-        # Tell Shibboleth the request IS secure
-        fastcgi_param SERVER_PORT 443;
-        fastcgi_param REQUEST_SCHEME https;
-        fastcgi_param HTTPS on;
-        fastcgi_pass unix:/opt/shibboleth/shibauthorizer.sock;
-    }}
-
-    location /Shibboleth.sso {{
-        include fastcgi_params;
-        include shib_fastcgi_params;
-        # Tell the responder the request IS secure
-        fastcgi_param SERVER_PORT 443;
-        fastcgi_param REQUEST_SCHEME https;
-        fastcgi_param HTTPS on;
-        fastcgi_pass unix:/opt/shibboleth/shibresponder.sock;
-    }}
-
-    location /login {{
-        include shib_clear_headers;
-        proxy_set_header Host {default_domain};
-        shib_request /shibauthorizer;
-        shib_request_use_headers on;
-        include shib_params;
-        include uwsgi_params;
-
-        # Override uwsgi_params to reflect the Ingress scheme
-        uwsgi_param UWSGI_SCHEME $my_scheme;
-        uwsgi_param HTTPS $my_https;
-
-        uwsgi_ignore_client_abort on;
-        uwsgi_pass 127.0.0.1:8087;
-    }}
-
-    location / {{
-        include uwsgi_params;
-        uwsgi_param UWSGI_SCHEME $my_scheme;
-        uwsgi_param HTTPS $my_https;
-        uwsgi_pass 127.0.0.1:8087;
-    }}
-
-    location = /nginx-health {{
-        access_log off;
-        return 200 "healthy\n";
-    }}
-
-    location /collections/letterlocking {{
-        return 301 https://www.youtube.com/c/Letterlocking/videos;
-    }}
-
-    location /collections/letterlocking/videos {{
-        return 301 https://www.youtube.com/c/Letterlocking/videos;
-    }}
-
-    location /collections/letterlocking/videos/30213-iron-gall-ink-a-quick-and-easy-method {{
-        return 301 https://www.youtube.com/playlist?list=PL2uZTM-xaHP4tFQT7eTTK3sWRoJMcDWwB;
-    }}
-
-    location /collections/letterlocking/videos/30215-elizabeth-stuart-s-deciphering-sir-thomas-roe-s-letter-cryptography-1626 {{
-        return 301 https://www.youtube.com/watch?v=6X_ZXrLs8I8&list=PL2uZTM-xaHP4tFQT7eTTK3sWRoJMcDWwB&index=3&t=0s;
-    }}
-
-    location /collections/letterlocking/videos/30209-a-tiny-spy-letter-constantijn-huygens-to-amalia-von-solms-1635 {{
-        return 301 https://www.youtube.com/watch?v=PePWd-h679c&list=PL2uZTM-xaHP4tFQT7eTTK3sWRoJMcDWwB&index=7&t=0s;
-    }}
-
-    location /collections/c8c5179c7596408fa0f09f6b76082331 {{
-        return 301 https://www.youtube.com/c/MITEnergyInitiative;
-    }}
-}}
-"""  # noqa: E501
-
-nginx_wo_shib_conf = f"""\
-server {{
-    listen 443 ssl default_server;
-    listen [::]:443;
-    server_name {default_domain};
-
-    ssl_certificate /etc/nginx/cert.pem;
-    ssl_certificate_key /etc/nginx/key.pem;
-    ssl_stapling on;
-    ssl_stapling_verify on;
-    ssl_session_timeout 1d;
-    ssl_session_tickets off;
-    # ssl_protocols TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-SHA256:DHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA256;
-    ssl_prefer_server_ciphers on;
-    resolver 1.1.1.1;
 
     location = /nginx-health {{
         access_log off;
@@ -924,6 +827,9 @@ server {{
 
     location / {{
         include uwsgi_params;
+        # Pass the real scheme so Django's SECURE_PROXY_SSL_HEADER check succeeds
+        # and request.is_secure() / build_absolute_uri() return https:// URLs.
+        uwsgi_param HTTP_X_FORWARDED_PROTO $my_scheme;
         uwsgi_ignore_client_abort on;
         uwsgi_pass 127.0.0.1:8087;
     }}
@@ -954,175 +860,17 @@ server {{
 }}
 """  # noqa: E501
 
-nginx_conf_content = nginx_with_shib_conf if use_shibboleth else nginx_wo_shib_conf
-
-shibboleth2_xml = f"""\
-<SPConfig xmlns="urn:mace:shibboleth:3.0:native:sp:config"
-          xmlns:conf="urn:mace:shibboleth:3.0:native:sp:config"
-          clockSkew="180">
-
-    <OutOfProcess tranLogFormat="%u|%s|%IDP|%i|%ac|%t|%attr|%n|%b|%E|%S|%SS|%L|%UA|%a" />
-
-    <RequestMapper type="Native">
-        <RequestMap>
-            <Host authType="shibboleth" name="{default_domain}" requireSession="true" scheme="https" port="443"/>
-        </RequestMap>
-    </RequestMapper>
-
-    <ApplicationDefaults entityID="https://{default_domain}/shibboleth"
-                         REMOTE_USER="eppn subject-id pairwise-id persistent-id"
-                         cipherSuites="DEFAULT:!EXP:!LOW:!aNULL:!eNULL:!DES:!IDEA:!SEED:!RC4:!3DES:!kRSA:!SSLv2:!SSLv3:!TLSv1:!TLSv1.1">
-
-        <Sessions lifetime="28800" timeout="3600" relayState="ss:mem"
-                  checkAddress="false" handlerSSL="false" cookieProps="https"
-                  redirectLimit="exact+whitelist"
-                  redirectWhitelist="https://idp.mit.edu/ https://idp.touchstonenetwork.net/ https://idp-alum.mit.edu/">
-
-            <SSO discoveryProtocol="SAMLDS" discoveryURL="https://wayf.mit.edu/DS">
-                SAML2
-            </SSO>
-
-            <Logout>SAML2 Local</Logout>
-            <LogoutInitiator type="Admin" Location="/Logout/Admin" acl="127.0.0.1 ::1" />
-            <Handler type="MetadataGenerator" Location="/Metadata" signing="false"/>
-            <Handler type="Status" Location="/Status" acl="127.0.0.1 ::1"/>
-            <Handler type="Session" Location="/Session" showAttributeValues="true"/>
-            <Handler type="DiscoveryFeed" Location="/DiscoFeed"/>
-        </Sessions>
-
-        <Errors supportContact="odl-devops@mit.edu"
-                helpLocation="/about.html"
-                styleSheet="/shibboleth-sp/main.css"/>
-
-        <MetadataProvider type="XML" validate="true" url="http://touchstone.mit.edu/metadata/MIT-metadata.xml" backingFilePath="MIT-metadata.xml" maxRefreshDelay="7200">
-            <MetadataFilter type="RequireValidUntil" maxValidityInterval="5184000"/>
-            <MetadataFilter type="Signature" certificate="mit-md-cert.pem" verifyBackup="false"/>
-        </MetadataProvider>
-
-        <TrustEngine type="ExplicitKey" />
-        <AttributeExtractor type="XML" validate="true" reloadChanges="false" path="attribute-map.xml"/>
-        <AttributeFilter type="XML" validate="true" path="attribute-policy.xml"/>
-        <AttributeResolver type="Query" subjectMatch="true"/>
-
-        <CredentialResolver type="File" use="signing" key="sp-key.pem" certificate="sp-cert.pem"/>
-        <CredentialResolver type="File" use="encryption" key="sp-key.pem" certificate="sp-cert.pem"/>
-
-    </ApplicationDefaults>
-
-    <SecurityPolicyProvider type="XML" validate="true" path="security-policy.xml"/>
-    <ProtocolProvider type="XML" validate="true" reloadChanges="false" path="protocols.xml"/>
-
-</SPConfig>
-"""  # noqa: E501
-
 # Static NGINX support files
 bilder_files_dir = Path(__file__).resolve().parent / "files"
 
-fastcgi_params_content = bilder_files_dir.joinpath("fastcgi_params").read_text()
 uwsgi_params_content = bilder_files_dir.joinpath("uwsgi_params").read_text()
 logging_conf_content = bilder_files_dir.joinpath("logging.conf").read_text()
 
-# Shibboleth-specific ConfigMap, volumes, and mounts (consolidated)
-if use_shibboleth:
-    attribute_map_content = bilder_files_dir.joinpath("attribute-map.xml").read_text()
-    shib_extra_nginx_data: dict[str, str] = {
-        "shib_clear_headers": bilder_files_dir.joinpath(
-            "shib_clear_headers"
-        ).read_text(),
-        "shib_fastcgi_params": bilder_files_dir.joinpath(
-            "shib_fastcgi_params"
-        ).read_text(),
-        "shib_params": bilder_files_dir.joinpath("shib_params").read_text(),
-    }
-    shib_configmap: kubernetes.core.v1.ConfigMap | None = kubernetes.core.v1.ConfigMap(
-        f"ovs-shib-configmap-{stack_info.env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="ovs-shib-config",
-            namespace=ovs_namespace,
-            labels=k8s_app_labels,
-        ),
-        data={
-            "shibboleth2.xml": shibboleth2_xml,
-            "attribute-map.xml": attribute_map_content,
-        },
-    )
-    shib_extra_volumes: list[kubernetes.core.v1.VolumeArgs] = [
-        kubernetes.core.v1.VolumeArgs(
-            name="shib-config",
-            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                name="ovs-shib-config",
-            ),
-        ),
-        kubernetes.core.v1.VolumeArgs(
-            name="shib-certs",
-            secret=kubernetes.core.v1.SecretVolumeSourceArgs(
-                secret_name="ovs-shib-certs-static-secret",  # noqa: S106  # pragma: allowlist secret
-            ),
-        ),
-    ]
-    shib_extra_nginx_mounts: list[kubernetes.core.v1.VolumeMountArgs] = [
-        kubernetes.core.v1.VolumeMountArgs(
-            name="nginx-config",
-            mount_path="/etc/nginx/shib_clear_headers",
-            sub_path="shib_clear_headers",
-            read_only=True,
-        ),
-        kubernetes.core.v1.VolumeMountArgs(
-            name="nginx-config",
-            mount_path="/etc/nginx/shib_fastcgi_params",
-            sub_path="shib_fastcgi_params",
-            read_only=True,
-        ),
-        kubernetes.core.v1.VolumeMountArgs(
-            name="nginx-config",
-            mount_path="/etc/nginx/shib_params",
-            sub_path="shib_params",
-            read_only=True,
-        ),
-        kubernetes.core.v1.VolumeMountArgs(
-            name="shib-config",
-            mount_path="/etc/shibboleth/shibboleth2.xml",
-            sub_path="shibboleth2.xml",
-            read_only=True,
-        ),
-        kubernetes.core.v1.VolumeMountArgs(
-            name="shib-config",
-            mount_path="/etc/shibboleth/attribute-map.xml",
-            sub_path="attribute-map.xml",
-            read_only=True,
-        ),
-        kubernetes.core.v1.VolumeMountArgs(
-            name="shib-certs",
-            mount_path="/etc/shibboleth/sp-cert.pem",
-            sub_path="sp-cert.pem",
-            read_only=True,
-        ),
-        kubernetes.core.v1.VolumeMountArgs(
-            name="shib-certs",
-            mount_path="/etc/shibboleth/sp-key.pem",
-            sub_path="sp-key.pem",
-            read_only=True,
-        ),
-        kubernetes.core.v1.VolumeMountArgs(
-            name="shib-certs",
-            mount_path="/etc/shibboleth/mit-md-cert.pem",
-            sub_path="mit-md-cert.pem",
-            read_only=True,
-        ),
-    ]
-else:
-    shib_configmap = None
-    shib_extra_nginx_data = {}
-    shib_extra_volumes = []
-    shib_extra_nginx_mounts = []
-
 # ConfigMap for NGINX configuration files
 nginx_configmap_data: dict[str, str] = {
-    "default.conf": nginx_conf_content,
-    "fastcgi_params": fastcgi_params_content,
+    "default.conf": f"include /etc/nginx/logging.conf;\n{nginx_conf_content}",
     "uwsgi_params": uwsgi_params_content,
     "logging.conf": logging_conf_content,
-    **shib_extra_nginx_data,
 }
 
 nginx_configmap = kubernetes.core.v1.ConfigMap(
@@ -1162,6 +910,8 @@ env_from_sources = [
     for secret_name in secret_names
 ]
 
+tls_secret_name = "ovs-tls-pair"  # noqa: S105  # pragma: allowlist secret
+
 # Volume definitions
 volumes: list[kubernetes.core.v1.VolumeArgs] = [
     kubernetes.core.v1.VolumeArgs(
@@ -1174,7 +924,16 @@ volumes: list[kubernetes.core.v1.VolumeArgs] = [
         name="staticfiles",
         empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
     ),
-    *shib_extra_volumes,
+    kubernetes.core.v1.VolumeArgs(
+        name="tls-certs",
+        secret=kubernetes.core.v1.SecretVolumeSourceArgs(
+            secret_name=tls_secret_name,
+            items=[
+                kubernetes.core.v1.KeyToPathArgs(key="tls.crt", path="cert.pem"),
+                kubernetes.core.v1.KeyToPathArgs(key="tls.key", path="key.pem"),
+            ],
+        ),
+    ),
 ]
 
 # NGINX sidecar volume mounts
@@ -1183,12 +942,6 @@ nginx_volume_mounts: list[kubernetes.core.v1.VolumeMountArgs] = [
         name="nginx-config",
         mount_path="/etc/nginx/conf.d/default.conf",
         sub_path="default.conf",
-        read_only=True,
-    ),
-    kubernetes.core.v1.VolumeMountArgs(
-        name="nginx-config",
-        mount_path="/etc/nginx/fastcgi_params",
-        sub_path="fastcgi_params",
         read_only=True,
     ),
     kubernetes.core.v1.VolumeMountArgs(
@@ -1208,7 +961,11 @@ nginx_volume_mounts: list[kubernetes.core.v1.VolumeMountArgs] = [
         mount_path="/opt/odl-video-service/staticfiles",
         read_only=True,
     ),
-    *shib_extra_nginx_mounts,
+    kubernetes.core.v1.VolumeMountArgs(
+        name="tls-certs",
+        mount_path="/etc/nginx/tls",
+        read_only=True,
+    ),
 ]
 
 # Init container for migrations and collectstatic
@@ -1259,10 +1016,10 @@ app_container = kubernetes.core.v1.ContainerArgs(
     ),
 )
 
-# NGINX + Shibboleth sidecar container
+# NGINX sidecar container
 nginx_sidecar = kubernetes.core.v1.ContainerArgs(
-    name="nginx-shib",
-    image="pennlabs/shibboleth-sp-nginx:latest",
+    name="nginx",
+    image="nginx:stable",
     ports=[
         kubernetes.core.v1.ContainerPortArgs(
             container_port=443,
@@ -1308,6 +1065,18 @@ nginx_sidecar = kubernetes.core.v1.ContainerArgs(
         failure_threshold=6,
         success_threshold=1,
         timeout_seconds=5,
+    ),
+)
+
+cert_manager_certificate = OLCertManagerCert(
+    f"ovs-cert-manager-certificate-{stack_info.env_suffix}",
+    cert_config=OLCertManagerCertConfig(
+        application_name="ovs",
+        k8s_namespace=ovs_namespace,
+        k8s_labels=k8s_app_labels,
+        create_apisixtls_resource=True,
+        dest_secret_name=tls_secret_name,
+        dns_names=[default_domain],
     ),
 )
 
@@ -1367,8 +1136,8 @@ ovs_deployment = kubernetes.apps.v1.Deployment(
             ovs_app_security_group,
             app_configmap,
             nginx_configmap,
+            cert_manager_certificate,
             *secret_resources,
-            *([] if shib_configmap is None else [shib_configmap]),
         ]
     ),
 )
@@ -1458,19 +1227,6 @@ celery_deployment = kubernetes.apps.v1.Deployment(
             app_configmap,
             *secret_resources,
         ]
-    ),
-)
-
-tls_secret_name = "ovs-tls-pair"  # noqa: S105  # pragma: allowlist secret
-cert_manager_certificate = OLCertManagerCert(
-    f"ovs-cert-manager-certificate-{stack_info.env_suffix}",
-    cert_config=OLCertManagerCertConfig(
-        application_name="ovs",
-        k8s_namespace=ovs_namespace,
-        k8s_labels=k8s_app_labels,
-        create_apisixtls_resource=True,
-        dest_secret_name=tls_secret_name,
-        dns_names=[default_domain],
     ),
 )
 

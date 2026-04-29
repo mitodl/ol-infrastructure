@@ -34,6 +34,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     cached_image_uri,
     check_cluster_namespace,
@@ -48,7 +49,7 @@ from ol_infrastructure.lib.ol_types import (
     K8sGlobalLabels,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 setup_vault_provider()
@@ -57,10 +58,12 @@ stack_info = parse_stack()
 digital_credentials_config = Config("digital-credentials")
 
 # Stack references
-cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+cluster_stack = StackReference(
+    stack_ref(projects.EKS, f"applications.{stack_info.name}")
+)
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
 vault_mount_stack = StackReference(
-    f"substructure.vault.static_mounts.operations.{stack_info.name}"
+    stack_ref(projects.VAULT_STATIC_MOUNTS, f"operations.{stack_info.name}")
 )
 
 apps_vpc = network_stack.require_output("applications_vpc")

@@ -57,6 +57,7 @@ config:
     communications: communications
     discussions: discuss
     gradebook: gradebook
+    instructor: instructor
     learner_dashboard: dashboard
     learning: learn
     ora_grading: ora-grading
@@ -123,4 +124,6 @@ config:
   meilisearch:memory_request: "1Gi"
   meilisearch:memory_limit: "1Gi"
   typesense:deploy: "true"
-  typesense:enabled: "false"
+  typesense:enabled: "true"
+  typesense:course_search_enabled: "true"
+  typesense:forum_search_enabled: "false"

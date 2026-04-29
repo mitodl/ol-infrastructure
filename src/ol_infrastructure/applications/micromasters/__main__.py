@@ -60,6 +60,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     default_psg_egress_args,
@@ -85,6 +86,7 @@ from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
     merge_otel_resource_attributes,
     parse_stack,
+    stack_ref,
 )
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -94,14 +96,17 @@ setup_vault_provider(skip_child_token=True)
 micromasters_config = Config("micromasters")
 
 stack_info = parse_stack()
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-dns_stack = StackReference("infrastructure.aws.dns")
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+dns_stack = StackReference(stack_ref(projects.DNS, "default"))
 vector_log_proxy_stack = StackReference(
-    f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
+    stack_ref(projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}")
 )
 micromasters_vpc = network_stack.require_output("applications_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+data_vpc = network_stack.require_output("data_vpc")
+vault_stack = StackReference(
+    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+)
 micromasters_environment = f"micromasters-{stack_info.env_suffix}"
 
 fastly_provider = get_fastly_provider()
@@ -231,7 +236,21 @@ micromasters_db_security_group = ec2.SecurityGroup(
             ],
             cidr_blocks=micromasters_vpc["k8s_pod_subnet_cidrs"],
             description="Allow Vault and in-VPC app pods to access the database",
-        )
+        ),
+        ec2.SecurityGroupIngressArgs(
+            protocol="tcp",
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
+            security_groups=[
+                data_vpc["security_groups"]["orchestrator"],
+                data_vpc["security_groups"]["integrator"],
+            ],
+            # Airbyte isn't using pod security groups in Kubernetes. This is a
+            # workaround to allow for data integration from the data Kubernetes
+            # cluster.
+            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"],
+            description="Allow access from Airbyte in the data VPC",
+        ),
     ],
     egress=[
         ec2.SecurityGroupEgressArgs(
@@ -276,11 +295,12 @@ micromasters_vault_backend = OLVaultDatabaseBackend(micromasters_vault_backend_c
 
 vault_config = Config("vault")
 redis_config = Config("redis")
-cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
-cluster_substructure_stack = StackReference(
-    f"substructure.aws.eks.applications.{stack_info.name}"
+cluster_stack = StackReference(
+    stack_ref(projects.EKS, f"applications.{stack_info.name}")
 )
-
+cluster_substructure_stack = StackReference(
+    stack_ref(projects.EKS_SUB, f"applications.{stack_info.name}")
+)
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 micromasters_namespace = "micromasters"

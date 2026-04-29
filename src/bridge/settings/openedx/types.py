@@ -62,6 +62,11 @@ class OpenEdxMicroFrontend(StrEnum, metaclass=EnumInvertedLookupMeta):
         "https://github.com/openedx/frontend-app-gradebook",
         "gradebook",
     )
+    instructor = (
+        "instructor",
+        "https://github.com/openedx/frontend-app-instructor-dashboard",
+        "instructor",
+    )
     learn = ("learning", "https://github.com/openedx/frontend-app-learning", "learn")
     learner_dashboard = (
         "learner-dashboard",

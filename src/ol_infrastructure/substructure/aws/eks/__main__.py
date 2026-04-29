@@ -20,8 +20,9 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 from ol_infrastructure.lib.vault import setup_vault_provider
 from ol_infrastructure.substructure.aws.eks.clickhouse_operator import (
     setup_clickhouse_operator,
@@ -58,10 +59,10 @@ VERSIONS = {
 stack_info = parse_stack()
 
 cluster_stack = StackReference(
-    f"infrastructure.aws.eks.{stack_info.env_prefix}.{stack_info.name}"
+    stack_ref(projects.EKS, f"{stack_info.env_prefix}.{stack_info.name}")
 )
-kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+kms_stack = StackReference(stack_ref(projects.KMS, stack_info.name))
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
 
 target_vpc = network_stack.require_output(env_config.require("target_vpc"))
 

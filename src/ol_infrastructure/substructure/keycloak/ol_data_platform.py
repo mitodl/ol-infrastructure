@@ -304,6 +304,9 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0913, PLR0915
         realm_id=ol_data_platform_realm.id,
         name="ol-instructor",
         description="Instructor role with limited access to educational data",
+        composite_roles=[
+            ol_data_platform_superset_client_role_refs["ol_instructor"].id
+        ],
         opts=resource_options,
     )
 
@@ -315,6 +318,9 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0913, PLR0915
             "Business analyst role similar to existing business_intelligence "
             "and finance roles"
         ),
+        composite_roles=[
+            ol_data_platform_superset_client_role_refs["ol_business_analyst"].id
+        ],
         opts=resource_options,
     )
 

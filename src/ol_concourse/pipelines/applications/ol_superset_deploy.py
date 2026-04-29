@@ -26,8 +26,8 @@ ol_data_platform_repo = git_repo(
 # then runs ol-superset promote --force to deploy assets to production.
 #
 # Vault secret paths (KV v1, mount: secret-data):
-#   superset_qa_service_account   -> superset_url, oauth_token_url, client_id, client_secret, oauth_username, oauth_password  # noqa: E501
-#   superset_service_account      -> superset_url, oauth_token_url, client_id, client_secret, oauth_username, oauth_password  # noqa: E501
+#   superset_qa_service_account   -> superset_url, oauth_token_url, client_id, client_secret  # noqa: E501
+#   superset_service_account      -> superset_url, oauth_token_url, client_id, client_secret  # noqa: E501
 _deploy_script = """\
 set -euo pipefail
 
@@ -40,16 +40,12 @@ superset_instances:
     oauth_token_url: ${SUPERSET_QA_OAUTH_TOKEN_URL}
     oauth_client_id: ${SUPERSET_QA_CLIENT_ID}
     oauth_client_secret: ${SUPERSET_QA_CLIENT_SECRET}
-    oauth_username: ${SUPERSET_QA_OAUTH_USERNAME}
-    oauth_password: ${SUPERSET_QA_OAUTH_PASSWORD}
   superset-production:
     url: ${SUPERSET_PRODUCTION_URL}
     auth_method: oauth
     oauth_token_url: ${SUPERSET_PRODUCTION_OAUTH_TOKEN_URL}
     oauth_client_id: ${SUPERSET_PRODUCTION_CLIENT_ID}
     oauth_client_secret: ${SUPERSET_PRODUCTION_CLIENT_SECRET}
-    oauth_username: ${SUPERSET_PRODUCTION_OAUTH_USERNAME}
-    oauth_password: ${SUPERSET_PRODUCTION_OAUTH_PASSWORD}
 current_instance_name: superset-qa
 EOF
 
@@ -83,14 +79,10 @@ deploy_pipeline = Pipeline(
                             "SUPERSET_QA_OAUTH_TOKEN_URL": "((superset_qa_service_account.oauth_token_url))",  # noqa: E501
                             "SUPERSET_QA_CLIENT_ID": "((superset_qa_service_account.client_id))",  # noqa: E501
                             "SUPERSET_QA_CLIENT_SECRET": "((superset_qa_service_account.client_secret))",  # noqa: E501
-                            "SUPERSET_QA_OAUTH_USERNAME": "((superset_qa_service_account.oauth_username))",  # noqa: E501
-                            "SUPERSET_QA_OAUTH_PASSWORD": "((superset_qa_service_account.oauth_password))",  # noqa: E501
                             "SUPERSET_PRODUCTION_URL": "((superset_service_account.superset_url))",  # noqa: E501
                             "SUPERSET_PRODUCTION_OAUTH_TOKEN_URL": "((superset_service_account.oauth_token_url))",  # noqa: E501
                             "SUPERSET_PRODUCTION_CLIENT_ID": "((superset_service_account.client_id))",  # noqa: E501
                             "SUPERSET_PRODUCTION_CLIENT_SECRET": "((superset_service_account.client_secret))",  # noqa: E501
-                            "SUPERSET_PRODUCTION_OAUTH_USERNAME": "((superset_service_account.oauth_username))",  # noqa: E501
-                            "SUPERSET_PRODUCTION_OAUTH_PASSWORD": "((superset_service_account.oauth_password))",  # noqa: E501
                         },
                         run=Command(
                             path="bash",

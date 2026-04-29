@@ -14,6 +14,7 @@ from ol_infrastructure.applications.jupyterhub.deployment import (
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
@@ -27,7 +28,7 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
@@ -42,9 +43,13 @@ vault_config = Config("vault")
 
 
 # Stack references
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
-cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+vault_stack = StackReference(
+    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+)
+cluster_stack = StackReference(
+    stack_ref(projects.EKS, f"applications.{stack_info.name}")
+)
 
 # AWS configuration
 apps_vpc = network_stack.require_output("applications_vpc")

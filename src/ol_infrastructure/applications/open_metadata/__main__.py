@@ -1,5 +1,7 @@
+import json
 from pathlib import Path
 from string import Template
+from typing import Any
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
@@ -12,6 +14,8 @@ from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
 )
 from bridge.lib.versions import OPEN_METADATA_VERSION
+from bridge.secrets import sops as _bridge_sops
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.eks import (
     OLEKSGateway,
@@ -30,6 +34,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
@@ -44,22 +49,28 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
+
+# Resolve the bridge secrets directory once at module level using the sops
+# module's own __file__ — the same base path read_yaml_secrets uses internally.
+_BRIDGE_SECRETS_DIR = Path(_bridge_sops.__file__).parent
 
 setup_vault_provider()
 stack_info = parse_stack()
 
 open_metadata_config = Config("open_metadata")
-dns_stack = StackReference("infrastructure.aws.dns")
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-policy_stack = StackReference("infrastructure.aws.policies")
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+dns_stack = StackReference(stack_ref(projects.DNS, "default"))
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
+vault_stack = StackReference(
+    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+)
 opensearch_stack = StackReference(
     f"infrastructure.aws.opensearch.open_metadata.{stack_info.name}"
 )
-cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
+cluster_stack = StackReference(stack_ref(projects.EKS, f"data.{stack_info.name}"))
 
 opensearch_cluster = opensearch_stack.require_output("cluster")
 apps_vpc = network_stack.require_output("applications_vpc")
@@ -290,40 +301,92 @@ oidc_config_secret = OLVaultK8SSecret(
 )
 
 # Connector credentials for OpenMetadata ingestion pipelines.
-# Each connector's credentials are stored in Vault under
-# secret-operations/open-metadata/connectors/<connector-name>
-# and synced to K8s secrets in the open-metadata namespace.
-# Add entries to connector_configs for each source system.
-connector_configs: dict[str, dict[str, str | Output[str]]] = {}
+# Credentials are read from SOPS-encrypted bridge secrets, written to a
+# dedicated Vault mount, and synced into K8s secrets via vault-secrets-operator.
+open_metadata_connector_secrets_path = (
+    _BRIDGE_SECRETS_DIR / f"open_metadata/secrets.{stack_info.env_suffix}.yaml"
+)
+open_metadata_connector_secrets: dict[str, Any] = {}
+if open_metadata_connector_secrets_path.exists():
+    _raw_secrets = read_yaml_secrets(open_metadata_connector_secrets_path)
+    if not isinstance(_raw_secrets, dict):
+        msg = (
+            f"Failed to decrypt {open_metadata_connector_secrets_path}: "
+            f"expected a dict but got {type(_raw_secrets).__name__}. "
+            "Check that sops can decrypt the file and that AWS KMS is accessible."
+        )
+        raise TypeError(msg)
+    open_metadata_connector_secrets = _raw_secrets
+
+open_metadata_connector_vault_mount = vault.Mount(
+    f"open-metadata-connector-vault-mount-{stack_info.env_suffix}",
+    description="Static connector credentials for OpenMetadata ingestion pipelines",
+    path="secret-openmetadata",
+    type="kv",
+    options={"version": "2"},
+    opts=ResourceOptions(parent=vault_k8s_resources),
+)
 
 connector_secrets: list[OLVaultK8SSecret] = []
 connector_secret_names: list[str] = []
-for connector_name, templates in connector_configs.items():
-    secret_name = f"om-connector-{connector_name}"
-    secret_config = OLVaultK8SStaticSecretConfig(
-        name=f"openmetadata-connector-{connector_name}",
-        namespace=open_metadata_namespace,
-        dest_secret_labels=k8s_global_labels,
-        dest_secret_name=secret_name,
-        labels=k8s_global_labels,
-        mount="secret-operations",
-        mount_type="kv-v1",
-        path=f"open-metadata/connectors/{connector_name}",
-        restart_target_kind="Deployment",
-        restart_target_name="openmetadata",
-        templates=templates,
-        vaultauth=vault_k8s_resources.auth_name,
-    )
-    connector_secret = OLVaultK8SSecret(
-        f"open-metadata-{stack_info.name}-connector-{connector_name}-secret",
-        secret_config,
+
+if open_metadata_connector_secrets:
+    open_metadata_connector_vault_secret = vault.generic.Secret(
+        f"open-metadata-connector-vault-secret-{stack_info.env_suffix}",
+        path="secret-openmetadata/data/connectors",
+        data_json=Output.secret(json.dumps(open_metadata_connector_secrets)),
         opts=ResourceOptions(
-            delete_before_replace=True,
+            depends_on=[open_metadata_connector_vault_mount],
             parent=vault_k8s_resources,
         ),
     )
-    connector_secrets.append(connector_secret)
-    connector_secret_names.append(secret_name)
+
+    # Each entry maps connector name → K8s env var → Vault template.
+    # Uses nested index syntax because secrets are stored as a map-of-maps.
+    # Only include connectors whose top-level key exists in the secrets file
+    # so stacks without a given connector's credentials don't create a K8s
+    # secret with unresolvable Vault template references.
+    _all_connector_configs: dict[str, dict[str, str | Output[str]]] = {
+        "trino": {
+            "OM_TRINO_HOST_PORT": '{{ index .Secrets "trino" "host_port" }}',
+            "OM_TRINO_USERNAME": '{{ index .Secrets "trino" "login_email" }}',
+            "OM_TRINO_PASSWORD": '{{ index .Secrets "trino" "password" }}',
+            "OM_TRINO_CATALOG": '{{ index .Secrets "trino" "catalog" }}',
+        },
+    }
+    connector_configs = {
+        name: templates
+        for name, templates in _all_connector_configs.items()
+        if name in open_metadata_connector_secrets
+    }
+
+    for connector_name, templates in connector_configs.items():
+        secret_name = f"om-connector-{connector_name}"
+        secret_config = OLVaultK8SStaticSecretConfig(
+            name=f"openmetadata-connector-{connector_name}",
+            namespace=open_metadata_namespace,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=secret_name,
+            labels=k8s_global_labels,
+            mount="secret-openmetadata",
+            mount_type="kv-v2",
+            path="connectors",
+            restart_target_kind="Deployment",
+            restart_target_name="openmetadata",
+            templates=templates,
+            vaultauth=vault_k8s_resources.auth_name,
+        )
+        connector_secret = OLVaultK8SSecret(
+            f"open-metadata-{stack_info.name}-connector-{connector_name}-secret",
+            secret_config,
+            opts=ResourceOptions(
+                delete_before_replace=True,
+                parent=vault_k8s_resources,
+                depends_on=[open_metadata_connector_vault_secret],
+            ),
+        )
+        connector_secrets.append(connector_secret)
+        connector_secret_names.append(secret_name)
 
 # IRSA trust role granting the OpenMetadata pod read access to AWS Glue and S3.
 # Uses OLEKSTrustRole directly (rather than OLEKSAuthBinding) because Vault K8s

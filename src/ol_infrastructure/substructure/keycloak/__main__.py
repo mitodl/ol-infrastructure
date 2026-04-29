@@ -12,6 +12,7 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 from ol_infrastructure.substructure.keycloak.ol_data_platform import (
     create_ol_data_platform_realm,
 )
+from ol_infrastructure.substructure.keycloak.ol_mit import create_ol_mit_realm
 from ol_infrastructure.substructure.keycloak.ol_platform_engineering import (
     create_ol_platform_engineering_realm,
 )
@@ -100,6 +101,21 @@ create_olapps_realm(
     mailgun_email_username,
     mailgun_email_host,
     mit_touchstone_cert,
+    session_secret,
+    fetch_realm_public_key_partial,
+)
+mit_ldap_bind_password = keycloak_realm_config.require_secret(
+    "ol-mit-ldap-bind-password"
+)
+create_ol_mit_realm(
+    keycloak_provider,
+    keycloak_url,
+    env_name,
+    stack_info,
+    mit_email_password,
+    mit_email_username,
+    mit_email_host,
+    mit_ldap_bind_password,
     session_secret,
     fetch_realm_public_key_partial,
 )

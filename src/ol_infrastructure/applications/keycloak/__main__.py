@@ -34,6 +34,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
 from ol_infrastructure.lib.aws.eks_helper import (
     cached_image_uri,
@@ -49,7 +50,7 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
@@ -61,12 +62,16 @@ stack_info = parse_stack()
 
 aws_account = get_caller_identity()
 
-cluster_stack = StackReference(f"infrastructure.aws.eks.operations.{stack_info.name}")
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-policy_stack = StackReference("infrastructure.aws.policies")
-dns_stack = StackReference("infrastructure.aws.dns")
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
-vault_pki_stack = StackReference(f"substructure.vault.pki.operations.{stack_info.name}")
+cluster_stack = StackReference(stack_ref(projects.EKS, f"operations.{stack_info.name}"))
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
+dns_stack = StackReference(stack_ref(projects.DNS, "default"))
+vault_stack = StackReference(
+    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+)
+vault_pki_stack = StackReference(
+    stack_ref(projects.VAULT_PKI, f"operations.{stack_info.name}")
+)
 
 # target vpc is 'operations', for a non-app-specific service
 target_vpc_name = keycloak_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
@@ -258,6 +263,16 @@ keycloak_database_security_group = ec2.SecurityGroup(
     ],
     vpc_id=target_vpc_id,
     tags=aws_config.tags,
+    egress=[
+        ec2.SecurityGroupEgressArgs(
+            from_port=0,
+            to_port=0,
+            protocol="-1",
+            cidr_blocks=[target_vpc["cidr"]],
+            ipv6_cidr_blocks=[target_vpc["cidr_v6"]],
+            description="Allow all outbound traffic within the VPC",
+        )
+    ],
 )
 
 # Database

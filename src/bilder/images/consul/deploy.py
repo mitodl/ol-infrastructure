@@ -56,6 +56,7 @@ consul_configuration = {
 
 # Install Traefik
 traefik_config = TraefikConfig(
+    version=VERSIONS["traefik"],
     static_configuration=traefik_static.TraefikStaticConfig.model_validate(
         yaml.safe_load(
             FILES_DIRECTORY.joinpath("traefik", "static_config.yaml").read_text()

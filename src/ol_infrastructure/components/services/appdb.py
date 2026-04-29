@@ -27,8 +27,9 @@ from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 from ol_infrastructure.lib.stack_defaults import defaults
 
 stack_info = parse_stack()
@@ -85,12 +86,14 @@ class OLAppDatabase(ComponentResource):
 
         network_stack = StackReference(
             name=f"db_network_stack_reference_{ol_db_config.app_db_name}",
-            stack_name=f"infrastructure.aws.network.{stack_info.name}",
+            stack_name=stack_ref(projects.NETWORKING, stack_info.name),
         )
         data_vpc = network_stack.require_output("data_vpc")
         vault_stack = StackReference(
             name=f"db_vault_stack_reference_{ol_db_config.app_db_name}",
-            stack_name=f"infrastructure.vault.operations.{stack_info.name}",
+            stack_name=stack_ref(
+                projects.VAULT_SERVER, f"operations.{stack_info.name}"
+            ),
         )
 
         ################################################

@@ -62,6 +62,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     default_psg_egress_args,
@@ -85,6 +86,7 @@ from ol_infrastructure.lib.pulumi_helper import (
     format_docker_image_ref,
     merge_otel_resource_attributes,
     parse_stack,
+    stack_ref,
 )
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -93,17 +95,21 @@ aws_account = get_caller_identity()
 stack_info = parse_stack()
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
-cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
-cluster_substructure_stack = StackReference(
-    f"substructure.aws.eks.applications.{stack_info.name}"
+cluster_stack = StackReference(
+    stack_ref(projects.EKS, f"applications.{stack_info.name}")
 )
-dns_stack = StackReference("infrastructure.aws.dns")
-monitoring_stack = StackReference("infrastructure.monitoring")
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-policy_stack = StackReference("infrastructure.aws.policies")
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+cluster_substructure_stack = StackReference(
+    stack_ref(projects.EKS_SUB, f"applications.{stack_info.name}")
+)
+dns_stack = StackReference(stack_ref(projects.DNS, "default"))
+monitoring_stack = StackReference(stack_ref(projects.MONITORING, "default"))
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
+vault_stack = StackReference(
+    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+)
 vector_log_proxy_stack = StackReference(
-    f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
+    stack_ref(projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}")
 )
 
 apps_vpc = network_stack.require_output("applications_vpc")
