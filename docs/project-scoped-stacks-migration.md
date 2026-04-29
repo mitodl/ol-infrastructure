@@ -20,7 +20,7 @@ where each project has its own namespace. Stack names become short (e.g., `QA`,
 | Phase | Description | Status |
 |-------|-------------|--------|
 | Phase 1 | Code preparation — backward-compatible helpers and shim | ✅ Merged (PR #4559) |
-| Phase 2a | Add missing project constants to `pulumi_projects.py` | ⬜ Pending |
+| Phase 2a | Add missing project constants to `pulumi_projects.py` | ✅ Merged (PR #4567) |
 | Phase 3 | `pulumi state upgrade` — one-time, bucket-wide | ⬜ Pending |
 | Phase 4 | Per-project stack renames (9 batches) + Pulumi.yaml updates | ⬜ Pending |
 | Phase 5 | Remove backward-compat shim | ⬜ Pending |
