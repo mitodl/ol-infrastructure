@@ -49,6 +49,12 @@ class SimplePulumiParams(BaseModel):
         app_name: The name of the application/service.
         pulumi_project_path: Path to Pulumi project relative to src/ol_infrastructure/.
         pulumi_project_name: Name of the Pulumi project (e.g. "ol-application-tika").
+        stack_prefix: Short deployment-scope discriminator that appears before the
+                      stage in the stack name (e.g. "mitlearn" for qdrant-cloud →
+                      stack name "mitlearn.QA", "operations" for vector-log-proxy →
+                      "operations.QA"). Leave empty for single-tenant projects whose
+                      stack names are just the stage (e.g. "QA", "Production").
+                      Not used when deployment_groups is set.
         stages: List of deployment stages (default: ["CI", "QA", "Production"]).
         deployment_groups: List of deployment group names for multi-group deployments
                           (e.g. ["mitx", "mitxonline", "xpro"] for mongodb_atlas).
@@ -71,6 +77,7 @@ class SimplePulumiParams(BaseModel):
     app_name: str
     pulumi_project_path: str
     pulumi_project_name: str
+    stack_prefix: str = ""
     stages: list[str] = ["CI", "QA", "Production"]
     deployment_groups: list[str] | None = None
     auto_discover_stacks: bool = False
@@ -220,6 +227,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="qdrant-cloud",
         pulumi_project_path="infrastructure/qdrant_cloud/",
         pulumi_project_name="ol-infrastructure-qdrant-cloud",
+        stack_prefix="mitlearn",
         additional_watched_paths=[
             "src/bridge/secrets/qdrant_cloud/",
             "src/bridge/lib/versions.py",
@@ -266,6 +274,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="vector-log-proxy",
         pulumi_project_path="infrastructure/vector_log_proxy/",
         pulumi_project_name="ol-infrastructure-vector-log-proxy",
+        stack_prefix="operations",
     ),
     "xpro-partner-dns": SimplePulumiParams(
         app_name="xpro-partner-dns",
@@ -479,9 +488,12 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 jobs=pulumi_fragment.jobs,
             )
     else:
-        # Use explicitly configured stages - single chain
+        # Use explicitly configured stages - single chain.
+        # When stack_prefix is set (e.g. "mitlearn", "operations"), the stack
+        # name is "{prefix}.{stage}"; otherwise it is just the stage.
         stack_names = [
-            "default" if stage == "default" else stage for stage in params.stages
+            f"{params.stack_prefix}.{stage}" if params.stack_prefix else stage
+            for stage in params.stages
         ]
 
         pulumi_fragment = pulumi_jobs_chain(
