@@ -43,7 +43,6 @@ QDRANT_CLOUD = "ol-infrastructure-qdrant-cloud"
 GRAFANA_CLOUD = "ol-infrastructure-grafana-cloud"
 SFTP = "ol-infrastructure-aws-sftp"
 S3_SITES = "ol-infrastructure-aws-s3"
-STARROCKS_INFRA = "ol-infrastructure-starrocks"
 GEMINI_API = "ol-infrastructure-gemini-api"
 
 # ---------------------------------------------------------------------------
@@ -99,6 +98,12 @@ KEYCLOAK_APP = "ol-application-keycloak"
 MAILGUN = "ol-application-mailgun"
 MITX = "ol-application-mitx"
 ODL_VIDEO_SERVICE = "ol-application-odl-video-service"
+OPEN_DISCUSSIONS = "ol-application-open-discussions"
+STARROCKS_APP = "ol-application-starrocks"
+TIKA = "ol-application-tika"
+XPRO = "ol-application-xpro"
+XQUEUE = "ol-application-xqueue"
+XQWATCHER = "ol-application-xqwatcher"
 
 # ---------------------------------------------------------------------------
 # LEGACY_PROJECT_PREFIXES — migration shim
@@ -136,7 +141,6 @@ LEGACY_PROJECT_PREFIXES: dict[str, str] = {
     GRAFANA_CLOUD: "infrastructure.grafana_cloud",
     SFTP: "infrastructure.aws.sftp_servers",
     S3_SITES: "infrastructure.aws.s3_sites",
-    STARROCKS_INFRA: "infrastructure.starrocks",
     # substructure/
     EKS_SUB: "substructure.aws.eks",
     VAULT_AUTH: "substructure.vault.auth",
@@ -182,4 +186,10 @@ LEGACY_PROJECT_PREFIXES: dict[str, str] = {
     MAILGUN: "applications.mailgun",
     MITX: "applications.mitx",
     ODL_VIDEO_SERVICE: "applications.odl_video_service",
+    OPEN_DISCUSSIONS: "applications.open_discussions",
+    STARROCKS_APP: "applications.starrocks",
+    TIKA: "applications.tika",
+    XPRO: "applications.xpro",
+    XQUEUE: "applications.xqueue",
+    XQWATCHER: "applications.xqwatcher",
 }
