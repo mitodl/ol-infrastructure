@@ -724,7 +724,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                 ),
             ],
             1: [
-                GetStep(get=release_gate.name, trigger=True),
+                GetStep(get=release_gate.name, trigger=True, version="every"),
                 PutStep(
                     put=deployment_prod.name,
                     params={"action": "start", "ref": "((.:image_tag))"},
