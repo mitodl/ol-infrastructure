@@ -382,7 +382,6 @@ app_env_vars = {
     "AWS_TEST_BUCKET_NAME": f"ocw-content-test-{stack_info.env_suffix}",
     "CONCOURSE_USERNAME": "oldevops",
     "COURSE_V3_CANONICAL_DOMAIN": "learn.mit.edu",
-    "COURSE_V3_NOINDEX": True,
     "CONTENT_SYNC_BACKEND": "content_sync.backends.github.GithubBackend",
     "CONTENT_SYNC_PIPELINE": "content_sync.pipelines.concourse.ConcourseGithubPipeline",
     "CONTENT_SYNC_THEME_PIPELINE": "content_sync.pipelines.concourse.ThemeAssetsPipeline",
