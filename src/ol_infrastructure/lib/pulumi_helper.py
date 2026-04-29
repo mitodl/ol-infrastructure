@@ -16,8 +16,11 @@ class StackInfo:
 
     After the project-scoped stack migration the fields carry these values:
 
-    * ``name``         — the short stack name, e.g. ``"QA"``, ``"mitx.QA"``,
-                         or ``"operations.QA"``.
+    * ``name``         — the trailing stack stage segment, e.g. ``"QA"``
+                         or ``"Production"``.  For the full short stack name
+                         (including any tenant prefix) use ``get_stack()``
+                         directly, or inspect ``namespace`` and combine:
+                         ``f"{namespace}.{name}" if namespace else name``.
     * ``project_name`` — Pulumi project name from ``Pulumi.yaml``, e.g.
                          ``"ol-infrastructure-networking"``.
     * ``namespace``    — the tenant/cluster token before the env segment
