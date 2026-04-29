@@ -196,12 +196,13 @@ def _define_git_resources(
 def _define_release_resources(
     app_name: str,
     github_repo: str,
+    repo_main_branch: str = "main",
 ) -> tuple[Resource, Resource, Resource, Resource, Resource]:
     """Define the release-flow resources: release resource, gates, issues, and GitHub Deployments."""
     release_res = release_resource(
         name=Identifier(f"{app_name}-release"),
         uri=f"https://github.com/{github_repo}",
-        branch="main",
+        branch=repo_main_branch,
         access_token="((github.access_token))",  # noqa: S106
         repository=github_repo,
     )
@@ -365,8 +366,8 @@ def _build_image_job(
     ecr_registry_image_resource: Resource,
     build_target: str | None = None,
 ) -> Job:
-    """Generate an image build job triggered by the main branch."""
-    job_name = f"build-{app_name}-image-from-main"
+    """Generate an image build job triggered by the configured git resource."""
+    job_name = f"build-{app_name}-image-from-{git_repo_resource.source['branch']}"
 
     additional_build_params = {}
     if build_target:
@@ -458,7 +459,7 @@ def _build_release_image_job(
 
     put_params: dict[str, Any] = {
         "image": "image/image.tar",
-        "additional_tags": f"./{main_repo.name}/.git/short_ref",
+        "additional_tags": f"./{release_res.name}/.git/short_ref",
         "version": "((.:release_version))",
         "bump_aliases": True,
     }
@@ -469,11 +470,6 @@ def _build_release_image_job(
         LoadVarStep(
             load_var="release_version",
             file=f"{release_res.name}/version",
-            reveal=True,
-        ),
-        LoadVarStep(
-            load_var="git_ref",
-            file=f"{main_repo.name}/.git/ref",
             reveal=True,
         ),
         bump_version_task(
@@ -488,11 +484,18 @@ def _build_release_image_job(
                 "version_file": f"{release_res.name}/version",
             },
         ),
+        # Load git_ref from the release resource AFTER the release commit is created,
+        # so the image is stamped with the correct post-release commit SHA.
+        LoadVarStep(
+            load_var="git_ref",
+            file=f"{release_res.name}/.git/ref",
+            reveal=True,
+        ),
         container_build_task(
-            inputs=[Input(name=main_repo.name)],
+            inputs=[Input(name=release_res.name)],
             build_parameters={
-                "CONTEXT": main_repo.name,
-                "DOCKERFILE": f"{main_repo.name}/{dockerfile_path}",
+                "CONTEXT": release_res.name,
+                "DOCKERFILE": f"{release_res.name}/{dockerfile_path}",
                 "BUILD_ARG_GIT_REF": "((.:git_ref))",
                 "BUILD_ARG_RELEASE_VERSION": "((.:release_version))",
                 **additional_build_params,
@@ -578,6 +581,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     ) = _define_release_resources(
         app_name=app_name,
         github_repo=pipeline_parameters.github_repo,
+        repo_main_branch=pipeline_parameters.repo_main_branch,
     )
 
     # Define Build Jobs
