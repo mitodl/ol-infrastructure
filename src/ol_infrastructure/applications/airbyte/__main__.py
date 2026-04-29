@@ -51,6 +51,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
 from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
 from ol_infrastructure.lib.aws.iam_helper import (
@@ -65,7 +66,7 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 
@@ -78,11 +79,13 @@ setup_vault_provider(stack_info)
 airbyte_config = Config("airbyte")
 vault_config = Config("vault")
 
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-policy_stack = StackReference("infrastructure.aws.policies")
-dns_stack = StackReference("infrastructure.aws.dns")
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
-cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
+dns_stack = StackReference(stack_ref(projects.DNS, "default"))
+vault_stack = StackReference(
+    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+)
+cluster_stack = StackReference(stack_ref(projects.EKS, f"data.{stack_info.name}"))
 
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
@@ -658,6 +661,15 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                 "serviceAccountName": airbyte_service_account_name,
                 "deploymentMode": "oss",
                 "edition": "community",
+                # AWS SDK v1 (Java) uses AWS_REGION (not AWS_DEFAULT_REGION) in its
+                # EnvironmentVariableRegionProvider. Without this, WebIdentity/IRSA
+                # credential providers fall through to IMDS which is blocked in EKS.
+                "extraEnv": [
+                    {"name": "AWS_REGION", "value": aws_config.region},
+                ],
+                # Airbyte 2.1 enables auth by default; we handle auth via OIDC
+                # at the APISix ingress layer, so disable the built-in auth.
+                "auth": {"enabled": False},
                 "database": {
                     "type": "external",
                     "secretName": app_db_creds_secret_name,
@@ -667,6 +679,15 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                     "name": db_name,
                     "port": DEFAULT_POSTGRES_PORT,
                     "jdbcUrl": connection_string,
+                    # Chart v2.1 always injects CONFIG_DATABASE_REPLICA_USER and
+                    # CONFIG_DATABASE_REPLICA_PASSWORD from the same secret.  We
+                    # don't run a read replica, so point these keys at the
+                    # existing DATABASE_USER / DATABASE_PASSWORD values so the
+                    # bootloader pod can start successfully.
+                    "replica": {
+                        "userSecretKey": "DATABASE_USER",  # pragma: allowlist secret
+                        "passwordSecretKey": "DATABASE_PASSWORD",  # pragma: allowlist secret  # noqa: E501
+                    },
                 },
                 "storage": {
                     "type": "s3",
@@ -674,6 +695,8 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                         "log": airbyte_bucket_name,
                         "state": airbyte_bucket_name,
                         "workloadOutput": airbyte_bucket_name,
+                        "activityPayload": airbyte_bucket_name,
+                        "auditLogging": airbyte_bucket_name,
                     },
                     "s3": {
                         "region": aws_config.region,
@@ -689,11 +712,34 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                         "tags": [{"key": "OU", "value": "data"}],
                     },
                 },
-                "jobs": {
+                # In Airbyte chart v2 the v1 path global.jobs.resources was
+                # replaced by global.workloads.resources.  The v2 path controls:
+                #   mainContainer  → JOB_MAIN_CONTAINER_MEMORY_{LIMIT,REQUEST}
+                #                    (source / destination connector containers)
+                #   replication    → REPLICATION_ORCHESTRATOR_MEMORY_{LIMIT,REQUEST}
+                #                    (JVM orchestrator container)
+                # Running syncs have shown destination containers reaching ~1.8Gi
+                # and orchestrators hitting java.lang.OutOfMemoryError: Java heap
+                # space at the previous 2Gi ceiling.  Raising both to 4Gi gives
+                # the JVM adequate heap while keeping requests modest so Karpenter
+                # doesn't over-provision.
+                "workloads": {
                     "resources": {
-                        "limits": {"memory": "15Gi", "cpu": "4000m"},
-                        "requests": {"memory": "10Gi", "cpu": "2000m"},
+                        "mainContainer": {
+                            "memory": {"limit": "4Gi", "request": "2Gi"},
+                            "cpu": {"limit": "2", "request": "1"},
+                        },
+                        "replication": {
+                            "memory": {"limit": "4Gi", "request": "2Gi"},
+                            "cpu": {"limit": "2", "request": "1"},
+                        },
                     },
+                    "containerOrchestrator": {
+                        "secretName": "",
+                        "secretMountPath": "",
+                    },
+                },
+                "jobs": {
                     "kube": {"annotations": {"karpenter.sh/do-not-disrupt": "true"}},
                 },
             },
@@ -763,6 +809,17 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
             "cron": {
                 "enabled": True,
                 "replicaCount": 1,
+                "podLabels": k8s_global_labels,
+                "resources": default_resources_definition,
+            },
+            # manifestServer replaces connectorBuilderServer in chart 2.1+
+            # (connectorBuilderServer was removed; manifestServer is now enabled)
+            "manifestServer": {
+                "enabled": True,
+                "podLabels": k8s_global_labels,
+                "resources": default_resources_definition,
+            },
+            "workloadApiServer": {
                 "podLabels": k8s_global_labels,
                 "resources": default_resources_definition,
             },

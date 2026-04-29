@@ -7,6 +7,7 @@ config:
     CONCOURSE_URL: https://cicd-qa.odl.mit.edu
     CONTENT_FILE_SEARCH_API_URL: 'https://mitopen.odl.mit.edu/api/v1/content_file_search/'
     COURSE_SEARCH_API_URL: 'https://mitopen.odl.mit.edu/api/v1/learning_resources_search/'
+    COURSE_V3_CANONICAL_DOMAIN: ci.learn.mit.edu
     DRIVE_UPLOADS_PARENT_FOLDER_ID: 1H4HCvbmY7v5YZFeqSlbCI1TFC5MXTMY4
     FEATURE_USE_LOCAL_STARTERS: "True"
     GIT_ORGANIZATION: "ocw-content-ci"

@@ -32,6 +32,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     default_psg_egress_args,
     get_default_psg_ingress_args,
@@ -44,7 +45,7 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 stack_info = parse_stack()
@@ -52,20 +53,22 @@ notes_config = Config("edxnotes")
 if Config("vault").get("address"):
     setup_vault_provider()
 
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-policy_stack = StackReference("infrastructure.aws.policies")
-dns_stack = StackReference("infrastructure.aws.dns")
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
+dns_stack = StackReference(stack_ref(projects.DNS, "default"))
+vault_stack = StackReference(
+    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+)
 edxapp_stack = StackReference(
-    f"applications.edxapp.{stack_info.env_prefix}.{stack_info.name}"
+    stack_ref(projects.EDXAPP, f"{stack_info.env_prefix}.{stack_info.name}")
 )
 
 cluster_name = notes_config.get("cluster") or "applications"
 cluster_stack = StackReference(
-    f"infrastructure.aws.eks.{cluster_name}.{stack_info.name}"
+    stack_ref(projects.EKS, f"{cluster_name}.{stack_info.name}")
 )
 opensearch_stack = StackReference(
-    f"infrastructure.aws.opensearch.{stack_info.env_prefix}.{stack_info.name}"
+    stack_ref(projects.OPENSEARCH, f"{stack_info.env_prefix}.{stack_info.name}")
 )
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"

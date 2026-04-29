@@ -21,6 +21,7 @@ config:
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
   - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
   - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
+  - ["instructor.legacy_instructor_dashbaord", "--create", "--everyone"]
   - ["legacy_studio.advanced_settings", "--deactivate"]
   - ["legacy_studio.certificates", "--create", "--everyone"]
   - ["legacy_studio.configurations", "--deactivate"]
@@ -79,6 +80,7 @@ config:
     authoring: authoring
     discussions: discuss
     gradebook: gradebook
+    instructor: instructor
     learning: learn
     ora_grading: ora-grading
   edxapp:github_org_api_url: https://github.mit.edu/api/v3/orgs/mitxonline-rc
@@ -151,4 +153,6 @@ config:
   meilisearch:memory_request: "4Gi"
   meilisearch:memory_limit: "4Gi"
   typesense:deploy: "true"
-  typesense:enabled: "false"
+  typesense:enabled: "true"
+  typesense:course_search_enabled: "true"
+  typesense:forum_search_enabled: "false"

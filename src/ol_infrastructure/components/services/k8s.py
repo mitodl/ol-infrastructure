@@ -1035,6 +1035,12 @@ class OLApplicationK8s(ComponentResource):
             f"{ol_app_k8s_config.application_name}-app"
         )
 
+        # Expose deployment names as public attributes so callers can reference them
+        # when configuring OLVaultK8SDynamicSecretConfig restart_targets.
+        self.webapp_deployment_name: str = _application_deployment_name
+        self.celery_deployment_names: list[str] = []
+        self.beat_deployment_name: str | None = None
+
         if pre_deploy_commands := ol_app_k8s_config.pre_deploy_commands:
             _pre_deploy_job = kubernetes.batch.v1.Job(
                 f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-job",
@@ -1596,6 +1602,7 @@ class OLApplicationK8s(ComponentResource):
                     "_", "-"
                 )
             )
+            self.celery_deployment_names.append(_celery_deployment_name)
             _celery_deployment = kubernetes.apps.v1.Deployment(
                 f"{ol_app_k8s_config.application_name}-celery-worker-{celery_worker_config.worker_name}-{stack_info.env_suffix}",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -1780,6 +1787,7 @@ class OLApplicationK8s(ComponentResource):
             _beat_deployment_name = truncate_k8s_metanames(
                 f"{ol_app_k8s_config.application_name}-celery-beat".replace("_", "-")
             )
+            self.beat_deployment_name = _beat_deployment_name
             _beat_deployment = kubernetes.apps.v1.Deployment(
                 f"{ol_app_k8s_config.application_name}-celery-beat-{stack_info.env_suffix}",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -1878,3 +1886,29 @@ class OLApplicationK8s(ComponentResource):
                 },
             ),
         )
+
+    @property
+    def all_deployment_names(self) -> list[str]:
+        """All Kubernetes Deployment names managed by this component.
+
+        Includes the webapp deployment, all celery worker deployments, and the
+        celery beat deployment (if configured).  Use this to populate
+        ``restart_targets`` on ``OLVaultK8SDynamicSecretConfig`` so that all
+        pods restart when Vault dynamic credentials are rotated:
+
+        .. code-block:: python
+
+            app = OLApplicationK8s(config)
+            OLVaultK8SDynamicSecretConfig(
+                ...
+                restart_targets=[
+                    OLVaultRestartTarget(kind="Deployment", name=name)
+                    for name in app.all_deployment_names
+                ],
+            )
+        """
+        names = [self.webapp_deployment_name]
+        names.extend(self.celery_deployment_names)
+        if self.beat_deployment_name:
+            names.append(self.beat_deployment_name)
+        return names

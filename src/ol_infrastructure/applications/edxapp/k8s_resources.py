@@ -53,6 +53,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     cached_image_uri,
     check_cluster_namespace,
@@ -68,7 +69,7 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import StackInfo
+from ol_infrastructure.lib.pulumi_helper import StackInfo, stack_ref
 
 
 def create_k8s_resources(  # noqa: C901
@@ -92,6 +93,16 @@ def create_k8s_resources(  # noqa: C901
 
     lms_celery_deployment_name = f"{env_name}-edxapp-lms-celery"
     cms_celery_deployment_name = f"{env_name}-edxapp-cms-celery"
+
+    # All deployments that consume MariaDB credentials and need to restart on rotation.
+    # Includes both OLApplicationK8s-managed webapps and hand-rolled celery/batch deployments.
+    edxapp_db_restart_deployment_names = [
+        "lms-edxapp-app",  # LMS webapp (OLApplicationK8s application_name="lms-edxapp")
+        "cms-edxapp-app",  # CMS webapp (OLApplicationK8s application_name="cms-edxapp")
+        lms_celery_deployment_name,
+        cms_celery_deployment_name,
+        f"{env_name}-edxapp-lms-process-scheduled-emails",
+    ]
 
     aws_account = aws.get_caller_identity()
 
@@ -121,7 +132,7 @@ def create_k8s_resources(  # noqa: C901
     release_info = OpenLearningOpenEdxDeployment.get_item(stack_info.env_prefix)
 
     opensearch_stack = StackReference(
-        f"infrastructure.aws.opensearch.{stack_info.env_prefix}.{stack_info.name}"
+        stack_ref(projects.OPENSEARCH, f"{stack_info.env_prefix}.{stack_info.name}")
     )
     opensearch_hostname = opensearch_stack.require_output("cluster")["endpoint"]
 
@@ -256,6 +267,7 @@ def create_k8s_resources(  # noqa: C901
         namespace=namespace,
         stack_info=stack_info,
         vault_k8s_resources=vault_k8s_resources,
+        restart_deployment_names=edxapp_db_restart_deployment_names,
     )
     configmaps = create_k8s_configmaps(
         stack_info=stack_info,
@@ -340,6 +352,12 @@ def create_k8s_resources(  # noqa: C901
             name=secrets.git_export_ssh_key_secret_name,
             mount_path="/openedx/.ssh/id_rsa",
             sub_path="private_key",
+            read_only=True,
+        ),
+        kubernetes.core.v1.VolumeMountArgs(
+            name=configmaps.ssh_known_hosts_config_name,
+            mount_path="/etc/ssh/ssh_known_hosts",
+            sub_path="known_hosts",
             read_only=True,
         ),
         kubernetes.core.v1.VolumeMountArgs(
@@ -522,6 +540,12 @@ def create_k8s_resources(  # noqa: C901
                 name=configmaps.waffle_flags_yaml_config_name,
                 config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
                     name=configmaps.waffle_flags_yaml_config_name,
+                ),
+            ),
+            kubernetes.core.v1.VolumeArgs(
+                name=configmaps.ssh_known_hosts_config_name,
+                config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                    name=configmaps.ssh_known_hosts_config_name,
                 ),
             ),
             kubernetes.core.v1.VolumeArgs(
@@ -811,6 +835,12 @@ def create_k8s_resources(  # noqa: C901
                 name=configmaps.waffle_flags_yaml_config_name,
                 config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
                     name=configmaps.waffle_flags_yaml_config_name,
+                ),
+            ),
+            kubernetes.core.v1.VolumeArgs(
+                name=configmaps.ssh_known_hosts_config_name,
+                config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                    name=configmaps.ssh_known_hosts_config_name,
                 ),
             ),
             kubernetes.core.v1.VolumeArgs(

@@ -59,6 +59,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResourcesConfig,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     default_psg_egress_args,
@@ -78,6 +79,7 @@ from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
     merge_otel_resource_attributes,
     parse_stack,
+    stack_ref,
 )
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -94,7 +96,7 @@ github_provider = github.Provider(
 )
 github_options = ResourceOptions(provider=github_provider)
 
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
@@ -381,6 +383,7 @@ app_env_vars = {
     "AWS_STORAGE_BUCKET_NAME": f"ol-ocw-studio-app-{stack_info.env_suffix}",
     "AWS_TEST_BUCKET_NAME": f"ocw-content-test-{stack_info.env_suffix}",
     "CONCOURSE_USERNAME": "oldevops",
+    "COURSE_V3_CANONICAL_DOMAIN": "learn.mit.edu",
     "CONTENT_SYNC_BACKEND": "content_sync.backends.github.GithubBackend",
     "CONTENT_SYNC_PIPELINE": "content_sync.pipelines.concourse.ConcourseGithubPipeline",
     "CONTENT_SYNC_THEME_PIPELINE": "content_sync.pipelines.concourse.ThemeAssetsPipeline",
@@ -426,9 +429,11 @@ app_env_vars["OCW_TEST_SITE_SLUGS"] = json.dumps(
 vault_config = Config("vault")
 redis_config = Config("redis")
 
-cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+cluster_stack = StackReference(
+    stack_ref(projects.EKS, f"applications.{stack_info.name}")
+)
 cluster_substructure_stack = StackReference(
-    f"substructure.aws.eks.applications.{stack_info.name}"
+    stack_ref(projects.EKS_SUB, f"applications.{stack_info.name}")
 )
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 

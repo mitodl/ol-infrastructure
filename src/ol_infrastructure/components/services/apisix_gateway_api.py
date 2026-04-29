@@ -260,7 +260,8 @@ class OLApisixHTTPRoute(ComponentResource):
                     ),
                     spec={
                         "plugins": [
-                            p.model_dump(by_alias=True) for p in route_config.plugins
+                            p.model_dump(by_alias=True, exclude_none=True)
+                            for p in route_config.plugins
                         ]
                     },
                     opts=resource_options,

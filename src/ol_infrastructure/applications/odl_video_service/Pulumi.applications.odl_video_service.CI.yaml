@@ -24,7 +24,6 @@ config:
   ovs:s3_transcode_bucket_name: odl-video-service-transcoded-ci
   ovs:s3_watch_bucket_name: odl-video-service-uploaded-ci
   ovs:target_vpc: applications_vpc
-  ovs:use_shibboleth: false
   redis:max_connections: "30"
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci

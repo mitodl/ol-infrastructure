@@ -79,6 +79,8 @@ config:
   - "ol_data_engineer"
   - "ol_data_analyst"
   - "ol_researcher"
+  - "ol_instructor"
+  - "ol_business_analyst"
   keycloak_realm:ol-data-platform-openmetadata-redirect-uris: ["https://data.ol.mit.edu/*"]
   keycloak_realm:ol-data-platform-openmetadata-client-roles:
   - "open_metadata_admin"
@@ -113,3 +115,11 @@ config:
     secure: v1:MiHrklsdHBBmM+x/:AKedvrwKVQYvoPpZat06SQ12Bzem8a7EGwPh0411HuW2PCMaU+yfDWebdmQ4msGLJPua
   keycloak_realm:ubsu-client-secret:
     secure: v1:pFUmPxSvnsIbE8nR:+FrZrRdidnTh5SU05bqIM3WWWF8iawzfx8aUMVwItpI=
+  keycloak_realm:ol-mit-ovs-redirect-uris:
+  - "https://video.odl.mit.edu/auth/complete/keycloak/"
+  keycloak_realm:ol-mit-ovs-logout-uris:
+  - "https://video.odl.mit.edu/"
+  keycloak_realm:ol-mit-ovs-web-origins:
+  - "https://video.odl.mit.edu"
+  keycloak_realm:ol-mit-ldap-bind-password:
+    secure: v1:xuY2YgyBZnGNLTMy:ZnmyEmcaAOFd8EsiQX+7uG4rBcyP5QmVbI2HI39kkDllxf2TFRovQA==

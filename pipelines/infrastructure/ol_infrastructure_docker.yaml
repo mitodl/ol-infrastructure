@@ -9,7 +9,7 @@ resources:
     paths:
     - pants.toml
     - pyproject.toml
-    - poetry.lock
+    - uv.lock
     - Dockerfile
     - src/bridge
     - src/ol_concourse

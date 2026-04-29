@@ -809,6 +809,470 @@
         "view_menu": {
           "name": "Scan New Datasources"
         }
+      },
+      {
+        "permission": {
+          "name": "can_add"
+        },
+        "view_menu": {
+          "name": "AnnotationLayerRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_add"
+        },
+        "view_menu": {
+          "name": "Chart"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_add"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_add"
+        },
+        "view_menu": {
+          "name": "FilterSets"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_add"
+        },
+        "view_menu": {
+          "name": "Tags"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_add"
+        },
+        "view_menu": {
+          "name": "UserRegistrationsRestAPI"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_bulk_create"
+        },
+        "view_menu": {
+          "name": "Tag"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_cache_dashboard_screenshot"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_delete"
+        },
+        "view_menu": {
+          "name": "AnnotationLayerRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_delete"
+        },
+        "view_menu": {
+          "name": "Chart"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_delete"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_delete"
+        },
+        "view_menu": {
+          "name": "FilterSets"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_delete"
+        },
+        "view_menu": {
+          "name": "Tags"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_delete"
+        },
+        "view_menu": {
+          "name": "UserRegistrationsRestAPI"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_download"
+        },
+        "view_menu": {
+          "name": "Tags"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_drill"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_edit"
+        },
+        "view_menu": {
+          "name": "FilterSets"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_edit"
+        },
+        "view_menu": {
+          "name": "Tags"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_edit"
+        },
+        "view_menu": {
+          "name": "UserRegistrationsRestAPI"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_estimate_query_cost"
+        },
+        "view_menu": {
+          "name": "SQLLab"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_export"
+        },
+        "view_menu": {
+          "name": "Theme"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_format_sql"
+        },
+        "view_menu": {
+          "name": "SQLLab"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_get_drill_info"
+        },
+        "view_menu": {
+          "name": "Dataset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_import_dashboards"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_language_pack"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_list"
+        },
+        "view_menu": {
+          "name": "FilterSets"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_list"
+        },
+        "view_menu": {
+          "name": "SavedQuery"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_list"
+        },
+        "view_menu": {
+          "name": "Tags"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_list"
+        },
+        "view_menu": {
+          "name": "UserRegistrationsRestAPI"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_my_queries"
+        },
+        "view_menu": {
+          "name": "SqlLab"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_profile"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "Profile"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "RowLevelSecurity"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "Tag"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "nl_explorer"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "security"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "user"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_show"
+        },
+        "view_menu": {
+          "name": "Tags"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_show"
+        },
+        "view_menu": {
+          "name": "UserRegistrationsRestAPI"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_tag"
+        },
+        "view_menu": {
+          "name": "Chart"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_tag"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_tags"
+        },
+        "view_menu": {
+          "name": "TagView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_userinfo"
+        },
+        "view_menu": {
+          "name": "UserDBModelView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_userinfo"
+        },
+        "view_menu": {
+          "name": "UserOAuthModelView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_userinfo"
+        },
+        "view_menu": {
+          "name": "UserOIDModelView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_view_chart_as_table"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_view_query"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_write"
+        },
+        "view_menu": {
+          "name": "AnnotationLayerRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_write"
+        },
+        "view_menu": {
+          "name": "Chart"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_write"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_write"
+        },
+        "view_menu": {
+          "name": "Tag"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_write"
+        },
+        "view_menu": {
+          "name": "Theme"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_write"
+        },
+        "view_menu": {
+          "name": "nl_explorer"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Import Dashboards"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Tags"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Themes"
+        }
+      },
+      {
+        "permission": {
+          "name": "resetmypassword"
+        },
+        "view_menu": {
+          "name": "UserDBModelView"
+        }
       }
     ],
     "allowed_schemas": [
@@ -1486,6 +1950,774 @@
         },
         "view_menu": {
           "name": "Datasets"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_add"
+        },
+        "view_menu": {
+          "name": "AnnotationLayerRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_add"
+        },
+        "view_menu": {
+          "name": "FilterSets"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_add"
+        },
+        "view_menu": {
+          "name": "Tags"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_add"
+        },
+        "view_menu": {
+          "name": "UserRegistrationsRestAPI"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_available_domains"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_bulk_create"
+        },
+        "view_menu": {
+          "name": "Tag"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_cache_dashboard_screenshot"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_csrf_token"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_delete"
+        },
+        "view_menu": {
+          "name": "AnnotationLayerRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_delete"
+        },
+        "view_menu": {
+          "name": "FilterSets"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_delete"
+        },
+        "view_menu": {
+          "name": "TagView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_delete"
+        },
+        "view_menu": {
+          "name": "Tags"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_delete"
+        },
+        "view_menu": {
+          "name": "UserRegistrationsRestAPI"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_delete_embedded"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_download"
+        },
+        "view_menu": {
+          "name": "Tags"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_drill"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_edit"
+        },
+        "view_menu": {
+          "name": "FilterSets"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_edit"
+        },
+        "view_menu": {
+          "name": "Tags"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_edit"
+        },
+        "view_menu": {
+          "name": "UserRegistrationsRestAPI"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_estimate_query_cost"
+        },
+        "view_menu": {
+          "name": "SQLLab"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_explore"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_export"
+        },
+        "view_menu": {
+          "name": "Theme"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_external_metadata_by_name"
+        },
+        "view_menu": {
+          "name": "Datasource"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_fetch_datasource_metadata"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_format_sql"
+        },
+        "view_menu": {
+          "name": "SQLLab"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_get"
+        },
+        "view_menu": {
+          "name": "MenuApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_get"
+        },
+        "view_menu": {
+          "name": "OpenApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_get"
+        },
+        "view_menu": {
+          "name": "TagView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_get_drill_info"
+        },
+        "view_menu": {
+          "name": "Dataset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_get_embedded"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_get_value"
+        },
+        "view_menu": {
+          "name": "KV"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_import_dashboards"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_invalidate"
+        },
+        "view_menu": {
+          "name": "CacheRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_language_pack"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_list"
+        },
+        "view_menu": {
+          "name": "AsyncEventsRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_list"
+        },
+        "view_menu": {
+          "name": "DynamicPlugin"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_list"
+        },
+        "view_menu": {
+          "name": "FilterSets"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_list"
+        },
+        "view_menu": {
+          "name": "SavedQuery"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_list"
+        },
+        "view_menu": {
+          "name": "Tags"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_list"
+        },
+        "view_menu": {
+          "name": "UserRegistrationsRestAPI"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_log"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_my_queries"
+        },
+        "view_menu": {
+          "name": "SqlLab"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_post"
+        },
+        "view_menu": {
+          "name": "TagView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_profile"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_publish"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "AdvancedDataType"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "AvailableDomains"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "Database"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "Explore"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "ExploreFormDataRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "Profile"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "RowLevelSecurity"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "SecurityRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "Tag"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "nl_explorer"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "security"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "user"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_request_access"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_schemas"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_show"
+        },
+        "view_menu": {
+          "name": "DynamicPlugin"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_show"
+        },
+        "view_menu": {
+          "name": "SwaggerView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_show"
+        },
+        "view_menu": {
+          "name": "Tags"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_show"
+        },
+        "view_menu": {
+          "name": "UserRegistrationsRestAPI"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_store"
+        },
+        "view_menu": {
+          "name": "KV"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_suggestions"
+        },
+        "view_menu": {
+          "name": "TagView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_tag"
+        },
+        "view_menu": {
+          "name": "Chart"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_tag"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_tagged_objects"
+        },
+        "view_menu": {
+          "name": "TagView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_tags"
+        },
+        "view_menu": {
+          "name": "TagView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_this_form_get"
+        },
+        "view_menu": {
+          "name": "ResetMyPasswordView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_this_form_post"
+        },
+        "view_menu": {
+          "name": "ResetMyPasswordView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_userinfo"
+        },
+        "view_menu": {
+          "name": "UserDBModelView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_userinfo"
+        },
+        "view_menu": {
+          "name": "UserOAuthModelView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_userinfo"
+        },
+        "view_menu": {
+          "name": "UserOIDModelView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_view_chart_as_table"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_view_query"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_write"
+        },
+        "view_menu": {
+          "name": "AnnotationLayerRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_write"
+        },
+        "view_menu": {
+          "name": "DashboardPermalinkRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_write"
+        },
+        "view_menu": {
+          "name": "ExploreFormDataRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_write"
+        },
+        "view_menu": {
+          "name": "Tag"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_write"
+        },
+        "view_menu": {
+          "name": "Theme"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_write"
+        },
+        "view_menu": {
+          "name": "nl_explorer"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Access requests"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Action Log"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Alerts"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Chart Emails"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Dashboard Email Schedules"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Data"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Databases"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Import Dashboards"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Plugins"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Scan New Datasources"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Tags"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Themes"
+        }
+      },
+      {
+        "permission": {
+          "name": "resetmypassword"
+        },
+        "view_menu": {
+          "name": "UserDBModelView"
         }
       }
     ],
@@ -2726,6 +3958,470 @@
         },
         "view_menu": {
           "name": "Manage"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_explore"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_fetch_datasource_metadata"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_schemas"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "Explore"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "ExploreFormDataRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_write"
+        },
+        "view_menu": {
+          "name": "ExploreFormDataRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_save"
+        },
+        "view_menu": {
+          "name": "Datasource"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_samples"
+        },
+        "view_menu": {
+          "name": "Datasource"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_get_column_values"
+        },
+        "view_menu": {
+          "name": "Datasource"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_external_metadata_by_name"
+        },
+        "view_menu": {
+          "name": "Datasource"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_duplicate"
+        },
+        "view_menu": {
+          "name": "Dataset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_get_or_create_dataset"
+        },
+        "view_menu": {
+          "name": "Dataset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_get_embedded"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_delete_embedded"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_available_domains"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_csrf_token"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_import_dashboards"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_log"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_publish"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_request_access"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_warm_up_cache"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_my_queries"
+        },
+        "view_menu": {
+          "name": "SqlLab"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_get"
+        },
+        "view_menu": {
+          "name": "MenuApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_get"
+        },
+        "view_menu": {
+          "name": "OpenApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_show"
+        },
+        "view_menu": {
+          "name": "SwaggerView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_list"
+        },
+        "view_menu": {
+          "name": "AsyncEventsRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_invalidate"
+        },
+        "view_menu": {
+          "name": "CacheRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "SecurityRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "AdvancedDataType"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "AvailableDomains"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_export"
+        },
+        "view_menu": {
+          "name": "ImportExportRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_write"
+        },
+        "view_menu": {
+          "name": "DashboardPermalinkRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_write"
+        },
+        "view_menu": {
+          "name": "CssTemplate"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_list"
+        },
+        "view_menu": {
+          "name": "DynamicPlugin"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_show"
+        },
+        "view_menu": {
+          "name": "DynamicPlugin"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_get_value"
+        },
+        "view_menu": {
+          "name": "KV"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_store"
+        },
+        "view_menu": {
+          "name": "KV"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_delete"
+        },
+        "view_menu": {
+          "name": "TagView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_get"
+        },
+        "view_menu": {
+          "name": "TagView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_post"
+        },
+        "view_menu": {
+          "name": "TagView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_suggestions"
+        },
+        "view_menu": {
+          "name": "TagView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_tagged_objects"
+        },
+        "view_menu": {
+          "name": "TagView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_this_form_get"
+        },
+        "view_menu": {
+          "name": "ResetMyPasswordView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_this_form_post"
+        },
+        "view_menu": {
+          "name": "ResetMyPasswordView"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Access requests"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Action Log"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Alerts"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Alerts & Report"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "CSS Templates"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Chart Emails"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Dashboard Email Schedules"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Data"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Databases"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Import Dashboards"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "List Roles"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "List Users"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Plugins"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Scan New Datasources"
         }
       }
     ],

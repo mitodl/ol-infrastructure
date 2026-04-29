@@ -55,6 +55,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultMysqlDatabaseConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.aws.route53_helper import (
@@ -65,7 +66,7 @@ from ol_infrastructure.lib.fastly import (
     get_fastly_provider,
 )
 from ol_infrastructure.lib.ol_types import AWSBase, Services
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import mysql_role_statements, setup_vault_provider
 
@@ -90,21 +91,23 @@ cluster_stack_name = (
 cluster_stack = StackReference(cluster_stack_name)
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-policy_stack = StackReference("infrastructure.aws.policies")
-dns_stack = StackReference("infrastructure.aws.dns")
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
+dns_stack = StackReference(stack_ref(projects.DNS, "default"))
 
-kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
-monitoring_stack = StackReference("infrastructure.monitoring")
+kms_stack = StackReference(stack_ref(projects.KMS, stack_info.name))
+vault_stack = StackReference(
+    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+)
+monitoring_stack = StackReference(stack_ref(projects.MONITORING, "default"))
 vector_log_proxy_stack = StackReference(
-    f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
+    stack_ref(projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}")
 )
 mongodb_atlas_stack = StackReference(
-    f"infrastructure.mongodb_atlas.{stack_info.env_prefix}.{stack_info.name}"
+    stack_ref(projects.MONGODB_ATLAS, f"{stack_info.env_prefix}.{stack_info.name}")
 )
 notes_stack = StackReference(
-    f"applications.edxnotes.{stack_info.env_prefix}.{stack_info.name}"
+    stack_ref(projects.EDX_NOTES, f"{stack_info.env_prefix}.{stack_info.name}")
 )
 
 #############

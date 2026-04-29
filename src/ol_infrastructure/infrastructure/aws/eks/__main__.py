@@ -53,6 +53,7 @@ from ol_infrastructure.infrastructure.aws.eks.vault_secrets_operator import (
     setup_vault_secrets_operator,
 )
 from ol_infrastructure.infrastructure.aws.eks.vpa import setup_vpa
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     access_entry_opts,
     get_cluster_version,
@@ -65,7 +66,7 @@ from ol_infrastructure.lib.aws.iam_helper import (
 )
 from ol_infrastructure.lib.fastly import get_fastly_provider
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 ############################################################
@@ -100,14 +101,18 @@ USE_IO_OPTIMIZED_STATEFUL_WORKLOAD_STORAGE = (
     STATEFUL_WORKLOAD_STORAGE_BACKEND == STATEFUL_WORKLOAD_IO_OPTIMIZED_BACKEND
 )
 
-dns_stack = StackReference("infrastructure.aws.dns")
-iam_stack = StackReference("infrastructure.aws.iam")
-kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-policy_stack = StackReference("infrastructure.aws.policies")
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
-vault_auth_stack = StackReference("substructure.vault.auth.operations.Production")
-concourse_stack = StackReference("applications.concourse.Production")
+dns_stack = StackReference(stack_ref(projects.DNS, "default"))
+iam_stack = StackReference(stack_ref(projects.IAM, "default"))
+kms_stack = StackReference(stack_ref(projects.KMS, stack_info.name))
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
+vault_stack = StackReference(
+    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+)
+vault_auth_stack = StackReference(
+    stack_ref(projects.VAULT_AUTH, "operations.Production")
+)
+concourse_stack = StackReference(stack_ref(projects.CONCOURSE, "Production"))
 
 business_unit = env_config.require("business_unit") or "operations"
 target_vpc = network_stack.require_output(env_config.require("target_vpc"))

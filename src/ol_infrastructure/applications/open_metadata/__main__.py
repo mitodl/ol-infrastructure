@@ -32,6 +32,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
@@ -45,7 +46,7 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 
@@ -57,14 +58,16 @@ setup_vault_provider()
 stack_info = parse_stack()
 
 open_metadata_config = Config("open_metadata")
-dns_stack = StackReference("infrastructure.aws.dns")
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-policy_stack = StackReference("infrastructure.aws.policies")
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+dns_stack = StackReference(stack_ref(projects.DNS, "default"))
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
+vault_stack = StackReference(
+    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+)
 opensearch_stack = StackReference(
     f"infrastructure.aws.opensearch.open_metadata.{stack_info.name}"
 )
-cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
+cluster_stack = StackReference(stack_ref(projects.EKS, f"data.{stack_info.name}"))
 
 opensearch_cluster = opensearch_stack.require_output("cluster")
 apps_vpc = network_stack.require_output("applications_vpc")
@@ -218,7 +221,7 @@ open_metadata_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
     "open-metadata-vault-k8s-auth-backend-role",
     role_name="open-metadata",
     backend=cluster_stack.require_output("vault_auth_endpoint"),
-    bound_service_account_names=["*"],
+    bound_service_account_names=["open-metadata-vault"],
     bound_service_account_namespaces=[open_metadata_namespace],
     token_policies=[open_metadata_vault_policy.name],
 )
@@ -316,7 +319,7 @@ open_metadata_connector_vault_mount = vault.Mount(
     description="Static connector credentials for OpenMetadata ingestion pipelines",
     path="secret-openmetadata",
     type="kv",
-    options={"version": "1"},
+    options={"version": "2"},
     opts=ResourceOptions(parent=vault_k8s_resources),
 )
 
@@ -326,7 +329,7 @@ connector_secret_names: list[str] = []
 if open_metadata_connector_secrets:
     open_metadata_connector_vault_secret = vault.generic.Secret(
         f"open-metadata-connector-vault-secret-{stack_info.env_suffix}",
-        path="secret-openmetadata/connectors",
+        path="secret-openmetadata/data/connectors",
         data_json=Output.secret(json.dumps(open_metadata_connector_secrets)),
         opts=ResourceOptions(
             depends_on=[open_metadata_connector_vault_mount],
@@ -362,7 +365,7 @@ if open_metadata_connector_secrets:
             dest_secret_name=secret_name,
             labels=k8s_global_labels,
             mount="secret-openmetadata",
-            mount_type="kv-v1",
+            mount_type="kv-v2",
             path="connectors",
             restart_target_kind="Deployment",
             restart_target_name="openmetadata",

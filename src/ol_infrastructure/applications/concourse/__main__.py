@@ -43,6 +43,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.ec2_helper import (
     DiskTypes,
     InstanceTypes,
@@ -51,7 +52,7 @@ from ol_infrastructure.lib.aws.ec2_helper import (
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 
@@ -63,11 +64,15 @@ if Config("vault_server").get("env_namespace"):
     setup_vault_provider()
 concourse_config = Config("concourse")
 stack_info = parse_stack()
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-policy_stack = StackReference("infrastructure.aws.policies")
-dns_stack = StackReference("infrastructure.aws.dns")
-consul_stack = StackReference(f"infrastructure.consul.operations.{stack_info.name}")
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
+dns_stack = StackReference(stack_ref(projects.DNS, "default"))
+consul_stack = StackReference(
+    stack_ref(projects.CONSUL_INFRA, f"operations.{stack_info.name}")
+)
+vault_stack = StackReference(
+    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+)
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
 target_vpc_name = concourse_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"

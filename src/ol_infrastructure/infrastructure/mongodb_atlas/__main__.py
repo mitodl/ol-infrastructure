@@ -8,9 +8,10 @@ import pulumi_mongodbatlas as atlas
 
 from bridge.lib.magic_numbers import DEFAULT_MONGODB_PORT
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 
 
 def privatize_mongo_uri(mongo_uri):
@@ -31,7 +32,7 @@ atlas_config = pulumi.Config("mongodb_atlas")
 env_config = pulumi.Config("environment")
 data_vpc_access_config = pulumi.Config("data_vpc_access")
 stack_info = parse_stack()
-network_stack = pulumi.StackReference(f"infrastructure.aws.network.{stack_info.name}")
+network_stack = pulumi.StackReference(stack_ref(projects.NETWORKING, stack_info.name))
 
 #############
 # VARIABLES #
