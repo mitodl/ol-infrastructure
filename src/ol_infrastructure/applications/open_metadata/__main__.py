@@ -3,7 +3,7 @@ from string import Template
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference
+from pulumi import Config, Output, ResourceOptions, StackReference
 from pulumi_aws import ec2, get_caller_identity
 
 from bridge.lib.magic_numbers import (
@@ -213,7 +213,7 @@ open_metadata_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
     "open-metadata-vault-k8s-auth-backend-role",
     role_name="open-metadata",
     backend=cluster_stack.require_output("vault_auth_endpoint"),
-    bound_service_account_names=["*"],
+    bound_service_account_names=["open-metadata-vault"],
     bound_service_account_namespaces=[open_metadata_namespace],
     token_policies=[open_metadata_vault_policy.name],
 )
@@ -287,6 +287,42 @@ oidc_config_secret = OLVaultK8SSecret(
         parent=vault_k8s_resources,
     ),
 )
+
+# Connector credentials for OpenMetadata ingestion pipelines.
+# Each connector's credentials are stored in Vault under
+# secret-openmetadata/connectors and synced to K8s secrets
+# in the open-metadata namespace via vault-secrets-operator.
+# Add entries to connector_configs for each source system.
+connector_configs: dict[str, dict[str, str | Output[str]]] = {}
+
+connector_secrets: list[OLVaultK8SSecret] = []
+connector_secret_names: list[str] = []
+for connector_name, templates in connector_configs.items():
+    secret_name = f"om-connector-{connector_name}"
+    secret_config = OLVaultK8SStaticSecretConfig(
+        name=f"openmetadata-connector-{connector_name}",
+        namespace=open_metadata_namespace,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name=secret_name,
+        labels=k8s_global_labels,
+        mount="secret-openmetadata",
+        mount_type="kv-v1",
+        path="connectors",
+        restart_target_kind="Deployment",
+        restart_target_name="openmetadata",
+        templates=templates,
+        vaultauth=vault_k8s_resources.auth_name,
+    )
+    connector_secret = OLVaultK8SSecret(
+        f"open-metadata-{stack_info.name}-connector-{connector_name}-secret",
+        secret_config,
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            parent=vault_k8s_resources,
+        ),
+    )
+    connector_secrets.append(connector_secret)
+    connector_secret_names.append(secret_name)
 
 # Install the openmetadata helm chart
 # https://github.com/mitodl/ol-infrastructure/issues/2680
@@ -381,6 +417,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         "name": oidc_config_secret_name,
                     },
                 },
+                *[{"secretRef": {"name": name}} for name in connector_secret_names],
             ],
         },
         skip_await=False,
@@ -388,7 +425,12 @@ open_metadata_application = kubernetes.helm.v3.Release(
     opts=ResourceOptions(
         parent=vault_k8s_resources,
         delete_before_replace=True,
-        depends_on=[open_metadata_db, db_creds_secret, oidc_config_secret],
+        depends_on=[
+            open_metadata_db,
+            db_creds_secret,
+            oidc_config_secret,
+            *connector_secrets,
+        ],
     ),
 )
 
