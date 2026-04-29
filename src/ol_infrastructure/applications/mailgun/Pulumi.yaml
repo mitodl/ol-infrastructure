@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-mailgun-service
+name: ol-application-mailgun
 runtime: python
 description: Manage configuration of mailgun domains
 backend:

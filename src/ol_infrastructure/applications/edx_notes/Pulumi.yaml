@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-edx-notes-application
+name: ol-application-edx-notes
 runtime: python
 description: Create and manage resources for running the edx_notes add on
 backend:

@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-substructure-vault-static-mounts
+name: ol-substructure-vault-static-mounts
 runtime: python
 description: Create and manage mounts of KV secrets in Vault
 backend:

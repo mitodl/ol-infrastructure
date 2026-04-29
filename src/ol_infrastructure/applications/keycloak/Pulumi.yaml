@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-keycloak-application
+name: ol-application-keycloak
 runtime: python
 description: A project to manage the resources and deployment of Keycloak
 backend:

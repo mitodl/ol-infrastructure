@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-tika-server
+name: ol-application-tika
 runtime: python
 description: Manage deployment of a tika server
 backend:

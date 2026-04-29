@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-starrocks-application
+name: ol-application-starrocks
 runtime: python
 description: Pulumi project for managing Starrocks deployments
 backend:

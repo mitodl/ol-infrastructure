@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-concourse-application
+name: ol-application-concourse
 runtime: python
 description: A project to manage the resources and deployment for the Concourse CI/CD
   system

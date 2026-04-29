@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-data_warehouse
+name: ol-infrastructure-data-warehouse
 runtime: python
 description: Manage the storage and query engine for an Open Learning data warehouse
   using Iceberg tables in S3

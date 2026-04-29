@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-ocw-studio-application
+name: ol-application-ocw-studio
 runtime: python
 description: Pulumi project to manage the infrastructure resources needed by the OCW
   Studio application

@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-mitx
+name: ol-application-mitx
 runtime: python
 description: Manage infrastructure required by MITx
 backend:

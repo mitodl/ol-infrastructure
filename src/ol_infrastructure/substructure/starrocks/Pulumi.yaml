@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-substructure-starrocks
+name: ol-substructure-starrocks
 runtime: python
 description: Vault dynamic database credentials for StarRocks
 backend:

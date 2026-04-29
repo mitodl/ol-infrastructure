@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-substructure-vault-setup
+name: ol-substructure-vault-setup
 runtime: python
 description: Mange initial setup of a new Vault cluster so that it is ready to be
   used with Pulumi

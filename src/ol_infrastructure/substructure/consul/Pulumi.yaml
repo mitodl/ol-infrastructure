@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-substructure-consul
+name: ol-substructure-consul
 runtime: python
 description: Management of shared resources for Consul clusters such as prepared queries
 backend:

@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-mitxonline-application
+name: ol-application-mitxonline
 runtime: python
 description: Pulumi project for deploying the stack of services needed by the mitxonline
   application

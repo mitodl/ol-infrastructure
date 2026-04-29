@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-dagster-application
+name: ol-application-dagster
 runtime: python
 description: Pulumi project for deploying the stack of services needed by the Dagster
   ETL framework
