@@ -580,7 +580,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         deployment_prod,
     ) = _define_release_resources(
         app_name=app_name,
-        github_repo=pipeline_parameters.github_repo,
+        github_repo=pipeline_parameters.github_repo or f"mitodl/{app_name}",
         repo_main_branch=pipeline_parameters.repo_main_branch,
     )
 
