@@ -333,7 +333,7 @@ connector_secret_names: list[str] = []
 if open_metadata_connector_secrets:
     open_metadata_connector_vault_secret = vault.generic.Secret(
         f"open-metadata-connector-vault-secret-{stack_info.env_suffix}",
-        path="secret-openmetadata/data/connectors",
+        path="secret-openmetadata/connectors",
         data_json=Output.secret(json.dumps(open_metadata_connector_secrets)),
         opts=ResourceOptions(
             depends_on=[open_metadata_connector_vault_mount],
