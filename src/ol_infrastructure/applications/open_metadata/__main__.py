@@ -6,7 +6,7 @@ from typing import Any
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, StackReference
-from pulumi_aws import ec2, get_caller_identity
+from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
@@ -22,6 +22,8 @@ from ol_infrastructure.components.aws.eks import (
     OLEKSGatewayConfig,
     OLEKSGatewayListenerConfig,
     OLEKSGatewayRouteConfig,
+    OLEKSTrustRole,
+    OLEKSTrustRoleConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -37,6 +39,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
 )
+from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.ol_types import (
     Application,
@@ -96,6 +99,7 @@ setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 aws_account = get_caller_identity()
 
 open_metadata_namespace = "open-metadata"
+open_metadata_service_account_name = "openmetadata"
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(open_metadata_namespace, ns)
 )
@@ -384,6 +388,84 @@ if open_metadata_connector_secrets:
         connector_secrets.append(connector_secret)
         connector_secret_names.append(secret_name)
 
+# IRSA trust role granting the OpenMetadata pod read access to AWS Glue and S3.
+# Uses OLEKSTrustRole directly (rather than OLEKSAuthBinding) because Vault K8s
+# auth is already managed above via OLVaultK8SResources; OLEKSAuthBinding would
+# create a conflicting duplicate Vault auth backend role.
+open_metadata_glue_policy_document = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "glue:GetDatabase",
+                "glue:GetDatabases",
+                "glue:GetTable",
+                "glue:GetTables",
+                "glue:GetPartition",
+                "glue:GetPartitions",
+            ],
+            "Resource": [
+                "arn:aws:glue:*:*:catalog",
+                f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}*",
+                f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}*/*",
+            ],
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:ListBucket",
+            ],
+            "Resource": [
+                f"arn:aws:s3:::ol-data-lake-*-{stack_info.env_suffix}",
+                f"arn:aws:s3:::ol-data-lake-*-{stack_info.env_suffix}/*",
+            ],
+        },
+    ],
+}
+
+open_metadata_glue_iam_policy = iam.Policy(
+    f"open-metadata-glue-read-policy-{stack_info.env_suffix}",
+    name=f"open-metadata-glue-read-policy-{stack_info.env_suffix}",
+    path=f"/ol-applications/open-metadata/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+    description=(
+        "Read-only access to AWS Glue catalog and S3 data lake"
+        " for OpenMetadata ingestion pipelines"
+    ),
+    policy=lint_iam_policy(
+        open_metadata_glue_policy_document,
+        stringify=True,
+        parliament_config={"RESOURCE_EFFECTIVELY_STAR": {}},
+    ),
+    tags=aws_config.tags,
+)
+
+open_metadata_irsa_role = OLEKSTrustRole(
+    f"open-metadata-irsa-trust-role-{stack_info.env_suffix}",
+    role_config=OLEKSTrustRoleConfig(
+        account_id=aws_account.account_id,
+        cluster_name=cluster_stack.require_output("cluster_name"),
+        cluster_identities=cluster_stack.require_output("cluster_identities"),
+        description=(
+            "Trust role for OpenMetadata service account"
+            " to access AWS Glue and S3 data lake"
+        ),
+        policy_operator="StringEquals",
+        role_name="open-metadata",
+        service_account_name=open_metadata_service_account_name,
+        service_account_namespace=open_metadata_namespace,
+        tags=aws_config.tags,
+    ),
+)
+
+open_metadata_glue_policy_attachment = iam.RolePolicyAttachment(
+    f"open-metadata-glue-policy-attachment-{stack_info.env_suffix}",
+    policy_arn=open_metadata_glue_iam_policy.arn,
+    role=open_metadata_irsa_role.role.name,
+    opts=ResourceOptions(parent=open_metadata_irsa_role),
+)
+
 # Install the openmetadata helm chart
 # https://github.com/mitodl/ol-infrastructure/issues/2680
 open_metadata_application = kubernetes.helm.v3.Release(
@@ -466,6 +548,13 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     "tag": OPEN_METADATA_VERSION,
                 },
             },
+            "serviceAccount": {
+                "create": True,
+                "name": open_metadata_service_account_name,
+                "annotations": {
+                    "eks.amazonaws.com/role-arn": open_metadata_irsa_role.role.arn,
+                },
+            },
             "envFrom": [
                 {
                     "secretRef": {
@@ -489,6 +578,8 @@ open_metadata_application = kubernetes.helm.v3.Release(
             open_metadata_db,
             db_creds_secret,
             oidc_config_secret,
+            open_metadata_irsa_role,
+            open_metadata_glue_policy_attachment,
             *connector_secrets,
         ],
     ),
