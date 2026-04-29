@@ -688,7 +688,11 @@ class OLVaultK8SSecretConfig(BaseModel):
     @model_validator(mode="after")
     def validate_restart_targets(self) -> "OLVaultK8SSecretConfig":
         has_legacy = bool(self.restart_target_kind or self.restart_target_name)
-        has_new = self.restart_targets is not None
+        has_new = bool(self.restart_targets)
+
+        if self.restart_targets is not None and not self.restart_targets:
+            msg = "restart_targets must be non-empty when provided."
+            raise ValueError(msg)
 
         if has_legacy and has_new:
             msg = (
