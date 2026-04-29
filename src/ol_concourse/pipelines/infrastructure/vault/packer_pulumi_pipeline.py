@@ -51,10 +51,7 @@ vault_ami_fragment = packer_jobs(
 vault_pulumi_fragment = pulumi_jobs_chain(
     vault_pulumi_code,
     project_name="ol-infrastructure-vault-server",
-    stack_names=[
-        f"infrastructure.vault.operations.{stage}"
-        for stage in ("CI", "QA", "Production")
-    ],
+    stack_names=[f"operations.{stage}" for stage in ("CI", "QA", "Production")],
     project_source_path=PULUMI_CODE_PATH.joinpath("infrastructure/vault/"),
     dependencies=[
         GetStep(
@@ -78,11 +75,8 @@ for substructure in [
     substructure_fragments.append(  # noqa: PERF401
         pulumi_jobs_chain(
             vault_pulumi_substructure_code,
-            project_name=f"ol-infrastructure-vault-{substructure}",
-            stack_names=[
-                f"substructure.vault.{substructure}.operations.{stage}"
-                for stage in ("CI", "QA", "Production")
-            ],
+            project_name=f"ol-substructure-vault-{substructure}",
+            stack_names=[f"operations.{stage}" for stage in ("CI", "QA", "Production")],
             project_source_path=PULUMI_CODE_PATH.joinpath(
                 f"substructure/vault/{substructure}/"
             ),

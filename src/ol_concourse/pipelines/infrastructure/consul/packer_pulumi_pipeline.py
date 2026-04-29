@@ -64,8 +64,8 @@ for network in [
         stages.insert(0, "CI")
     consul_pulumi_infrastructure_fragment = pulumi_jobs_chain(
         consul_pulumi_infrastructure_code,
-        project_name="ol-infrastructure-consul-server",
-        stack_names=[f"infrastructure.consul.{network}.{stage}" for stage in stages],
+        project_name="ol-infrastructure-consul",
+        stack_names=[f"{network}.{stage}" for stage in stages],
         project_source_path=PULUMI_CODE_PATH.joinpath("infrastructure/consul/"),
         dependencies=[
             GetStep(
@@ -85,8 +85,8 @@ for network in [
         stages.insert(0, "CI")
     consul_pulumi_substructure_fragment = pulumi_jobs_chain(
         consul_pulumi_substructure_code,
-        project_name="ol-infrastructure-substructure-consul",
-        stack_names=[f"substructure.consul.{network}.{stage}" for stage in stages],
+        project_name="ol-substructure-consul",
+        stack_names=[f"{network}.{stage}" for stage in stages],
         project_source_path=PULUMI_CODE_PATH.joinpath("substructure/consul/"),
     )
     consul_pulumi_substructure_fragments.append(consul_pulumi_substructure_fragment)

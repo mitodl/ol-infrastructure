@@ -34,7 +34,7 @@ for cluster in ["data", "operations", "applications", "residential"]:
         eks_infrastructure_code,
         project_name="ol-infrastructure-eks",
         project_source_path=PULUMI_CODE_PATH.joinpath("infrastructure/aws/eks"),
-        stack_names=[f"infrastructure.aws.eks.{cluster}.{stage}" for stage in stages],
+        stack_names=[f"{cluster}.{stage}" for stage in stages],
     )
     pipeline_fragments.append(infra_chain)
 
@@ -42,7 +42,7 @@ for cluster in ["data", "operations", "applications", "residential"]:
         eks_substructure_code,
         project_name="ol-substructure-eks",
         project_source_path=PULUMI_CODE_PATH.joinpath("substructure/aws/eks"),
-        stack_names=[f"substructure.aws.eks.{cluster}.{stage}" for stage in stages],
+        stack_names=[f"{cluster}.{stage}" for stage in stages],
     )
     pipeline_fragments.append(substructure_chain)
 

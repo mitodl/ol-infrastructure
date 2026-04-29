@@ -5,6 +5,12 @@ from ol_concourse.lib.resources import git_repo
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 
+# Project names differ from the service names for kms/network, so use explicit mapping.
+_SIMPLE_SERVICE_PROJECT_NAMES = {
+    "kms": "ol-infrastructure-aws-kms",
+    "network": "ol-infrastructure-networking",
+}
+
 # Simple services that follow well defined patterns (CI -> QA -> Production)
 simple_resource_types = []
 simple_resources = []
@@ -21,11 +27,8 @@ for service in ["kms", "network"]:
 
     simple_pulumi_chain = pulumi_jobs_chain(
         simple_pulumi_code,
-        project_name=f"ol-infrastructure-aws-{service}",
-        stack_names=[
-            f"infrastructure.aws.{service}.{stage}"
-            for stage in ("CI", "QA", "Production")
-        ],
+        project_name=_SIMPLE_SERVICE_PROJECT_NAMES[service],
+        stack_names=["CI", "QA", "Production"],
         project_source_path=PULUMI_CODE_PATH.joinpath(f"infrastructure/aws/{service}/"),
         dependencies=[],
     )
@@ -63,7 +66,7 @@ for service in ["dns", "policies", "iam"]:
     oneoff_pulumi_chain = pulumi_jobs_chain(
         oneoff_pulumi_code,
         project_name=f"ol-infrastructure-aws-{service}",
-        stack_names=[f"infrastructure.aws.{service}"],
+        stack_names=["default"],
         project_source_path=PULUMI_CODE_PATH.joinpath(f"infrastructure/aws/{service}/"),
         dependencies=[],
     )
