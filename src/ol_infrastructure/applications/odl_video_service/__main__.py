@@ -793,7 +793,7 @@ default_domain = ovs_config.get("default_domain")
 nginx_conf_content = f"""\
 server {{
     listen 443 ssl default_server;
-    listen [::]:443;
+    listen [::]:443 ssl default_server;
     server_name {default_domain};
 
     ssl_certificate /etc/nginx/tls/cert.pem;
@@ -862,7 +862,7 @@ logging_conf_content = bilder_files_dir.joinpath("logging.conf").read_text()
 
 # ConfigMap for NGINX configuration files
 nginx_configmap_data: dict[str, str] = {
-    "default.conf": nginx_conf_content,
+    "default.conf": f"include /etc/nginx/logging.conf;\n{nginx_conf_content}",
     "uwsgi_params": uwsgi_params_content,
     "logging.conf": logging_conf_content,
 }
