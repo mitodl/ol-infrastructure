@@ -396,32 +396,42 @@ if open_metadata_connector_secrets:
         connector_secrets.append(connector_secret)
         connector_secret_names.append(secret_name)
 
-# Ingestion-bot JWT token: read from SOPS secrets, write to Vault, sync to K8s.
-# The bot token authenticates ingestion pods to the OpenMetadata server API.
-ingestion_bot_secret_name = "om-ingestion-bot"  # noqa: S105  # pragma: allowlist secret
-if open_metadata_connector_secrets.get("ingestion_bot"):
+# OM ships with several system bots, each with its own JWT used by a specific
+# workflow type.  All known bots are listed here (SOPS key → OM hyphenated name).
+# Any bot whose token appears in the SOPS file gets its own Vault secret and a
+# VSO-managed K8s secret (``om-<bot>``).  The K8s secret exposes a single key
+# ``OM_BOT_JWT_TOKEN`` so all ingestion scripts can use the same env-var name.
+_OM_BOTS: dict[str, str] = {
+    "ingestion_bot": "ingestion-bot",
+    "lineage_bot": "lineage-bot",
+    "profiler_bot": "profiler-bot",
+    "data_insight_bot": "data-insight-bot",
+}
+
+for _bot_key, _bot_name in _OM_BOTS.items():
+    if not open_metadata_connector_secrets.get(_bot_key):
+        continue
+    _k8s_secret_name = f"om-{_bot_name}"  # pragma: allowlist secret
     vault.generic.Secret(
-        f"open-metadata-ingestion-bot-vault-secret-{stack_info.env_suffix}",
-        path="secret-openmetadata/ingestion-bot",
-        data_json=Output.secret(
-            json.dumps(open_metadata_connector_secrets["ingestion_bot"])
-        ),
+        f"open-metadata-{_bot_name}-vault-secret-{stack_info.env_suffix}",
+        path=f"secret-openmetadata/{_bot_name}",
+        data_json=Output.secret(json.dumps(open_metadata_connector_secrets[_bot_key])),
         opts=ResourceOptions(
             depends_on=[open_metadata_connector_vault_mount],
             parent=vault_k8s_resources,
         ),
     )
-    ingestion_bot_k8s_secret = OLVaultK8SSecret(
-        f"open-metadata-{stack_info.name}-ingestion-bot-secret",
+    OLVaultK8SSecret(
+        f"open-metadata-{stack_info.name}-{_bot_name}-secret",
         OLVaultK8SStaticSecretConfig(
-            name="openmetadata-ingestion-bot",
+            name=f"openmetadata-{_bot_name}",
             namespace=open_metadata_namespace,
             dest_secret_labels=k8s_global_labels,
-            dest_secret_name=ingestion_bot_secret_name,
+            dest_secret_name=_k8s_secret_name,
             labels=k8s_global_labels,
             mount="secret-openmetadata",
             mount_type="kv-v2",
-            path="ingestion-bot",
+            path=_bot_name,
             restart_target_kind="Deployment",
             restart_target_name="openmetadata",
             templates={"OM_BOT_JWT_TOKEN": '{{ get .Secrets "token" }}'},
@@ -432,7 +442,7 @@ if open_metadata_connector_secrets.get("ingestion_bot"):
             parent=vault_k8s_resources,
         ),
     )
-    connector_secret_names.append(ingestion_bot_secret_name)
+    connector_secret_names.append(_k8s_secret_name)
 
 # IRSA trust role granting the OpenMetadata server pod read access to AWS Glue and S3.
 # Uses OLEKSTrustRole directly (rather than OLEKSAuthBinding) because Vault K8s

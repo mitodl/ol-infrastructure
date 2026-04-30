@@ -170,15 +170,25 @@ _POD_SECURITY_CONTEXT = {
     "runAsGroup": 1000,
     "runAsNonRoot": True,
 }
-_BOT_JWT_ENV = {
-    "name": "OM_BOT_JWT_TOKEN",
-    "valueFrom": {
-        "secretKeyRef": {
-            "name": "om-ingestion-bot",
-            "key": "OM_BOT_JWT_TOKEN",
-        }
-    },
-}
+
+
+def _bot_jwt_env(bot_secret_name: str) -> dict[str, object]:
+    """Return the env-var entry that injects the OM bot JWT from a K8s secret.
+
+    :param bot_secret_name: Name of the K8s secret holding the bot token
+        (e.g. ``"om-ingestion-bot"``, ``"om-lineage-bot"``).  The secret
+        must have a key named ``OM_BOT_JWT_TOKEN`` (created by VSO in the
+        application stack).
+    """
+    return {
+        "name": "OM_BOT_JWT_TOKEN",
+        "valueFrom": {
+            "secretKeyRef": {
+                "name": bot_secret_name,
+                "key": "OM_BOT_JWT_TOKEN",
+            }
+        },
+    }
 
 
 def _secret_env(secret_name: str, key: str) -> dict[str, object]:
@@ -188,12 +198,13 @@ def _secret_env(secret_name: str, key: str) -> dict[str, object]:
     }
 
 
-def _make_cronjob(
+def _make_cronjob(  # noqa: PLR0913
     name: str,
     schedule: str,
     python_script: "str | Output[str]",
     extra_env: list[dict[str, object]] | None = None,
     opts: ResourceOptions | None = None,
+    bot_secret_name: str = "om-ingestion-bot",  # noqa: S107
 ) -> kubernetes.apiextensions.CustomResource:
     """Create a CronOMJob custom resource.
 
@@ -205,10 +216,15 @@ def _make_cronjob(
         and a ``config = {...}`` dict that may reference ``os.environ[...]``
         for credential injection.
     :param extra_env: Additional env vars (e.g. secretKeyRef entries).
-        The ingestion-bot JWT env var is always prepended automatically.
+        The bot JWT env var (``OM_BOT_JWT_TOKEN``) is always prepended
+        automatically, sourced from *bot_secret_name*.
     :param opts: Optional Pulumi resource options (e.g. depends_on).
+    :param bot_secret_name: K8s secret that holds the OM bot JWT token.
+        Defaults to ``"om-ingestion-bot"`` for metadata ingestion workflows.
+        Use ``"om-lineage-bot"``, ``"om-profiler-bot"``, or
+        ``"om-data-insight-bot"`` for other workflow types.
     """
-    env = [_BOT_JWT_ENV, *(extra_env or [])]
+    env = [_bot_jwt_env(bot_secret_name), *(extra_env or [])]
     command = Output.from_input(python_script).apply(lambda s: ["python", "-c", s])
 
     return kubernetes.apiextensions.CustomResource(
