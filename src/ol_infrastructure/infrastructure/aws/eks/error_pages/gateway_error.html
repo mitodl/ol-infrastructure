@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Something went wrong | MIT Learn</title>
+    <!--
+      Neue Haas Grotesk Text (the smoot-design / MIT Learn typeface) is served
+      via Adobe Typekit and will load on any authorised MIT domain.  The page
+      degrades gracefully to system sans-serif when the font is unavailable.
+    -->
+    <link rel="stylesheet" href="https://use.typekit.net/lbk1xay.css" />
+    <style>
+      /* ── smoot-design tokens ────────────────────────────────────────────── */
+      :root {
+        --color-mit-red:          #750014;
+        --color-red:              #a31f34;
+        --color-nav-gray:         #303337;
+        --color-dark-gray-2:      #212326;
+        --color-dark-gray-1:      #40464c;
+        --color-silver-gray-dark: #626a73;
+        --color-silver-gray:      #8b959e;
+        --color-silver-gray-lt:   #b8c2cc;
+        --color-light-gray-2:     #dde1e6;
+        --color-light-gray-1:     #f3f4f8;
+        --color-white:            #ffffff;
+        --font:                   "neue-haas-grotesk-text", sans-serif;
+        --nav-height:             72px;
+        --radius-card:            8px;
+        --radius-btn:             4px;
+      }
+
+      /* ── Reset / base ───────────────────────────────────────────────────── */
+      *, *::before, *::after { box-sizing: border-box; }
+
+      html {
+        font-family: var(--font);
+        font-size: 16px;
+        scroll-padding-top: var(--nav-height);
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: var(--color-light-gray-1);
+        color: var(--color-dark-gray-2);
+        min-height: 100vh;
+      }
+
+      a { color: inherit; text-decoration: none; }
+      ul { margin: 0; padding: 0 0 0 1.25rem; }
+      li { margin: 0.375rem 0; }
+
+      /* ── Nav bar ────────────────────────────────────────────────────────── */
+      .nav {
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        z-index: 100;
+        height: var(--nav-height);
+        background-color: var(--color-nav-gray);
+        display: flex;
+        align-items: center;
+        padding: 0 24px;
+      }
+
+      /* Wordmark: "MIT" in bold red + "Learn" in regular white */
+      .nav-wordmark {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        color: var(--color-white);
+        font-size: 1.125rem;   /* 18px */
+        line-height: 1;
+        user-select: none;
+      }
+      .nav-wordmark-mit {
+        font-weight: 700;
+        color: var(--color-white);
+        letter-spacing: -0.02em;
+      }
+      .nav-wordmark-pipe {
+        color: var(--color-silver-gray);
+        font-weight: 300;
+      }
+      .nav-wordmark-learn {
+        font-weight: 400;
+        color: var(--color-white);
+      }
+
+      /* ── Page layout ────────────────────────────────────────────────────── */
+      .page-body {
+        margin-top: var(--nav-height);
+        min-height: calc(100vh - var(--nav-height));
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 48px 16px 64px;
+      }
+
+      /* ── Card ───────────────────────────────────────────────────────────── */
+      .card {
+        background: var(--color-white);
+        border-radius: var(--radius-card);
+        box-shadow: 0 2px 4px rgba(37,38,43,.08), 0 4px 16px rgba(37,38,43,.10);
+        width: 100%;
+        max-width: 640px;
+        padding: 40px 48px 48px;
+      }
+
+      /* ── Error icon ─────────────────────────────────────────────────────── */
+      .icon-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background-color: rgba(117, 0, 20, 0.08); /* mitRed @ 8 % */
+        margin-bottom: 20px;
+        flex-shrink: 0;
+      }
+      .icon-wrap svg {
+        width: 28px;
+        height: 28px;
+        color: var(--color-mit-red);
+      }
+
+      /* ── Typography ─────────────────────────────────────────────────────── */
+      .heading {
+        margin: 0 0 8px;
+        font-size: 1.75rem;   /* 28px ≈ h3 */
+        font-weight: 700;
+        line-height: 2.25rem;
+        color: var(--color-dark-gray-2);
+      }
+
+      .subheading {
+        margin: 0 0 28px;
+        font-size: 1rem;
+        font-weight: 400;
+        line-height: 1.5rem;
+        color: var(--color-dark-gray-1);
+      }
+
+      /* ── Scenario sections ──────────────────────────────────────────────── */
+      .scenario {
+        border: 1px solid var(--color-light-gray-2);
+        border-radius: var(--radius-card);
+        padding: 20px 24px;
+        margin-bottom: 16px;
+      }
+
+      .scenario--primary {
+        border-color: rgba(117, 0, 20, 0.20);
+        background-color: rgba(117, 0, 20, 0.03);
+      }
+
+      .scenario-title {
+        margin: 0 0 8px;
+        font-size: 0.9375rem; /* 15px ≈ subtitle1 */
+        font-weight: 500;
+        line-height: 1.375rem;
+        color: var(--color-dark-gray-2);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .scenario-title-badge {
+        display: inline-flex;
+        align-items: center;
+        font-size: 0.6875rem;  /* 11px */
+        font-weight: 500;
+        line-height: 1;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 2px 7px;
+        border-radius: 100vh;
+        background-color: var(--color-mit-red);
+        color: var(--color-white);
+        vertical-align: middle;
+      }
+
+      .scenario-body {
+        font-size: 0.875rem;  /* 14px ≈ body2 */
+        font-weight: 400;
+        line-height: 1.375rem;
+        color: var(--color-dark-gray-1);
+      }
+
+      .scenario-body li {
+        line-height: 1.5rem;
+      }
+
+      /* ── Divider ────────────────────────────────────────────────────────── */
+      .divider {
+        border: none;
+        border-top: 1px solid var(--color-light-gray-2);
+        margin: 28px 0;
+      }
+
+      /* ── Primary action button ──────────────────────────────────────────── */
+      .btn-primary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--color-mit-red);
+        color: var(--color-white);
+        border: none;
+        border-radius: var(--radius-btn);
+        padding: 11px 20px;
+        font-family: var(--font);
+        font-size: 0.875rem;  /* 14px */
+        font-weight: 500;
+        line-height: 1.125rem;
+        cursor: pointer;
+        text-decoration: none;
+        box-shadow: 0 2px 4px rgba(37,38,43,.10), 0 3px 8px rgba(37,38,43,.12);
+        transition: background-color 200ms;
+      }
+      .btn-primary:hover {
+        background-color: var(--color-red);
+        box-shadow: none;
+      }
+
+      /* ── Countdown notice ───────────────────────────────────────────────── */
+      .redirect-notice {
+        margin-top: 16px;
+        font-size: 0.8125rem;  /* 13px ≈ body3 */
+        font-weight: 400;
+        color: var(--color-silver-gray-dark);
+      }
+
+      /* ── Visibility helpers (JS-driven) ─────────────────────────────────── */
+      .js-auth-scenario   { display: none; }
+      .js-header-scenario { display: none; }
+      body.scenario-auth   .js-auth-scenario   { display: block; }
+      body.scenario-header .js-header-scenario { display: block; }
+      body.scenario-auth   .js-auth-scenario.js-primary   { display: block; }
+      body.scenario-header .js-header-scenario.js-primary { display: block; }
+      /* Both sections shown when scenario is unknown */
+      body.scenario-unknown .js-auth-scenario   { display: block; }
+      body.scenario-unknown .js-header-scenario { display: block; }
+
+      /* ── Responsive ─────────────────────────────────────────────────────── */
+      @media (max-width: 599px) {
+        :root { --nav-height: 60px; }
+        .card  { padding: 28px 20px 36px; }
+        .heading { font-size: 1.375rem; line-height: 1.875rem; }
+        .page-body { padding: 32px 12px 48px; }
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- ── Navigation bar ──────────────────────────────────────────────── -->
+    <header class="nav" role="banner">
+      <a href="/" class="nav-wordmark" aria-label="MIT Learn — home">
+        <span class="nav-wordmark-mit">MIT</span>
+        <span class="nav-wordmark-pipe">|</span>
+        <span class="nav-wordmark-learn">Learn</span>
+      </a>
+    </header>
+
+    <!-- ── Main content ────────────────────────────────────────────────── -->
+    <main class="page-body" id="main">
+      <div class="card" role="main">
+
+        <!-- Warning icon -->
+        <div class="icon-wrap" aria-hidden="true">
+          <!-- Exclamation triangle (inline SVG, no external dependency) -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+
+        <h1 class="heading">Something went wrong</h1>
+        <p class="subheading" id="page-subheading">
+          We encountered a problem processing your request.
+          The most likely cause is described below.
+        </p>
+
+        <!-- ── Scenario: auth / OIDC token error ──────────────────────── -->
+        <div class="scenario scenario--primary js-auth-scenario js-primary"
+             role="region" aria-labelledby="scenario-auth-title">
+          <p class="scenario-title" id="scenario-auth-title">
+            Authentication session expired
+            <span class="scenario-title-badge">most likely</span>
+          </p>
+          <div class="scenario-body">
+            <p style="margin:0 0 8px">
+              The sign-in link or email verification token you followed has
+              already been used or has expired.  This commonly happens when:
+            </p>
+            <ul>
+              <li>You verified your email in another tab — this tab's link is no longer valid.</li>
+              <li>The session was interrupted or timed out during sign-in.</li>
+            </ul>
+            <p style="margin:8px 0 0">
+              Return to the home page and sign in again to continue.
+            </p>
+          </div>
+        </div>
+
+        <!-- ── Scenario: oversized request headers / too many cookies ─── -->
+        <div class="scenario js-header-scenario"
+             role="region" aria-labelledby="scenario-header-title">
+          <p class="scenario-title" id="scenario-header-title">
+            Browser cookies or session data is too large
+          </p>
+          <div class="scenario-body">
+            <p style="margin:0 0 8px">
+              Your browser may have accumulated too many cookies or stored
+              session data that is making the request too large to process.
+              To resolve this, try the following steps in order:
+            </p>
+            <ul>
+              <li>Clear cookies for this site, then reload the page.</li>
+              <li>Open a new private or incognito browser window and try again.</li>
+              <li>Sign out of all accounts on this site, clear your browser cookies for this domain, then sign back in.</li>
+              <li>If the problem persists, try a different browser or device.</li>
+            </ul>
+          </div>
+        </div>
+
+        <hr class="divider" />
+
+        <a href="/" class="btn-primary" id="home-link">Return to home page</a>
+
+        <p class="redirect-notice" id="redirect-notice" aria-live="polite">
+          Redirecting to the home page in <strong id="countdown">30</strong> seconds…
+        </p>
+
+      </div><!-- /.card -->
+    </main>
+
+    <script>
+      (function () {
+        "use strict";
+
+        /* ── Scenario detection ─────────────────────────────────────────── */
+
+        /**
+         * Each scenario has a `test` predicate that receives the current URL.
+         * The first matching scenario wins; if none match, "unknown" is used
+         * and all sections are shown so the user can self-diagnose.
+         */
+        var SCENARIOS = [
+          {
+            id: "auth",
+            /**
+             * APISIX's OIDC redirect callback lives at /.apisix/redirect.
+             * When the openid-connect plugin fails (expired/consumed token,
+             * "already_logged_in" error, etc.) the 500 is thrown while handling
+             * this path, so the browser URL still ends with that path.
+             */
+            test: function (url) {
+              return (
+                /\.apisix\/redirect/.test(url.pathname) ||
+                /\/login\/.apisix/.test(url.pathname) ||
+                url.searchParams.get("error") !== null
+              );
+            },
+          },
+          {
+            id: "header",
+            /**
+             * nginx returns 400 when request headers exceed
+             * large_client_header_buffers (currently 4×32 k).  This is most
+             * commonly caused by an oversized Cookie header.  There is no
+             * URL pattern that uniquely identifies this case, so it is treated
+             * as the second-priority fallback when the URL doesn't look like an
+             * OIDC callback.
+             */
+            test: function () { return true; },
+          },
+        ];
+
+        function detectScenario(url) {
+          for (var i = 0; i < SCENARIOS.length; i++) {
+            if (SCENARIOS[i].test(url)) {
+              return SCENARIOS[i].id;
+            }
+          }
+          return "unknown";
+        }
+
+        /* ── Apply scenario class ────────────────────────────────────────── */
+        var url;
+        try {
+          url = new URL(window.location.href);
+        } catch (_) {
+          url = { pathname: "", searchParams: { get: function () { return null; } } };
+        }
+
+        var scenario = detectScenario(url);
+        document.body.classList.add("scenario-" + scenario);
+
+        /* Update subheading for the auth case to be more specific */
+        if (scenario === "auth") {
+          var sub = document.getElementById("page-subheading");
+          if (sub) {
+            sub.textContent =
+              "We encountered an authentication error. " +
+              "This is usually caused by following a link that has already been used.";
+          }
+        }
+
+        /* ── Countdown + redirect ────────────────────────────────────────── */
+        var REDIRECT_SECONDS = 30;
+        var remaining = REDIRECT_SECONDS;
+        var countdownEl = document.getElementById("countdown");
+        var noticeEl    = document.getElementById("redirect-notice");
+        var homeLink    = document.getElementById("home-link");
+
+        /* Point the button (and eventual redirect) at the origin root */
+        var homeUrl = window.location.origin + "/";
+        if (homeLink) { homeLink.href = homeUrl; }
+
+        function tick() {
+          remaining -= 1;
+          if (countdownEl) { countdownEl.textContent = remaining; }
+          if (remaining <= 0) {
+            if (noticeEl) { noticeEl.textContent = "Redirecting…"; }
+            window.location.href = homeUrl;
+          }
+        }
+
+        var timer = setInterval(tick, 1000);
+
+        /* Cancel redirect if the user interacts with the page */
+        function cancelRedirect() {
+          clearInterval(timer);
+          if (noticeEl) { noticeEl.style.display = "none"; }
+        }
+        document.addEventListener("click", cancelRedirect, { once: true });
+        document.addEventListener("keydown", cancelRedirect, { once: true });
+        document.addEventListener("scroll", cancelRedirect, { once: true, passive: true });
+
+      })();
+    </script>
+
+  </body>
+</html>
