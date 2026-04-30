@@ -54,6 +54,7 @@ VAULT_APPROLES = "ol-substructure-vault-approles"
 VAULT_SECRETS = "ol-substructure-vault-secrets"  # pragma: allowlist secret
 CONSUL_SUB = "ol-substructure-consul"
 KEYCLOAK_SUB = "ol-substructure-keycloak"
+OPEN_METADATA_SUB = "ol-substructure-open-metadata"
 STARROCKS_SUB = "ol-substructure-starrocks"
 TLS_CERTS = "ol-substructure-tls-certificates"
 XPRO_PARTNER_DNS = "ol-substructure-xpro-partner-dns"
@@ -150,6 +151,7 @@ LEGACY_STACK_REF_PREFIXES: dict[str, str] = {
     VAULT_SECRETS: "substructure.vault.secrets",  # pragma: allowlist secret
     CONSUL_SUB: "substructure.consul",
     KEYCLOAK_SUB: "substructure.keycloak",
+    OPEN_METADATA_SUB: "substructure.open_metadata",
     STARROCKS_SUB: "substructure.starrocks",
     TLS_CERTS: "substructure.tls_certificates",
     XPRO_PARTNER_DNS: "substructure.xpro_partner_dns",

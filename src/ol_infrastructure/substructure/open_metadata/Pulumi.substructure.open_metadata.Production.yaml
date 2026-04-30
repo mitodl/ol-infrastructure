@@ -1,0 +1,11 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: ""
+config:
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production
+  open_metadata:aws_region: us-east-1
+  open_metadata:service_name_trino: Starburst Galaxy
+  open_metadata:service_name_airbyte: Airbyte
+  open_metadata:service_name_superset: Superset
+  open_metadata:service_name_iceberg: Iceberg

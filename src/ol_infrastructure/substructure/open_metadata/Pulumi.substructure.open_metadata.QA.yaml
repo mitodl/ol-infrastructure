@@ -1,0 +1,11 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: ""
+config:
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa
+  open_metadata:aws_region: us-east-1
+  open_metadata:service_name_trino: Starburst Galaxy
+  open_metadata:service_name_airbyte: Airbyte
+  open_metadata:service_name_superset: Superset
+  open_metadata:service_name_iceberg: Iceberg

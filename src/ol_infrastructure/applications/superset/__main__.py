@@ -820,5 +820,7 @@ export(
         "deployment": "superset",
         "redis": superset_redis_cache.address,
         "redis_token": redis_auth_token,
+        "db_host": superset_db.db_instance.address,
+        "db_resource_id": superset_db.db_instance.resource_id,
     },
 )

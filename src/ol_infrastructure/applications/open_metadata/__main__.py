@@ -356,6 +356,11 @@ if open_metadata_connector_secrets:
             "OM_TRINO_PASSWORD": '{{ index .Secrets "trino" "password" }}',
             "OM_TRINO_CATALOG": '{{ index .Secrets "trino" "catalog" }}',
         },
+        "airbyte": {
+            "OM_AIRBYTE_HOST_PORT": '{{ index .Secrets "airbyte" "host_port" }}',
+            "OM_AIRBYTE_USERNAME": '{{ index .Secrets "airbyte" "username" }}',
+            "OM_AIRBYTE_PASSWORD": '{{ index .Secrets "airbyte" "password" }}',
+        },
     }
     connector_configs = {
         name: templates
@@ -391,7 +396,45 @@ if open_metadata_connector_secrets:
         connector_secrets.append(connector_secret)
         connector_secret_names.append(secret_name)
 
-# IRSA trust role granting the OpenMetadata pod read access to AWS Glue and S3.
+# Ingestion-bot JWT token: read from SOPS secrets, write to Vault, sync to K8s.
+# The bot token authenticates ingestion pods to the OpenMetadata server API.
+ingestion_bot_secret_name = "om-ingestion-bot"  # noqa: S105  # pragma: allowlist secret
+if open_metadata_connector_secrets.get("ingestion_bot"):
+    vault.generic.Secret(
+        f"open-metadata-ingestion-bot-vault-secret-{stack_info.env_suffix}",
+        path="secret-openmetadata/ingestion-bot",
+        data_json=Output.secret(
+            json.dumps(open_metadata_connector_secrets["ingestion_bot"])
+        ),
+        opts=ResourceOptions(
+            depends_on=[open_metadata_connector_vault_mount],
+            parent=vault_k8s_resources,
+        ),
+    )
+    ingestion_bot_k8s_secret = OLVaultK8SSecret(
+        f"open-metadata-{stack_info.name}-ingestion-bot-secret",
+        OLVaultK8SStaticSecretConfig(
+            name="openmetadata-ingestion-bot",
+            namespace=open_metadata_namespace,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=ingestion_bot_secret_name,
+            labels=k8s_global_labels,
+            mount="secret-openmetadata",
+            mount_type="kv-v2",
+            path="ingestion-bot",
+            restart_target_kind="Deployment",
+            restart_target_name="openmetadata",
+            templates={"OM_BOT_JWT_TOKEN": '{{ get .Secrets "token" }}'},
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            parent=vault_k8s_resources,
+        ),
+    )
+    connector_secret_names.append(ingestion_bot_secret_name)
+
+# IRSA trust role granting the OpenMetadata server pod read access to AWS Glue and S3.
 # Uses OLEKSTrustRole directly (rather than OLEKSAuthBinding) because Vault K8s
 # auth is already managed above via OLVaultK8SResources; OLEKSAuthBinding would
 # create a conflicting duplicate Vault auth backend role.
@@ -516,6 +559,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
                             # "namespace": open_metadata_namespace,  # noqa: ERA001
                             "enableFailureDiagnostics": True,
                             "ingestionImage": f"docker.getcollate.io/openmetadata/ingestion-base:{OPEN_METADATA_VERSION}",  # noqa: E501
+                            "useOMJobOperator": True,
                         },
                     },
                     "elasticsearch": {
@@ -544,18 +588,18 @@ open_metadata_application = kubernetes.helm.v3.Release(
             "hpa": {
                 "enabled": True,
             },
-            "omjobOperator": {
-                "enabled": True,
-                "image": {
-                    "repository": "docker.getcollate.io/openmetadata/omjob-operator",
-                    "tag": OPEN_METADATA_VERSION,
-                },
-            },
             "serviceAccount": {
                 "create": True,
                 "name": open_metadata_service_account_name,
                 "annotations": {
                     "eks.amazonaws.com/role-arn": open_metadata_irsa_role.role.arn,
+                },
+            },
+            "omjobOperator": {
+                "enabled": True,
+                "image": {
+                    "repository": "docker.getcollate.io/openmetadata/omjob-operator",
+                    "tag": OPEN_METADATA_VERSION,
                 },
             },
             "envFrom": [
