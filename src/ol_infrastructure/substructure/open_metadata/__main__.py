@@ -13,7 +13,7 @@ token from the ``om-ingestion-bot`` K8s secret, and to data sources via
 connector-specific K8s secrets (``om-connector-{name}``).
 """
 
-import json
+from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, Output, ResourceOptions, StackReference, export
@@ -198,6 +198,15 @@ def _secret_env(secret_name: str, key: str) -> dict[str, object]:
     }
 
 
+def _plain_env(name: str, value: "str | Output[str]") -> dict[str, object]:
+    """Return an env-var entry with a literal (non-secret) value.
+
+    Accepts a plain string or a Pulumi ``Output[str]`` — Pulumi resolves
+    Outputs when serialising the CronOMJob spec.
+    """
+    return {"name": name, "value": value}
+
+
 def _make_cronjob(  # noqa: PLR0913
     name: str,
     schedule: str,
@@ -270,38 +279,10 @@ service_name_iceberg = om_config.get("service_name_iceberg") or "Iceberg"
 _make_cronjob(
     name="trino",
     schedule="0 2 * * *",
-    python_script=f"""
-import os
-from metadata.workflow.metadata import MetadataWorkflow
-config = {{
-    "source": {{
-        "type": "trino",
-        "serviceName": {json.dumps(service_name_trino)},
-        "serviceConnection": {{
-            "config": {{
-                "type": "Trino",
-                "hostPort": os.environ["OM_TRINO_HOST_PORT"],
-                "username": os.environ["OM_TRINO_USERNAME"],
-                "authType": {{"password": os.environ["OM_TRINO_PASSWORD"]}},
-                "catalog": os.environ["OM_TRINO_CATALOG"],
-            }}
-        }},
-        "sourceConfig": {{"config": {{"type": "DatabaseMetadata"}}}},
-    }},
-    "sink": {{"type": "metadata-rest", "config": {{}}}},
-    "workflowConfig": {{
-        "openMetadataServerConfig": {{
-            "hostPort": {json.dumps(OM_SERVER_URL)},
-            "authProvider": "openmetadata",
-            "securityConfig": {{"jwtToken": os.environ["OM_BOT_JWT_TOKEN"]}},
-        }}
-    }},
-}}
-workflow = MetadataWorkflow.create(config)
-workflow.execute()
-workflow.raise_from_status()
-""",
+    python_script=(Path(__file__).parent / "scripts" / "trino_metadata.py").read_text(),
     extra_env=[
+        _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+        _plain_env("OM_SERVICE_NAME", service_name_trino),
         _secret_env("om-connector-trino", "OM_TRINO_HOST_PORT"),
         _secret_env("om-connector-trino", "OM_TRINO_USERNAME"),
         _secret_env("om-connector-trino", "OM_TRINO_PASSWORD"),
@@ -316,37 +297,12 @@ workflow.raise_from_status()
 _make_cronjob(
     name="airbyte",
     schedule="0 3 * * *",
-    python_script=f"""
-import os
-from metadata.workflow.metadata import MetadataWorkflow
-config = {{
-    "source": {{
-        "type": "airbyte",
-        "serviceName": {json.dumps(service_name_airbyte)},
-        "serviceConnection": {{
-            "config": {{
-                "type": "Airbyte",
-                "hostPort": os.environ["OM_AIRBYTE_HOST_PORT"],
-                "username": os.environ["OM_AIRBYTE_USERNAME"],
-                "password": os.environ["OM_AIRBYTE_PASSWORD"],
-            }}
-        }},
-        "sourceConfig": {{"config": {{"type": "PipelineMetadata"}}}},
-    }},
-    "sink": {{"type": "metadata-rest", "config": {{}}}},
-    "workflowConfig": {{
-        "openMetadataServerConfig": {{
-            "hostPort": {json.dumps(OM_SERVER_URL)},
-            "authProvider": "openmetadata",
-            "securityConfig": {{"jwtToken": os.environ["OM_BOT_JWT_TOKEN"]}},
-        }}
-    }},
-}}
-workflow = MetadataWorkflow.create(config)
-workflow.execute()
-workflow.raise_from_status()
-""",
+    python_script=(
+        Path(__file__).parent / "scripts" / "airbyte_metadata.py"
+    ).read_text(),
     extra_env=[
+        _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+        _plain_env("OM_SERVICE_NAME", service_name_airbyte),
         _secret_env("om-connector-airbyte", "OM_AIRBYTE_HOST_PORT"),
         _secret_env("om-connector-airbyte", "OM_AIRBYTE_USERNAME"),
         _secret_env("om-connector-airbyte", "OM_AIRBYTE_PASSWORD"),
@@ -364,125 +320,53 @@ workflow.raise_from_status()
 superset_db_host = superset_stack.require_output("superset")["db_host"]
 superset_db_resource_id = superset_stack.require_output("superset")["db_resource_id"]
 
-_superset_script = Output.all(
-    host=superset_db_host,
-    resource_id=superset_db_resource_id,
-).apply(
-    lambda args: (
-        f"""
-import os
-from metadata.workflow.metadata import MetadataWorkflow
-config = {{
-    "source": {{
-        "type": "superset",
-        "serviceName": {json.dumps(service_name_superset)},
-        "serviceConnection": {{
-            "config": {{
-                "type": "Superset",
-                "connection": {{
-                    "type": "PostgresConnection",
-                    "username": "read_only_role",
-                    "hostPort": {json.dumps(args["host"] + ":5432")},
-                    "database": "superset",
-                    "authType": {{
-                        "awsConfig": {{"awsRegion": {json.dumps(aws_region)}}},
-                        "iamMode": True,
-                        "dbClusterIdentifier": {json.dumps(args["resource_id"])},
-                    }},
-                }},
-            }}
-        }},
-        "sourceConfig": {{"config": {{"type": "DashboardMetadata"}}}},
-    }},
-    "sink": {{"type": "metadata-rest", "config": {{}}}},
-    "workflowConfig": {{
-        "openMetadataServerConfig": {{
-            "hostPort": {json.dumps(OM_SERVER_URL)},
-            "authProvider": "openmetadata",
-            "securityConfig": {{"jwtToken": os.environ["OM_BOT_JWT_TOKEN"]}},
-        }}
-    }},
-}}
-workflow = MetadataWorkflow.create(config)
-workflow.execute()
-workflow.raise_from_status()
-"""
-    )
-)
-
 _make_cronjob(
     name="superset",
     schedule="0 4 * * *",
-    python_script=_superset_script,
+    python_script=(
+        Path(__file__).parent / "scripts" / "superset_metadata.py"
+    ).read_text(),
+    extra_env=[
+        _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+        _plain_env("OM_SERVICE_NAME", service_name_superset),
+        _plain_env("OM_AWS_REGION", aws_region),
+        _plain_env("OM_SUPERSET_DB_HOST", superset_db_host),
+        _plain_env("OM_SUPERSET_DB_RESOURCE_ID", superset_db_resource_id),
+    ],
     opts=ResourceOptions(depends_on=[ingestion_irsa_role]),
 )
 
 # ---------------------------------------------------------------------------
 # Trino (Starburst Galaxy) lineage extraction
 # ---------------------------------------------------------------------------
-# Note on Starburst Galaxy query history:
+# Starburst Galaxy's 30-day query history is in
+# galaxy_telemetry.public.query_history, but its column names differ from
+# the standard Trino system.runtime.queries view that OM's built-in
+# TrinoLineageSource expects:
 #
-# OM's Trino lineage connector queries columns "query", "user", "started",
-# "end", and "state" from the configured queryHistoryTable.
+#   OM expected         Galaxy telemetry
+#   ──────────────────  ─────────────────────
+#   "query"             query          (same)
+#   "user"              email
+#   "started"           create_time
+#   "end"               end_time
+#   "state" = FINISHED  query_state = COMPLETED
 #
-# The two candidate tables in Galaxy:
-#   - system.runtime.queries (OM default): standard Trino view with compatible
-#     column names, but in Starburst Galaxy this view reflects only currently
-#     executing / very recently completed queries (minutes, not days). Limited
-#     usefulness for lineage lookback.
-#   - galaxy_telemetry.public.query_history: 30-day retention, but column names
-#     are INCOMPATIBLE with OM (email vs user, create_time vs started,
-#     end_time vs end, query_state vs state).
+# TrinoLineageSource reads its SQL from the class attribute `sql_stmt` and
+# appends lineage-specific filters from `filters`. We patch both before
+# constructing the workflow so all SQL parsing, OM entity resolution, and
+# lineage posting logic remains intact.
 #
-# For now we use the default (system.runtime.queries) since its columns are
-# compatible. A future improvement would be to create a compatibility view in a
-# user catalog that aliases the galaxy_telemetry columns to the expected names,
-# then set queryHistoryTable to that view.
-#
-# Lineage for Iceberg-backed tables is also captured here since Trino is the
-# query engine that reads/writes them.
+# Lineage for Iceberg-backed tables is also captured here since Trino is
+# the query engine that reads and writes them.
 
 _make_cronjob(
     name="trino-lineage",
     schedule="0 6 * * *",
-    python_script=f"""
-import os
-from metadata.workflow.lineage import LineageWorkflow
-config = {{
-    "source": {{
-        "type": "trino",
-        "serviceName": {json.dumps(service_name_trino)},
-        "serviceConnection": {{
-            "config": {{
-                "type": "Trino",
-                "hostPort": os.environ["OM_TRINO_HOST_PORT"],
-                "username": os.environ["OM_TRINO_USERNAME"],
-                "authType": {{"password": os.environ["OM_TRINO_PASSWORD"]}},
-                "catalog": os.environ["OM_TRINO_CATALOG"],
-            }}
-        }},
-        "sourceConfig": {{
-            "config": {{
-                "type": "DatabaseLineage",
-                "queryLogDuration": 1,
-                "resultLimit": 1000,
-            }}
-        }},
-    }},
-    "sink": {{"type": "metadata-rest", "config": {{}}}},
-    "workflowConfig": {{
-        "openMetadataServerConfig": {{
-            "hostPort": {json.dumps(OM_SERVER_URL)},
-            "authProvider": "openmetadata",
-            "securityConfig": {{"jwtToken": os.environ["OM_BOT_JWT_TOKEN"]}},
-        }}
-    }},
-}}
-workflow = LineageWorkflow.create(config)
-workflow.execute()
-workflow.raise_from_status()
-""",
+    python_script=(Path(__file__).parent / "scripts" / "trino_lineage.py").read_text(),
     extra_env=[
+        _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+        _plain_env("OM_SERVICE_NAME", service_name_trino),
         _secret_env("om-connector-trino", "OM_TRINO_HOST_PORT"),
         _secret_env("om-connector-trino", "OM_TRINO_USERNAME"),
         _secret_env("om-connector-trino", "OM_TRINO_PASSWORD"),
@@ -503,41 +387,14 @@ workflow.raise_from_status()
 _make_cronjob(
     name="iceberg",
     schedule="0 2 * * *",
-    python_script=f"""
-import os
-from metadata.workflow.metadata import MetadataWorkflow
-config = {{
-    "source": {{
-        "type": "iceberg",
-        "serviceName": {json.dumps(service_name_iceberg)},
-        "serviceConnection": {{
-            "config": {{
-                "type": "Iceberg",
-                "catalog": {{
-                    "type": "Glue",
-                    "name": {json.dumps(service_name_iceberg)},
-                    "connection": {{
-                        "awsConfig": {{"awsRegion": {json.dumps(aws_region)}}},
-                    }},
-                }},
-            }}
-        }},
-        "sourceConfig": {{"config": {{"type": "StorageMetadata"}}}},
-    }},
-    "sink": {{"type": "metadata-rest", "config": {{}}}},
-    "workflowConfig": {{
-        "openMetadataServerConfig": {{
-            "hostPort": {json.dumps(OM_SERVER_URL)},
-            "authProvider": "openmetadata",
-            "securityConfig": {{"jwtToken": os.environ["OM_BOT_JWT_TOKEN"]}},
-        }}
-    }},
-}}
-workflow = MetadataWorkflow.create(config)
-workflow.execute()
-workflow.raise_from_status()
-""",
-    extra_env=[],
+    python_script=(
+        Path(__file__).parent / "scripts" / "iceberg_metadata.py"
+    ).read_text(),
+    extra_env=[
+        _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+        _plain_env("OM_SERVICE_NAME", service_name_iceberg),
+        _plain_env("OM_AWS_REGION", aws_region),
+    ],
 )
 
 export(
