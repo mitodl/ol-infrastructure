@@ -93,7 +93,9 @@ def setup_apisix(
     ).apply(lambda blocks: [*blocks[0], *blocks[1]])
 
     _error_pages_dir = Path(__file__).resolve().parent / "error_pages"
-    _gateway_error_html = (_error_pages_dir / "gateway_error.html").read_text()
+    _gateway_error_html = (_error_pages_dir / "gateway_error.html").read_text(
+        encoding="utf-8"
+    )
     _error_pages_configmap_name = "apache-apisix-error-pages"
 
     error_pages_configmap = kubernetes.core.v1.ConfigMap(

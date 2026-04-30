@@ -3,6 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Prevent the browser from sending the current URL (which may contain
+      OIDC query params such as code= and state=) as a Referer header to
+      the Typekit CDN or any other third-party resource on this page.
+    -->
+    <meta name="referrer" content="no-referrer" />
     <title>Something went wrong | MIT Learn</title>
     <!--
       Neue Haas Grotesk Text (the smoot-design / MIT Learn typeface) is served
@@ -75,7 +81,7 @@
       }
       .nav-wordmark-mit {
         font-weight: 700;
-        color: var(--color-white);
+        color: var(--color-red);
         letter-spacing: -0.02em;
       }
       .nav-wordmark-pipe {
@@ -222,13 +228,15 @@
         box-shadow: none;
       }
 
-      /* ── Countdown notice ───────────────────────────────────────────────── */
+      /* ── Countdown notice (auth scenario only) ─────────────────────────── */
       .redirect-notice {
+        display: none;   /* hidden by default; shown only for the auth scenario */
         margin-top: 16px;
         font-size: 0.8125rem;  /* 13px ≈ body3 */
         font-weight: 400;
         color: var(--color-silver-gray-dark);
       }
+      body.scenario-auth .redirect-notice { display: block; }
 
       /* ── Visibility helpers (JS-driven) ─────────────────────────────────── */
       .js-auth-scenario   { display: none; }
@@ -237,9 +245,6 @@
       body.scenario-header .js-header-scenario { display: block; }
       body.scenario-auth   .js-auth-scenario.js-primary   { display: block; }
       body.scenario-header .js-header-scenario.js-primary { display: block; }
-      /* Both sections shown when scenario is unknown */
-      body.scenario-unknown .js-auth-scenario   { display: block; }
-      body.scenario-unknown .js-header-scenario { display: block; }
 
       /* ── Responsive ─────────────────────────────────────────────────────── */
       @media (max-width: 599px) {
@@ -330,7 +335,7 @@
         <a href="/" class="btn-primary" id="home-link">Return to home page</a>
 
         <p class="redirect-notice" id="redirect-notice" aria-live="polite">
-          Redirecting to the home page in <strong id="countdown">30</strong> seconds…
+          Redirecting to the sign-out page in <strong id="countdown">10</strong> seconds…
         </p>
 
       </div><!-- /.card -->
@@ -344,8 +349,10 @@
 
         /**
          * Each scenario has a `test` predicate that receives the current URL.
-         * The first matching scenario wins; if none match, "unknown" is used
-         * and all sections are shown so the user can self-diagnose.
+         * The first matching scenario wins.  The `header` scenario has an
+         * unconditional predicate so it acts as the catch-all default — this
+         * is intentional: oversized-cookie errors give no distinguishing URL
+         * signal, so non-auth errors fall through to header instructions.
          */
         var SCENARIOS = [
           {
@@ -408,36 +415,38 @@
           }
         }
 
-        /* ── Countdown + redirect ────────────────────────────────────────── */
-        var REDIRECT_SECONDS = 30;
-        var remaining = REDIRECT_SECONDS;
-        var countdownEl = document.getElementById("countdown");
-        var noticeEl    = document.getElementById("redirect-notice");
-        var homeLink    = document.getElementById("home-link");
-
-        /* Point the button (and eventual redirect) at the origin root */
+        /* ── Countdown + redirect (auth scenario only) ───────────────────── */
+        var homeLink = document.getElementById("home-link");
         var homeUrl = window.location.origin + "/";
         if (homeLink) { homeLink.href = homeUrl; }
 
-        function tick() {
-          remaining -= 1;
-          if (countdownEl) { countdownEl.textContent = remaining; }
-          if (remaining <= 0) {
-            if (noticeEl) { noticeEl.textContent = "Redirecting…"; }
-            window.location.href = homeUrl;
+        if (scenario === "auth") {
+          var REDIRECT_SECONDS = 10;
+          var remaining = REDIRECT_SECONDS;
+          var countdownEl = document.getElementById("countdown");
+          var noticeEl    = document.getElementById("redirect-notice");
+          var logoutUrl   = window.location.origin + "/logout";
+
+          function tick() {
+            remaining -= 1;
+            if (countdownEl) { countdownEl.textContent = remaining; }
+            if (remaining <= 0) {
+              if (noticeEl) { noticeEl.textContent = "Redirecting…"; }
+              window.location.href = logoutUrl;
+            }
           }
-        }
 
-        var timer = setInterval(tick, 1000);
+          var timer = setInterval(tick, 1000);
 
-        /* Cancel redirect if the user interacts with the page */
-        function cancelRedirect() {
-          clearInterval(timer);
-          if (noticeEl) { noticeEl.style.display = "none"; }
+          /* Cancel redirect if the user interacts with the page */
+          function cancelRedirect() {
+            clearInterval(timer);
+            if (noticeEl) { noticeEl.style.display = "none"; }
+          }
+          document.addEventListener("click", cancelRedirect, { once: true });
+          document.addEventListener("keydown", cancelRedirect, { once: true });
+          document.addEventListener("scroll", cancelRedirect, { once: true, passive: true });
         }
-        document.addEventListener("click", cancelRedirect, { once: true });
-        document.addEventListener("keydown", cancelRedirect, { once: true });
-        document.addEventListener("scroll", cancelRedirect, { once: true, passive: true });
 
       })();
     </script>
