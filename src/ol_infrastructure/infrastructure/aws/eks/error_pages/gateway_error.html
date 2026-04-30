@@ -290,7 +290,7 @@
               <li>The session was interrupted or timed out during sign-in.</li>
             </ul>
             <p style="margin:8px 0 0">
-              Return to the home page and sign in again to continue.
+              You can safely return to the home page and continue from there.
               If the problem persists, <a href="https://support.learn.mit.edu/hc/en-us/requests/new" style="text-decoration:underline">contact support</a>.
             </p>
           </div>
@@ -323,7 +323,7 @@
         <a href="/" class="btn-primary" id="home-link">Return to home page</a>
 
         <p class="redirect-notice" id="redirect-notice" aria-live="polite">
-          Redirecting to the sign-out page in <strong id="countdown">10</strong> seconds…
+          Redirecting to the home page in <strong id="countdown">10</strong> seconds…
         </p>
 
       </div><!-- /.card -->
@@ -406,18 +406,11 @@
         /* ── Countdown + redirect (auth scenario only) ───────────────────── */
         var homeLink = document.getElementById("home-link");
         var homeUrl = window.location.origin + "/";
-        var logoutUrl = window.location.origin + "/logout";
 
-        /* Default: button goes to home page (header/cookie scenario) */
+        /* Button points to home page for all scenarios */
         if (homeLink) { homeLink.href = homeUrl; }
 
         if (scenario === "auth") {
-          /* Auth scenario: button and auto-redirect both go to /logout */
-          if (homeLink) {
-            homeLink.href = logoutUrl;
-            homeLink.textContent = "Sign out and try again";
-          }
-
           var REDIRECT_SECONDS = 10;
           var remaining = REDIRECT_SECONDS;
           var countdownEl = document.getElementById("countdown");
@@ -428,7 +421,7 @@
             if (countdownEl) { countdownEl.textContent = remaining; }
             if (remaining <= 0) {
               if (noticeEl) { noticeEl.textContent = "Redirecting…"; }
-              window.location.href = logoutUrl;
+              window.location.href = homeUrl;
             }
           }
 
