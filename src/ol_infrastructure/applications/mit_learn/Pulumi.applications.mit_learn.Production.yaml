@@ -111,6 +111,7 @@ config:
     TIKA_SERVER_ENDPOINT: "https://tika-production.ol.mit.edu"
     UWSGI_THREADS: 15
     UWSGI_WORKERS: 3
+    YOUTUBE_CONFIG_URL: "https://raw.githubusercontent.com/mitodl/open-video-data/mitopen/youtube/channels.yaml"
   mitlearn:zendesk_help_url: "mitlearn.zendesk.com"
   redis:password:
     secure: v1:xdJFi6D7NpeVwYrg:C0GQl3mctDO1+ehHcFAPdeJDuhk9PbuNdNGtghRNMlzP6GC/GCOyGS1V0ViUXwiO7JhAFD6zrstWmhg0X/yHQLnK8KA=
