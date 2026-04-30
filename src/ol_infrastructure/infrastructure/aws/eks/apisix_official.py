@@ -240,7 +240,7 @@ def setup_apisix(
                             "httpStart": textwrap.dedent(
                                 """\
                                 client_header_buffer_size 8k;
-                                large_client_header_buffers 4 32k;
+                                large_client_header_buffers 4 64k;
                                 """
                             ),
                             "httpEnd": "",

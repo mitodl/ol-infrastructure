@@ -2,7 +2,7 @@
 server {
     listen 8071 default_server;  # DEFAULT_NGINX_PORT
     server_name _;
-    large_client_header_buffers 4 32k; # Added based on learn_ai example
+    large_client_header_buffers 4 64k;
 
     root /src;
     location = /.well-known/dnt-policy.txt {
