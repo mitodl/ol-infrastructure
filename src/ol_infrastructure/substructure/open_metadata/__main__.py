@@ -418,9 +418,87 @@ _make_cronjob(
 )
 
 # ---------------------------------------------------------------------------
+# Trino (Starburst Galaxy) lineage extraction
+# ---------------------------------------------------------------------------
+# Note on Starburst Galaxy query history:
+#
+# OM's Trino lineage connector queries columns "query", "user", "started",
+# "end", and "state" from the configured queryHistoryTable.
+#
+# The two candidate tables in Galaxy:
+#   - system.runtime.queries (OM default): standard Trino view with compatible
+#     column names, but in Starburst Galaxy this view reflects only currently
+#     executing / very recently completed queries (minutes, not days). Limited
+#     usefulness for lineage lookback.
+#   - galaxy_telemetry.public.query_history: 30-day retention, but column names
+#     are INCOMPATIBLE with OM (email vs user, create_time vs started,
+#     end_time vs end, query_state vs state).
+#
+# For now we use the default (system.runtime.queries) since its columns are
+# compatible. A future improvement would be to create a compatibility view in a
+# user catalog that aliases the galaxy_telemetry columns to the expected names,
+# then set queryHistoryTable to that view.
+#
+# Lineage for Iceberg-backed tables is also captured here since Trino is the
+# query engine that reads/writes them.
+
+_make_cronjob(
+    name="trino-lineage",
+    schedule="0 6 * * *",
+    python_script=f"""
+import os
+from metadata.workflow.lineage import LineageWorkflow
+config = {{
+    "source": {{
+        "type": "trino",
+        "serviceName": {json.dumps(service_name_trino)},
+        "serviceConnection": {{
+            "config": {{
+                "type": "Trino",
+                "hostPort": os.environ["OM_TRINO_HOST_PORT"],
+                "username": os.environ["OM_TRINO_USERNAME"],
+                "authType": {{"password": os.environ["OM_TRINO_PASSWORD"]}},
+                "catalog": os.environ["OM_TRINO_CATALOG"],
+            }}
+        }},
+        "sourceConfig": {{
+            "config": {{
+                "type": "DatabaseLineage",
+                "queryLogDuration": 1,
+                "resultLimit": 1000,
+            }}
+        }},
+    }},
+    "sink": {{"type": "metadata-rest", "config": {{}}}},
+    "workflowConfig": {{
+        "openMetadataServerConfig": {{
+            "hostPort": {json.dumps(OM_SERVER_URL)},
+            "authProvider": "openmetadata",
+            "securityConfig": {{"jwtToken": os.environ["OM_BOT_JWT_TOKEN"]}},
+        }}
+    }},
+}}
+workflow = LineageWorkflow.create(config)
+workflow.execute()
+workflow.raise_from_status()
+""",
+    extra_env=[
+        _secret_env("om-connector-trino", "OM_TRINO_HOST_PORT"),
+        _secret_env("om-connector-trino", "OM_TRINO_USERNAME"),
+        _secret_env("om-connector-trino", "OM_TRINO_PASSWORD"),
+        _secret_env("om-connector-trino", "OM_TRINO_CATALOG"),
+    ],
+    bot_secret_name="om-lineage-bot",  # noqa: S106  # pragma: allowlist secret
+)
+
+# ---------------------------------------------------------------------------
 # Iceberg (Glue + S3) metadata ingestion
 # ---------------------------------------------------------------------------
 # Uses IRSA for Glue/S3 access — no credentials secret needed.
+# NOTE: The Iceberg connector does not support lineage extraction
+# (supportsLineageExtraction is absent from its schema). Lineage for
+# Iceberg-backed tables is captured by the Trino lineage job above, since
+# Trino is the query engine that reads and writes these tables.
 
 _make_cronjob(
     name="iceberg",
