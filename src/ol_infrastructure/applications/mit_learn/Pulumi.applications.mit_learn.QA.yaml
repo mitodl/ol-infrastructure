@@ -109,10 +109,12 @@ config:
     SENTRY_PROFILES_SAMPLE_RATE: "0.1"
     SENTRY_TRACES_SAMPLE_RATE: "0.1"
     SESSION_COOKIE_NAME: "session_mitlearn_rc"
+    SHOW_OCW_LECTURE_VIDEOS: "true"
     SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT:
     TIKA_SERVER_ENDPOINT: "https://tika-qa.ol.mit.edu"
     UWSGI_THREADS: 15
     UWSGI_WORKERS: 3
+    YOUTUBE_CONFIG_URL: "https://raw.githubusercontent.com/mitodl/open-video-data/refs/heads/ab/update-ocw-config/youtube/channels.yaml"
   mitlearn:zendesk_help_url: "mitlearn.zendesk.com"
   redis:password:
     secure: v1:eRydfkAj/y5E7anM:QZ33gRMPZ7DDG3TrvAbuZk+6zliItTLKf4zuBgwEzpliRDnnxA/FoKMjRf4IB1uFLDH4Bb/n5sUxUj+s4fXlRuZt/jxA66eNBg==

@@ -1264,7 +1264,6 @@ env_vars = {
     "XPRO_CATALOG_API_URL": "https://xpro.mit.edu/api/programs/",
     "XPRO_COURSES_API_URL": "https://xpro.mit.edu/api/courses/",
     "XPRO_LEARNING_COURSE_BUCKET_NAME": "mitx-etl-xpro-production-mitxpro-production",
-    "YOUTUBE_CONFIG_URL": "https://raw.githubusercontent.com/mitodl/open-video-data/mitopen/youtube/channels.yaml",
     "YOUTUBE_FETCH_SCHEDULE_SECONDS": 14400,
     "YOUTUBE_FETCH_TRANSCRIPT_SCHEDULE_SECONDS": 21600,
 }
