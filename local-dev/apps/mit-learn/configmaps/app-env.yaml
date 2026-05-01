@@ -94,7 +94,7 @@ data:
   QDRANT_DENSE_MODEL:
   QDRANT_ENCODER: "vector_search.encoders.gensim.GensimEncoder"
   # SparseHashEncoder uses sklearn locally — no Qdrant Cloud required.
-  QDRANT_SPARSE_ENCODER_V2: "vector_search.encoders.gensim.GensimEncoder"
+  QDRANT_SPARSE_ENCODER_V2: "vector_search.encoders.sparse_hash.SparseHashEncoder"
   QDRANT_SPARSE_MODEL_V2: "sklearn/hashing_vectorizer_sparse_model"
   QDRANT_ENABLE_INDEXING_PLUGIN_HOOKS: "True"
 
