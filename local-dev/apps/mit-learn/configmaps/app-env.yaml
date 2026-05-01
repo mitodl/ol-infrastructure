@@ -37,6 +37,8 @@ data:
   # ── Domain / CORS / CSRF ───────────────────────────────────────────────────
   CSRF_COOKIE_DOMAIN: ".mit.dev"
   SESSION_COOKIE_DOMAIN: ".mit.dev"
+  MITOL_COOKIE_NAME: "mitlearn-auth"
+  MITOL_COOKIE_DOMAIN: ".mit.dev"
   CSRF_TRUSTED_ORIGINS: '["https://learn.mit.dev","https://api.learn.mit.dev"]'
   CORS_ALLOWED_ORIGINS: '["https://learn.mit.dev","https://api.learn.mit.dev","https://sso.ol.mit.dev"]'
   MITOL_CORS_ORIGIN_WHITELIST: '["https://learn.mit.dev","https://api.learn.mit.dev"]'
