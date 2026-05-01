@@ -99,21 +99,27 @@ cp tilt_config.json.example tilt_config.json
 
 At minimum, review `enabled_apps` to enable only the services you need.
 
-### 3. Install Python dependencies for the Pulumi infra stack
+### 3. Start the environment
+
+The easiest way is to use the provided start script, which validates your setup and syncs dependencies:
 
 ```bash
-cd local-dev/infra
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt   # or: pulumi install
-cd ../..
+./local-dev/scripts/start.sh
 ```
 
-### 4. Start the environment
+This will:
+1. Validate that `setup.sh` has been run (cluster exists, kubeconfig configured, certs present)
+2. Sync Python dependencies via `uv`
+3. Start Tilt
+
+**Alternative:** If you prefer to start manually without the validation wrapper:
 
 ```bash
+uv sync
 tilt up
 ```
+
+### 4. Monitor the environment
 
 Tilt will:
 1. Run `pulumi up` to deploy shared infrastructure (Postgres, Valkey, APISIX, Keycloak, etc.)
@@ -180,6 +186,7 @@ ol-infrastructure/
     │
     ├── scripts/
     │   ├── setup.sh                  # One-time bootstrap (cluster, certs, /etc/hosts)
+    │   ├── start.sh                  # Start the environment (validate setup, sync deps, tilt up)
     │   ├── teardown.sh               # Cluster teardown
     │   └── seed.sh                   # CLI seeding wrapper (kubectl exec into pods)
     │
