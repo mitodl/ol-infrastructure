@@ -9,6 +9,67 @@ from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
+def _apisix_cookie_metrics_alloy_config() -> str:
+    """
+    Alloy River stage blocks that extract cookie header telemetry from APISix
+    access logs and emit Prometheus histograms.
+
+    This string is injected into the loki.process "pod_logs" component by the
+    k8s-monitoring chart via podLogsViaLoki.extraLogProcessingStages. It runs
+    after the standard relabeling stages so stream labels (e.g.
+    app_kubernetes_io_name) are already available.
+
+    The APISix access log format appends these fields at the end of each line:
+      cookie_bytes=NNN cookie_count=N oidc_session_bytes=NNN cookie_names=name1,name2
+
+    The stage.metrics blocks emit Prometheus histograms that Alloy exposes on
+    its own metrics endpoint (:12345/metrics), from where they are scraped and
+    forwarded to Grafana Cloud Prometheus.
+
+    Privacy: only byte counts and cookie name keys are captured; cookie values
+    are never logged or extracted.
+    """
+    return r"""
+stage.match {
+  selector = "{app_kubernetes_io_name=\"apisix\"} |= \"cookie_bytes=\""
+  pipeline_name = "apisix_cookie_metrics"
+
+  // Extract host, status, and the four cookie fields appended at the end of
+  // each APISix access log line. host and status appear early in the line;
+  // the cookie fields are always at the tail after request="...".
+  stage.regex {
+    expression = `.*\bhost=(?P<host>\S+).*\bstatus=(?P<status>\d+).*\bcookie_bytes=(?P<cookie_bytes>\d+)\s+cookie_count=(?P<cookie_count>\d+)\s+oidc_session_bytes=(?P<oidc_session_bytes>\d+)`
+  }
+
+  stage.metrics {
+    metric.histogram "apisix_cookie_header_bytes" {
+      description = "Size in bytes of the Cookie request header at the APISix ingress, per virtual host"
+      source      = "cookie_bytes"
+      config {
+        buckets = [256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536]
+      }
+    }
+
+    metric.histogram "apisix_cookie_count" {
+      description = "Number of cookies in the Cookie request header at APISix ingress"
+      source      = "cookie_count"
+      config {
+        buckets = [1, 2, 3, 5, 8, 12, 20, 30, 50]
+      }
+    }
+
+    metric.histogram "apisix_oidc_session_cookie_bytes" {
+      description = "Size in bytes of the APISix OIDC session cookie only"
+      source      = "oidc_session_bytes"
+      config {
+        buckets = [0, 256, 1024, 2048, 4096, 6144, 8192]
+      }
+    }
+  }
+}
+"""
+
+
 def setup_grafana(
     cluster_name: str,
     stack_info: StackInfo,
@@ -191,6 +252,7 @@ def setup_grafana(
                 "podLogsViaLoki": {
                     "enabled": True,
                     "collector": "alloy-logs",
+                    "extraLogProcessingStages": _apisix_cookie_metrics_alloy_config(),
                 },
                 "applicationObservability": {
                     "enabled": True,

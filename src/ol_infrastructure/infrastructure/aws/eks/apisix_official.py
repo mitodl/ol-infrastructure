@@ -251,7 +251,11 @@ def setup_apisix(
                             'http_referer="$http_referer" '
                             'http_user_agent="$http_user_agent" '
                             "method=$request_method "
-                            'request="$request"',
+                            'request="$request" '
+                            "cookie_bytes=$cookie_bytes "
+                            "cookie_count=$cookie_count "
+                            "oidc_session_bytes=$oidc_session_bytes "
+                            "cookie_names=$cookie_names",
                             "accessLogFormatEscape": "default",
                             "errorLog": "/dev/stderr",
                             "errorLogLevel": "warn",
@@ -269,6 +273,41 @@ def setup_apisix(
                                 f"""\
                                 set $session_compressor zlib;
                                 set $session_name {session_cookie_name};
+
+                                set_by_lua_block $cookie_bytes {{
+                                    return #(ngx.var.http_cookie or "")
+                                }}
+                                set_by_lua_block $cookie_count {{
+                                    local cookie = ngx.var.http_cookie or ""
+                                    if cookie == "" then return "0" end
+                                    local count = 1
+                                    for _ in cookie:gmatch(";") do count = count + 1 end
+                                    return tostring(count)
+                                }}
+                                set_by_lua_block $oidc_session_bytes {{
+                                    local session_name = ngx.var.session_name or ""
+                                    if session_name == "" then return "0" end
+                                    local all = ngx.var.http_cookie or ""
+                                    for pair in (all .. ";"):gmatch("([^;]+);") do
+                                        local name, val = pair:match("^%s*([^=]+)=(.*)")
+                                        if name and name:match("^%s*" .. session_name .. "%s*$") then
+                                            return tostring(#pair)
+                                        end
+                                    end
+                                    return "0"
+                                }}
+                                set_by_lua_block $cookie_names {{
+                                    local cookie = ngx.var.http_cookie or ""
+                                    local names = {{}}
+                                    for pair in (cookie .. ";"):gmatch("([^;]+);") do
+                                        local name = pair:match("^%s*([^=]+)=")
+                                        if name then
+                                            name = name:match("^%s*(.-)%s*$")
+                                            table.insert(names, name)
+                                        end
+                                    end
+                                    return table.concat(names, ",")
+                                }}
 
                                 # Serve a branded error page for gateway-level errors (HTTP 400/431
                                 # from oversized request headers, HTTP 500 from OIDC plugin failures,
