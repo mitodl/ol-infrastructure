@@ -37,6 +37,7 @@ def create_identity_core(  # noqa: PLR0913
     keycloak_hostname: str,
     keycloak_url: str,  # noqa: ARG001
     root_domain: str,  # noqa: ARG001
+    db_cluster: k8s.apiextensions.CustomResource,
 ) -> IdentityCoreResources:
     """Deploy Keycloak operator, instance, and routes (no realm)."""
     kc_base = (
@@ -90,9 +91,10 @@ def create_identity_core(  # noqa: PLR0913
         opts=_k8s(parent=local_infra_ns),
     )
 
-    # Note: instance depends on pg-app-credentials secret created by apps-infra stack.
-    # This is acceptable because the database cluster is created before the instance
-    # is reconciled (Tiltfile runs stacks sequentially).
+    # Note: instance explicitly depends on the database cluster being ready.
+    # The pg-app-credentials secret is created in the core stack (database.py),
+    # so we need to ensure the cluster is ready before attempting to create
+    # the Keycloak instance.
     instance = k8s.apiextensions.CustomResource(
         "keycloak-instance",
         api_version="k8s.keycloak.org/v2alpha1",
@@ -194,7 +196,7 @@ def create_identity_core(  # noqa: PLR0913
         },
         opts=_k8s(
             parent=local_infra_ns,
-            depends_on=[operator, admin_secret],
+            depends_on=[operator, admin_secret, db_cluster],
         ),
     )
 

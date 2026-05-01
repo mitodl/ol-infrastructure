@@ -128,6 +128,7 @@ identity = create_identity_core(
     keycloak_hostname=keycloak_hostname,
     keycloak_url=keycloak_url,
     root_domain=root_domain,
+    db_cluster=db.cluster,
 )
 
 # ---------------------------------------------------------------------------
