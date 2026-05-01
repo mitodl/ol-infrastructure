@@ -557,48 +557,6 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     )
 
     # -------------------------------------------------------------------------
-    # Test users (local dev only)
-    # -------------------------------------------------------------------------
-
-    for username, email, first, last, is_admin in [
-        ("admin", "admin@odl.local", "Admin", "User", True),
-        ("student", "student@odl.local", "Student", "User", False),
-        ("prof", "prof@odl.local", "Professor", "User", False),
-    ]:
-        user = keycloak.User(
-            f"test-user-{username}",
-            realm_id=realm.id,
-            username=username,
-            email=email,
-            first_name=first,
-            last_name=last,
-            enabled=True,
-            email_verified=True,
-            initial_password=keycloak.UserInitialPasswordArgs(
-                value="localdev123",
-                temporary=False,
-            ),
-            opts=kc_opts,
-        )
-        if is_admin:
-            # Create an admin role in the olapps realm and assign it.
-            # (Keycloak only has 'admin' in the master realm by default.)
-            admin_role = keycloak.Role(
-                "olapps-admin-role",
-                realm_id=realm.id,
-                name="admin",
-                description="Local dev admin role",
-                opts=kc_opts,
-            )
-            keycloak.UserRoles(
-                f"test-user-{username}-roles",
-                realm_id=realm.id,
-                user_id=user.id,
-                role_ids=[admin_role.id],
-                opts=kc_opts,
-            )
-
-    # -------------------------------------------------------------------------
     # Fake-Touchstone IdP (CI/QA pattern — skip real Touchstone for local dev)
     # -------------------------------------------------------------------------
 
