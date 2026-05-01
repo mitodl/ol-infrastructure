@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Prevent the browser from sending the current URL (which may contain
+      OIDC query params such as code= and state=) as a Referer header to
+      the Typekit CDN or any other third-party resource on this page.
+    -->
+    <meta name="referrer" content="no-referrer" />
+    <title>Something went wrong | MIT Learn</title>
+    <!--
+      Neue Haas Grotesk Text (the smoot-design / MIT Learn typeface) is served
+      via Adobe Typekit and will load on any authorised MIT domain.  The page
+      degrades gracefully to system sans-serif when the font is unavailable.
+    -->
+    <link rel="stylesheet" href="https://use.typekit.net/lbk1xay.css" />
+    <style>
+      /* ── smoot-design tokens ────────────────────────────────────────────── */
+      :root {
+        --color-mit-red:          #750014;
+        --color-red:              #a31f34;
+        --color-nav-gray:         #303337;
+        --color-dark-gray-2:      #212326;
+        --color-dark-gray-1:      #40464c;
+        --color-silver-gray-dark: #626a73;
+        --color-silver-gray:      #8b959e;
+        --color-silver-gray-lt:   #b8c2cc;
+        --color-light-gray-2:     #dde1e6;
+        --color-light-gray-1:     #f3f4f8;
+        --color-white:            #ffffff;
+        --font:                   "neue-haas-grotesk-text", sans-serif;
+        --nav-height:             72px;
+        --radius-card:            8px;
+        --radius-btn:             4px;
+      }
+
+      /* ── Reset / base ───────────────────────────────────────────────────── */
+      *, *::before, *::after { box-sizing: border-box; }
+
+      html {
+        font-family: var(--font);
+        font-size: 16px;
+        scroll-padding-top: var(--nav-height);
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: var(--color-light-gray-1);
+        color: var(--color-dark-gray-2);
+        min-height: 100vh;
+      }
+
+      a { color: inherit; text-decoration: none; }
+      ul { margin: 0; padding: 0 0 0 1.25rem; }
+      li { margin: 0.375rem 0; }
+
+      /* ── Nav bar ────────────────────────────────────────────────────────── */
+      .nav {
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        z-index: 100;
+        height: var(--nav-height);
+        background-color: var(--color-nav-gray);
+        display: flex;
+        align-items: center;
+        padding: 0 24px;
+      }
+
+      .nav-logo {
+        display: flex;
+        align-items: center;
+        line-height: 0;
+      }
+      .nav-logo svg {
+        height: 26px;
+        width: auto;
+      }
+
+      /* ── Page layout ────────────────────────────────────────────────────── */
+      .page-body {
+        margin-top: var(--nav-height);
+        min-height: calc(100vh - var(--nav-height));
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 48px 16px 64px;
+      }
+
+      /* ── Card ───────────────────────────────────────────────────────────── */
+      .card {
+        background: var(--color-white);
+        border-radius: var(--radius-card);
+        box-shadow: 0 2px 4px rgba(37,38,43,.08), 0 4px 16px rgba(37,38,43,.10);
+        width: 100%;
+        max-width: 640px;
+        padding: 40px 48px 48px;
+      }
+
+      /* ── Error icon ─────────────────────────────────────────────────────── */
+      .icon-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background-color: rgba(117, 0, 20, 0.08); /* mitRed @ 8 % */
+        margin-bottom: 20px;
+        flex-shrink: 0;
+      }
+      .icon-wrap svg {
+        width: 28px;
+        height: 28px;
+        color: var(--color-mit-red);
+      }
+
+      /* ── Typography ─────────────────────────────────────────────────────── */
+      .heading {
+        margin: 0 0 8px;
+        font-size: 1.75rem;   /* 28px ≈ h3 */
+        font-weight: 700;
+        line-height: 2.25rem;
+        color: var(--color-dark-gray-2);
+      }
+
+      .subheading {
+        margin: 0 0 28px;
+        font-size: 1rem;
+        font-weight: 400;
+        line-height: 1.5rem;
+        color: var(--color-dark-gray-1);
+      }
+
+      /* ── Scenario sections ──────────────────────────────────────────────── */
+      .scenario {
+        border: 1px solid var(--color-light-gray-2);
+        border-radius: var(--radius-card);
+        padding: 20px 24px;
+        margin-bottom: 16px;
+      }
+
+      .scenario--primary {
+        border-color: rgba(117, 0, 20, 0.20);
+        background-color: rgba(117, 0, 20, 0.03);
+      }
+
+      .scenario-title {
+        margin: 0 0 8px;
+        font-size: 0.9375rem; /* 15px ≈ subtitle1 */
+        font-weight: 500;
+        line-height: 1.375rem;
+        color: var(--color-dark-gray-2);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .scenario-title-badge {
+        display: inline-flex;
+        align-items: center;
+        font-size: 0.6875rem;  /* 11px */
+        font-weight: 500;
+        line-height: 1;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 2px 7px;
+        border-radius: 100vh;
+        background-color: var(--color-mit-red);
+        color: var(--color-white);
+        vertical-align: middle;
+      }
+
+      .scenario-body {
+        font-size: 0.875rem;  /* 14px ≈ body2 */
+        font-weight: 400;
+        line-height: 1.375rem;
+        color: var(--color-dark-gray-1);
+      }
+
+      .scenario-body li {
+        line-height: 1.5rem;
+      }
+
+      /* ── Divider ────────────────────────────────────────────────────────── */
+      .divider {
+        border: none;
+        border-top: 1px solid var(--color-light-gray-2);
+        margin: 28px 0;
+      }
+
+      /* ── Primary action button ──────────────────────────────────────────── */
+      .btn-primary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--color-mit-red);
+        color: var(--color-white);
+        border: none;
+        border-radius: var(--radius-btn);
+        padding: 11px 20px;
+        font-family: var(--font);
+        font-size: 0.875rem;  /* 14px */
+        font-weight: 500;
+        line-height: 1.125rem;
+        cursor: pointer;
+        text-decoration: none;
+        box-shadow: 0 2px 4px rgba(37,38,43,.10), 0 3px 8px rgba(37,38,43,.12);
+        transition: background-color 200ms;
+      }
+      .btn-primary:hover {
+        background-color: var(--color-red);
+        box-shadow: none;
+      }
+
+      /* ── Countdown notice (auth scenario only) ─────────────────────────── */
+      .redirect-notice {
+        display: none;   /* hidden by default; shown only for the auth scenario */
+        margin-top: 16px;
+        font-size: 0.8125rem;  /* 13px ≈ body3 */
+        font-weight: 400;
+        color: var(--color-silver-gray-dark);
+      }
+      body.scenario-auth .redirect-notice { display: block; }
+
+      /* ── Visibility helpers (JS-driven) ─────────────────────────────────── */
+      .js-auth-scenario   { display: none; }
+      .js-header-scenario { display: none; }
+      body.scenario-auth   .js-auth-scenario   { display: block; }
+      body.scenario-header .js-header-scenario { display: block; }
+      body.scenario-auth   .js-auth-scenario.js-primary   { display: block; }
+      body.scenario-header .js-header-scenario.js-primary { display: block; }
+
+      /* ── Responsive ─────────────────────────────────────────────────────── */
+      @media (max-width: 599px) {
+        :root { --nav-height: 60px; }
+        .card  { padding: 28px 20px 36px; }
+        .heading { font-size: 1.375rem; line-height: 1.875rem; }
+        .page-body { padding: 32px 12px 48px; }
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- ── Navigation bar ──────────────────────────────────────────────── -->
+    <header class="nav" role="banner">
+      <a href="/" class="nav-logo" aria-label="MIT Learn — home">
+        <svg width="143" height="26" viewBox="0 0 143 26" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M0.462 25V0.689999H9.71L13.45 14.29H13.518L17.258 0.689999H26.574V25H20.148V9.768H20.08L16.034 25H10.832L6.786 9.768H6.718V25H0.462ZM29.4815 25V0.689999H36.5875V25H29.4815ZM38.5569 6.742V0.689999H59.5009V6.742H52.5309V25H45.4249V6.742H38.5569ZM67.2834 25V0.689999H69.5614V22.892H82.5154V25H67.2834ZM91.5167 25.442C88.9553 25.442 86.9493 24.592 85.4987 22.892C84.048 21.1693 83.3227 18.948 83.3227 16.228C83.3227 13.5533 84.0593 11.3547 85.5327 9.632C87.006 7.88667 88.944 7.014 91.3467 7.014C92.7067 7.014 93.8853 7.27467 94.8827 7.796C95.9027 8.31733 96.696 9.04267 97.2627 9.972C97.8293 10.9013 98.2373 11.9213 98.4867 13.032C98.7587 14.12 98.8947 15.31 98.8947 16.602H85.4987C85.544 18.6873 86.0767 20.3873 87.0967 21.702C88.1167 22.994 89.59 23.64 91.5167 23.64C94.1913 23.64 95.9027 22.3253 96.6507 19.696H98.6907C98.3053 21.464 97.4893 22.8693 96.2427 23.912C95.0187 24.932 93.4433 25.442 91.5167 25.442ZM85.5327 14.936H96.6847C96.6393 13.1 96.1633 11.6153 95.2567 10.482C94.3727 9.326 93.0693 8.748 91.3467 8.748C89.6467 8.748 88.298 9.31467 87.3007 10.448C86.326 11.5813 85.7367 13.0773 85.5327 14.936ZM106.266 25.408C104.566 25.408 103.184 24.9887 102.118 24.15C101.053 23.3113 100.52 22.0987 100.52 20.512C100.52 19.5147 100.69 18.676 101.03 17.996C101.393 17.2933 101.937 16.7493 102.662 16.364C103.41 15.9787 104.158 15.6953 104.906 15.514C105.677 15.31 106.629 15.14 107.762 15.004C109.666 14.7773 110.924 14.5393 111.536 14.29C112.171 14.018 112.488 13.4627 112.488 12.624V12.284C112.488 9.92667 111.083 8.748 108.272 8.748C105.144 8.748 103.501 10.0513 103.342 12.658H101.268C101.382 10.9127 102.028 9.54133 103.206 8.544C104.385 7.54667 106.074 7.048 108.272 7.048C112.42 7.048 114.494 8.86133 114.494 12.488V22.042C114.494 23.0167 114.88 23.5267 115.65 23.572C115.764 23.572 116.024 23.5267 116.432 23.436H116.534V24.966C116.126 25.1473 115.65 25.238 115.106 25.238C113.474 25.238 112.613 24.4107 112.522 22.756V22.382H112.42C110.992 24.3993 108.941 25.408 106.266 25.408ZM106.64 23.708C108.454 23.708 109.882 23.198 110.924 22.178C111.99 21.1353 112.522 19.9567 112.522 18.642V15.48C111.661 15.956 110.142 16.3413 107.966 16.636C107.241 16.7267 106.663 16.8173 106.232 16.908C105.824 16.9987 105.36 17.1347 104.838 17.316C104.34 17.4973 103.954 17.7127 103.682 17.962C103.433 18.2113 103.206 18.5513 103.002 18.982C102.821 19.4127 102.73 19.9227 102.73 20.512C102.73 22.6427 104.034 23.708 106.64 23.708ZM118.473 25V7.422H120.581V10.686H120.649C121.85 8.41933 123.641 7.286 126.021 7.286C126.225 7.286 126.418 7.30867 126.599 7.354V9.428C125.216 9.20133 123.97 9.48467 122.859 10.278C121.34 11.4113 120.581 12.9867 120.581 15.004V25H118.473ZM128.932 25V7.422H131.04V10.108H131.108C132.491 8.068 134.451 7.048 136.99 7.048C138.667 7.048 140.016 7.53533 141.036 8.51C142.079 9.462 142.6 10.7993 142.6 12.522V25H140.492V12.726C140.492 10.142 139.155 8.85 136.48 8.85C134.961 8.85 133.669 9.326 132.604 10.278C131.561 11.23 131.04 12.42 131.04 13.848V25H128.932Z" fill="white"/>
+        </svg>
+      </a>
+    </header>
+
+    <!-- ── Main content ────────────────────────────────────────────────── -->
+    <main class="page-body" id="main">
+      <div class="card" role="main">
+
+        <!-- Warning icon -->
+        <div class="icon-wrap" aria-hidden="true">
+          <!-- Exclamation triangle (inline SVG, no external dependency) -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+
+        <h1 class="heading">Something went wrong</h1>
+        <p class="subheading" id="page-subheading">
+          We encountered a problem processing your request.
+          The most likely cause is described below.
+        </p>
+
+        <!-- ── Scenario: auth / OIDC token error ──────────────────────── -->
+        <div class="scenario scenario--primary js-auth-scenario js-primary"
+             role="region" aria-labelledby="scenario-auth-title">
+          <p class="scenario-title" id="scenario-auth-title">
+            Authentication session expired
+            <span class="scenario-title-badge">most likely</span>
+          </p>
+          <div class="scenario-body">
+            <p style="margin:0 0 8px">
+              The sign-in link or email verification token you followed has
+              already been used or has expired.  This commonly happens when:
+            </p>
+            <ul>
+              <li>You verified your email in another tab — this tab's link is no longer valid.</li>
+              <li>The session was interrupted or timed out during sign-in.</li>
+            </ul>
+            <p style="margin:8px 0 0">
+              You can safely return to the home page and continue from there.
+              If the problem persists, <a href="https://support.learn.mit.edu/hc/en-us/requests/new" style="text-decoration:underline">contact support</a>.
+            </p>
+          </div>
+        </div>
+
+        <!-- ── Scenario: oversized request headers / too many cookies ─── -->
+        <div class="scenario scenario--primary js-header-scenario"
+             role="region" aria-labelledby="scenario-header-title">
+          <p class="scenario-title" id="scenario-header-title">
+            Browser cookies or session data is too large
+          </p>
+          <div class="scenario-body">
+            <p style="margin:0 0 8px">
+              Your browser may have accumulated too many cookies or stored
+              session data that is making the request too large to process.
+              To resolve this, try the following steps in order:
+            </p>
+            <ul>
+              <li>Clear cookies for this site, then reload the page.</li>
+              <li>Open a new private or incognito browser window and try again.</li>
+              <li>Sign out of all accounts on this site, clear your browser cookies for this domain, then sign back in.</li>
+              <li>Try a different browser or device.</li>
+              <li>If the problem persists, <a href="https://support.learn.mit.edu/hc/en-us/requests/new" style="text-decoration:underline">contact us</a>.</li>
+            </ul>
+          </div>
+        </div>
+
+        <hr class="divider" />
+
+        <a href="/" class="btn-primary" id="home-link">Return to home page</a>
+
+        <p class="redirect-notice" id="redirect-notice" aria-live="polite">
+          Redirecting to the home page in <strong id="countdown">10</strong> seconds…
+        </p>
+
+      </div><!-- /.card -->
+    </main>
+
+    <script>
+      (function () {
+        "use strict";
+
+        /* ── Scenario detection ─────────────────────────────────────────── */
+
+        /**
+         * Each scenario has a `test` predicate that receives the current URL.
+         * The first matching scenario wins.  The `header` scenario has an
+         * unconditional predicate so it acts as the catch-all default — this
+         * is intentional: oversized-cookie errors give no distinguishing URL
+         * signal, so non-auth errors fall through to header instructions.
+         */
+        var SCENARIOS = [
+          {
+            id: "auth",
+            /**
+             * APISIX's OIDC redirect callback lives at /.apisix/redirect.
+             * When the openid-connect plugin fails (expired/consumed token,
+             * "already_logged_in" error, etc.) the 500 is thrown while handling
+             * this path, so the browser URL still ends with that path.
+             */
+            test: function (url) {
+              return (
+                /\.apisix\/redirect/.test(url.pathname) ||
+                /\/login\/.apisix/.test(url.pathname) ||
+                url.searchParams.get("error") !== null
+              );
+            },
+          },
+          {
+            id: "header",
+            /**
+             * nginx returns 400 when request headers exceed
+             * large_client_header_buffers (currently 4×32 k).  This is most
+             * commonly caused by an oversized Cookie header.  There is no
+             * URL pattern that uniquely identifies this case, so it is treated
+             * as the second-priority fallback when the URL doesn't look like an
+             * OIDC callback.
+             */
+            test: function () { return true; },
+          },
+        ];
+
+        function detectScenario(url) {
+          for (var i = 0; i < SCENARIOS.length; i++) {
+            if (SCENARIOS[i].test(url)) {
+              return SCENARIOS[i].id;
+            }
+          }
+          return "unknown";
+        }
+
+        /* ── Apply scenario class ────────────────────────────────────────── */
+        var url;
+        try {
+          url = new URL(window.location.href);
+        } catch (_) {
+          url = { pathname: "", searchParams: { get: function () { return null; } } };
+        }
+
+        var scenario = detectScenario(url);
+        document.body.classList.add("scenario-" + scenario);
+
+        /* Update subheading for the auth case to be more specific */
+        if (scenario === "auth") {
+          var sub = document.getElementById("page-subheading");
+          if (sub) {
+            sub.textContent =
+              "We encountered an authentication error. " +
+              "This is usually caused by following a link that has already been used.";
+          }
+        }
+
+        /* ── Countdown + redirect (auth scenario only) ───────────────────── */
+        var homeLink = document.getElementById("home-link");
+        var homeUrl = window.location.origin + "/";
+
+        /* Button points to home page for all scenarios */
+        if (homeLink) { homeLink.href = homeUrl; }
+
+        if (scenario === "auth") {
+          var REDIRECT_SECONDS = 10;
+          var remaining = REDIRECT_SECONDS;
+          var countdownEl = document.getElementById("countdown");
+          var noticeEl    = document.getElementById("redirect-notice");
+
+          function tick() {
+            remaining -= 1;
+            if (countdownEl) { countdownEl.textContent = remaining; }
+            if (remaining <= 0) {
+              if (noticeEl) { noticeEl.textContent = "Redirecting…"; }
+              window.location.href = homeUrl;
+            }
+          }
+
+          var timer = setInterval(tick, 1000);
+
+          /* Cancel redirect if the user interacts with the page */
+          function cancelRedirect() {
+            clearInterval(timer);
+            if (noticeEl) { noticeEl.style.display = "none"; }
+          }
+          document.addEventListener("click", cancelRedirect, { once: true });
+          document.addEventListener("keydown", cancelRedirect, { once: true });
+          document.addEventListener("scroll", cancelRedirect, { once: true, passive: true });
+        }
+
+      })();
+    </script>
+
+  </body>
+</html>

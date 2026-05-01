@@ -5,6 +5,7 @@ This module deploys the Apache APISIX chart from https://apache.github.io/apisix
 """
 
 import textwrap
+from pathlib import Path
 
 import pulumi_eks as eks
 import pulumi_fastly as fastly
@@ -90,6 +91,26 @@ def setup_apisix(
             opts=InvokeOptions(provider=fastly_provider)
         ).ipv6_cidr_blocks,
     ).apply(lambda blocks: [*blocks[0], *blocks[1]])
+
+    _error_pages_dir = Path(__file__).resolve().parent / "error_pages"
+    _gateway_error_html = (_error_pages_dir / "gateway_error.html").read_text(
+        encoding="utf-8"
+    )
+    _error_pages_configmap_name = "apache-apisix-error-pages"
+
+    error_pages_configmap = kubernetes.core.v1.ConfigMap(
+        f"{cluster_name}-apisix-error-pages-configmap",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=_error_pages_configmap_name,
+            namespace="operations",
+            labels=k8s_global_labels,
+        ),
+        data={"gateway_error.html": _gateway_error_html},
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=operations_namespace,
+        ),
+    )
 
     apisix_helm_release = kubernetes.helm.v3.Release(
         f"{cluster_name}-apisix-official-helm-release",
@@ -248,6 +269,17 @@ def setup_apisix(
                                 f"""\
                                 set $session_compressor zlib;
                                 set $session_name {session_cookie_name};
+
+                                # Serve a branded error page for gateway-level errors (HTTP 400/431
+                                # from oversized request headers, HTTP 500 from OIDC plugin failures,
+                                # and other upstream/server errors).  The location is marked
+                                # `internal` so it is only reachable via nginx's error_page redirect
+                                # and cannot be requested directly by clients.
+                                error_page 400 431 500 502 503 504 /gateway_error.html;
+                                location = /gateway_error.html {{
+                                    root /usr/local/apisix/error-pages;
+                                    internal;
+                                }}
                                 """
                             ),
                             "httpAdmin": "",
@@ -338,6 +370,23 @@ def setup_apisix(
                         "labels": k8s_global_labels,
                     },
                 },
+                # --- Custom error pages ---
+                # Mount the branded gateway error page ConfigMap into every
+                # APISIX pod so nginx can serve it via the error_page directive
+                # configured above in configurationSnippet.httpSrv.
+                "extraVolumes": [
+                    {
+                        "name": "apisix-error-pages",
+                        "configMap": {"name": _error_pages_configmap_name},
+                    }
+                ],
+                "extraVolumeMounts": [
+                    {
+                        "name": "apisix-error-pages",
+                        "mountPath": "/usr/local/apisix/error-pages",
+                        "readOnly": True,
+                    }
+                ],
             },
         ),
         opts=ResourceOptions(
@@ -350,6 +399,7 @@ def setup_apisix(
                 operations_namespace,
                 gateway_api_crds,
                 lb_controller,
+                error_pages_configmap,
             ],
         ),
     )
