@@ -17,7 +17,7 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         context=APP_DIR,
         dockerfile=APP_DIR + '/Dockerfile',
         live_update=[
-            sync(APP_DIR + '/main', '/src/main', ignore=["__pycache__", "*.pyc", ".pytest_cache", ".ruff_cache"]),
+            sync(APP_DIR + '/main', '/src/main'),
             run(
                 'cd /src && pip install -r requirements.txt',
                 trigger=[APP_DIR + '/requirements.txt'],
