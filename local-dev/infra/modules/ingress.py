@@ -163,7 +163,6 @@ def create_ingress(
                         },
                     },
                     "resources": {
-                        "requests": {"cpu": "100m", "memory": "256Mi"},
                         "limits": {"memory": "512Mi"},
                     },
                     "autoscaling": {"enabled": False},

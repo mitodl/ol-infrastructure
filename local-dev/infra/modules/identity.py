@@ -170,7 +170,6 @@ def create_identity(  # noqa: PLR0913
                 {"name": "spi-email-smtp-starttls", "value": "false"},
             ],
             "resources": {
-                "requests": {"cpu": "200m", "memory": "512Mi"},
                 "limits": {"memory": "1Gi"},
             },
             "unsupported": {

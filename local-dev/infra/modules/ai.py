@@ -81,7 +81,6 @@ def create_ai_services(
                                 }
                             ],
                             "resources": {
-                                "requests": {"cpu": "50m", "memory": "256Mi"},
                                 "limits": {"memory": "2Gi"},
                             },
                         }

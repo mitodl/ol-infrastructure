@@ -41,7 +41,6 @@ def create_database(
             values={
                 "replicaCount": 1,
                 "resources": {
-                    "requests": {"cpu": "50m", "memory": "128Mi"},
                     "limits": {"memory": "256Mi"},
                 },
             },
@@ -89,7 +88,6 @@ def create_database(
                 "parameters": {"max_connections": "100"},
             },
             "resources": {
-                "requests": {"cpu": "100m", "memory": "256Mi"},
                 "limits": {"memory": "512Mi"},
             },
         },

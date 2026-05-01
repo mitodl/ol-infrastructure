@@ -31,7 +31,6 @@ def create_cache(
                             "image": "valkey/valkey:8-alpine",
                             "ports": [{"containerPort": 6379}],
                             "resources": {
-                                "requests": {"cpu": "50m", "memory": "64Mi"},
                                 "limits": {"memory": "128Mi"},
                             },
                         }

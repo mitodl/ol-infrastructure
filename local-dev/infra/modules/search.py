@@ -43,7 +43,6 @@ def create_search(
                                 {"containerPort": 6334, "name": "grpc"},
                             ],
                             "resources": {
-                                "requests": {"cpu": "100m", "memory": "256Mi"},
                                 "limits": {"memory": "512Mi"},
                             },
                             "volumeMounts": [
@@ -91,7 +90,6 @@ def create_search(
                 "replicas": 1,
                 "opensearchJavaOpts": "-Xms256m -Xmx256m",
                 "resources": {
-                    "requests": {"cpu": "100m", "memory": "512Mi"},
                     "limits": {"memory": "1Gi"},
                 },
                 "persistence": {"size": "5Gi"},
@@ -120,7 +118,6 @@ def create_search(
                             "image": "apache/tika:3.0.0.0",
                             "ports": [{"containerPort": 9998}],
                             "resources": {
-                                "requests": {"cpu": "50m", "memory": "256Mi"},
                                 "limits": {"memory": "512Mi"},
                             },
                         }

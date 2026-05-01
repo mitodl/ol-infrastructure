@@ -40,7 +40,6 @@ def create_messaging(
                                 {"containerPort": 8025, "name": "ui"},
                             ],
                             "resources": {
-                                "requests": {"cpu": "10m", "memory": "32Mi"},
                                 "limits": {"memory": "64Mi"},
                             },
                         }
