@@ -521,7 +521,86 @@ Tilt also runs `pulumi up` automatically when infra files change. You can also t
 ./local-dev/scripts/teardown.sh --keep-certs --keep-hosts
 ```
 
-> Pulumi state is stored in `local-dev/infra/.pulumi/` (file backend, gitignored). Deleting the cluster without running `pulumi destroy` first will leave orphaned Pulumi state. Run `pulumi destroy` before `teardown.sh` if you want a clean slate.
+> **Note:** The teardown script now calls `pulumi destroy` automatically to clean up Pulumi-managed resources before deleting the cluster. This ensures no orphaned resources are left behind.
+
+---
+
+## Customization & Advanced Setup
+
+### Local Configuration Overrides
+
+The ConfigMaps and Secrets are tracked by the repository. For personal development customizations (API keys, custom endpoints, etc.), you have several options:
+
+**Option 1: tilt_config.json (recommended for most cases)**
+
+```json
+{
+  "enabled_apps": ["mit-learn"],
+  "openai_api_key": "sk-...",  # pragma: allowlist secret
+  "langsmith_api_key": "ls-..."  # pragma: allowlist secret
+}
+```
+
+Pass config values via Tilt's config system. See `tilt_config.json.example` for all available options.
+
+**Option 2: kubectl patch (for local debugging)**
+
+Modify a ConfigMap or Secret in-cluster without committing:
+
+```bash
+# Patch an env var
+kubectl patch configmap -n mit-learn app-env -p \
+  '{"data":{"MY_VAR":"new_value"}}'
+
+# View changes
+kubectl get configmap -n mit-learn app-env -o yaml
+```
+
+These changes persist until the pod restarts or `tilt up` is re-run.
+
+**Option 3: Stash workflow (if heavily customizing)**
+
+If you have many local changes to tracked files, you can stash them before pulling:
+
+```bash
+# Stash local changes
+git stash
+
+# Pull latest
+git pull
+
+# Reapply your changes
+git stash pop
+```
+
+### GPU Support for Ollama
+
+If you prefer to run Ollama on your host machine to use GPU acceleration:
+
+1. **Stop the in-cluster Ollama** — Set `OLLAMA_ENDPOINT` in your app ConfigMap to point to your host:
+   ```yaml
+   OLLAMA_ENDPOINT: "http://host.docker.internal:11434"  # Docker Desktop
+   OLLAMA_ENDPOINT: "http://172.17.0.1:11434"            # Linux
+   ```
+
+2. **Run Ollama on your host:**
+   ```bash
+   ollama serve  # Listens on localhost:11434 by default
+   ```
+
+### Custom S3 Storage (MinIO / RustFS)
+
+The local-dev stack doesn't include S3 storage by default. To add it:
+
+**Option 1: Use external MinIO instance** — Run MinIO on your host and configure apps to use it:
+```yaml
+AWS_ENDPOINT_URL: "http://host.docker.internal:9000"  # Docker Desktop
+AWS_ENDPOINT_URL: "http://172.17.0.1:9000"            # Linux
+AWS_ACCESS_KEY_ID: "minioadmin"  # pragma: allowlist secret
+AWS_SECRET_ACCESS_KEY: "minioadmin"  # pragma: allowlist secret
+```
+
+**Option 2: Deploy MinIO in-cluster** — Modify `local-dev/infra/__main__.py` to add a MinIO Helm chart and patch the ConfigMaps accordingly.
 
 ---
 

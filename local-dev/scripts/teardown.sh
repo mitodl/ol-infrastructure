@@ -76,6 +76,9 @@ else
     warn "Cluster '${CLUSTER_NAME}' not found — skipping."
 fi
 
+# ---------------------------------------------------------------------------
+# Remove /etc/hosts entries
+# ---------------------------------------------------------------------------
 if ! $KEEP_HOSTS; then
     log "Removing /etc/hosts entries..."
     BLOCK_START="# BEGIN mit-learn-dev local-dev"
@@ -104,6 +107,9 @@ with open('/etc/hosts', 'w') as f:
     fi
 fi
 
+# ---------------------------------------------------------------------------
+# Remove TLS certificates
+# ---------------------------------------------------------------------------
 if ! $KEEP_CERTS; then
     CERT_DIR="${REPO_ROOT}/local-dev/certs"
     if [[ -d "${CERT_DIR}" ]]; then
@@ -113,5 +119,32 @@ if ! $KEEP_CERTS; then
     fi
 fi
 
+# ---------------------------------------------------------------------------
+# Destroy Pulumi state and k3d cluster
+# ---------------------------------------------------------------------------
+
+log "Destroying Pulumi-managed resources..."
+cd "${REPO_ROOT}/local-dev/infra"
+
+# Destroy Pulumi state (if it exists)
+if pulumi stack ls 2>/dev/null | grep -q "local-dev"; then
+    pulumi destroy --stack local-dev.infra.Dev --yes --logtostderr || true
+    ok "Pulumi resources destroyed."
+else
+    ok "No Pulumi state found (already cleaned up)."
+fi
+
+cd "${REPO_ROOT}"
+
+# Delete k3d cluster
+if k3d cluster list | grep -q "${CLUSTER_NAME}"; then
+    log "Deleting k3d cluster '${CLUSTER_NAME}'..."
+    k3d cluster delete "${CLUSTER_NAME}"
+    ok "k3d cluster deleted."
+else
+    warn "k3d cluster '${CLUSTER_NAME}' not found — nothing to delete."
+fi
+
 echo ""
 echo "Teardown complete. Run ./local-dev/scripts/setup.sh to start fresh."
+
