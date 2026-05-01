@@ -1,9 +1,0 @@
----
-name: ol-local-dev-infra
-runtime: python
-description: >
-  Shared infrastructure for the MIT Learn local development environment.
-  Provisions all in-cluster operators, services, and Keycloak realm.
-  Uses the local k3d cluster with a file-based state backend.
-backend:
-  url: file://.pulumi
