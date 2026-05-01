@@ -145,9 +145,30 @@ def create_identity_core(  # noqa: PLR0913
             },
             "ingress": {"enabled": False},  # Routed through APISIX.
             "additionalOptions": [
-                # Explicitly select the OL freemarker login SPI. The image ships
-                # two custom implementations; without this the jcputney freemarker
-                # override is used by default and causes an NPE in KC 26.5.
+                # Use local cache instead of Infinispan for single-instance
+                # deployments. Infinispan is designed for clustered HA setups
+                # and requires significant memory for distributed state.
+                # Local cache disables clustering and reduces memory footprint
+                # by ~40-50%, from ~1700Mi requests to ~800-1000Mi.
+                # Appropriate for local development and testing only.
+                {"name": "cache", "value": "local"},
+                # Reduce embedded cache entry limits to match local dev
+                # workload sizes. Default values are sized for production
+                # with many concurrent users. Local dev typically has fewer
+                # entries, reducing pre-allocation waste.
+                {"name": "cache-embedded-keys-max-count", "value": "1000"},
+                {
+                    "name": "cache-embedded-client-sessions-max-count",
+                    "value": "1000",
+                },
+                {
+                    "name": "cache-embedded-authorization-max-count",
+                    "value": "1000",
+                },
+                # Explicitly select the OL freemarker login SPI. The image
+                # ships two custom implementations; without this the
+                # jcputney freemarker override is used by default and
+                # causes an NPE in KC 26.5.
                 {"name": "spi-login--provider", "value": "ol-freemarker"},
                 # Prevent Infinispan sticky-session cookies from destabilising
                 # single-instance deployments.
@@ -167,7 +188,7 @@ def create_identity_core(  # noqa: PLR0913
                 {"name": "spi-email-smtp-starttls", "value": "false"},
             ],
             "resources": {
-                "limits": {"memory": "2Gi"},
+                "limits": {"memory": "1.5Gi"},
             },
             "unsupported": {
                 "podTemplate": {
