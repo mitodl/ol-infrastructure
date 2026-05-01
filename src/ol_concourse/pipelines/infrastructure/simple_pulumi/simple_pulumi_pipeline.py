@@ -330,6 +330,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
         paths=[
             *PULUMI_WATCHED_PATHS,
             str(PULUMI_CODE_PATH.joinpath(params.pulumi_project_path)),
+            "src/bridge/lib/versions.py",
             *params.additional_watched_paths,
         ],
     )
