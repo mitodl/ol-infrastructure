@@ -78,7 +78,7 @@ def create_search(
         k8s.helm.v3.ReleaseArgs(
             name="opensearch",
             chart="opensearch",
-            version="2.26.1",
+            version="3.4.0",
             namespace="local-infra",
             repository_opts=k8s.helm.v3.RepositoryOptsArgs(
                 repo="https://opensearch-project.github.io/helm-charts",
