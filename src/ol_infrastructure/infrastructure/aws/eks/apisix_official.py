@@ -255,7 +255,8 @@ def setup_apisix(
                             "cookie_bytes=$cookie_bytes "
                             "cookie_count=$cookie_count "
                             "oidc_session_bytes=$oidc_session_bytes "
-                            "cookie_names=$cookie_names",
+                            "cookie_names=$cookie_names "
+                            "cookie_sizes=$cookie_sizes",
                             "accessLogFormatEscape": "default",
                             "errorLog": "/dev/stderr",
                             "errorLogLevel": "warn",
@@ -280,8 +281,13 @@ def setup_apisix(
                                 set_by_lua_block $cookie_count {{
                                     local cookie = ngx.var.http_cookie or ""
                                     if cookie == "" then return "0" end
-                                    local count = 1
-                                    for _ in cookie:gmatch(";") do count = count + 1 end
+                                    local count = 0
+                                    for pair in (cookie .. ";"):gmatch("([^;]*);") do
+                                        local name = pair:match("^%s*([^=]+)=")
+                                        if name and name:match("%S") then
+                                            count = count + 1
+                                        end
+                                    end
                                     return tostring(count)
                                 }}
                                 set_by_lua_block $oidc_session_bytes {{
@@ -290,8 +296,11 @@ def setup_apisix(
                                     local all = ngx.var.http_cookie or ""
                                     for pair in (all .. ";"):gmatch("([^;]+);") do
                                         local name, val = pair:match("^%s*([^=]+)=(.*)")
-                                        if name and name:match("^%s*" .. session_name .. "%s*$") then
-                                            return tostring(#pair)
+                                        if name then
+                                            local trimmed_name = name:match("^%s*(.-)%s*$")
+                                            if trimmed_name == session_name then
+                                                return tostring(#(trimmed_name .. "=" .. val))
+                                            end
                                         end
                                     end
                                     return "0"
@@ -307,6 +316,23 @@ def setup_apisix(
                                         end
                                     end
                                     return table.concat(names, ",")
+                                }}
+                                -- cookie_sizes logs each cookie name with its byte count as name:BYTES
+                                -- pairs (e.g. _csrf:64,session_id:4096).  Cookie request headers do
+                                -- NOT carry the domain/path the cookie was set on; use host= in the
+                                -- surrounding log line to correlate which destination received them.
+                                set_by_lua_block $cookie_sizes {{
+                                    local cookie = ngx.var.http_cookie or ""
+                                    local parts = {{}}
+                                    for pair in (cookie .. ";"):gmatch("([^;]+);") do
+                                        local name = pair:match("^%s*([^=]+)=")
+                                        if name then
+                                            local trimmed_name = name:match("^%s*(.-)%s*$")
+                                            local trimmed_pair = pair:match("^%s*(.-)%s*$")
+                                            table.insert(parts, trimmed_name .. ":" .. tostring(#trimmed_pair))
+                                        end
+                                    end
+                                    return table.concat(parts, ",")
                                 }}
 
                                 # Serve a branded error page for gateway-level errors (HTTP 400/431

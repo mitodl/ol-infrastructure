@@ -31,7 +31,7 @@ def _apisix_cookie_metrics_alloy_config() -> str:
     """
     return r"""
 stage.match {
-  selector = "{app_kubernetes_io_name=\"apisix\"} |= \"cookie_bytes=\""
+  selector = "{service=\"apisix\"} |= \"cookie_bytes=\""
   pipeline_name = "apisix_cookie_metrics"
 
   // Extract host, status, and the four cookie fields appended at the end of
