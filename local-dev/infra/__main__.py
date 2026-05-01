@@ -47,7 +47,14 @@ tls_cert_path = config.get("tls_cert_path") or "local-dev/certs/local-dev.pem"
 tls_key_path = config.get("tls_key_path") or "local-dev/certs/local-dev-key.pem"
 mkcert_ca_cert_path = config.get("mkcert_ca_cert_path") or "local-dev/certs/rootCA.pem"
 
-keycloak_hostname = config.get("keycloak_hostname") or "sso.ol.mit.dev"
+# Root domain for all local-dev hostnames.  Override via the LOCAL_DEV_ROOT_DOMAIN
+# environment variable or the Pulumi config key `root_domain`.  The default
+# `mit.dev` matches the baseline setup.sh / /etc/hosts configuration.
+root_domain = config.get("root_domain") or os.environ.get(
+    "LOCAL_DEV_ROOT_DOMAIN", "mit.dev"
+)
+
+keycloak_hostname = config.get("keycloak_hostname") or f"sso.ol.{root_domain}"
 keycloak_url = config.get("keycloak_url") or f"https://{keycloak_hostname}"
 
 mitlearn_client_secret = config.require_secret("mitlearn_client_secret")
@@ -126,6 +133,7 @@ create_identity(
     keycloak_operator_version=keycloak_operator_version,
     keycloak_hostname=keycloak_hostname,
     keycloak_url=keycloak_url,
+    root_domain=root_domain,
     mitlearn_client_secret=mitlearn_client_secret,
     learn_ai_client_secret=learn_ai_client_secret,
     mitxonline_client_secret=mitxonline_client_secret,

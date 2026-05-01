@@ -12,11 +12,17 @@ config.define_string_list("prebuilt_tags", usage="Prebuilt image tag overrides p
 config.define_string("openai_api_key", usage="OpenAI API key for AI/embedding features (optional)")
 config.define_string("langsmith_api_key", usage="LangSmith API key for tracing (optional)")
 config.define_string("canvas_ai_token", usage="Canvas AI token (optional)")
+config.define_string("root_domain", usage="Root DNS domain for all local-dev services (default: mit.dev). Overrides LOCAL_DEV_ROOT_DOMAIN env var.")
 cfg = config.parse()
 
 enabled_apps = cfg.get("enabled_apps", ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"])
 per_app_databases = cfg.get("per_app_databases", False)
 openedx_mode = cfg.get("openedx_mode", "qa")
+
+# Root domain: configurable via tilt config or LOCAL_DEV_ROOT_DOMAIN env var.
+# All service hostnames are derived from this value — changing it rewires
+# every URL, CORS origin, APISIX route, and Keycloak redirect URI at once.
+root_domain = cfg.get("root_domain") or os.environ.get("LOCAL_DEV_ROOT_DOMAIN", "mit.dev")
 
 # Parse prebuilt_tags list (["app=tag", ...]) into a lookup dict.
 prebuilt_tags = {
@@ -28,6 +34,26 @@ prebuilt_tags = {
 # Workspace root: directory that contains ol-infrastructure and sibling app repos.
 # Override with MITOL_WORKSPACE_ROOT environment variable.
 workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
+
+# ---------------------------------------------------------------------------
+# Domain substitution helper
+# ---------------------------------------------------------------------------
+def k8s_yaml_with_domain(paths):
+    """Apply k8s YAML files, substituting root_domain for the default 'mit.dev'.
+
+    When root_domain is the default, files are applied as-is.  When overridden,
+    each file is processed through sed before being applied so that all hostname,
+    URL, and cookie-domain references are updated consistently.
+    """
+    if root_domain == "mit.dev":
+        k8s_yaml(paths)
+        return
+    for p in paths:
+        content = str(local(
+            "sed 's/mit\\.dev/{rd}/g' {p}".format(rd=root_domain, p=p),
+            quiet=True,
+        ))
+        k8s_yaml(blob(content))
 
 # ---------------------------------------------------------------------------
 # Application registry
@@ -146,7 +172,7 @@ APPS = [
 # ---------------------------------------------------------------------------
 local_resource(
     "local-infra",
-    cmd="PULUMI_CONFIG_PASSPHRASE='' pulumi up --yes --skip-preview --logtostderr --stack local-dev.infra.Dev",
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' pulumi up --yes --skip-preview --logtostderr --stack local-dev.infra.Dev".format(rd=root_domain),
     dir="./local-dev/infra",
     deps=["./local-dev/infra"],
     labels=["infra"],

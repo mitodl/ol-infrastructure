@@ -21,31 +21,37 @@ K3D_CONFIG="${REPO_ROOT}/local-dev/cluster/k3d-config.yaml"
 CLUSTER_NAME="mit-learn-dev"
 
 # ---------------------------------------------------------------------------
+# Root domain configuration
+# ---------------------------------------------------------------------------
+# Override by setting LOCAL_DEV_ROOT_DOMAIN before running this script:
+#   LOCAL_DEV_ROOT_DOMAIN=mycompany.dev ./local-dev/scripts/setup.sh
+ROOT_DOMAIN="${LOCAL_DEV_ROOT_DOMAIN:-mit.dev}"
+
+# ---------------------------------------------------------------------------
 # All local hostnames — must be listed explicitly; /etc/hosts has no wildcards.
-# Pattern: production domain with .edu → .dev
 # ---------------------------------------------------------------------------
 HOSTS=(
     # mit-learn backend (Django/granian)
-    "api.learn.mit.dev"
+    "api.learn.${ROOT_DOMAIN}"
     # mit-learn frontend (Next.js)
-    "learn.mit.dev"
+    "learn.${ROOT_DOMAIN}"
     # learn-ai
-    "ai.learn.mit.dev"
+    "ai.learn.${ROOT_DOMAIN}"
     # mitxonline
-    "mitxonline.mit.dev"
+    "mitxonline.${ROOT_DOMAIN}"
     # odl-video-service
-    "video.odl.mit.dev"
+    "video.odl.${ROOT_DOMAIN}"
     # Keycloak SSO
-    "sso.ol.mit.dev"
+    "sso.ol.${ROOT_DOMAIN}"
 )
 
 # mkcert wildcard SANs — one wildcard per subdomain level needed.
 MKCERT_DOMAINS=(
-    "*.mit.dev"           # learn.mit.dev, mitxonline.mit.dev
-    "*.learn.mit.dev"     # api.learn.mit.dev, ai.learn.mit.dev
-    "*.mitxonline.mit.dev"
-    "*.ol.mit.dev"        # sso.ol.mit.dev
-    "*.odl.mit.dev"       # video.odl.mit.dev
+    "*.${ROOT_DOMAIN}"                # learn.*, mitxonline.*
+    "*.learn.${ROOT_DOMAIN}"          # api.learn.*, ai.learn.*
+    "*.mitxonline.${ROOT_DOMAIN}"
+    "*.ol.${ROOT_DOMAIN}"             # sso.ol.*
+    "*.odl.${ROOT_DOMAIN}"            # video.odl.*
 )
 
 # Output cert files (mkcert names them from the first domain, replacing * with _)

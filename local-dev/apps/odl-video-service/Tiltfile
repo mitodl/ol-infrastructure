@@ -3,6 +3,8 @@
 # prebuilt DockerHub image (mitodl/odl-video-service-app:latest) without
 # attempting a local build.
 
+load("../../tiltlib.star", "k8s_yaml_with_domain")
+
 workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 APP_DIR = os.path.join(workspace_root, "odl-video-service")
 IMAGE = 'mitodl/odl-video-service-app'
