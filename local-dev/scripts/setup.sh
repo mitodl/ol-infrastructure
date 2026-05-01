@@ -212,6 +212,7 @@ need_cmd helm
 need_cmd mkcert
 need_cmd pulumi
 need_cmd python3
+need_cmd uv
 
 # Docker must be running
 docker info &>/dev/null || err "Docker is not running. Start Docker Desktop or the Docker daemon."

@@ -584,9 +584,39 @@ The Next.js build needs ~4 GB of memory. If it OOMs:
 - Increase Docker Desktop memory to 10+ GB
 - Or use a prebuilt image by removing `mit-learn` from `enabled_apps` in `tilt_config.json` and letting Tilt use the `prebuilt_tags` value instead
 
----
+### macOS: Port 5000 already in use
 
-## WSL2-specific issues
+On macOS, AirPlay Receiver listens on port 5000 by default. If you see `Address already in use` during cluster creation:
+
+**Option 1 (recommended):** Disable AirPlay Receiver in System Settings → General → AirDrop & Handoff → disable "AirPlay Receiver".
+
+**Option 2:** Modify the k3d registry port in `local-dev/cluster/k3d-config.yaml`:
+```yaml
+registries:
+  create:
+    hostPort: "5001"  # Use 5001 instead of 5000
+  config: |
+    mirrors:
+      "k3d-registry.localhost:5001":  # Update mirror endpoint
+        endpoint:
+          - "http://k3d-registry.localhost:5001"
+```
+
+Then re-run `setup.sh`.
+
+### Linux: inotify limit exceeded
+
+Tilt watches source files and uses inotify for change detection. On Linux, the default inotify limit may be too low for watching the entire Tilt workspace. If you see errors like `watch ENOSPC` or "No space left on device", increase the limit:
+
+```bash
+# Increase inotify watch limit (recommended: 100k for large workspaces)
+sudo sysctl fs.inotify.max_user_watches=100000
+
+# Make it permanent (add to /etc/sysctl.conf)
+echo 'fs.inotify.max_user_watches=100000' | sudo tee -a /etc/sysctl.conf
+```
+
+---
 
 ### `/etc/hosts` entries disappear after WSL restart
 

@@ -83,7 +83,7 @@ spec:
         post_logout_redirect_uri: "https://api.learn.mit.dev/logout/"
         unauth_action: pass
         session:
-          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          secret: "local-dev-apisix-oidc-session-secret"  # pragma: allowlist secret
         ssl_verify: false
 
   - name: logout-redirect
@@ -130,7 +130,7 @@ spec:
         post_logout_redirect_uri: "https://api.learn.mit.dev/logout/"
         unauth_action: auth
         session:
-          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          secret: "local-dev-apisix-oidc-session-secret"  # pragma: allowlist secret
         ssl_verify: false
 ---
 # ApisixRoute — /learn/ prefix (strips prefix before forwarding to backend).
