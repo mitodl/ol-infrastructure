@@ -26,6 +26,7 @@ if os.path.exists(os.path.join(MIT_LEARN_DIR, ".git")):
             sync(
                 os.path.join(MIT_LEARN_DIR),
                 "/src",
+                ignore=["__pycache__", "*.pyc", ".pytest_cache", ".ruff_cache"],
             ),
             # Reinstall Python deps if pyproject.toml or uv.lock changes.
             run(

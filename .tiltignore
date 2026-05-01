@@ -1,0 +1,37 @@
+# Tilt ignore patterns — files/directories excluded from watch triggers
+# These patterns prevent unnecessary Tilt updates when generated files change
+
+# Python cache directories and files
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+
+# Python test/build artifacts
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/*.egg-info/
+**/dist/
+**/build/
+
+# Node.js artifacts
+**/node_modules/
+**/.next/
+
+# Pulumi state and artifacts
+.pulumi/
+**/*.auto.tfvars.json
+**/Pulumi.*.yaml
+**/Pulumi.*.yml
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
