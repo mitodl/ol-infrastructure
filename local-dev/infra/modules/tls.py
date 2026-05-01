@@ -10,8 +10,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pulumi_kubernetes as k8s
-from helpers import read_file_b64
 from pulumi import ResourceOptions
+
+from .helpers import read_file_b64
 
 
 @dataclass

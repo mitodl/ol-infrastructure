@@ -1,0 +1,20 @@
+config:
+  # Path to the kubeconfig for the k3d cluster.
+  # Defaults to ${HOME}/.kube/config if not set.
+  ol-local-dev-core:kubeconfig: ""
+  # Path to the mkcert-generated TLS certificate and key.
+  ol-local-dev-core:tls_cert_path: "local-dev/certs/local-dev.pem"
+  ol-local-dev-core:tls_key_path: "local-dev/certs/local-dev-key.pem"
+  ol-local-dev-core:mkcert_ca_cert_path: "local-dev/certs/rootCA.pem"
+  # Domain configuration
+  ol-local-dev-core:keycloak_hostname: "sso.ol.mit.dev"
+  ol-local-dev-core:keycloak_url: "https://sso.ol.mit.dev"
+  # APISIX secrets for core infrastructure
+  ol-local-dev-core:apisix_admin_key: "local-dev-apisix-admin-key"
+  ol-local-dev-core:apisix_viewer_key: "local-dev-apisix-viewer-key"
+  # Helm chart versions
+  ol-local-dev-core:cert_manager_version: "v1.16.2"
+  ol-local-dev-core:cnpg_version: "0.23.0"
+  ol-local-dev-core:apisix_version: "2.13.0"
+  ol-local-dev-core:keycloak_operator_version: "26.0.7"
+encryptionsalt: v1:PidwC1BukA0=:v1:fQSvxydFUaIrKsEE:C/DV/mn+diHPVUfZrl/5F5QXOYhEuw==

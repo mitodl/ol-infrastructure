@@ -84,7 +84,7 @@ From the `ol-infrastructure` repo root:
 
 This will:
 1. Check all prerequisites
-2. Create the `mit-learn-dev` k3d cluster with a local image registry on port 5000
+2. Create the `local-dev` k3d cluster with a local image registry on port 5000
 3. Generate a wildcard TLS certificate with `mkcert` (trusted by your OS)
 4. Add all `.dev` hostnames to `/etc/hosts` (requires `sudo`)
 
@@ -135,7 +135,7 @@ Open the Tilt UI at `http://localhost:10350` to monitor deployments and trigger 
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  k3d cluster: mit-learn-dev                                   │
+│  k3d cluster: local-dev                                       │
 │                                                               │
 │  ┌──────────┐  ┌──────────────────────────────────────────┐  │
 │  │operations│  │           local-infra                    │  │
@@ -614,7 +614,7 @@ pulumi up --logtostderr -v=3   # Verbose output
 ```
 
 Common causes:
-- **kubeconfig not set:** Ensure `k3d kubeconfig merge mit-learn-dev --kubeconfig-merge-default` has been run, or set `ol-local-dev-infra:kubeconfig` in `Pulumi.local-dev.infra.Dev.yaml`.
+- **kubeconfig not set:** Ensure `k3d kubeconfig merge local-dev --kubeconfig-merge-default` has been run, or set `ol-local-dev-infra:kubeconfig` in `Pulumi.local-dev.infra.Dev.yaml`.
 - **Cert files missing:** Run `setup.sh --skip-hosts` to regenerate certs without touching `/etc/hosts`.
 
 ### App pod stuck in `Init:CrashLoopBackOff`

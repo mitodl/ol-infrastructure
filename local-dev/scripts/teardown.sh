@@ -8,7 +8,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-CLUSTER_NAME="mit-learn-dev"
+CLUSTER_NAME="local-dev"
 
 KEEP_CERTS=false
 KEEP_HOSTS=false
@@ -42,7 +42,7 @@ _remove_windows_hosts() {
         return
     fi
 
-    if ! grep -q "# BEGIN mit-learn-dev local-dev" "$win_hosts" 2>/dev/null; then
+    if ! grep -q "# BEGIN local-dev local-dev" "$win_hosts" 2>/dev/null; then
         ok "No Windows hosts entries to remove."
         return
     fi
@@ -52,7 +52,7 @@ import re
 with open('${win_hosts}', 'r') as f:
     content = f.read()
 content = re.sub(
-    r'# BEGIN mit-learn-dev local-dev.*?# END mit-learn-dev local-dev\n?',
+    r'# BEGIN local-dev local-dev.*?# END local-dev local-dev\n?',
     '',
     content,
     flags=re.DOTALL,
@@ -63,13 +63,50 @@ with open('${win_hosts}', 'w') as f:
         ok "Windows hosts entries removed (${win_hosts})."
     else
         warn "Could not remove Windows hosts entries (requires Windows admin rights)."
-        warn "Remove the '# BEGIN mit-learn-dev local-dev' block manually from"
+        warn "Remove the '# BEGIN local-dev local-dev' block manually from"
         warn "C:\\Windows\\System32\\drivers\\etc\\hosts"
     fi
 }
 
 log "Destroying k3d cluster '${CLUSTER_NAME}'..."
 if k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
+    # Ensure cluster is running before destroying Pulumi resources
+    log "  Ensuring cluster is running..."
+    if ! k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}.*1/1"; then
+        log "  Starting cluster for resource cleanup..."
+        k3d cluster start "${CLUSTER_NAME}"
+        sleep 10  # Give cluster time to stabilize
+        ok "Cluster started."
+    else
+        ok "Cluster is already running."
+    fi
+
+    # Now destroy Pulumi resources while cluster is running
+    log "Destroying Pulumi-managed resources before cluster teardown..."
+
+    # Destroy apps_infra stack first (it depends on core stack)
+    log "  Destroying apps_infra stack..."
+    cd "${REPO_ROOT}/local-dev/infra/apps_infra"
+    if pulumi stack ls 2>/dev/null | grep -q "local-dev.apps-infra"; then
+        PULUMI_CONFIG_PASSPHRASE='' pulumi destroy --stack local-dev.apps-infra.Dev --yes --logtostderr || true
+        ok "    Apps infrastructure destroyed."
+    else
+        ok "    No apps_infra state found."
+    fi
+
+    # Destroy core stack (after apps_infra is gone)
+    log "  Destroying core stack..."
+    cd "${REPO_ROOT}/local-dev/infra/core"
+    if pulumi stack ls 2>/dev/null | grep -q "local-dev.core"; then
+        PULUMI_CONFIG_PASSPHRASE='' pulumi destroy --stack local-dev.core.Dev --yes --logtostderr || true
+        ok "    Core infrastructure destroyed."
+    else
+        ok "    No core state found."
+    fi
+
+    cd "${REPO_ROOT}"
+
+    # Now delete the cluster
     k3d cluster delete "${CLUSTER_NAME}"
     ok "Cluster deleted."
 else
@@ -81,14 +118,14 @@ fi
 # ---------------------------------------------------------------------------
 if ! $KEEP_HOSTS; then
     log "Removing /etc/hosts entries..."
-    BLOCK_START="# BEGIN mit-learn-dev local-dev"
+    BLOCK_START="# BEGIN local-dev local-dev"
     if grep -q "${BLOCK_START}" /etc/hosts; then
         sudo python3 -c "
 import re
 with open('/etc/hosts', 'r') as f:
     content = f.read()
 content = re.sub(
-    r'# BEGIN mit-learn-dev local-dev.*?# END mit-learn-dev local-dev\n?',
+    r'# BEGIN local-dev local-dev.*?# END local-dev local-dev\n?',
     '',
     content,
     flags=re.DOTALL,
@@ -134,16 +171,6 @@ else
     ok "No Pulumi state found (already cleaned up)."
 fi
 
-cd "${REPO_ROOT}"
-
-# Delete k3d cluster
-if k3d cluster list | grep -q "${CLUSTER_NAME}"; then
-    log "Deleting k3d cluster '${CLUSTER_NAME}'..."
-    k3d cluster delete "${CLUSTER_NAME}"
-    ok "k3d cluster deleted."
-else
-    warn "k3d cluster '${CLUSTER_NAME}' not found — nothing to delete."
-fi
 
 echo ""
 echo "Teardown complete. Run ./local-dev/scripts/setup.sh to start fresh."

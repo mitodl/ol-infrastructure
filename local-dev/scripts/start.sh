@@ -17,7 +17,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-CLUSTER_NAME="mit-learn-dev"
+CLUSTER_NAME="local-dev"
 
 # ---------------------------------------------------------------------------
 # Helpers

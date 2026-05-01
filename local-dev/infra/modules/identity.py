@@ -14,8 +14,9 @@ import pulumi_keycloak as keycloak
 import pulumi_kubernetes as k8s
 import requests
 import yaml as pyyaml
-from keycloak import create_olapps_dev_realm
 from pulumi import Output, ResourceOptions
+
+from .keycloak import create_olapps_dev_realm
 
 
 @dataclass

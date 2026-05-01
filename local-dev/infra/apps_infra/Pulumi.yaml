@@ -1,0 +1,9 @@
+---
+name: ol-local-dev-apps-infra
+runtime: python
+description: >
+  Applications infrastructure for the MIT Learn local development environment.
+  Provisions databases and Keycloak realm resources that depend on the core
+  infrastructure stack. Must be deployed after core stack is ready.
+backend:
+  url: file://../.pulumi

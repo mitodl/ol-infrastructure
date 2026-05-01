@@ -148,14 +148,26 @@ APPS = [
 ]
 
 # ---------------------------------------------------------------------------
-# Shared infrastructure (Pulumi stack)
+# Shared infrastructure (Pulumi stacks)
 # ---------------------------------------------------------------------------
+
+# Core stack (operators, foundational services, Keycloak instance)
 local_resource(
-    "local-infra",
-    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' pulumi up --yes --skip-preview --logtostderr --stack local-dev.infra.Dev".format(rd=root_domain),
-    dir="./local-dev/infra",
-    deps=["./local-dev/infra"],
+    "local-infra-core",
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'pulumi stack init local-dev.core.Dev 2>/dev/null; pulumi refresh --yes --skip-preview --stack local-dev.core.Dev && pulumi up --yes --skip-preview --logtostderr --stack local-dev.core.Dev'".format(rd=root_domain),
+    dir="./local-dev/infra/core",
+    deps=["./local-dev/infra/modules", "./local-dev/infra/core/__main__.py"],
     labels=["infra"],
+)
+
+# Apps infrastructure stack (databases, Keycloak realm) — depends on core
+local_resource(
+    "local-infra-apps",
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi refresh --yes --skip-preview --stack local-dev.apps-infra.Dev && pulumi up --yes --skip-preview --logtostderr --stack local-dev.apps-infra.Dev'".format(rd=root_domain),
+    dir="./local-dev/infra/apps_infra",
+    deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py"],
+    labels=["infra"],
+    resource_deps=["local-infra-core"],
 )
 
 # ---------------------------------------------------------------------------

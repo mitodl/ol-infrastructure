@@ -3,7 +3,7 @@
 #
 # What this script does:
 #   1. Validates prerequisites (Docker, kubectl, k3d, tilt, helm, mkcert, pulumi)
-#   2. Creates the k3d cluster (mit-learn-dev) with local image registry
+#   2. Creates the k3d cluster (local-dev) with local image registry
 #   3. Generates mkcert TLS certificates for all local .dev hostnames
 #   4. Adds /etc/hosts entries for all local hostnames
 #
@@ -18,7 +18,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 K3D_CONFIG="${REPO_ROOT}/local-dev/cluster/k3d-config.yaml"
-CLUSTER_NAME="mit-learn-dev"
+CLUSTER_NAME="local-dev"
 
 # ---------------------------------------------------------------------------
 # Root domain configuration
@@ -174,13 +174,13 @@ _update_windows_hosts() {
     fi
 
     # Idempotent: remove any existing block first.
-    if grep -q "# BEGIN mit-learn-dev local-dev" "$win_hosts" 2>/dev/null; then
+    if grep -q "# BEGIN local-dev local-dev" "$win_hosts" 2>/dev/null; then
         python3 -c "
 import re
 with open('${win_hosts}', 'r') as f:
     content = f.read()
 content = re.sub(
-    r'# BEGIN mit-learn-dev local-dev.*?# END mit-learn-dev local-dev\n?',
+    r'# BEGIN local-dev local-dev.*?# END local-dev local-dev\n?',
     '',
     content,
     flags=re.DOTALL,
@@ -316,8 +316,8 @@ else
     # k3d load balancer always listens on 127.0.0.1 for the exposed ports
     INGRESS_IP="127.0.0.1"
 
-    HOSTS_BLOCK_START="# BEGIN mit-learn-dev local-dev"
-    HOSTS_BLOCK_END="# END mit-learn-dev local-dev"
+    HOSTS_BLOCK_START="# BEGIN local-dev local-dev"
+    HOSTS_BLOCK_END="# END local-dev local-dev"
 
     # Build the new hosts block
     HOSTS_BLOCK="${HOSTS_BLOCK_START}"$'\n'
