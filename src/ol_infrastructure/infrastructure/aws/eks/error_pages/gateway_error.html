@@ -405,7 +405,13 @@
 
         /* ── Countdown + redirect (auth scenario only) ───────────────────── */
         var homeLink = document.getElementById("home-link");
-        var homeUrl = window.location.origin + "/";
+
+        /* Strip API subdomain to return to frontend domain */
+        var hostname = window.location.hostname;
+        if (hostname.startsWith("api.")) {
+          hostname = hostname.substring(4);
+        }
+        var homeUrl = window.location.protocol + "//" + hostname + "/";
 
         /* Button points to home page for all scenarios */
         if (homeLink) { homeLink.href = homeUrl; }
