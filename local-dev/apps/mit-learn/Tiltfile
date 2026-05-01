@@ -60,7 +60,7 @@ k8s_yaml([
 k8s_resource(
     "mitlearn-webapp",
     labels=["mit-learn"],
-    resource_deps=["local-infra"],
+    resource_deps=["local-infra-apps"],
     port_forwards=[
         "18061:8060",  # nginx → host port 18061
     ],
