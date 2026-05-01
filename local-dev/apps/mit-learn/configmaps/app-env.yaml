@@ -80,6 +80,7 @@ data:
   CELERY_TASK_ALWAYS_EAGER: "False"
 
   # ── OpenSearch ─────────────────────────────────────────────────────────────
+  OPENSEARCH_INDEX: "mitlearn-local"
   OPENSEARCH_URL: "http://opensearch-master.local-infra.svc.cluster.local:9200"
   OPENSEARCH_DEFAULT_TIMEOUT: "30"
   OPENSEARCH_INDEXING_CHUNK_SIZE: "75"
