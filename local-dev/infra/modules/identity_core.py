@@ -188,7 +188,7 @@ def create_identity_core(  # noqa: PLR0913
                 {"name": "spi-email-smtp-starttls", "value": "false"},
             ],
             "resources": {
-                "limits": {"memory": "1.5Gi"},
+                "limits": {"memory": "2Gi"},
             },
             "unsupported": {
                 "podTemplate": {
