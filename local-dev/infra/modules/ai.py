@@ -92,7 +92,9 @@ def create_ai_services(
                 },
             },
         },
-        opts=_k8s(parent=local_infra_ns, depends_on=[config_cm, pg_cluster]),
+        opts=_k8s(
+            parent=local_infra_ns, depends_on=[d for d in [config_cm, pg_cluster] if d]
+        ),
     )
 
     k8s.core.v1.Service(

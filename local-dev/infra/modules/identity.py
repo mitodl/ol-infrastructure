@@ -200,7 +200,9 @@ def create_identity(  # noqa: PLR0913
         },
         opts=_k8s(
             parent=local_infra_ns,
-            depends_on=[operator, pg_cluster, mailpit_deployment, admin_secret],
+            depends_on=[
+                d for d in [operator, pg_cluster, mailpit_deployment, admin_secret] if d
+            ],
         ),
     )
 
