@@ -255,8 +255,8 @@ def setup_apisix(
                             "cookie_bytes=$cookie_bytes "
                             "cookie_count=$cookie_count "
                             "oidc_session_bytes=$oidc_session_bytes "
-                            "cookie_names=$cookie_names "
-                            "cookie_sizes=$cookie_sizes",
+                            'cookie_names="$cookie_names" '
+                            'cookie_sizes="$cookie_sizes"',
                             "accessLogFormatEscape": "default",
                             "errorLog": "/dev/stderr",
                             "errorLogLevel": "warn",
@@ -275,64 +275,43 @@ def setup_apisix(
                                 set $session_compressor zlib;
                                 set $session_name {session_cookie_name};
 
-                                set_by_lua_block $cookie_bytes {{
-                                    return #(ngx.var.http_cookie or "")
-                                }}
-                                set_by_lua_block $cookie_count {{
-                                    local cookie = ngx.var.http_cookie or ""
-                                    if cookie == "" then return "0" end
-                                    local count = 0
-                                    for pair in (cookie .. ";"):gmatch("([^;]*);") do
-                                        local name = pair:match("^%s*([^=]+)=")
-                                        if name and name:match("%S") then
-                                            count = count + 1
-                                        end
-                                    end
-                                    return tostring(count)
-                                }}
-                                set_by_lua_block $oidc_session_bytes {{
+                                set $cookie_bytes 0;
+                                set $cookie_count 0;
+                                set $oidc_session_bytes 0;
+                                set $cookie_names "";
+                                set $cookie_sizes "";
+
+                                -- Parse the Cookie request header exactly once per request and
+                                -- populate all telemetry variables.  APISix does not use
+                                -- rewrite_by_lua_block in its server block so this is safe.
+                                rewrite_by_lua_block {{
+                                    local raw = ngx.var.http_cookie or ""
+                                    ngx.var.cookie_bytes = tostring(#raw)
+                                    if raw == "" then return end
                                     local session_name = ngx.var.session_name or ""
-                                    if session_name == "" then return "0" end
-                                    local all = ngx.var.http_cookie or ""
-                                    for pair in (all .. ";"):gmatch("([^;]+);") do
+                                    local count = 0
+                                    local names = {{}}
+                                    local sizes = {{}}
+                                    local oidc_bytes = 0
+                                    for pair in (raw .. ";"):gmatch("([^;]+);") do
                                         local name, val = pair:match("^%s*([^=]+)=(.*)")
                                         if name then
                                             local trimmed_name = name:match("^%s*(.-)%s*$")
-                                            if trimmed_name == session_name then
-                                                return tostring(#(trimmed_name .. "=" .. val))
+                                            if trimmed_name ~= "" then
+                                                count = count + 1
+                                                local trimmed_pair = pair:match("^%s*(.-)%s*$")
+                                                table.insert(names, trimmed_name)
+                                                table.insert(sizes, trimmed_name .. ":" .. tostring(#trimmed_pair))
+                                                if trimmed_name == session_name then
+                                                    oidc_bytes = #(trimmed_name .. "=" .. val)
+                                                end
                                             end
                                         end
                                     end
-                                    return "0"
-                                }}
-                                set_by_lua_block $cookie_names {{
-                                    local cookie = ngx.var.http_cookie or ""
-                                    local names = {{}}
-                                    for pair in (cookie .. ";"):gmatch("([^;]+);") do
-                                        local name = pair:match("^%s*([^=]+)=")
-                                        if name then
-                                            name = name:match("^%s*(.-)%s*$")
-                                            table.insert(names, name)
-                                        end
-                                    end
-                                    return table.concat(names, ",")
-                                }}
-                                -- cookie_sizes logs each cookie name with its byte count as name:BYTES
-                                -- pairs (e.g. _csrf:64,session_id:4096).  Cookie request headers do
-                                -- NOT carry the domain/path the cookie was set on; use host= in the
-                                -- surrounding log line to correlate which destination received them.
-                                set_by_lua_block $cookie_sizes {{
-                                    local cookie = ngx.var.http_cookie or ""
-                                    local parts = {{}}
-                                    for pair in (cookie .. ";"):gmatch("([^;]+);") do
-                                        local name = pair:match("^%s*([^=]+)=")
-                                        if name then
-                                            local trimmed_name = name:match("^%s*(.-)%s*$")
-                                            local trimmed_pair = pair:match("^%s*(.-)%s*$")
-                                            table.insert(parts, trimmed_name .. ":" .. tostring(#trimmed_pair))
-                                        end
-                                    end
-                                    return table.concat(parts, ",")
+                                    ngx.var.cookie_count = tostring(count)
+                                    ngx.var.oidc_session_bytes = tostring(oidc_bytes)
+                                    ngx.var.cookie_names = table.concat(names, ",")
+                                    ngx.var.cookie_sizes = table.concat(sizes, ",")
                                 }}
 
                                 # Serve a branded error page for gateway-level errors (HTTP 400/431

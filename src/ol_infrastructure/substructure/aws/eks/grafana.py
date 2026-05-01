@@ -16,27 +16,28 @@ def _apisix_cookie_metrics_alloy_config() -> str:
 
     This string is injected into the loki.process "pod_logs" component by the
     k8s-monitoring chart via podLogsViaLoki.extraLogProcessingStages. It runs
-    after the standard relabeling stages so stream labels (e.g.
-    app_kubernetes_io_name) are already available.
+    after the standard relabeling stages so retained stream labels (e.g.
+    service, namespace, and container) are already available.
 
-    The APISix access log format appends these fields at the end of each line:
-      cookie_bytes=NNN cookie_count=N oidc_session_bytes=NNN cookie_names=name1,name2
+    The APISix access log format appends cookie telemetry at the end of each
+    line. This pipeline extracts the three numeric fields:
+      cookie_bytes=NNN cookie_count=N oidc_session_bytes=NNN
 
     The stage.metrics blocks emit Prometheus histograms that Alloy exposes on
     its own metrics endpoint (:12345/metrics), from where they are scraped and
     forwarded to Grafana Cloud Prometheus.
 
-    Privacy: only byte counts and cookie name keys are captured; cookie values
-    are never logged or extracted.
+    Privacy: only numeric cookie metrics are extracted; cookie values are never
+    logged or extracted.
     """
     return r"""
 stage.match {
   selector = "{service=\"apisix\"} |= \"cookie_bytes=\""
   pipeline_name = "apisix_cookie_metrics"
 
-  // Extract host, status, and the four cookie fields appended at the end of
-  // each APISix access log line. host and status appear early in the line;
-  // the cookie fields are always at the tail after request="...".
+  // Extract host, status, and the three numeric cookie fields appended at the
+  // end of each APISix access log line. host and status appear early in the
+  // line; the cookie fields are always at the tail after request="...".
   stage.regex {
     expression = `.*\bhost=(?P<host>\S+).*\bstatus=(?P<status>\d+).*\bcookie_bytes=(?P<cookie_bytes>\d+)\s+cookie_count=(?P<cookie_count>\d+)\s+oidc_session_bytes=(?P<oidc_session_bytes>\d+)`
   }
