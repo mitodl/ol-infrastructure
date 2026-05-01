@@ -2,9 +2,7 @@
 MIT Learn Local Dev — Applications Infrastructure Pulumi Stack.
 
 Provisions resources that depend on the core infrastructure stack being deployed first:
-  - CNPG PostgreSQL cluster (depends on CNPG operator from core)
   - Keycloak olapps realm (depends on Keycloak instance from core)
-  - APISIX routes to applications
 
 This stack should be deployed after the core stack is ready.
 """
@@ -14,14 +12,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import pulumi
 import pulumi_keycloak as keycloak
 import pulumi_kubernetes as k8s
 
 # Add parent directory to sys.path to import shared modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from modules.database import create_database
 from modules.helpers import make_resource_opts
 from modules.keycloak import create_olapps_dev_realm
 from pulumi import Config
@@ -51,8 +47,6 @@ unified_ecommerce_client_secret = config.require_secret(
 )
 apisix_oidc_session_secret = config.require_secret("apisix_oidc_session_secret")
 
-cnpg_version = config.get("cnpg_version") or "0.23.0"
-
 _infra_dir = Path(__file__).parent.parent
 _repo_root = _infra_dir.parent.parent
 
@@ -76,12 +70,6 @@ local_infra_ns = k8s.core.v1.Namespace.get(
     id="local-infra",
     opts=_k8s(),
 )
-
-# ---------------------------------------------------------------------------
-# Database cluster (depends on CNPG operator from core stack)
-# ---------------------------------------------------------------------------
-
-db = create_database(_k8s, local_infra_ns, cnpg_version)
 
 # ---------------------------------------------------------------------------
 # Keycloak realm (depends on Keycloak instance from core stack)
@@ -110,7 +98,7 @@ create_olapps_dev_realm(
 )
 
 # ---------------------------------------------------------------------------
-# Stack outputs (consumed by app Tiltfiles)
+# Stack outputs
 # ---------------------------------------------------------------------------
 
-pulumi.export("postgres_host", "local-pg-rw.local-infra.svc.cluster.local")
+# No outputs for apps-infra; realm configuration is consumed by cluster applications

@@ -5,15 +5,15 @@ Provisions the foundational layer for the local k3d development environment:
   - Namespaces
   - TLS/cert-manager
   - APISIX ingress controller (Helm)
-  - CNPG operator (database operator — cluster created by apps-infra stack)
-  - Keycloak operator
-  - Keycloak instance (CR backed by CNPG cluster created by apps-infra)
+  - CNPG operator + cluster (database)
+  - Keycloak operator and instance
   - Cache (Valkey StatefulSet)
   - Search (OpenSearch Helm)
   - AI services (Qdrant, Tika, LiteLLM)
   - Messaging (Mailpit)
 
 The apps-infra stack depends on this core stack being deployed first.
+It provisions the Keycloak realm and any other app-specific resources.
 """
 
 import os
@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from modules.ai import create_ai_services
 from modules.cache import create_cache
+from modules.database import create_database
 from modules.helpers import make_resource_opts
 from modules.identity_core import create_identity_core
 from modules.ingress import create_ingress
@@ -113,6 +114,9 @@ create_ai_services(_k8s, namespaces["local-infra"], None, _infra_dir)
 
 messaging = create_messaging(_k8s, namespaces["local-infra"])
 
+# Create database cluster (needed by Keycloak instance) before identity
+db = create_database(_k8s, namespaces["local-infra"], cnpg_version)
+
 # Deploy Keycloak operator and instance (but not realm — that's in apps-infra)
 identity = create_identity_core(
     _k8s=_k8s,
@@ -132,6 +136,7 @@ identity = create_identity_core(
 
 pulumi.export("keycloak_url", keycloak_url)
 pulumi.export("keycloak_hostname", keycloak_hostname)
+pulumi.export("postgres_host", "local-pg-rw.local-infra.svc.cluster.local")
 pulumi.export("valkey_host", "valkey.local-infra.svc.cluster.local")
 pulumi.export("qdrant_url", "http://qdrant.local-infra.svc.cluster.local:6333")
 pulumi.export(
