@@ -174,7 +174,6 @@ def create_identity_core(  # noqa: PLR0913
                     "spec": {
                         "containers": [
                             {
-                                "name": "keycloak",
                                 "env": [
                                     # Image has OTel compiled in at build time.
                                     # Without a receiver, SDK init timeouts
