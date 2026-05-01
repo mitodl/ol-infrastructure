@@ -25,17 +25,17 @@ from typing import Any
 
 import pulumi
 import pulumi_kubernetes as k8s
-from ai import create_ai_services
-from cache import create_cache
-from database import create_database
-from helpers import make_resource_opts
-from identity import create_identity
-from ingress import create_ingress
-from messaging import create_messaging
-from namespaces import create_namespaces
+from modules.ai import create_ai_services
+from modules.cache import create_cache
+from modules.database import create_database
+from modules.helpers import make_resource_opts
+from modules.identity import create_identity
+from modules.ingress import create_ingress
+from modules.messaging import create_messaging
+from modules.namespaces import create_namespaces
+from modules.search import create_search
+from modules.tls import create_tls_resources
 from pulumi import Config
-from search import create_search
-from tls import create_tls_resources
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -134,7 +134,6 @@ create_identity(
     keycloak_operator_version=keycloak_operator_version,
     keycloak_hostname=keycloak_hostname,
     keycloak_url=keycloak_url,
-    root_domain=root_domain,
     mitlearn_client_secret=mitlearn_client_secret,
     learn_ai_client_secret=learn_ai_client_secret,
     mitxonline_client_secret=mitxonline_client_secret,
