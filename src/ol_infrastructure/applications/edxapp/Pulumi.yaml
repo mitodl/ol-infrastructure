@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-edxapp-application
+name: ol-application-edxapp
 runtime: python
 description: Create and manage resources for powering the Open edX application
 backend:

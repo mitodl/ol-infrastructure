@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-codejail-server
+name: ol-application-codejail
 runtime: python
 description: Manage deployment of an codejail server
 backend:

@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-vector-log-proxy-server
+name: ol-infrastructure-vector-log-proxy
 runtime: python
 description: Manage deployment of a vector-log-proxy server for routing logs to Grafana
 backend:

@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-open_discussions-application
+name: ol-application-open-discussions
 runtime: python
 description: Manage infrastructure required by the Open Discussions application
 backend:

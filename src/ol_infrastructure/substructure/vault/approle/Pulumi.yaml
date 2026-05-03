@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-vault-approles
+name: ol-substructure-vault-approles
 runtime: python
 description: Pulumi project for managing Vault AppRoles
 backend:

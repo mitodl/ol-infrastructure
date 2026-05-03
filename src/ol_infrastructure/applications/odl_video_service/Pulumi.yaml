@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-odl-video-service-env
+name: ol-application-odl-video-service
 runtime: python
 description: Manage deployment of an odl-video-service environment
 backend:

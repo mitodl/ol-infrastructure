@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-mitlearn-application
+name: ol-application-mit-learn
 runtime: python
 description: Manage infrastructure required by the MIT Learn application
 backend:

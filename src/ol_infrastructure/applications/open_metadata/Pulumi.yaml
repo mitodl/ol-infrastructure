@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-open_metadata-application
+name: ol-application-open-metadata
 runtime: python
 description: MIT OL Open Metadata Service
 backend:

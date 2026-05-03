@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-vault-pki
+name: ol-substructure-vault-pki
 runtime: python
 description: Pulumi project for managing Vault PKI
 backend:

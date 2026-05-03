@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-bootcamps-ecommerce-application
+name: ol-application-bootcamps
 runtime: python
 description: Pulumi project to manage the infrastructure resources needed by the bootcamps
   ecommerce application

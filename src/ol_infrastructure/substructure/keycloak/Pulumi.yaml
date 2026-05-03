@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-substructure-keycloak
+name: ol-substructure-keycloak
 runtime: python
 description: A project for managing Keycloak configuration
 backend:

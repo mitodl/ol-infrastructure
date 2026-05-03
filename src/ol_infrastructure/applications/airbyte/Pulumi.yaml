@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-airbyte-server
+name: ol-application-airbyte
 runtime: python
 description: Manage deployment of an airbyte server
 backend:

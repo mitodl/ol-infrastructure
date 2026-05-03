@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-learn_ai-application
+name: ol-application-learn-ai
 runtime: python
 description: MIT OL Learn AI
 backend:

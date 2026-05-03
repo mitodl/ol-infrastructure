@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-kubewatch-webhook-handler
+name: ol-application-kubewatch-webhook
 runtime: python
 description: Custom webhook handler for kubewatch to provide rich Slack notifications
   with deployment details

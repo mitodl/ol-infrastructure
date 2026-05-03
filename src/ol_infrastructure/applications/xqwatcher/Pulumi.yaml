@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-xqwatcher-server
+name: ol-application-xqwatcher
 runtime: python
 description: Manage deployment of a xqwatcher server
 backend:

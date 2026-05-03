@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-fastly-redirector
+name: ol-application-fastly-redirector
 runtime: python
 description: Fastly service for managing arbitrary redirects in a serverless fashion
 backend:

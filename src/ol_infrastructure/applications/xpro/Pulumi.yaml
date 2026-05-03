@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-xpro-application
+name: ol-application-xpro
 runtime: python
 description: Pulumi project to manage the infrastructure resources needed by the XPro
   application.

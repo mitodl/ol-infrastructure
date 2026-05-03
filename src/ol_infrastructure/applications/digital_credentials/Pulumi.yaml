@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-digital-credentials-application
+name: ol-application-digital-credentials
 runtime: python
 description: Services to support the creation and validation of digitally signed verifiable
   credentials

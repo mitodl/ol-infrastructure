@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-starburst-application
+name: ol-application-starburst
 runtime: python
 description: Pulumi project for managing Starburst roles and permissions based on
   dbt project structure

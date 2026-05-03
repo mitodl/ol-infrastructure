@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-superset-application
+name: ol-application-superset
 runtime: python
 description: Provision and maintain the infrastructure required to run the Apache
   Superset business intelligence application

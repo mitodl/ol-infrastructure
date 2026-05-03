@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-micromasters-application
+name: ol-application-micromasters
 runtime: python
 description: Pulumi project for deploying the stack of services needed by the micromasters
   application
