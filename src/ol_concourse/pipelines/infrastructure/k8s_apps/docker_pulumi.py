@@ -211,8 +211,8 @@ def _define_pulumi_resources(
     """Define the Pulumi resource type and resource."""
     pulumi_resource_type = pulumi_provisioner_resource()
     pulumi_resource = pulumi_provisioner(
-        name=Identifier(f"pulumi-ol-infrastructure-{app_name}-application"),
-        project_name=f"ol-infrastructure-{app_name}-application",
+        name=Identifier(f"pulumi-ol-application-{app_name}"),
+        project_name=f"ol-application-{app_name}",
         project_path=(
             f"{ol_infra_repo_name}/src/ol_infrastructure/applications/"
             f"{app_name.replace('-', '_')}"
@@ -405,8 +405,8 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     # CI Deployment
     ci_fragment = pulumi_job(
         pulumi_code=ol_infra_repo,
-        stack_name=f"applications.{app_name.replace('-', '_')}.CI",
-        project_name=f"ol-infrastructure-{app_name}-application",
+        stack_name="CI",
+        project_name=f"ol-application-{app_name}",
         project_source_path=(
             f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}"
         ),
@@ -496,11 +496,8 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     # QA and Production Deployments
     qa_and_production_fragment = pulumi_jobs_chain(
         pulumi_code=ol_infra_repo,
-        stack_names=[
-            f"applications.{app_name.replace('-', '_')}.QA",
-            f"applications.{app_name.replace('-', '_')}.Production",
-        ],
-        project_name=f"ol-infrastructure-{app_name}-application",
+        stack_names=["QA", "Production"],
+        project_name=f"ol-application-{app_name}",
         project_source_path=(
             f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}"
         ),

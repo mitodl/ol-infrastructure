@@ -43,10 +43,8 @@ def build_keycloak_substructure_pipeline() -> PipelineFragment:
     )
     substructure_fragment = pulumi_jobs_chain(
         pulumi_code=keycloak_pulumi_code,
-        stack_names=[
-            f"substructure.keycloak.{env}" for env in ("CI", "QA", "Production")
-        ],
-        project_name="ol-infrastructure-substructure-keycloak",
+        stack_names=["CI", "QA", "Production"],
+        project_name="ol-substructure-keycloak",
         project_source_path=PULUMI_CODE_PATH.joinpath("substructure/keycloak/"),
     )
     substructure_fragment.resources.append(keycloak_pulumi_code)
@@ -216,15 +214,8 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
 
     pulumi_fragment = pulumi_jobs_chain(
         keycloak_pulumi_code,
-        stack_names=[
-            f"applications.keycloak.{stage}"
-            for stage in [
-                "CI",
-                "QA",
-                "Production",
-            ]
-        ],
-        project_name="ol-infrastructure-keycloak",
+        stack_names=["CI", "QA", "Production"],
+        project_name="ol-application-keycloak",
         project_source_path=PULUMI_CODE_PATH.joinpath(
             "applications/keycloak",
         ),

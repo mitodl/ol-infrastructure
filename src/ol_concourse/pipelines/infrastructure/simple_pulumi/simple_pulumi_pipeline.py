@@ -48,11 +48,16 @@ class SimplePulumiParams(BaseModel):
     Attributes:
         app_name: The name of the application/service.
         pulumi_project_path: Path to Pulumi project relative to src/ol_infrastructure/.
-        stack_prefix: Prefix for Pulumi stack names (e.g., "applications.tika").
-        pulumi_project_name: Name of the Pulumi project.
+        pulumi_project_name: Name of the Pulumi project (e.g. "ol-application-tika").
+        stack_prefix: Short deployment-scope discriminator that appears before the
+                      stage in the stack name (e.g. "mitlearn" for qdrant-cloud →
+                      stack name "mitlearn.QA", "operations" for vector-log-proxy →
+                      "operations.QA"). Leave empty for single-tenant projects whose
+                      stack names are just the stage (e.g. "QA", "Production").
+                      Not used when deployment_groups is set.
         stages: List of deployment stages (default: ["CI", "QA", "Production"]).
         deployment_groups: List of deployment group names for multi-group deployments
-                          (e.g., ["mitx", "mitxonline", "xpro"] for mongodb_atlas).
+                          (e.g. ["mitx", "mitxonline", "xpro"] for mongodb_atlas).
                           If specified, auto_discover_stacks will be used.
         auto_discover_stacks: If True, automatically discover stacks from repo
                              (default: False unless deployment_groups is set).
@@ -60,19 +65,19 @@ class SimplePulumiParams(BaseModel):
         branch: Git branch to watch (default: "main").
         docker_image: Optional Docker image configuration for apps that depend on
                      external Docker images.
-        prior_stage_stack: Full stack name of the preceding stage that runs in a
-                          different Concourse environment (e.g. QA stack when this
-                          pipeline only runs the Production stage in prod Concourse).
-                          When set, a GitHub issues trigger resource is added so this
-                          pipeline gates on the prior stage's deployment issue being
-                          closed, preserving the same promotion workflow used within a
-                          single chained pipeline.
+        prior_stage_stack: Short stack name of the preceding stage that runs in a
+                          different Concourse environment (e.g. "lakehouse.QA" when
+                          this pipeline only runs the Production stage in prod
+                          Concourse). When set, a GitHub issues trigger resource is
+                          added so this pipeline gates on the prior stage's deployment
+                          issue being closed, preserving the same promotion workflow
+                          used within a single chained pipeline.
     """
 
     app_name: str
     pulumi_project_path: str
-    stack_prefix: str
-    pulumi_project_name: str | None = None
+    pulumi_project_name: str
+    stack_prefix: str = ""
     stages: list[str] = ["CI", "QA", "Production"]
     deployment_groups: list[str] | None = None
     auto_discover_stacks: bool = False
@@ -85,8 +90,6 @@ class SimplePulumiParams(BaseModel):
     @classmethod
     def set_defaults(cls, data: dict[str, Any]) -> dict[str, Any]:
         """Set default values for optional fields."""
-        if not data.get("pulumi_project_name"):
-            data["pulumi_project_name"] = f"ol-infrastructure-{data['app_name']}"
         # Auto-enable stack discovery if deployment_groups is specified
         if data.get("deployment_groups") and not data.get("auto_discover_stacks"):
             data["auto_discover_stacks"] = True
@@ -94,13 +97,12 @@ class SimplePulumiParams(BaseModel):
 
 
 def discover_pulumi_stacks(
-    project_path: Path, stack_prefix: str, deployment_groups: list[str] | None = None
+    project_path: Path, deployment_groups: list[str] | None = None
 ) -> dict[str, list[str]] | list[str]:
     """Discover Pulumi stacks from the filesystem.
 
     Args:
         project_path: Path to the Pulumi project directory.
-        stack_prefix: Stack prefix to match (e.g., "infrastructure.mongodb_atlas").
         deployment_groups: Optional list of deployment groups to discover.
 
     Returns:
@@ -108,7 +110,7 @@ def discover_pulumi_stacks(
         stack names for that group (sorted by stage: CI → QA → Production).
         If deployment_groups is None: List of stack names sorted by stage.
     """
-    stack_files = list(project_path.glob(f"Pulumi.{stack_prefix}.*.yaml"))
+    stack_files = list(project_path.glob("Pulumi.*.yaml"))
 
     stacks = []
     for stack_file in stack_files:
@@ -130,11 +132,7 @@ def discover_pulumi_stacks(
     if deployment_groups:
         grouped_stacks: dict[str, list[str]] = {}
         for group in deployment_groups:
-            group_stacks = [
-                stack
-                for stack in stacks
-                if stack.startswith(f"{stack_prefix}.{group}.")
-            ]
+            group_stacks = [stack for stack in stacks if stack.startswith(f"{group}.")]
             # Sort by stage priority within group
             group_stacks.sort(key=get_stage_priority)
             if group_stacks:
@@ -146,13 +144,11 @@ def discover_pulumi_stacks(
         return stacks
 
 
-# Pipeline parameter configurations for each app
 pipeline_params: dict[str, SimplePulumiParams] = {
     "airbyte": SimplePulumiParams(
         app_name="airbyte",
         pulumi_project_path="applications/airbyte/",
-        pulumi_project_name="ol-infrastructure-airbyte-server",
-        stack_prefix="applications.airbyte",
+        pulumi_project_name="ol-application-airbyte",
         additional_watched_paths=[
             "src/bridge/secrets/airbyte/",
             "src/bridge/lib/versions.py",
@@ -161,8 +157,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
     "celery-monitoring": SimplePulumiParams(
         app_name="celery-monitoring",
         pulumi_project_path="applications/celery_monitoring/",
-        stack_prefix="applications.celery_monitoring",
-        pulumi_project_name="ol-infrastructure-celery-monitoring-server",
+        pulumi_project_name="ol-application-celery-monitoring",
         docker_image=DockerImageConfig(
             image_repository="kodhive/leek",
             image_tag="0.7.5",  # Must match LEEK_VERSION in bridge.lib.versions
@@ -171,47 +166,42 @@ pipeline_params: dict[str, SimplePulumiParams] = {
     "clickhouse": SimplePulumiParams(
         app_name="clickhouse",
         pulumi_project_path="applications/clickhouse/",
-        stack_prefix="applications.clickhouse",
-        pulumi_project_name="ol-infrastructure-clickhouse-application",
+        pulumi_project_name="ol-application-clickhouse",
         stages=["CI", "QA", "Production"],
     ),
     "data_warehouse": SimplePulumiParams(
         app_name="data_warehouse",
         pulumi_project_path="infrastructure/aws/data_warehouse/",
-        stack_prefix="infrastructure.aws.data_warehouse",
-        pulumi_project_name="ol-infrastructure-data_warehouse",
+        pulumi_project_name="ol-infrastructure-data-warehouse",
         stages=["QA", "Production"],
     ),
     "digital-credentials": SimplePulumiParams(
         app_name="digital-credentials",
         pulumi_project_path="applications/digital_credentials/",
-        stack_prefix="applications.digital_credentials",
+        pulumi_project_name="ol-application-digital-credentials",
         additional_watched_paths=["src/bridge/secrets/digital_credentials/"],
     ),
     "fastly-redirector": SimplePulumiParams(
         app_name="fastly-redirector",
         pulumi_project_path="applications/fastly_redirector/",
-        stack_prefix="applications.fastly_redirector",
-        pulumi_project_name="ol-infrastructure-fastly-redirector",
+        pulumi_project_name="ol-application-fastly-redirector",
     ),
     "mongodb-atlas": SimplePulumiParams(
         app_name="mongodb-atlas",
         pulumi_project_path="infrastructure/mongodb_atlas/",
-        stack_prefix="infrastructure.mongodb_atlas",
+        pulumi_project_name="ol-infrastructure-mongodb-atlas",
         deployment_groups=["mitx", "mitx-staging", "mitxonline", "xpro"],
     ),
     "open-discussions": SimplePulumiParams(
         app_name="open-discussions",
         pulumi_project_path="applications/open_discussions/",
-        stack_prefix="applications.open_discussions",
-        pulumi_project_name="ol-infrastructure-open_discussions-application",
+        pulumi_project_name="ol-application-open-discussions",
         stages=["QA", "Production"],
     ),
     "open-metadata": SimplePulumiParams(
         app_name="open-metadata",
         pulumi_project_path="applications/open_metadata/",
-        pulumi_project_name="ol-infrastructure-open_metadata-application",
-        stack_prefix="applications.open_metadata",
+        pulumi_project_name="ol-application-open-metadata",
         additional_watched_paths=[
             "src/bridge/secrets/open_metadata/",
             "src/bridge/lib/versions.py",
@@ -220,7 +210,6 @@ pipeline_params: dict[str, SimplePulumiParams] = {
     "opensearch": SimplePulumiParams(
         app_name="opensearch",
         pulumi_project_path="infrastructure/aws/opensearch/",
-        stack_prefix="infrastructure.aws.opensearch",
         pulumi_project_name="ol-infrastructure-opensearch",
         deployment_groups=[
             "apps",
@@ -237,8 +226,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
     "qdrant-cloud": SimplePulumiParams(
         app_name="qdrant-cloud",
         pulumi_project_path="infrastructure/qdrant_cloud/",
-        stack_prefix="infrastructure.qdrant_cloud.mitlearn",
         pulumi_project_name="ol-infrastructure-qdrant-cloud",
+        stack_prefix="mitlearn",
         additional_watched_paths=[
             "src/bridge/secrets/qdrant_cloud/",
             "src/bridge/lib/versions.py",
@@ -247,8 +236,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
     "starrocks": SimplePulumiParams(
         app_name="starrocks",
         pulumi_project_path="applications/starrocks/",
-        stack_prefix="applications.starrocks",
-        pulumi_project_name="ol-infrastructure-starrocks-application",
+        pulumi_project_name="ol-application-starrocks",
         deployment_groups=[
             "lakehouse",
         ],
@@ -261,19 +249,17 @@ pipeline_params: dict[str, SimplePulumiParams] = {
     "starrocks-substructure": SimplePulumiParams(
         app_name="starrocks_substructure",
         pulumi_project_path="substructure/starrocks/",
-        stack_prefix="substructure.starrocks",
-        pulumi_project_name="ol-infrastructure-substructure-starrocks",
+        pulumi_project_name="ol-substructure-starrocks",
         deployment_groups=[
             "lakehouse",
         ],
         stages=["Production"],
-        prior_stage_stack="substructure.starrocks.lakehouse.QA",
+        prior_stage_stack="lakehouse.QA",
     ),
     "starrocks-substructure-qa": SimplePulumiParams(
         app_name="starrocks_substructure",
         pulumi_project_path="substructure/starrocks/",
-        stack_prefix="substructure.starrocks",
-        pulumi_project_name="ol-infrastructure-substructure-starrocks",
+        pulumi_project_name="ol-substructure-starrocks",
         deployment_groups=[
             "lakehouse",
         ],
@@ -282,21 +268,19 @@ pipeline_params: dict[str, SimplePulumiParams] = {
     "tika": SimplePulumiParams(
         app_name="tika",
         pulumi_project_path="applications/tika/",
-        stack_prefix="applications.tika",
-        pulumi_project_name="ol-infrastructure-tika-server",
+        pulumi_project_name="ol-application-tika",
     ),
     "vector-log-proxy": SimplePulumiParams(
         app_name="vector-log-proxy",
         pulumi_project_path="infrastructure/vector_log_proxy/",
-        stack_prefix="infrastructure.vector_log_proxy.operations",
-        pulumi_project_name="ol-infrastructure-vector-log-proxy-server",
+        pulumi_project_name="ol-infrastructure-vector-log-proxy",
+        stack_prefix="operations",
     ),
     "xpro-partner-dns": SimplePulumiParams(
         app_name="xpro-partner-dns",
         pulumi_project_path="substructure/xpro_partner_dns/",
-        stack_prefix="substructure.xpro_partner_dns",
-        pulumi_project_name="ol-infrastructure-substructure-xpro-partner-dns",
-        stages=[""],
+        pulumi_project_name="ol-substructure-xpro-partner-dns",
+        stages=["default"],
     ),
 }
 
@@ -403,13 +387,10 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             repo_root / "src/ol_infrastructure" / params.pulumi_project_path
         )
         discovered_stacks = discover_pulumi_stacks(
-            project_full_path, params.stack_prefix, params.deployment_groups
+            project_full_path, params.deployment_groups
         )
         if not discovered_stacks:
-            msg = (
-                f"No stacks discovered for {app_name} at {project_full_path} "
-                f"with prefix {params.stack_prefix}"
-            )
+            msg = f"No stacks discovered for {app_name} at {project_full_path}"
             raise ValueError(msg)
 
         # Filter discovered stacks to only the configured stages.  This ensures
@@ -440,8 +421,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
         if not discovered_stacks:
             msg = (
                 f"No stacks discovered for {app_name} at {project_full_path} "
-                f"with prefix {params.stack_prefix} after filtering for "
-                f"stages {params.stages}"
+                f"after filtering for stages {params.stages}"
             )
             raise ValueError(msg)
 
@@ -509,9 +489,11 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 jobs=pulumi_fragment.jobs,
             )
     else:
-        # Use explicitly configured stages - single chain
+        # Use explicitly configured stages - single chain.
+        # When stack_prefix is set (e.g. "mitlearn", "operations"), the stack
+        # name is "{prefix}.{stage}"; otherwise it is just the stage.
         stack_names = [
-            params.stack_prefix if stage == "" else f"{params.stack_prefix}.{stage}"
+            f"{params.stack_prefix}.{stage}" if params.stack_prefix else stage
             for stage in params.stages
         ]
 
