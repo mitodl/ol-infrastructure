@@ -88,8 +88,8 @@ aws_config = AWSBase(
 
 k8s_global_labels = {
     "pulumi_managed": "true",
-    "pulumi_stack": stack_info.full_name,
-    "ol.mit.edu/stack": stack_info.full_name,
+    "pulumi_stack": stack_info.k8s_name,
+    "ol.mit.edu/stack": stack_info.k8s_name,
     "app.kubernetes.io/managed-by": "pulumi",
 }
 
