@@ -81,8 +81,10 @@ aws_config = AWSBase(
 
 k8s_global_labels = {
     "pulumi_managed": "true",
-    "pulumi_stack": stack_info.k8s_name,
-    "ol.mit.edu/stack": stack_info.k8s_name,
+    # Preserve the existing labels to avoid disruptions due to delete/create (2026-05-04
+    # TMM)
+    "pulumi_stack": f"infrastructure.aws.eks.{stack_info.env_prefix}.{stack_info.name}",
+    "ol.mit.edu/stack": f"infrastructure.aws.eks.{stack_info.env_prefix}.{stack_info.name}",  # noqa: E501
 }
 
 setup_vault_provider(stack_info)

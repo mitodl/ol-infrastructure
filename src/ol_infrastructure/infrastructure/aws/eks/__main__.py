@@ -561,7 +561,9 @@ node_access_entry = aws.eks.AccessEntry(
 # Initalize the k8s pulumi provider
 k8s_global_labels = {
     "pulumi_managed": "true",
-    "pulumi_stack": stack_info.k8s_name,
+    # Preserve the existing labels to avoid disruptions due to delete/create (2026-05-04
+    # TMM)
+    "pulumi_stack": f"infrastructure.aws.eks.{stack_info.env_prefix}.{stack_info.name}",
 }
 k8s_provider = kubernetes.Provider(
     "k8s-provider",
