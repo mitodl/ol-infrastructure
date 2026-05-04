@@ -192,7 +192,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_name="ol-infrastructure-mongodb-atlas",
         deployment_groups=["mitx", "mitx-staging", "mitxonline", "xpro"],
     ),
-    "ocw_site": SimplePulumiParams(
+    "ocw-site": SimplePulumiParams(
         app_name="ocw-site",
         pulumi_project_path="applications/ocw_site/",
         pulumi_project_name="ol-application-ocw-site",
