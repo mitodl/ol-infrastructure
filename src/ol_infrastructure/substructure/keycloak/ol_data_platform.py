@@ -222,7 +222,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0913, PLR0915
 
     # Create public client for CLI/interactive OAuth flows (no client secret needed)
     # This allows tools like superset-sup to use browser-based auth without secrets
-    keycloak.openid.Client(
+    ol_data_platform_superset_cli_client = keycloak.openid.Client(
         "ol-data-platform-superset-cli-client",
         name="ol-data-platform-superset-cli-client",
         realm_id=ol_data_platform_realm.id,
@@ -352,6 +352,23 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0913, PLR0915
         "ol-data-platform-superset-client-default-scopes",
         realm_id=ol_data_platform_realm.id,
         client_id=ol_data_platform_superset_client.id,
+        default_scopes=[
+            "acr",
+            "basic",
+            "email",
+            "ol_roles",
+            "openid",
+            "profile",
+            "roles",
+            "web-origins",
+        ],
+        opts=resource_options,
+    )
+
+    keycloak.openid.ClientDefaultScopes(
+        "ol-data-platform-superset-cli-client-default-scopes",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_superset_cli_client.id,
         default_scopes=[
             "acr",
             "basic",

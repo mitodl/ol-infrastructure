@@ -116,7 +116,7 @@ def build_superset_docker_pipeline() -> Pipeline:
 
     pulumi_fragment = pulumi_jobs_chain(
         pulumi_code_repo,
-        refresh_stack=False,
+        refresh_stack=True,
         stack_names=["CI", "QA", "Production"],
         project_name="ol-infrastructure-superset-server",
         project_source_path=PULUMI_CODE_PATH.joinpath("applications/superset/"),
