@@ -406,7 +406,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     ci_fragment = pulumi_job(
         pulumi_code=ol_infra_repo,
         stack_name="CI",
-        refresh_stack=False,
+        refresh_stack=True,
         project_name=f"ol-application-{app_name}",
         project_source_path=(
             f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}"
@@ -496,7 +496,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
 
     # QA and Production Deployments
     qa_and_production_fragment = pulumi_jobs_chain(
-        refresh_stack=False,
+        refresh_stack=True,
         pulumi_code=ol_infra_repo,
         stack_names=["QA", "Production"],
         project_name=f"ol-application-{app_name}",
