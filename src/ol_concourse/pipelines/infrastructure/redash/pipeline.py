@@ -40,7 +40,7 @@ redash_ami_fragment = packer_jobs(
 
 redash_pulumi_fragment = pulumi_jobs_chain(
     redash_pulumi_code,
-    refresh_stack=False,
+    refresh_stack=True,
     stack_names=["QA", "Production"],
     project_name="ol-infrastructure-redash-application",
     project_source_path=PULUMI_CODE_PATH.joinpath("applications/redash/"),

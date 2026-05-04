@@ -125,7 +125,7 @@ def build_notes_pipeline(
     for deployment in filter_deployments_by_release(release_name):
         pulumi_fragment = pulumi_jobs_chain(
             notes_pulumi_code,
-            refresh_stack=False,
+            refresh_stack=True,
             stack_names=[
                 f"{deployment.deployment_name}.{stage}"
                 for stage in deployment.envs_by_release(release_name)
