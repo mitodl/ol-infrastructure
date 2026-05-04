@@ -1,6 +1,6 @@
 ---
 secretsprovider: awskms://alias/infrastructure-secrets-production
-encryptedkey: ""
+encryptedkey: "AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwE0H/G0hWP33Yy56dW55symAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMyQaZtOgatLGrVGwvAgEQgDtpWl52q3vDnW1MisaLRc9TOGvO4tS8R6b8dlp1DOESI3rdu1c85LMyaYVU5dW5udkQAMJTIxNISWxUSA=="
 config:
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

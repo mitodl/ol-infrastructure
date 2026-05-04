@@ -1,6 +1,6 @@
 ---
 secretsprovider: awskms://alias/infrastructure-secrets-qa
-encryptedkey: ""
+encryptedkey: "AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgGoEj1l/e90rMjh8PKqy1DWAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMxl5Nd2PzaNEXvNEuAgEQgDvqOdk2BjcYO/Eiu1Jxtx4aBVF7dHS184NUw5tS4IapMcbxqM/NX2PbzPZNQj1wOd0Iv/ua/xpUSRMLuw=="
 config:
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
