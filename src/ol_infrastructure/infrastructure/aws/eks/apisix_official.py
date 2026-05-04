@@ -251,7 +251,12 @@ def setup_apisix(
                             'http_referer="$http_referer" '
                             'http_user_agent="$http_user_agent" '
                             "method=$request_method "
-                            'request="$request"',
+                            'request="$request" '
+                            "cookie_bytes=$cookie_bytes "
+                            "cookie_count=$cookie_count "
+                            "oidc_session_bytes=$oidc_session_bytes "
+                            'cookie_names="$cookie_names" '
+                            'cookie_sizes="$cookie_sizes"',
                             "accessLogFormatEscape": "default",
                             "errorLog": "/dev/stderr",
                             "errorLogLevel": "warn",
@@ -269,6 +274,45 @@ def setup_apisix(
                                 f"""\
                                 set $session_compressor zlib;
                                 set $session_name {session_cookie_name};
+
+                                set $cookie_bytes 0;
+                                set $cookie_count 0;
+                                set $oidc_session_bytes 0;
+                                set $cookie_names "";
+                                set $cookie_sizes "";
+
+                                -- Parse the Cookie request header exactly once per request and
+                                -- populate all telemetry variables.  APISix does not use
+                                -- rewrite_by_lua_block in its server block so this is safe.
+                                rewrite_by_lua_block {{
+                                    local raw = ngx.var.http_cookie or ""
+                                    ngx.var.cookie_bytes = tostring(#raw)
+                                    if raw == "" then return end
+                                    local session_name = ngx.var.session_name or ""
+                                    local count = 0
+                                    local names = {{}}
+                                    local sizes = {{}}
+                                    local oidc_bytes = 0
+                                    for pair in (raw .. ";"):gmatch("([^;]+);") do
+                                        local name, val = pair:match("^%s*([^=]+)=(.*)")
+                                        if name then
+                                            local trimmed_name = name:match("^%s*(.-)%s*$")
+                                            if trimmed_name ~= "" then
+                                                count = count + 1
+                                                local trimmed_pair = pair:match("^%s*(.-)%s*$")
+                                                table.insert(names, trimmed_name)
+                                                table.insert(sizes, trimmed_name .. ":" .. tostring(#trimmed_pair))
+                                                if trimmed_name == session_name then
+                                                    oidc_bytes = #(trimmed_name .. "=" .. val)
+                                                end
+                                            end
+                                        end
+                                    end
+                                    ngx.var.cookie_count = tostring(count)
+                                    ngx.var.oidc_session_bytes = tostring(oidc_bytes)
+                                    ngx.var.cookie_names = table.concat(names, ",")
+                                    ngx.var.cookie_sizes = table.concat(sizes, ",")
+                                }}
 
                                 # Serve a branded error page for gateway-level errors (HTTP 400/431
                                 # from oversized request headers, HTTP 500 from OIDC plugin failures,
