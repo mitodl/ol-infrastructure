@@ -1142,14 +1142,14 @@ wheels = [
 
 [[package]]
 name = "ol-concourse"
-version = "0.8.2"
+version = "0.8.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a0/c6/bf593b9b689a37f007ff81cb9a2ec714dd2f44ee755d03e765e8483766f0/ol_concourse-0.8.2.tar.gz", hash = "sha256:fd7d92235a0562016abd5acfcda8ab57337bc998e58b57429509260677292cb4", size = 44968, upload-time = "2026-05-04T13:02:23.628Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/60/58/b930e1ffd7eea4e33ac4969517651cd35f9026de9691ecdf414a1cbfde73/ol_concourse-0.8.3.tar.gz", hash = "sha256:eaf4f14a7d74a6563c1abf7e30fc54a87d134fcf0f350446fd88610a1c1420ca", size = 45488, upload-time = "2026-05-04T14:17:21.602Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5d/0e/26c0e3900c7f9fb22e9f24811a0e7ee06b8ad25922d151a0204bbf08d01e/ol_concourse-0.8.2-py3-none-any.whl", hash = "sha256:1a69d1dfb56ecadb119f3f9d8e7778de5c17414992e892b9f28b0bddce8dd414", size = 46865, upload-time = "2026-05-04T13:02:22.442Z" },
+    { url = "https://files.pythonhosted.org/packages/48/cb/ff32bad195086050fe55e4fd88e6a637ed19fb737f644f5ab75f23044a1c/ol_concourse-0.8.3-py3-none-any.whl", hash = "sha256:5fc8ea832ab69d4d7aae3c7bf36a747b50599817a2d2d7a9453ba9ffc11b835b", size = 47001, upload-time = "2026-05-04T14:17:20.422Z" },
 ]
 
 [[package]]
