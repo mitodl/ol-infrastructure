@@ -28,6 +28,7 @@ def mock_stack_info_mitx() -> StackInfo:
         env_prefix="mitx",
         env_suffix="qa",
         full_name="infrastructure.aws.edxapp.mitx",
+        k8s_name="ol-application-edxapp.mitx.QA",
         project_name="ol-application-edxapp",
     )
 
@@ -41,6 +42,7 @@ def mock_stack_info_xpro() -> StackInfo:
         env_prefix="xpro",
         env_suffix="qa",
         full_name="infrastructure.aws.edxapp.xpro",
+        k8s_name="ol-application-edxapp.xpro.QA",
         project_name="ol-application-edxapp",
     )
 
@@ -54,6 +56,7 @@ def mock_stack_info_mitxonline() -> StackInfo:
         env_prefix="mitxonline",
         env_suffix="qa",
         full_name="infrastructure.aws.edxapp.mitxonline",
+        k8s_name="ol-application-edxapp.mitxonline.QA",
         project_name="ol-application-edxapp",
     )
 
