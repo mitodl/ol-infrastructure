@@ -27,8 +27,8 @@ pulumi_jobs = pulumi_jobs_chain(
     refresh_stack=False,
     pulumi_code=ocw_site_pulumi_code,
     stack_names=[
-        "applications.ocw_site.QA",
-        "applications.ocw_site.Production",
+        "QA",
+        "Production",
     ],
     project_name="ol-infrastructure-ocw-site-application",
     project_source_path=PULUMI_CODE_PATH.joinpath("applications/ocw_site/"),

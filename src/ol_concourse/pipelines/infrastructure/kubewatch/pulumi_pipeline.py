@@ -74,10 +74,7 @@ def build_kubewatch_webhook_handler_pipeline() -> PipelineFragment:
     webhook_handler_fragment = pulumi_jobs_chain(
         refresh_stack=False,
         pulumi_code=webhook_handler_pulumi_code,
-        stack_names=[
-            f"applications.kubewatch_webhook_handler.applications.{env}"
-            for env in ("CI", "QA", "Production")
-        ],
+        stack_names=[f"applications.{env}" for env in ("CI", "QA", "Production")],
         project_name="ol-infrastructure-kubewatch-webhook-handler",
         project_source_path=PULUMI_CODE_PATH.joinpath(
             "applications/kubewatch_webhook_handler/"
@@ -133,10 +130,7 @@ def build_kubewatch_pipeline() -> PipelineFragment:
     kubewatch_fragment = pulumi_jobs_chain(
         refresh_stack=False,
         pulumi_code=kubewatch_pulumi_code,
-        stack_names=[
-            f"applications.kubewatch.applications.{env}"
-            for env in ("CI", "QA", "Production")
-        ],
+        stack_names=[f"applications.{env}" for env in ("CI", "QA", "Production")],
         project_name="ol-infrastructure-kubewatch",
         project_source_path=PULUMI_CODE_PATH.joinpath("applications/kubewatch/"),
         custom_dependencies=custom_dependencies,

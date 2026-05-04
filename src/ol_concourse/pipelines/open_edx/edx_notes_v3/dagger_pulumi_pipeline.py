@@ -127,7 +127,7 @@ def build_notes_pipeline(
             notes_pulumi_code,
             refresh_stack=False,
             stack_names=[
-                f"applications.edxnotes.{deployment.deployment_name}.{stage}"
+                f"{deployment.deployment_name}.{stage}"
                 for stage in deployment.envs_by_release(release_name)
             ],
             project_name="ol-infrastructure-notes-server",

@@ -99,7 +99,7 @@ def build_xqueue_pipeline(release_name: str):
             xqueue_pulumi_code,
             refresh_stack=False,
             stack_names=[
-                f"applications.xqueue.{deployment.deployment_name}.{stage}"
+                f"{deployment.deployment_name}.{stage}"
                 for stage in deployment.envs_by_release(release_name)
             ],
             project_name="ol-infrastructure-xqueue-server",
