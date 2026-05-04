@@ -26,7 +26,6 @@ from pulumi import (
     Config,
     Output,
     ResourceOptions,
-    StackReference,
     export,
 )
 from pulumi.invoke import InvokeOptions
@@ -87,11 +86,10 @@ FIVE_MINUTES = 60 * 5
 #####################
 # Stack Information #
 #####################
-cluster_stack_name = (
-    edxapp_config.get("cluster_stack")
-    or f"infrastructure.aws.eks.applications.{stack_info.name}"
+cluster_short_stack = (
+    edxapp_config.get("cluster_stack") or f"applications.{stack_info.name}"
 )
-cluster_stack = StackReference(cluster_stack_name)
+cluster_stack = make_stack_reference(projects.EKS, cluster_short_stack)
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
