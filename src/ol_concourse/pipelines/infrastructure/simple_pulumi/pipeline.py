@@ -221,6 +221,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             "src/bridge/secrets/open_metadata/",
             "src/bridge/lib/versions.py",
         ],
+        stages=["QA", "Production"],
     ),
     "opensearch": SimplePulumiParams(
         app_name="opensearch",
