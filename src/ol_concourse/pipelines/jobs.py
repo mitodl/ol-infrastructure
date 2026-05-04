@@ -22,6 +22,12 @@ def pulumi_jobs_chain(
     github_issue_repository: str = GH_ISSUES_DEFAULT_REPOSITORY,
     **kwargs,
 ):
+    """Create a chained sequence of Pulumi jobs pre-configured for ol-infrastructure.
+
+    Wraps ol_concourse.lib.jobs.infrastructure.pulumi_jobs_chain with
+    project-scoped defaults.  All parameters accepted by the upstream function
+    (including ``refresh_stack``) are forwarded via ``**kwargs``.
+    """
     return _pulumi_jobs_chain(
         *args, github_issue_repository=github_issue_repository, **kwargs
     )
