@@ -19,7 +19,7 @@ from ol_infrastructure.substructure.keycloak.ol_platform_engineering import (
 from ol_infrastructure.substructure.keycloak.olapps import create_olapps_realm
 
 stack_info = parse_stack()
-env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+env_name = f"keycloak-{stack_info.env_suffix}"
 keycloak_config = Config("keycloak")
 keycloak_realm_config = Config("keycloak_realm")
 setup_vault_provider()

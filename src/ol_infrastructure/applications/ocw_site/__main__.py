@@ -1026,7 +1026,7 @@ for purpose in ("draft", "live", "test"):
     )
 
     fastly_tls = fastly.TlsSubscription(
-        f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-{purpose}-tls-subscription",
+        f"fastly-ocw_site-{stack_info.env_suffix}-{purpose}-tls-subscription",
         # valid values are certainly, lets-encrypt, or globalsign
         certificate_authority="certainly",
         domains=servicevcl_backend.domains.apply(

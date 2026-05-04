@@ -78,7 +78,7 @@ vault_stack = make_stack_reference(
 )
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
-target_vpc_name = concourse_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
+target_vpc_name = concourse_config.get("target_vpc") or "operations_vpc"
 target_vpc = network_stack.require_output(target_vpc_name)
 
 consul_security_groups = consul_stack.require_output("security_groups")

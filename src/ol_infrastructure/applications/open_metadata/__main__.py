@@ -431,7 +431,7 @@ open_metadata_glue_policy_document = {
 open_metadata_glue_iam_policy = iam.Policy(
     f"open-metadata-glue-read-policy-{stack_info.env_suffix}",
     name=f"open-metadata-glue-read-policy-{stack_info.env_suffix}",
-    path=f"/ol-applications/open-metadata/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+    path=f"/ol-applications/open-metadata/open_metadata/{stack_info.env_suffix}/",
     description=(
         "Read-only access to AWS Glue catalog and S3 data lake"
         " for OpenMetadata ingestion pipelines"

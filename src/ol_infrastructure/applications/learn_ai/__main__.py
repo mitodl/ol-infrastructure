@@ -92,7 +92,7 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 
 aws_account = get_caller_identity()
 stack_info = parse_stack()
-env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+env_name = f"learn_ai-{stack_info.env_suffix}"
 
 cluster_stack = make_stack_reference(projects.EKS, f"applications.{stack_info.name}")
 cluster_substructure_stack = make_stack_reference(
@@ -414,7 +414,7 @@ learn_ai_fastly_service = fastly.ServiceVcl(
     dictionaries=[],
     domains=[
         fastly.ServiceVclDomainArgs(
-            comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application",
+            comment=f"learn_ai {stack_info.env_suffix} Application",
             name=learn_ai_frontend_domain,
         ),
     ],
@@ -465,7 +465,7 @@ learn_ai_fastly_service = fastly.ServiceVcl(
             url=Output.all(domain=vector_log_proxy_domain).apply(
                 lambda kwargs: f"https://{kwargs['domain']}/fastly"
             ),
-            name=f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-https-logging-args",
+            name=f"fastly-learn_ai-{stack_info.env_suffix}-https-logging-args",
             content_type="application/json",
             format=build_fastly_log_format_string(additional_static_fields={}),
             format_version=2,

@@ -1097,7 +1097,7 @@ micromasters_fastly_service = fastly.ServiceVcl(
             url=Output.all(domain=vector_log_proxy_domain).apply(
                 lambda kwargs: f"https://{kwargs['domain']}/fastly"
             ),
-            name=f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-https-logging-args",
+            name=f"fastly-micromasters-{stack_info.env_suffix}-https-logging-args",
             content_type="application/json",
             format=build_fastly_log_format_string(additional_static_fields={}),
             format_version=2,
@@ -1119,7 +1119,7 @@ tls_configuration = fastly.get_tls_configuration(
 )
 
 micromasters_fastly_tls = fastly.TlsSubscription(
-    f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-tls-subscription",
+    f"fastly-micromasters-{stack_info.env_suffix}-tls-subscription",
     # valid values are certainly, lets-encrypt, or globalsign
     certificate_authority="certainly",
     domains=micromasters_fastly_service.domains.apply(

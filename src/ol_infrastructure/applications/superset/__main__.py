@@ -817,7 +817,7 @@ _gateway = OLEKSGateway(
 export(
     "superset",
     {
-        "deployment": stack_info.env_prefix,
+        "deployment": "superset",
         "redis": superset_redis_cache.address,
         "redis_token": redis_auth_token,
     },

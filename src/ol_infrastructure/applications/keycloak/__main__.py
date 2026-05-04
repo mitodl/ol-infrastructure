@@ -77,7 +77,7 @@ vault_pki_stack = make_stack_reference(
 )
 
 # target vpc is 'operations', for a non-app-specific service
-target_vpc_name = keycloak_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
+target_vpc_name = keycloak_config.get("target_vpc") or "operations_vpc"
 target_vpc = network_stack.require_output(target_vpc_name)
 target_vpc_id = target_vpc["id"]
 
@@ -113,7 +113,7 @@ aws_config = AWSBase(
     tags={"OU": "operations", "Environment": f"operations-{stack_info.env_suffix}"}
 )
 
-env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+env_name = f"keycloak-{stack_info.env_suffix}"
 
 # Install the keycloak operator into k8s
 # download custom resource definitions for the keycloak operator

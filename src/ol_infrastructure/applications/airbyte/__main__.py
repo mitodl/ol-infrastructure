@@ -91,9 +91,9 @@ cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
 
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
-env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+env_name = f"airbyte-{stack_info.env_suffix}"
 
-target_vpc_name = airbyte_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
+target_vpc_name = airbyte_config.get("target_vpc") or "data_vpc"
 target_vpc = network_stack.require_output(target_vpc_name)
 k8s_pod_subnet_cidrs = target_vpc["k8s_pod_subnet_cidrs"]
 
@@ -218,7 +218,7 @@ airbyte_app_policy_document = {
 }
 airbyte_app_policy = iam.Policy(
     "airbyte-app-instance-iam-policy",
-    path=f"/ol-applications/airbyte-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+    path=f"/ol-applications/airbyte-server/airbyte/{stack_info.env_suffix}/",
     description=(
         "Grant access to AWS resources for the operation of the Airbyte application."
     ),
@@ -293,7 +293,7 @@ data_lake_policy_document = {
 data_lake_policy = iam.Policy(
     "data-lake-access-policy",
     name_prefix="airbyte-datalake-policy-",
-    path=f"/ol-applications/airbyte-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+    path=f"/ol-applications/airbyte-server/airbyte/{stack_info.env_suffix}/",
     policy=lint_iam_policy(
         data_lake_policy_document,
         stringify=True,
@@ -340,7 +340,7 @@ s3_source_policy_document = {
 s3_source_policy = iam.Policy(
     "airbyte-s3-source-access-policy",
     name_prefix="airbyte-s3-source-policy-",
-    path=f"/ol-applications/airbyte-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+    path=f"/ol-applications/airbyte-server/airbyte/{stack_info.env_suffix}/",
     policy=lint_iam_policy(
         s3_source_policy_document,
         stringify=True,

@@ -96,7 +96,7 @@ vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
 
-target_vpc_name = ovs_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
+target_vpc_name = ovs_config.get("target_vpc") or "applications_vpc"
 target_vpc = network_stack.require_output(target_vpc_name)
 target_vpc_id = target_vpc["id"]
 data_vpc = network_stack.require_output("data_vpc")
@@ -116,7 +116,7 @@ aws_config = AWSBase(
     }
 )
 
-env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+env_name = f"odl_video_service-{stack_info.env_suffix}"
 
 # S3 Buckets for ODL Video Service
 # Get bucket names from configuration
@@ -448,7 +448,7 @@ ovs_server_policy_document = {
 ovs_server_policy = iam.Policy(
     "odl-video-service-server-policy",
     name_prefix="odl-video-service-server-policy-",
-    path=f"/ol-applications/odl-video-service-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+    path=f"/ol-applications/odl-video-service-server/odl_video_service/{stack_info.env_suffix}/",
     policy=lint_iam_policy(
         ovs_server_policy_document,
         stringify=True,

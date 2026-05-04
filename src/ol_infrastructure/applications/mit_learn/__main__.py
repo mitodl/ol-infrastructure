@@ -865,7 +865,7 @@ ocw_courses_bucket_fqdn = ocw_site_buckets["buckets"]["live"].apply(
     lambda name: f"{name}.s3.us-east-1.amazonaws.com"
 )
 mitlearn_fastly_service = fastly.ServiceVcl(
-    f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}",
+    f"fastly-mit_learn-{stack_info.env_suffix}",
     name=f"MIT Learn {stack_info.env_suffix}",
     comment="Managed by Pulumi",
     backends=[
@@ -936,11 +936,11 @@ mitlearn_fastly_service = fastly.ServiceVcl(
     ],
     domains=[
         fastly.ServiceVclDomainArgs(
-            comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application",
+            comment=f"mit_learn {stack_info.env_suffix} Application",
             name=learn_frontend_domain,
         ),
         fastly.ServiceVclDomainArgs(
-            comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application - Legacy",
+            comment=f"mit_learn {stack_info.env_suffix} Application - Legacy",
             name=legacy_learn_frontend_domain,
         ),
     ],
@@ -1100,7 +1100,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             url=Output.all(domain=vector_log_proxy_domain).apply(
                 lambda kwargs: f"https://{kwargs['domain']}/fastly"
             ),
-            name=f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-https-logging-args",
+            name=f"fastly-mit_learn-{stack_info.env_suffix}-https-logging-args",
             content_type="application/json",
             format=build_fastly_log_format_string(
                 additional_static_fields={

@@ -913,7 +913,7 @@ set bereq.http.x-forwarded-host = "{frontend_domain}";""",  # noqa: E501
             url=vector_log_proxy_domain.apply(
                 lambda domain: f"https://{domain}/fastly"
             ),
-            name=f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-https-logging-args",
+            name=f"fastly-xpro-{stack_info.env_suffix}-https-logging-args",
             content_type="application/json",
             format=build_fastly_log_format_string(
                 additional_static_fields={
@@ -932,11 +932,11 @@ set bereq.http.x-forwarded-host = "{frontend_domain}";""",  # noqa: E501
     logging_s3s=[
         fastly.ServiceVclLoggingS3Args(
             bucket_name=fastly_access_logging_bucket["bucket_name"],
-            name=f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-s3-logging-args",
+            name=f"fastly-xpro-{stack_info.env_suffix}-s3-logging-args",
             format=build_fastly_log_format_string(additional_static_fields={}),
             gzip_level=3,
             message_type="blank",
-            path=f"/xpro/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+            path=f"/xpro/xpro/{stack_info.env_suffix}/",
             redundancy="standard",
             s3_iam_role=fastly_access_logging_iam_role["role_arn"],
         ),
@@ -954,7 +954,7 @@ xpro_tls_configuration = fastly.get_tls_configuration(
 )
 
 xpro_fastly_tls = fastly.TlsSubscription(
-    f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-tls-subscription",
+    f"fastly-xpro-{stack_info.env_suffix}-tls-subscription",
     # valid values are certainly, lets-encrypt, or globalsign
     certificate_authority="certainly",
     domains=xpro_service.domains.apply(

@@ -8,7 +8,6 @@ from ol_infrastructure.lib.aws.route53_helper import (
     acm_certificate_validation_records,
     lookup_zone_id_from_domain,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
 class ACMCertificateConfig(BaseModel):
@@ -36,8 +35,6 @@ class ACMCertificate(ComponentResource):
 
         cert_opts = ResourceOptions(parent=self).merge(opts)
 
-        stack_info = parse_stack()
-
         acm_cert = acm.Certificate(
             f"{name}-acm-certificate",
             domain_name=cert_config.certificate_domain,
@@ -59,7 +56,6 @@ class ACMCertificate(ComponentResource):
                 acm_certificate_validation_records,
                 cert_name=name,
                 zone_id=cert_config.certificate_zone_id,
-                stack_info=stack_info,
                 opts=cert_opts,
             )
         )

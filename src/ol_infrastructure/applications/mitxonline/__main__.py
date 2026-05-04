@@ -996,7 +996,7 @@ tls_configuration = fastly.get_tls_configuration(
 )
 
 mitxonline_fastly_tls = fastly.TlsSubscription(
-    f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-tls-subscription",
+    f"fastly-mitxonline-{stack_info.env_suffix}-tls-subscription",
     # valid values are certainly, lets-encrypt, or globalsign
     certificate_authority="certainly",
     domains=mitxonline_service.domains.apply(

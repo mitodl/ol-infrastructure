@@ -657,7 +657,6 @@ class OLApplicationK8sConfig(BaseModel):
 
 
 stack_info = parse_stack()
-env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
 
 class OLApplicationK8s(ComponentResource):

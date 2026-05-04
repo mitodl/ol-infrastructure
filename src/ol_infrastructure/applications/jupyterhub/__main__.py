@@ -38,7 +38,7 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 # Parse stack and setup providers
 stack_info = parse_stack()
 setup_vault_provider(stack_info)
-env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+env_name = f"jupyterhub-{stack_info.env_suffix}"
 
 # Configuration
 jupyterhub_config = Config("jupyterhub")
@@ -135,7 +135,7 @@ parliament_config = {
 }
 jupyterhub_policy = iam.Policy(
     "jupyterhub-instance-iam-policy",
-    path=f"/ol-applications/jupyterhub/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+    path=f"/ol-applications/jupyterhub/jupyterhub/{stack_info.env_suffix}/",
     description=("Grant access to AWS resources for saving/editing Jupyter notebooks."),
     policy=lint_iam_policy(
         jupyterhub_policy_document, stringify=True, parliament_config=parliament_config
@@ -179,7 +179,7 @@ rds_defaults["use_blue_green"] = False
 rds_defaults["read_replica"] = None
 rds_password = jupyterhub_config.require("rds_password")
 
-target_vpc_name = jupyterhub_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
+target_vpc_name = jupyterhub_config.get("target_vpc") or "applications_vpc"
 target_vpc = network_stack.require_output(target_vpc_name)
 target_vpc_id = target_vpc["id"]
 
