@@ -192,6 +192,12 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_name="ol-infrastructure-mongodb-atlas",
         deployment_groups=["mitx", "mitx-staging", "mitxonline", "xpro"],
     ),
+    "ocw_site": SimplePulumiParams(
+        app_name="ocw-site",
+        pulumi_project_path="applications/ocw_site/",
+        pulumi_project_name="ol-application-ocw-site",
+        stages=["QA", "Production"],
+    ),
     "open-discussions": SimplePulumiParams(
         app_name="open-discussions",
         pulumi_project_path="applications/open_discussions/",
@@ -275,6 +281,39 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_path="infrastructure/vector_log_proxy/",
         pulumi_project_name="ol-infrastructure-vector-log-proxy",
         stack_prefix="operations",
+    ),
+    "aws-ecr": SimplePulumiParams(
+        app_name="aws-ecr",
+        pulumi_project_path="infrastructure/aws/ecr/",
+        pulumi_project_name="ol-infrastructure-ecr",
+        stages=["default"],
+    ),
+    "aws-sftp": SimplePulumiParams(
+        app_name="aws-sftp",
+        pulumi_project_path="infrastructure/aws/sftp_servers/",
+        pulumi_project_name="ol-infrastructure-aws-sftp",
+    ),
+    "b2b-partners-storage": SimplePulumiParams(
+        app_name="b2b-partners-storage",
+        pulumi_project_path="applications/b2b_partners_storage/",
+        pulumi_project_name="ol-application-b2b-partners-storage",
+    ),
+    "mailgun": SimplePulumiParams(
+        app_name="mailgun",
+        pulumi_project_path="applications/mailgun/",
+        pulumi_project_name="ol-application-mailgun",
+    ),
+    "monitoring": SimplePulumiParams(
+        app_name="monitoring",
+        pulumi_project_path="infrastructure/monitoring/",
+        pulumi_project_name="ol-infrastructure-monitoring",
+        stages=["default"],
+    ),
+    "starburst": SimplePulumiParams(
+        app_name="starburst",
+        pulumi_project_path="applications/starburst/",
+        pulumi_project_name="ol-application-starburst",
+        stages=["Production"],
     ),
     "xpro-partner-dns": SimplePulumiParams(
         app_name="xpro-partner-dns",

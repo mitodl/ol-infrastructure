@@ -39,7 +39,7 @@ def build_meta_job(release_name):
         pipeline_id = "self"
     else:
         pipeline_definition_path = (
-            "src/ol_concourse/pipelines/open_edx/codejail_v3/dagger_pulumi_pipeline.py"
+            "src/ol_concourse/pipelines/open_edx/codejail_v3/pipeline.py"
         )
         pipeline_team = "infrastructure"
         pipeline_id = f"dagger-pulumi-codejail-{release_name}"

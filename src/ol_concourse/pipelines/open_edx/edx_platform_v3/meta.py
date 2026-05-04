@@ -31,7 +31,9 @@ def build_meta_job(pipeline_name: str):
         pipeline_team = "main"
         pipeline_id = "self"
     else:
-        pipeline_definition_path = "src/ol_concourse/pipelines/open_edx/edx_platform_v3/dagger_pulumi_pipeline.py"  # noqa: E501
+        pipeline_definition_path = (
+            "src/ol_concourse/pipelines/open_edx/edx_platform_v3/pipeline.py"
+        )
         pipeline_team = "infrastructure"
         pipeline_id = f"dagger-pulumi-edxapp-{pipeline_name}"
     return Job(

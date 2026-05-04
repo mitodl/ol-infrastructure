@@ -43,7 +43,7 @@ def meta_job(app_name: str) -> Job:
                         dir="pipeline",
                         user="root",
                         args=[
-                            "../k8s-app-pipeline-definitions/src/ol_concourse/pipelines/infrastructure/k8s_apps/docker_pulumi.py",
+                            "../k8s-app-pipeline-definitions/src/ol_concourse/pipelines/infrastructure/k8s_apps/pipeline.py",
                             app_name,
                         ],
                     ),
