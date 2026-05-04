@@ -20,7 +20,6 @@ config = {
             "config": {
                 "type": "Iceberg",
                 "catalog": {
-                    "type": "Glue",
                     "name": os.environ["OM_SERVICE_NAME"],
                     "connection": {
                         "awsConfig": {"awsRegion": os.environ["OM_AWS_REGION"]},

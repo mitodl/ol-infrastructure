@@ -292,21 +292,25 @@ _make_cronjob(
 # ---------------------------------------------------------------------------
 # Airbyte metadata ingestion
 # ---------------------------------------------------------------------------
+# Only created when the om-connector-airbyte K8s secret exists, which the
+# application stack provisions only when airbyte credentials are present in
+# the SOPS secrets file (src/bridge/secrets/open_metadata/secrets.<env>.yaml).
 
-_make_cronjob(
-    name="airbyte",
-    schedule="0 3 * * *",
-    python_script=(
-        Path(__file__).parent / "scripts" / "airbyte_metadata.py"
-    ).read_text(),
-    extra_env=[
-        _plain_env("OM_SERVER_URL", OM_SERVER_URL),
-        _plain_env("OM_SERVICE_NAME", service_name_airbyte),
-        _secret_env("om-connector-airbyte", "OM_AIRBYTE_HOST_PORT"),
-        _secret_env("om-connector-airbyte", "OM_AIRBYTE_USERNAME"),
-        _secret_env("om-connector-airbyte", "OM_AIRBYTE_PASSWORD"),
-    ],
-)
+if om_config.get_bool("enable_airbyte_connector"):
+    _make_cronjob(
+        name="airbyte",
+        schedule="0 3 * * *",
+        python_script=(
+            Path(__file__).parent / "scripts" / "airbyte_metadata.py"
+        ).read_text(),
+        extra_env=[
+            _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+            _plain_env("OM_SERVICE_NAME", service_name_airbyte),
+            _secret_env("om-connector-airbyte", "OM_AIRBYTE_HOST_PORT"),
+            _secret_env("om-connector-airbyte", "OM_AIRBYTE_USERNAME"),
+            _secret_env("om-connector-airbyte", "OM_AIRBYTE_PASSWORD"),
+        ],
+    )
 
 # ---------------------------------------------------------------------------
 # Superset (PostgreSQL/RDS IAM auth) metadata ingestion
@@ -314,10 +318,10 @@ _make_cronjob(
 # Connects to the Superset RDS instance as the Vault-managed read_only_role DB
 # user using IAM auth. No password secret needed — the ingestion SA's IRSA role
 # grants rds-db:connect, and GRANT rds_iam TO "read_only_role" in vault.py
-# enables IAM auth for any Vault-issued readonly user.
+# enables IAM auth for any Vault-issued readonly user. IRSA credentials are
+# picked up automatically via IamAuthConfigurationSource with awsConfig.enabled.
 
 superset_db_host = superset_stack.require_output("superset")["db_host"]
-superset_db_resource_id = superset_stack.require_output("superset")["db_resource_id"]
 
 _make_cronjob(
     name="superset",
@@ -330,7 +334,6 @@ _make_cronjob(
         _plain_env("OM_SERVICE_NAME", service_name_superset),
         _plain_env("OM_AWS_REGION", aws_region),
         _plain_env("OM_SUPERSET_DB_HOST", superset_db_host),
-        _plain_env("OM_SUPERSET_DB_RESOURCE_ID", superset_db_resource_id),
     ],
     opts=ResourceOptions(depends_on=[ingestion_irsa_role]),
 )

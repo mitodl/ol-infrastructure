@@ -26,7 +26,7 @@ import os
 import textwrap
 
 from metadata.ingestion.source.database.trino.lineage import TrinoLineageSource
-from metadata.workflow.lineage import LineageWorkflow
+from metadata.workflow.metadata import MetadataWorkflow
 
 TrinoLineageSource.sql_stmt = textwrap.dedent(
     """
@@ -55,7 +55,7 @@ TrinoLineageSource.filters = """
 
 config = {
     "source": {
-        "type": "trino",
+        "type": "trino-lineage",
         "serviceName": os.environ["OM_SERVICE_NAME"],
         "serviceConnection": {
             "config": {
@@ -83,6 +83,6 @@ config = {
         }
     },
 }
-workflow = LineageWorkflow.create(config)
+workflow = MetadataWorkflow.create(config)
 workflow.execute()
 workflow.raise_from_status()

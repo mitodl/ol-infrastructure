@@ -24,9 +24,10 @@ config = {
                     "hostPort": f"{os.environ['OM_SUPERSET_DB_HOST']}:5432",
                     "database": "superset",
                     "authType": {
-                        "awsConfig": {"awsRegion": os.environ["OM_AWS_REGION"]},
-                        "iamMode": True,
-                        "dbClusterIdentifier": os.environ["OM_SUPERSET_DB_RESOURCE_ID"],
+                        "awsConfig": {
+                            "awsRegion": os.environ["OM_AWS_REGION"],
+                            "enabled": True,
+                        },
                     },
                 },
             }
