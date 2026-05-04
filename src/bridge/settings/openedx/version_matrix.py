@@ -16,7 +16,7 @@ class OpenLearningOpenEdxDeployment(Enum):
             # Residential environments want to track master in CI for testing new
             # features as they land. (TMM 2025-05-20)
             EnvRelease("CI", OpenEdxSupportedRelease["master"]),
-            EnvRelease("QA", OpenEdxSupportedRelease["ulmo"]),
+            EnvRelease("QA", OpenEdxSupportedRelease["verawood"]),
             EnvRelease("Production", OpenEdxSupportedRelease["ulmo"]),
         ],
     )
@@ -26,7 +26,7 @@ class OpenLearningOpenEdxDeployment(Enum):
             # Residential environments want to track master in CI for testing new
             # features as they land. (TMM 2025-05-20)
             EnvRelease("CI", OpenEdxSupportedRelease["master"]),
-            EnvRelease("QA", OpenEdxSupportedRelease["ulmo"]),
+            EnvRelease("QA", OpenEdxSupportedRelease["verawood"]),
             EnvRelease("Production", OpenEdxSupportedRelease["ulmo"]),
         ],
     )
@@ -41,7 +41,7 @@ class OpenLearningOpenEdxDeployment(Enum):
     xpro = DeploymentEnvRelease(
         deployment_name="xpro",
         env_release_map=[
-            EnvRelease("CI", OpenEdxSupportedRelease["ulmo"]),
+            EnvRelease("CI", OpenEdxSupportedRelease["verawood"]),
             EnvRelease("QA", OpenEdxSupportedRelease["ulmo"]),
             EnvRelease("Production", OpenEdxSupportedRelease["ulmo"]),
         ],
@@ -267,6 +267,209 @@ ReleaseMap: dict[
                 application="ora-grading",
                 application_type="MFE",
                 release="ulmo",
+            ),
+        ],
+    },
+    "verawood": {
+        "mitx": [
+            OpenEdxApplicationVersion(
+                application="codejail",
+                application_type="IDA",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="communications",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="authoring",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="discussions",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="edx-platform",
+                application_type="IDA",
+                release="verawood",
+                branch_override="mitx/verawood",
+                origin_override="https://github.com/mitodl/edx-platform",
+            ),
+            OpenEdxApplicationVersion(
+                application="edxapp_theme",
+                application_type="IDA",
+                release="verawood",
+                branch_override="verawood",
+                origin_override="https://github.com/mitodl/mitx-theme",
+            ),
+            OpenEdxApplicationVersion(
+                application="gradebook",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="learner-dashboard",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="learning",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="notes-api",
+                application_type="IDA",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="ora-grading",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="xqueue",
+                application_type="IDA",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="xqwatcher",
+                application_type="IDA",
+                branch_override="master",
+                origin_override="https://github.com/mitodl/xqueue-watcher",
+                release="verawood",
+            ),
+        ],
+        "mitx-staging": [
+            OpenEdxApplicationVersion(
+                application="codejail",
+                application_type="IDA",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="communications",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="authoring",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="discussions",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="edx-platform",
+                application_type="IDA",
+                release="verawood",
+                branch_override="mitx/verawood",
+                origin_override="https://github.com/mitodl/edx-platform",
+                runtime_version_override="3.12",
+            ),
+            OpenEdxApplicationVersion(
+                application="edxapp_theme",
+                application_type="IDA",
+                release="verawood",
+                branch_override="verawood",
+                origin_override="https://github.com/mitodl/mitx-theme",
+            ),
+            OpenEdxApplicationVersion(
+                application="gradebook",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="learning",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="learner-dashboard",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="notes-api",
+                application_type="IDA",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="ora-grading",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="xqueue",
+                application_type="IDA",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="xqwatcher",
+                application_type="IDA",
+                branch_override="master",
+                origin_override="https://github.com/mitodl/xqueue-watcher",
+                release="verawood",
+            ),
+        ],
+        "xpro": [
+            OpenEdxApplicationVersion(
+                application="codejail",
+                application_type="IDA",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="authoring",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="communications",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="discussions",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="edx-platform",
+                application_type="IDA",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="edxapp_theme",
+                application_type="IDA",
+                release="verawood",
+                branch_override="verawood",
+                origin_override="https://github.com/mitodl/mitxpro-theme",
+            ),
+            OpenEdxApplicationVersion(
+                application="gradebook",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="learning",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="notes-api",
+                application_type="IDA",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="ora-grading",
+                application_type="MFE",
+                release="verawood",
             ),
         ],
     },

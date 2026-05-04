@@ -108,6 +108,7 @@ class OpenEdxSupportedRelease(StrEnum):
 
     master = ("master", "master", "3.12", "24")
     ulmo = ("ulmo", "release/ulmo", "3.11", "24")
+    verawood = ("verawood", "release/verawood", "3.12", "24")
 
     def __str__(self):
         return self.value
