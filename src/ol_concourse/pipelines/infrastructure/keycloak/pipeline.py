@@ -42,7 +42,7 @@ def build_keycloak_substructure_pipeline() -> PipelineFragment:
         ],
     )
     substructure_fragment = pulumi_jobs_chain(
-        refresh_stack=False,
+        refresh_stack=True,
         pulumi_code=keycloak_pulumi_code,
         stack_names=["CI", "QA", "Production"],
         project_name="ol-substructure-keycloak",
@@ -203,7 +203,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
 
     pulumi_fragment = pulumi_jobs_chain(
         keycloak_pulumi_code,
-        refresh_stack=False,
+        refresh_stack=True,
         stack_names=["CI", "QA", "Production"],
         project_name="ol-application-keycloak",
         project_source_path=PULUMI_CODE_PATH.joinpath(
