@@ -95,14 +95,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
         order_by="time",
     )
 
-    # Repo: https://github.com/mitodl/keycloakify-starter
-    # Use: Keycloakify to enhance theme customization
-    keycloakify_spi = github_release(
-        name=Identifier("keycloakify-spi"),
-        owner="mitodl",
-        repository="keycloakify-starter",
-    )
-
     # Repo: https://github.com/mitodl/ol-keycloak
     # Use: OL SPI to customize login process
     ol_spi = github_release(
@@ -134,7 +126,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
             GetStep(get=keycloak_upstream_registry_image.name, trigger=True),
             GetStep(get=cas_protocol_spi.name, trigger=True),
             GetStep(get=keycloak_customization_repo.name, trigger=True),
-            GetStep(get=keycloakify_spi.name, trigger=True),
             GetStep(get=ol_keycloakify.name, trigger=True),
             GetStep(get=ol_spi.name, trigger=True),
             GetStep(get=scim_plugin.name, trigger=True),
@@ -146,7 +137,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
                     inputs=[
                         Input(name=keycloak_customization_repo.name),
                         Input(name=cas_protocol_spi.name),
-                        Input(name=keycloakify_spi.name),
                         Input(name=ol_keycloakify.name),
                         Input(name=ol_spi.name),
                         Input(name=scim_plugin.name),
@@ -164,7 +154,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
                         mkdir {image_build_context.name}/plugins/
                         cp -r {keycloak_customization_repo.name}/* {image_build_context.name}/
                         cp -r {cas_protocol_spi.name}/* {image_build_context.name}/plugins/
-                        cp -r {keycloakify_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {ol_keycloakify.name}/* {image_build_context.name}/plugins/
                         cp -r {ol_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {scim_plugin.name}/* {image_build_context.name}/plugins/
@@ -205,7 +194,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
             keycloak_customization_repo,
             keycloak_registry_image,
             cas_protocol_spi,
-            keycloakify_spi,
             ol_keycloakify,
             ol_spi,
             scim_plugin,
