@@ -48,7 +48,7 @@ PIPELINE_CONFIGS: list[tuple[str, str]] = [
         "src/ol_concourse/pipelines/infrastructure/dagster/pipeline.py",
     ),
     (
-        "pulumi-eks-cluster-update",
+        "pulumi-eks-cluster",
         "src/ol_concourse/pipelines/infrastructure/eks_clusters/pipeline.py",
     ),
     (
@@ -56,7 +56,7 @@ PIPELINE_CONFIGS: list[tuple[str, str]] = [
         "src/ol_concourse/pipelines/infrastructure/jupyterhub/pipeline.py",
     ),
     (
-        "docker-packer-pulumi-keycloak",
+        "docker-pulumi-keycloak",
         "src/ol_concourse/pipelines/infrastructure/keycloak/pipeline.py",
     ),
     (
@@ -68,7 +68,7 @@ PIPELINE_CONFIGS: list[tuple[str, str]] = [
         "src/ol_concourse/pipelines/infrastructure/redash/pipeline.py",
     ),
     (
-        "docker-packer-pulumi-superset",
+        "docker-pulumi-superset",
         "src/ol_concourse/pipelines/infrastructure/superset/pipeline.py",
     ),
     (
