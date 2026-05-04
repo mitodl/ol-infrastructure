@@ -5,7 +5,7 @@ from typing import Any
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions, StackReference
+from pulumi import Config, Output, ResourceOptions
 from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import (
@@ -70,8 +70,8 @@ policy_stack = make_stack_reference(projects.POLICIES, "default")
 vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
-opensearch_stack = StackReference(
-    f"infrastructure.aws.opensearch.open_metadata.{stack_info.name}"
+opensearch_stack = make_stack_reference(
+    projects.OPENSEARCH, f"open_metadata.{stack_info.name}"
 )
 cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
 
