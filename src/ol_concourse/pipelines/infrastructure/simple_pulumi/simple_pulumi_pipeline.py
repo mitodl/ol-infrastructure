@@ -356,7 +356,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
         prior_trigger = github_issues(
             auth_method="token",
             name=Identifier(
-                f"github-issues-{params.prior_stage_stack.lower()}-trigger"
+                f"github-issues-{params.pulumi_project_name}-{params.prior_stage_stack.lower()}-trigger"
             ),
             repository=GH_ISSUES_DEFAULT_REPOSITORY,
             issue_title_template=(
