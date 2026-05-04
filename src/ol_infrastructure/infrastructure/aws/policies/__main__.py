@@ -1,4 +1,4 @@
-from pulumi import ResourceOptions, StackReference, export
+from pulumi import ResourceOptions, export
 from pulumi.resource import Alias
 from pulumi_aws import iam
 
@@ -7,9 +7,9 @@ from ol_infrastructure.lib.aws.iam_helper import (
     lint_iam_policy,
     route53_policy_template,
 )
-from ol_infrastructure.lib.pulumi_helper import stack_ref
+from ol_infrastructure.lib.pulumi_helper import make_stack_reference
 
-dns_stack = StackReference(stack_ref(projects.DNS, "default"))
+dns_stack = make_stack_reference(projects.DNS, "default")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
 default_instance_policy_document = {

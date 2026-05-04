@@ -25,7 +25,7 @@ from typing import Any
 import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi import Config, Output, ResourceOptions, export
 
 from bridge.lib.versions import (
     CLICKHOUSE_KEEPER_VERSION,
@@ -54,9 +54,9 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
     parse_stack,
     require_stack_output_value,
-    stack_ref,
 )
 from ol_infrastructure.lib.vault import setup_vault_provider
 
@@ -66,10 +66,10 @@ clickhouse_config = Config("clickhouse")
 vault_config = Config("vault")
 stack_info = parse_stack()
 
-vault_mount_stack = StackReference(
-    stack_ref(projects.VAULT_STATIC_MOUNTS, f"operations.{stack_info.name}")
+vault_mount_stack = make_stack_reference(
+    projects.VAULT_STATIC_MOUNTS, f"operations.{stack_info.name}"
 )
-cluster_stack = StackReference(stack_ref(projects.EKS, f"data.{stack_info.name}"))
+cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
 stateful_workload_storage = require_stack_output_value(
     cluster_stack, "stateful_workload_storage"
 )

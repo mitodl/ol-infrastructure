@@ -9,7 +9,7 @@ import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 import requests
 import yaml
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi import Config, Output, ResourceOptions, export
 from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import (
@@ -50,7 +50,10 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
@@ -62,15 +65,15 @@ stack_info = parse_stack()
 
 aws_account = get_caller_identity()
 
-cluster_stack = StackReference(stack_ref(projects.EKS, f"operations.{stack_info.name}"))
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
-policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
-dns_stack = StackReference(stack_ref(projects.DNS, "default"))
-vault_stack = StackReference(
-    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+cluster_stack = make_stack_reference(projects.EKS, f"operations.{stack_info.name}")
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+policy_stack = make_stack_reference(projects.POLICIES, "default")
+dns_stack = make_stack_reference(projects.DNS, "default")
+vault_stack = make_stack_reference(
+    projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
-vault_pki_stack = StackReference(
-    stack_ref(projects.VAULT_PKI, f"operations.{stack_info.name}")
+vault_pki_stack = make_stack_reference(
+    projects.VAULT_PKI, f"operations.{stack_info.name}"
 )
 
 # target vpc is 'operations', for a non-app-specific service

@@ -83,7 +83,7 @@ config:
   mongodb:atlas_project_id: 61a8f2d2c263e144f50f13b4
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
-  edxapp:cluster_stack: infrastructure.aws.eks.residential.QA
+  edxapp:cluster_stack: residential.QA
   edxapp:learn_ai_frontend_domain: "learn-ai-qa.ol.mit.edu"
   edxapp:mit_learn_api_domain: api.rc.learn.mit.edu
   edxapp:mit_learn_domain: rc.learn.mit.edu

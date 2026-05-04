@@ -15,7 +15,10 @@ from ol_infrastructure.lib.aws.iam_helper import (
     lint_iam_policy,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 from ol_infrastructure.lib.stack_defaults import defaults
 
 SEARCH_DOMAIN_NAME_MAX_LENGTH = 28
@@ -27,9 +30,9 @@ search_config = pulumi.Config("opensearch")
 env_config = pulumi.Config("environment")
 stack_info = parse_stack()
 
-network_stack = pulumi.StackReference(stack_ref(projects.NETWORKING, stack_info.name))
-vault_stack = pulumi.StackReference(
-    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+vault_stack = make_stack_reference(
+    projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
 
 #############

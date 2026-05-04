@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi import Config, Output, ResourceOptions, export
 from pulumi_aws import ec2, get_caller_identity
 
 from bridge.secrets.sops import read_yaml_secrets
@@ -45,7 +45,10 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 stack_info = parse_stack()
@@ -53,22 +56,20 @@ notes_config = Config("edxnotes")
 if Config("vault").get("address"):
     setup_vault_provider()
 
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
-policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
-dns_stack = StackReference(stack_ref(projects.DNS, "default"))
-vault_stack = StackReference(
-    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+policy_stack = make_stack_reference(projects.POLICIES, "default")
+dns_stack = make_stack_reference(projects.DNS, "default")
+vault_stack = make_stack_reference(
+    projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
-edxapp_stack = StackReference(
-    stack_ref(projects.EDXAPP, f"{stack_info.env_prefix}.{stack_info.name}")
+edxapp_stack = make_stack_reference(
+    projects.EDXAPP, f"{stack_info.env_prefix}.{stack_info.name}"
 )
 
 cluster_name = notes_config.get("cluster") or "applications"
-cluster_stack = StackReference(
-    stack_ref(projects.EKS, f"{cluster_name}.{stack_info.name}")
-)
-opensearch_stack = StackReference(
-    stack_ref(projects.OPENSEARCH, f"{stack_info.env_prefix}.{stack_info.name}")
+cluster_stack = make_stack_reference(projects.EKS, f"{cluster_name}.{stack_info.name}")
+opensearch_stack = make_stack_reference(
+    projects.OPENSEARCH, f"{stack_info.env_prefix}.{stack_info.name}"
 )
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"

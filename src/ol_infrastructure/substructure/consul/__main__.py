@@ -1,4 +1,4 @@
-from pulumi import Alias, ResourceOptions, StackReference
+from pulumi import Alias, ResourceOptions
 from pulumi_consul import (
     PreparedQuery,
     PreparedQueryFailoverArgs,
@@ -7,10 +7,13 @@ from pulumi_consul import (
 
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.consul import get_consul_provider
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 
 stack_info = parse_stack()
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 operations_vpc = network_stack.require_output("operations_vpc")
 consul_provider = get_consul_provider(stack_info).merge(
     ResourceOptions(delete_before_replace=True)

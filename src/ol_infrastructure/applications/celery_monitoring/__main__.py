@@ -7,7 +7,7 @@ from pathlib import Path
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
-from pulumi import Config, InvokeOptions, Output, StackReference
+from pulumi import Config, InvokeOptions, Output
 
 from bridge.lib.versions import LEEK_VERSION
 from ol_infrastructure.components.applications.eks import (
@@ -42,25 +42,28 @@ from ol_infrastructure.lib.ol_types import (
     K8sGlobalLabels,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 stack_info = parse_stack()
 setup_vault_provider(stack_info)
 celery_monitoring_config = Config("celery_monitoring")
-opensearch_stack = StackReference(
-    stack_ref(projects.OPENSEARCH, f"celery_monitoring.{stack_info.name}")
+opensearch_stack = make_stack_reference(
+    projects.OPENSEARCH, f"celery_monitoring.{stack_info.name}"
 )
-vault_mount_stack = StackReference(
-    stack_ref(projects.VAULT_STATIC_MOUNTS, f"operations.{stack_info.name}")
+vault_mount_stack = make_stack_reference(
+    projects.VAULT_STATIC_MOUNTS, f"operations.{stack_info.name}"
 )
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 operations_vpc = network_stack.require_output("operations_vpc")
 
 # K8s stack references
-cluster_stack = StackReference(stack_ref(projects.EKS, f"operations.{stack_info.name}"))
-cluster_substructure_stack = StackReference(
-    stack_ref(projects.EKS_SUB, f"operations.{stack_info.name}")
+cluster_stack = make_stack_reference(projects.EKS, f"operations.{stack_info.name}")
+cluster_substructure_stack = make_stack_reference(
+    projects.EKS_SUB, f"operations.{stack_info.name}"
 )
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
@@ -114,24 +117,81 @@ def build_broker_subscriptions(
     return json.dumps(arbitrary_dict)
 
 
+# List of (legacy_name, project_const, short_stack_name, output_key) tuples.
+# legacy_name is preserved so that build_broker_subscriptions/stack_to_app can
+# still derive the app label from the historical dotted namespace.
 stacks = [
-    f"applications.edxapp.xpro.{stack_info.name}",
-    f"applications.edxapp.mitx.{stack_info.name}",
-    f"applications.edxapp.mitx-staging.{stack_info.name}",
-    f"applications.edxapp.mitxonline.{stack_info.name}",
-    f"applications.superset.{stack_info.name}",
-    f"applications.mitxonline.{stack_info.name}",
-    f"applications.mit_learn.{stack_info.name}",
-    f"applications.learn_ai.{stack_info.name}",
-    f"applications.xpro.{stack_info.name}",
-    f"applications.ocw_studio.{stack_info.name}",
-    f"applications.micromasters.{stack_info.name}",
+    (
+        f"applications.edxapp.xpro.{stack_info.name}",
+        projects.EDXAPP,
+        f"xpro.{stack_info.name}",
+        "edxapp",
+    ),
+    (
+        f"applications.edxapp.mitx.{stack_info.name}",
+        projects.EDXAPP,
+        f"mitx.{stack_info.name}",
+        "edxapp",
+    ),
+    (
+        f"applications.edxapp.mitx-staging.{stack_info.name}",
+        projects.EDXAPP,
+        f"mitx-staging.{stack_info.name}",
+        "edxapp",
+    ),
+    (
+        f"applications.edxapp.mitxonline.{stack_info.name}",
+        projects.EDXAPP,
+        f"mitxonline.{stack_info.name}",
+        "edxapp",
+    ),
+    (
+        f"applications.superset.{stack_info.name}",
+        projects.SUPERSET,
+        stack_info.name,
+        "superset",
+    ),
+    (
+        f"applications.mitxonline.{stack_info.name}",
+        projects.MITXONLINE,
+        stack_info.name,
+        "mitxonline",
+    ),
+    (
+        f"applications.mit_learn.{stack_info.name}",
+        projects.MIT_LEARN,
+        stack_info.name,
+        "mit_learn",
+    ),
+    (
+        f"applications.learn_ai.{stack_info.name}",
+        projects.LEARN_AI,
+        stack_info.name,
+        "learn_ai",
+    ),
+    (f"applications.xpro.{stack_info.name}", projects.XPRO, stack_info.name, "xpro"),
+    (
+        f"applications.ocw_studio.{stack_info.name}",
+        projects.OCW_STUDIO,
+        stack_info.name,
+        "ocw_studio",
+    ),
+    (
+        f"applications.micromasters.{stack_info.name}",
+        projects.MICROMASTERS,
+        stack_info.name,
+        "micromasters",
+    ),
 ]
 
 redis_outputs: list[tuple[str, Output]] = []
-for stack in stacks:
-    project = stack.split(".")[1]
-    redis_outputs.append((stack, StackReference(stack).require_output(project)))
+for legacy_name, project_const, short_stack, output_key in stacks:
+    redis_outputs.append(
+        (
+            legacy_name,
+            make_stack_reference(project_const, short_stack).require_output(output_key),
+        )
+    )
 redis_broker_subscriptions = Output.all(*redis_outputs).apply(
     build_broker_subscriptions
 )

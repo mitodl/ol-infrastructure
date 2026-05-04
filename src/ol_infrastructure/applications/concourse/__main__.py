@@ -16,7 +16,7 @@ from string import Template
 
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, Output, StackReference, export
+from pulumi import Config, Output, export
 from pulumi_aws import ec2, get_caller_identity, iam, route53
 from pulumi_aws.autoscaling import LifecycleHook
 from pulumi_consul import Node, Service, ServiceCheckArgs
@@ -52,7 +52,10 @@ from ol_infrastructure.lib.aws.ec2_helper import (
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 
@@ -64,14 +67,14 @@ if Config("vault_server").get("env_namespace"):
     setup_vault_provider()
 concourse_config = Config("concourse")
 stack_info = parse_stack()
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
-policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
-dns_stack = StackReference(stack_ref(projects.DNS, "default"))
-consul_stack = StackReference(
-    stack_ref(projects.CONSUL_INFRA, f"operations.{stack_info.name}")
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+policy_stack = make_stack_reference(projects.POLICIES, "default")
+dns_stack = make_stack_reference(projects.DNS, "default")
+consul_stack = make_stack_reference(
+    projects.CONSUL_INFRA, f"operations.{stack_info.name}"
 )
-vault_stack = StackReference(
-    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+vault_stack = make_stack_reference(
+    projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 

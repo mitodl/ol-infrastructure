@@ -5,7 +5,6 @@ from pulumi import (
     Alias,
     Config,
     ResourceOptions,
-    StackReference,
     export,
 )
 from pulumi_aws import iam, sns
@@ -14,11 +13,14 @@ from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 
 stack_info = parse_stack()
 
-kms_stack = StackReference(stack_ref(projects.KMS, "Production"))
+kms_stack = make_stack_reference(projects.KMS, "Production")
 kms_s3_key = kms_stack.require_output("kms_s3_data_analytics_key")
 
 monitoring_config = Config("monitoring")

@@ -17,7 +17,6 @@ from pulumi import (
     Config,
     Output,
     ResourceOptions,
-    StackReference,
     export,
 )
 
@@ -66,7 +65,10 @@ from ol_infrastructure.lib.aws.iam_helper import (
 )
 from ol_infrastructure.lib.fastly import get_fastly_provider
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 ############################################################
@@ -101,18 +103,16 @@ USE_IO_OPTIMIZED_STATEFUL_WORKLOAD_STORAGE = (
     STATEFUL_WORKLOAD_STORAGE_BACKEND == STATEFUL_WORKLOAD_IO_OPTIMIZED_BACKEND
 )
 
-dns_stack = StackReference(stack_ref(projects.DNS, "default"))
-iam_stack = StackReference(stack_ref(projects.IAM, "default"))
-kms_stack = StackReference(stack_ref(projects.KMS, stack_info.name))
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
-policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
-vault_stack = StackReference(
-    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+dns_stack = make_stack_reference(projects.DNS, "default")
+iam_stack = make_stack_reference(projects.IAM, "default")
+kms_stack = make_stack_reference(projects.KMS, stack_info.name)
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+policy_stack = make_stack_reference(projects.POLICIES, "default")
+vault_stack = make_stack_reference(
+    projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
-vault_auth_stack = StackReference(
-    stack_ref(projects.VAULT_AUTH, "operations.Production")
-)
-concourse_stack = StackReference(stack_ref(projects.CONCOURSE, "Production"))
+vault_auth_stack = make_stack_reference(projects.VAULT_AUTH, "operations.Production")
+concourse_stack = make_stack_reference(projects.CONCOURSE, "Production")
 
 business_unit = env_config.require("business_unit") or "operations"
 target_vpc = network_stack.require_output(env_config.require("target_vpc"))

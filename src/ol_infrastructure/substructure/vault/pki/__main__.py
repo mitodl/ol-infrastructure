@@ -1,4 +1,4 @@
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, ResourceOptions, export
 
 from ol_infrastructure.components.services.vault import (
     OLVaultPKIIntermediateCABackend,
@@ -8,7 +8,10 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.ol_types import BusinessUnit
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 SIX_MONTHS = 60 * 60 * 24 * 30 * 6
@@ -17,9 +20,7 @@ TWELVE_MONTHS = 60 * 60 * 24 * 30 * 12
 env_config = Config("environment")
 stack_info = parse_stack()
 
-root_ca = StackReference(stack_ref(projects.PRIVATE_CA, "default")).require_output(
-    "root_ca"
-)
+root_ca = make_stack_reference(projects.PRIVATE_CA, "default").require_output("root_ca")
 root_ca_arn = root_ca["arn"]
 
 setup_vault_provider(stack_info)

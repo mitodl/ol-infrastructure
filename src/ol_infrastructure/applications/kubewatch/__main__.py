@@ -7,7 +7,7 @@ This service will echo select k8s events to Slack.
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, StackReference, log
+from pulumi import Config, log
 
 from bridge.lib.versions import KUBEWATCH_CHART_VERSION
 from bridge.secrets.sops import read_yaml_secrets
@@ -25,7 +25,10 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 stack_info = parse_stack()
@@ -35,13 +38,13 @@ setup_vault_provider(stack_info)
 kubewatch_config = Config("config_kubewatch")
 vault_config = Config("vault")
 
-cluster_stack = StackReference(
-    stack_ref(projects.EKS, f"{stack_info.env_prefix}.{stack_info.name}")
+cluster_stack = make_stack_reference(
+    projects.EKS, f"{stack_info.env_prefix}.{stack_info.name}"
 )
 
 # Reference the webhook handler stack to get the service URL
-webhook_handler_stack = StackReference(
-    stack_ref(projects.KUBEWATCH_WEBHOOK, f"{stack_info.env_prefix}.{stack_info.name}")
+webhook_handler_stack = make_stack_reference(
+    projects.KUBEWATCH_WEBHOOK, f"{stack_info.env_prefix}.{stack_info.name}"
 )
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))

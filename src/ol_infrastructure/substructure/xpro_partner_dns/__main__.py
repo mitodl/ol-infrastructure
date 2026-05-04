@@ -1,15 +1,18 @@
 from typing import Literal
 
-from pulumi import Config, StackReference
+from pulumi import Config
 from pulumi_aws import route53
 
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.ol_types import AWSBase, BusinessUnit
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 
 xpro_dns_config = Config("xpro_dns")
 stack_info = parse_stack()
-dns_stack = StackReference(stack_ref(projects.DNS, "default"))
+dns_stack = make_stack_reference(projects.DNS, "default")
 xpro_zone = dns_stack.require_output("xpro")
 FIFTEEN_MINUTES = 60 * 15
 aws_tags = AWSBase(tags={"OU": BusinessUnit.xpro, "Environment": "xpro"}).tags

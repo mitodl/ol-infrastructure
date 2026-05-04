@@ -5,7 +5,7 @@ from typing import Any
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions, StackReference
+from pulumi import Config, Output, ResourceOptions
 from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import (
@@ -49,7 +49,10 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 
@@ -61,16 +64,16 @@ setup_vault_provider()
 stack_info = parse_stack()
 
 open_metadata_config = Config("open_metadata")
-dns_stack = StackReference(stack_ref(projects.DNS, "default"))
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
-policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
-vault_stack = StackReference(
-    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+dns_stack = make_stack_reference(projects.DNS, "default")
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+policy_stack = make_stack_reference(projects.POLICIES, "default")
+vault_stack = make_stack_reference(
+    projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
-opensearch_stack = StackReference(
-    f"infrastructure.aws.opensearch.open_metadata.{stack_info.name}"
+opensearch_stack = make_stack_reference(
+    projects.OPENSEARCH, f"open_metadata.{stack_info.name}"
 )
-cluster_stack = StackReference(stack_ref(projects.EKS, f"data.{stack_info.name}"))
+cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
 
 opensearch_cluster = opensearch_stack.require_output("cluster")
 apps_vpc = network_stack.require_output("applications_vpc")

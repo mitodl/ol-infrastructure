@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, ResourceOptions, export
 from pulumi_aws import get_caller_identity
 
 from bridge.lib.versions import VECTOR_VERSION
@@ -27,7 +27,10 @@ from ol_infrastructure.components.services.vault import (
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import cached_image_uri, setup_k8s_provider
 from ol_infrastructure.lib.ol_types import AWSBase, K8sGlobalLabels, Services
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 ##################################
@@ -39,9 +42,9 @@ if Config("vault_server").get("env_namespace"):
 
 stack_info = parse_stack()
 vector_log_proxy_config = Config("vector_log_proxy")
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
-cluster_stack = StackReference(
-    stack_ref(projects.EKS, f"{stack_info.env_prefix}.{stack_info.name}")
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+cluster_stack = make_stack_reference(
+    projects.EKS, f"{stack_info.env_prefix}.{stack_info.name}"
 )
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"

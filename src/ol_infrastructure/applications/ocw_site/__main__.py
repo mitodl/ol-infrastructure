@@ -11,7 +11,6 @@ from pulumi import (
     InvokeOptions,
     Output,
     ResourceOptions,
-    StackReference,
     export,
 )
 from pulumi_aws import get_caller_identity, iam, route53, s3
@@ -36,7 +35,10 @@ from ol_infrastructure.lib.fastly import (
     get_fastly_provider,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 
 ocw_site_config = Config("ocw_site")
 stack_info = parse_stack()
@@ -48,11 +50,11 @@ aws_config = AWSBase(
 )
 fastly_provider = get_fastly_provider()
 
-dns_stack = StackReference(stack_ref(projects.DNS, "default"))
+dns_stack = make_stack_reference(projects.DNS, "default")
 ocw_zone = dns_stack.require_output("ocw")
 
-vector_log_proxy_stack = StackReference(
-    stack_ref(projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}")
+vector_log_proxy_stack = make_stack_reference(
+    projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
 )
 vector_log_proxy_domain = vector_log_proxy_stack.require_output(
     "vector_log_proxy_domain"
@@ -66,7 +68,7 @@ encoded_fastly_proxy_credentials = base64.b64encode(
     f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
 ).decode("utf8")
 
-monitoring_stack = StackReference(stack_ref(projects.MONITORING, "default"))
+monitoring_stack = make_stack_reference(projects.MONITORING, "default")
 fastly_access_logging_bucket = monitoring_stack.require_output(
     "fastly_access_logging_bucket"
 )

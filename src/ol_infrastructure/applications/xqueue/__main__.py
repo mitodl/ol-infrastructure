@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, ResourceOptions, export
 from pulumi_aws import ec2, get_caller_identity
 
 from bridge.lib.magic_numbers import XQUEUE_SERVICE_PORT
@@ -39,7 +39,10 @@ from ol_infrastructure.lib.ol_types import (
     K8sGlobalLabels,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 stack_info = parse_stack()
@@ -48,19 +51,17 @@ if Config("vault").get("address"):
     setup_vault_provider()
 
 # Load shared infrastructure stacks
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
-policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
-vault_stack = StackReference(
-    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+policy_stack = make_stack_reference(projects.POLICIES, "default")
+vault_stack = make_stack_reference(
+    projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
-edxapp_stack = StackReference(
-    stack_ref(projects.EDXAPP, f"{stack_info.env_prefix}.{stack_info.name}")
+edxapp_stack = make_stack_reference(
+    projects.EDXAPP, f"{stack_info.env_prefix}.{stack_info.name}"
 )
 
 cluster_name = xqueue_config.get("cluster") or "applications"
-cluster_stack = StackReference(
-    stack_ref(projects.EKS, f"{cluster_name}.{stack_info.name}")
-)
+cluster_stack = make_stack_reference(projects.EKS, f"{cluster_name}.{stack_info.name}")
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 target_vpc_name = xqueue_config.get("target_vpc")

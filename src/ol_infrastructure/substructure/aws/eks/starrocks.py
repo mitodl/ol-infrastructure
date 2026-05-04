@@ -10,7 +10,10 @@ from ol_infrastructure.components.aws.eks import (
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import check_cluster_namespace
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import StackInfo, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    StackInfo,
+    make_stack_reference,
+)
 
 
 def setup_starrocks(
@@ -36,8 +39,8 @@ def setup_starrocks(
     """
     aws_account = get_caller_identity()
 
-    data_warehouse_stack = StackReference(
-        stack_ref(projects.DATA_WAREHOUSE, stack_info.name)
+    data_warehouse_stack = make_stack_reference(
+        projects.DATA_WAREHOUSE, stack_info.name
     )
     data_lake_query_engine_iam_policy_arn = data_warehouse_stack.require_output(
         "data_lake_query_engine_iam_policy_arn",

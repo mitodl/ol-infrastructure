@@ -3,7 +3,7 @@
 import os
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, StackReference
+from pulumi import Config
 
 from bridge.lib.magic_numbers import CODEJAIL_SERVICE_PORT
 from ol_infrastructure.lib import pulumi_projects as projects
@@ -17,17 +17,20 @@ from ol_infrastructure.lib.ol_types import (
     K8sGlobalLabels,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 
 stack_info = parse_stack()
 codejail_config = Config("codejail")
 
 target_cluster = codejail_config.require("target_cluster")
-cluster_stack = StackReference(
-    stack_ref(projects.EKS, f"{target_cluster}.{stack_info.name}")
+cluster_stack = make_stack_reference(
+    projects.EKS, f"{target_cluster}.{stack_info.name}"
 )
-edxapp_stack = StackReference(
-    stack_ref(projects.EDXAPP, f"{stack_info.env_prefix}.{stack_info.name}")
+edxapp_stack = make_stack_reference(
+    projects.EDXAPP, f"{stack_info.env_prefix}.{stack_info.name}"
 )
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
