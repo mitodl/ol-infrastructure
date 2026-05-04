@@ -256,7 +256,6 @@ def _make_cronjob(  # noqa: PLR0913
                     "securityContext": _POD_SECURITY_CONTEXT,
                 },
             },
-            "ttlSecondsAfterFinished": 86400,
             "failedJobsHistoryLimit": 3,
             "successfulJobsHistoryLimit": 3,
         },
