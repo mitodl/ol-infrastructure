@@ -18,7 +18,6 @@ from pulumi import (
     InvokeOptions,
     Output,
     ResourceOptions,
-    StackReference,
     export,
 )
 from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
@@ -84,9 +83,9 @@ from ol_infrastructure.lib.ol_types import (
 from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
     format_docker_image_ref,
+    make_stack_reference,
     merge_otel_resource_attributes,
     parse_stack,
-    stack_ref,
 )
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -95,21 +94,19 @@ aws_account = get_caller_identity()
 stack_info = parse_stack()
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
-cluster_stack = StackReference(
-    stack_ref(projects.EKS, f"applications.{stack_info.name}")
+cluster_stack = make_stack_reference(projects.EKS, f"applications.{stack_info.name}")
+cluster_substructure_stack = make_stack_reference(
+    projects.EKS_SUB, f"applications.{stack_info.name}"
 )
-cluster_substructure_stack = StackReference(
-    stack_ref(projects.EKS_SUB, f"applications.{stack_info.name}")
+dns_stack = make_stack_reference(projects.DNS, "default")
+monitoring_stack = make_stack_reference(projects.MONITORING, "default")
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+policy_stack = make_stack_reference(projects.POLICIES, "default")
+vault_stack = make_stack_reference(
+    projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
-dns_stack = StackReference(stack_ref(projects.DNS, "default"))
-monitoring_stack = StackReference(stack_ref(projects.MONITORING, "default"))
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
-policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
-vault_stack = StackReference(
-    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
-)
-vector_log_proxy_stack = StackReference(
-    stack_ref(projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}")
+vector_log_proxy_stack = make_stack_reference(
+    projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
 )
 
 apps_vpc = network_stack.require_output("applications_vpc")

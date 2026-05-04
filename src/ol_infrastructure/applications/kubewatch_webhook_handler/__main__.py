@@ -14,13 +14,16 @@ from pathlib import Path
 
 import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, Output, StackReference, export, log
+from pulumi import Config, Output, export, log
 
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
 from ol_infrastructure.lib.ol_types import AWSBase, BusinessUnit, Environment
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 
 # Get stack info
 stack_info = parse_stack()
@@ -35,8 +38,8 @@ aws_config = AWSBase(
 )
 
 # Reference the EKS cluster stack
-cluster_stack = StackReference(
-    stack_ref(projects.EKS, f"{stack_info.env_prefix}.{stack_info.name}")
+cluster_stack = make_stack_reference(
+    projects.EKS, f"{stack_info.env_prefix}.{stack_info.name}"
 )
 
 # Setup Kubernetes provider

@@ -7,7 +7,7 @@ from typing import Any
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi import Config, Output, ResourceOptions, export
 from pulumi_aws import ec2, get_caller_identity, route53, ses
 
 from bridge.lib.magic_numbers import (
@@ -51,23 +51,26 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 setup_vault_provider()
 superset_config = Config("superset")
 stack_info = parse_stack()
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
-dns_stack = StackReference(stack_ref(projects.DNS, "default"))
-vault_infra_stack = StackReference(
-    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+dns_stack = make_stack_reference(projects.DNS, "default")
+vault_infra_stack = make_stack_reference(
+    projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
-vault_mount_stack = StackReference(
-    stack_ref(projects.VAULT_STATIC_MOUNTS, f"operations.{stack_info.name}")
+vault_mount_stack = make_stack_reference(
+    projects.VAULT_STATIC_MOUNTS, f"operations.{stack_info.name}"
 )
-policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
-cluster_stack = StackReference(stack_ref(projects.EKS, f"data.{stack_info.name}"))
+policy_stack = make_stack_reference(projects.POLICIES, "default")
+cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
 
 mitol_zone_id = dns_stack.require_output("ol")["id"]
 operations_vpc = network_stack.require_output("operations_vpc")

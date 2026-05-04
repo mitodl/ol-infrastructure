@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi import Config, Output, ResourceOptions, export
 from pulumi_aws import iam
 
 from bridge.lib.versions import STARROCKS_CHART_VERSION, STARROCKS_VERSION
@@ -26,6 +26,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
@@ -38,14 +39,18 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack, require_stack_output_value
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+    require_stack_output_value,
+)
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 setup_vault_provider()
 stack_info = parse_stack()
 starrocks_config = Config("starrocks")
 
-cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
+cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
 setup_k8s_provider(require_stack_output_value(cluster_stack, "kube_config"))
 stateful_workload_storage = require_stack_output_value(
     cluster_stack, "stateful_workload_storage"
@@ -53,7 +58,7 @@ stateful_workload_storage = require_stack_output_value(
 use_io_optimized_nodes = stateful_workload_storage["use_io_optimized_nodes"]
 starrocks_data_storage_class = stateful_workload_storage["storage_class"]
 
-kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
+kms_stack = make_stack_reference(projects.KMS, stack_info.name)
 s3_kms_key = kms_stack.require_output("kms_s3_data_analytics_key")
 
 starrocks_env = f"data-{stack_info.env_suffix}"
@@ -178,9 +183,7 @@ _DATA_LAKE_ENVS = ("QA", "Production")
 
 if starrocks_config.get_bool("enable_data_lake_integration"):
     for _data_lake_env in _DATA_LAKE_ENVS:
-        _dw_stack = StackReference(
-            f"infrastructure.aws.data_warehouse.{_data_lake_env}"
-        )
+        _dw_stack = make_stack_reference(projects.DATA_WAREHOUSE, _data_lake_env)
         iam.RolePolicyAttachment(
             f"starrocks-data-lake-policy-{stack_info.env_suffix}-{_data_lake_env}",
             policy_arn=_dw_stack.require_output(

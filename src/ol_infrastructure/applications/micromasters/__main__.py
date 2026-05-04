@@ -21,7 +21,6 @@ from pulumi import (
     Config,
     Output,
     ResourceOptions,
-    StackReference,
     export,
 )
 from pulumi_aws import ec2, iam, route53, s3
@@ -84,9 +83,9 @@ from ol_infrastructure.lib.ol_types import (
 )
 from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
+    make_stack_reference,
     merge_otel_resource_attributes,
     parse_stack,
-    stack_ref,
 )
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -96,16 +95,16 @@ setup_vault_provider(skip_child_token=True)
 micromasters_config = Config("micromasters")
 
 stack_info = parse_stack()
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
-dns_stack = StackReference(stack_ref(projects.DNS, "default"))
-vector_log_proxy_stack = StackReference(
-    stack_ref(projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}")
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+dns_stack = make_stack_reference(projects.DNS, "default")
+vector_log_proxy_stack = make_stack_reference(
+    projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
 )
 micromasters_vpc = network_stack.require_output("applications_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
 data_vpc = network_stack.require_output("data_vpc")
-vault_stack = StackReference(
-    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+vault_stack = make_stack_reference(
+    projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
 micromasters_environment = f"micromasters-{stack_info.env_suffix}"
 
@@ -295,11 +294,9 @@ micromasters_vault_backend = OLVaultDatabaseBackend(micromasters_vault_backend_c
 
 vault_config = Config("vault")
 redis_config = Config("redis")
-cluster_stack = StackReference(
-    stack_ref(projects.EKS, f"applications.{stack_info.name}")
-)
-cluster_substructure_stack = StackReference(
-    stack_ref(projects.EKS_SUB, f"applications.{stack_info.name}")
+cluster_stack = make_stack_reference(projects.EKS, f"applications.{stack_info.name}")
+cluster_substructure_stack = make_stack_reference(
+    projects.EKS_SUB, f"applications.{stack_info.name}"
 )
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 

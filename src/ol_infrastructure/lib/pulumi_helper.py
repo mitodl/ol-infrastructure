@@ -6,7 +6,7 @@ from typing import Any
 
 import pulumi
 import pulumi.log
-from pulumi import StackReference, get_stack
+from pulumi import Alias, ResourceOptions, StackReference, get_stack
 from pulumi.runtime import sync_await
 
 
@@ -82,6 +82,58 @@ def stack_ref(project_name: str, stack_name: str) -> str:
     :returns: Reference string suitable for :class:`pulumi.StackReference`.
     """
     return f"organization/{project_name}/{stack_name}"
+
+
+def make_stack_reference(
+    project_name: str,
+    stack_name: str,
+    *,
+    opts: ResourceOptions | None = None,
+) -> StackReference:
+    """Create a StackReference with a legacy-name alias for state migration.
+
+    After the project-scoped stack migration the resource name embedded in
+    existing stack state files still uses the old flat-namespace dotted format
+    (e.g. ``"infrastructure.aws.network.CI"``).  Without an alias Pulumi would
+    plan a *delete* of the old resource followed by a *create* of the new one.
+    The delete step tries to read outputs from the now-gone legacy stack and
+    fails with "unknown stack".
+
+    By supplying a ``pulumi.Alias`` from the old name to the new
+    ``organization/{project}/{stack}`` name, Pulumi matches the existing state
+    entry to the new code declaration and performs an in-place update instead,
+    reading outputs only from the new (correctly named) stack.
+
+    This is the preferred replacement for ``StackReference(stack_ref(...))``.
+
+    :param project_name: Pulumi project name constant from
+        :mod:`ol_infrastructure.lib.pulumi_projects`.
+    :param stack_name: Short stack name, e.g. ``"QA"``, ``"operations.CI"``,
+        ``"default"``.
+    :param opts: Optional :class:`pulumi.ResourceOptions` to merge.
+    :returns: A :class:`pulumi.StackReference` with the appropriate alias.
+    """
+    from ol_infrastructure.lib.pulumi_projects import (  # noqa: PLC0415
+        LEGACY_STACK_REF_PREFIXES,
+    )
+
+    ref = stack_ref(project_name, stack_name)
+
+    aliases: list[Alias] = []
+    if project_name in LEGACY_STACK_REF_PREFIXES:
+        legacy_prefix = LEGACY_STACK_REF_PREFIXES[project_name]
+        legacy_name = (
+            legacy_prefix
+            if stack_name == "default"
+            else f"{legacy_prefix}.{stack_name}"
+        )
+        aliases.append(Alias(name=legacy_name))
+
+    merged_opts = ResourceOptions.merge(
+        opts or ResourceOptions(),
+        ResourceOptions(aliases=aliases),
+    )
+    return StackReference(ref, opts=merged_opts)
 
 
 def require_stack_output_value(

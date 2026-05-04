@@ -6,7 +6,7 @@ from pathlib import Path
 import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference
+from pulumi import Config, ResourceOptions
 
 from bridge.lib.versions import (
     GRAFANA_K8S_MONITORING_CHART_VERSION,
@@ -22,7 +22,10 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 from ol_infrastructure.lib.vault import setup_vault_provider
 from ol_infrastructure.substructure.aws.eks.clickhouse_operator import (
     setup_clickhouse_operator,
@@ -58,11 +61,11 @@ VERSIONS = {
 
 stack_info = parse_stack()
 
-cluster_stack = StackReference(
-    stack_ref(projects.EKS, f"{stack_info.env_prefix}.{stack_info.name}")
+cluster_stack = make_stack_reference(
+    projects.EKS, f"{stack_info.env_prefix}.{stack_info.name}"
 )
-kms_stack = StackReference(stack_ref(projects.KMS, stack_info.name))
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+kms_stack = make_stack_reference(projects.KMS, stack_info.name)
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 
 target_vpc = network_stack.require_output(env_config.require("target_vpc"))
 

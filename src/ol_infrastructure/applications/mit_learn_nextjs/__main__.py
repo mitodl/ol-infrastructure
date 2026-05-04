@@ -4,7 +4,7 @@ from typing import Any
 
 import pulumi_kubernetes as kubernetes
 from kubernetes import client, config
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, ResourceOptions, export
 
 from bridge.lib.magic_numbers import DEFAULT_NEXTJS_PORT
 from ol_infrastructure.components.aws.eks import (
@@ -29,16 +29,14 @@ from ol_infrastructure.lib.ol_types import (
 from ol_infrastructure.lib.pulumi_helper import (
     format_docker_image_ref,
     get_docker_image_tag,
+    make_stack_reference,
     merge_otel_resource_attributes,
     parse_stack,
-    stack_ref,
 )
 
 stack_info = parse_stack()
 
-cluster_stack = StackReference(
-    stack_ref(projects.EKS, f"applications.{stack_info.name}")
-)
+cluster_stack = make_stack_reference(projects.EKS, f"applications.{stack_info.name}")
 # Assume the application image URI comes from a separate image build stack
 MIT_LEARN_NEXTJS_DOCKER_TAG = get_docker_image_tag("MIT_LEARN_NEXTJS")
 

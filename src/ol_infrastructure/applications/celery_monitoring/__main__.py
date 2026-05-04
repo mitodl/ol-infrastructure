@@ -42,25 +42,28 @@ from ol_infrastructure.lib.ol_types import (
     K8sGlobalLabels,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 stack_info = parse_stack()
 setup_vault_provider(stack_info)
 celery_monitoring_config = Config("celery_monitoring")
-opensearch_stack = StackReference(
-    stack_ref(projects.OPENSEARCH, f"celery_monitoring.{stack_info.name}")
+opensearch_stack = make_stack_reference(
+    projects.OPENSEARCH, f"celery_monitoring.{stack_info.name}"
 )
-vault_mount_stack = StackReference(
-    stack_ref(projects.VAULT_STATIC_MOUNTS, f"operations.{stack_info.name}")
+vault_mount_stack = make_stack_reference(
+    projects.VAULT_STATIC_MOUNTS, f"operations.{stack_info.name}"
 )
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 operations_vpc = network_stack.require_output("operations_vpc")
 
 # K8s stack references
-cluster_stack = StackReference(stack_ref(projects.EKS, f"operations.{stack_info.name}"))
-cluster_substructure_stack = StackReference(
-    stack_ref(projects.EKS_SUB, f"operations.{stack_info.name}")
+cluster_stack = make_stack_reference(projects.EKS, f"operations.{stack_info.name}")
+cluster_substructure_stack = make_stack_reference(
+    projects.EKS_SUB, f"operations.{stack_info.name}"
 )
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 

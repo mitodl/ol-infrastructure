@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, ResourceOptions, export
 
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
@@ -28,7 +28,10 @@ from ol_infrastructure.components.services.vault import (
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import cached_image_uri, setup_k8s_provider
 from ol_infrastructure.lib.ol_types import AWSBase, K8sGlobalLabels, Services
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 ##################################
@@ -42,9 +45,7 @@ stack_info = parse_stack()
 xqwatcher_config = Config("xqwatcher")
 
 cluster_name = xqwatcher_config.get("cluster") or "applications"
-cluster_stack = StackReference(
-    stack_ref(projects.EKS, f"{cluster_name}.{stack_info.name}")
-)
+cluster_stack = make_stack_reference(projects.EKS, f"{cluster_name}.{stack_info.name}")
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 

@@ -7,7 +7,10 @@ import pulumi_vault as vault
 
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib import pulumi_projects as projects
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 from ol_infrastructure.lib.vault import get_vault_provider
 
 vault_config = pulumi.Config("vault_setup")
@@ -15,8 +18,8 @@ vault_server_config = pulumi.Config("vault_server")
 stack_info = parse_stack()
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 env_namespace = f"{stack_info.env_prefix}.{stack_info.env_suffix}"
-vault_cluster = pulumi.StackReference(
-    stack_ref(projects.VAULT_SERVER, f"{stack_info.env_prefix}.{stack_info.name}")
+vault_cluster = make_stack_reference(
+    projects.VAULT_SERVER, f"{stack_info.env_prefix}.{stack_info.name}"
 )
 vault_dns = vault_cluster.outputs["vault_server"]["public_dns"]
 vault_address = vault_cluster.outputs["vault_server"]["cluster_address"]

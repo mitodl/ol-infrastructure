@@ -27,7 +27,6 @@ from pulumi import (
     Config,
     Output,
     ResourceOptions,
-    StackReference,
     export,
 )
 from pulumi_aws import (
@@ -61,7 +60,10 @@ from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.ec2_helper import DiskTypes, InstanceTypes
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 
 ###############
 # Stack Setup #
@@ -69,14 +71,14 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 vault_config = Config("vault")
 stack_info = parse_stack()
 target_network = vault_config.require("target_vpc")
-ca_stack = StackReference(stack_ref(projects.PRIVATE_CA, "default"))
-consul_stack = StackReference(
-    stack_ref(projects.CONSUL_INFRA, f"{stack_info.env_prefix}.{stack_info.name}")
+ca_stack = make_stack_reference(projects.PRIVATE_CA, "default")
+consul_stack = make_stack_reference(
+    projects.CONSUL_INFRA, f"{stack_info.env_prefix}.{stack_info.name}"
 )
-dns_stack = StackReference(stack_ref(projects.DNS, "default"))
-kms_stack = StackReference(stack_ref(projects.KMS, stack_info.name))
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
-policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
+dns_stack = make_stack_reference(projects.DNS, "default")
+kms_stack = make_stack_reference(projects.KMS, stack_info.name)
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+policy_stack = make_stack_reference(projects.POLICIES, "default")
 
 ##################
 # Variable Setup #

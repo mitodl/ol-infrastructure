@@ -69,7 +69,10 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import StackInfo, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    StackInfo,
+    make_stack_reference,
+)
 
 
 def create_k8s_resources(  # noqa: C901
@@ -131,8 +134,8 @@ def create_k8s_resources(  # noqa: C901
     # Look up what what release to deploy for this stack
     release_info = OpenLearningOpenEdxDeployment.get_item(stack_info.env_prefix)
 
-    opensearch_stack = StackReference(
-        stack_ref(projects.OPENSEARCH, f"{stack_info.env_prefix}.{stack_info.name}")
+    opensearch_stack = make_stack_reference(
+        projects.OPENSEARCH, f"{stack_info.env_prefix}.{stack_info.name}"
     )
     opensearch_hostname = opensearch_stack.require_output("cluster")["endpoint"]
 

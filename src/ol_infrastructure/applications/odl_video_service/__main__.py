@@ -18,7 +18,6 @@ from pulumi import (
     Config,
     Output,
     ResourceOptions,
-    StackReference,
     export,
 )
 from pulumi_aws import ec2, get_caller_identity, iam
@@ -74,9 +73,9 @@ from ol_infrastructure.lib.ol_types import (
 )
 from ol_infrastructure.lib.pulumi_helper import (
     format_docker_image_ref,
+    make_stack_reference,
     merge_otel_resource_attributes,
     parse_stack,
-    stack_ref,
 )
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -90,11 +89,11 @@ k8s_cutover = ovs_config.get_bool("k8s_cutover") or False
 
 aws_account = get_caller_identity()
 
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
-policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
-dns_stack = StackReference(stack_ref(projects.DNS, "default"))
-vault_stack = StackReference(
-    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+policy_stack = make_stack_reference(projects.POLICIES, "default")
+dns_stack = make_stack_reference(projects.DNS, "default")
+vault_stack = make_stack_reference(
+    projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
 
 target_vpc_name = ovs_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
@@ -694,9 +693,7 @@ app_env_vars: dict[str, str | bool] = {
 
 vault_config = Config("vault")
 
-cluster_stack = StackReference(
-    stack_ref(projects.EKS, f"applications.{stack_info.name}")
-)
+cluster_stack = make_stack_reference(projects.EKS, f"applications.{stack_info.name}")
 k8s_pod_subnet_cidrs = target_vpc["k8s_pod_subnet_cidrs"]
 
 k8s_app_labels = K8sAppLabels(

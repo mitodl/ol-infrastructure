@@ -18,7 +18,6 @@ from pulumi import (
     Config,
     InvokeOptions,
     ResourceOptions,
-    StackReference,
     export,
 )
 from pulumi_aws import ec2, iam, route53
@@ -82,9 +81,9 @@ from ol_infrastructure.lib.ol_types import (
 )
 from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
+    make_stack_reference,
     merge_otel_resource_attributes,
     parse_stack,
-    stack_ref,
 )
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -101,16 +100,16 @@ fastly_provider = get_fastly_provider()
 stack_info = parse_stack()
 backend_domain = xpro_config.require("backend_domain")
 frontend_domain = xpro_config.require("frontend_domain")
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
-monitoring_stack = StackReference(stack_ref(projects.MONITORING, "default"))
-vector_log_proxy_stack = StackReference(
-    stack_ref(projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}")
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+monitoring_stack = make_stack_reference(projects.MONITORING, "default")
+vector_log_proxy_stack = make_stack_reference(
+    projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
 )
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
-vault_stack = StackReference(
-    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+vault_stack = make_stack_reference(
+    projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
 aws_config = AWSBase(
     tags={
@@ -372,11 +371,11 @@ if k8s_deploy:
     vault_config = Config("vault")
     redis_config = Config("redis")
 
-    cluster_stack = StackReference(
-        stack_ref(projects.EKS, f"applications.{stack_info.name}")
+    cluster_stack = make_stack_reference(
+        projects.EKS, f"applications.{stack_info.name}"
     )
-    cluster_substructure_stack = StackReference(
-        stack_ref(projects.EKS_SUB, f"applications.{stack_info.name}")
+    cluster_substructure_stack = make_stack_reference(
+        projects.EKS_SUB, f"applications.{stack_info.name}"
     )
     k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 

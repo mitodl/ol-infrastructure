@@ -5,7 +5,7 @@ from pathlib import Path
 
 import bcrypt
 import yaml
-from pulumi import Config, Output, StackReference, export
+from pulumi import Config, Output, export
 from pulumi_aws import ec2, get_caller_identity, iam, route53
 
 from bridge.lib.magic_numbers import (
@@ -33,7 +33,10 @@ from ol_infrastructure.lib.aws.ec2_helper import (
     default_egress_args,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 
 
 # Make cloud-init userdata
@@ -118,18 +121,18 @@ env_config = Config("environment")
 consul_config = Config("consul")
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 business_unit = env_config.get("business_unit") or "operations"
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
-policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+policy_stack = make_stack_reference(projects.POLICIES, "default")
 destination_vpc = network_stack.require_output(env_config.require("vpc_reference"))
 peer_vpcs = destination_vpc["peers"].apply(
     lambda peers: {peer: network_stack.require_output(peer) for peer in peers}
 )
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": env_name})
 destination_vpc = network_stack.require_output(env_config.require("vpc_reference"))
-dns_stack = StackReference(stack_ref(projects.DNS, "default"))
+dns_stack = make_stack_reference(projects.DNS, "default")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 vpc_id = destination_vpc["id"]
-kms_stack = StackReference(stack_ref(projects.KMS, stack_info.name))
+kms_stack = make_stack_reference(projects.KMS, stack_info.name)
 kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
 consul_dns_name = f"consul-{env_name}.odl.mit.edu"
 

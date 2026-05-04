@@ -18,7 +18,6 @@ from pulumi import (
     Config,
     InvokeOptions,
     ResourceOptions,
-    StackReference,
     export,
 )
 from pulumi_aws import ec2, get_caller_identity, iam
@@ -77,9 +76,9 @@ from ol_infrastructure.lib.ol_types import (
 )
 from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
+    make_stack_reference,
     merge_otel_resource_attributes,
     parse_stack,
-    stack_ref,
 )
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -96,7 +95,7 @@ github_provider = github.Provider(
 )
 github_options = ResourceOptions(provider=github_provider)
 
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
@@ -429,11 +428,9 @@ app_env_vars["OCW_TEST_SITE_SLUGS"] = json.dumps(
 vault_config = Config("vault")
 redis_config = Config("redis")
 
-cluster_stack = StackReference(
-    stack_ref(projects.EKS, f"applications.{stack_info.name}")
-)
-cluster_substructure_stack = StackReference(
-    stack_ref(projects.EKS_SUB, f"applications.{stack_info.name}")
+cluster_stack = make_stack_reference(projects.EKS, f"applications.{stack_info.name}")
+cluster_substructure_stack = make_stack_reference(
+    projects.EKS_SUB, f"applications.{stack_info.name}"
 )
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 

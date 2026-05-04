@@ -20,7 +20,6 @@ from pulumi import (
     Alias,
     Config,
     ResourceOptions,
-    StackReference,
     export,
 )
 from pulumi_aws import ec2, iam, route53, s3
@@ -89,9 +88,9 @@ from ol_infrastructure.lib.ol_types import (
 )
 from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
+    make_stack_reference,
     merge_otel_resource_attributes,
     parse_stack,
-    stack_ref,
 )
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -105,16 +104,14 @@ apisix_ingress_class = mitxonline_config.get("apisix_ingress_class") or "apisix"
 fastly_provider = get_fastly_provider()
 
 stack_info = parse_stack()
-cluster_stack = StackReference(
-    stack_ref(projects.EKS, f"applications.{stack_info.name}")
+cluster_stack = make_stack_reference(projects.EKS, f"applications.{stack_info.name}")
+cluster_substructure_stack = make_stack_reference(
+    projects.EKS_SUB, f"applications.{stack_info.name}"
 )
-cluster_substructure_stack = StackReference(
-    stack_ref(projects.EKS_SUB, f"applications.{stack_info.name}")
+vault_stack = make_stack_reference(
+    projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
-vault_stack = StackReference(
-    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
-)
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]

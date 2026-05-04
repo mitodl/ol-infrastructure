@@ -66,7 +66,10 @@ from ol_infrastructure.lib.fastly import (
     get_fastly_provider,
 )
 from ol_infrastructure.lib.ol_types import AWSBase, Services
-from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+)
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import mysql_role_statements, setup_vault_provider
 
@@ -91,23 +94,23 @@ cluster_stack_name = (
 cluster_stack = StackReference(cluster_stack_name)
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
-network_stack = StackReference(stack_ref(projects.NETWORKING, stack_info.name))
-policy_stack = StackReference(stack_ref(projects.POLICIES, "default"))
-dns_stack = StackReference(stack_ref(projects.DNS, "default"))
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+policy_stack = make_stack_reference(projects.POLICIES, "default")
+dns_stack = make_stack_reference(projects.DNS, "default")
 
-kms_stack = StackReference(stack_ref(projects.KMS, stack_info.name))
-vault_stack = StackReference(
-    stack_ref(projects.VAULT_SERVER, f"operations.{stack_info.name}")
+kms_stack = make_stack_reference(projects.KMS, stack_info.name)
+vault_stack = make_stack_reference(
+    projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
-monitoring_stack = StackReference(stack_ref(projects.MONITORING, "default"))
-vector_log_proxy_stack = StackReference(
-    stack_ref(projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}")
+monitoring_stack = make_stack_reference(projects.MONITORING, "default")
+vector_log_proxy_stack = make_stack_reference(
+    projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
 )
-mongodb_atlas_stack = StackReference(
-    stack_ref(projects.MONGODB_ATLAS, f"{stack_info.env_prefix}.{stack_info.name}")
+mongodb_atlas_stack = make_stack_reference(
+    projects.MONGODB_ATLAS, f"{stack_info.env_prefix}.{stack_info.name}"
 )
-notes_stack = StackReference(
-    stack_ref(projects.EDX_NOTES, f"{stack_info.env_prefix}.{stack_info.name}")
+notes_stack = make_stack_reference(
+    projects.EDX_NOTES, f"{stack_info.env_prefix}.{stack_info.name}"
 )
 
 #############
