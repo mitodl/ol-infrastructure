@@ -213,6 +213,15 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             "src/bridge/lib/versions.py",
         ],
     ),
+    "open-metadata-substructure": SimplePulumiParams(
+        app_name="open-metadata-substructure",
+        pulumi_project_path="substructure/open_metadata/",
+        pulumi_project_name="ol-substructure-open-metadata",
+        additional_watched_paths=[
+            "src/bridge/secrets/open_metadata/",
+            "src/bridge/lib/versions.py",
+        ],
+    ),
     "opensearch": SimplePulumiParams(
         app_name="opensearch",
         pulumi_project_path="infrastructure/aws/opensearch/",
