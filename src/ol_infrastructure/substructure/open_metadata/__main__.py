@@ -56,59 +56,59 @@ ingestion_iam_policy = iam.Policy(
         "Grants OpenMetadata ingestion pods read access to Glue catalog,"
         " S3 data lake, and RDS IAM auth for all app databases"
     ),
-    # Build the policy JSON inside an apply so the account_id Output is
-    # resolved before serialization. lint_iam_policy cannot accept Outputs.
-    policy=aws_account.account_id.apply(
-        lambda acct_id: lint_iam_policy(
-            {
-                "Version": IAM_POLICY_VERSION,
-                "Statement": [
-                    {
-                        "Sid": "GlueReadOnly",
-                        "Effect": "Allow",
-                        "Action": [
-                            "glue:GetDatabase",
-                            "glue:GetDatabases",
-                            "glue:GetTable",
-                            "glue:GetTables",
-                            "glue:GetPartition",
-                            "glue:GetPartitions",
-                        ],
-                        "Resource": [
-                            "arn:aws:glue:*:*:catalog",
-                            f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}*",
-                            f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}*/*",
-                        ],
-                    },
-                    {
-                        "Sid": "S3DataLakeRead",
-                        "Effect": "Allow",
-                        "Action": [
-                            "s3:GetObject",
-                            "s3:ListBucket",
-                        ],
-                        "Resource": [
-                            f"arn:aws:s3:::ol-data-lake-*-{stack_info.env_suffix}",
-                            f"arn:aws:s3:::ol-data-lake-*-{stack_info.env_suffix}/*",
-                        ],
-                    },
-                    {
-                        # Allows IAM-based auth to any RDS instance for the
-                        # read_only_role DB user. Works in combination with
-                        # GRANT rds_iam TO "read_only_role" in vault.py
-                        # (applied to all Vault-managed PostgreSQL databases).
-                        "Sid": "RDSIAMAuth",
-                        "Effect": "Allow",
-                        "Action": ["rds-db:connect"],
-                        "Resource": [
-                            f"arn:aws:rds-db:{aws_region}:{acct_id}:dbuser/*/read_only_role"
-                        ],
-                    },
-                ],
-            },
-            stringify=True,
-            parliament_config={"RESOURCE_EFFECTIVELY_STAR": {}},
-        )
+    policy=lint_iam_policy(
+        {
+            "Version": IAM_POLICY_VERSION,
+            "Statement": [
+                {
+                    "Sid": "GlueReadOnly",
+                    "Effect": "Allow",
+                    "Action": [
+                        "glue:GetDatabase",
+                        "glue:GetDatabases",
+                        "glue:GetTable",
+                        "glue:GetTables",
+                        "glue:GetPartition",
+                        "glue:GetPartitions",
+                    ],
+                    "Resource": [
+                        "arn:aws:glue:*:*:catalog",
+                        f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}*",
+                        f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}*/*",
+                    ],
+                },
+                {
+                    "Sid": "S3DataLakeRead",
+                    "Effect": "Allow",
+                    "Action": [
+                        "s3:GetObject",
+                        "s3:ListBucket",
+                    ],
+                    "Resource": [
+                        f"arn:aws:s3:::ol-data-lake-*-{stack_info.env_suffix}",
+                        f"arn:aws:s3:::ol-data-lake-*-{stack_info.env_suffix}/*",
+                    ],
+                },
+                {
+                    # Allows IAM-based auth to any RDS instance for the
+                    # read_only_role DB user. Works in combination with
+                    # GRANT rds_iam TO "read_only_role" in vault.py
+                    # (applied to all Vault-managed PostgreSQL databases).
+                    "Sid": "RDSIAMAuth",
+                    "Effect": "Allow",
+                    "Action": ["rds-db:connect"],
+                    "Resource": [
+                        f"arn:aws:rds-db:{aws_region}:{aws_account.account_id}:dbuser:*/read_only_role"
+                    ],
+                },
+            ],
+        },
+        stringify=True,
+        parliament_config={
+            "RESOURCE_EFFECTIVELY_STAR": {},
+            "CREDENTIALS_EXPOSURE": {},
+            "PERMISSIONS_MANAGEMENT_ACTIONS": {},
+        },
     ),
     tags=aws_config.tags,
 )
@@ -121,7 +121,7 @@ ingestion_irsa_role = OLEKSTrustRole(
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         description=(
             "IRSA trust role for OpenMetadata ingestion service account"
-            " — Glue, S3, and RDS IAM auth"
+            " - Glue, S3, and RDS IAM auth"
         ),
         policy_operator="StringEquals",
         role_name=f"om-ingestion-{stack_info.env_suffix}",
