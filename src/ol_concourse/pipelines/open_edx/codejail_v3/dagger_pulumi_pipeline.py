@@ -116,6 +116,7 @@ def build_codejail_pipeline(
     for deployment in filter_deployments_by_release(release_name):
         pulumi_fragment = pulumi_jobs_chain(
             codejail_pulumi_code,
+            refresh_stack=False,
             stack_names=[
                 f"applications.codejail.{deployment.deployment_name}.{stage}"
                 for stage in deployment.envs_by_release(release_name)

@@ -214,6 +214,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
             pulumi_fragments.append(
                 pulumi_jobs_chain(
                     edx_pulumi_code,
+                    refresh_stack=False,
                     stack_names=[
                         f"applications.edxapp.{deployment.deployment_name}.{stage}"
                         for stage in deployment.envs_by_release(release_name)

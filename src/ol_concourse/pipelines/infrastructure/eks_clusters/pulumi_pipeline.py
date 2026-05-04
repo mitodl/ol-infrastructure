@@ -32,6 +32,7 @@ for cluster in ["data", "operations", "applications", "residential"]:
 
     infra_chain = pulumi_jobs_chain(
         eks_infrastructure_code,
+        refresh_stack=False,
         project_name="ol-infrastructure-eks",
         project_source_path=PULUMI_CODE_PATH.joinpath("infrastructure/aws/eks"),
         stack_names=[f"{cluster}.{stage}" for stage in stages],
@@ -40,6 +41,7 @@ for cluster in ["data", "operations", "applications", "residential"]:
 
     substructure_chain = pulumi_jobs_chain(
         eks_substructure_code,
+        refresh_stack=False,
         project_name="ol-substructure-eks",
         project_source_path=PULUMI_CODE_PATH.joinpath("substructure/aws/eks"),
         stack_names=[f"{cluster}.{stage}" for stage in stages],

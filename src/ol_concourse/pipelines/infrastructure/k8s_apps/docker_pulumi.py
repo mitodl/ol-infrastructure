@@ -495,6 +495,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
 
     # QA and Production Deployments
     qa_and_production_fragment = pulumi_jobs_chain(
+        refresh_stack=False,
         pulumi_code=ol_infra_repo,
         stack_names=["QA", "Production"],
         project_name=f"ol-application-{app_name}",

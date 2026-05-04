@@ -72,6 +72,7 @@ def build_kubewatch_webhook_handler_pipeline() -> PipelineFragment:
     )
 
     webhook_handler_fragment = pulumi_jobs_chain(
+        refresh_stack=False,
         pulumi_code=webhook_handler_pulumi_code,
         stack_names=[
             f"applications.kubewatch_webhook_handler.applications.{env}"
@@ -130,6 +131,7 @@ def build_kubewatch_pipeline() -> PipelineFragment:
         ]
 
     kubewatch_fragment = pulumi_jobs_chain(
+        refresh_stack=False,
         pulumi_code=kubewatch_pulumi_code,
         stack_names=[
             f"applications.kubewatch.applications.{env}"

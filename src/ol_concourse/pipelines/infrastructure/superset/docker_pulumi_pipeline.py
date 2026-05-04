@@ -116,6 +116,7 @@ def build_superset_docker_pipeline() -> Pipeline:
 
     pulumi_fragment = pulumi_jobs_chain(
         pulumi_code_repo,
+        refresh_stack=False,
         stack_names=[
             f"applications.superset.{stage}" for stage in ("CI", "QA", "Production")
         ],

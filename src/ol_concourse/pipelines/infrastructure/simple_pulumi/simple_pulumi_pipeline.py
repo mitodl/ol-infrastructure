@@ -436,6 +436,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 # Create a job chain for this deployment group
                 group_fragment = pulumi_jobs_chain(
                     pulumi_code,
+                    refresh_stack=False,
                     project_name=params.pulumi_project_name,
                     stack_names=group_stacks,
                     project_source_path=PULUMI_CODE_PATH.joinpath(
@@ -465,6 +466,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             # Single chain for simple discovered stacks
             pulumi_fragment = pulumi_jobs_chain(
                 pulumi_code,
+                refresh_stack=False,
                 project_name=params.pulumi_project_name,
                 stack_names=discovered_stacks,
                 project_source_path=PULUMI_CODE_PATH.joinpath(
@@ -499,6 +501,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
 
         pulumi_fragment = pulumi_jobs_chain(
             pulumi_code,
+            refresh_stack=False,
             project_name=params.pulumi_project_name,
             stack_names=stack_names,
             project_source_path=PULUMI_CODE_PATH.joinpath(params.pulumi_project_path),

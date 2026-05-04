@@ -19,6 +19,7 @@ jupyterhub_pulumi_code = git_repo(
 
 jupyter_pulumi_fragment = pulumi_jobs_chain(
     jupyterhub_pulumi_code,
+    refresh_stack=False,
     stack_names=[
         f"applications.jupyterhub.{stage}" for stage in ("CI", "QA", "Production")
     ],

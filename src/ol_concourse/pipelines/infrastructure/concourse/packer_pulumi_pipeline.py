@@ -54,6 +54,7 @@ concourse_ami_fragment = packer_jobs(
 
 concourse_pulumi_fragment = pulumi_jobs_chain(
     concourse_pulumi_code,
+    refresh_stack=False,
     stack_names=[
         f"applications.concourse.{stage}" for stage in ("CI", "QA", "Production")
     ],
