@@ -1,0 +1,7 @@
+---
+name: ol-substructure-open-metadata
+runtime: python
+description: OpenMetadata Kubernetes ingestion jobs (CronOMJob resources) and IRSA
+  role for the ingestion service account
+backend:
+  url: s3://mitol-pulumi-state/

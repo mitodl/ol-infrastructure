@@ -194,6 +194,21 @@ postgres_role_statements = {
                 """
             ),
             Template("""RESET ROLE;"""),
+            # Grant rds_iam so any user in this role can authenticate via AWS IAM
+            # on RDS instances that have IAM DB authentication enabled.
+            # The DO block is a no-op on non-RDS Postgres where the role doesn't exist.
+            Template(
+                """
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT FROM pg_catalog.pg_roles WHERE rolname = 'rds_iam'
+                    ) THEN
+                        GRANT rds_iam TO "read_only_role";
+                    END IF;
+                END $$;
+                """
+            ),
             # Create the read-only user and put it into the read-only-role
             Template(
                 """

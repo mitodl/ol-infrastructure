@@ -1,0 +1,11 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: "AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgGoEj1l/e90rMjh8PKqy1DWAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMxl5Nd2PzaNEXvNEuAgEQgDvqOdk2BjcYO/Eiu1Jxtx4aBVF7dHS184NUw5tS4IapMcbxqM/NX2PbzPZNQj1wOd0Iv/ua/xpUSRMLuw=="
+config:
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa
+  open_metadata:aws_region: us-east-1
+  open_metadata:service_name_trino: Starburst Galaxy
+  open_metadata:service_name_airbyte: Airbyte
+  open_metadata:service_name_superset: Superset
+  open_metadata:service_name_iceberg: Iceberg

@@ -17,6 +17,20 @@ path "secret-openmetadata/data/connectors" {
 path "secret-openmetadata/data/connectors/*" {
   capabilities = ["read"]
 }
+# Ingestion-bot JWT tokens for authenticating to the OpenMetadata server API.
+# One path per system bot (ingestion, lineage, profiler, data-insight).
+path "secret-openmetadata/data/ingestion-bot" {
+  capabilities = ["read"]
+}
+path "secret-openmetadata/data/lineage-bot" {
+  capabilities = ["read"]
+}
+path "secret-openmetadata/data/profiler-bot" {
+  capabilities = ["read"]
+}
+path "secret-openmetadata/data/data-insight-bot" {
+  capabilities = ["read"]
+}
 # vault-secrets-operator is a little more particular about
 # managing its own leases, give it the permissions it needs
 # for dynamic secret renewals / revocation without giving

@@ -193,6 +193,7 @@ if __name__ == "__main__":
         "ocw-site",
         "open-discussions",
         "open-metadata",
+        "open-metadata-substructure",
         "opensearch",
         "qdrant-cloud",
         "starrocks",
