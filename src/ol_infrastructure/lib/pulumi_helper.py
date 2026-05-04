@@ -39,6 +39,7 @@ class StackInfo:
     env_suffix: str
     env_prefix: str
     full_name: str
+    k8s_name: str
     project_name: str = field(default="")
 
 
@@ -67,6 +68,7 @@ def parse_stack() -> StackInfo:
         env_suffix=stack_name.lower(),
         env_prefix=env_prefix,
         full_name=f"organization/{project}/{stack}",
+        k8s_name=f"{project}.{stack}",
         project_name=project,
     )
 

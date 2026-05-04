@@ -196,7 +196,7 @@ class K8sGlobalLabels(BaseModel):
             if key == "source_repository" and isinstance(value, str):
                 value = self._sanitize_label_value(value)
             new_dict[f"ol.mit.edu/{key}"] = value
-        new_dict["ol.mit.edu/stack"] = self.stack.full_name
+        new_dict["ol.mit.edu/stack"] = self._sanitize_label_value(self.stack.k8s_name)
         new_dict["ol.mit.edu/environment"] = self.stack.env_suffix
         return new_dict
 
