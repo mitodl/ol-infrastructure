@@ -281,9 +281,9 @@ def setup_apisix(
                                 set $cookie_names "";
                                 set $cookie_sizes "";
 
-                                -- Parse the Cookie request header exactly once per request and
-                                -- populate all telemetry variables.  APISix does not use
-                                -- rewrite_by_lua_block in its server block so this is safe.
+                                # Parse the Cookie request header exactly once per request and
+                                # populate all telemetry variables.  APISix does not use
+                                # rewrite_by_lua_block in its server block so this is safe.
                                 rewrite_by_lua_block {{
                                     local raw = ngx.var.http_cookie or ""
                                     ngx.var.cookie_bytes = tostring(#raw)
