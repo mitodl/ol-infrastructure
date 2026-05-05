@@ -34,7 +34,15 @@ aws_config = AWSBase(
 )
 s3_kms_key = kms_stack.require_output("kms_s3_data_analytics_key")
 
-data_stages = ("raw", "staging", "intermediate", "mart", "external")
+data_stages = (
+    "raw",
+    "staging",
+    "intermediate",
+    "mart",
+    "external",
+    "dimensional",
+    "reporting",
+)
 
 results_bucket_config = S3BucketConfig(
     bucket_name=f"ol-warehouse-results-{stack_info.env_suffix}",
