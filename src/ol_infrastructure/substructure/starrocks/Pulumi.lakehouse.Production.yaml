@@ -4,7 +4,7 @@ encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAFkYLtPxSaeEyWd7C
 config:
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
-  starrocks:applications_stack_name: applications.starrocks.lakehouse.Production
+  starrocks:applications_stack_name: lakehouse.Production
   starrocks:db_admin_username: root
   starrocks:verify_connection: "false"
   starrocks:ssl_enabled: "true"
