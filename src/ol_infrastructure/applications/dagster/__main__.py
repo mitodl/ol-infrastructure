@@ -1476,3 +1476,10 @@ export(
         "domain": dagster_config.require("domain"),
     },
 )
+export(
+    "dbt_artifacts",
+    {
+        "s3_bucket": dagster_bucket_name,
+        "s3_prefix": "openmetadata/dbt-artifacts",
+    },
+)
