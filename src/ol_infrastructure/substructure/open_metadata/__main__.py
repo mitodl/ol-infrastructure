@@ -90,6 +90,21 @@ ingestion_iam_policy = iam.Policy(
                     ],
                 },
                 {
+                    # Allows reading dbt artifacts (manifest.json, catalog.json,
+                    # run_results.json) uploaded by DbtS3ArtifactsResource after
+                    # each full Dagster dbt build.
+                    "Sid": "S3DagsterArtifactsRead",
+                    "Effect": "Allow",
+                    "Action": [
+                        "s3:GetObject",
+                        "s3:ListBucket",
+                    ],
+                    "Resource": [
+                        f"arn:aws:s3:::dagster-data-{stack_info.env_suffix}",
+                        f"arn:aws:s3:::dagster-data-{stack_info.env_suffix}/*",
+                    ],
+                },
+                {
                     # Allows IAM-based auth to any RDS instance for the
                     # read_only_role DB user. Works in combination with
                     # GRANT rds_iam TO "read_only_role" in vault.py
@@ -270,6 +285,9 @@ service_name_trino = om_config.get("service_name_trino") or "Starburst Galaxy"
 service_name_airbyte = om_config.get("service_name_airbyte") or "Airbyte"
 service_name_superset = om_config.get("service_name_superset") or "Superset"
 service_name_glue = om_config.get("service_name_glue") or "Glue"
+# dbt enrichment targets the same Glue service (defaults to service_name_glue)
+# but can be overridden independently if the service name differs.
+service_name_dbt = om_config.get("service_name_dbt") or service_name_glue
 
 # ---------------------------------------------------------------------------
 # Trino (Starburst Galaxy) metadata ingestion
@@ -396,6 +414,38 @@ _make_cronjob(
         _plain_env("OM_SERVER_URL", OM_SERVER_URL),
         _plain_env("OM_SERVICE_NAME", service_name_glue),
         _plain_env("OM_AWS_REGION", aws_region),
+    ],
+)
+
+# ---------------------------------------------------------------------------
+# dbt metadata enrichment
+# ---------------------------------------------------------------------------
+# Runs after Glue metadata (2 AM) so that the Glue service tables already
+# exist in OM before dbt descriptions, tags, and test results are applied.
+#
+# Downloads manifest.json, catalog.json, and run_results.json from the
+# Dagster S3 bucket (dagster-data-{env}) at the prefix uploaded by
+# DbtS3ArtifactsResource after each full dbt build in the lakehouse code
+# location.  IRSA provides ambient S3 credentials — no secret needed.
+#
+# The serviceName must match the Glue service so that dbt model FQNs
+# resolve to the correct table entities in OM.
+
+# Bucket where DbtS3ArtifactsResource uploads artifacts; can be overridden
+# per-stack via the open_metadata:dbt_artifacts_bucket config key.
+dbt_artifacts_bucket = (
+    om_config.get("dbt_artifacts_bucket") or f"dagster-data-{stack_info.env_suffix}"
+)
+
+_make_cronjob(
+    name="dbt",
+    schedule="0 3 * * *",
+    python_script=(Path(__file__).parent / "scripts" / "dbt_metadata.py").read_text(),
+    extra_env=[
+        _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+        _plain_env("OM_SERVICE_NAME", service_name_dbt),
+        _plain_env("OM_AWS_REGION", aws_region),
+        _plain_env("OM_DBT_BUCKET", dbt_artifacts_bucket),
     ],
 )
 
