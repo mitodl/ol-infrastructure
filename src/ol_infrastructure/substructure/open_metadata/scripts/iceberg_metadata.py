@@ -27,7 +27,23 @@ config = {
                 },
             }
         },
-        "sourceConfig": {"config": {"type": "StorageMetadata"}},
+        "sourceConfig": {
+            "config": {
+                "type": "DatabaseMetadata",
+                # Only ingest production dbt layer schemas. Dev/personal schemas
+                # follow the pattern ol_warehouse_{env}_{user}_{layer} and
+                # have stale __dbt_tmp Glue entries pointing to non-existent S3
+                # paths. Valid schemas are ol_warehouse_{env}_{layer} where env
+                # is a single word (production, qa, ci, etc.) and layer is one
+                # of the dbt model directory names from ol-data-platform.
+                "schemaFilterPattern": {
+                    "includes": [
+                        "ol_warehouse_[a-z]+_(dimensional|external|intermediate|mart|migration|reporting|staging)$",
+                        "ol_data_lake_[a-z]+",
+                    ],
+                },
+            }
+        },
     },
     "sink": {"type": "metadata-rest", "config": {}},
     "workflowConfig": {

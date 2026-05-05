@@ -11,7 +11,7 @@ TrinoLineageSource expects:
   "user"              email
   "started"           create_time
   "end"               end_time
-  "state" = FINISHED  query_state = COMPLETED
+  "state" = FINISHED  query_state = FINISHED
 
 We patch sql_stmt and filters directly on TrinoLineageSource before
 constructing the workflow, so all of OM's SQL parsing, entity resolution,
@@ -36,20 +36,26 @@ TrinoLineageSource.sql_stmt = textwrap.dedent(
       end_time as end_time
     from galaxy_telemetry.public.query_history
     WHERE query NOT LIKE '/* {{"app": "OpenMetadata", %%}} */%%'
-    AND query NOT LIKE '/* {{"app": "dbt", %%}} */%%'
-    AND CAST(create_time AS date) >= date_parse('{start_time}', '%Y-%m-%d %H:%i:%s')
-    AND CAST(create_time AS date) < date_parse('{end_time}', '%Y-%m-%d %H:%i:%s')
-    AND query_state = 'COMPLETED'
+    AND create_time >= date_parse('{start_time}', '%Y-%m-%d %H:%i:%s')
+    AND create_time < date_parse('{end_time}', '%Y-%m-%d %H:%i:%s')
+    AND query_state = 'FINISHED'
     {filters}
     LIMIT {result_limit}
     """
 )
+# dbt incremental models produce INSERT INTO <final_table> ... which contains
+# real lineage. dbt full-refresh CTAS creates __dbt_tmp temp tables that are
+# not registered in OM, so we exclude those. GRANT statements contain the
+# word "update" (GRANT update ON ...) so we exclude them explicitly.
 TrinoLineageSource.filters = """
+    AND lower(query) NOT LIKE '%%__dbt_tmp%%'
+    AND lower(query) NOT LIKE '%%__dbt_backup%%'
+    AND lower(query) NOT LIKE '%%grant%%update%%'
     AND (
         lower(query) LIKE '%%create%%table%%as%%select%%'
         OR lower(query) LIKE '%%insert%%into%%select%%'
-        OR lower(query) LIKE '%%update%%'
-        OR lower(query) LIKE '%%merge%%'
+        OR lower(query) LIKE '%%update %%set%%'
+        OR lower(query) LIKE '%%merge%%into%%'
     )
 """
 

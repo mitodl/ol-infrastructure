@@ -361,6 +361,17 @@ if open_metadata_connector_secrets:
             "OM_AIRBYTE_USERNAME": '{{ index .Secrets "airbyte" "username" }}',
             "OM_AIRBYTE_PASSWORD": '{{ index .Secrets "airbyte" "password" }}',
         },
+        "superset": {
+            "OM_SUPERSET_OIDC_REALM_URL": (
+                '{{ index .Secrets "superset" "oidc_realm_url" }}'
+            ),
+            "OM_SUPERSET_OIDC_CLIENT_ID": (
+                '{{ index .Secrets "superset" "oidc_client_id" }}'
+            ),
+            "OM_SUPERSET_OIDC_CLIENT_SECRET": (
+                '{{ index .Secrets "superset" "oidc_client_secret" }}'
+            ),
+        },
     }
     connector_configs = {
         name: templates
