@@ -495,6 +495,46 @@ _make_cronjob(
     ],
 )
 
+# Trino data profiler — collects table/column statistics (row count, null %,
+# distinct %, min/max, mean/std) for all ol_warehouse_production_* schemas.
+# Uses a 10% row sample; runs weekly (Sunday 07:00 UTC) to control cost.
+_make_cronjob(
+    name="trino-profiler",
+    schedule="0 7 * * 0",
+    python_script=(Path(__file__).parent / "scripts" / "trino_profiler.py").read_text(),
+    extra_env=[
+        _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+        _plain_env("OM_SERVICE_NAME", service_name_trino),
+        _secret_env("om-connector-trino", "OM_TRINO_HOST_PORT"),
+        _secret_env("om-connector-trino", "OM_TRINO_USERNAME"),
+        _secret_env("om-connector-trino", "OM_TRINO_PASSWORD"),
+        _secret_env("om-connector-trino", "OM_TRINO_CATALOG"),
+    ],
+    bot_secret_name="om-profiler-bot",  # noqa: S106  # pragma: allowlist secret
+)
+
+# Trino PII auto-classifier — uses OM's built-in AutoClassificationWorkflow,
+# which combines column-name regex (ColumnNameScanner) and Presidio NLP on
+# sampled rows (NERScanner) to suggest PII.Sensitive / PII.NonSensitive tags.
+# Suggested tags propagate via OM lineage once a data steward confirms them.
+# Runs weekly (Sunday 08:00 UTC, after the profiler).
+_make_cronjob(
+    name="trino-classifier",
+    schedule="0 8 * * 0",
+    python_script=(
+        Path(__file__).parent / "scripts" / "trino_classifier.py"
+    ).read_text(),
+    extra_env=[
+        _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+        _plain_env("OM_SERVICE_NAME", service_name_trino),
+        _secret_env("om-connector-trino", "OM_TRINO_HOST_PORT"),
+        _secret_env("om-connector-trino", "OM_TRINO_USERNAME"),
+        _secret_env("om-connector-trino", "OM_TRINO_PASSWORD"),
+        _secret_env("om-connector-trino", "OM_TRINO_CATALOG"),
+    ],
+    bot_secret_name="om-profiler-bot",  # noqa: S106  # pragma: allowlist secret
+)
+
 export(
     "open_metadata_ingestion",
     {
