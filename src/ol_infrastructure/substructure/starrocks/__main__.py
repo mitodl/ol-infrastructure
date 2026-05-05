@@ -32,11 +32,12 @@ import json
 import pulumi
 import pulumi_command as command
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, ResourceOptions, export
 
 from bridge.lib.magic_numbers import ONE_MONTH_SECONDS
 from bridge.lib.versions import VAULT_PLUGIN_STARROCKS_SHA256
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib import pulumi_projects
+from ol_infrastructure.lib.pulumi_helper import make_stack_reference, parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 setup_vault_provider()
@@ -52,7 +53,9 @@ DEFAULT_TTL = ONE_MONTH_SECONDS * 3
 
 # Read the FE MySQL NLB hostname and admin password from the applications stack so
 # both values stay in sync with the deployed cluster without duplication.
-applications_stack = StackReference(starrocks_config.require("applications_stack_name"))
+applications_stack = make_stack_reference(
+    pulumi_projects.STARROCKS_APP, starrocks_config.require("applications_stack_name")
+)
 db_host = applications_stack.require_output("fe_mysql_host")
 db_admin_password = applications_stack.require_output("root_password_secret")
 
