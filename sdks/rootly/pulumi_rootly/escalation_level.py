@@ -471,4 +471,3 @@ class EscalationLevel(pulumi.CustomResource):
         Position of the escalation policy level
         """
         return pulumi.get(self, "position")
-

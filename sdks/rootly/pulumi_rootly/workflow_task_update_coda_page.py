@@ -424,4 +424,3 @@ class WorkflowTaskUpdateCodaPage(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskUpdateCodaPageId")
     def workflow_task_update_coda_page_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_update_coda_page_id")
-

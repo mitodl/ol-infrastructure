@@ -376,4 +376,3 @@ class OverrideShift(pulumi.CustomResource):
         Override shift user
         """
         return pulumi.get(self, "user_id")
-

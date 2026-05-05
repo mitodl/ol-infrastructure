@@ -324,4 +324,3 @@ class AlertRoute(pulumi.CustomResource):
     @pulumi.getter
     def rules(self) -> pulumi.Output[Optional[Sequence['outputs.AlertRouteRule']]]:
         return pulumi.get(self, "rules")
-

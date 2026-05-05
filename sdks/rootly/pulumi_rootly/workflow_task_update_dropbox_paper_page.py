@@ -424,4 +424,3 @@ class WorkflowTaskUpdateDropboxPaperPage(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskUpdateDropboxPaperPageId")
     def workflow_task_update_dropbox_paper_page_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_update_dropbox_paper_page_id")
-

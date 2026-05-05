@@ -424,4 +424,3 @@ class WorkflowTaskGetAlerts(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskGetAlertsId")
     def workflow_task_get_alerts_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_get_alerts_id")
-

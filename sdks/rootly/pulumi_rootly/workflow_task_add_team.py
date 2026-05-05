@@ -424,4 +424,3 @@ class WorkflowTaskAddTeam(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskAddTeamId")
     def workflow_task_add_team_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_add_team_id")
-
