@@ -1013,6 +1013,19 @@ for location in code_locations:
             "failureThreshold": 3,
             "initialDelaySeconds": 30,
         }
+        # dbt artifact upload for OpenMetadata ingestion
+        deployment["env"].extend(
+            [
+                {
+                    "name": "DBT_ARTIFACTS_S3_BUCKET",
+                    "value": dagster_bucket_name,
+                },
+                {
+                    "name": "DBT_ARTIFACTS_S3_PREFIX",
+                    "value": "openmetadata/dbt-artifacts",
+                },
+            ]
+        )
 
     # Increase RAM for legacy edX because of studentmodule loading to memory
     if name == "legacy_openedx":
