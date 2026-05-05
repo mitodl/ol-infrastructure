@@ -424,3 +424,4 @@ class WorkflowTaskAddSlackBookmark(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskAddSlackBookmarkId")
     def workflow_task_add_slack_bookmark_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_add_slack_bookmark_id")
+

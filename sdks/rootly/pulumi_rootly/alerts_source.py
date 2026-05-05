@@ -939,3 +939,4 @@ class AlertsSource(pulumi.CustomResource):
         The webhook URL generated for non-email alert sources
         """
         return pulumi.get(self, "webhook_endpoint")
+

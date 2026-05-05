@@ -1172,3 +1172,4 @@ class WorkflowActionItem(pulumi.CustomResource):
         The group this workflow belongs to.
         """
         return pulumi.get(self, "workflow_group_id")
+

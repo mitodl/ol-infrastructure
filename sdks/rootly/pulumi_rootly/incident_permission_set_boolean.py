@@ -301,3 +301,4 @@ class IncidentPermissionSetBoolean(pulumi.CustomResource):
         Value must be one of true or false
         """
         return pulumi.get(self, "private")
+

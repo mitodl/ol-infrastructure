@@ -658,3 +658,4 @@ class CommunicationsGroup(pulumi.CustomResource):
         SMS channel enabled. Value must be one of true or false
         """
         return pulumi.get(self, "sms_channel")
+

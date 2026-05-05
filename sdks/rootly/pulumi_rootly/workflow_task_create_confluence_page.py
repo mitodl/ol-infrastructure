@@ -424,3 +424,4 @@ class WorkflowTaskCreateConfluencePage(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateConfluencePageId")
     def workflow_task_create_confluence_page_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_confluence_page_id")
+

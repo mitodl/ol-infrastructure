@@ -845,3 +845,4 @@ class EscalationPath(pulumi.CustomResource):
         If time restrictions are set, alerts will follow this path when they arrive within the specified time ranges and meet the rules.
         """
         return pulumi.get(self, "time_restrictions")
+

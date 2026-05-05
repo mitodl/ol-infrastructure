@@ -279,3 +279,4 @@ class AlertField(pulumi.CustomResource):
         The slug of the alert field
         """
         return pulumi.get(self, "slug")
+

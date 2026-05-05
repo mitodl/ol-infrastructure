@@ -424,3 +424,4 @@ class WorkflowTaskAutoAssignRoleRootly(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskAutoAssignRoleRootlyId")
     def workflow_task_auto_assign_role_rootly_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_auto_assign_role_rootly_id")
+

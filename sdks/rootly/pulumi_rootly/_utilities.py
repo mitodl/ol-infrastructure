@@ -354,3 +354,4 @@ async def get_package():
 	if _package_ref is None or _package_ref is ...:
 		raise Exception("The Pulumi CLI does not support parameterization. Please update the Pulumi CLI.")
 	return _package_ref
+	

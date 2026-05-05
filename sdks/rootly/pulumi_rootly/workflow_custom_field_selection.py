@@ -348,3 +348,4 @@ class WorkflowCustomFieldSelection(pulumi.CustomResource):
         The workflow for this selection
         """
         return pulumi.get(self, "workflow_id")
+

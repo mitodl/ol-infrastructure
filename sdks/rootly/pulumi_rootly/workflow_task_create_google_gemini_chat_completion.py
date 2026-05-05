@@ -424,3 +424,4 @@ class WorkflowTaskCreateGoogleGeminiChatCompletion(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateGoogleGeminiChatCompletionId")
     def workflow_task_create_google_gemini_chat_completion_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_google_gemini_chat_completion_id")
+

@@ -314,3 +314,4 @@ class PlaybookTask(pulumi.CustomResource):
         The task of the task
         """
         return pulumi.get(self, "task")
+

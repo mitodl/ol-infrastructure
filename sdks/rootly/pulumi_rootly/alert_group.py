@@ -662,3 +662,4 @@ class AlertGroup(pulumi.CustomResource):
         Time window for the alert grouping
         """
         return pulumi.get(self, "time_window")
+

@@ -424,3 +424,4 @@ class WorkflowTaskCreateOutlookEvent(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateOutlookEventId")
     def workflow_task_create_outlook_event_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_outlook_event_id")
+

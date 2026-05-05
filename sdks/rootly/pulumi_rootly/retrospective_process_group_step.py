@@ -239,3 +239,4 @@ class RetrospectiveProcessGroupStep(pulumi.CustomResource):
     @pulumi.getter(name="retrospectiveStepId")
     def retrospective_step_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "retrospective_step_id")
+

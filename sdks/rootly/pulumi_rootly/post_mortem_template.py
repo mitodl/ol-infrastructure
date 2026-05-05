@@ -326,3 +326,4 @@ class PostMortemTemplate(pulumi.CustomResource):
     @pulumi.getter(name="postMortemTemplateId")
     def post_mortem_template_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "post_mortem_template_id")
+

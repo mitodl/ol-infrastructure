@@ -424,3 +424,4 @@ class WorkflowTaskSendWhatsappMessage(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskSendWhatsappMessageId")
     def workflow_task_send_whatsapp_message_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_send_whatsapp_message_id")
+

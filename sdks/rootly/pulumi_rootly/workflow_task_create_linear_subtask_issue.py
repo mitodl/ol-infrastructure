@@ -424,3 +424,4 @@ class WorkflowTaskCreateLinearSubtaskIssue(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateLinearSubtaskIssueId")
     def workflow_task_create_linear_subtask_issue_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_linear_subtask_issue_id")
+

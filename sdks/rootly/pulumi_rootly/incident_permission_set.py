@@ -373,3 +373,4 @@ class IncidentPermissionSet(pulumi.CustomResource):
         The incident permission set slug.
         """
         return pulumi.get(self, "slug")
+

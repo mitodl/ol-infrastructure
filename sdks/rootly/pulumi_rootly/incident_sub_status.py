@@ -289,3 +289,4 @@ class IncidentSubStatus(pulumi.CustomResource):
         Note: To change an incident's sub-status, use the PATCH /incidents/:id endpoint and set the<span pulumi-lang-nodejs=" subStatusId " pulumi-lang-dotnet=" SubStatusId " pulumi-lang-go=" subStatusId " pulumi-lang-python=" sub_status_id " pulumi-lang-yaml=" subStatusId " pulumi-lang-java=" subStatusId "> sub_status_id </span>attribute. This endpoint is for modifying the timestamp of when an incident's sub-status was assigned.
         """
         return pulumi.get(self, "sub_status_id")
+

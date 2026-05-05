@@ -424,3 +424,4 @@ class WorkflowTaskAutoAssignRolePagerduty(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskAutoAssignRolePagerdutyId")
     def workflow_task_auto_assign_role_pagerduty_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_auto_assign_role_pagerduty_id")
+

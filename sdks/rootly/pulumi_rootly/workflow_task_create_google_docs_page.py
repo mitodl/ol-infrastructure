@@ -424,3 +424,4 @@ class WorkflowTaskCreateGoogleDocsPage(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateGoogleDocsPageId")
     def workflow_task_create_google_docs_page_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_google_docs_page_id")
+

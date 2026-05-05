@@ -424,3 +424,4 @@ class WorkflowTaskPublishIncident(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskPublishIncidentId")
     def workflow_task_publish_incident_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_publish_incident_id")
+

@@ -424,3 +424,4 @@ class WorkflowTaskCreateNotionPage(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateNotionPageId")
     def workflow_task_create_notion_page_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_notion_page_id")
+

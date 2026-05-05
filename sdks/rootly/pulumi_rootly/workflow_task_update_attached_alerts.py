@@ -424,3 +424,4 @@ class WorkflowTaskUpdateAttachedAlerts(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskUpdateAttachedAlertsId")
     def workflow_task_update_attached_alerts_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_update_attached_alerts_id")
+

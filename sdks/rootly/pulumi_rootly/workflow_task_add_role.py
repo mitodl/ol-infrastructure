@@ -424,3 +424,4 @@ class WorkflowTaskAddRole(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskAddRoleId")
     def workflow_task_add_role_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_add_role_id")
+

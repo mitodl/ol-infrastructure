@@ -563,3 +563,4 @@ class Severity(pulumi.CustomResource):
         The slug of the severity
         """
         return pulumi.get(self, "slug")
+

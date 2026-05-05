@@ -424,3 +424,4 @@ class WorkflowTaskCreateJiraSubtask(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateJiraSubtaskId")
     def workflow_task_create_jira_subtask_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_jira_subtask_id")
+

@@ -424,3 +424,4 @@ class WorkflowTaskChangeSlackChannelPrivacy(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskChangeSlackChannelPrivacyId")
     def workflow_task_change_slack_channel_privacy_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_change_slack_channel_privacy_id")
+

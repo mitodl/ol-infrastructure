@@ -558,3 +558,4 @@ class EdgeConnectorAction(pulumi.CustomResource):
     @pulumi.getter(name="updatedAt")
     def updated_at(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "updated_at")
+

@@ -516,3 +516,4 @@ class CatalogChecklistTemplate(pulumi.CustomResource):
         The slug of the checklist template
         """
         return pulumi.get(self, "slug")
+

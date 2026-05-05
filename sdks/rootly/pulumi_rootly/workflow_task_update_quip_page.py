@@ -424,3 +424,4 @@ class WorkflowTaskUpdateQuipPage(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskUpdateQuipPageId")
     def workflow_task_update_quip_page_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_update_quip_page_id")
+

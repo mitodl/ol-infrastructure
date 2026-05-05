@@ -1127,3 +1127,4 @@ class Functionality(pulumi.CustomResource):
         The slug of the functionality
         """
         return pulumi.get(self, "slug")
+

@@ -424,3 +424,4 @@ class WorkflowTaskInviteToSlackChannelRootly(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskInviteToSlackChannelRootlyId")
     def workflow_task_invite_to_slack_channel_rootly_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_invite_to_slack_channel_rootly_id")
+

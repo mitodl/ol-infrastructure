@@ -424,3 +424,4 @@ class WorkflowTaskRedisClient(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskRedisClientId")
     def workflow_task_redis_client_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_redis_client_id")
+

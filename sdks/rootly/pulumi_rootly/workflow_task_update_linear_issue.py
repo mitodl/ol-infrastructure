@@ -424,3 +424,4 @@ class WorkflowTaskUpdateLinearIssue(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskUpdateLinearIssueId")
     def workflow_task_update_linear_issue_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_update_linear_issue_id")
+

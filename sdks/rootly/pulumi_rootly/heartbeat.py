@@ -816,3 +816,4 @@ class Heartbeat(pulumi.CustomResource):
         Value must be one of <span pulumi-lang-nodejs="`waiting`" pulumi-lang-dotnet="`Waiting`" pulumi-lang-go="`waiting`" pulumi-lang-python="`waiting`" pulumi-lang-yaml="`waiting`" pulumi-lang-java="`waiting`">`waiting`</span>, <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`">`active`</span>, <span pulumi-lang-nodejs="`expired`" pulumi-lang-dotnet="`Expired`" pulumi-lang-go="`expired`" pulumi-lang-python="`expired`" pulumi-lang-yaml="`expired`" pulumi-lang-java="`expired`">`expired`</span>.
         """
         return pulumi.get(self, "status")
+

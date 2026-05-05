@@ -1583,3 +1583,4 @@ class StatusPage(pulumi.CustomResource):
         Website URL
         """
         return pulumi.get(self, "website_url")
+

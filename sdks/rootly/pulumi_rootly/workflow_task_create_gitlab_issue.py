@@ -424,3 +424,4 @@ class WorkflowTaskCreateGitlabIssue(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateGitlabIssueId")
     def workflow_task_create_gitlab_issue_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_gitlab_issue_id")
+

@@ -1595,3 +1595,4 @@ class Role(pulumi.CustomResource):
         Value must be one of <span pulumi-lang-nodejs="`create`" pulumi-lang-dotnet="`Create`" pulumi-lang-go="`create`" pulumi-lang-python="`create`" pulumi-lang-yaml="`create`" pulumi-lang-java="`create`">`create`</span>, <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`">`update`</span>, <span pulumi-lang-nodejs="`delete`" pulumi-lang-dotnet="`Delete`" pulumi-lang-go="`delete`" pulumi-lang-python="`delete`" pulumi-lang-yaml="`delete`" pulumi-lang-java="`delete`">`delete`</span>.
         """
         return pulumi.get(self, "workflows_permissions")
+

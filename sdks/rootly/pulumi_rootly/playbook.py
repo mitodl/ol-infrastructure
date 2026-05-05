@@ -562,3 +562,4 @@ class Playbook(pulumi.CustomResource):
         The title of the playbook
         """
         return pulumi.get(self, "title")
+

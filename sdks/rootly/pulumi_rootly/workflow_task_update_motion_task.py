@@ -424,3 +424,4 @@ class WorkflowTaskUpdateMotionTask(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskUpdateMotionTaskId")
     def workflow_task_update_motion_task_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_update_motion_task_id")
+

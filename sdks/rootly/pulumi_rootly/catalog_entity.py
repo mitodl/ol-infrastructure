@@ -349,3 +349,4 @@ class CatalogEntity(pulumi.CustomResource):
         Array of property values for this catalog entity
         """
         return pulumi.get(self, "properties")
+

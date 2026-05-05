@@ -467,3 +467,4 @@ class WorkflowGroup(pulumi.CustomResource):
     @pulumi.getter(name="workflowGroupId")
     def workflow_group_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_group_id")
+

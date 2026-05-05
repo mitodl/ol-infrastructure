@@ -21374,3 +21374,5 @@ class GetTeamsTeamResult(dict):
     @pulumi.getter
     def slug(self) -> _builtins.str:
         return pulumi.get(self, "slug")
+
+

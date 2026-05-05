@@ -373,3 +373,4 @@ class Secret(pulumi.CustomResource):
     @pulumi.getter(name="secretId")
     def secret_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "secret_id")
+
