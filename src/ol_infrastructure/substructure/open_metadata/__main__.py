@@ -269,7 +269,7 @@ def _make_cronjob(  # noqa: PLR0913
 service_name_trino = om_config.get("service_name_trino") or "Starburst Galaxy"
 service_name_airbyte = om_config.get("service_name_airbyte") or "Airbyte"
 service_name_superset = om_config.get("service_name_superset") or "Superset"
-service_name_iceberg = om_config.get("service_name_iceberg") or "Iceberg"
+service_name_glue = om_config.get("service_name_glue") or "Glue"
 
 # ---------------------------------------------------------------------------
 # Trino (Starburst Galaxy) metadata ingestion
@@ -380,23 +380,21 @@ _make_cronjob(
 )
 
 # ---------------------------------------------------------------------------
-# Iceberg (Glue + S3) metadata ingestion
+# Glue Data Catalog metadata ingestion
 # ---------------------------------------------------------------------------
-# Uses IRSA for Glue/S3 access — no credentials secret needed.
-# NOTE: The Iceberg connector does not support lineage extraction
-# (supportsLineageExtraction is absent from its schema). Lineage for
-# Iceberg-backed tables is captured by the Trino lineage job above, since
-# Trino is the query engine that reads and writes these tables.
+# Uses IRSA for Glue API access — no credentials secret needed.
+# Reads all metadata from the Glue API (boto3) without fetching Iceberg
+# metadata files from S3, providing resilience to stale __dbt_tmp Glue
+# entries and additionally capturing locationPath, fileFormat, table-type
+# classification, and external-table → S3 container lineage.
 
 _make_cronjob(
-    name="iceberg",
+    name="glue",
     schedule="0 2 * * *",
-    python_script=(
-        Path(__file__).parent / "scripts" / "iceberg_metadata.py"
-    ).read_text(),
+    python_script=(Path(__file__).parent / "scripts" / "glue_metadata.py").read_text(),
     extra_env=[
         _plain_env("OM_SERVER_URL", OM_SERVER_URL),
-        _plain_env("OM_SERVICE_NAME", service_name_iceberg),
+        _plain_env("OM_SERVICE_NAME", service_name_glue),
         _plain_env("OM_AWS_REGION", aws_region),
     ],
 )
