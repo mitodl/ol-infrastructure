@@ -43,6 +43,7 @@ def ad_optimization_pipeline() -> Pipeline:
         plan=[
             GetStep(get=ad_optimization_schedule.name, trigger=True),
             TaskStep(
+                attempts=3,
                 task=Identifier("ad-optimization-pipeline"),
                 config=TaskConfig(
                     platform=Platform.linux,
