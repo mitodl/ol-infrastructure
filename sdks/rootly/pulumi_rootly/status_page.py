@@ -535,6 +535,7 @@ class _StatusPageState:
                  authentication_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
                  authentication_method: Optional[pulumi.Input[_builtins.str]] = None,
                  authentication_password: Optional[pulumi.Input[_builtins.str]] = None,
+                 cname_records: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
                  description: Optional[pulumi.Input[_builtins.str]] = None,
                  enabled: Optional[pulumi.Input[_builtins.bool]] = None,
                  external_domain_names: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
@@ -570,6 +571,7 @@ class _StatusPageState:
         :param pulumi.Input[_builtins.bool] authentication_enabled: Enable authentication (deprecated - use<span pulumi-lang-nodejs=" authenticationMethod " pulumi-lang-dotnet=" AuthenticationMethod " pulumi-lang-go=" authenticationMethod " pulumi-lang-python=" authentication_method " pulumi-lang-yaml=" authenticationMethod " pulumi-lang-java=" authenticationMethod "> authentication_method </span>instead). Value must be one of true or false
         :param pulumi.Input[_builtins.str] authentication_method: Authentication method. Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`">`none`</span>, <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`">`password`</span>, <span pulumi-lang-nodejs="`saml`" pulumi-lang-dotnet="`Saml`" pulumi-lang-go="`saml`" pulumi-lang-python="`saml`" pulumi-lang-yaml="`saml`" pulumi-lang-java="`saml`">`saml`</span>.
         :param pulumi.Input[_builtins.str] authentication_password: Authentication password
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] cname_records: CNAME records mapping external domain names to their DNS target values. Populated asynchronously after setting external_domain_names.
         :param pulumi.Input[_builtins.str] description: The description of the status page
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] external_domain_names: External domain names attached to the status page
         :param pulumi.Input[_builtins.str] failure_message: Message showing when at least one component is not operational
@@ -605,6 +607,8 @@ class _StatusPageState:
             pulumi.set(__self__, "authentication_method", authentication_method)
         if authentication_password is not None:
             pulumi.set(__self__, "authentication_password", authentication_password)
+        if cname_records is not None:
+            pulumi.set(__self__, "cname_records", cname_records)
         if description is not None:
             pulumi.set(__self__, "description", description)
         if enabled is not None:
@@ -709,6 +713,18 @@ class _StatusPageState:
     @authentication_password.setter
     def authentication_password(self, value: Optional[pulumi.Input[_builtins.str]]):
         pulumi.set(self, "authentication_password", value)
+
+    @_builtins.property
+    @pulumi.getter(name="cnameRecords")
+    def cname_records(self) -> Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]]:
+        """
+        CNAME records mapping external domain names to their DNS target values. Populated asynchronously after setting external_domain_names.
+        """
+        return pulumi.get(self, "cname_records")
+
+    @cname_records.setter
+    def cname_records(self, value: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "cname_records", value)
 
     @_builtins.property
     @pulumi.getter
@@ -1215,6 +1231,7 @@ class StatusPage(pulumi.CustomResource):
             __props__.__dict__["website_privacy_url"] = website_privacy_url
             __props__.__dict__["website_support_url"] = website_support_url
             __props__.__dict__["website_url"] = website_url
+            __props__.__dict__["cname_records"] = None
         super(StatusPage, __self__).__init__(
             'rootly:index/statusPage:StatusPage',
             resource_name,
@@ -1230,6 +1247,7 @@ class StatusPage(pulumi.CustomResource):
             authentication_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
             authentication_method: Optional[pulumi.Input[_builtins.str]] = None,
             authentication_password: Optional[pulumi.Input[_builtins.str]] = None,
+            cname_records: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
             description: Optional[pulumi.Input[_builtins.str]] = None,
             enabled: Optional[pulumi.Input[_builtins.bool]] = None,
             external_domain_names: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
@@ -1269,6 +1287,7 @@ class StatusPage(pulumi.CustomResource):
         :param pulumi.Input[_builtins.bool] authentication_enabled: Enable authentication (deprecated - use<span pulumi-lang-nodejs=" authenticationMethod " pulumi-lang-dotnet=" AuthenticationMethod " pulumi-lang-go=" authenticationMethod " pulumi-lang-python=" authentication_method " pulumi-lang-yaml=" authenticationMethod " pulumi-lang-java=" authenticationMethod "> authentication_method </span>instead). Value must be one of true or false
         :param pulumi.Input[_builtins.str] authentication_method: Authentication method. Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`">`none`</span>, <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`">`password`</span>, <span pulumi-lang-nodejs="`saml`" pulumi-lang-dotnet="`Saml`" pulumi-lang-go="`saml`" pulumi-lang-python="`saml`" pulumi-lang-yaml="`saml`" pulumi-lang-java="`saml`">`saml`</span>.
         :param pulumi.Input[_builtins.str] authentication_password: Authentication password
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] cname_records: CNAME records mapping external domain names to their DNS target values. Populated asynchronously after setting external_domain_names.
         :param pulumi.Input[_builtins.str] description: The description of the status page
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] external_domain_names: External domain names attached to the status page
         :param pulumi.Input[_builtins.str] failure_message: Message showing when at least one component is not operational
@@ -1304,6 +1323,7 @@ class StatusPage(pulumi.CustomResource):
         __props__.__dict__["authentication_enabled"] = authentication_enabled
         __props__.__dict__["authentication_method"] = authentication_method
         __props__.__dict__["authentication_password"] = authentication_password
+        __props__.__dict__["cname_records"] = cname_records
         __props__.__dict__["description"] = description
         __props__.__dict__["enabled"] = enabled
         __props__.__dict__["external_domain_names"] = external_domain_names
@@ -1365,6 +1385,14 @@ class StatusPage(pulumi.CustomResource):
         Authentication password
         """
         return pulumi.get(self, "authentication_password")
+
+    @_builtins.property
+    @pulumi.getter(name="cnameRecords")
+    def cname_records(self) -> pulumi.Output[Mapping[str, _builtins.str]]:
+        """
+        CNAME records mapping external domain names to their DNS target values. Populated asynchronously after setting external_domain_names.
+        """
+        return pulumi.get(self, "cname_records")
 
     @_builtins.property
     @pulumi.getter
@@ -1583,4 +1611,3 @@ class StatusPage(pulumi.CustomResource):
         Website URL
         """
         return pulumi.get(self, "website_url")
-

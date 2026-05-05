@@ -26,10 +26,13 @@ class GetFormFieldPlacementConditionResult:
     """
     A collection of values returned by getFormFieldPlacementCondition.
     """
-    def __init__(__self__, form_field_id=None, id=None):
+    def __init__(__self__, form_field_id=None, form_field_placement_id=None, id=None):
         if form_field_id and not isinstance(form_field_id, str):
             raise TypeError("Expected argument 'form_field_id' to be a str")
         pulumi.set(__self__, "form_field_id", form_field_id)
+        if form_field_placement_id and not isinstance(form_field_placement_id, str):
+            raise TypeError("Expected argument 'form_field_placement_id' to be a str")
+        pulumi.set(__self__, "form_field_placement_id", form_field_placement_id)
         if id and not isinstance(id, str):
             raise TypeError("Expected argument 'id' to be a str")
         pulumi.set(__self__, "id", id)
@@ -38,6 +41,11 @@ class GetFormFieldPlacementConditionResult:
     @pulumi.getter(name="formFieldId")
     def form_field_id(self) -> _builtins.str:
         return pulumi.get(self, "form_field_id")
+
+    @_builtins.property
+    @pulumi.getter(name="formFieldPlacementId")
+    def form_field_placement_id(self) -> _builtins.str:
+        return pulumi.get(self, "form_field_placement_id")
 
     @_builtins.property
     @pulumi.getter
@@ -52,31 +60,38 @@ class AwaitableGetFormFieldPlacementConditionResult(GetFormFieldPlacementConditi
             yield self
         return GetFormFieldPlacementConditionResult(
             form_field_id=self.form_field_id,
+            form_field_placement_id=self.form_field_placement_id,
             id=self.id)
 
 
 def get_form_field_placement_condition(form_field_id: Optional[_builtins.str] = None,
+                                       form_field_placement_id: Optional[_builtins.str] = None,
                                        opts: Optional[pulumi.InvokeOptions] = None) -> AwaitableGetFormFieldPlacementConditionResult:
     """
     Use this data source to access information about an existing resource.
     """
     __args__ = dict()
     __args__['formFieldId'] = form_field_id
+    __args__['formFieldPlacementId'] = form_field_placement_id
     opts = pulumi.InvokeOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke('rootly:index/getFormFieldPlacementCondition:getFormFieldPlacementCondition', __args__, opts=opts, typ=GetFormFieldPlacementConditionResult, package_ref=_utilities.get_package()).value
 
     return AwaitableGetFormFieldPlacementConditionResult(
         form_field_id=pulumi.get(__ret__, 'form_field_id'),
+        form_field_placement_id=pulumi.get(__ret__, 'form_field_placement_id'),
         id=pulumi.get(__ret__, 'id'))
 def get_form_field_placement_condition_output(form_field_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+                                              form_field_placement_id: Optional[pulumi.Input[_builtins.str]] = None,
                                               opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetFormFieldPlacementConditionResult]:
     """
     Use this data source to access information about an existing resource.
     """
     __args__ = dict()
     __args__['formFieldId'] = form_field_id
+    __args__['formFieldPlacementId'] = form_field_placement_id
     opts = pulumi.InvokeOutputOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke_output('rootly:index/getFormFieldPlacementCondition:getFormFieldPlacementCondition', __args__, opts=opts, typ=GetFormFieldPlacementConditionResult, package_ref=_utilities.get_package())
     return __ret__.apply(lambda __response__: GetFormFieldPlacementConditionResult(
         form_field_id=pulumi.get(__response__, 'form_field_id'),
+        form_field_placement_id=pulumi.get(__response__, 'form_field_placement_id'),
         id=pulumi.get(__response__, 'id')))

@@ -26,10 +26,13 @@ class GetRetrospectiveProcessGroupResult:
     """
     A collection of values returned by getRetrospectiveProcessGroup.
     """
-    def __init__(__self__, id=None, sub_status_id=None):
+    def __init__(__self__, id=None, retrospective_process_id=None, sub_status_id=None):
         if id and not isinstance(id, str):
             raise TypeError("Expected argument 'id' to be a str")
         pulumi.set(__self__, "id", id)
+        if retrospective_process_id and not isinstance(retrospective_process_id, str):
+            raise TypeError("Expected argument 'retrospective_process_id' to be a str")
+        pulumi.set(__self__, "retrospective_process_id", retrospective_process_id)
         if sub_status_id and not isinstance(sub_status_id, str):
             raise TypeError("Expected argument 'sub_status_id' to be a str")
         pulumi.set(__self__, "sub_status_id", sub_status_id)
@@ -38,6 +41,11 @@ class GetRetrospectiveProcessGroupResult:
     @pulumi.getter
     def id(self) -> _builtins.str:
         return pulumi.get(self, "id")
+
+    @_builtins.property
+    @pulumi.getter(name="retrospectiveProcessId")
+    def retrospective_process_id(self) -> _builtins.str:
+        return pulumi.get(self, "retrospective_process_id")
 
     @_builtins.property
     @pulumi.getter(name="subStatusId")
@@ -52,31 +60,38 @@ class AwaitableGetRetrospectiveProcessGroupResult(GetRetrospectiveProcessGroupRe
             yield self
         return GetRetrospectiveProcessGroupResult(
             id=self.id,
+            retrospective_process_id=self.retrospective_process_id,
             sub_status_id=self.sub_status_id)
 
 
-def get_retrospective_process_group(sub_status_id: Optional[_builtins.str] = None,
+def get_retrospective_process_group(retrospective_process_id: Optional[_builtins.str] = None,
+                                    sub_status_id: Optional[_builtins.str] = None,
                                     opts: Optional[pulumi.InvokeOptions] = None) -> AwaitableGetRetrospectiveProcessGroupResult:
     """
     Use this data source to access information about an existing resource.
     """
     __args__ = dict()
+    __args__['retrospectiveProcessId'] = retrospective_process_id
     __args__['subStatusId'] = sub_status_id
     opts = pulumi.InvokeOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke('rootly:index/getRetrospectiveProcessGroup:getRetrospectiveProcessGroup', __args__, opts=opts, typ=GetRetrospectiveProcessGroupResult, package_ref=_utilities.get_package()).value
 
     return AwaitableGetRetrospectiveProcessGroupResult(
         id=pulumi.get(__ret__, 'id'),
+        retrospective_process_id=pulumi.get(__ret__, 'retrospective_process_id'),
         sub_status_id=pulumi.get(__ret__, 'sub_status_id'))
-def get_retrospective_process_group_output(sub_status_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_retrospective_process_group_output(retrospective_process_id: Optional[pulumi.Input[_builtins.str]] = None,
+                                           sub_status_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
                                            opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetRetrospectiveProcessGroupResult]:
     """
     Use this data source to access information about an existing resource.
     """
     __args__ = dict()
+    __args__['retrospectiveProcessId'] = retrospective_process_id
     __args__['subStatusId'] = sub_status_id
     opts = pulumi.InvokeOutputOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke_output('rootly:index/getRetrospectiveProcessGroup:getRetrospectiveProcessGroup', __args__, opts=opts, typ=GetRetrospectiveProcessGroupResult, package_ref=_utilities.get_package())
     return __ret__.apply(lambda __response__: GetRetrospectiveProcessGroupResult(
         id=pulumi.get(__response__, 'id'),
+        retrospective_process_id=pulumi.get(__response__, 'retrospective_process_id'),
         sub_status_id=pulumi.get(__response__, 'sub_status_id')))

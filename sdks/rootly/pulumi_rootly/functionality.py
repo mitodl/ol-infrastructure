@@ -26,6 +26,7 @@ class FunctionalityArgs:
                  cortex_id: Optional[pulumi.Input[_builtins.str]] = None,
                  description: Optional[pulumi.Input[_builtins.str]] = None,
                  environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
                  external_id: Optional[pulumi.Input[_builtins.str]] = None,
                  functionality_id: Optional[pulumi.Input[_builtins.str]] = None,
                  name: Optional[pulumi.Input[_builtins.str]] = None,
@@ -51,6 +52,7 @@ class FunctionalityArgs:
         :param pulumi.Input[_builtins.str] cortex_id: The Cortex group id associated to this functionality
         :param pulumi.Input[_builtins.str] description: The description of the functionality
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] environment_ids: Environments associated with this functionality
+        :param pulumi.Input[_builtins.str] escalation_policy_id: The escalation policy id of the functionality
         :param pulumi.Input[_builtins.str] external_id: The external id associated to this functionality
         :param pulumi.Input[_builtins.str] name: The name of the functionality
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] notify_emails: Emails attached to the functionality
@@ -78,6 +80,8 @@ class FunctionalityArgs:
             pulumi.set(__self__, "description", description)
         if environment_ids is not None:
             pulumi.set(__self__, "environment_ids", environment_ids)
+        if escalation_policy_id is not None:
+            pulumi.set(__self__, "escalation_policy_id", escalation_policy_id)
         if external_id is not None:
             pulumi.set(__self__, "external_id", external_id)
         if functionality_id is not None:
@@ -172,6 +176,18 @@ class FunctionalityArgs:
     @environment_ids.setter
     def environment_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "environment_ids", value)
+
+    @_builtins.property
+    @pulumi.getter(name="escalationPolicyId")
+    def escalation_policy_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+        """
+        The escalation policy id of the functionality
+        """
+        return pulumi.get(self, "escalation_policy_id")
+
+    @escalation_policy_id.setter
+    def escalation_policy_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+        pulumi.set(self, "escalation_policy_id", value)
 
     @_builtins.property
     @pulumi.getter(name="externalId")
@@ -383,6 +399,7 @@ class _FunctionalityState:
                  cortex_id: Optional[pulumi.Input[_builtins.str]] = None,
                  description: Optional[pulumi.Input[_builtins.str]] = None,
                  environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
                  external_id: Optional[pulumi.Input[_builtins.str]] = None,
                  functionality_id: Optional[pulumi.Input[_builtins.str]] = None,
                  name: Optional[pulumi.Input[_builtins.str]] = None,
@@ -408,6 +425,7 @@ class _FunctionalityState:
         :param pulumi.Input[_builtins.str] cortex_id: The Cortex group id associated to this functionality
         :param pulumi.Input[_builtins.str] description: The description of the functionality
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] environment_ids: Environments associated with this functionality
+        :param pulumi.Input[_builtins.str] escalation_policy_id: The escalation policy id of the functionality
         :param pulumi.Input[_builtins.str] external_id: The external id associated to this functionality
         :param pulumi.Input[_builtins.str] name: The name of the functionality
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] notify_emails: Emails attached to the functionality
@@ -435,6 +453,8 @@ class _FunctionalityState:
             pulumi.set(__self__, "description", description)
         if environment_ids is not None:
             pulumi.set(__self__, "environment_ids", environment_ids)
+        if escalation_policy_id is not None:
+            pulumi.set(__self__, "escalation_policy_id", escalation_policy_id)
         if external_id is not None:
             pulumi.set(__self__, "external_id", external_id)
         if functionality_id is not None:
@@ -529,6 +549,18 @@ class _FunctionalityState:
     @environment_ids.setter
     def environment_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "environment_ids", value)
+
+    @_builtins.property
+    @pulumi.getter(name="escalationPolicyId")
+    def escalation_policy_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+        """
+        The escalation policy id of the functionality
+        """
+        return pulumi.get(self, "escalation_policy_id")
+
+    @escalation_policy_id.setter
+    def escalation_policy_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+        pulumi.set(self, "escalation_policy_id", value)
 
     @_builtins.property
     @pulumi.getter(name="externalId")
@@ -743,6 +775,7 @@ class Functionality(pulumi.CustomResource):
                  cortex_id: Optional[pulumi.Input[_builtins.str]] = None,
                  description: Optional[pulumi.Input[_builtins.str]] = None,
                  environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
                  external_id: Optional[pulumi.Input[_builtins.str]] = None,
                  functionality_id: Optional[pulumi.Input[_builtins.str]] = None,
                  name: Optional[pulumi.Input[_builtins.str]] = None,
@@ -771,6 +804,7 @@ class Functionality(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] cortex_id: The Cortex group id associated to this functionality
         :param pulumi.Input[_builtins.str] description: The description of the functionality
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] environment_ids: Environments associated with this functionality
+        :param pulumi.Input[_builtins.str] escalation_policy_id: The escalation policy id of the functionality
         :param pulumi.Input[_builtins.str] external_id: The external id associated to this functionality
         :param pulumi.Input[_builtins.str] name: The name of the functionality
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] notify_emails: Emails attached to the functionality
@@ -817,6 +851,7 @@ class Functionality(pulumi.CustomResource):
                  cortex_id: Optional[pulumi.Input[_builtins.str]] = None,
                  description: Optional[pulumi.Input[_builtins.str]] = None,
                  environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
                  external_id: Optional[pulumi.Input[_builtins.str]] = None,
                  functionality_id: Optional[pulumi.Input[_builtins.str]] = None,
                  name: Optional[pulumi.Input[_builtins.str]] = None,
@@ -848,6 +883,7 @@ class Functionality(pulumi.CustomResource):
             __props__.__dict__["cortex_id"] = cortex_id
             __props__.__dict__["description"] = description
             __props__.__dict__["environment_ids"] = environment_ids
+            __props__.__dict__["escalation_policy_id"] = escalation_policy_id
             __props__.__dict__["external_id"] = external_id
             __props__.__dict__["functionality_id"] = functionality_id
             __props__.__dict__["name"] = name
@@ -881,6 +917,7 @@ class Functionality(pulumi.CustomResource):
             cortex_id: Optional[pulumi.Input[_builtins.str]] = None,
             description: Optional[pulumi.Input[_builtins.str]] = None,
             environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
             external_id: Optional[pulumi.Input[_builtins.str]] = None,
             functionality_id: Optional[pulumi.Input[_builtins.str]] = None,
             name: Optional[pulumi.Input[_builtins.str]] = None,
@@ -910,6 +947,7 @@ class Functionality(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] cortex_id: The Cortex group id associated to this functionality
         :param pulumi.Input[_builtins.str] description: The description of the functionality
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] environment_ids: Environments associated with this functionality
+        :param pulumi.Input[_builtins.str] escalation_policy_id: The escalation policy id of the functionality
         :param pulumi.Input[_builtins.str] external_id: The external id associated to this functionality
         :param pulumi.Input[_builtins.str] name: The name of the functionality
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] notify_emails: Emails attached to the functionality
@@ -936,6 +974,7 @@ class Functionality(pulumi.CustomResource):
         __props__.__dict__["cortex_id"] = cortex_id
         __props__.__dict__["description"] = description
         __props__.__dict__["environment_ids"] = environment_ids
+        __props__.__dict__["escalation_policy_id"] = escalation_policy_id
         __props__.__dict__["external_id"] = external_id
         __props__.__dict__["functionality_id"] = functionality_id
         __props__.__dict__["name"] = name
@@ -994,6 +1033,14 @@ class Functionality(pulumi.CustomResource):
         Environments associated with this functionality
         """
         return pulumi.get(self, "environment_ids")
+
+    @_builtins.property
+    @pulumi.getter(name="escalationPolicyId")
+    def escalation_policy_id(self) -> pulumi.Output[_builtins.str]:
+        """
+        The escalation policy id of the functionality
+        """
+        return pulumi.get(self, "escalation_policy_id")
 
     @_builtins.property
     @pulumi.getter(name="externalId")
@@ -1127,4 +1174,3 @@ class Functionality(pulumi.CustomResource):
         The slug of the functionality
         """
         return pulumi.get(self, "slug")
-

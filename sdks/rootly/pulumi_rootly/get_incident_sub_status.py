@@ -26,13 +26,16 @@ class GetIncidentSubStatusResult:
     """
     A collection of values returned by getIncidentSubStatus.
     """
-    def __init__(__self__, assigned_at=None, id=None, sub_status_id=None):
+    def __init__(__self__, assigned_at=None, id=None, incident_id=None, sub_status_id=None):
         if assigned_at and not isinstance(assigned_at, dict):
             raise TypeError("Expected argument 'assigned_at' to be a dict")
         pulumi.set(__self__, "assigned_at", assigned_at)
         if id and not isinstance(id, str):
             raise TypeError("Expected argument 'id' to be a str")
         pulumi.set(__self__, "id", id)
+        if incident_id and not isinstance(incident_id, str):
+            raise TypeError("Expected argument 'incident_id' to be a str")
+        pulumi.set(__self__, "incident_id", incident_id)
         if sub_status_id and not isinstance(sub_status_id, str):
             raise TypeError("Expected argument 'sub_status_id' to be a str")
         pulumi.set(__self__, "sub_status_id", sub_status_id)
@@ -48,6 +51,11 @@ class GetIncidentSubStatusResult:
         return pulumi.get(self, "id")
 
     @_builtins.property
+    @pulumi.getter(name="incidentId")
+    def incident_id(self) -> _builtins.str:
+        return pulumi.get(self, "incident_id")
+
+    @_builtins.property
     @pulumi.getter(name="subStatusId")
     def sub_status_id(self) -> _builtins.str:
         return pulumi.get(self, "sub_status_id")
@@ -61,10 +69,12 @@ class AwaitableGetIncidentSubStatusResult(GetIncidentSubStatusResult):
         return GetIncidentSubStatusResult(
             assigned_at=self.assigned_at,
             id=self.id,
+            incident_id=self.incident_id,
             sub_status_id=self.sub_status_id)
 
 
 def get_incident_sub_status(assigned_at: Optional[Mapping[str, _builtins.str]] = None,
+                            incident_id: Optional[_builtins.str] = None,
                             sub_status_id: Optional[_builtins.str] = None,
                             opts: Optional[pulumi.InvokeOptions] = None) -> AwaitableGetIncidentSubStatusResult:
     """
@@ -72,6 +82,7 @@ def get_incident_sub_status(assigned_at: Optional[Mapping[str, _builtins.str]] =
     """
     __args__ = dict()
     __args__['assignedAt'] = assigned_at
+    __args__['incidentId'] = incident_id
     __args__['subStatusId'] = sub_status_id
     opts = pulumi.InvokeOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke('rootly:index/getIncidentSubStatus:getIncidentSubStatus', __args__, opts=opts, typ=GetIncidentSubStatusResult, package_ref=_utilities.get_package()).value
@@ -79,8 +90,10 @@ def get_incident_sub_status(assigned_at: Optional[Mapping[str, _builtins.str]] =
     return AwaitableGetIncidentSubStatusResult(
         assigned_at=pulumi.get(__ret__, 'assigned_at'),
         id=pulumi.get(__ret__, 'id'),
+        incident_id=pulumi.get(__ret__, 'incident_id'),
         sub_status_id=pulumi.get(__ret__, 'sub_status_id'))
 def get_incident_sub_status_output(assigned_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
+                                   incident_id: Optional[pulumi.Input[_builtins.str]] = None,
                                    sub_status_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
                                    opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetIncidentSubStatusResult]:
     """
@@ -88,10 +101,12 @@ def get_incident_sub_status_output(assigned_at: Optional[pulumi.Input[Optional[M
     """
     __args__ = dict()
     __args__['assignedAt'] = assigned_at
+    __args__['incidentId'] = incident_id
     __args__['subStatusId'] = sub_status_id
     opts = pulumi.InvokeOutputOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke_output('rootly:index/getIncidentSubStatus:getIncidentSubStatus', __args__, opts=opts, typ=GetIncidentSubStatusResult, package_ref=_utilities.get_package())
     return __ret__.apply(lambda __response__: GetIncidentSubStatusResult(
         assigned_at=pulumi.get(__response__, 'assigned_at'),
         id=pulumi.get(__response__, 'id'),
+        incident_id=pulumi.get(__response__, 'incident_id'),
         sub_status_id=pulumi.get(__response__, 'sub_status_id')))

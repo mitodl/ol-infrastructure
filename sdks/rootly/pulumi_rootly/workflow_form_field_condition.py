@@ -22,8 +22,11 @@ class WorkflowFormFieldConditionArgs:
                  form_field_id: pulumi.Input[_builtins.str],
                  incident_condition: Optional[pulumi.Input[_builtins.str]] = None,
                  selected_catalog_entity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_cause_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_option_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
@@ -42,10 +45,16 @@ class WorkflowFormFieldConditionArgs:
             pulumi.set(__self__, "incident_condition", incident_condition)
         if selected_catalog_entity_ids is not None:
             pulumi.set(__self__, "selected_catalog_entity_ids", selected_catalog_entity_ids)
+        if selected_cause_ids is not None:
+            pulumi.set(__self__, "selected_cause_ids", selected_cause_ids)
+        if selected_environment_ids is not None:
+            pulumi.set(__self__, "selected_environment_ids", selected_environment_ids)
         if selected_functionality_ids is not None:
             pulumi.set(__self__, "selected_functionality_ids", selected_functionality_ids)
         if selected_group_ids is not None:
             pulumi.set(__self__, "selected_group_ids", selected_group_ids)
+        if selected_incident_type_ids is not None:
+            pulumi.set(__self__, "selected_incident_type_ids", selected_incident_type_ids)
         if selected_option_ids is not None:
             pulumi.set(__self__, "selected_option_ids", selected_option_ids)
         if selected_service_ids is not None:
@@ -93,6 +102,24 @@ class WorkflowFormFieldConditionArgs:
         pulumi.set(self, "selected_catalog_entity_ids", value)
 
     @_builtins.property
+    @pulumi.getter(name="selectedCauseIds")
+    def selected_cause_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+        return pulumi.get(self, "selected_cause_ids")
+
+    @selected_cause_ids.setter
+    def selected_cause_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "selected_cause_ids", value)
+
+    @_builtins.property
+    @pulumi.getter(name="selectedEnvironmentIds")
+    def selected_environment_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+        return pulumi.get(self, "selected_environment_ids")
+
+    @selected_environment_ids.setter
+    def selected_environment_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "selected_environment_ids", value)
+
+    @_builtins.property
     @pulumi.getter(name="selectedFunctionalityIds")
     def selected_functionality_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "selected_functionality_ids")
@@ -109,6 +136,15 @@ class WorkflowFormFieldConditionArgs:
     @selected_group_ids.setter
     def selected_group_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "selected_group_ids", value)
+
+    @_builtins.property
+    @pulumi.getter(name="selectedIncidentTypeIds")
+    def selected_incident_type_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+        return pulumi.get(self, "selected_incident_type_ids")
+
+    @selected_incident_type_ids.setter
+    def selected_incident_type_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "selected_incident_type_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedOptionIds")
@@ -174,8 +210,11 @@ class _WorkflowFormFieldConditionState:
                  form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
                  incident_condition: Optional[pulumi.Input[_builtins.str]] = None,
                  selected_catalog_entity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_cause_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_option_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
@@ -195,10 +234,16 @@ class _WorkflowFormFieldConditionState:
             pulumi.set(__self__, "incident_condition", incident_condition)
         if selected_catalog_entity_ids is not None:
             pulumi.set(__self__, "selected_catalog_entity_ids", selected_catalog_entity_ids)
+        if selected_cause_ids is not None:
+            pulumi.set(__self__, "selected_cause_ids", selected_cause_ids)
+        if selected_environment_ids is not None:
+            pulumi.set(__self__, "selected_environment_ids", selected_environment_ids)
         if selected_functionality_ids is not None:
             pulumi.set(__self__, "selected_functionality_ids", selected_functionality_ids)
         if selected_group_ids is not None:
             pulumi.set(__self__, "selected_group_ids", selected_group_ids)
+        if selected_incident_type_ids is not None:
+            pulumi.set(__self__, "selected_incident_type_ids", selected_incident_type_ids)
         if selected_option_ids is not None:
             pulumi.set(__self__, "selected_option_ids", selected_option_ids)
         if selected_service_ids is not None:
@@ -246,6 +291,24 @@ class _WorkflowFormFieldConditionState:
         pulumi.set(self, "selected_catalog_entity_ids", value)
 
     @_builtins.property
+    @pulumi.getter(name="selectedCauseIds")
+    def selected_cause_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+        return pulumi.get(self, "selected_cause_ids")
+
+    @selected_cause_ids.setter
+    def selected_cause_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "selected_cause_ids", value)
+
+    @_builtins.property
+    @pulumi.getter(name="selectedEnvironmentIds")
+    def selected_environment_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+        return pulumi.get(self, "selected_environment_ids")
+
+    @selected_environment_ids.setter
+    def selected_environment_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "selected_environment_ids", value)
+
+    @_builtins.property
     @pulumi.getter(name="selectedFunctionalityIds")
     def selected_functionality_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "selected_functionality_ids")
@@ -262,6 +325,15 @@ class _WorkflowFormFieldConditionState:
     @selected_group_ids.setter
     def selected_group_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "selected_group_ids", value)
+
+    @_builtins.property
+    @pulumi.getter(name="selectedIncidentTypeIds")
+    def selected_incident_type_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+        return pulumi.get(self, "selected_incident_type_ids")
+
+    @selected_incident_type_ids.setter
+    def selected_incident_type_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "selected_incident_type_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedOptionIds")
@@ -330,8 +402,11 @@ class WorkflowFormFieldCondition(pulumi.CustomResource):
                  form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
                  incident_condition: Optional[pulumi.Input[_builtins.str]] = None,
                  selected_catalog_entity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_cause_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_option_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
@@ -375,8 +450,11 @@ class WorkflowFormFieldCondition(pulumi.CustomResource):
                  form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
                  incident_condition: Optional[pulumi.Input[_builtins.str]] = None,
                  selected_catalog_entity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_cause_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_option_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
@@ -397,8 +475,11 @@ class WorkflowFormFieldCondition(pulumi.CustomResource):
             __props__.__dict__["form_field_id"] = form_field_id
             __props__.__dict__["incident_condition"] = incident_condition
             __props__.__dict__["selected_catalog_entity_ids"] = selected_catalog_entity_ids
+            __props__.__dict__["selected_cause_ids"] = selected_cause_ids
+            __props__.__dict__["selected_environment_ids"] = selected_environment_ids
             __props__.__dict__["selected_functionality_ids"] = selected_functionality_ids
             __props__.__dict__["selected_group_ids"] = selected_group_ids
+            __props__.__dict__["selected_incident_type_ids"] = selected_incident_type_ids
             __props__.__dict__["selected_option_ids"] = selected_option_ids
             __props__.__dict__["selected_service_ids"] = selected_service_ids
             __props__.__dict__["selected_user_ids"] = selected_user_ids
@@ -419,8 +500,11 @@ class WorkflowFormFieldCondition(pulumi.CustomResource):
             form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
             incident_condition: Optional[pulumi.Input[_builtins.str]] = None,
             selected_catalog_entity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            selected_cause_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            selected_environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
             selected_functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
             selected_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            selected_incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
             selected_option_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
             selected_service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
             selected_user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
@@ -445,8 +529,11 @@ class WorkflowFormFieldCondition(pulumi.CustomResource):
         __props__.__dict__["form_field_id"] = form_field_id
         __props__.__dict__["incident_condition"] = incident_condition
         __props__.__dict__["selected_catalog_entity_ids"] = selected_catalog_entity_ids
+        __props__.__dict__["selected_cause_ids"] = selected_cause_ids
+        __props__.__dict__["selected_environment_ids"] = selected_environment_ids
         __props__.__dict__["selected_functionality_ids"] = selected_functionality_ids
         __props__.__dict__["selected_group_ids"] = selected_group_ids
+        __props__.__dict__["selected_incident_type_ids"] = selected_incident_type_ids
         __props__.__dict__["selected_option_ids"] = selected_option_ids
         __props__.__dict__["selected_service_ids"] = selected_service_ids
         __props__.__dict__["selected_user_ids"] = selected_user_ids
@@ -477,6 +564,16 @@ class WorkflowFormFieldCondition(pulumi.CustomResource):
         return pulumi.get(self, "selected_catalog_entity_ids")
 
     @_builtins.property
+    @pulumi.getter(name="selectedCauseIds")
+    def selected_cause_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
+        return pulumi.get(self, "selected_cause_ids")
+
+    @_builtins.property
+    @pulumi.getter(name="selectedEnvironmentIds")
+    def selected_environment_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
+        return pulumi.get(self, "selected_environment_ids")
+
+    @_builtins.property
     @pulumi.getter(name="selectedFunctionalityIds")
     def selected_functionality_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
         return pulumi.get(self, "selected_functionality_ids")
@@ -485,6 +582,11 @@ class WorkflowFormFieldCondition(pulumi.CustomResource):
     @pulumi.getter(name="selectedGroupIds")
     def selected_group_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
         return pulumi.get(self, "selected_group_ids")
+
+    @_builtins.property
+    @pulumi.getter(name="selectedIncidentTypeIds")
+    def selected_incident_type_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
+        return pulumi.get(self, "selected_incident_type_ids")
 
     @_builtins.property
     @pulumi.getter(name="selectedOptionIds")
@@ -518,4 +620,3 @@ class WorkflowFormFieldCondition(pulumi.CustomResource):
         The workflow for this condition
         """
         return pulumi.get(self, "workflow_id")
-

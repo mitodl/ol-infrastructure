@@ -716,11 +716,13 @@ class AlertsSource(pulumi.CustomResource):
             __props__.__dict__["name"] = name
             __props__.__dict__["owner_group_ids"] = owner_group_ids
             __props__.__dict__["resolution_rule_attributes"] = resolution_rule_attributes
-            __props__.__dict__["secret"] = secret
+            __props__.__dict__["secret"] = None if secret is None else pulumi.Output.secret(secret)
             __props__.__dict__["source_type"] = source_type
             __props__.__dict__["sourceable_attributes"] = sourceable_attributes
             __props__.__dict__["status"] = status
             __props__.__dict__["webhook_endpoint"] = webhook_endpoint
+        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["secret"])
+        opts = pulumi.ResourceOptions.merge(opts, secret_opts)
         super(AlertsSource, __self__).__init__(
             'rootly:index/alertsSource:AlertsSource',
             resource_name,
@@ -939,4 +941,3 @@ class AlertsSource(pulumi.CustomResource):
         The webhook URL generated for non-email alert sources
         """
         return pulumi.get(self, "webhook_endpoint")
-

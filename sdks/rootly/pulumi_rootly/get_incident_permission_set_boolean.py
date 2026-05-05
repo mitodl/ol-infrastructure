@@ -26,13 +26,16 @@ class GetIncidentPermissionSetBooleanResult:
     """
     A collection of values returned by getIncidentPermissionSetBoolean.
     """
-    def __init__(__self__, created_at=None, id=None, kind=None):
+    def __init__(__self__, created_at=None, id=None, incident_permission_set_id=None, kind=None):
         if created_at and not isinstance(created_at, dict):
             raise TypeError("Expected argument 'created_at' to be a dict")
         pulumi.set(__self__, "created_at", created_at)
         if id and not isinstance(id, str):
             raise TypeError("Expected argument 'id' to be a str")
         pulumi.set(__self__, "id", id)
+        if incident_permission_set_id and not isinstance(incident_permission_set_id, str):
+            raise TypeError("Expected argument 'incident_permission_set_id' to be a str")
+        pulumi.set(__self__, "incident_permission_set_id", incident_permission_set_id)
         if kind and not isinstance(kind, str):
             raise TypeError("Expected argument 'kind' to be a str")
         pulumi.set(__self__, "kind", kind)
@@ -48,6 +51,11 @@ class GetIncidentPermissionSetBooleanResult:
         return pulumi.get(self, "id")
 
     @_builtins.property
+    @pulumi.getter(name="incidentPermissionSetId")
+    def incident_permission_set_id(self) -> _builtins.str:
+        return pulumi.get(self, "incident_permission_set_id")
+
+    @_builtins.property
     @pulumi.getter
     def kind(self) -> _builtins.str:
         return pulumi.get(self, "kind")
@@ -61,10 +69,12 @@ class AwaitableGetIncidentPermissionSetBooleanResult(GetIncidentPermissionSetBoo
         return GetIncidentPermissionSetBooleanResult(
             created_at=self.created_at,
             id=self.id,
+            incident_permission_set_id=self.incident_permission_set_id,
             kind=self.kind)
 
 
 def get_incident_permission_set_boolean(created_at: Optional[Mapping[str, _builtins.str]] = None,
+                                        incident_permission_set_id: Optional[_builtins.str] = None,
                                         kind: Optional[_builtins.str] = None,
                                         opts: Optional[pulumi.InvokeOptions] = None) -> AwaitableGetIncidentPermissionSetBooleanResult:
     """
@@ -72,6 +82,7 @@ def get_incident_permission_set_boolean(created_at: Optional[Mapping[str, _built
     """
     __args__ = dict()
     __args__['createdAt'] = created_at
+    __args__['incidentPermissionSetId'] = incident_permission_set_id
     __args__['kind'] = kind
     opts = pulumi.InvokeOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke('rootly:index/getIncidentPermissionSetBoolean:getIncidentPermissionSetBoolean', __args__, opts=opts, typ=GetIncidentPermissionSetBooleanResult, package_ref=_utilities.get_package()).value
@@ -79,8 +90,10 @@ def get_incident_permission_set_boolean(created_at: Optional[Mapping[str, _built
     return AwaitableGetIncidentPermissionSetBooleanResult(
         created_at=pulumi.get(__ret__, 'created_at'),
         id=pulumi.get(__ret__, 'id'),
+        incident_permission_set_id=pulumi.get(__ret__, 'incident_permission_set_id'),
         kind=pulumi.get(__ret__, 'kind'))
 def get_incident_permission_set_boolean_output(created_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
+                                               incident_permission_set_id: Optional[pulumi.Input[_builtins.str]] = None,
                                                kind: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
                                                opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetIncidentPermissionSetBooleanResult]:
     """
@@ -88,10 +101,12 @@ def get_incident_permission_set_boolean_output(created_at: Optional[pulumi.Input
     """
     __args__ = dict()
     __args__['createdAt'] = created_at
+    __args__['incidentPermissionSetId'] = incident_permission_set_id
     __args__['kind'] = kind
     opts = pulumi.InvokeOutputOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke_output('rootly:index/getIncidentPermissionSetBoolean:getIncidentPermissionSetBoolean', __args__, opts=opts, typ=GetIncidentPermissionSetBooleanResult, package_ref=_utilities.get_package())
     return __ret__.apply(lambda __response__: GetIncidentPermissionSetBooleanResult(
         created_at=pulumi.get(__response__, 'created_at'),
         id=pulumi.get(__response__, 'id'),
+        incident_permission_set_id=pulumi.get(__response__, 'incident_permission_set_id'),
         kind=pulumi.get(__response__, 'kind')))

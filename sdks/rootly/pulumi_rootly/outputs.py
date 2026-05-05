@@ -80,6 +80,8 @@ __all__ = [
     'ServiceSlackChannel',
     'SeveritySlackAlias',
     'SeveritySlackChannel',
+    'SlaCondition',
+    'SlaNotificationConfiguration',
     'TeamAlertBroadcastChannel',
     'TeamIncidentBroadcastChannel',
     'TeamProperty',
@@ -96,6 +98,7 @@ __all__ = [
     'WorkflowSimpleTriggerParams',
     'WorkflowTaskAddActionItemTaskParams',
     'WorkflowTaskAddActionItemTaskParamsPostToSlackChannel',
+    'WorkflowTaskAddMicrosoftTeamsChatTabTaskParams',
     'WorkflowTaskAddMicrosoftTeamsTabTaskParams',
     'WorkflowTaskAddRoleTaskParams',
     'WorkflowTaskAddSlackBookmarkTaskParams',
@@ -126,6 +129,7 @@ __all__ = [
     'WorkflowTaskCreateDatadogNotebookTaskParams',
     'WorkflowTaskCreateDropboxPaperPageTaskParams',
     'WorkflowTaskCreateGithubIssueTaskParams',
+    'WorkflowTaskCreateGithubIssueTaskParamsLabel',
     'WorkflowTaskCreateGitlabIssueTaskParams',
     'WorkflowTaskCreateGoToMeetingTaskParams',
     'WorkflowTaskCreateGoToMeetingTaskParamsPostToSlackChannel',
@@ -140,6 +144,11 @@ __all__ = [
     'WorkflowTaskCreateIncidentTaskParams',
     'WorkflowTaskCreateJiraIssueTaskParams',
     'WorkflowTaskCreateJiraSubtaskTaskParams',
+    'WorkflowTaskCreateJsmopsAlertTaskParams',
+    'WorkflowTaskCreateJsmopsAlertTaskParamsEscalation',
+    'WorkflowTaskCreateJsmopsAlertTaskParamsSchedule',
+    'WorkflowTaskCreateJsmopsAlertTaskParamsTeam',
+    'WorkflowTaskCreateJsmopsAlertTaskParamsUser',
     'WorkflowTaskCreateLinearIssueCommentTaskParams',
     'WorkflowTaskCreateLinearIssueTaskParams',
     'WorkflowTaskCreateLinearIssueTaskParamsLabel',
@@ -203,6 +212,9 @@ __all__ = [
     'WorkflowTaskInviteToSlackChannelTaskParamsSlackUserGroup',
     'WorkflowTaskInviteToSlackChannelVictorOpsTaskParams',
     'WorkflowTaskInviteToSlackChannelVictorOpsTaskParamsChannel',
+    'WorkflowTaskPageJsmopsOnCallRespondersTaskParams',
+    'WorkflowTaskPageJsmopsOnCallRespondersTaskParamsTeam',
+    'WorkflowTaskPageJsmopsOnCallRespondersTaskParamsUser',
     'WorkflowTaskPageOpsgenieOnCallRespondersTaskParams',
     'WorkflowTaskPageOpsgenieOnCallRespondersTaskParamsTeam',
     'WorkflowTaskPageOpsgenieOnCallRespondersTaskParamsUser',
@@ -225,6 +237,8 @@ __all__ = [
     'WorkflowTaskSendDashboardReportTaskParams',
     'WorkflowTaskSendEmailTaskParams',
     'WorkflowTaskSendMicrosoftTeamsBlocksTaskParams',
+    'WorkflowTaskSendMicrosoftTeamsChatMessageTaskParams',
+    'WorkflowTaskSendMicrosoftTeamsChatMessageTaskParamsChat',
     'WorkflowTaskSendMicrosoftTeamsMessageTaskParams',
     'WorkflowTaskSendMicrosoftTeamsMessageTaskParamsChannel',
     'WorkflowTaskSendSlackBlocksTaskParams',
@@ -260,6 +274,7 @@ __all__ = [
     'WorkflowTaskUpdateDatadogNotebookTaskParams',
     'WorkflowTaskUpdateDropboxPaperPageTaskParams',
     'WorkflowTaskUpdateGithubIssueTaskParams',
+    'WorkflowTaskUpdateGithubIssueTaskParamsLabel',
     'WorkflowTaskUpdateGitlabIssueTaskParams',
     'WorkflowTaskUpdateGoogleCalendarEventTaskParams',
     'WorkflowTaskUpdateGoogleCalendarEventTaskParamsPostToSlackChannel',
@@ -555,7 +570,7 @@ class AlertGroupTarget(dict):
                  target_type: Optional[_builtins.str] = None):
         """
         :param _builtins.str target_id: id for the Group, Service or EscalationPolicy
-        :param _builtins.str target_type: The type of the target.. Value must be one of `Group`, `Service`, `EscalationPolicy`.
+        :param _builtins.str target_type: The type of the target.. Value must be one of `Group`, `Service`, `Functionality`, `EscalationPolicy`.
         """
         if target_id is not None:
             pulumi.set(__self__, "target_id", target_id)
@@ -574,7 +589,7 @@ class AlertGroupTarget(dict):
     @pulumi.getter(name="targetType")
     def target_type(self) -> Optional[_builtins.str]:
         """
-        The type of the target.. Value must be one of `Group`, `Service`, `EscalationPolicy`.
+        The type of the target.. Value must be one of `Group`, `Service`, `Functionality`, `EscalationPolicy`.
         """
         return pulumi.get(self, "target_type")
 
@@ -1232,7 +1247,7 @@ class AlertRoutingRuleDestination(dict):
                  target_type: Optional[_builtins.str] = None):
         """
         :param _builtins.str target_id: The ID of the target
-        :param _builtins.str target_type: The type of the target. Value must be one of `Service`, `Group`, `EscalationPolicy`.
+        :param _builtins.str target_type: The type of the target. Please contact support if you encounter issues using `Functionality` as a target type.. Value must be one of `Service`, `Group`, `Functionality`, `EscalationPolicy`.
         """
         pulumi.set(__self__, "target_id", target_id)
         if target_type is not None:
@@ -1250,7 +1265,7 @@ class AlertRoutingRuleDestination(dict):
     @pulumi.getter(name="targetType")
     def target_type(self) -> Optional[_builtins.str]:
         """
-        The type of the target. Value must be one of `Service`, `Group`, `EscalationPolicy`.
+        The type of the target. Please contact support if you encounter issues using `Functionality` as a target type.. Value must be one of `Service`, `Group`, `Functionality`, `EscalationPolicy`.
         """
         return pulumi.get(self, "target_type")
 
@@ -2972,7 +2987,7 @@ class EscalationPathRule(dict):
         :param _builtins.str rule_type: The type of the escalation path rule. Value must be one of <span pulumi-lang-nodejs="`alertUrgency`" pulumi-lang-dotnet="`AlertUrgency`" pulumi-lang-go="`alertUrgency`" pulumi-lang-python="`alert_urgency`" pulumi-lang-yaml="`alertUrgency`" pulumi-lang-java="`alertUrgency`">`alert_urgency`</span>, <span pulumi-lang-nodejs="`workingHour`" pulumi-lang-dotnet="`WorkingHour`" pulumi-lang-go="`workingHour`" pulumi-lang-python="`working_hour`" pulumi-lang-yaml="`workingHour`" pulumi-lang-java="`workingHour`">`working_hour`</span>, <span pulumi-lang-nodejs="`jsonPath`" pulumi-lang-dotnet="`JsonPath`" pulumi-lang-go="`jsonPath`" pulumi-lang-python="`json_path`" pulumi-lang-yaml="`jsonPath`" pulumi-lang-java="`jsonPath`">`json_path`</span>, <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`">`field`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`">`service`</span>, <span pulumi-lang-nodejs="`deferralWindow`" pulumi-lang-dotnet="`DeferralWindow`" pulumi-lang-go="`deferralWindow`" pulumi-lang-python="`deferral_window`" pulumi-lang-yaml="`deferralWindow`" pulumi-lang-java="`deferralWindow`">`deferral_window`</span>.
         :param Sequence[_builtins.str] service_ids: Service ids for which this escalation path should be used. Only used with <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`">`service`</span> rule type.
         :param Sequence['EscalationPathRuleTimeBlockArgs'] time_blocks: Time windows during which alerts are deferred. Only used with <span pulumi-lang-nodejs="`deferralWindow`" pulumi-lang-dotnet="`DeferralWindow`" pulumi-lang-go="`deferralWindow`" pulumi-lang-python="`deferral_window`" pulumi-lang-yaml="`deferralWindow`" pulumi-lang-java="`deferralWindow`">`deferral_window`</span> rule type.
-        :param _builtins.str time_zone: Time zone for the deferral window. Only used with <span pulumi-lang-nodejs="`deferralWindow`" pulumi-lang-dotnet="`DeferralWindow`" pulumi-lang-go="`deferralWindow`" pulumi-lang-python="`deferral_window`" pulumi-lang-yaml="`deferralWindow`" pulumi-lang-java="`deferralWindow`">`deferral_window`</span> rule type.
+        :param _builtins.str time_zone: Time zone for the deferral window (IANA format, e.g. `America/New_York`). Only used with <span pulumi-lang-nodejs="`deferralWindow`" pulumi-lang-dotnet="`DeferralWindow`" pulumi-lang-go="`deferralWindow`" pulumi-lang-python="`deferral_window`" pulumi-lang-yaml="`deferralWindow`" pulumi-lang-java="`deferralWindow`">`deferral_window`</span> rule type.
         :param Sequence[_builtins.str] urgency_ids: Alert urgency ids for which this escalation path should be used
         :param _builtins.str value: Value with which JSON path value should be matched
         :param Sequence[_builtins.str] values: Values to match against. Only used with <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`">`field`</span> rule type.
@@ -3063,7 +3078,7 @@ class EscalationPathRule(dict):
     @pulumi.getter(name="timeZone")
     def time_zone(self) -> Optional[_builtins.str]:
         """
-        Time zone for the deferral window. Only used with <span pulumi-lang-nodejs="`deferralWindow`" pulumi-lang-dotnet="`DeferralWindow`" pulumi-lang-go="`deferralWindow`" pulumi-lang-python="`deferral_window`" pulumi-lang-yaml="`deferralWindow`" pulumi-lang-java="`deferralWindow`">`deferral_window`</span> rule type.
+        Time zone for the deferral window (IANA format, e.g. `America/New_York`). Only used with <span pulumi-lang-nodejs="`deferralWindow`" pulumi-lang-dotnet="`DeferralWindow`" pulumi-lang-go="`deferralWindow`" pulumi-lang-python="`deferral_window`" pulumi-lang-yaml="`deferralWindow`" pulumi-lang-java="`deferralWindow`">`deferral_window`</span> rule type.
         """
         return pulumi.get(self, "time_zone")
 
@@ -4155,6 +4170,206 @@ class SeveritySlackChannel(dict):
 
 
 @pulumi.output_type
+class SlaCondition(dict):
+    @staticmethod
+    def __key_warning(key: str):
+        suggest = None
+        if key == "conditionableType":
+            suggest = "conditionable_type"
+        elif key == "formFieldId":
+            suggest = "form_field_id"
+
+        if suggest:
+            pulumi.log.warn(f"Key '{key}' not found in SlaCondition. Access the value via the '{suggest}' property getter instead.")
+
+    def __getitem__(self, key: str) -> Any:
+        SlaCondition.__key_warning(key)
+        return super().__getitem__(key)
+
+    def get(self, key: str, default = None) -> Any:
+        SlaCondition.__key_warning(key)
+        return super().get(key, default)
+
+    def __init__(__self__, *,
+                 conditionable_type: Optional[_builtins.str] = None,
+                 form_field_id: Optional[_builtins.str] = None,
+                 id: Optional[_builtins.str] = None,
+                 operator: Optional[_builtins.str] = None,
+                 position: Optional[_builtins.float] = None,
+                 property: Optional[_builtins.str] = None,
+                 values: Optional[Sequence[_builtins.str]] = None):
+        """
+        :param _builtins.str conditionable_type: The type of condition. Value must be one of `SLAs::BuiltInFieldCondition`, `SLAs::CustomFieldCondition`.
+        :param _builtins.str form_field_id: The ID of the form field (for custom field conditions)
+        :param _builtins.str id: Unique ID of the condition
+        :param _builtins.str operator: The comparison operator
+        :param _builtins.float position: The position of the condition
+        :param _builtins.str property: The property to evaluate (for built-in field conditions)
+        :param Sequence[_builtins.str] values: The values to compare against
+        """
+        if conditionable_type is not None:
+            pulumi.set(__self__, "conditionable_type", conditionable_type)
+        if form_field_id is not None:
+            pulumi.set(__self__, "form_field_id", form_field_id)
+        if id is not None:
+            pulumi.set(__self__, "id", id)
+        if operator is not None:
+            pulumi.set(__self__, "operator", operator)
+        if position is not None:
+            pulumi.set(__self__, "position", position)
+        if property is not None:
+            pulumi.set(__self__, "property", property)
+        if values is not None:
+            pulumi.set(__self__, "values", values)
+
+    @_builtins.property
+    @pulumi.getter(name="conditionableType")
+    def conditionable_type(self) -> Optional[_builtins.str]:
+        """
+        The type of condition. Value must be one of `SLAs::BuiltInFieldCondition`, `SLAs::CustomFieldCondition`.
+        """
+        return pulumi.get(self, "conditionable_type")
+
+    @_builtins.property
+    @pulumi.getter(name="formFieldId")
+    def form_field_id(self) -> Optional[_builtins.str]:
+        """
+        The ID of the form field (for custom field conditions)
+        """
+        return pulumi.get(self, "form_field_id")
+
+    @_builtins.property
+    @pulumi.getter
+    def id(self) -> Optional[_builtins.str]:
+        """
+        Unique ID of the condition
+        """
+        return pulumi.get(self, "id")
+
+    @_builtins.property
+    @pulumi.getter
+    def operator(self) -> Optional[_builtins.str]:
+        """
+        The comparison operator
+        """
+        return pulumi.get(self, "operator")
+
+    @_builtins.property
+    @pulumi.getter
+    def position(self) -> Optional[_builtins.float]:
+        """
+        The position of the condition
+        """
+        return pulumi.get(self, "position")
+
+    @_builtins.property
+    @pulumi.getter
+    def property(self) -> Optional[_builtins.str]:
+        """
+        The property to evaluate (for built-in field conditions)
+        """
+        return pulumi.get(self, "property")
+
+    @_builtins.property
+    @pulumi.getter
+    def values(self) -> Optional[Sequence[_builtins.str]]:
+        """
+        The values to compare against
+        """
+        return pulumi.get(self, "values")
+
+
+@pulumi.output_type
+class SlaNotificationConfiguration(dict):
+    @staticmethod
+    def __key_warning(key: str):
+        suggest = None
+        if key == "createdAt":
+            suggest = "created_at"
+        elif key == "offsetDays":
+            suggest = "offset_days"
+        elif key == "offsetType":
+            suggest = "offset_type"
+        elif key == "updatedAt":
+            suggest = "updated_at"
+
+        if suggest:
+            pulumi.log.warn(f"Key '{key}' not found in SlaNotificationConfiguration. Access the value via the '{suggest}' property getter instead.")
+
+    def __getitem__(self, key: str) -> Any:
+        SlaNotificationConfiguration.__key_warning(key)
+        return super().__getitem__(key)
+
+    def get(self, key: str, default = None) -> Any:
+        SlaNotificationConfiguration.__key_warning(key)
+        return super().get(key, default)
+
+    def __init__(__self__, *,
+                 created_at: Optional[_builtins.str] = None,
+                 id: Optional[_builtins.str] = None,
+                 offset_days: Optional[_builtins.float] = None,
+                 offset_type: Optional[_builtins.str] = None,
+                 updated_at: Optional[_builtins.str] = None):
+        """
+        :param _builtins.str created_at: Date of creation
+        :param _builtins.str id: Unique ID of the notification configuration
+        :param _builtins.float offset_days: Number of days offset from the deadline
+        :param _builtins.str offset_type: When to send the notification relative to the deadline. Value must be one of <span pulumi-lang-nodejs="`beforeDue`" pulumi-lang-dotnet="`BeforeDue`" pulumi-lang-go="`beforeDue`" pulumi-lang-python="`before_due`" pulumi-lang-yaml="`beforeDue`" pulumi-lang-java="`beforeDue`">`before_due`</span>, <span pulumi-lang-nodejs="`whenDue`" pulumi-lang-dotnet="`WhenDue`" pulumi-lang-go="`whenDue`" pulumi-lang-python="`when_due`" pulumi-lang-yaml="`whenDue`" pulumi-lang-java="`whenDue`">`when_due`</span>, <span pulumi-lang-nodejs="`afterDue`" pulumi-lang-dotnet="`AfterDue`" pulumi-lang-go="`afterDue`" pulumi-lang-python="`after_due`" pulumi-lang-yaml="`afterDue`" pulumi-lang-java="`afterDue`">`after_due`</span>.
+        :param _builtins.str updated_at: Date of last update
+        """
+        if created_at is not None:
+            pulumi.set(__self__, "created_at", created_at)
+        if id is not None:
+            pulumi.set(__self__, "id", id)
+        if offset_days is not None:
+            pulumi.set(__self__, "offset_days", offset_days)
+        if offset_type is not None:
+            pulumi.set(__self__, "offset_type", offset_type)
+        if updated_at is not None:
+            pulumi.set(__self__, "updated_at", updated_at)
+
+    @_builtins.property
+    @pulumi.getter(name="createdAt")
+    def created_at(self) -> Optional[_builtins.str]:
+        """
+        Date of creation
+        """
+        return pulumi.get(self, "created_at")
+
+    @_builtins.property
+    @pulumi.getter
+    def id(self) -> Optional[_builtins.str]:
+        """
+        Unique ID of the notification configuration
+        """
+        return pulumi.get(self, "id")
+
+    @_builtins.property
+    @pulumi.getter(name="offsetDays")
+    def offset_days(self) -> Optional[_builtins.float]:
+        """
+        Number of days offset from the deadline
+        """
+        return pulumi.get(self, "offset_days")
+
+    @_builtins.property
+    @pulumi.getter(name="offsetType")
+    def offset_type(self) -> Optional[_builtins.str]:
+        """
+        When to send the notification relative to the deadline. Value must be one of <span pulumi-lang-nodejs="`beforeDue`" pulumi-lang-dotnet="`BeforeDue`" pulumi-lang-go="`beforeDue`" pulumi-lang-python="`before_due`" pulumi-lang-yaml="`beforeDue`" pulumi-lang-java="`beforeDue`">`before_due`</span>, <span pulumi-lang-nodejs="`whenDue`" pulumi-lang-dotnet="`WhenDue`" pulumi-lang-go="`whenDue`" pulumi-lang-python="`when_due`" pulumi-lang-yaml="`whenDue`" pulumi-lang-java="`whenDue`">`when_due`</span>, <span pulumi-lang-nodejs="`afterDue`" pulumi-lang-dotnet="`AfterDue`" pulumi-lang-go="`afterDue`" pulumi-lang-python="`after_due`" pulumi-lang-yaml="`afterDue`" pulumi-lang-java="`afterDue`">`after_due`</span>.
+        """
+        return pulumi.get(self, "offset_type")
+
+    @_builtins.property
+    @pulumi.getter(name="updatedAt")
+    def updated_at(self) -> Optional[_builtins.str]:
+        """
+        Date of last update
+        """
+        return pulumi.get(self, "updated_at")
+
+
+@pulumi.output_type
 class TeamAlertBroadcastChannel(dict):
     def __init__(__self__, *,
                  id: Optional[_builtins.str] = None,
@@ -4445,30 +4660,30 @@ class WorkflowActionItemTriggerParams(dict):
                  trigger_type: Optional[_builtins.str] = None,
                  triggers: Optional[Sequence[_builtins.str]] = None):
         """
-        :param _builtins.str incident_action_item_condition: Value must be one off `ALL`, `ANY`, `NONE`.
-        :param _builtins.str incident_action_item_condition_group: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_action_item_condition_kind: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_action_item_condition_priority: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_action_item_condition_status: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_action_item_condition: Value must be one of `ALL`, `ANY`, `NONE`.
+        :param _builtins.str incident_action_item_condition_group: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_action_item_condition_kind: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_action_item_condition_priority: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_action_item_condition_status: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param Sequence[_builtins.str] incident_action_item_kinds: Value must be one of <span pulumi-lang-nodejs="`task`" pulumi-lang-dotnet="`Task`" pulumi-lang-go="`task`" pulumi-lang-python="`task`" pulumi-lang-yaml="`task`" pulumi-lang-java="`task`">`task`</span>, <span pulumi-lang-nodejs="`followUp`" pulumi-lang-dotnet="`FollowUp`" pulumi-lang-go="`followUp`" pulumi-lang-python="`follow_up`" pulumi-lang-yaml="`followUp`" pulumi-lang-java="`followUp`">`follow_up`</span>.
         :param Sequence[_builtins.str] incident_action_item_priorities: Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
         :param Sequence[_builtins.str] incident_action_item_statuses: Value must be one of <span pulumi-lang-nodejs="`open`" pulumi-lang-dotnet="`Open`" pulumi-lang-go="`open`" pulumi-lang-python="`open`" pulumi-lang-yaml="`open`" pulumi-lang-java="`open`">`open`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`done`" pulumi-lang-dotnet="`Done`" pulumi-lang-go="`done`" pulumi-lang-python="`done`" pulumi-lang-yaml="`done`" pulumi-lang-java="`done`">`done`</span>.
-        :param _builtins.str incident_condition: Value must be one off `ALL`, `ANY`, `NONE`.
-        :param _builtins.str incident_condition_environment: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_functionality: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_group: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_incident_roles: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_incident_type: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_kind: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_service: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_severity: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_status: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_sub_status: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_visibility: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition: Value must be one of `ALL`, `ANY`, `NONE`.
+        :param _builtins.str incident_condition_environment: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_functionality: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_group: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_incident_roles: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_incident_type: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_kind: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_service: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_severity: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_status: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_sub_status: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_visibility: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_inactivity_duration: ex. 10 min, 1h, 3 days, 2 weeks
         :param Sequence[_builtins.str] incident_kinds: Value must be one of <span pulumi-lang-nodejs="`test`" pulumi-lang-dotnet="`Test`" pulumi-lang-go="`test`" pulumi-lang-python="`test`" pulumi-lang-yaml="`test`" pulumi-lang-java="`test`">`test`</span>, <span pulumi-lang-nodejs="`testSub`" pulumi-lang-dotnet="`TestSub`" pulumi-lang-go="`testSub`" pulumi-lang-python="`test_sub`" pulumi-lang-yaml="`testSub`" pulumi-lang-java="`testSub`">`test_sub`</span>, <span pulumi-lang-nodejs="`example`" pulumi-lang-dotnet="`Example`" pulumi-lang-go="`example`" pulumi-lang-python="`example`" pulumi-lang-yaml="`example`" pulumi-lang-java="`example`">`example`</span>, <span pulumi-lang-nodejs="`exampleSub`" pulumi-lang-dotnet="`ExampleSub`" pulumi-lang-go="`exampleSub`" pulumi-lang-python="`example_sub`" pulumi-lang-yaml="`exampleSub`" pulumi-lang-java="`exampleSub`">`example_sub`</span>, <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`normalSub`" pulumi-lang-dotnet="`NormalSub`" pulumi-lang-go="`normalSub`" pulumi-lang-python="`normal_sub`" pulumi-lang-yaml="`normalSub`" pulumi-lang-java="`normalSub`">`normal_sub`</span>, <span pulumi-lang-nodejs="`backfilled`" pulumi-lang-dotnet="`Backfilled`" pulumi-lang-go="`backfilled`" pulumi-lang-python="`backfilled`" pulumi-lang-yaml="`backfilled`" pulumi-lang-java="`backfilled`">`backfilled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`scheduledSub`" pulumi-lang-dotnet="`ScheduledSub`" pulumi-lang-go="`scheduledSub`" pulumi-lang-python="`scheduled_sub`" pulumi-lang-yaml="`scheduledSub`" pulumi-lang-java="`scheduledSub`">`scheduled_sub`</span>.
         :param Sequence[_builtins.str] incident_statuses: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`">`in_triage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`">`started`</span>, <span pulumi-lang-nodejs="`detected`" pulumi-lang-dotnet="`Detected`" pulumi-lang-go="`detected`" pulumi-lang-python="`detected`" pulumi-lang-yaml="`detected`" pulumi-lang-java="`detected`">`detected`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`">`completed`</span>.
-        :param _builtins.str trigger_type: Value must be one off <span pulumi-lang-nodejs="`actionItem`" pulumi-lang-dotnet="`ActionItem`" pulumi-lang-go="`actionItem`" pulumi-lang-python="`action_item`" pulumi-lang-yaml="`actionItem`" pulumi-lang-java="`actionItem`">`action_item`</span>.
+        :param _builtins.str trigger_type: Value must be one of <span pulumi-lang-nodejs="`actionItem`" pulumi-lang-dotnet="`ActionItem`" pulumi-lang-go="`actionItem`" pulumi-lang-python="`action_item`" pulumi-lang-yaml="`actionItem`" pulumi-lang-java="`actionItem`">`action_item`</span>.
         :param Sequence[_builtins.str] triggers: Actions that trigger the workflow. One of custom_fields.<slug>.updated, incident_updated, action_item_created, action_item_updated, assigned_user_updated, summary_updated, description_updated, status_updated, priority_updated, due_date_updated, teams_updated, slack_command
         """
         if incident_action_item_condition is not None:
@@ -4544,7 +4759,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentActionItemCondition")
     def incident_action_item_condition(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `ALL`, `ANY`, `NONE`.
+        Value must be one of `ALL`, `ANY`, `NONE`.
         """
         return pulumi.get(self, "incident_action_item_condition")
 
@@ -4552,7 +4767,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentActionItemConditionGroup")
     def incident_action_item_condition_group(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_action_item_condition_group")
 
@@ -4560,7 +4775,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentActionItemConditionKind")
     def incident_action_item_condition_kind(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_action_item_condition_kind")
 
@@ -4568,7 +4783,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentActionItemConditionPriority")
     def incident_action_item_condition_priority(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_action_item_condition_priority")
 
@@ -4576,7 +4791,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentActionItemConditionStatus")
     def incident_action_item_condition_status(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_action_item_condition_status")
 
@@ -4613,7 +4828,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentCondition")
     def incident_condition(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `ALL`, `ANY`, `NONE`.
+        Value must be one of `ALL`, `ANY`, `NONE`.
         """
         return pulumi.get(self, "incident_condition")
 
@@ -4631,7 +4846,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionEnvironment")
     def incident_condition_environment(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_environment")
 
@@ -4639,7 +4854,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionFunctionality")
     def incident_condition_functionality(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_functionality")
 
@@ -4647,7 +4862,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionGroup")
     def incident_condition_group(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_group")
 
@@ -4655,7 +4870,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionIncidentRoles")
     def incident_condition_incident_roles(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_incident_roles")
 
@@ -4663,7 +4878,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionIncidentType")
     def incident_condition_incident_type(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_incident_type")
 
@@ -4671,7 +4886,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionKind")
     def incident_condition_kind(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_kind")
 
@@ -4689,7 +4904,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionService")
     def incident_condition_service(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_service")
 
@@ -4697,7 +4912,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionSeverity")
     def incident_condition_severity(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_severity")
 
@@ -4710,7 +4925,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionStatus")
     def incident_condition_status(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_status")
 
@@ -4718,7 +4933,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionSubStatus")
     def incident_condition_sub_status(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_sub_status")
 
@@ -4731,7 +4946,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionVisibility")
     def incident_condition_visibility(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_visibility")
 
@@ -4773,7 +4988,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="triggerType")
     def trigger_type(self) -> Optional[_builtins.str]:
         """
-        Value must be one off <span pulumi-lang-nodejs="`actionItem`" pulumi-lang-dotnet="`ActionItem`" pulumi-lang-go="`actionItem`" pulumi-lang-python="`action_item`" pulumi-lang-yaml="`actionItem`" pulumi-lang-java="`actionItem`">`action_item`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`actionItem`" pulumi-lang-dotnet="`ActionItem`" pulumi-lang-go="`actionItem`" pulumi-lang-python="`action_item`" pulumi-lang-yaml="`actionItem`" pulumi-lang-java="`actionItem`">`action_item`</span>.
         """
         return pulumi.get(self, "trigger_type")
 
@@ -4809,6 +5024,8 @@ class WorkflowAlertTriggerParams(dict):
             suggest = "alert_condition_status"
         elif key == "alertConditionStatusUseRegexp":
             suggest = "alert_condition_status_use_regexp"
+        elif key == "alertConditionUrgency":
+            suggest = "alert_condition_urgency"
         elif key == "alertFieldConditions":
             suggest = "alert_field_conditions"
         elif key == "alertLabels":
@@ -4823,6 +5040,8 @@ class WorkflowAlertTriggerParams(dict):
             suggest = "alert_sources"
         elif key == "alertStatuses":
             suggest = "alert_statuses"
+        elif key == "alertUrgencyIds":
+            suggest = "alert_urgency_ids"
         elif key == "triggerType":
             suggest = "trigger_type"
 
@@ -4847,6 +5066,7 @@ class WorkflowAlertTriggerParams(dict):
                  alert_condition_source_use_regexp: Optional[_builtins.bool] = None,
                  alert_condition_status: Optional[_builtins.str] = None,
                  alert_condition_status_use_regexp: Optional[_builtins.bool] = None,
+                 alert_condition_urgency: Optional[_builtins.str] = None,
                  alert_field_conditions: Optional[Sequence['outputs.WorkflowAlertTriggerParamsAlertFieldCondition']] = None,
                  alert_labels: Optional[Sequence[_builtins.str]] = None,
                  alert_payload_conditions: Optional['outputs.WorkflowAlertTriggerParamsAlertPayloadConditions'] = None,
@@ -4854,21 +5074,22 @@ class WorkflowAlertTriggerParams(dict):
                  alert_query_payload: Optional[_builtins.str] = None,
                  alert_sources: Optional[Sequence[_builtins.str]] = None,
                  alert_statuses: Optional[Sequence[_builtins.str]] = None,
+                 alert_urgency_ids: Optional[Sequence[_builtins.str]] = None,
                  trigger_type: Optional[_builtins.str] = None,
                  triggers: Optional[Sequence[_builtins.str]] = None):
         """
-        :param _builtins.str alert_condition: Value must be one off `ALL`, `ANY`, `NONE`.
-        :param _builtins.str alert_condition_label: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str alert_condition: Value must be one of `ALL`, `ANY`, `NONE`.
+        :param _builtins.str alert_condition_label: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.bool alert_condition_label_use_regexp: Value must be one of true or false
-        :param _builtins.str alert_condition_payload: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str alert_condition_payload: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.bool alert_condition_payload_use_regexp: Value must be one of true or false
-        :param _builtins.str alert_condition_source: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str alert_condition_source: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.bool alert_condition_source_use_regexp: Value must be one of true or false
-        :param _builtins.str alert_condition_status: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str alert_condition_status: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.bool alert_condition_status_use_regexp: Value must be one of true or false
-        :param 'WorkflowAlertTriggerParamsAlertPayloadConditionsArgs' alert_payload_conditions: Advanced payload filtering with multiple conditions and logical operators
+        :param _builtins.str alert_condition_urgency: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str alert_query_payload: You can use jsonpath syntax. eg: $.incident.teams[*]
-        :param _builtins.str trigger_type: Value must be one off <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`">`alert`</span>.
+        :param _builtins.str trigger_type: Value must be one of <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`">`alert`</span>.
         :param Sequence[_builtins.str] triggers: Actions that trigger the workflow. Value must be one of <span pulumi-lang-nodejs="`alertCreated`" pulumi-lang-dotnet="`AlertCreated`" pulumi-lang-go="`alertCreated`" pulumi-lang-python="`alert_created`" pulumi-lang-yaml="`alertCreated`" pulumi-lang-java="`alertCreated`">`alert_created`</span>, <span pulumi-lang-nodejs="`alertStatusUpdated`" pulumi-lang-dotnet="`AlertStatusUpdated`" pulumi-lang-go="`alertStatusUpdated`" pulumi-lang-python="`alert_status_updated`" pulumi-lang-yaml="`alertStatusUpdated`" pulumi-lang-java="`alertStatusUpdated`">`alert_status_updated`</span>.
         """
         if alert_condition is not None:
@@ -4889,6 +5110,8 @@ class WorkflowAlertTriggerParams(dict):
             pulumi.set(__self__, "alert_condition_status", alert_condition_status)
         if alert_condition_status_use_regexp is not None:
             pulumi.set(__self__, "alert_condition_status_use_regexp", alert_condition_status_use_regexp)
+        if alert_condition_urgency is not None:
+            pulumi.set(__self__, "alert_condition_urgency", alert_condition_urgency)
         if alert_field_conditions is not None:
             pulumi.set(__self__, "alert_field_conditions", alert_field_conditions)
         if alert_labels is not None:
@@ -4903,6 +5126,8 @@ class WorkflowAlertTriggerParams(dict):
             pulumi.set(__self__, "alert_sources", alert_sources)
         if alert_statuses is not None:
             pulumi.set(__self__, "alert_statuses", alert_statuses)
+        if alert_urgency_ids is not None:
+            pulumi.set(__self__, "alert_urgency_ids", alert_urgency_ids)
         if trigger_type is not None:
             pulumi.set(__self__, "trigger_type", trigger_type)
         if triggers is not None:
@@ -4912,7 +5137,7 @@ class WorkflowAlertTriggerParams(dict):
     @pulumi.getter(name="alertCondition")
     def alert_condition(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `ALL`, `ANY`, `NONE`.
+        Value must be one of `ALL`, `ANY`, `NONE`.
         """
         return pulumi.get(self, "alert_condition")
 
@@ -4920,7 +5145,7 @@ class WorkflowAlertTriggerParams(dict):
     @pulumi.getter(name="alertConditionLabel")
     def alert_condition_label(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "alert_condition_label")
 
@@ -4936,7 +5161,7 @@ class WorkflowAlertTriggerParams(dict):
     @pulumi.getter(name="alertConditionPayload")
     def alert_condition_payload(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "alert_condition_payload")
 
@@ -4952,7 +5177,7 @@ class WorkflowAlertTriggerParams(dict):
     @pulumi.getter(name="alertConditionSource")
     def alert_condition_source(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "alert_condition_source")
 
@@ -4968,7 +5193,7 @@ class WorkflowAlertTriggerParams(dict):
     @pulumi.getter(name="alertConditionStatus")
     def alert_condition_status(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "alert_condition_status")
 
@@ -4979,6 +5204,14 @@ class WorkflowAlertTriggerParams(dict):
         Value must be one of true or false
         """
         return pulumi.get(self, "alert_condition_status_use_regexp")
+
+    @_builtins.property
+    @pulumi.getter(name="alertConditionUrgency")
+    def alert_condition_urgency(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        """
+        return pulumi.get(self, "alert_condition_urgency")
 
     @_builtins.property
     @pulumi.getter(name="alertFieldConditions")
@@ -4993,9 +5226,6 @@ class WorkflowAlertTriggerParams(dict):
     @_builtins.property
     @pulumi.getter(name="alertPayloadConditions")
     def alert_payload_conditions(self) -> Optional['outputs.WorkflowAlertTriggerParamsAlertPayloadConditions']:
-        """
-        Advanced payload filtering with multiple conditions and logical operators
-        """
         return pulumi.get(self, "alert_payload_conditions")
 
     @_builtins.property
@@ -5022,10 +5252,15 @@ class WorkflowAlertTriggerParams(dict):
         return pulumi.get(self, "alert_statuses")
 
     @_builtins.property
+    @pulumi.getter(name="alertUrgencyIds")
+    def alert_urgency_ids(self) -> Optional[Sequence[_builtins.str]]:
+        return pulumi.get(self, "alert_urgency_ids")
+
+    @_builtins.property
     @pulumi.getter(name="triggerType")
     def trigger_type(self) -> Optional[_builtins.str]:
         """
-        Value must be one off <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`">`alert`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`">`alert`</span>.
         """
         return pulumi.get(self, "trigger_type")
 
@@ -5063,8 +5298,7 @@ class WorkflowAlertTriggerParamsAlertPayloadConditions(dict):
                  conditions: Optional[Sequence['outputs.WorkflowAlertTriggerParamsAlertPayloadConditionsCondition']] = None,
                  logic: Optional[_builtins.str] = None):
         """
-        :param Sequence['WorkflowAlertTriggerParamsAlertPayloadConditionsConditionArgs'] conditions: List of condition rules to evaluate
-        :param _builtins.str logic: Logical operator for combining conditions. Value must be one of `ALL`, `ANY`, `NONE`.
+        :param _builtins.str logic: Logic operator for conditions. Value must be one of `ALL` or `ANY`.
         """
         if conditions is not None:
             pulumi.set(__self__, "conditions", conditions)
@@ -5074,16 +5308,13 @@ class WorkflowAlertTriggerParamsAlertPayloadConditions(dict):
     @_builtins.property
     @pulumi.getter
     def conditions(self) -> Optional[Sequence['outputs.WorkflowAlertTriggerParamsAlertPayloadConditionsCondition']]:
-        """
-        List of condition rules to evaluate
-        """
         return pulumi.get(self, "conditions")
 
     @_builtins.property
     @pulumi.getter
     def logic(self) -> Optional[_builtins.str]:
         """
-        Logical operator for combining conditions. Value must be one of `ALL`, `ANY`, `NONE`.
+        Logic operator for conditions. Value must be one of `ALL` or `ANY`.
         """
         return pulumi.get(self, "logic")
 
@@ -5110,26 +5341,23 @@ class WorkflowAlertTriggerParamsAlertPayloadConditionsCondition(dict):
     def __init__(__self__, *,
                  operator: _builtins.str,
                  query: _builtins.str,
-                 use_regexp: Optional[_builtins.bool] = None,
-                 values: Optional[Sequence[_builtins.str]] = None):
+                 values: Sequence[_builtins.str],
+                 use_regexp: Optional[_builtins.bool] = None):
         """
-        :param _builtins.str operator: Comparison operator. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str query: JSONPath query to extract value from alert payload (e.g., $.commonLabels.namespace)
-        :param _builtins.bool use_regexp: Whether to use regular expression matching
-        :param Sequence[_builtins.str] values: List of values to compare against
+        :param _builtins.str operator: Value must be one of `IS`, `IS NOT`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `SET`, `UNSET`.
+        :param _builtins.str query: JSONPath query. eg: $.commonLabels.namespace
         """
         pulumi.set(__self__, "operator", operator)
         pulumi.set(__self__, "query", query)
+        pulumi.set(__self__, "values", values)
         if use_regexp is not None:
             pulumi.set(__self__, "use_regexp", use_regexp)
-        if values is not None:
-            pulumi.set(__self__, "values", values)
 
     @_builtins.property
     @pulumi.getter
     def operator(self) -> _builtins.str:
         """
-        Comparison operator. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "operator")
 
@@ -5137,25 +5365,19 @@ class WorkflowAlertTriggerParamsAlertPayloadConditionsCondition(dict):
     @pulumi.getter
     def query(self) -> _builtins.str:
         """
-        JSONPath query to extract value from alert payload (e.g., $.commonLabels.namespace)
+        JSONPath query. eg: $.commonLabels.namespace
         """
         return pulumi.get(self, "query")
 
     @_builtins.property
-    @pulumi.getter(name="useRegexp")
-    def use_regexp(self) -> Optional[_builtins.bool]:
-        """
-        Whether to use regular expression matching
-        """
-        return pulumi.get(self, "use_regexp")
+    @pulumi.getter
+    def values(self) -> Sequence[_builtins.str]:
+        return pulumi.get(self, "values")
 
     @_builtins.property
-    @pulumi.getter
-    def values(self) -> Optional[Sequence[_builtins.str]]:
-        """
-        List of values to compare against
-        """
-        return pulumi.get(self, "values")
+    @pulumi.getter(name="useRegexp")
+    def use_regexp(self) -> Optional[_builtins.bool]:
+        return pulumi.get(self, "use_regexp")
 
 
 @pulumi.output_type
@@ -5256,25 +5478,25 @@ class WorkflowIncidentTriggerParams(dict):
                  trigger_type: Optional[_builtins.str] = None,
                  triggers: Optional[Sequence[_builtins.str]] = None):
         """
-        :param _builtins.str incident_condition: Value must be one off `ALL`, `ANY`, `NONE`.
-        :param _builtins.str incident_condition_cause: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_environment: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_functionality: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_group: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_incident_roles: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_incident_type: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_kind: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_service: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_severity: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_status: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_sub_status: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_visibility: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition: Value must be one of `ALL`, `ANY`, `NONE`.
+        :param _builtins.str incident_condition_cause: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_environment: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_functionality: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_group: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_incident_roles: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_incident_type: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_kind: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_service: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_severity: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_status: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_sub_status: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_visibility: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_inactivity_duration: ex. 10 min, 1h, 3 days, 2 weeks
         :param Sequence[_builtins.str] incident_kinds: Value must be one of <span pulumi-lang-nodejs="`test`" pulumi-lang-dotnet="`Test`" pulumi-lang-go="`test`" pulumi-lang-python="`test`" pulumi-lang-yaml="`test`" pulumi-lang-java="`test`">`test`</span>, <span pulumi-lang-nodejs="`testSub`" pulumi-lang-dotnet="`TestSub`" pulumi-lang-go="`testSub`" pulumi-lang-python="`test_sub`" pulumi-lang-yaml="`testSub`" pulumi-lang-java="`testSub`">`test_sub`</span>, <span pulumi-lang-nodejs="`example`" pulumi-lang-dotnet="`Example`" pulumi-lang-go="`example`" pulumi-lang-python="`example`" pulumi-lang-yaml="`example`" pulumi-lang-java="`example`">`example`</span>, <span pulumi-lang-nodejs="`exampleSub`" pulumi-lang-dotnet="`ExampleSub`" pulumi-lang-go="`exampleSub`" pulumi-lang-python="`example_sub`" pulumi-lang-yaml="`exampleSub`" pulumi-lang-java="`exampleSub`">`example_sub`</span>, <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`normalSub`" pulumi-lang-dotnet="`NormalSub`" pulumi-lang-go="`normalSub`" pulumi-lang-python="`normal_sub`" pulumi-lang-yaml="`normalSub`" pulumi-lang-java="`normalSub`">`normal_sub`</span>, <span pulumi-lang-nodejs="`backfilled`" pulumi-lang-dotnet="`Backfilled`" pulumi-lang-go="`backfilled`" pulumi-lang-python="`backfilled`" pulumi-lang-yaml="`backfilled`" pulumi-lang-java="`backfilled`">`backfilled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`scheduledSub`" pulumi-lang-dotnet="`ScheduledSub`" pulumi-lang-go="`scheduledSub`" pulumi-lang-python="`scheduled_sub`" pulumi-lang-yaml="`scheduledSub`" pulumi-lang-java="`scheduledSub`">`scheduled_sub`</span>.
-        :param _builtins.str incident_post_mortem_condition_cause: [DEPRECATED] Use<span pulumi-lang-nodejs=" incidentConditionCause " pulumi-lang-dotnet=" IncidentConditionCause " pulumi-lang-go=" incidentConditionCause " pulumi-lang-python=" incident_condition_cause " pulumi-lang-yaml=" incidentConditionCause " pulumi-lang-java=" incidentConditionCause "> incident_condition_cause </span>instead. Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_post_mortem_condition_cause: [DEPRECATED] Use<span pulumi-lang-nodejs=" incidentConditionCause " pulumi-lang-dotnet=" IncidentConditionCause " pulumi-lang-go=" incidentConditionCause " pulumi-lang-python=" incident_condition_cause " pulumi-lang-yaml=" incidentConditionCause " pulumi-lang-java=" incidentConditionCause "> incident_condition_cause </span>instead. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param Sequence[_builtins.str] incident_statuses: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`">`in_triage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`">`started`</span>, <span pulumi-lang-nodejs="`detected`" pulumi-lang-dotnet="`Detected`" pulumi-lang-go="`detected`" pulumi-lang-python="`detected`" pulumi-lang-yaml="`detected`" pulumi-lang-java="`detected`">`detected`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`">`completed`</span>.
-        :param _builtins.str trigger_type: Value must be one off <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`">`incident`</span>.
-        :param Sequence[_builtins.str] triggers: Actions that trigger the workflow. One of custom_fields.<slug>.updated, incident_in_triage, incident_created, incident_started, incident_updated, title_updated, summary_updated, status_updated, severity_updated, environments_added, environments_removed, environments_updated, incident_types_added, incident_types_removed, incident_types_updated, services_added, services_removed, services_updated, visibility_updated, functionalities_added, functionalities_removed, functionalities_updated, teams_added, teams_removed, teams_updated, causes_added, causes_removed, causes_updated, timeline_updated, status_page_timeline_updated, role_assignments_updated, role_assignments_added, role_assignments_removed, slack_command, slack_channel_created, slack_channel_converted, microsoft_teams_channel_created, subscribers_updated, subscribers_added, subscribers_removed, user_joined_slack_channel, user_left_slack_channel
+        :param _builtins.str trigger_type: Value must be one of <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`">`incident`</span>.
+        :param Sequence[_builtins.str] triggers: Actions that trigger the workflow. One of custom_fields.<slug>.updated, incident_in_triage, incident_created, incident_started, incident_updated, title_updated, summary_updated, status_updated, severity_updated, environments_added, environments_removed, environments_updated, incident_types_added, incident_types_removed, incident_types_updated, services_added, services_removed, services_updated, visibility_updated, functionalities_added, functionalities_removed, functionalities_updated, teams_added, teams_removed, teams_updated, causes_added, causes_removed, causes_updated, timeline_updated, status_page_timeline_updated, role_assignments_updated, role_assignments_added, role_assignments_removed, slack_command, slack_channel_created, slack_channel_converted, microsoft_teams_channel_created, microsoft_teams_chat_created, subscribers_updated, subscribers_added, subscribers_removed, user_joined_slack_channel, user_left_slack_channel
         """
         if incident_condition is not None:
             pulumi.set(__self__, "incident_condition", incident_condition)
@@ -5335,7 +5557,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter(name="incidentCondition")
     def incident_condition(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `ALL`, `ANY`, `NONE`.
+        Value must be one of `ALL`, `ANY`, `NONE`.
         """
         return pulumi.get(self, "incident_condition")
 
@@ -5348,7 +5570,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter(name="incidentConditionCause")
     def incident_condition_cause(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_cause")
 
@@ -5361,7 +5583,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter(name="incidentConditionEnvironment")
     def incident_condition_environment(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_environment")
 
@@ -5369,7 +5591,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter(name="incidentConditionFunctionality")
     def incident_condition_functionality(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_functionality")
 
@@ -5377,7 +5599,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter(name="incidentConditionGroup")
     def incident_condition_group(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_group")
 
@@ -5385,7 +5607,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter(name="incidentConditionIncidentRoles")
     def incident_condition_incident_roles(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_incident_roles")
 
@@ -5393,7 +5615,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter(name="incidentConditionIncidentType")
     def incident_condition_incident_type(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_incident_type")
 
@@ -5401,7 +5623,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter(name="incidentConditionKind")
     def incident_condition_kind(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_kind")
 
@@ -5419,7 +5641,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter(name="incidentConditionService")
     def incident_condition_service(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_service")
 
@@ -5427,7 +5649,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter(name="incidentConditionSeverity")
     def incident_condition_severity(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_severity")
 
@@ -5440,7 +5662,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter(name="incidentConditionStatus")
     def incident_condition_status(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_status")
 
@@ -5448,7 +5670,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter(name="incidentConditionSubStatus")
     def incident_condition_sub_status(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_sub_status")
 
@@ -5461,7 +5683,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter(name="incidentConditionVisibility")
     def incident_condition_visibility(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_visibility")
 
@@ -5490,7 +5712,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter(name="incidentPostMortemConditionCause")
     def incident_post_mortem_condition_cause(self) -> Optional[_builtins.str]:
         """
-        [DEPRECATED] Use<span pulumi-lang-nodejs=" incidentConditionCause " pulumi-lang-dotnet=" IncidentConditionCause " pulumi-lang-go=" incidentConditionCause " pulumi-lang-python=" incident_condition_cause " pulumi-lang-yaml=" incidentConditionCause " pulumi-lang-java=" incidentConditionCause "> incident_condition_cause </span>instead. Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        [DEPRECATED] Use<span pulumi-lang-nodejs=" incidentConditionCause " pulumi-lang-dotnet=" IncidentConditionCause " pulumi-lang-go=" incidentConditionCause " pulumi-lang-python=" incident_condition_cause " pulumi-lang-yaml=" incidentConditionCause " pulumi-lang-java=" incidentConditionCause "> incident_condition_cause </span>instead. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_post_mortem_condition_cause")
 
@@ -5511,7 +5733,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter(name="triggerType")
     def trigger_type(self) -> Optional[_builtins.str]:
         """
-        Value must be one off <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`">`incident`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`">`incident`</span>.
         """
         return pulumi.get(self, "trigger_type")
 
@@ -5519,7 +5741,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter
     def triggers(self) -> Optional[Sequence[_builtins.str]]:
         """
-        Actions that trigger the workflow. One of custom_fields.<slug>.updated, incident_in_triage, incident_created, incident_started, incident_updated, title_updated, summary_updated, status_updated, severity_updated, environments_added, environments_removed, environments_updated, incident_types_added, incident_types_removed, incident_types_updated, services_added, services_removed, services_updated, visibility_updated, functionalities_added, functionalities_removed, functionalities_updated, teams_added, teams_removed, teams_updated, causes_added, causes_removed, causes_updated, timeline_updated, status_page_timeline_updated, role_assignments_updated, role_assignments_added, role_assignments_removed, slack_command, slack_channel_created, slack_channel_converted, microsoft_teams_channel_created, subscribers_updated, subscribers_added, subscribers_removed, user_joined_slack_channel, user_left_slack_channel
+        Actions that trigger the workflow. One of custom_fields.<slug>.updated, incident_in_triage, incident_created, incident_started, incident_updated, title_updated, summary_updated, status_updated, severity_updated, environments_added, environments_removed, environments_updated, incident_types_added, incident_types_removed, incident_types_updated, services_added, services_removed, services_updated, visibility_updated, functionalities_added, functionalities_removed, functionalities_updated, teams_added, teams_removed, teams_updated, causes_added, causes_removed, causes_updated, timeline_updated, status_page_timeline_updated, role_assignments_updated, role_assignments_added, role_assignments_removed, slack_command, slack_channel_created, slack_channel_converted, microsoft_teams_channel_created, microsoft_teams_chat_created, subscribers_updated, subscribers_added, subscribers_removed, user_joined_slack_channel, user_left_slack_channel
         """
         return pulumi.get(self, "triggers")
 
@@ -5631,27 +5853,27 @@ class WorkflowPostMortemTriggerParams(dict):
                  trigger_type: Optional[_builtins.str] = None,
                  triggers: Optional[Sequence[_builtins.str]] = None):
         """
-        :param _builtins.str incident_condition: Value must be one off `ALL`, `ANY`, `NONE`.
-        :param _builtins.str incident_condition_cause: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_environment: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_functionality: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_group: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_incident_roles: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_incident_type: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_kind: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_service: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_severity: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_status: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_sub_status: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_condition_visibility: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition: Value must be one of `ALL`, `ANY`, `NONE`.
+        :param _builtins.str incident_condition_cause: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_environment: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_functionality: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_group: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_incident_roles: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_incident_type: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_kind: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_service: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_severity: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_status: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_sub_status: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_visibility: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_inactivity_duration: ex. 10 min, 1h, 3 days, 2 weeks
         :param Sequence[_builtins.str] incident_kinds: Value must be one of <span pulumi-lang-nodejs="`test`" pulumi-lang-dotnet="`Test`" pulumi-lang-go="`test`" pulumi-lang-python="`test`" pulumi-lang-yaml="`test`" pulumi-lang-java="`test`">`test`</span>, <span pulumi-lang-nodejs="`testSub`" pulumi-lang-dotnet="`TestSub`" pulumi-lang-go="`testSub`" pulumi-lang-python="`test_sub`" pulumi-lang-yaml="`testSub`" pulumi-lang-java="`testSub`">`test_sub`</span>, <span pulumi-lang-nodejs="`example`" pulumi-lang-dotnet="`Example`" pulumi-lang-go="`example`" pulumi-lang-python="`example`" pulumi-lang-yaml="`example`" pulumi-lang-java="`example`">`example`</span>, <span pulumi-lang-nodejs="`exampleSub`" pulumi-lang-dotnet="`ExampleSub`" pulumi-lang-go="`exampleSub`" pulumi-lang-python="`example_sub`" pulumi-lang-yaml="`exampleSub`" pulumi-lang-java="`exampleSub`">`example_sub`</span>, <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`normalSub`" pulumi-lang-dotnet="`NormalSub`" pulumi-lang-go="`normalSub`" pulumi-lang-python="`normal_sub`" pulumi-lang-yaml="`normalSub`" pulumi-lang-java="`normalSub`">`normal_sub`</span>, <span pulumi-lang-nodejs="`backfilled`" pulumi-lang-dotnet="`Backfilled`" pulumi-lang-go="`backfilled`" pulumi-lang-python="`backfilled`" pulumi-lang-yaml="`backfilled`" pulumi-lang-java="`backfilled`">`backfilled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`scheduledSub`" pulumi-lang-dotnet="`ScheduledSub`" pulumi-lang-go="`scheduledSub`" pulumi-lang-python="`scheduled_sub`" pulumi-lang-yaml="`scheduledSub`" pulumi-lang-java="`scheduledSub`">`scheduled_sub`</span>.
-        :param _builtins.str incident_post_mortem_condition: Value must be one off `ALL`, `ANY`, `NONE`.
-        :param _builtins.str incident_post_mortem_condition_cause: [DEPRECATED] Use<span pulumi-lang-nodejs=" incidentConditionCause " pulumi-lang-dotnet=" IncidentConditionCause " pulumi-lang-go=" incidentConditionCause " pulumi-lang-python=" incident_condition_cause " pulumi-lang-yaml=" incidentConditionCause " pulumi-lang-java=" incidentConditionCause "> incident_condition_cause </span>instead. Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param _builtins.str incident_post_mortem_condition_status: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_post_mortem_condition: Value must be one of `ALL`, `ANY`, `NONE`.
+        :param _builtins.str incident_post_mortem_condition_cause: [DEPRECATED] Use<span pulumi-lang-nodejs=" incidentConditionCause " pulumi-lang-dotnet=" IncidentConditionCause " pulumi-lang-go=" incidentConditionCause " pulumi-lang-python=" incident_condition_cause " pulumi-lang-yaml=" incidentConditionCause " pulumi-lang-java=" incidentConditionCause "> incident_condition_cause </span>instead. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_post_mortem_condition_status: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param Sequence[_builtins.str] incident_post_mortem_statuses: Value must be one of <span pulumi-lang-nodejs="`draft`" pulumi-lang-dotnet="`Draft`" pulumi-lang-go="`draft`" pulumi-lang-python="`draft`" pulumi-lang-yaml="`draft`" pulumi-lang-java="`draft`">`draft`</span>, <span pulumi-lang-nodejs="`published`" pulumi-lang-dotnet="`Published`" pulumi-lang-go="`published`" pulumi-lang-python="`published`" pulumi-lang-yaml="`published`" pulumi-lang-java="`published`">`published`</span>.
         :param Sequence[_builtins.str] incident_statuses: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`">`in_triage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`">`started`</span>, <span pulumi-lang-nodejs="`detected`" pulumi-lang-dotnet="`Detected`" pulumi-lang-go="`detected`" pulumi-lang-python="`detected`" pulumi-lang-yaml="`detected`" pulumi-lang-java="`detected`">`detected`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`">`completed`</span>.
-        :param _builtins.str trigger_type: Value must be one off <span pulumi-lang-nodejs="`postMortem`" pulumi-lang-dotnet="`PostMortem`" pulumi-lang-go="`postMortem`" pulumi-lang-python="`post_mortem`" pulumi-lang-yaml="`postMortem`" pulumi-lang-java="`postMortem`">`post_mortem`</span>.
+        :param _builtins.str trigger_type: Value must be one of <span pulumi-lang-nodejs="`postMortem`" pulumi-lang-dotnet="`PostMortem`" pulumi-lang-go="`postMortem`" pulumi-lang-python="`post_mortem`" pulumi-lang-yaml="`postMortem`" pulumi-lang-java="`postMortem`">`post_mortem`</span>.
         :param Sequence[_builtins.str] triggers: Actions that trigger the workflow. One of custom_fields.<slug>.updated, post_mortem_created, post_mortem_updated, status_updated, slack_command
         """
         if incident_condition is not None:
@@ -5719,7 +5941,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentCondition")
     def incident_condition(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `ALL`, `ANY`, `NONE`.
+        Value must be one of `ALL`, `ANY`, `NONE`.
         """
         return pulumi.get(self, "incident_condition")
 
@@ -5732,7 +5954,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionCause")
     def incident_condition_cause(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_cause")
 
@@ -5745,7 +5967,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionEnvironment")
     def incident_condition_environment(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_environment")
 
@@ -5753,7 +5975,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionFunctionality")
     def incident_condition_functionality(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_functionality")
 
@@ -5761,7 +5983,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionGroup")
     def incident_condition_group(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_group")
 
@@ -5769,7 +5991,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionIncidentRoles")
     def incident_condition_incident_roles(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_incident_roles")
 
@@ -5777,7 +5999,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionIncidentType")
     def incident_condition_incident_type(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_incident_type")
 
@@ -5785,7 +6007,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionKind")
     def incident_condition_kind(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_kind")
 
@@ -5803,7 +6025,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionService")
     def incident_condition_service(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_service")
 
@@ -5811,7 +6033,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionSeverity")
     def incident_condition_severity(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_severity")
 
@@ -5824,7 +6046,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionStatus")
     def incident_condition_status(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_status")
 
@@ -5832,7 +6054,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionSubStatus")
     def incident_condition_sub_status(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_sub_status")
 
@@ -5845,7 +6067,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentConditionVisibility")
     def incident_condition_visibility(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition_visibility")
 
@@ -5874,7 +6096,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentPostMortemCondition")
     def incident_post_mortem_condition(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `ALL`, `ANY`, `NONE`.
+        Value must be one of `ALL`, `ANY`, `NONE`.
         """
         return pulumi.get(self, "incident_post_mortem_condition")
 
@@ -5882,7 +6104,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentPostMortemConditionCause")
     def incident_post_mortem_condition_cause(self) -> Optional[_builtins.str]:
         """
-        [DEPRECATED] Use<span pulumi-lang-nodejs=" incidentConditionCause " pulumi-lang-dotnet=" IncidentConditionCause " pulumi-lang-go=" incidentConditionCause " pulumi-lang-python=" incident_condition_cause " pulumi-lang-yaml=" incidentConditionCause " pulumi-lang-java=" incidentConditionCause "> incident_condition_cause </span>instead. Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        [DEPRECATED] Use<span pulumi-lang-nodejs=" incidentConditionCause " pulumi-lang-dotnet=" IncidentConditionCause " pulumi-lang-go=" incidentConditionCause " pulumi-lang-python=" incident_condition_cause " pulumi-lang-yaml=" incidentConditionCause " pulumi-lang-java=" incidentConditionCause "> incident_condition_cause </span>instead. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_post_mortem_condition_cause")
 
@@ -5890,7 +6112,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentPostMortemConditionStatus")
     def incident_post_mortem_condition_status(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_post_mortem_condition_status")
 
@@ -5919,7 +6141,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="triggerType")
     def trigger_type(self) -> Optional[_builtins.str]:
         """
-        Value must be one off <span pulumi-lang-nodejs="`postMortem`" pulumi-lang-dotnet="`PostMortem`" pulumi-lang-go="`postMortem`" pulumi-lang-python="`post_mortem`" pulumi-lang-yaml="`postMortem`" pulumi-lang-java="`postMortem`">`post_mortem`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`postMortem`" pulumi-lang-dotnet="`PostMortem`" pulumi-lang-go="`postMortem`" pulumi-lang-python="`post_mortem`" pulumi-lang-yaml="`postMortem`" pulumi-lang-java="`postMortem`">`post_mortem`</span>.
         """
         return pulumi.get(self, "trigger_type")
 
@@ -5988,15 +6210,15 @@ class WorkflowPulseTriggerParams(dict):
                  trigger_type: Optional[_builtins.str] = None,
                  triggers: Optional[Sequence[_builtins.str]] = None):
         """
-        :param _builtins.str pulse_condition: Value must be one off `ALL`, `ANY`, `NONE`.
-        :param _builtins.str pulse_condition_label: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str pulse_condition: Value must be one of `ALL`, `ANY`, `NONE`.
+        :param _builtins.str pulse_condition_label: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.bool pulse_condition_label_use_regexp: Value must be one of true or false
-        :param _builtins.str pulse_condition_payload: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str pulse_condition_payload: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.bool pulse_condition_payload_use_regexp: Value must be one of true or false
-        :param _builtins.str pulse_condition_source: Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str pulse_condition_source: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.bool pulse_condition_source_use_regexp: Value must be one of true or false
         :param _builtins.str pulse_query_payload: You can use jsonpath syntax. eg: $.incident.teams[*]
-        :param _builtins.str trigger_type: Value must be one off <span pulumi-lang-nodejs="`pulse`" pulumi-lang-dotnet="`Pulse`" pulumi-lang-go="`pulse`" pulumi-lang-python="`pulse`" pulumi-lang-yaml="`pulse`" pulumi-lang-java="`pulse`">`pulse`</span>.
+        :param _builtins.str trigger_type: Value must be one of <span pulumi-lang-nodejs="`pulse`" pulumi-lang-dotnet="`Pulse`" pulumi-lang-go="`pulse`" pulumi-lang-python="`pulse`" pulumi-lang-yaml="`pulse`" pulumi-lang-java="`pulse`">`pulse`</span>.
         :param Sequence[_builtins.str] triggers: Actions that trigger the workflow. Value must be one of <span pulumi-lang-nodejs="`pulseCreated`" pulumi-lang-dotnet="`PulseCreated`" pulumi-lang-go="`pulseCreated`" pulumi-lang-python="`pulse_created`" pulumi-lang-yaml="`pulseCreated`" pulumi-lang-java="`pulseCreated`">`pulse_created`</span>.
         """
         if pulse_condition is not None:
@@ -6030,7 +6252,7 @@ class WorkflowPulseTriggerParams(dict):
     @pulumi.getter(name="pulseCondition")
     def pulse_condition(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `ALL`, `ANY`, `NONE`.
+        Value must be one of `ALL`, `ANY`, `NONE`.
         """
         return pulumi.get(self, "pulse_condition")
 
@@ -6038,7 +6260,7 @@ class WorkflowPulseTriggerParams(dict):
     @pulumi.getter(name="pulseConditionLabel")
     def pulse_condition_label(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "pulse_condition_label")
 
@@ -6054,7 +6276,7 @@ class WorkflowPulseTriggerParams(dict):
     @pulumi.getter(name="pulseConditionPayload")
     def pulse_condition_payload(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "pulse_condition_payload")
 
@@ -6070,7 +6292,7 @@ class WorkflowPulseTriggerParams(dict):
     @pulumi.getter(name="pulseConditionSource")
     def pulse_condition_source(self) -> Optional[_builtins.str]:
         """
-        Value must be one off `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "pulse_condition_source")
 
@@ -6109,7 +6331,7 @@ class WorkflowPulseTriggerParams(dict):
     @pulumi.getter(name="triggerType")
     def trigger_type(self) -> Optional[_builtins.str]:
         """
-        Value must be one off <span pulumi-lang-nodejs="`pulse`" pulumi-lang-dotnet="`Pulse`" pulumi-lang-go="`pulse`" pulumi-lang-python="`pulse`" pulumi-lang-yaml="`pulse`" pulumi-lang-java="`pulse`">`pulse`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`pulse`" pulumi-lang-dotnet="`Pulse`" pulumi-lang-go="`pulse`" pulumi-lang-python="`pulse`" pulumi-lang-yaml="`pulse`" pulumi-lang-java="`pulse`">`pulse`</span>.
         """
         return pulumi.get(self, "trigger_type")
 
@@ -6145,7 +6367,7 @@ class WorkflowSimpleTriggerParams(dict):
                  trigger_type: Optional[_builtins.str] = None,
                  triggers: Optional[Sequence[_builtins.str]] = None):
         """
-        :param _builtins.str trigger_type: Value must be one off <span pulumi-lang-nodejs="`simple`" pulumi-lang-dotnet="`Simple`" pulumi-lang-go="`simple`" pulumi-lang-python="`simple`" pulumi-lang-yaml="`simple`" pulumi-lang-java="`simple`">`simple`</span>.
+        :param _builtins.str trigger_type: Value must be one of <span pulumi-lang-nodejs="`simple`" pulumi-lang-dotnet="`Simple`" pulumi-lang-go="`simple`" pulumi-lang-python="`simple`" pulumi-lang-yaml="`simple`" pulumi-lang-java="`simple`">`simple`</span>.
         :param Sequence[_builtins.str] triggers: Actions that trigger the workflow. Value must be one of <span pulumi-lang-nodejs="`slackCommand`" pulumi-lang-dotnet="`SlackCommand`" pulumi-lang-go="`slackCommand`" pulumi-lang-python="`slack_command`" pulumi-lang-yaml="`slackCommand`" pulumi-lang-java="`slackCommand`">`slack_command`</span>.
         """
         if trigger_type is not None:
@@ -6157,7 +6379,7 @@ class WorkflowSimpleTriggerParams(dict):
     @pulumi.getter(name="triggerType")
     def trigger_type(self) -> Optional[_builtins.str]:
         """
-        Value must be one off <span pulumi-lang-nodejs="`simple`" pulumi-lang-dotnet="`Simple`" pulumi-lang-go="`simple`" pulumi-lang-python="`simple`" pulumi-lang-yaml="`simple`" pulumi-lang-java="`simple`">`simple`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`simple`" pulumi-lang-dotnet="`Simple`" pulumi-lang-go="`simple`" pulumi-lang-python="`simple`" pulumi-lang-yaml="`simple`" pulumi-lang-java="`simple`">`simple`</span>.
         """
         return pulumi.get(self, "trigger_type")
 
@@ -6384,6 +6606,71 @@ class WorkflowTaskAddActionItemTaskParamsPostToSlackChannel(dict):
     @pulumi.getter
     def name(self) -> _builtins.str:
         return pulumi.get(self, "name")
+
+
+@pulumi.output_type
+class WorkflowTaskAddMicrosoftTeamsChatTabTaskParams(dict):
+    @staticmethod
+    def __key_warning(key: str):
+        suggest = None
+        if key == "taskType":
+            suggest = "task_type"
+
+        if suggest:
+            pulumi.log.warn(f"Key '{key}' not found in WorkflowTaskAddMicrosoftTeamsChatTabTaskParams. Access the value via the '{suggest}' property getter instead.")
+
+    def __getitem__(self, key: str) -> Any:
+        WorkflowTaskAddMicrosoftTeamsChatTabTaskParams.__key_warning(key)
+        return super().__getitem__(key)
+
+    def get(self, key: str, default = None) -> Any:
+        WorkflowTaskAddMicrosoftTeamsChatTabTaskParams.__key_warning(key)
+        return super().get(key, default)
+
+    def __init__(__self__, *,
+                 chat: Mapping[str, _builtins.str],
+                 link: _builtins.str,
+                 title: _builtins.str,
+                 task_type: Optional[_builtins.str] = None):
+        """
+        :param Mapping[str, _builtins.str] chat: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param _builtins.str link: The tab link
+        :param _builtins.str title: The tab title
+        """
+        pulumi.set(__self__, "chat", chat)
+        pulumi.set(__self__, "link", link)
+        pulumi.set(__self__, "title", title)
+        if task_type is not None:
+            pulumi.set(__self__, "task_type", task_type)
+
+    @_builtins.property
+    @pulumi.getter
+    def chat(self) -> Mapping[str, _builtins.str]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        """
+        return pulumi.get(self, "chat")
+
+    @_builtins.property
+    @pulumi.getter
+    def link(self) -> _builtins.str:
+        """
+        The tab link
+        """
+        return pulumi.get(self, "link")
+
+    @_builtins.property
+    @pulumi.getter
+    def title(self) -> _builtins.str:
+        """
+        The tab title
+        """
+        return pulumi.get(self, "title")
+
+    @_builtins.property
+    @pulumi.getter(name="taskType")
+    def task_type(self) -> Optional[_builtins.str]:
+        return pulumi.get(self, "task_type")
 
 
 @pulumi.output_type
@@ -8481,7 +8768,11 @@ class WorkflowTaskCreateGithubIssueTaskParams(dict):
     @staticmethod
     def __key_warning(key: str):
         suggest = None
-        if key == "taskType":
+        if key == "issueType":
+            suggest = "issue_type"
+        elif key == "parentIssueNumber":
+            suggest = "parent_issue_number"
+        elif key == "taskType":
             suggest = "task_type"
 
         if suggest:
@@ -8499,16 +8790,28 @@ class WorkflowTaskCreateGithubIssueTaskParams(dict):
                  repository: Mapping[str, _builtins.str],
                  title: _builtins.str,
                  body: Optional[_builtins.str] = None,
+                 issue_type: Optional[Mapping[str, _builtins.str]] = None,
+                 labels: Optional[Sequence['outputs.WorkflowTaskCreateGithubIssueTaskParamsLabel']] = None,
+                 parent_issue_number: Optional[_builtins.str] = None,
                  task_type: Optional[_builtins.str] = None):
         """
         :param Mapping[str, _builtins.str] repository: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
         :param _builtins.str title: The issue title
         :param _builtins.str body: The issue body
+        :param Mapping[str, _builtins.str] issue_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The issue type
+        :param Sequence['WorkflowTaskCreateGithubIssueTaskParamsLabelArgs'] labels: The issue labels
+        :param _builtins.str parent_issue_number: The parent issue number for sub-issue linking
         """
         pulumi.set(__self__, "repository", repository)
         pulumi.set(__self__, "title", title)
         if body is not None:
             pulumi.set(__self__, "body", body)
+        if issue_type is not None:
+            pulumi.set(__self__, "issue_type", issue_type)
+        if labels is not None:
+            pulumi.set(__self__, "labels", labels)
+        if parent_issue_number is not None:
+            pulumi.set(__self__, "parent_issue_number", parent_issue_number)
         if task_type is not None:
             pulumi.set(__self__, "task_type", task_type)
 
@@ -8537,9 +8840,52 @@ class WorkflowTaskCreateGithubIssueTaskParams(dict):
         return pulumi.get(self, "body")
 
     @_builtins.property
+    @pulumi.getter(name="issueType")
+    def issue_type(self) -> Optional[Mapping[str, _builtins.str]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The issue type
+        """
+        return pulumi.get(self, "issue_type")
+
+    @_builtins.property
+    @pulumi.getter
+    def labels(self) -> Optional[Sequence['outputs.WorkflowTaskCreateGithubIssueTaskParamsLabel']]:
+        """
+        The issue labels
+        """
+        return pulumi.get(self, "labels")
+
+    @_builtins.property
+    @pulumi.getter(name="parentIssueNumber")
+    def parent_issue_number(self) -> Optional[_builtins.str]:
+        """
+        The parent issue number for sub-issue linking
+        """
+        return pulumi.get(self, "parent_issue_number")
+
+    @_builtins.property
     @pulumi.getter(name="taskType")
     def task_type(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "task_type")
+
+
+@pulumi.output_type
+class WorkflowTaskCreateGithubIssueTaskParamsLabel(dict):
+    def __init__(__self__, *,
+                 id: _builtins.str,
+                 name: _builtins.str):
+        pulumi.set(__self__, "id", id)
+        pulumi.set(__self__, "name", name)
+
+    @_builtins.property
+    @pulumi.getter
+    def id(self) -> _builtins.str:
+        return pulumi.get(self, "id")
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> _builtins.str:
+        return pulumi.get(self, "name")
 
 
 @pulumi.output_type
@@ -10082,6 +10428,193 @@ class WorkflowTaskCreateJiraSubtaskTaskParams(dict):
         Update payload. Can contain liquid markup and need to be valid JSON
         """
         return pulumi.get(self, "update_payload")
+
+
+@pulumi.output_type
+class WorkflowTaskCreateJsmopsAlertTaskParams(dict):
+    @staticmethod
+    def __key_warning(key: str):
+        suggest = None
+        if key == "taskType":
+            suggest = "task_type"
+
+        if suggest:
+            pulumi.log.warn(f"Key '{key}' not found in WorkflowTaskCreateJsmopsAlertTaskParams. Access the value via the '{suggest}' property getter instead.")
+
+    def __getitem__(self, key: str) -> Any:
+        WorkflowTaskCreateJsmopsAlertTaskParams.__key_warning(key)
+        return super().__getitem__(key)
+
+    def get(self, key: str, default = None) -> Any:
+        WorkflowTaskCreateJsmopsAlertTaskParams.__key_warning(key)
+        return super().get(key, default)
+
+    def __init__(__self__, *,
+                 message: _builtins.str,
+                 description: Optional[_builtins.str] = None,
+                 details: Optional[_builtins.str] = None,
+                 escalations: Optional[Sequence['outputs.WorkflowTaskCreateJsmopsAlertTaskParamsEscalation']] = None,
+                 priority: Optional[_builtins.str] = None,
+                 schedules: Optional[Sequence['outputs.WorkflowTaskCreateJsmopsAlertTaskParamsSchedule']] = None,
+                 task_type: Optional[_builtins.str] = None,
+                 teams: Optional[Sequence['outputs.WorkflowTaskCreateJsmopsAlertTaskParamsTeam']] = None,
+                 users: Optional[Sequence['outputs.WorkflowTaskCreateJsmopsAlertTaskParamsUser']] = None):
+        """
+        :param _builtins.str message: Message of the alert
+        :param _builtins.str description: Description field of the alert that is generally used to provide a detailed information about the alert
+        :param _builtins.str details: Details payload. Can contain liquid markup and need to be valid JSON
+        :param _builtins.str priority: Value must be one of `P3`, `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        """
+        pulumi.set(__self__, "message", message)
+        if description is not None:
+            pulumi.set(__self__, "description", description)
+        if details is not None:
+            pulumi.set(__self__, "details", details)
+        if escalations is not None:
+            pulumi.set(__self__, "escalations", escalations)
+        if priority is not None:
+            pulumi.set(__self__, "priority", priority)
+        if schedules is not None:
+            pulumi.set(__self__, "schedules", schedules)
+        if task_type is not None:
+            pulumi.set(__self__, "task_type", task_type)
+        if teams is not None:
+            pulumi.set(__self__, "teams", teams)
+        if users is not None:
+            pulumi.set(__self__, "users", users)
+
+    @_builtins.property
+    @pulumi.getter
+    def message(self) -> _builtins.str:
+        """
+        Message of the alert
+        """
+        return pulumi.get(self, "message")
+
+    @_builtins.property
+    @pulumi.getter
+    def description(self) -> Optional[_builtins.str]:
+        """
+        Description field of the alert that is generally used to provide a detailed information about the alert
+        """
+        return pulumi.get(self, "description")
+
+    @_builtins.property
+    @pulumi.getter
+    def details(self) -> Optional[_builtins.str]:
+        """
+        Details payload. Can contain liquid markup and need to be valid JSON
+        """
+        return pulumi.get(self, "details")
+
+    @_builtins.property
+    @pulumi.getter
+    def escalations(self) -> Optional[Sequence['outputs.WorkflowTaskCreateJsmopsAlertTaskParamsEscalation']]:
+        return pulumi.get(self, "escalations")
+
+    @_builtins.property
+    @pulumi.getter
+    def priority(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `P3`, `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        """
+        return pulumi.get(self, "priority")
+
+    @_builtins.property
+    @pulumi.getter
+    def schedules(self) -> Optional[Sequence['outputs.WorkflowTaskCreateJsmopsAlertTaskParamsSchedule']]:
+        return pulumi.get(self, "schedules")
+
+    @_builtins.property
+    @pulumi.getter(name="taskType")
+    def task_type(self) -> Optional[_builtins.str]:
+        return pulumi.get(self, "task_type")
+
+    @_builtins.property
+    @pulumi.getter
+    def teams(self) -> Optional[Sequence['outputs.WorkflowTaskCreateJsmopsAlertTaskParamsTeam']]:
+        return pulumi.get(self, "teams")
+
+    @_builtins.property
+    @pulumi.getter
+    def users(self) -> Optional[Sequence['outputs.WorkflowTaskCreateJsmopsAlertTaskParamsUser']]:
+        return pulumi.get(self, "users")
+
+
+@pulumi.output_type
+class WorkflowTaskCreateJsmopsAlertTaskParamsEscalation(dict):
+    def __init__(__self__, *,
+                 id: _builtins.str,
+                 name: _builtins.str):
+        pulumi.set(__self__, "id", id)
+        pulumi.set(__self__, "name", name)
+
+    @_builtins.property
+    @pulumi.getter
+    def id(self) -> _builtins.str:
+        return pulumi.get(self, "id")
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> _builtins.str:
+        return pulumi.get(self, "name")
+
+
+@pulumi.output_type
+class WorkflowTaskCreateJsmopsAlertTaskParamsSchedule(dict):
+    def __init__(__self__, *,
+                 id: _builtins.str,
+                 name: _builtins.str):
+        pulumi.set(__self__, "id", id)
+        pulumi.set(__self__, "name", name)
+
+    @_builtins.property
+    @pulumi.getter
+    def id(self) -> _builtins.str:
+        return pulumi.get(self, "id")
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> _builtins.str:
+        return pulumi.get(self, "name")
+
+
+@pulumi.output_type
+class WorkflowTaskCreateJsmopsAlertTaskParamsTeam(dict):
+    def __init__(__self__, *,
+                 id: _builtins.str,
+                 name: _builtins.str):
+        pulumi.set(__self__, "id", id)
+        pulumi.set(__self__, "name", name)
+
+    @_builtins.property
+    @pulumi.getter
+    def id(self) -> _builtins.str:
+        return pulumi.get(self, "id")
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> _builtins.str:
+        return pulumi.get(self, "name")
+
+
+@pulumi.output_type
+class WorkflowTaskCreateJsmopsAlertTaskParamsUser(dict):
+    def __init__(__self__, *,
+                 id: _builtins.str,
+                 name: _builtins.str):
+        pulumi.set(__self__, "id", id)
+        pulumi.set(__self__, "name", name)
+
+    @_builtins.property
+    @pulumi.getter
+    def id(self) -> _builtins.str:
+        return pulumi.get(self, "id")
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> _builtins.str:
+        return pulumi.get(self, "name")
 
 
 @pulumi.output_type
@@ -14481,6 +15014,140 @@ class WorkflowTaskInviteToSlackChannelVictorOpsTaskParamsChannel(dict):
 
 
 @pulumi.output_type
+class WorkflowTaskPageJsmopsOnCallRespondersTaskParams(dict):
+    @staticmethod
+    def __key_warning(key: str):
+        suggest = None
+        if key == "taskType":
+            suggest = "task_type"
+
+        if suggest:
+            pulumi.log.warn(f"Key '{key}' not found in WorkflowTaskPageJsmopsOnCallRespondersTaskParams. Access the value via the '{suggest}' property getter instead.")
+
+    def __getitem__(self, key: str) -> Any:
+        WorkflowTaskPageJsmopsOnCallRespondersTaskParams.__key_warning(key)
+        return super().__getitem__(key)
+
+    def get(self, key: str, default = None) -> Any:
+        WorkflowTaskPageJsmopsOnCallRespondersTaskParams.__key_warning(key)
+        return super().get(key, default)
+
+    def __init__(__self__, *,
+                 description: Optional[_builtins.str] = None,
+                 message: Optional[_builtins.str] = None,
+                 priority: Optional[_builtins.str] = None,
+                 task_type: Optional[_builtins.str] = None,
+                 teams: Optional[Sequence['outputs.WorkflowTaskPageJsmopsOnCallRespondersTaskParamsTeam']] = None,
+                 title: Optional[_builtins.str] = None,
+                 users: Optional[Sequence['outputs.WorkflowTaskPageJsmopsOnCallRespondersTaskParamsUser']] = None):
+        """
+        :param _builtins.str description: Description field of the incident that is generally used to provide a detailed information about the incident
+        :param _builtins.str message: Message of the incident
+        :param _builtins.str priority: Value must be one of `P3`, `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        :param _builtins.str title: Incident title.
+        """
+        if description is not None:
+            pulumi.set(__self__, "description", description)
+        if message is not None:
+            pulumi.set(__self__, "message", message)
+        if priority is not None:
+            pulumi.set(__self__, "priority", priority)
+        if task_type is not None:
+            pulumi.set(__self__, "task_type", task_type)
+        if teams is not None:
+            pulumi.set(__self__, "teams", teams)
+        if title is not None:
+            pulumi.set(__self__, "title", title)
+        if users is not None:
+            pulumi.set(__self__, "users", users)
+
+    @_builtins.property
+    @pulumi.getter
+    def description(self) -> Optional[_builtins.str]:
+        """
+        Description field of the incident that is generally used to provide a detailed information about the incident
+        """
+        return pulumi.get(self, "description")
+
+    @_builtins.property
+    @pulumi.getter
+    def message(self) -> Optional[_builtins.str]:
+        """
+        Message of the incident
+        """
+        return pulumi.get(self, "message")
+
+    @_builtins.property
+    @pulumi.getter
+    def priority(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `P3`, `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        """
+        return pulumi.get(self, "priority")
+
+    @_builtins.property
+    @pulumi.getter(name="taskType")
+    def task_type(self) -> Optional[_builtins.str]:
+        return pulumi.get(self, "task_type")
+
+    @_builtins.property
+    @pulumi.getter
+    def teams(self) -> Optional[Sequence['outputs.WorkflowTaskPageJsmopsOnCallRespondersTaskParamsTeam']]:
+        return pulumi.get(self, "teams")
+
+    @_builtins.property
+    @pulumi.getter
+    def title(self) -> Optional[_builtins.str]:
+        """
+        Incident title.
+        """
+        return pulumi.get(self, "title")
+
+    @_builtins.property
+    @pulumi.getter
+    def users(self) -> Optional[Sequence['outputs.WorkflowTaskPageJsmopsOnCallRespondersTaskParamsUser']]:
+        return pulumi.get(self, "users")
+
+
+@pulumi.output_type
+class WorkflowTaskPageJsmopsOnCallRespondersTaskParamsTeam(dict):
+    def __init__(__self__, *,
+                 id: _builtins.str,
+                 name: _builtins.str):
+        pulumi.set(__self__, "id", id)
+        pulumi.set(__self__, "name", name)
+
+    @_builtins.property
+    @pulumi.getter
+    def id(self) -> _builtins.str:
+        return pulumi.get(self, "id")
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> _builtins.str:
+        return pulumi.get(self, "name")
+
+
+@pulumi.output_type
+class WorkflowTaskPageJsmopsOnCallRespondersTaskParamsUser(dict):
+    def __init__(__self__, *,
+                 id: _builtins.str,
+                 name: _builtins.str):
+        pulumi.set(__self__, "id", id)
+        pulumi.set(__self__, "name", name)
+
+    @_builtins.property
+    @pulumi.getter
+    def id(self) -> _builtins.str:
+        return pulumi.get(self, "id")
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> _builtins.str:
+        return pulumi.get(self, "name")
+
+
+@pulumi.output_type
 class WorkflowTaskPageOpsgenieOnCallRespondersTaskParams(dict):
     @staticmethod
     def __key_warning(key: str):
@@ -14782,6 +15449,8 @@ class WorkflowTaskPageRootlyOnCallRespondersTaskParams(dict):
             suggest = "escalation_note"
         elif key == "escalationPolicyTarget":
             suggest = "escalation_policy_target"
+        elif key == "functionalityTarget":
+            suggest = "functionality_target"
         elif key == "groupTarget":
             suggest = "group_target"
         elif key == "serviceTarget":
@@ -14808,6 +15477,7 @@ class WorkflowTaskPageRootlyOnCallRespondersTaskParams(dict):
                  description: Optional[_builtins.str] = None,
                  escalation_note: Optional[_builtins.str] = None,
                  escalation_policy_target: Optional[Mapping[str, _builtins.str]] = None,
+                 functionality_target: Optional[Mapping[str, _builtins.str]] = None,
                  group_target: Optional[Mapping[str, _builtins.str]] = None,
                  service_target: Optional[Mapping[str, _builtins.str]] = None,
                  task_type: Optional[_builtins.str] = None,
@@ -14817,6 +15487,7 @@ class WorkflowTaskPageRootlyOnCallRespondersTaskParams(dict):
         :param _builtins.str summary: Alert title
         :param _builtins.str description: Alert description
         :param Mapping[str, _builtins.str] escalation_policy_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] functionality_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
         :param Mapping[str, _builtins.str] group_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
         :param Mapping[str, _builtins.str] service_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
         :param Mapping[str, _builtins.str] user_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
@@ -14829,6 +15500,8 @@ class WorkflowTaskPageRootlyOnCallRespondersTaskParams(dict):
             pulumi.set(__self__, "escalation_note", escalation_note)
         if escalation_policy_target is not None:
             pulumi.set(__self__, "escalation_policy_target", escalation_policy_target)
+        if functionality_target is not None:
+            pulumi.set(__self__, "functionality_target", functionality_target)
         if group_target is not None:
             pulumi.set(__self__, "group_target", group_target)
         if service_target is not None:
@@ -14874,6 +15547,14 @@ class WorkflowTaskPageRootlyOnCallRespondersTaskParams(dict):
         Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
         """
         return pulumi.get(self, "escalation_policy_target")
+
+    @_builtins.property
+    @pulumi.getter(name="functionalityTarget")
+    def functionality_target(self) -> Optional[Mapping[str, _builtins.str]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        """
+        return pulumi.get(self, "functionality_target")
 
     @_builtins.property
     @pulumi.getter(name="groupTarget")
@@ -15857,6 +16538,75 @@ class WorkflowTaskSendMicrosoftTeamsBlocksTaskParams(dict):
     @pulumi.getter(name="taskType")
     def task_type(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "task_type")
+
+
+@pulumi.output_type
+class WorkflowTaskSendMicrosoftTeamsChatMessageTaskParams(dict):
+    @staticmethod
+    def __key_warning(key: str):
+        suggest = None
+        if key == "taskType":
+            suggest = "task_type"
+
+        if suggest:
+            pulumi.log.warn(f"Key '{key}' not found in WorkflowTaskSendMicrosoftTeamsChatMessageTaskParams. Access the value via the '{suggest}' property getter instead.")
+
+    def __getitem__(self, key: str) -> Any:
+        WorkflowTaskSendMicrosoftTeamsChatMessageTaskParams.__key_warning(key)
+        return super().__getitem__(key)
+
+    def get(self, key: str, default = None) -> Any:
+        WorkflowTaskSendMicrosoftTeamsChatMessageTaskParams.__key_warning(key)
+        return super().get(key, default)
+
+    def __init__(__self__, *,
+                 chats: Sequence['outputs.WorkflowTaskSendMicrosoftTeamsChatMessageTaskParamsChat'],
+                 text: _builtins.str,
+                 task_type: Optional[_builtins.str] = None):
+        """
+        :param _builtins.str text: The message text
+        """
+        pulumi.set(__self__, "chats", chats)
+        pulumi.set(__self__, "text", text)
+        if task_type is not None:
+            pulumi.set(__self__, "task_type", task_type)
+
+    @_builtins.property
+    @pulumi.getter
+    def chats(self) -> Sequence['outputs.WorkflowTaskSendMicrosoftTeamsChatMessageTaskParamsChat']:
+        return pulumi.get(self, "chats")
+
+    @_builtins.property
+    @pulumi.getter
+    def text(self) -> _builtins.str:
+        """
+        The message text
+        """
+        return pulumi.get(self, "text")
+
+    @_builtins.property
+    @pulumi.getter(name="taskType")
+    def task_type(self) -> Optional[_builtins.str]:
+        return pulumi.get(self, "task_type")
+
+
+@pulumi.output_type
+class WorkflowTaskSendMicrosoftTeamsChatMessageTaskParamsChat(dict):
+    def __init__(__self__, *,
+                 id: _builtins.str,
+                 name: _builtins.str):
+        pulumi.set(__self__, "id", id)
+        pulumi.set(__self__, "name", name)
+
+    @_builtins.property
+    @pulumi.getter
+    def id(self) -> _builtins.str:
+        return pulumi.get(self, "id")
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> _builtins.str:
+        return pulumi.get(self, "name")
 
 
 @pulumi.output_type
@@ -17818,6 +18568,7 @@ class WorkflowTaskUpdateConfluencePageTaskParams(dict):
     def __init__(__self__, *,
                  file_id: _builtins.str,
                  content: Optional[_builtins.str] = None,
+                 integration: Optional[Mapping[str, _builtins.str]] = None,
                  post_mortem_template_id: Optional[_builtins.str] = None,
                  task_type: Optional[_builtins.str] = None,
                  template: Optional[Mapping[str, _builtins.str]] = None,
@@ -17825,6 +18576,7 @@ class WorkflowTaskUpdateConfluencePageTaskParams(dict):
         """
         :param _builtins.str file_id: The Confluence page ID
         :param _builtins.str content: The Confluence page content
+        :param Mapping[str, _builtins.str] integration: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Specify integration id if you have more than one Confluence instance
         :param _builtins.str post_mortem_template_id: Retrospective template to use when updating page, if desired
         :param Mapping[str, _builtins.str] template: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The Confluence template to use
         :param _builtins.str title: The Confluence page title
@@ -17832,6 +18584,8 @@ class WorkflowTaskUpdateConfluencePageTaskParams(dict):
         pulumi.set(__self__, "file_id", file_id)
         if content is not None:
             pulumi.set(__self__, "content", content)
+        if integration is not None:
+            pulumi.set(__self__, "integration", integration)
         if post_mortem_template_id is not None:
             pulumi.set(__self__, "post_mortem_template_id", post_mortem_template_id)
         if task_type is not None:
@@ -17856,6 +18610,14 @@ class WorkflowTaskUpdateConfluencePageTaskParams(dict):
         The Confluence page content
         """
         return pulumi.get(self, "content")
+
+    @_builtins.property
+    @pulumi.getter
+    def integration(self) -> Optional[Mapping[str, _builtins.str]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Specify integration id if you have more than one Confluence instance
+        """
+        return pulumi.get(self, "integration")
 
     @_builtins.property
     @pulumi.getter(name="postMortemTemplateId")
@@ -18084,6 +18846,10 @@ class WorkflowTaskUpdateGithubIssueTaskParams(dict):
         suggest = None
         if key == "issueId":
             suggest = "issue_id"
+        elif key == "issueType":
+            suggest = "issue_type"
+        elif key == "labelsMode":
+            suggest = "labels_mode"
         elif key == "taskType":
             suggest = "task_type"
 
@@ -18102,18 +18868,34 @@ class WorkflowTaskUpdateGithubIssueTaskParams(dict):
                  completion: Mapping[str, _builtins.str],
                  issue_id: _builtins.str,
                  body: Optional[_builtins.str] = None,
+                 issue_type: Optional[Mapping[str, _builtins.str]] = None,
+                 labels: Optional[Sequence['outputs.WorkflowTaskUpdateGithubIssueTaskParamsLabel']] = None,
+                 labels_mode: Optional[_builtins.str] = None,
+                 repository: Optional[Mapping[str, _builtins.str]] = None,
                  task_type: Optional[_builtins.str] = None,
                  title: Optional[_builtins.str] = None):
         """
         :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
         :param _builtins.str issue_id: The issue id
         :param _builtins.str body: The issue body
+        :param Mapping[str, _builtins.str] issue_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The issue type
+        :param Sequence['WorkflowTaskUpdateGithubIssueTaskParamsLabelArgs'] labels: The issue labels
+        :param _builtins.str labels_mode: How to apply labels. 'replace' (default) overwrites all existing labels. 'append' adds to existing labels without removing them.. Value must be one of <span pulumi-lang-nodejs="`replace`" pulumi-lang-dotnet="`Replace`" pulumi-lang-go="`replace`" pulumi-lang-python="`replace`" pulumi-lang-yaml="`replace`" pulumi-lang-java="`replace`">`replace`</span>, <span pulumi-lang-nodejs="`append`" pulumi-lang-dotnet="`Append`" pulumi-lang-go="`append`" pulumi-lang-python="`append`" pulumi-lang-yaml="`append`" pulumi-lang-java="`append`">`append`</span>.
+        :param Mapping[str, _builtins.str] repository: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The repository (used for loading labels and issue types)
         :param _builtins.str title: The issue title
         """
         pulumi.set(__self__, "completion", completion)
         pulumi.set(__self__, "issue_id", issue_id)
         if body is not None:
             pulumi.set(__self__, "body", body)
+        if issue_type is not None:
+            pulumi.set(__self__, "issue_type", issue_type)
+        if labels is not None:
+            pulumi.set(__self__, "labels", labels)
+        if labels_mode is not None:
+            pulumi.set(__self__, "labels_mode", labels_mode)
+        if repository is not None:
+            pulumi.set(__self__, "repository", repository)
         if task_type is not None:
             pulumi.set(__self__, "task_type", task_type)
         if title is not None:
@@ -18144,6 +18926,38 @@ class WorkflowTaskUpdateGithubIssueTaskParams(dict):
         return pulumi.get(self, "body")
 
     @_builtins.property
+    @pulumi.getter(name="issueType")
+    def issue_type(self) -> Optional[Mapping[str, _builtins.str]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The issue type
+        """
+        return pulumi.get(self, "issue_type")
+
+    @_builtins.property
+    @pulumi.getter
+    def labels(self) -> Optional[Sequence['outputs.WorkflowTaskUpdateGithubIssueTaskParamsLabel']]:
+        """
+        The issue labels
+        """
+        return pulumi.get(self, "labels")
+
+    @_builtins.property
+    @pulumi.getter(name="labelsMode")
+    def labels_mode(self) -> Optional[_builtins.str]:
+        """
+        How to apply labels. 'replace' (default) overwrites all existing labels. 'append' adds to existing labels without removing them.. Value must be one of <span pulumi-lang-nodejs="`replace`" pulumi-lang-dotnet="`Replace`" pulumi-lang-go="`replace`" pulumi-lang-python="`replace`" pulumi-lang-yaml="`replace`" pulumi-lang-java="`replace`">`replace`</span>, <span pulumi-lang-nodejs="`append`" pulumi-lang-dotnet="`Append`" pulumi-lang-go="`append`" pulumi-lang-python="`append`" pulumi-lang-yaml="`append`" pulumi-lang-java="`append`">`append`</span>.
+        """
+        return pulumi.get(self, "labels_mode")
+
+    @_builtins.property
+    @pulumi.getter
+    def repository(self) -> Optional[Mapping[str, _builtins.str]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The repository (used for loading labels and issue types)
+        """
+        return pulumi.get(self, "repository")
+
+    @_builtins.property
     @pulumi.getter(name="taskType")
     def task_type(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "task_type")
@@ -18155,6 +18969,25 @@ class WorkflowTaskUpdateGithubIssueTaskParams(dict):
         The issue title
         """
         return pulumi.get(self, "title")
+
+
+@pulumi.output_type
+class WorkflowTaskUpdateGithubIssueTaskParamsLabel(dict):
+    def __init__(__self__, *,
+                 id: _builtins.str,
+                 name: _builtins.str):
+        pulumi.set(__self__, "id", id)
+        pulumi.set(__self__, "name", name)
+
+    @_builtins.property
+    @pulumi.getter
+    def id(self) -> _builtins.str:
+        return pulumi.get(self, "id")
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> _builtins.str:
+        return pulumi.get(self, "name")
 
 
 @pulumi.output_type
@@ -21245,18 +22078,104 @@ class GetIncidentTypesIncidentTypeResult(dict):
 @pulumi.output_type
 class GetServicesServiceResult(dict):
     def __init__(__self__, *,
+                 alert_broadcast_channel: Mapping[str, _builtins.str],
+                 alert_broadcast_enabled: _builtins.bool,
+                 alert_urgency_id: _builtins.str,
+                 alerts_email_address: _builtins.str,
+                 alerts_email_enabled: _builtins.bool,
+                 backstage_id: _builtins.str,
                  color: _builtins.str,
+                 cortex_id: _builtins.str,
                  description: _builtins.str,
+                 environment_ids: Sequence[_builtins.str],
+                 escalation_policy_id: _builtins.str,
+                 external_id: _builtins.str,
+                 github_repository_branch: _builtins.str,
+                 github_repository_name: _builtins.str,
+                 gitlab_repository_branch: _builtins.str,
+                 gitlab_repository_name: _builtins.str,
                  id: _builtins.str,
+                 incident_broadcast_channel: Mapping[str, _builtins.str],
+                 incident_broadcast_enabled: _builtins.bool,
+                 kubernetes_deployment_name: _builtins.str,
                  name: _builtins.str,
+                 notify_emails: Sequence[_builtins.str],
+                 opsgenie_id: _builtins.str,
+                 owner_group_ids: Sequence[_builtins.str],
+                 owner_user_ids: Sequence[_builtins.str],
+                 pagerduty_id: _builtins.str,
+                 position: _builtins.float,
+                 properties: Sequence[_builtins.str],
                  public_description: _builtins.str,
+                 service_ids: Sequence[_builtins.str],
+                 service_now_ci_sys_id: _builtins.str,
+                 slack_aliases: Sequence[_builtins.str],
+                 slack_channels: Sequence[_builtins.str],
                  slug: _builtins.str):
+        pulumi.set(__self__, "alert_broadcast_channel", alert_broadcast_channel)
+        pulumi.set(__self__, "alert_broadcast_enabled", alert_broadcast_enabled)
+        pulumi.set(__self__, "alert_urgency_id", alert_urgency_id)
+        pulumi.set(__self__, "alerts_email_address", alerts_email_address)
+        pulumi.set(__self__, "alerts_email_enabled", alerts_email_enabled)
+        pulumi.set(__self__, "backstage_id", backstage_id)
         pulumi.set(__self__, "color", color)
+        pulumi.set(__self__, "cortex_id", cortex_id)
         pulumi.set(__self__, "description", description)
+        pulumi.set(__self__, "environment_ids", environment_ids)
+        pulumi.set(__self__, "escalation_policy_id", escalation_policy_id)
+        pulumi.set(__self__, "external_id", external_id)
+        pulumi.set(__self__, "github_repository_branch", github_repository_branch)
+        pulumi.set(__self__, "github_repository_name", github_repository_name)
+        pulumi.set(__self__, "gitlab_repository_branch", gitlab_repository_branch)
+        pulumi.set(__self__, "gitlab_repository_name", gitlab_repository_name)
         pulumi.set(__self__, "id", id)
+        pulumi.set(__self__, "incident_broadcast_channel", incident_broadcast_channel)
+        pulumi.set(__self__, "incident_broadcast_enabled", incident_broadcast_enabled)
+        pulumi.set(__self__, "kubernetes_deployment_name", kubernetes_deployment_name)
         pulumi.set(__self__, "name", name)
+        pulumi.set(__self__, "notify_emails", notify_emails)
+        pulumi.set(__self__, "opsgenie_id", opsgenie_id)
+        pulumi.set(__self__, "owner_group_ids", owner_group_ids)
+        pulumi.set(__self__, "owner_user_ids", owner_user_ids)
+        pulumi.set(__self__, "pagerduty_id", pagerduty_id)
+        pulumi.set(__self__, "position", position)
+        pulumi.set(__self__, "properties", properties)
         pulumi.set(__self__, "public_description", public_description)
+        pulumi.set(__self__, "service_ids", service_ids)
+        pulumi.set(__self__, "service_now_ci_sys_id", service_now_ci_sys_id)
+        pulumi.set(__self__, "slack_aliases", slack_aliases)
+        pulumi.set(__self__, "slack_channels", slack_channels)
         pulumi.set(__self__, "slug", slug)
+
+    @_builtins.property
+    @pulumi.getter(name="alertBroadcastChannel")
+    def alert_broadcast_channel(self) -> Mapping[str, _builtins.str]:
+        return pulumi.get(self, "alert_broadcast_channel")
+
+    @_builtins.property
+    @pulumi.getter(name="alertBroadcastEnabled")
+    def alert_broadcast_enabled(self) -> _builtins.bool:
+        return pulumi.get(self, "alert_broadcast_enabled")
+
+    @_builtins.property
+    @pulumi.getter(name="alertUrgencyId")
+    def alert_urgency_id(self) -> _builtins.str:
+        return pulumi.get(self, "alert_urgency_id")
+
+    @_builtins.property
+    @pulumi.getter(name="alertsEmailAddress")
+    def alerts_email_address(self) -> _builtins.str:
+        return pulumi.get(self, "alerts_email_address")
+
+    @_builtins.property
+    @pulumi.getter(name="alertsEmailEnabled")
+    def alerts_email_enabled(self) -> _builtins.bool:
+        return pulumi.get(self, "alerts_email_enabled")
+
+    @_builtins.property
+    @pulumi.getter(name="backstageId")
+    def backstage_id(self) -> _builtins.str:
+        return pulumi.get(self, "backstage_id")
 
     @_builtins.property
     @pulumi.getter
@@ -21264,9 +22183,49 @@ class GetServicesServiceResult(dict):
         return pulumi.get(self, "color")
 
     @_builtins.property
+    @pulumi.getter(name="cortexId")
+    def cortex_id(self) -> _builtins.str:
+        return pulumi.get(self, "cortex_id")
+
+    @_builtins.property
     @pulumi.getter
     def description(self) -> _builtins.str:
         return pulumi.get(self, "description")
+
+    @_builtins.property
+    @pulumi.getter(name="environmentIds")
+    def environment_ids(self) -> Sequence[_builtins.str]:
+        return pulumi.get(self, "environment_ids")
+
+    @_builtins.property
+    @pulumi.getter(name="escalationPolicyId")
+    def escalation_policy_id(self) -> _builtins.str:
+        return pulumi.get(self, "escalation_policy_id")
+
+    @_builtins.property
+    @pulumi.getter(name="externalId")
+    def external_id(self) -> _builtins.str:
+        return pulumi.get(self, "external_id")
+
+    @_builtins.property
+    @pulumi.getter(name="githubRepositoryBranch")
+    def github_repository_branch(self) -> _builtins.str:
+        return pulumi.get(self, "github_repository_branch")
+
+    @_builtins.property
+    @pulumi.getter(name="githubRepositoryName")
+    def github_repository_name(self) -> _builtins.str:
+        return pulumi.get(self, "github_repository_name")
+
+    @_builtins.property
+    @pulumi.getter(name="gitlabRepositoryBranch")
+    def gitlab_repository_branch(self) -> _builtins.str:
+        return pulumi.get(self, "gitlab_repository_branch")
+
+    @_builtins.property
+    @pulumi.getter(name="gitlabRepositoryName")
+    def gitlab_repository_name(self) -> _builtins.str:
+        return pulumi.get(self, "gitlab_repository_name")
 
     @_builtins.property
     @pulumi.getter
@@ -21274,14 +22233,84 @@ class GetServicesServiceResult(dict):
         return pulumi.get(self, "id")
 
     @_builtins.property
+    @pulumi.getter(name="incidentBroadcastChannel")
+    def incident_broadcast_channel(self) -> Mapping[str, _builtins.str]:
+        return pulumi.get(self, "incident_broadcast_channel")
+
+    @_builtins.property
+    @pulumi.getter(name="incidentBroadcastEnabled")
+    def incident_broadcast_enabled(self) -> _builtins.bool:
+        return pulumi.get(self, "incident_broadcast_enabled")
+
+    @_builtins.property
+    @pulumi.getter(name="kubernetesDeploymentName")
+    def kubernetes_deployment_name(self) -> _builtins.str:
+        return pulumi.get(self, "kubernetes_deployment_name")
+
+    @_builtins.property
     @pulumi.getter
     def name(self) -> _builtins.str:
         return pulumi.get(self, "name")
 
     @_builtins.property
+    @pulumi.getter(name="notifyEmails")
+    def notify_emails(self) -> Sequence[_builtins.str]:
+        return pulumi.get(self, "notify_emails")
+
+    @_builtins.property
+    @pulumi.getter(name="opsgenieId")
+    def opsgenie_id(self) -> _builtins.str:
+        return pulumi.get(self, "opsgenie_id")
+
+    @_builtins.property
+    @pulumi.getter(name="ownerGroupIds")
+    def owner_group_ids(self) -> Sequence[_builtins.str]:
+        return pulumi.get(self, "owner_group_ids")
+
+    @_builtins.property
+    @pulumi.getter(name="ownerUserIds")
+    def owner_user_ids(self) -> Sequence[_builtins.str]:
+        return pulumi.get(self, "owner_user_ids")
+
+    @_builtins.property
+    @pulumi.getter(name="pagerdutyId")
+    def pagerduty_id(self) -> _builtins.str:
+        return pulumi.get(self, "pagerduty_id")
+
+    @_builtins.property
+    @pulumi.getter
+    def position(self) -> _builtins.float:
+        return pulumi.get(self, "position")
+
+    @_builtins.property
+    @pulumi.getter
+    def properties(self) -> Sequence[_builtins.str]:
+        return pulumi.get(self, "properties")
+
+    @_builtins.property
     @pulumi.getter(name="publicDescription")
     def public_description(self) -> _builtins.str:
         return pulumi.get(self, "public_description")
+
+    @_builtins.property
+    @pulumi.getter(name="serviceIds")
+    def service_ids(self) -> Sequence[_builtins.str]:
+        return pulumi.get(self, "service_ids")
+
+    @_builtins.property
+    @pulumi.getter(name="serviceNowCiSysId")
+    def service_now_ci_sys_id(self) -> _builtins.str:
+        return pulumi.get(self, "service_now_ci_sys_id")
+
+    @_builtins.property
+    @pulumi.getter(name="slackAliases")
+    def slack_aliases(self) -> Sequence[_builtins.str]:
+        return pulumi.get(self, "slack_aliases")
+
+    @_builtins.property
+    @pulumi.getter(name="slackChannels")
+    def slack_channels(self) -> Sequence[_builtins.str]:
+        return pulumi.get(self, "slack_channels")
 
     @_builtins.property
     @pulumi.getter
@@ -21374,5 +22403,3 @@ class GetTeamsTeamResult(dict):
     @pulumi.getter
     def slug(self) -> _builtins.str:
         return pulumi.get(self, "slug")
-
-

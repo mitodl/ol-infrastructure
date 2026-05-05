@@ -21,6 +21,7 @@ __all__ = ['CatalogEntityArgs', 'CatalogEntity']
 @pulumi.input_type
 class CatalogEntityArgs:
     def __init__(__self__, *,
+                 backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
                  catalog_entity_id: Optional[pulumi.Input[_builtins.str]] = None,
                  catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
                  description: Optional[pulumi.Input[_builtins.str]] = None,
@@ -30,10 +31,13 @@ class CatalogEntityArgs:
         """
         The set of arguments for constructing a CatalogEntity resource.
 
+        :param pulumi.Input[_builtins.str] backstage_id: The Backstage entity ID this catalog entity is linked to.
         :param pulumi.Input[_builtins.str] catalog_id: The ID of the parent catalog
         :param pulumi.Input[_builtins.float] position: Default position of the item when displayed in a list.
         :param pulumi.Input[Sequence[pulumi.Input['CatalogEntityPropertyArgs']]] properties: Array of property values for this catalog entity
         """
+        if backstage_id is not None:
+            pulumi.set(__self__, "backstage_id", backstage_id)
         if catalog_entity_id is not None:
             pulumi.set(__self__, "catalog_entity_id", catalog_entity_id)
         if catalog_id is not None:
@@ -46,6 +50,18 @@ class CatalogEntityArgs:
             pulumi.set(__self__, "position", position)
         if properties is not None:
             pulumi.set(__self__, "properties", properties)
+
+    @_builtins.property
+    @pulumi.getter(name="backstageId")
+    def backstage_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+        """
+        The Backstage entity ID this catalog entity is linked to.
+        """
+        return pulumi.get(self, "backstage_id")
+
+    @backstage_id.setter
+    def backstage_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+        pulumi.set(self, "backstage_id", value)
 
     @_builtins.property
     @pulumi.getter(name="catalogEntityId")
@@ -114,6 +130,7 @@ class CatalogEntityArgs:
 @pulumi.input_type
 class _CatalogEntityState:
     def __init__(__self__, *,
+                 backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
                  catalog_entity_id: Optional[pulumi.Input[_builtins.str]] = None,
                  catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
                  description: Optional[pulumi.Input[_builtins.str]] = None,
@@ -123,10 +140,13 @@ class _CatalogEntityState:
         """
         Input properties used for looking up and filtering CatalogEntity resources.
 
+        :param pulumi.Input[_builtins.str] backstage_id: The Backstage entity ID this catalog entity is linked to.
         :param pulumi.Input[_builtins.str] catalog_id: The ID of the parent catalog
         :param pulumi.Input[_builtins.float] position: Default position of the item when displayed in a list.
         :param pulumi.Input[Sequence[pulumi.Input['CatalogEntityPropertyArgs']]] properties: Array of property values for this catalog entity
         """
+        if backstage_id is not None:
+            pulumi.set(__self__, "backstage_id", backstage_id)
         if catalog_entity_id is not None:
             pulumi.set(__self__, "catalog_entity_id", catalog_entity_id)
         if catalog_id is not None:
@@ -139,6 +159,18 @@ class _CatalogEntityState:
             pulumi.set(__self__, "position", position)
         if properties is not None:
             pulumi.set(__self__, "properties", properties)
+
+    @_builtins.property
+    @pulumi.getter(name="backstageId")
+    def backstage_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+        """
+        The Backstage entity ID this catalog entity is linked to.
+        """
+        return pulumi.get(self, "backstage_id")
+
+    @backstage_id.setter
+    def backstage_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+        pulumi.set(self, "backstage_id", value)
 
     @_builtins.property
     @pulumi.getter(name="catalogEntityId")
@@ -210,6 +242,7 @@ class CatalogEntity(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
+                 backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
                  catalog_entity_id: Optional[pulumi.Input[_builtins.str]] = None,
                  catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
                  description: Optional[pulumi.Input[_builtins.str]] = None,
@@ -222,6 +255,7 @@ class CatalogEntity(pulumi.CustomResource):
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
+        :param pulumi.Input[_builtins.str] backstage_id: The Backstage entity ID this catalog entity is linked to.
         :param pulumi.Input[_builtins.str] catalog_id: The ID of the parent catalog
         :param pulumi.Input[_builtins.float] position: Default position of the item when displayed in a list.
         :param pulumi.Input[Sequence[pulumi.Input[Union['CatalogEntityPropertyArgs', 'CatalogEntityPropertyArgsDict']]]] properties: Array of property values for this catalog entity
@@ -250,6 +284,7 @@ class CatalogEntity(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
+                 backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
                  catalog_entity_id: Optional[pulumi.Input[_builtins.str]] = None,
                  catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
                  description: Optional[pulumi.Input[_builtins.str]] = None,
@@ -265,6 +300,7 @@ class CatalogEntity(pulumi.CustomResource):
                 raise TypeError('__props__ is only valid when passed in combination with a valid opts.id to get an existing resource')
             __props__ = CatalogEntityArgs.__new__(CatalogEntityArgs)
 
+            __props__.__dict__["backstage_id"] = backstage_id
             __props__.__dict__["catalog_entity_id"] = catalog_entity_id
             __props__.__dict__["catalog_id"] = catalog_id
             __props__.__dict__["description"] = description
@@ -282,6 +318,7 @@ class CatalogEntity(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
+            backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
             catalog_entity_id: Optional[pulumi.Input[_builtins.str]] = None,
             catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
             description: Optional[pulumi.Input[_builtins.str]] = None,
@@ -295,6 +332,7 @@ class CatalogEntity(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
+        :param pulumi.Input[_builtins.str] backstage_id: The Backstage entity ID this catalog entity is linked to.
         :param pulumi.Input[_builtins.str] catalog_id: The ID of the parent catalog
         :param pulumi.Input[_builtins.float] position: Default position of the item when displayed in a list.
         :param pulumi.Input[Sequence[pulumi.Input[Union['CatalogEntityPropertyArgs', 'CatalogEntityPropertyArgsDict']]]] properties: Array of property values for this catalog entity
@@ -303,6 +341,7 @@ class CatalogEntity(pulumi.CustomResource):
 
         __props__ = _CatalogEntityState.__new__(_CatalogEntityState)
 
+        __props__.__dict__["backstage_id"] = backstage_id
         __props__.__dict__["catalog_entity_id"] = catalog_entity_id
         __props__.__dict__["catalog_id"] = catalog_id
         __props__.__dict__["description"] = description
@@ -310,6 +349,14 @@ class CatalogEntity(pulumi.CustomResource):
         __props__.__dict__["position"] = position
         __props__.__dict__["properties"] = properties
         return CatalogEntity(resource_name, opts=opts, __props__=__props__)
+
+    @_builtins.property
+    @pulumi.getter(name="backstageId")
+    def backstage_id(self) -> pulumi.Output[_builtins.str]:
+        """
+        The Backstage entity ID this catalog entity is linked to.
+        """
+        return pulumi.get(self, "backstage_id")
 
     @_builtins.property
     @pulumi.getter(name="catalogEntityId")
@@ -349,4 +396,3 @@ class CatalogEntity(pulumi.CustomResource):
         Array of property values for this catalog entity
         """
         return pulumi.get(self, "properties")
-

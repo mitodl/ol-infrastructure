@@ -26,10 +26,13 @@ class GetRetrospectiveProcessGroupStepResult:
     """
     A collection of values returned by getRetrospectiveProcessGroupStep.
     """
-    def __init__(__self__, id=None, retrospective_step_id=None):
+    def __init__(__self__, id=None, retrospective_process_group_id=None, retrospective_step_id=None):
         if id and not isinstance(id, str):
             raise TypeError("Expected argument 'id' to be a str")
         pulumi.set(__self__, "id", id)
+        if retrospective_process_group_id and not isinstance(retrospective_process_group_id, str):
+            raise TypeError("Expected argument 'retrospective_process_group_id' to be a str")
+        pulumi.set(__self__, "retrospective_process_group_id", retrospective_process_group_id)
         if retrospective_step_id and not isinstance(retrospective_step_id, str):
             raise TypeError("Expected argument 'retrospective_step_id' to be a str")
         pulumi.set(__self__, "retrospective_step_id", retrospective_step_id)
@@ -38,6 +41,11 @@ class GetRetrospectiveProcessGroupStepResult:
     @pulumi.getter
     def id(self) -> _builtins.str:
         return pulumi.get(self, "id")
+
+    @_builtins.property
+    @pulumi.getter(name="retrospectiveProcessGroupId")
+    def retrospective_process_group_id(self) -> _builtins.str:
+        return pulumi.get(self, "retrospective_process_group_id")
 
     @_builtins.property
     @pulumi.getter(name="retrospectiveStepId")
@@ -52,31 +60,38 @@ class AwaitableGetRetrospectiveProcessGroupStepResult(GetRetrospectiveProcessGro
             yield self
         return GetRetrospectiveProcessGroupStepResult(
             id=self.id,
+            retrospective_process_group_id=self.retrospective_process_group_id,
             retrospective_step_id=self.retrospective_step_id)
 
 
-def get_retrospective_process_group_step(retrospective_step_id: Optional[_builtins.str] = None,
+def get_retrospective_process_group_step(retrospective_process_group_id: Optional[_builtins.str] = None,
+                                         retrospective_step_id: Optional[_builtins.str] = None,
                                          opts: Optional[pulumi.InvokeOptions] = None) -> AwaitableGetRetrospectiveProcessGroupStepResult:
     """
     Use this data source to access information about an existing resource.
     """
     __args__ = dict()
+    __args__['retrospectiveProcessGroupId'] = retrospective_process_group_id
     __args__['retrospectiveStepId'] = retrospective_step_id
     opts = pulumi.InvokeOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke('rootly:index/getRetrospectiveProcessGroupStep:getRetrospectiveProcessGroupStep', __args__, opts=opts, typ=GetRetrospectiveProcessGroupStepResult, package_ref=_utilities.get_package()).value
 
     return AwaitableGetRetrospectiveProcessGroupStepResult(
         id=pulumi.get(__ret__, 'id'),
+        retrospective_process_group_id=pulumi.get(__ret__, 'retrospective_process_group_id'),
         retrospective_step_id=pulumi.get(__ret__, 'retrospective_step_id'))
-def get_retrospective_process_group_step_output(retrospective_step_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_retrospective_process_group_step_output(retrospective_process_group_id: Optional[pulumi.Input[_builtins.str]] = None,
+                                                retrospective_step_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
                                                 opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetRetrospectiveProcessGroupStepResult]:
     """
     Use this data source to access information about an existing resource.
     """
     __args__ = dict()
+    __args__['retrospectiveProcessGroupId'] = retrospective_process_group_id
     __args__['retrospectiveStepId'] = retrospective_step_id
     opts = pulumi.InvokeOutputOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke_output('rootly:index/getRetrospectiveProcessGroupStep:getRetrospectiveProcessGroupStep', __args__, opts=opts, typ=GetRetrospectiveProcessGroupStepResult, package_ref=_utilities.get_package())
     return __ret__.apply(lambda __response__: GetRetrospectiveProcessGroupStepResult(
         id=pulumi.get(__response__, 'id'),
+        retrospective_process_group_id=pulumi.get(__response__, 'retrospective_process_group_id'),
         retrospective_step_id=pulumi.get(__response__, 'retrospective_step_id')))

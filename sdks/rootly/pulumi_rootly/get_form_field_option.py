@@ -26,10 +26,13 @@ class GetFormFieldOptionResult:
     """
     A collection of values returned by getFormFieldOption.
     """
-    def __init__(__self__, color=None, id=None, value=None):
+    def __init__(__self__, color=None, form_field_id=None, id=None, value=None):
         if color and not isinstance(color, str):
             raise TypeError("Expected argument 'color' to be a str")
         pulumi.set(__self__, "color", color)
+        if form_field_id and not isinstance(form_field_id, str):
+            raise TypeError("Expected argument 'form_field_id' to be a str")
+        pulumi.set(__self__, "form_field_id", form_field_id)
         if id and not isinstance(id, str):
             raise TypeError("Expected argument 'id' to be a str")
         pulumi.set(__self__, "id", id)
@@ -41,6 +44,11 @@ class GetFormFieldOptionResult:
     @pulumi.getter
     def color(self) -> _builtins.str:
         return pulumi.get(self, "color")
+
+    @_builtins.property
+    @pulumi.getter(name="formFieldId")
+    def form_field_id(self) -> _builtins.str:
+        return pulumi.get(self, "form_field_id")
 
     @_builtins.property
     @pulumi.getter
@@ -60,11 +68,13 @@ class AwaitableGetFormFieldOptionResult(GetFormFieldOptionResult):
             yield self
         return GetFormFieldOptionResult(
             color=self.color,
+            form_field_id=self.form_field_id,
             id=self.id,
             value=self.value)
 
 
 def get_form_field_option(color: Optional[_builtins.str] = None,
+                          form_field_id: Optional[_builtins.str] = None,
                           value: Optional[_builtins.str] = None,
                           opts: Optional[pulumi.InvokeOptions] = None) -> AwaitableGetFormFieldOptionResult:
     """
@@ -72,15 +82,18 @@ def get_form_field_option(color: Optional[_builtins.str] = None,
     """
     __args__ = dict()
     __args__['color'] = color
+    __args__['formFieldId'] = form_field_id
     __args__['value'] = value
     opts = pulumi.InvokeOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke('rootly:index/getFormFieldOption:getFormFieldOption', __args__, opts=opts, typ=GetFormFieldOptionResult, package_ref=_utilities.get_package()).value
 
     return AwaitableGetFormFieldOptionResult(
         color=pulumi.get(__ret__, 'color'),
+        form_field_id=pulumi.get(__ret__, 'form_field_id'),
         id=pulumi.get(__ret__, 'id'),
         value=pulumi.get(__ret__, 'value'))
 def get_form_field_option_output(color: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+                                 form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
                                  value: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
                                  opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetFormFieldOptionResult]:
     """
@@ -88,10 +101,12 @@ def get_form_field_option_output(color: Optional[pulumi.Input[Optional[_builtins
     """
     __args__ = dict()
     __args__['color'] = color
+    __args__['formFieldId'] = form_field_id
     __args__['value'] = value
     opts = pulumi.InvokeOutputOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke_output('rootly:index/getFormFieldOption:getFormFieldOption', __args__, opts=opts, typ=GetFormFieldOptionResult, package_ref=_utilities.get_package())
     return __ret__.apply(lambda __response__: GetFormFieldOptionResult(
         color=pulumi.get(__response__, 'color'),
+        form_field_id=pulumi.get(__response__, 'form_field_id'),
         id=pulumi.get(__response__, 'id'),
         value=pulumi.get(__response__, 'value')))

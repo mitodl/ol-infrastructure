@@ -4,7 +4,7 @@
   "version": "1.1.1",
   "parameterization": {
     "name": "rootly",
-    "version": "5.10.0",
-    "value": "eyJyZW1vdGUiOnsidXJsIjoicmVnaXN0cnkub3BlbnRvZnUub3JnL3Jvb3RseWhxL3Jvb3RseSIsInZlcnNpb24iOiI1LjEwLjAifX0="
+    "version": "5.13.0",
+    "value": "eyJyZW1vdGUiOnsidXJsIjoicmVnaXN0cnkub3BlbnRvZnUub3JnL3Jvb3RseWhxL3Jvb3RseSIsInZlcnNpb24iOiI1LjEzLjAifX0="
   }
 }

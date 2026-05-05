@@ -33,13 +33,13 @@ class PlaybookArgs:
         The set of arguments for constructing a Playbook resource.
 
         :param pulumi.Input[_builtins.str] title: The title of the playbook
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] environment_ids: The Environment ID's to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] environment_ids: The Environment IDs to attach to the incident
         :param pulumi.Input[_builtins.str] external_url: The external url of the playbook
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] functionality_ids: The Functionality ID's to attach to the incident
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] group_ids: The Team ID's to attach to the incident
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] incident_type_ids: The Incident Type ID's to attach to the incident
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] service_ids: The Service ID's to attach to the incident
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] severity_ids: The Severity ID's to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] functionality_ids: The Functionality IDs to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] group_ids: The Team IDs to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] incident_type_ids: The Incident Type IDs to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] service_ids: The Service IDs to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] severity_ids: The Severity IDs to attach to the incident
         :param pulumi.Input[_builtins.str] summary: The summary of the playbook
         """
         pulumi.set(__self__, "title", title)
@@ -78,7 +78,7 @@ class PlaybookArgs:
     @pulumi.getter(name="environmentIds")
     def environment_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
         """
-        The Environment ID's to attach to the incident
+        The Environment IDs to attach to the incident
         """
         return pulumi.get(self, "environment_ids")
 
@@ -102,7 +102,7 @@ class PlaybookArgs:
     @pulumi.getter(name="functionalityIds")
     def functionality_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
         """
-        The Functionality ID's to attach to the incident
+        The Functionality IDs to attach to the incident
         """
         return pulumi.get(self, "functionality_ids")
 
@@ -114,7 +114,7 @@ class PlaybookArgs:
     @pulumi.getter(name="groupIds")
     def group_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
         """
-        The Team ID's to attach to the incident
+        The Team IDs to attach to the incident
         """
         return pulumi.get(self, "group_ids")
 
@@ -126,7 +126,7 @@ class PlaybookArgs:
     @pulumi.getter(name="incidentTypeIds")
     def incident_type_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
         """
-        The Incident Type ID's to attach to the incident
+        The Incident Type IDs to attach to the incident
         """
         return pulumi.get(self, "incident_type_ids")
 
@@ -147,7 +147,7 @@ class PlaybookArgs:
     @pulumi.getter(name="serviceIds")
     def service_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
         """
-        The Service ID's to attach to the incident
+        The Service IDs to attach to the incident
         """
         return pulumi.get(self, "service_ids")
 
@@ -159,7 +159,7 @@ class PlaybookArgs:
     @pulumi.getter(name="severityIds")
     def severity_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
         """
-        The Severity ID's to attach to the incident
+        The Severity IDs to attach to the incident
         """
         return pulumi.get(self, "severity_ids")
 
@@ -196,13 +196,13 @@ class _PlaybookState:
         """
         Input properties used for looking up and filtering Playbook resources.
 
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] environment_ids: The Environment ID's to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] environment_ids: The Environment IDs to attach to the incident
         :param pulumi.Input[_builtins.str] external_url: The external url of the playbook
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] functionality_ids: The Functionality ID's to attach to the incident
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] group_ids: The Team ID's to attach to the incident
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] incident_type_ids: The Incident Type ID's to attach to the incident
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] service_ids: The Service ID's to attach to the incident
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] severity_ids: The Severity ID's to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] functionality_ids: The Functionality IDs to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] group_ids: The Team IDs to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] incident_type_ids: The Incident Type IDs to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] service_ids: The Service IDs to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] severity_ids: The Severity IDs to attach to the incident
         :param pulumi.Input[_builtins.str] summary: The summary of the playbook
         :param pulumi.Input[_builtins.str] title: The title of the playbook
         """
@@ -231,7 +231,7 @@ class _PlaybookState:
     @pulumi.getter(name="environmentIds")
     def environment_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
         """
-        The Environment ID's to attach to the incident
+        The Environment IDs to attach to the incident
         """
         return pulumi.get(self, "environment_ids")
 
@@ -255,7 +255,7 @@ class _PlaybookState:
     @pulumi.getter(name="functionalityIds")
     def functionality_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
         """
-        The Functionality ID's to attach to the incident
+        The Functionality IDs to attach to the incident
         """
         return pulumi.get(self, "functionality_ids")
 
@@ -267,7 +267,7 @@ class _PlaybookState:
     @pulumi.getter(name="groupIds")
     def group_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
         """
-        The Team ID's to attach to the incident
+        The Team IDs to attach to the incident
         """
         return pulumi.get(self, "group_ids")
 
@@ -279,7 +279,7 @@ class _PlaybookState:
     @pulumi.getter(name="incidentTypeIds")
     def incident_type_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
         """
-        The Incident Type ID's to attach to the incident
+        The Incident Type IDs to attach to the incident
         """
         return pulumi.get(self, "incident_type_ids")
 
@@ -300,7 +300,7 @@ class _PlaybookState:
     @pulumi.getter(name="serviceIds")
     def service_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
         """
-        The Service ID's to attach to the incident
+        The Service IDs to attach to the incident
         """
         return pulumi.get(self, "service_ids")
 
@@ -312,7 +312,7 @@ class _PlaybookState:
     @pulumi.getter(name="severityIds")
     def severity_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
         """
-        The Severity ID's to attach to the incident
+        The Severity IDs to attach to the incident
         """
         return pulumi.get(self, "severity_ids")
 
@@ -367,13 +367,13 @@ class Playbook(pulumi.CustomResource):
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] environment_ids: The Environment ID's to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] environment_ids: The Environment IDs to attach to the incident
         :param pulumi.Input[_builtins.str] external_url: The external url of the playbook
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] functionality_ids: The Functionality ID's to attach to the incident
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] group_ids: The Team ID's to attach to the incident
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] incident_type_ids: The Incident Type ID's to attach to the incident
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] service_ids: The Service ID's to attach to the incident
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] severity_ids: The Severity ID's to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] functionality_ids: The Functionality IDs to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] group_ids: The Team IDs to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] incident_type_ids: The Incident Type IDs to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] service_ids: The Service IDs to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] severity_ids: The Severity IDs to attach to the incident
         :param pulumi.Input[_builtins.str] summary: The summary of the playbook
         :param pulumi.Input[_builtins.str] title: The title of the playbook
         """
@@ -460,13 +460,13 @@ class Playbook(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] environment_ids: The Environment ID's to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] environment_ids: The Environment IDs to attach to the incident
         :param pulumi.Input[_builtins.str] external_url: The external url of the playbook
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] functionality_ids: The Functionality ID's to attach to the incident
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] group_ids: The Team ID's to attach to the incident
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] incident_type_ids: The Incident Type ID's to attach to the incident
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] service_ids: The Service ID's to attach to the incident
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] severity_ids: The Severity ID's to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] functionality_ids: The Functionality IDs to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] group_ids: The Team IDs to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] incident_type_ids: The Incident Type IDs to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] service_ids: The Service IDs to attach to the incident
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] severity_ids: The Severity IDs to attach to the incident
         :param pulumi.Input[_builtins.str] summary: The summary of the playbook
         :param pulumi.Input[_builtins.str] title: The title of the playbook
         """
@@ -490,7 +490,7 @@ class Playbook(pulumi.CustomResource):
     @pulumi.getter(name="environmentIds")
     def environment_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
         """
-        The Environment ID's to attach to the incident
+        The Environment IDs to attach to the incident
         """
         return pulumi.get(self, "environment_ids")
 
@@ -506,7 +506,7 @@ class Playbook(pulumi.CustomResource):
     @pulumi.getter(name="functionalityIds")
     def functionality_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
         """
-        The Functionality ID's to attach to the incident
+        The Functionality IDs to attach to the incident
         """
         return pulumi.get(self, "functionality_ids")
 
@@ -514,7 +514,7 @@ class Playbook(pulumi.CustomResource):
     @pulumi.getter(name="groupIds")
     def group_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
         """
-        The Team ID's to attach to the incident
+        The Team IDs to attach to the incident
         """
         return pulumi.get(self, "group_ids")
 
@@ -522,7 +522,7 @@ class Playbook(pulumi.CustomResource):
     @pulumi.getter(name="incidentTypeIds")
     def incident_type_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
         """
-        The Incident Type ID's to attach to the incident
+        The Incident Type IDs to attach to the incident
         """
         return pulumi.get(self, "incident_type_ids")
 
@@ -535,7 +535,7 @@ class Playbook(pulumi.CustomResource):
     @pulumi.getter(name="serviceIds")
     def service_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
         """
-        The Service ID's to attach to the incident
+        The Service IDs to attach to the incident
         """
         return pulumi.get(self, "service_ids")
 
@@ -543,7 +543,7 @@ class Playbook(pulumi.CustomResource):
     @pulumi.getter(name="severityIds")
     def severity_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
         """
-        The Severity ID's to attach to the incident
+        The Severity IDs to attach to the incident
         """
         return pulumi.get(self, "severity_ids")
 
@@ -562,4 +562,3 @@ class Playbook(pulumi.CustomResource):
         The title of the playbook
         """
         return pulumi.get(self, "title")
-

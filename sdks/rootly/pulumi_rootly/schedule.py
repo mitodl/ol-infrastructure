@@ -34,7 +34,7 @@ class ScheduleArgs:
         :param pulumi.Input[_builtins.str] description: The description of the schedule
         :param pulumi.Input[_builtins.str] name: The name of the schedule
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] owner_group_ids: The owning teams for this schedules.
-        :param pulumi.Input[_builtins.float] owner_user_id: ID of user assigned as owner of the schedule
+        :param pulumi.Input[_builtins.float] owner_user_id: ID of user assigned as owner of the schedule. Defaults to the API token's user if not specified.
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack channel of the schedule
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_user_group: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack group of the schedule
         """
@@ -107,7 +107,7 @@ class ScheduleArgs:
     @pulumi.getter(name="ownerUserId")
     def owner_user_id(self) -> Optional[pulumi.Input[_builtins.float]]:
         """
-        ID of user assigned as owner of the schedule
+        ID of user assigned as owner of the schedule. Defaults to the API token's user if not specified.
         """
         return pulumi.get(self, "owner_user_id")
 
@@ -167,7 +167,7 @@ class _ScheduleState:
         :param pulumi.Input[_builtins.str] description: The description of the schedule
         :param pulumi.Input[_builtins.str] name: The name of the schedule
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] owner_group_ids: The owning teams for this schedules.
-        :param pulumi.Input[_builtins.float] owner_user_id: ID of user assigned as owner of the schedule
+        :param pulumi.Input[_builtins.float] owner_user_id: ID of user assigned as owner of the schedule. Defaults to the API token's user if not specified.
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack channel of the schedule
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_user_group: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack group of the schedule
         """
@@ -240,7 +240,7 @@ class _ScheduleState:
     @pulumi.getter(name="ownerUserId")
     def owner_user_id(self) -> Optional[pulumi.Input[_builtins.float]]:
         """
-        ID of user assigned as owner of the schedule
+        ID of user assigned as owner of the schedule. Defaults to the API token's user if not specified.
         """
         return pulumi.get(self, "owner_user_id")
 
@@ -306,7 +306,7 @@ class Schedule(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] description: The description of the schedule
         :param pulumi.Input[_builtins.str] name: The name of the schedule
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] owner_group_ids: The owning teams for this schedules.
-        :param pulumi.Input[_builtins.float] owner_user_id: ID of user assigned as owner of the schedule
+        :param pulumi.Input[_builtins.float] owner_user_id: ID of user assigned as owner of the schedule. Defaults to the API token's user if not specified.
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack channel of the schedule
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_user_group: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack group of the schedule
         """
@@ -389,7 +389,7 @@ class Schedule(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] description: The description of the schedule
         :param pulumi.Input[_builtins.str] name: The name of the schedule
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] owner_group_ids: The owning teams for this schedules.
-        :param pulumi.Input[_builtins.float] owner_user_id: ID of user assigned as owner of the schedule
+        :param pulumi.Input[_builtins.float] owner_user_id: ID of user assigned as owner of the schedule. Defaults to the API token's user if not specified.
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack channel of the schedule
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_user_group: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack group of the schedule
         """
@@ -443,7 +443,7 @@ class Schedule(pulumi.CustomResource):
     @pulumi.getter(name="ownerUserId")
     def owner_user_id(self) -> pulumi.Output[_builtins.float]:
         """
-        ID of user assigned as owner of the schedule
+        ID of user assigned as owner of the schedule. Defaults to the API token's user if not specified.
         """
         return pulumi.get(self, "owner_user_id")
 
@@ -467,4 +467,3 @@ class Schedule(pulumi.CustomResource):
         Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack group of the schedule
         """
         return pulumi.get(self, "slack_user_group")
-

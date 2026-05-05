@@ -26,10 +26,13 @@ class GetFormFieldPositionResult:
     """
     A collection of values returned by getFormFieldPosition.
     """
-    def __init__(__self__, form=None, id=None):
+    def __init__(__self__, form=None, form_field_id=None, id=None):
         if form and not isinstance(form, str):
             raise TypeError("Expected argument 'form' to be a str")
         pulumi.set(__self__, "form", form)
+        if form_field_id and not isinstance(form_field_id, str):
+            raise TypeError("Expected argument 'form_field_id' to be a str")
+        pulumi.set(__self__, "form_field_id", form_field_id)
         if id and not isinstance(id, str):
             raise TypeError("Expected argument 'id' to be a str")
         pulumi.set(__self__, "id", id)
@@ -38,6 +41,11 @@ class GetFormFieldPositionResult:
     @pulumi.getter
     def form(self) -> _builtins.str:
         return pulumi.get(self, "form")
+
+    @_builtins.property
+    @pulumi.getter(name="formFieldId")
+    def form_field_id(self) -> _builtins.str:
+        return pulumi.get(self, "form_field_id")
 
     @_builtins.property
     @pulumi.getter
@@ -52,31 +60,38 @@ class AwaitableGetFormFieldPositionResult(GetFormFieldPositionResult):
             yield self
         return GetFormFieldPositionResult(
             form=self.form,
+            form_field_id=self.form_field_id,
             id=self.id)
 
 
 def get_form_field_position(form: Optional[_builtins.str] = None,
+                            form_field_id: Optional[_builtins.str] = None,
                             opts: Optional[pulumi.InvokeOptions] = None) -> AwaitableGetFormFieldPositionResult:
     """
     Use this data source to access information about an existing resource.
     """
     __args__ = dict()
     __args__['form'] = form
+    __args__['formFieldId'] = form_field_id
     opts = pulumi.InvokeOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke('rootly:index/getFormFieldPosition:getFormFieldPosition', __args__, opts=opts, typ=GetFormFieldPositionResult, package_ref=_utilities.get_package()).value
 
     return AwaitableGetFormFieldPositionResult(
         form=pulumi.get(__ret__, 'form'),
+        form_field_id=pulumi.get(__ret__, 'form_field_id'),
         id=pulumi.get(__ret__, 'id'))
 def get_form_field_position_output(form: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+                                   form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
                                    opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetFormFieldPositionResult]:
     """
     Use this data source to access information about an existing resource.
     """
     __args__ = dict()
     __args__['form'] = form
+    __args__['formFieldId'] = form_field_id
     opts = pulumi.InvokeOutputOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke_output('rootly:index/getFormFieldPosition:getFormFieldPosition', __args__, opts=opts, typ=GetFormFieldPositionResult, package_ref=_utilities.get_package())
     return __ret__.apply(lambda __response__: GetFormFieldPositionResult(
         form=pulumi.get(__response__, 'form'),
+        form_field_id=pulumi.get(__response__, 'form_field_id'),
         id=pulumi.get(__response__, 'id')))
