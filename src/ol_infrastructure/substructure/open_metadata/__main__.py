@@ -288,6 +288,24 @@ service_name_glue = om_config.get("service_name_glue") or "Glue"
 # dbt enrichment targets the same Glue service (defaults to service_name_glue)
 # but can be overridden independently if the service name differs.
 service_name_dbt = om_config.get("service_name_dbt") or service_name_glue
+# Dagster pipeline service name in OM.
+service_name_dagster = om_config.get("service_name_dagster") or "OL Orchestration"
+
+# External Dagster UI URL — used as sourceUrl base for pipeline/task entities
+# so links in OM are clickable by users.  Defaults to the standard env-specific
+# pattern (pipelines.odl.mit.edu for Production, pipelines-{env}.odl.mit.edu
+# for others) but can be overridden via open_metadata:dagster_external_url.
+_dagster_domain_by_env = {
+    "production": "pipelines.odl.mit.edu",
+    "qa": "pipelines-qa.odl.mit.edu",
+    "ci": "pipelines-ci.odl.mit.edu",
+}
+_dagster_default_domain = _dagster_domain_by_env.get(
+    stack_info.env_suffix, "pipelines.odl.mit.edu"
+)
+dagster_external_url = (
+    om_config.get("dagster_external_url") or f"https://{_dagster_default_domain}"
+)
 
 # ---------------------------------------------------------------------------
 # Trino (Starburst Galaxy) metadata ingestion
@@ -446,6 +464,34 @@ _make_cronjob(
         _plain_env("OM_SERVICE_NAME", service_name_dbt),
         _plain_env("OM_AWS_REGION", aws_region),
         _plain_env("OM_DBT_BUCKET", dbt_artifacts_bucket),
+    ],
+)
+
+# ---------------------------------------------------------------------------
+# Dagster pipeline metadata ingestion
+# ---------------------------------------------------------------------------
+# Custom ingestion that replaces the manually-created Dagster OMJob.
+# Improvements:
+#   - Source URLs point to the external Dagster UI (not the internal K8s
+#     service address), so links in OM are clickable by users.
+#   - One OM Pipeline per asset *group* (per code location) instead of one
+#     per Dagster job, so dbt model layers, Airbyte sync groups, and other
+#     logical collections each appear as a named pipeline rather than all
+#     collapsing into the synthetic __ASSET_JOB entity.
+#   - OM Tasks are asset nodes (with asset-page source URLs), not op handles.
+#   - Inter-group asset dependencies become Pipeline → Pipeline lineage edges.
+#   - Groups covered by other connectors (Superset datasets) are skipped.
+
+_make_cronjob(
+    name="dagster",
+    schedule="0 5 * * *",
+    python_script=(
+        Path(__file__).parent / "scripts" / "dagster_metadata.py"
+    ).read_text(),
+    extra_env=[
+        _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+        _plain_env("DAGSTER_SERVICE_NAME", service_name_dagster),
+        _plain_env("DAGSTER_EXTERNAL_URL", dagster_external_url),
     ],
 )
 
