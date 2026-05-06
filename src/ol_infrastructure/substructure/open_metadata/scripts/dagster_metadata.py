@@ -59,10 +59,8 @@ from metadata.generated.schema.entity.services.connections.metadata.openMetadata
 from metadata.generated.schema.entity.services.connections.pipeline.dagsterConnection import (  # noqa: E501
     DagsterConnection,
 )
-from metadata.generated.schema.entity.services.connections.pipeline.pipelineConnection import (  # noqa: E501
-    PipelineConnection,
-)
 from metadata.generated.schema.entity.services.pipelineService import (
+    PipelineConnection,
     PipelineService,
     PipelineServiceType,
 )
