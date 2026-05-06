@@ -42,7 +42,7 @@ const SLOT_IDS = {
 const addFooterSubSlotsOverride = (config) => {
   const currentYear = new Date().getFullYear();
   const accessibilityURL = process.env.ACCESSIBILITY_URL || 'https://accessibility.mit.edu/';
-  const contactUsURL = process.env.CONTACT_URL || 'https://support.learn.mit.edu/';
+  const helpURL = process.env.CONTACT_URL || 'https://support.learn.mit.edu/';
   const copyRightText = 'Massachusetts Institute of Technology';
   const footerLogo = <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={process.env.MIT_BASE_URL} />;
 
@@ -63,7 +63,7 @@ const addFooterSubSlotsOverride = (config) => {
       messageId: 'footer.links.accessibility',
     },
     {
-      url: contactUsURL,
+      url: helpURL,
       title: 'Help',
       messageId: 'footer.links.help',
     },
