@@ -285,9 +285,10 @@ service_name_trino = om_config.get("service_name_trino") or "Starburst Galaxy"
 service_name_airbyte = om_config.get("service_name_airbyte") or "Airbyte"
 service_name_superset = om_config.get("service_name_superset") or "Superset"
 service_name_glue = om_config.get("service_name_glue") or "Glue"
-# dbt enrichment targets the same Glue service (defaults to service_name_glue)
-# but can be overridden independently if the service name differs.
-service_name_dbt = om_config.get("service_name_dbt") or service_name_glue
+# dbt enrichment targets the Trino (Starburst Galaxy) service — Glue and Trino
+# both catalog the same Iceberg tables, but dbt writes via Trino so the FQNs
+# resolve against the Trino service in OM. Can be overridden per-stack.
+service_name_dbt = om_config.get("service_name_dbt") or service_name_trino
 # Dagster pipeline service name in OM.
 service_name_dagster = om_config.get("service_name_dagster") or "OL Orchestration"
 
@@ -495,7 +496,26 @@ _make_cronjob(
     ],
 )
 
-# Trino data profiler — collects table/column statistics (row count, null %,
+# Glue ↔ Trino table lineage — creates bidirectional lineage edges between
+# Glue and Trino (Starburst Galaxy) entities that represent the same underlying
+# Iceberg tables.  Runs daily at 03:30 UTC, after both metadata jobs (02:00)
+# and before the dbt enrichment job (03:00) so dbt lineage resolution sees
+# complete table lineage.
+_make_cronjob(
+    name="glue-trino-lineage",
+    schedule="30 3 * * *",
+    python_script=(
+        Path(__file__).parent / "scripts" / "glue_trino_lineage.py"
+    ).read_text(),
+    extra_env=[
+        _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+        _plain_env("OM_GLUE_SERVICE_NAME", service_name_glue),
+        _plain_env("OM_TRINO_SERVICE_NAME", service_name_trino),
+    ],
+    bot_secret_name="om-lineage-bot",  # noqa: S106  # pragma: allowlist secret
+)
+
+
 # distinct %, min/max, mean/std) for all ol_warehouse_production_* schemas.
 # Uses a 10% row sample; runs weekly (Sunday 07:00 UTC) to control cost.
 _make_cronjob(
