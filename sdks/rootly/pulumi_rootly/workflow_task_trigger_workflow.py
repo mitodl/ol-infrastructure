@@ -424,4 +424,3 @@ class WorkflowTaskTriggerWorkflow(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskTriggerWorkflowId")
     def workflow_task_trigger_workflow_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_trigger_workflow_id")
-

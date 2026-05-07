@@ -374,4 +374,3 @@ class CommunicationsType(pulumi.CustomResource):
         The slug of the communications type
         """
         return pulumi.get(self, "slug")
-

@@ -424,4 +424,3 @@ class WorkflowTaskSnapshotGrafanaDashboard(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskSnapshotGrafanaDashboardId")
     def workflow_task_snapshot_grafana_dashboard_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_snapshot_grafana_dashboard_id")
-

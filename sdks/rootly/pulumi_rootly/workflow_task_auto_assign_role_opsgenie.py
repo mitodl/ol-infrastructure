@@ -424,4 +424,3 @@ class WorkflowTaskAutoAssignRoleOpsgenie(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskAutoAssignRoleOpsgenieId")
     def workflow_task_auto_assign_role_opsgenie_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_auto_assign_role_opsgenie_id")
-

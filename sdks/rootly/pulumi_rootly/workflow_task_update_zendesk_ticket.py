@@ -424,4 +424,3 @@ class WorkflowTaskUpdateZendeskTicket(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskUpdateZendeskTicketId")
     def workflow_task_update_zendesk_ticket_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_update_zendesk_ticket_id")
-

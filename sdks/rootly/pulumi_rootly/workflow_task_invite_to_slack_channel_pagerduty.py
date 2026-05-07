@@ -424,4 +424,3 @@ class WorkflowTaskInviteToSlackChannelPagerduty(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskInviteToSlackChannelPagerdutyId")
     def workflow_task_invite_to_slack_channel_pagerduty_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_invite_to_slack_channel_pagerduty_id")
-

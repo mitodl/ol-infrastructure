@@ -424,4 +424,3 @@ class WorkflowTaskRenameSlackChannel(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskRenameSlackChannelId")
     def workflow_task_rename_slack_channel_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_rename_slack_channel_id")
-

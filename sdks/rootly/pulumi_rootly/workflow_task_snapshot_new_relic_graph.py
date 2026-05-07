@@ -424,4 +424,3 @@ class WorkflowTaskSnapshotNewRelicGraph(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskSnapshotNewRelicGraphId")
     def workflow_task_snapshot_new_relic_graph_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_snapshot_new_relic_graph_id")
-

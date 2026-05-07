@@ -321,4 +321,3 @@ class SubStatus(pulumi.CustomResource):
     @pulumi.getter(name="subStatusId")
     def sub_status_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "sub_status_id")
-
