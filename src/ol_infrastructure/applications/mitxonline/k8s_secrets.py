@@ -228,6 +228,8 @@ def create_mitxonline_k8s_secrets(
             "templates": {
                 "HUBSPOT_HOME_PAGE_FORM_GUID": '{{ index .Secrets "hubspot" "formId" }}',
                 "HUBSPOT_PORTAL_ID": '{{ index .Secrets "hubspot" "portalId" }}',
+                "MITOL_CERTIFICATE_WEBHOOK_ACCESS_TOKEN": '{{ index .Secrets "webhook_access_token" "access_token" }}',
+                "MITOL_ENROLLMENT_WEBHOOK_TOKEN": '{{ index .Secrets "webhook_access_token" "access token" }}',
                 "MITOL_GOOGLE_SHEETS_DRIVE_API_PROJECT_ID": '{{ index .Secrets "google-sheets" "drive-api-project-id" }}',
                 "MITOL_GOOGLE_SHEETS_DRIVE_CLIENT_ID": '{{ index .Secrets "google-sheets" "drive-client-id" }}',
                 "MITOL_GOOGLE_SHEETS_DRIVE_CLIENT_SECRET": '{{ index .Secrets "google-sheets" "drive-client-secret" }}',
