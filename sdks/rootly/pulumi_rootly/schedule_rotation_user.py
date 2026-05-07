@@ -267,4 +267,3 @@ class ScheduleRotationUser(pulumi.CustomResource):
         Schedule rotation user
         """
         return pulumi.get(self, "user_id")
-

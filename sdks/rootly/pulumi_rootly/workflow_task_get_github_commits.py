@@ -424,4 +424,3 @@ class WorkflowTaskGetGithubCommits(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskGetGithubCommitsId")
     def workflow_task_get_github_commits_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_get_github_commits_id")
-

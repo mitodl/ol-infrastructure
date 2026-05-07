@@ -424,4 +424,3 @@ class WorkflowTaskCreateAnthropicChatCompletion(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateAnthropicChatCompletionId")
     def workflow_task_create_anthropic_chat_completion_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_anthropic_chat_completion_id")
-

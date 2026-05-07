@@ -424,4 +424,3 @@ class WorkflowTaskGetPulses(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskGetPulsesId")
     def workflow_task_get_pulses_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_get_pulses_id")
-

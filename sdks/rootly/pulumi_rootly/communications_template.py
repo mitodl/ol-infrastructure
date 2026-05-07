@@ -470,4 +470,3 @@ class CommunicationsTemplate(pulumi.CustomResource):
         The slug of the communications template
         """
         return pulumi.get(self, "slug")
-

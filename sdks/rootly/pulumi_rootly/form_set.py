@@ -327,4 +327,3 @@ class FormSet(pulumi.CustomResource):
         The slug of the form set
         """
         return pulumi.get(self, "slug")
-

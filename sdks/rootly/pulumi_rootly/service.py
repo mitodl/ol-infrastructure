@@ -1691,4 +1691,3 @@ class Service(pulumi.CustomResource):
         The slug of the service
         """
         return pulumi.get(self, "slug")
-

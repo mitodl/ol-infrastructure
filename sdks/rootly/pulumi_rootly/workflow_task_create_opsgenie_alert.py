@@ -424,4 +424,3 @@ class WorkflowTaskCreateOpsgenieAlert(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateOpsgenieAlertId")
     def workflow_task_create_opsgenie_alert_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_opsgenie_alert_id")
-

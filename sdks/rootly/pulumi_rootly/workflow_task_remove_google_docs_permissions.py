@@ -424,4 +424,3 @@ class WorkflowTaskRemoveGoogleDocsPermissions(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskRemoveGoogleDocsPermissionsId")
     def workflow_task_remove_google_docs_permissions_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_remove_google_docs_permissions_id")
-
