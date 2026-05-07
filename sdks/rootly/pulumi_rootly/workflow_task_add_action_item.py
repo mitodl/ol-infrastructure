@@ -424,4 +424,3 @@ class WorkflowTaskAddActionItem(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskAddActionItemId")
     def workflow_task_add_action_item_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_add_action_item_id")
-

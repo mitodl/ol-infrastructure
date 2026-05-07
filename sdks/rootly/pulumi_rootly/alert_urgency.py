@@ -280,4 +280,3 @@ class AlertUrgency(pulumi.CustomResource):
         Position of the alert urgency
         """
         return pulumi.get(self, "position")
-

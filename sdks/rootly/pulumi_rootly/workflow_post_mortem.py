@@ -1172,4 +1172,3 @@ class WorkflowPostMortem(pulumi.CustomResource):
     @pulumi.getter(name="workflowPostMortemId")
     def workflow_post_mortem_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_post_mortem_id")
-

@@ -424,4 +424,3 @@ class WorkflowTaskCreateAsanaSubtask(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateAsanaSubtaskId")
     def workflow_task_create_asana_subtask_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_asana_subtask_id")
-
