@@ -424,4 +424,3 @@ class WorkflowTaskUpdatePagerdutyIncident(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskUpdatePagerdutyIncidentId")
     def workflow_task_update_pagerduty_incident_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_update_pagerduty_incident_id")
-

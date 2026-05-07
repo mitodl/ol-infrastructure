@@ -563,4 +563,3 @@ class Environment(pulumi.CustomResource):
         The slug of the environment
         """
         return pulumi.get(self, "slug")
-

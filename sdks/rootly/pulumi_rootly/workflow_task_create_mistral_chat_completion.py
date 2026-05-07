@@ -424,4 +424,3 @@ class WorkflowTaskCreateMistralChatCompletion(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateMistralChatCompletionId")
     def workflow_task_create_mistral_chat_completion_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_mistral_chat_completion_id")
-

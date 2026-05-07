@@ -424,4 +424,3 @@ class WorkflowTaskCreateShortcutTask(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateShortcutTaskId")
     def workflow_task_create_shortcut_task_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_shortcut_task_id")
-

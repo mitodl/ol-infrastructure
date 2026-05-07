@@ -424,4 +424,3 @@ class WorkflowTaskUpdateIncidentPostmortem(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskUpdateIncidentPostmortemId")
     def workflow_task_update_incident_postmortem_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_update_incident_postmortem_id")
-

@@ -697,4 +697,3 @@ class FormField(pulumi.CustomResource):
         The ID of the catalog used when<span pulumi-lang-nodejs=" valueKind " pulumi-lang-dotnet=" ValueKind " pulumi-lang-go=" valueKind " pulumi-lang-python=" value_kind " pulumi-lang-yaml=" valueKind " pulumi-lang-java=" valueKind "> value_kind </span>is <span pulumi-lang-nodejs="`catalogEntity`" pulumi-lang-dotnet="`CatalogEntity`" pulumi-lang-go="`catalogEntity`" pulumi-lang-python="`catalog_entity`" pulumi-lang-yaml="`catalogEntity`" pulumi-lang-java="`catalogEntity`">`catalog_entity`</span>
         """
         return pulumi.get(self, "value_kind_catalog_id")
-

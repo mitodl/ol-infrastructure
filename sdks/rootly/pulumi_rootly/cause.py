@@ -375,4 +375,3 @@ class Cause(pulumi.CustomResource):
         The slug of the cause
         """
         return pulumi.get(self, "slug")
-
