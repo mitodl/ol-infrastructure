@@ -424,4 +424,3 @@ class WorkflowTaskAddMicrosoftTeamsTab(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskAddMicrosoftTeamsTabId")
     def workflow_task_add_microsoft_teams_tab_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_add_microsoft_teams_tab_id")
-

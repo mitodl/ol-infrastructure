@@ -424,4 +424,3 @@ class WorkflowTaskAttachDatadogDashboards(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskAttachDatadogDashboardsId")
     def workflow_task_attach_datadog_dashboards_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_attach_datadog_dashboards_id")
-

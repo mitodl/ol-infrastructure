@@ -269,4 +269,3 @@ class ScheduleRotationActiveDay(pulumi.CustomResource):
     @pulumi.getter(name="scheduleRotationId")
     def schedule_rotation_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "schedule_rotation_id")
-

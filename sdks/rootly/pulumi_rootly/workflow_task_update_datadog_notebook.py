@@ -424,4 +424,3 @@ class WorkflowTaskUpdateDatadogNotebook(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskUpdateDatadogNotebookId")
     def workflow_task_update_datadog_notebook_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_update_datadog_notebook_id")
-

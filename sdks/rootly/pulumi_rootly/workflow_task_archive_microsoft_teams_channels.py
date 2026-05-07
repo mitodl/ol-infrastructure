@@ -424,4 +424,3 @@ class WorkflowTaskArchiveMicrosoftTeamsChannels(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskArchiveMicrosoftTeamsChannelsId")
     def workflow_task_archive_microsoft_teams_channels_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_archive_microsoft_teams_channels_id")
-

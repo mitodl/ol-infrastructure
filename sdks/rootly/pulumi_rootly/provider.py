@@ -163,4 +163,3 @@ class Provider(pulumi.ProviderResource):
         __args__ = dict()
         __args__['__self__'] = __self__
         return pulumi.runtime.call('pulumi:providers:rootly/terraformConfig', __args__, res=__self__, typ=Provider.TerraformConfigResult, package_ref=_utilities.get_package())
-

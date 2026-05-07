@@ -753,4 +753,3 @@ class ScheduleRotation(pulumi.CustomResource):
         A valid IANA time zone name.
         """
         return pulumi.get(self, "time_zone")
-
