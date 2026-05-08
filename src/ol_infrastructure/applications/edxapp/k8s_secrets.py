@@ -1,4 +1,4 @@
-# ruff: noqa: E501, S105, PLR0913
+# ruff: noqa: E501, S105, PLR0913, PLR0915
 # mypy: ignore-errors
 """Kubernetes secrets for edxapp using Vault integration.
 
@@ -50,6 +50,7 @@ class EdxappSecrets:
     lms_oauth: OLVaultK8SSecret | None
     git_export_ssh_key: OLVaultK8SSecret
     translations_providers: OLVaultK8SSecret | None
+    webhook_tokens: OLVaultK8SSecret | None
     meilisearch: OLVaultK8SSecret | None
     typesense: OLVaultK8SSecret | None
 
@@ -65,6 +66,7 @@ class EdxappSecrets:
     lms_oauth_secret_name: str | None
     git_export_ssh_key_secret_name: str
     translations_providers_secret_name: str | None
+    webhook_tokens_secret_name: str | None
     meilisearch_secret_name: str | None
     typesense_secret_name: str | None
 
@@ -133,6 +135,7 @@ def create_k8s_secrets(
     )
     meilisearch_secret_name = "15-meilisearch-yaml"  # pragma: allowlist secret
     typesense_secret_name = "16-typesense-yaml"  # pragma: allowlist secret
+    webhook_tokens_secret_name = "17-webhook-tokens-yaml"  # pragma: allowlist secret
 
     # Database credentials secret (dynamic - depends on DB outputs)
     _db_restart_targets = (
@@ -380,6 +383,24 @@ def create_k8s_secrets(
         },
     )
 
+    # Webhook tokens secret (conditional - only for mitxonline)
+    if stack_info.env_prefix == "mitxonline":
+        webhook_tokens_secret = builder.create_static(
+            name="webhook-tokens",
+            resource_name="webhook-tokens-secret",
+            secret_name=webhook_tokens_secret_name,
+            mount=f"secret-{stack_info.env_prefix}",
+            path="collected-static-secrets",
+            templates={
+                "17-webhook-tokens-secrets.yaml": textwrap.dedent("""
+                    MITOL_CERTIFICATE_WEBHOOK_ACCESS_TOKEN: {{ index .Secrets "webhook_access_token" "access_token" }}
+                    MITOL_ENROLLMENT_WEBHOOK_ACCESS_TOKEN: {{ index .Secrets "webhook_access_token" "access_token" }}
+                """),
+            },
+        )
+    else:
+        webhook_tokens_secret = None
+
     # Translations providers secret (conditional - only for mitxonline)
     if stack_info.env_prefix == "mitxonline":
         translations_providers_secret = builder.create_static(
@@ -459,6 +480,7 @@ def create_k8s_secrets(
         lms_oauth=lms_oauth_secret,
         git_export_ssh_key=git_export_ssh_key_secret,
         translations_providers=translations_providers_secret,
+        webhook_tokens=webhook_tokens_secret,
         meilisearch=meilisearch_secret,
         typesense=typesense_secret,
         db_creds_secret_name=db_creds_secret_name,
@@ -473,6 +495,9 @@ def create_k8s_secrets(
         lms_oauth_secret_name=lms_oauth_secret_name,
         git_export_ssh_key_secret_name=git_export_ssh_key_secret_name,
         translations_providers_secret_name=translations_providers_secret_name
+        if stack_info.env_prefix == "mitxonline"
+        else None,
+        webhook_tokens_secret_name=webhook_tokens_secret_name
         if stack_info.env_prefix == "mitxonline"
         else None,
         meilisearch_secret_name=meilisearch_secret_name,
