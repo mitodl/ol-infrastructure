@@ -348,4 +348,3 @@ class CustomForm(pulumi.CustomResource):
         The custom form slug. Add this to form_field.shown or form_field.required to associate form fields with custom forms.
         """
         return pulumi.get(self, "slug")
-

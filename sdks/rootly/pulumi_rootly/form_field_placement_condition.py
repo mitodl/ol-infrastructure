@@ -422,4 +422,3 @@ class FormFieldPlacementCondition(pulumi.CustomResource):
         The values for comparison.
         """
         return pulumi.get(self, "values")
-

@@ -475,4 +475,3 @@ class CatalogProperty(pulumi.CustomResource):
     @pulumi.getter
     def slug(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "slug")
-

@@ -424,4 +424,3 @@ class WorkflowTaskUpdateGitlabIssue(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskUpdateGitlabIssueId")
     def workflow_task_update_gitlab_issue_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_update_gitlab_issue_id")
-

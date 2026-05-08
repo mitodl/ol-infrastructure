@@ -335,4 +335,3 @@ class IncidentPermissionSetResource(pulumi.CustomResource):
     @pulumi.getter(name="resourceType")
     def resource_type(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "resource_type")
-

@@ -424,4 +424,3 @@ class WorkflowTaskCreateZoomMeeting(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateZoomMeetingId")
     def workflow_task_create_zoom_meeting_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_zoom_meeting_id")
-

@@ -335,4 +335,3 @@ class Dashboard(pulumi.CustomResource):
         The<span pulumi-lang-nodejs=" userId " pulumi-lang-dotnet=" UserId " pulumi-lang-go=" userId " pulumi-lang-python=" user_id " pulumi-lang-yaml=" userId " pulumi-lang-java=" userId "> user_id </span>of the dashboard, for dashboards with owner == user
         """
         return pulumi.get(self, "user_id")
-

@@ -537,4 +537,3 @@ class StatusPageTemplate(pulumi.CustomResource):
         Title that will be used for the status page update
         """
         return pulumi.get(self, "update_title")
-

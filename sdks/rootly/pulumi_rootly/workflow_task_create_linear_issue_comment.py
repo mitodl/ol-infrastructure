@@ -424,4 +424,3 @@ class WorkflowTaskCreateLinearIssueComment(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateLinearIssueCommentId")
     def workflow_task_create_linear_issue_comment_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_linear_issue_comment_id")
-
