@@ -1172,4 +1172,3 @@ class WorkflowSimple(pulumi.CustomResource):
     @pulumi.getter(name="workflowSimpleId")
     def workflow_simple_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_simple_id")
-

@@ -424,4 +424,3 @@ class WorkflowTaskCreateTrelloCard(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateTrelloCardId")
     def workflow_task_create_trello_card_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_trello_card_id")
-
