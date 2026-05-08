@@ -424,3 +424,4 @@ class WorkflowTaskUpdateIncidentStatusTimestamp(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskUpdateIncidentStatusTimestampId")
     def workflow_task_update_incident_status_timestamp_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_update_incident_status_timestamp_id")
+

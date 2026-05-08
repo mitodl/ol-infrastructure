@@ -304,3 +304,4 @@ class DashboardPanel(pulumi.CustomResource):
     @pulumi.getter
     def position(self) -> pulumi.Output[Optional['outputs.DashboardPanelPosition']]:
         return pulumi.get(self, "position")
+

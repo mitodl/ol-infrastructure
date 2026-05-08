@@ -424,3 +424,4 @@ class WorkflowTaskCreateGoogleDocsPermissions(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateGoogleDocsPermissionsId")
     def workflow_task_create_google_docs_permissions_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_google_docs_permissions_id")
+

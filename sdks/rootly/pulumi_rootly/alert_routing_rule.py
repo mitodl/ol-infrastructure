@@ -505,3 +505,4 @@ class AlertRoutingRule(pulumi.CustomResource):
         The position of the alert routing rule for ordering evaluation
         """
         return pulumi.get(self, "position")
+

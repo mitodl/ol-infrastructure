@@ -424,3 +424,4 @@ class OnCallShadow(pulumi.CustomResource):
         Start datetime of shadow shift
         """
         return pulumi.get(self, "starts_at")
+

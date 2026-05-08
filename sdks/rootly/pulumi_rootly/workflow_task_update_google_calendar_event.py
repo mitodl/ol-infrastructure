@@ -424,3 +424,4 @@ class WorkflowTaskUpdateGoogleCalendarEvent(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskUpdateGoogleCalendarEventId")
     def workflow_task_update_google_calendar_event_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_update_google_calendar_event_id")
+

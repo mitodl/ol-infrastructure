@@ -424,3 +424,4 @@ class WorkflowTaskCreateMicrosoftTeamsChat(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateMicrosoftTeamsChatId")
     def workflow_task_create_microsoft_teams_chat_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_microsoft_teams_chat_id")
+

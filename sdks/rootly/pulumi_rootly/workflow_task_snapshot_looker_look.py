@@ -424,3 +424,4 @@ class WorkflowTaskSnapshotLookerLook(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskSnapshotLookerLookId")
     def workflow_task_snapshot_looker_look_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_snapshot_looker_look_id")
+

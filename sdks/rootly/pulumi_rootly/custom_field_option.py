@@ -361,3 +361,4 @@ class CustomFieldOption(pulumi.CustomResource):
         The value of the custom_field_option
         """
         return pulumi.get(self, "value")
+

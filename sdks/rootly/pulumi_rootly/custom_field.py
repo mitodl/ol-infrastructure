@@ -523,3 +523,4 @@ class CustomField(pulumi.CustomResource):
         The slug of the custom_field
         """
         return pulumi.get(self, "slug")
+

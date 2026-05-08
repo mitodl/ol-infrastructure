@@ -501,3 +501,4 @@ class IncidentRole(pulumi.CustomResource):
         The summary of the incident role
         """
         return pulumi.get(self, "summary")
+

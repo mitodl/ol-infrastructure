@@ -326,3 +326,4 @@ class CommunicationsStage(pulumi.CustomResource):
         The slug of the communications stage
         """
         return pulumi.get(self, "slug")
+

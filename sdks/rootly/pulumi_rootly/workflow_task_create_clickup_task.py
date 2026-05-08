@@ -424,3 +424,4 @@ class WorkflowTaskCreateClickupTask(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateClickupTaskId")
     def workflow_task_create_clickup_task_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_clickup_task_id")
+

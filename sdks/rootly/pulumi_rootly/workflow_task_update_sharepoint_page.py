@@ -424,3 +424,4 @@ class WorkflowTaskUpdateSharepointPage(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskUpdateSharepointPageId")
     def workflow_task_update_sharepoint_page_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_update_sharepoint_page_id")
+

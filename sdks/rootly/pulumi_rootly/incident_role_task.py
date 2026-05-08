@@ -314,3 +314,4 @@ class IncidentRoleTask(pulumi.CustomResource):
         The task of the incident task
         """
         return pulumi.get(self, "task")
+

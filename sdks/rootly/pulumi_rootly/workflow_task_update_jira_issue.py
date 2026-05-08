@@ -424,3 +424,4 @@ class WorkflowTaskUpdateJiraIssue(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskUpdateJiraIssueId")
     def workflow_task_update_jira_issue_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_update_jira_issue_id")
+

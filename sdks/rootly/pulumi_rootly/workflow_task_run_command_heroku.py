@@ -424,3 +424,4 @@ class WorkflowTaskRunCommandHeroku(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskRunCommandHerokuId")
     def workflow_task_run_command_heroku_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_run_command_heroku_id")
+

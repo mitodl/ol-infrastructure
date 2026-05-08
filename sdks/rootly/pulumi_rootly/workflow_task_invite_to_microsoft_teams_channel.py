@@ -424,3 +424,4 @@ class WorkflowTaskInviteToMicrosoftTeamsChannel(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskInviteToMicrosoftTeamsChannelId")
     def workflow_task_invite_to_microsoft_teams_channel_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_invite_to_microsoft_teams_channel_id")
+

@@ -363,3 +363,4 @@ class RetrospectiveProcess(pulumi.CustomResource):
     @pulumi.getter(name="retrospectiveProcessMatchingCriteria")
     def retrospective_process_matching_criteria(self) -> pulumi.Output['outputs.RetrospectiveProcessRetrospectiveProcessMatchingCriteria']:
         return pulumi.get(self, "retrospective_process_matching_criteria")
+

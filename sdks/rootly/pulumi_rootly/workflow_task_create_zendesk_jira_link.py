@@ -424,3 +424,4 @@ class WorkflowTaskCreateZendeskJiraLink(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateZendeskJiraLinkId")
     def workflow_task_create_zendesk_jira_link_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_zendesk_jira_link_id")
+

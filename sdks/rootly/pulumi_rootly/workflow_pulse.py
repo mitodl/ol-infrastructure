@@ -1172,3 +1172,4 @@ class WorkflowPulse(pulumi.CustomResource):
     @pulumi.getter(name="workflowPulseId")
     def workflow_pulse_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_pulse_id")
+

@@ -424,3 +424,4 @@ class WorkflowTaskRenameMicrosoftTeamsChannel(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskRenameMicrosoftTeamsChannelId")
     def workflow_task_rename_microsoft_teams_channel_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_rename_microsoft_teams_channel_id")
+

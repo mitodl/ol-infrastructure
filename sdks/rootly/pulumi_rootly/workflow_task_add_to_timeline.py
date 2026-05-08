@@ -424,3 +424,4 @@ class WorkflowTaskAddToTimeline(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskAddToTimelineId")
     def workflow_task_add_to_timeline_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_add_to_timeline_id")
+

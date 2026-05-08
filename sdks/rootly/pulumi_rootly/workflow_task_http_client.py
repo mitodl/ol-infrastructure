@@ -424,3 +424,4 @@ class WorkflowTaskHttpClient(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskHttpClientId")
     def workflow_task_http_client_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_http_client_id")
+

@@ -424,3 +424,4 @@ class WorkflowTaskSnapshotDatadogGraph(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskSnapshotDatadogGraphId")
     def workflow_task_snapshot_datadog_graph_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_snapshot_datadog_graph_id")
+

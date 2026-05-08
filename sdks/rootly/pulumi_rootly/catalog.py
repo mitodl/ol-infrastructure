@@ -300,3 +300,4 @@ class Catalog(pulumi.CustomResource):
         Default position of the catalog when displayed in a list.
         """
         return pulumi.get(self, "position")
+

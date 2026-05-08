@@ -424,3 +424,4 @@ class WorkflowTaskSendMicrosoftTeamsMessage(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskSendMicrosoftTeamsMessageId")
     def workflow_task_send_microsoft_teams_message_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_send_microsoft_teams_message_id")
+

@@ -326,3 +326,4 @@ class RetrospectiveConfiguration(pulumi.CustomResource):
         Severities associated with the retrospective configuration.
         """
         return pulumi.get(self, "severity_ids")
+

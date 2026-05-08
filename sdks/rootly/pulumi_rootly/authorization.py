@@ -376,3 +376,4 @@ class Authorization(pulumi.CustomResource):
         Value must be one of <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`">`update`</span>, <span pulumi-lang-nodejs="`authorize`" pulumi-lang-dotnet="`Authorize`" pulumi-lang-go="`authorize`" pulumi-lang-python="`authorize`" pulumi-lang-yaml="`authorize`" pulumi-lang-java="`authorize`">`authorize`</span>, <span pulumi-lang-nodejs="`destroy`" pulumi-lang-dotnet="`Destroy`" pulumi-lang-go="`destroy`" pulumi-lang-python="`destroy`" pulumi-lang-yaml="`destroy`" pulumi-lang-java="`destroy`">`destroy`</span>.
         """
         return pulumi.get(self, "permissions")
+

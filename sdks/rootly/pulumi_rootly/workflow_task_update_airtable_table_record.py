@@ -424,3 +424,4 @@ class WorkflowTaskUpdateAirtableTableRecord(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskUpdateAirtableTableRecordId")
     def workflow_task_update_airtable_table_record_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_update_airtable_table_record_id")
+
