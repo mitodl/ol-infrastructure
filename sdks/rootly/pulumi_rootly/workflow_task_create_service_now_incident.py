@@ -424,4 +424,3 @@ class WorkflowTaskCreateServiceNowIncident(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskCreateServiceNowIncidentId")
     def workflow_task_create_service_now_incident_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_create_service_now_incident_id")
-

@@ -424,4 +424,3 @@ class WorkflowTaskUpdateAsanaTask(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskUpdateAsanaTaskId")
     def workflow_task_update_asana_task_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_update_asana_task_id")
-

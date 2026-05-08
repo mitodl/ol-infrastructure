@@ -563,4 +563,3 @@ class IncidentType(pulumi.CustomResource):
         The slug of the incident type
         """
         return pulumi.get(self, "slug")
-
