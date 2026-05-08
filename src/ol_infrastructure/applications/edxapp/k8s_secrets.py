@@ -393,8 +393,8 @@ def create_k8s_secrets(
             path="collected-static-secrets",
             templates={
                 "17-webhook-tokens-secrets.yaml": textwrap.dedent("""
-                    MITOL_CERTIFICATE_WEBHOOK_ACCESS_TOKEN: {{ index .Secrets "webhook_access_token" "access_token" }}
-                    MITOL_ENROLLMENT_WEBHOOK_ACCESS_TOKEN: {{ index .Secrets "webhook_access_token" "access_token" }}
+                    CERTIFICATE_WEBHOOK_ACCESS_TOKEN: {{ index .Secrets "webhook_access_token" "access_token" }}
+                    ENROLLMENT_WEBHOOK_ACCESS_TOKEN: {{ index .Secrets "webhook_access_token" "access_token" }}
                 """),
             },
         )
