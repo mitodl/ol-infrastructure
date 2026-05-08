@@ -424,4 +424,3 @@ class WorkflowTaskSendEmail(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskSendEmailId")
     def workflow_task_send_email_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_send_email_id")
-

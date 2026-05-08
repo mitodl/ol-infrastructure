@@ -424,4 +424,3 @@ class WorkflowTaskArchiveSlackChannels(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskArchiveSlackChannelsId")
     def workflow_task_archive_slack_channels_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_archive_slack_channels_id")
-

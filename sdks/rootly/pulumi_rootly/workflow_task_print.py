@@ -424,4 +424,3 @@ class WorkflowTaskPrint(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskPrintId")
     def workflow_task_print_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_print_id")
-

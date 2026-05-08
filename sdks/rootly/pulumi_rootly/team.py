@@ -1349,4 +1349,3 @@ class Team(pulumi.CustomResource):
         The VictorOps group id associated to this team
         """
         return pulumi.get(self, "victor_ops_id")
-
