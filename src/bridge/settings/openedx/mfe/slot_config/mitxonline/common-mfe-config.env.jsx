@@ -14,6 +14,7 @@ const MOBILE_BREAKPOINT = 991; // px
 const AUTHORING_APP_ID = 'authoring';
 const LEARNING_APPS = ['learning', 'discussions', 'ora-grading', 'communications'];
 const DASHBOARD_APPS = ['gradebook', 'learner-dashboard'];
+const DEFAULT_SUPPORT_URL = 'https://support.learn.mit.edu/';
 
 const CURRENT_MFE_APP_ID = configData.APP_ID;
 const SLOT_IDS = {
@@ -42,7 +43,7 @@ const SLOT_IDS = {
 const addFooterSubSlotsOverride = (config) => {
   const currentYear = new Date().getFullYear();
   const accessibilityURL = process.env.ACCESSIBILITY_URL || 'https://accessibility.mit.edu/';
-  const helpURL = process.env.CONTACT_URL || 'https://support.learn.mit.edu/';
+  const helpURL = process.env.SUPPORT_URL || DEFAULT_SUPPORT_URL;
   const copyRightText = 'Massachusetts Institute of Technology';
   const footerLogo = <Logo imageUrl={configData.LOGO_TRADEMARK_URL} destinationUrl={process.env.MIT_BASE_URL} />;
 
@@ -536,7 +537,7 @@ const addEnvOverrides = (config) => {
   if (!isMITxOnlineCourse()) {
     return {
       ...config,
-      SUPPORT_URL: process.env.CONTACT_URL || 'https://support.learn.mit.edu/',
+      SUPPORT_URL: process.env.SUPPORT_URL || DEFAULT_SUPPORT_URL,
     }
   }
   return config;
