@@ -199,14 +199,16 @@ postgres_role_statements = {
             # The DO block is a no-op on non-RDS Postgres where the role doesn't exist.
             Template(
                 """
-                DO $$
+                DO
+                $$do$$
                 BEGIN
                     IF EXISTS (
                         SELECT FROM pg_catalog.pg_roles WHERE rolname = 'rds_iam'
                     ) THEN
                         GRANT rds_iam TO "read_only_role";
                     END IF;
-                END $$;
+                END
+                $$do$$;
                 """
             ),
             # Create the read-only user and put it into the read-only-role
