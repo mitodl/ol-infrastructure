@@ -591,6 +591,10 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
                     "schedule": 86400,
                     "args": ["Daily"],
                 },
+                "ol_clear_expired_tokens": {
+                    "task": "ol_social_auth.tasks.ol_clear_expired_tokens",
+                    "schedule": {"minute": 0, "hour": 9, "day_of_week": "monday"},
+                },
             },
             # Module-level settings overrides for mitxonline
             "ENABLE_MKTG_SITE": True,  # Extracted to module-level
