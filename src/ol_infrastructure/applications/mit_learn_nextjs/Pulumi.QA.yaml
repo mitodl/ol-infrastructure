@@ -4,6 +4,7 @@ encryptedkey: AQICAHjZAY5LtmRWGljev0oiDGn0jR5cRwD4IVXCn50TW5i0qQGFNzbK/uuewL52Wb
 config:
   nextjs:appzi_url:
     secure: v1:BvKYm13EnJavPEmi:Ef5Gf3J3tU+noMVdRHTzhw==
+  nextjs:cache_s_maxage_seconds: 900
   nextjs:csrf_cookie_name: "learn_rc_csrftoken"
   nextjs:domain: "next.rc.learn.mit.edu"
   nextjs:gtm_auth: "Rl-qxbJnD78rPEq1OFQLow"
