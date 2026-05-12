@@ -534,12 +534,6 @@ const addEnvOverrides = (config) => {
       LOGO_URL: process.env.LOGO_URL.replace(/logo\.svg$/, 'old-logo.svg'),
     }
   }
-  if (!isMITxOnlineCourse()) {
-    return {
-      ...config,
-      SUPPORT_URL: process.env.SUPPORT_URL || DEFAULT_SUPPORT_URL,
-    }
-  }
   return config;
 }
 
