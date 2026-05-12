@@ -96,7 +96,7 @@ config:
     TIKA_SERVER_ENDPOINT: "https://tika-ci.ol.mit.edu"
     UWSGI_THREADS: 15
     UWSGI_WORKERS: 3
-    YOUTUBE_CONFIG_URL: "https://raw.githubusercontent.com/mitodl/open-video-data/mitopen/youtube/channels.yaml"
+    YOUTUBE_CONFIG_URL: "https://raw.githubusercontent.com/mitodl/open-video-data/main/youtube/channels.yaml"
   redis:password:
     secure: v1:JyjseV72WDGhqdIj:l4p+LgmMz3HY7myVHusGBKXPkP7nXsSMoQ1jpU31bHDSzik4DWYfKhaNjvEzebdpdiWMjWaAwS5mmoDPBoHw9LLBDA+qcQYr8w==
   vault:address: "https://vault-ci.odl.mit.edu"
