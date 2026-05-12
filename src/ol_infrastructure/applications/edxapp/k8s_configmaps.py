@@ -670,7 +670,7 @@ def create_k8s_configmaps(  # noqa: PLR0915
         "APPZI_URL": edxapp_config.get("appzi_url", ""),
         "SITE_NAME": edxapp_config.require_object("domains")["lms"],
         "SESSION_COOKIE_NAME": f"{env_name}-edx-lms-sessionid",
-        "MIT_LEARN_SUPPORT_SITE_LINK": f"mailto:{edxapp_config.require('sender_email_address')}",
+        "MIT_LEARN_SUPPORT_SITE_LINK": "https://support.learn.mit.edu/",
     }
 
     lms_interpolated_config_map = kubernetes.core.v1.ConfigMap(

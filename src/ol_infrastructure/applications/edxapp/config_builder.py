@@ -552,7 +552,7 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
             "SYSADMIN_DEFAULT_BRANCH": "live",
             "EMAIL_BACKEND": "django_ses.SESBackend",
             "MIT_BASE_URL": "https://web.mit.edu",
-            "MIT_LEARN_SUPPORT_SITE_LINK": "mailto:mitlearn-support@mit.edu",
+            "MIT_LEARN_SUPPORT_SITE_LINK": "https://support.learn.mit.edu/",
             "UAI_COURSE_KEY_FORMATS": [
                 "course-v1:uai_",
                 "course-v1:mitxt+ctl.scx_wm+1t2026",
