@@ -96,6 +96,9 @@ github_provider = github.Provider(
 github_options = ResourceOptions(provider=github_provider)
 
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+vault_stack = make_stack_reference(
+    projects.VAULT_SERVER, f"operations.{stack_info.name}"
+)
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
@@ -257,7 +260,18 @@ db_ingress_rules = [
         protocol="tcp",
         from_port=DEFAULT_POSTGRES_PORT,
         to_port=DEFAULT_POSTGRES_PORT,
-        security_groups=[data_vpc["security_groups"]["integrator"]],
+        security_groups=[
+            vault_stack.require_output("vault_server")["security_group"],
+        ],
+        description="Allow access from vault servers for secrets management",
+    ),
+    ec2.SecurityGroupIngressArgs(
+        protocol="tcp",
+        from_port=DEFAULT_POSTGRES_PORT,
+        to_port=DEFAULT_POSTGRES_PORT,
+        security_groups=[
+            data_vpc["security_groups"]["integrator"],
+        ],
         cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"],
     ),
     ec2.SecurityGroupIngressArgs(
