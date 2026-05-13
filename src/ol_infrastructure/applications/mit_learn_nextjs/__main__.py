@@ -209,7 +209,7 @@ raw_env_vars = {
     "OTEL_SERVICE_NAME": "learn-nextjs",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318",
     "OTEL_TRACES_SAMPLER": "parentbased_traceidratio",
-    "OTEL_TRACES_SAMPLER_ARG": "1.0",
+    "OTEL_TRACES_SAMPLER_ARG": "0.25",
     "OTEL_PROPAGATORS": "tracecontext,baggage",
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
     "OTEL_RESOURCE_ATTRIBUTES": (
