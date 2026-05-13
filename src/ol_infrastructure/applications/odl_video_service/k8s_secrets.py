@@ -188,6 +188,7 @@ def create_ovs_k8s_secrets(
         path="ovs-secrets",
         templates={
             "VIDEO_CLOUDFRONT_DIST": '{{ index .Secrets "cloudfront" "subdomain" }}',
+            "VIDEO_CDN_DISTRIBUTION_ID": '{{ index .Secrets "cloudfront" "distribution_id" }}',
             "DROPBOX_KEY": '{{ index .Secrets "dropbox" "key" }}',
             "DROPBOX_TOKEN": '{{ index .Secrets "dropbox" "token" }}',
             "ET_PIPELINE_ID": '{{ index .Secrets "misc" "et_pipeline_id" }}',
