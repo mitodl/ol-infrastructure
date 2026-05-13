@@ -43,28 +43,25 @@ stage.match {
   }
 
   stage.metrics {
-    metric.histogram "apisix_cookie_header_bytes" {
+    metric.histogram {
+      name        = "apisix_cookie_header_bytes"
       description = "Size in bytes of the Cookie request header at the APISix ingress, per virtual host"
       source      = "cookie_bytes"
-      config {
-        buckets = [256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536]
-      }
+      buckets     = [256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536]
     }
 
-    metric.histogram "apisix_cookie_count" {
+    metric.histogram {
+      name        = "apisix_cookie_count"
       description = "Number of cookies in the Cookie request header at APISix ingress"
       source      = "cookie_count"
-      config {
-        buckets = [1, 2, 3, 5, 8, 12, 20, 30, 50]
-      }
+      buckets     = [1, 2, 3, 5, 8, 12, 20, 30, 50]
     }
 
-    metric.histogram "apisix_oidc_session_cookie_bytes" {
+    metric.histogram {
+      name        = "apisix_oidc_session_cookie_bytes"
       description = "Size in bytes of the APISix OIDC session cookie only"
       source      = "oidc_session_bytes"
-      config {
-        buckets = [0, 256, 1024, 2048, 4096, 6144, 8192]
-      }
+      buckets     = [0, 256, 1024, 2048, 4096, 6144, 8192]
     }
   }
 }
