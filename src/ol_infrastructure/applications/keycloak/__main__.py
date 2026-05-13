@@ -399,7 +399,7 @@ if stack_info.name != "CI":
     tracing_config = {
         "enabled": True,
         "endpoint": "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4317",
-        "samplerRatio": 1.0,
+        "samplerRatio": 0.25,
     }
 else:
     tracing_config = {"enabled": False}

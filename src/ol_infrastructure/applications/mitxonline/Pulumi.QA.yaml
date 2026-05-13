@@ -54,7 +54,7 @@ config:
     OPENTELEMETRY_SERVICE_NAME: "mitxonline-webapp"
     OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=qa,service.namespace=mitxonline,service.version=${GIT_SHA:-unknown},service.instance.id=${HOSTNAME}"
     OTEL_TRACES_SAMPLER: "parentbased_traceidratio"
-    OTEL_TRACES_SAMPLER_ARG: "1.0"
+    OTEL_TRACES_SAMPLER_ARG: "0.25"
     OTEL_PROPAGATORS: "tracecontext,baggage"
     OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
     OTEL_LOGS_EXPORTER: "otlp"
