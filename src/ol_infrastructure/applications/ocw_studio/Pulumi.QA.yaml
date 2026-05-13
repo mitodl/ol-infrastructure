@@ -48,7 +48,7 @@ config:
     SITEMAP_DOMAIN: 'live-qa.ocw.mit.edu'
     SOCIAL_AUTH_SAML_SP_ENTITY_ID: 'https://ocw-studio-rc.odl.mit.edu/saml/metadata'
     STATIC_API_BASE_URL_TEST: 'https://test-qa.ocw.mit.edu/'
-    THREEPLAY_PROJECT_ID: '51817'
+    THREEPLAY_PROJECT_ID: 51817
     YT_PROJECT_ID: 'ocw-studio-qa'
     POST_TRANSCODE_ACTIONS: 'videos.api.update_video_job'
     VIDEO_S3_UPLOAD_PREFIX: 'gdrive_uploads'
