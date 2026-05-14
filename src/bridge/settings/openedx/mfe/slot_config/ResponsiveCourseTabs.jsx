@@ -87,12 +87,11 @@ const ResponsiveCourseTabs = ({ activeTabSlug }) => {
     if (!nav) return undefined;
 
         if (typeof ResizeObserver !== 'undefined') {
-    const observer = new ResizeObserver(() => {
-      window.requestAnimationFrame(calculate);
-    });
-    observer.observe(nav);
-
-    return () => observer.disconnect();
+            const observer = new ResizeObserver(() => {
+                window.requestAnimationFrame(calculate);
+            });
+            observer.observe(nav);
+            return () => observer.disconnect();
         }
         const handleResize = () => window.requestAnimationFrame(calculate);
         window.addEventListener('resize', handleResize);

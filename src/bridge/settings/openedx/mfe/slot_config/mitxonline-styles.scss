@@ -243,11 +243,10 @@
     // Prevent nav growth beyond parent; overflow is handled in JS.
     max-width: 100% !important;
   }
-}
 
-// Our responsive tabs dropdown styles
-.responsive-tabs-overflow {
-  position: relative;
+  // Responsive tabs dropdown styles (scoped to #courseTabsNavigation)
+  .responsive-tabs-overflow {
+    position: relative;
 
   .dropdown {
     // Reset the header's dropdown-toggle styles which would make this white-on-dark
@@ -321,6 +320,7 @@
 
         &:hover, &:focus {
           background: var(--pgn-color-light-300) !important;
+          }
         }
       }
     }
