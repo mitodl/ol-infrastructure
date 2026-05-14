@@ -12,8 +12,8 @@ const moreMessage = {
 
 // Course tabs with explicit overflow-to-dropdown behavior.
 const ResponsiveCourseTabs = ({ activeTabSlug }) => {
-    const intl = useIntl();
-    const moreLabel = intl.formatMessage(moreMessage);
+  const intl = useIntl();
+  const moreLabel = intl.formatMessage(moreMessage);
 
   const courseId = useSelector(
     state => state.courseHome?.courseId || state.courseware?.courseId
@@ -86,16 +86,17 @@ const ResponsiveCourseTabs = ({ activeTabSlug }) => {
     const nav = containerRef.current?.closest('nav');
     if (!nav) return undefined;
 
-        if (typeof ResizeObserver !== 'undefined') {
-            const observer = new ResizeObserver(() => {
-                window.requestAnimationFrame(calculate);
-            });
-            observer.observe(nav);
-            return () => observer.disconnect();
-        }
-        const handleResize = () => window.requestAnimationFrame(calculate);
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(() => {
+        window.requestAnimationFrame(calculate);
+      });
+      observer.observe(nav);
+      return () => observer.disconnect();
+    }
+
+    const handleResize = () => window.requestAnimationFrame(calculate);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [calculate]);
 
   if (!tabs?.length) return null;
