@@ -1,11 +1,20 @@
 import React, { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { Dropdown } from '@openedx/paragon';
-import { FormattedMessage } from '@edx/frontend-platform/i18n';
+import { useIntl, FormattedMessage } from '@edx/frontend-platform/i18n';
 import { useModel } from './src/generic/model-store';
+
+const moreMessage = {
+    id: 'learn.course.tabs.navigation.overflow.menu',
+    description: 'The title of the overflow menu for course tabs',
+    defaultMessage: 'More...',
+};
 
 // Course tabs with explicit overflow-to-dropdown behavior.
 const ResponsiveCourseTabs = ({ activeTabSlug }) => {
+    const intl = useIntl();
+    const moreLabel = intl.formatMessage(moreMessage);
+
   const courseId = useSelector(
     state => state.courseHome?.courseId || state.courseware?.courseId
   );
@@ -77,12 +86,17 @@ const ResponsiveCourseTabs = ({ activeTabSlug }) => {
     const nav = containerRef.current?.closest('nav');
     if (!nav) return undefined;
 
+        if (typeof ResizeObserver !== 'undefined') {
     const observer = new ResizeObserver(() => {
       window.requestAnimationFrame(calculate);
     });
     observer.observe(nav);
 
     return () => observer.disconnect();
+        }
+        const handleResize = () => window.requestAnimationFrame(calculate);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
   }, [calculate]);
 
   if (!tabs?.length) return null;
@@ -113,11 +127,7 @@ const ResponsiveCourseTabs = ({ activeTabSlug }) => {
               className="nav-link h-100"
               id="responsive-tabs-more-menu"
             >
-              <FormattedMessage
-                id="learn.course.tabs.navigation.overflow.menu"
-                description="The title of the overflow menu for course tabs"
-                defaultMessage="More..."
-              />
+              <FormattedMessage {...moreMessage} />
             </Dropdown.Toggle>
             <Dropdown.Menu className="responsive-tabs-dropdown-menu">
               {overflowTabs.map(({ url, title, slug }) => (
@@ -164,7 +174,7 @@ const ResponsiveCourseTabs = ({ activeTabSlug }) => {
           className="nav-item flex-shrink-0 nav-link"
           style={{ whiteSpace: 'nowrap' }}
         >
-          More...
+          {moreLabel}
         </span>
       </div>
     </div>

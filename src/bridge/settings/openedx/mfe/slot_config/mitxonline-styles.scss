@@ -208,13 +208,24 @@
     display: none !important;
   }
 
-  // Hide upstream overflow trigger; custom tabs component renders its own.
-  .nav > .nav-item:has(> .dropdown > #learn\\.course\\.tabs\\.navigation\\.overflow\\.menu) {
+  // Hide upstream overflow trigger by targeting its known toggle button ID.
+  // This is the cross-browser-safe approach (no :has() required).
+  // The button itself is hidden, so the dropdown is non-functional even if
+  // the wrapper element retains a zero-size footprint.
+  .nav #learn\.course\.tabs\.navigation\.overflow\.menu {
     display: none !important;
   }
-  // Fallback: hide any Tabs.jsx overflow element that is not ours
+
+  // When :has() is supported, also collapse the parent nav-item wrapper
+  // entirely for a clean layout — no empty space left behind.
+  @supports selector(:has(*)) {
+    .nav > .nav-item:has(> .dropdown > #learn\.course\.tabs\.navigation\.overflow\.menu) {
+      display: none !important;
+    }
+    // Belt-and-suspenders: hide any other non-custom Tabs.jsx overflow element.
   .nav > .nav-item:not(.responsive-tabs-overflow):has(> .dropdown) {
     display: none !important;
+    }
   }
 
   .container-xl {
