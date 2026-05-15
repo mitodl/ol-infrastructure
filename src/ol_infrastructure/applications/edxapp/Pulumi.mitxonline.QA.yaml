@@ -62,7 +62,7 @@ config:
   - ["new_studio_mfe.use_new_home_page", "--create", "--superusers", "--everyone"]
   - ["new_studio_mfe.use_tagging_taxonomy_list_page", "--create", "--superusers",
     "--everyone"]
-  edxapp:canvas_base_url: https://canvas.mit.edu
+  edxapp:canvas_base_url: https://mit.test.instructure.com
   edxapp:use_extracted_html_block: "false"
   edxapp:business_unit: mitxonline
   edxapp:db_password:
