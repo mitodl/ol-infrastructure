@@ -307,7 +307,6 @@ const AIDrawerManagerSidebar = () => {
             className="ai-drawer-manager-sidebar-wrapper"
             role="region"
             aria-label={intl.formatMessage(wrapperMessages.sidebarAriaLabel)}
-            aria-live="polite"
             aria-busy={isLoading}
         >
             {isLoading && (
