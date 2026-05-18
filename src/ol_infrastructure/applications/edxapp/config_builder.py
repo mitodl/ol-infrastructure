@@ -102,6 +102,8 @@ def build_base_general_config() -> ConfigDict:
                 "location": "blockstore/",
             },
         },
+        "BULK_EMAIL_DEFAULT_RETRY_DELAY": 30,
+        "BULK_EMAIL_MAX_RETRIES": 5,
         "BRANCH_IO_KEY": "",
         "BUGS_EMAIL": "odl-devops@mit.edu",
         "BULK_EMAIL_EMAILS_PER_TASK": 500,
