@@ -100,7 +100,7 @@ NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION = "0.19.1"
 # renovate: datasource=docker depName=pgbouncer packageName=ghcr.io/cloudnative-pg/pgbouncer
 PGBOUNCER_VERSION = "1.25.2"
 # renovate: datasource=github-releases depName=local-path-provisioner packageName=rancher/local-path-provisioner
-LOCAL_PATH_PROVISIONER_CHART_VERSION = "0.0.35"
+LOCAL_PATH_PROVISIONER_CHART_VERSION = "0.0.36"
 # renovate: datasource=github-releases depName=qdrant packageName=qdrant/qdrant
 QDRANT_VERSION = "v1.17.1"
 # renovate: datasource=helm depName=typesense-operator packageName=typesense-operator registryUrl=https://akyriako.github.io/typesense-operator
