@@ -175,8 +175,8 @@ def build_base_general_config() -> ConfigDict:
         "FORUM_MONGODB_DATABASE": "forum",
         "GITHUB_REPO_ROOT": "/openedx/data",
         "HELP_TOKENS_BOOKS": {
-            "course_author": "http://edx.readthedocs.io/projects/open-edx-building-and-running-a-course",
-            "learner": "http://edx.readthedocs.io/projects/open-edx-learner-guide",
+            "course_author": "https://docs.openedx.org/en/latest/educators",
+            "learner": "https://docs.openedx.org/en/latest/learners",
         },
         "ICP_LICENSE": None,
         "ICP_LICENSE_INFO": {},
