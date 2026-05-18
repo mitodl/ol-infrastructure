@@ -120,7 +120,7 @@ config:
   edxapp:k8s_resources:
     webapp:
       lms:
-        cpu_request: "250m"
+        cpu_request: "500m"
         memory_request: "2Gi"
         memory_limit: "3Gi"
       cms:
