@@ -383,24 +383,6 @@ def create_k8s_secrets(
         },
     )
 
-    # Webhook tokens secret (conditional - only for mitxonline QA for now)
-    if stack_info.env_prefix == "mitxonline" and stack_info.env_suffix == "QA":
-        webhook_tokens_secret = builder.create_static(
-            name="webhook-tokens",
-            resource_name="webhook-tokens-secret",
-            secret_name=webhook_tokens_secret_name,
-            mount=f"secret-{stack_info.env_prefix}",
-            path="collected-static-secrets",
-            templates={
-                "17-webhook-tokens-secrets.yaml": textwrap.dedent("""
-                    CERTIFICATE_WEBHOOK_ACCESS_TOKEN: {{ index .Secrets "webhook_access_token" "access_token" }}
-                    ENROLLMENT_WEBHOOK_ACCESS_TOKEN: {{ index .Secrets "webhook_access_token" "access_token" }}
-                """),
-            },
-        )
-    else:
-        webhook_tokens_secret = None
-
     # Translations providers secret (conditional - only for mitxonline)
     if stack_info.env_prefix == "mitxonline":
         translations_providers_secret = builder.create_static(
@@ -466,6 +448,24 @@ def create_k8s_secrets(
     else:
         typesense_secret = None
 
+    # Webhook tokens secret (conditional - only for mitxonline QA for now)
+    if stack_info.env_prefix == "mitxonline" and stack_info.env_suffix == "qa":
+        webhook_tokens_secret = builder.create_static(
+            name="webhook-tokens",
+            resource_name="webhook-tokens-secret",
+            secret_name=webhook_tokens_secret_name,
+            mount=f"secret-{stack_info.env_prefix}",
+            path="edxapp",
+            templates={
+                "17-webhook-tokens-secrets.yaml": textwrap.dedent("""
+                    CERTIFICATE_WEBHOOK_ACCESS_TOKEN: {{ get .Secrets "webhook_access_token" }}
+                    ENROLLMENT_WEBHOOK_ACCESS_TOKEN: {{ get .Secrets "webhook_access_token" }}
+                """),
+            },
+        )
+    else:
+        webhook_tokens_secret = None
+
     # Return dataclass with all secrets
     return EdxappSecrets(
         db_creds=db_creds_secret,
@@ -498,7 +498,7 @@ def create_k8s_secrets(
         if stack_info.env_prefix == "mitxonline"
         else None,
         webhook_tokens_secret_name=webhook_tokens_secret_name
-        if stack_info.env_prefix == "mitxonline" and stack_info.env_suffix == "QA"
+        if stack_info.env_prefix == "mitxonline" and stack_info.env_suffix == "qa"
         else None,
         meilisearch_secret_name=meilisearch_secret_name,
         typesense_secret_name=typesense_secret_name,
