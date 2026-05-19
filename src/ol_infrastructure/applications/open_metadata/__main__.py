@@ -600,17 +600,6 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         "port": DEFAULT_HTTPS_PORT,
                         "scheme": "https",
                     },
-                    # Ref: https://docs.open-metadata.org/v1.12.x/deployment/semantic-search
-                    "extraEnvs": [
-                        {
-                            "name": "SEMANTIC_SEARCH_ENABLED",
-                            "value": "true",
-                        },
-                        {
-                            "name": "EMBEDDING_PROVIDER",
-                            "value": "djl",
-                        },
-                    ],
                     "database": {
                         "host": open_metadata_db.db_instance.address,
                         "port": open_metadata_db_config.port,
@@ -632,6 +621,17 @@ open_metadata_application = kubernetes.helm.v3.Release(
             "hpa": {
                 "enabled": True,
             },
+            # Ref: https://docs.open-metadata.org/v1.12.x/deployment/semantic-search
+            "extraEnvs": [
+                {
+                    "name": "SEMANTIC_SEARCH_ENABLED",
+                    "value": "true",
+                },
+                {
+                    "name": "EMBEDDING_PROVIDER",
+                    "value": "djl",
+                },
+            ],
             "serviceAccount": {
                 "create": True,
                 "name": open_metadata_service_account_name,
