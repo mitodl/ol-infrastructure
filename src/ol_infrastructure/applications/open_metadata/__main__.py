@@ -550,12 +550,6 @@ open_metadata_application = kubernetes.helm.v3.Release(
             "commonLabels": k8s_global_labels,
             "openmetadata": {
                 "config": {
-                    # SERVER_HOST tells OpenMetadata its own public URL, used when
-                    # constructing OAuth discovery metadata (e.g. for MCP OAuth).
-                    # Without this it defaults to 0.0.0.0 and falls back to localhost.
-                    "openmetadata": {
-                        "host": open_metadata_config.require("domain"),
-                    },
                     # Ref: https://docs.open-metadata.org/latest/deployment/security/keycloak/kubernetes
                     "authorizer": {
                         "enabled": True,
@@ -587,6 +581,9 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     "pipelineServiceClientConfig": {
                         "enabled": True,
                         "type": "k8s",
+                        # Tells OpenMetadata its own public API URL, used when
+                        # constructing OAuth discovery metadata for MCP OAuth.
+                        "metadataApiEndpoint": f"https://{open_metadata_config.require('domain')}/api",
                         "k8s": {
                             # The schema doesn't yet support this value (TMM 2026-02-26)
                             # "namespace": open_metadata_namespace,  # noqa: ERA001
