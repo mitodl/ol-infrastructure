@@ -1276,6 +1276,7 @@
       }
     ],
     "allowed_schemas": [
+      "ol_warehouse_production_reporting",
       "ol_warehouse_production_dimensional",
       "ol_warehouse_production_mart",
       "public"
