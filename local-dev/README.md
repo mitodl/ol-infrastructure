@@ -195,12 +195,15 @@ ol-infrastructure/
     │   ├── local-dev-key.pem
     │   └── rootCA.pem
     │
-    ├── infra/                        # Pulumi stack — shared in-cluster infrastructure
-    │   ├── Pulumi.yaml
-    │   ├── Pulumi.local-dev.infra.Dev.yaml   # Stack config (domains, secrets, chart versions)
-    │   ├── __main__.py               # All shared resources: CNPG, Valkey, APISIX, Keycloak operator
-    │   ├── local_dev_keycloak.py     # Keycloak olapps realm (mirrors production olapps.py)
-    │   └── requirements.txt
+    ├── infra/                        # Pulumi stacks — shared in-cluster infrastructure
+    │   ├── core/                     # Core stack: operators, Keycloak, APISIX, DB, Valkey
+    │   │   ├── Pulumi.yaml
+    │   │   ├── Pulumi.local-dev.core.Dev.yaml   # Stack config (chart versions, Keycloak hostname)
+    │   │   └── __main__.py
+    │   └── apps_infra/               # Apps-infra stack: Keycloak realm + OIDC clients
+    │       ├── Pulumi.yaml
+    │       ├── Pulumi.local-dev.apps-infra.Dev.yaml   # Stack config (client secrets)
+    │       └── __main__.py
     │
     └── apps/
         ├── mit-learn/                # Django backend manifests
@@ -400,16 +403,24 @@ tilt trigger seed-mit-learn-fixtures
 
 ### Pulumi stack config
 
-`local-dev/infra/Pulumi.local-dev.infra.Dev.yaml` controls shared infra settings:
+The infrastructure is split across two Pulumi stacks:
+
+**`local-dev/infra/core/Pulumi.local-dev.core.Dev.yaml`** — operators, Keycloak, APISIX, DB, Valkey:
 
 | Key | Default | Description |
 |-----|---------|-------------|
 | `keycloak_hostname` | `sso.ol.mit.dev` | Keycloak ingress hostname |
 | `tls_cert_path` | `local-dev/certs/local-dev.pem` | mkcert cert (relative to repo root) |
-| `*_client_secret` | `local-dev-*-secret` | OIDC client secrets (change these if needed) |
 | `apisix_version` | `2.12.0` | APISIX Helm chart version |
 | `cnpg_version` | `0.23.0` | CloudNativePG operator Helm chart version |
 | `keycloak_operator_version` | `26.0.7` | Official Keycloak Operator version |
+
+**`local-dev/infra/apps_infra/Pulumi.local-dev.apps-infra.Dev.yaml`** — Keycloak realm and OIDC clients:
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `*_client_secret` | `local-dev-*-secret` | OIDC client secrets (change if needed) |
+| `apisix_oidc_session_secret` | `local-dev-oidc-session-secret-32chars!` | Session encryption key (kept for reference) |
 
 ---
 
@@ -485,23 +496,29 @@ In `setup.sh`, add the hostname to `HOSTS` and ensure it's covered by a `MKCERT_
 
 ## Modifying Shared Infrastructure
 
-Shared infrastructure is managed by the Pulumi stack in `local-dev/infra/`. Changes here affect all apps.
+Shared infrastructure is split into two Pulumi stacks in `local-dev/infra/`. The `core` stack provisions operators, databases, Valkey, APISIX, and the Keycloak instance. The `apps_infra` stack provisions the Keycloak realm and all OIDC client registrations. Changes here affect all apps.
 
 ```bash
-cd local-dev/infra
-pulumi preview   # See what would change
-pulumi up        # Apply changes
+# Preview and apply core stack changes
+cd local-dev/infra/core
+pulumi preview --stack local-dev.core.Dev
+pulumi up --stack local-dev.core.Dev
+
+# Preview and apply apps_infra stack changes
+cd local-dev/infra/apps_infra
+pulumi preview --stack local-dev.apps-infra.Dev
+pulumi up --stack local-dev.apps-infra.Dev
 ```
 
-Tilt also runs `pulumi up` automatically when infra files change. You can also trigger it manually from the Tilt UI (`local-infra` resource).
+Tilt also runs `pulumi up` automatically when infra files change. You can also trigger it manually from the Tilt UI (`local-infra-core` and `local-infra-apps` resources).
 
 ### Common modifications
 
-**Change a Helm chart version:** Edit the version in `Pulumi.local-dev.infra.Dev.yaml` and run `pulumi up`.
+**Change a Helm chart version:** Edit the version in `infra/core/Pulumi.local-dev.core.Dev.yaml` and run `pulumi up` in `infra/core/`.
 
-**Add a new shared service:** Add it to `__main__.py`. Use the existing Qdrant or Valkey blocks as a reference.
+**Add a new shared service:** Add it to `infra/core/__main__.py`. Use the existing Qdrant or Valkey blocks as a reference.
 
-**Modify the Keycloak realm:** Edit `local_dev_keycloak.py`. On `pulumi up`, pulumi-keycloak will diff the realm state and apply only what changed. Test users, clients, and IdP config are all managed here.
+**Modify the Keycloak realm or add a new OIDC client:** Edit `infra/modules/keycloak.py`. On `pulumi up`, pulumi-keycloak will diff the realm state and apply only what changed.
 
 ---
 
@@ -609,12 +626,17 @@ AWS_SECRET_ACCESS_KEY: "minioadmin"  # pragma: allowlist secret
 ### `tilt up` fails on `local-infra` (Pulumi errors)
 
 ```bash
-cd local-dev/infra
-pulumi up --logtostderr -v=3   # Verbose output
+# Verbose core stack run
+cd local-dev/infra/core
+PULUMI_CONFIG_PASSPHRASE='' pulumi up --stack local-dev.core.Dev --logtostderr -v=3
+
+# Verbose apps_infra stack run
+cd local-dev/infra/apps_infra
+PULUMI_CONFIG_PASSPHRASE='' pulumi up --stack local-dev.apps-infra.Dev --logtostderr -v=3
 ```
 
 Common causes:
-- **kubeconfig not set:** Ensure `k3d kubeconfig merge local-dev --kubeconfig-merge-default` has been run, or set `ol-local-dev-infra:kubeconfig` in `Pulumi.local-dev.infra.Dev.yaml`.
+- **kubeconfig not set:** Ensure `k3d kubeconfig merge local-dev --kubeconfig-merge-default` has been run. If your `~/.kube` directory is a symlink pointing to a Windows-side path (common in WSL2), see [WSL2: kubeconfig context not found](#wsl2-kubeconfig-context-not-found) below.
 - **Cert files missing:** Run `setup.sh --skip-hosts` to regenerate certs without touching `/etc/hosts`.
 
 ### App pod stuck in `Init:CrashLoopBackOff`
@@ -653,7 +675,8 @@ kubectl logs -n local-infra -l app=keycloak -f
 Also verify the `olapps` realm was provisioned by Pulumi:
 
 ```bash
-cd local-dev/infra && pulumi stack output
+cd local-dev/infra/apps_infra
+PULUMI_CONFIG_PASSPHRASE='' pulumi stack output --stack local-dev.apps-infra.Dev
 ```
 
 ### TLS certificate not trusted
@@ -670,25 +693,15 @@ The Next.js build needs ~4 GB of memory. If it OOMs:
 - Increase Docker Desktop memory to 10+ GB
 - Or use a prebuilt image by removing `mit-learn` from `enabled_apps` in `tilt_config.json` and letting Tilt use the `prebuilt_tags` value instead
 
-### macOS: Port 5000 already in use
+### macOS: Port conflict during cluster creation
 
-On macOS, AirPlay Receiver listens on port 5000 by default. If you see `Address already in use` during cluster creation:
+The k3d registry is bound to host port 5001. This avoids the macOS AirPlay Receiver port conflict that affected port 5000 in older versions of this setup. If you see `Address already in use` on port 5001, check what is using it:
 
-**Option 1 (recommended):** Disable AirPlay Receiver in System Settings → General → AirDrop & Handoff → disable "AirPlay Receiver".
-
-**Option 2:** Modify the k3d registry port in `local-dev/cluster/k3d-config.yaml`:
-```yaml
-registries:
-  create:
-    hostPort: "5001"  # Use 5001 instead of 5000
-  config: |
-    mirrors:
-      "k3d-registry.localhost:5001":  # Update mirror endpoint
-        endpoint:
-          - "http://k3d-registry.localhost:5001"
+```bash
+lsof -i :5001
 ```
 
-Then re-run `setup.sh`.
+Edit `local-dev/cluster/k3d-config.yaml` to change `hostPort` to an unused port and update the mirror entry to match, then re-run `setup.sh`.
 
 ### Linux: inotify limit exceeded
 
@@ -703,6 +716,24 @@ echo 'fs.inotify.max_user_watches=100000' | sudo tee -a /etc/sysctl.conf
 ```
 
 ---
+
+### WSL2: kubeconfig context not found
+
+If `k3d kubeconfig merge` succeeds but `kubectl config get-contexts local-dev` still fails, your `~/.kube` directory may be a Windows-side symlink. WSL2 sometimes creates `~/.kube` as a symbolic link pointing to the Windows `%USERPROFILE%\.kube` directory. When k3d writes the merged kubeconfig into WSL's path, the Windows symlink destination may not be reachable or may silently drop the context.
+
+**Fix:** Break the symlink and create a real WSL-side directory:
+
+```bash
+# Backup and replace the symlink with a real directory
+cp ~/.kube/config ~/kube-backup.yaml 2>/dev/null || true
+rm ~/.kube          # Remove symlink (NOT the Windows-side directory)
+mkdir -p ~/.kube
+cp ~/kube-backup.yaml ~/.kube/config 2>/dev/null || true
+
+# Re-merge k3d kubeconfig
+k3d kubeconfig merge local-dev --kubeconfig-merge-default
+kubectl config get-contexts local-dev   # Should now succeed
+```
 
 ### `/etc/hosts` entries disappear after WSL restart
 

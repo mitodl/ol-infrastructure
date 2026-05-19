@@ -73,7 +73,9 @@ ok "Python dependencies synced."
 # ---------------------------------------------------------------------------
 log "Starting Tilt..."
 log "  Tilt UI will be available at http://localhost:10350"
-log "  Press Ctrl+C to stop."
+log "  Press Ctrl+C to stop Tilt."
+log "  To stop and clean up the entire cluster, run:"
+log "    ./local-dev/scripts/teardown.sh"
 log ""
 
 # Pass all arguments to tilt up (allows --port, --host, etc.)
