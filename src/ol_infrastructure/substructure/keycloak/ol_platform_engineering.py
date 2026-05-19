@@ -514,33 +514,37 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913
     # GRAFANA [END] # noqa: ERA001
 
     # FASTLY [START] # noqa: ERA001
-    ol_platform_engineering_fastly_client = keycloak.saml.Client(
-        "ol-platform-engineering-fastly-saml-client",
-        realm_id=ol_platform_engineering_realm.id,
-        client_id=keycloak_realm_config.get("ol-platform-engineering-fastly-entity-id"),
-        name="ol-platform-engineering-fastly-saml-client",
-        enabled=True,
-        valid_redirect_uris=["https://manage.fastly.com/saml/consume"],
-        assertion_consumer_post_url="https://manage.fastly.com/saml/consume",
-        name_id_format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress",
-        force_name_id_format=True,
-        sign_documents=True,
-        sign_assertions=True,
-        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    fastly_entity_id = keycloak_realm_config.get(
+        "ol-platform-engineering-fastly-entity-id"
     )
-    vault.generic.Secret(
-        "ol-platform-engineering-fastly-saml-vault-metadata",
-        path="secret-operations/sso/fastly",
-        data_json=Output.all(
-            realm_id=ol_platform_engineering_fastly_client.realm_id,
-            metadata_url=ol_platform_engineering_fastly_client.realm_id.apply(
-                lambda realm_id: (
-                    f"{keycloak_url}/realms/{realm_id}/protocol/saml/descriptor"
-                )
-            ),
-            client_id=ol_platform_engineering_fastly_client.client_id,
-        ).apply(json.dumps),
-    )
+    if fastly_entity_id:
+        ol_platform_engineering_fastly_client = keycloak.saml.Client(
+            "ol-platform-engineering-fastly-saml-client",
+            realm_id=ol_platform_engineering_realm.id,
+            client_id=fastly_entity_id,
+            name="ol-platform-engineering-fastly-saml-client",
+            enabled=True,
+            valid_redirect_uris=["https://manage.fastly.com/saml/consume"],
+            assertion_consumer_post_url="https://manage.fastly.com/saml/consume",
+            name_id_format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress",
+            force_name_id_format=True,
+            sign_documents=True,
+            sign_assertions=True,
+            opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+        )
+        vault.generic.Secret(
+            "ol-platform-engineering-fastly-saml-vault-metadata",
+            path="secret-operations/sso/fastly",
+            data_json=Output.all(
+                realm_id=ol_platform_engineering_fastly_client.realm_id,
+                metadata_url=ol_platform_engineering_fastly_client.realm_id.apply(
+                    lambda realm_id: (
+                        f"{keycloak_url}/realms/{realm_id}/protocol/saml/descriptor"
+                    )
+                ),
+                client_id=ol_platform_engineering_fastly_client.client_id,
+            ).apply(json.dumps),
+        )
     # FASTLY [END] # noqa: ERA001
 
     # OL Platform Engineering Realm - Authentication Flows[START]
