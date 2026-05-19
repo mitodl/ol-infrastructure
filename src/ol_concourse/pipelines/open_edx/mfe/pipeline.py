@@ -138,7 +138,7 @@ def mfe_params(
         "SESSION_COOKIE_DOMAIN": open_edx.lms_domain,
         "SITE_NAME": open_edx.site_name,
         "STUDIO_BASE_URL": f"https://{open_edx.studio_domain}",
-        "SUPPORT_URL": f"https://{open_edx.support_url}",
+        "SUPPORT_URL": open_edx.support_url,
         "TERMS_OF_SERVICE_URL": open_edx.terms_of_service_url,
         "TRADEMARK_TEXT": open_edx.trademark_text,
         "USER_INFO_COOKIE_NAME": f"{open_edx.environment}-edx-user-info",
