@@ -68,10 +68,13 @@ spec:
             cpu: 100m
             memory: 512Mi
           limits:
-            memory: 1Gi
+            memory: 2Gi
         volumeMounts:
         - name: static-files
           mountPath: /src/staticfiles
+        - name: mkcert-root-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
 
       containers:
         # granian ASGI application server
@@ -105,7 +108,7 @@ spec:
             cpu: 100m
             memory: 512Mi
           limits:
-            memory: 1Gi
+            memory: 2Gi
         readinessProbe:
           httpGet:
             path: /health/
@@ -113,6 +116,7 @@ spec:
           initialDelaySeconds: 15
           periodSeconds: 10
           failureThreshold: 6
+          timeoutSeconds: 5
         livenessProbe:
           httpGet:
             path: /health/
@@ -120,6 +124,7 @@ spec:
           initialDelaySeconds: 30
           periodSeconds: 30
           failureThreshold: 3
+          timeoutSeconds: 5
         volumeMounts:
         - name: mkcert-root-ca
           mountPath: /etc/ssl/local-dev
@@ -202,7 +207,7 @@ spec:
             cpu: 100m
             memory: 512Mi
           limits:
-            memory: 1Gi
+            memory: 2Gi
         volumeMounts:
         - name: mkcert-root-ca
           mountPath: /etc/ssl/local-dev
@@ -259,7 +264,7 @@ spec:
             cpu: 100m
             memory: 512Mi
           limits:
-            memory: 1Gi
+            memory: 2Gi
         volumeMounts:
         - name: mkcert-root-ca
           mountPath: /etc/ssl/local-dev
@@ -316,7 +321,7 @@ spec:
             cpu: 100m
             memory: 512Mi
           limits:
-            memory: 1Gi
+            memory: 2Gi
         volumeMounts:
         - name: mkcert-root-ca
           mountPath: /etc/ssl/local-dev

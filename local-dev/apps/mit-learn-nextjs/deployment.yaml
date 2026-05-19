@@ -48,6 +48,7 @@ spec:
             port: 3000
           initialDelaySeconds: 15
           periodSeconds: 10
+          timeoutSeconds: 5
         volumeMounts:
         - name: mkcert-root-ca
           mountPath: /etc/ssl/local-dev

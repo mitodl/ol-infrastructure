@@ -38,6 +38,9 @@ spec:
         volumeMounts:
         - name: static-files
           mountPath: /src/staticfiles
+        - name: mkcert-root-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
       containers:
       - name: app
         image: mitodl/mitxonline-app:latest
