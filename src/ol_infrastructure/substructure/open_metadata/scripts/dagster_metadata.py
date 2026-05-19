@@ -169,7 +169,7 @@ def _gql(query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
 
 def _safe_name(text: str) -> str:
     """Return a string safe for use as an OM entity name (alphanumeric + _-.)."""
-    return re.sub(r"[^a-zA-Z0-9_\\-.]", "_", text)
+    return re.sub(r"[^a-zA-Z0-9_\-.]", "_", text)
 
 
 def _task_name(path: list[str]) -> str:

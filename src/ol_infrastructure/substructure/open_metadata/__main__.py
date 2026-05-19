@@ -229,6 +229,7 @@ def _make_cronjob(  # noqa: PLR0913
     extra_env: list[dict[str, object]] | None = None,
     opts: ResourceOptions | None = None,
     bot_secret_name: str = "om-ingestion-bot",  # noqa: S107
+    resources: dict[str, object] | None = None,
 ) -> kubernetes.apiextensions.CustomResource:
     """Create a CronOMJob custom resource.
 
@@ -247,6 +248,9 @@ def _make_cronjob(  # noqa: PLR0913
         Defaults to ``"om-ingestion-bot"`` for metadata ingestion workflows.
         Use ``"om-lineage-bot"``, ``"om-profiler-bot"``, or
         ``"om-data-insight-bot"`` for other workflow types.
+    :param resources: Pod resource requests/limits. Defaults to
+        ``_POD_RESOURCES`` (500m/1Gi request, 2/4Gi limit). Override for
+        connectors that require more memory (e.g. Trino full-catalog ingestion).
     """
     env = [_bot_jwt_env(bot_secret_name), *(extra_env or [])]
     command = Output.from_input(python_script).apply(lambda s: ["python", "-c", s])
@@ -267,7 +271,7 @@ def _make_cronjob(  # noqa: PLR0913
                     "serviceAccountName": ingestion_sa_name,
                     "command": command,
                     "env": env,
-                    "resources": _POD_RESOURCES,
+                    "resources": resources or _POD_RESOURCES,
                     "securityContext": _POD_SECURITY_CONTEXT,
                 },
             },
@@ -285,9 +289,10 @@ service_name_trino = om_config.get("service_name_trino") or "Starburst Galaxy"
 service_name_airbyte = om_config.get("service_name_airbyte") or "Airbyte"
 service_name_superset = om_config.get("service_name_superset") or "Superset"
 service_name_glue = om_config.get("service_name_glue") or "Glue"
-# dbt enrichment targets the Trino (Starburst Galaxy) service — Glue and Trino
-# both catalog the same Iceberg tables, but dbt writes via Trino so the FQNs
-# resolve against the Trino service in OM. Can be overridden per-stack.
+# dbt enrichment targets the Trino (Starburst Galaxy) service — dbt writes
+# via Trino so the manifest database/schema values map directly to the Trino
+# OM entity FQNs (Starburst Galaxy.<catalog>.<schema>.<table>).
+# Can be overridden per-stack.
 service_name_dbt = om_config.get("service_name_dbt") or service_name_trino
 # Dagster pipeline service name in OM.
 service_name_dagster = om_config.get("service_name_dagster") or "OL Orchestration"
@@ -324,6 +329,12 @@ _make_cronjob(
         _secret_env("om-connector-trino", "OM_TRINO_PASSWORD"),
         _secret_env("om-connector-trino", "OM_TRINO_CATALOG"),
     ],
+    # Trino full-catalog ingestion is memory-intensive; increase limits above
+    # the shared default (4Gi) to avoid OOM kills.
+    resources={
+        "requests": {"cpu": "500m", "memory": "2Gi"},
+        "limits": {"cpu": "2", "memory": "8Gi"},
+    },
 )
 
 # ---------------------------------------------------------------------------
@@ -447,8 +458,9 @@ _make_cronjob(
 # DbtS3ArtifactsResource after each full dbt build in the lakehouse code
 # location.  IRSA provides ambient S3 credentials — no secret needed.
 #
-# The serviceName must match the Glue service so that dbt model FQNs
-# resolve to the correct table entities in OM.
+# The serviceName must match the Trino service so that dbt model FQNs
+# (Starburst Galaxy.<catalog>.<schema>.<table>) resolve to the correct
+# table entities already ingested by the Trino connector.
 
 # Bucket where DbtS3ArtifactsResource uploads artifacts; can be overridden
 # per-stack via the open_metadata:dbt_artifacts_bucket config key.

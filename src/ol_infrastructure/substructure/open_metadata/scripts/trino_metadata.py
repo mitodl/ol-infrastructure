@@ -17,7 +17,20 @@ config = {
                 "catalog": os.environ["OM_TRINO_CATALOG"],
             }
         },
-        "sourceConfig": {"config": {"type": "DatabaseMetadata"}},
+        "sourceConfig": {
+            "config": {
+                "type": "DatabaseMetadata",
+                # Only ingest production dbt layer schemas; excludes system
+                # schemas (information_schema, system) and personal dev namespaces
+                # (ol_warehouse_{env}_{user}_{layer}).
+                "schemaFilterPattern": {
+                    "includes": [
+                        r"ol_warehouse_[a-z]+_(dimensional|external|intermediate|irx|mart|migration|raw|reporting|staging)$",
+                        r"ol_data_lake_[a-z]+",
+                    ],
+                },
+            }
+        },
     },
     "sink": {"type": "metadata-rest", "config": {}},
     "workflowConfig": {
