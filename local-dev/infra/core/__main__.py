@@ -141,7 +141,8 @@ pulumi.export("postgres_host", "local-pg-rw.local-infra.svc.cluster.local")
 pulumi.export("valkey_host", "valkey.local-infra.svc.cluster.local")
 pulumi.export("qdrant_url", "http://qdrant.local-infra.svc.cluster.local:6333")
 pulumi.export(
-    "opensearch_url", "http://opensearch-master.local-infra.svc.cluster.local:9200"
+    "opensearch_url",
+    "http://opensearch-cluster-master.local-infra.svc.cluster.local:9200",
 )
 pulumi.export("tika_url", "http://tika.local-infra.svc.cluster.local:9998")
 pulumi.export("litellm_url", "http://litellm.local-infra.svc.cluster.local:4000")

@@ -28,6 +28,8 @@ data:
   # Required — ImproperlyConfigured raised if unset.
   MITOL_APP_BASE_URL: "https://learn.mit.dev"
   MITOL_API_BASE_URL: "https://api.learn.mit.dev"
+  # Redirect target for first-time OIDC logins; defaults to a legacy open.odl.local host.
+  MITOL_NEW_USER_LOGIN_URL: "https://learn.mit.dev/onboarding"
 
   # mkcert root CA — trusts the local wildcard TLS cert for inter-pod HTTPS
   # (e.g. Django OIDC token exchange with Keycloak at sso.ol.mit.dev)
@@ -83,12 +85,12 @@ data:
 
   # ── OpenSearch ─────────────────────────────────────────────────────────────
   OPENSEARCH_INDEX: "mitlearn-local"
-  OPENSEARCH_URL: "http://opensearch-master.local-infra.svc.cluster.local:9200"
+  OPENSEARCH_URL: "http://opensearch-cluster-master.local-infra.svc.cluster.local:9200"
   OPENSEARCH_DEFAULT_TIMEOUT: "30"
   OPENSEARCH_INDEXING_CHUNK_SIZE: "75"
 
   # ── Qdrant (local — use SparseHashEncoder which runs locally via sklearn) ──
-  # Use _V2 suffixes — these are the env var names the app reads in settings.py.
+  QDRANT_HOST: "http://qdrant.local-infra.svc.cluster.local:6333"
   QDRANT_HOST_V2: "http://qdrant.local-infra.svc.cluster.local:6333"
   QDRANT_COLLECTION_NAME: "mitlearn-local"
   QDRANT_DENSE_MODEL:
