@@ -7,6 +7,7 @@ import glob
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -19,9 +20,9 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-contexts = []
-clusters = []
-users = []
+contexts: list[dict[str, Any]] = []
+clusters: list[dict[str, Any]] = []
+users: list[dict[str, Any]] = []
 
 role_arn_name = "admin_role_arn"
 
