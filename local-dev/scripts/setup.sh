@@ -366,25 +366,37 @@ fi
 # ---------------------------------------------------------------------------
 # 5. Pulumi stack prerequisites
 # ---------------------------------------------------------------------------
-log "Checking Pulumi local-dev/infra stack..."
+log "Checking Pulumi stack prerequisites..."
 
-INFRA_DIR="${REPO_ROOT}/local-dev/infra"
-if [[ -d "${INFRA_DIR}" ]]; then
-    # Ensure the local state backend directory exists before any pulumi command.
-    mkdir -p "${INFRA_DIR}/.pulumi"
-    (
-        cd "${INFRA_DIR}"
-        # PULUMI_CONFIG_PASSPHRASE="" uses an empty passphrase for the local
-        # secrets provider — avoids interactive prompts in local dev.
-        export PULUMI_CONFIG_PASSPHRASE=""
-        # Init the stack if it doesn't exist yet.
-        if ! pulumi stack ls --json 2>/dev/null \
-            | python3 -c "import json,sys; stacks=[s['name'] for s in json.load(sys.stdin)]; sys.exit(0 if 'local-dev.infra.Dev' in stacks else 1)" 2>/dev/null; then
-            pulumi stack init local-dev.infra.Dev --secrets-provider=passphrase
-        fi
-    )
-    ok "Pulumi infra stack ready."
-fi
+# Shared state backend lives at local-dev/infra/.pulumi (referenced as
+# file://../.pulumi from each sub-project Pulumi.yaml).
+mkdir -p "${REPO_ROOT}/local-dev/infra/.pulumi"
+
+# PULUMI_CONFIG_PASSPHRASE="" uses an empty passphrase for the local secrets
+# provider — avoids interactive prompts in local dev.
+export PULUMI_CONFIG_PASSPHRASE=""
+
+# Init the core stack if it doesn't exist yet.
+(
+    cd "${REPO_ROOT}/local-dev/infra/core"
+    if ! pulumi stack ls --json 2>/dev/null \
+        | python3 -c "import json,sys; stacks=[s['name'] for s in json.load(sys.stdin)]; sys.exit(0 if 'local-dev.core.Dev' in stacks else 1)" 2>/dev/null; then
+        log "  Initialising core stack..."
+        pulumi stack init local-dev.core.Dev --secrets-provider=passphrase
+    fi
+)
+
+# Init the apps_infra stack if it doesn't exist yet.
+(
+    cd "${REPO_ROOT}/local-dev/infra/apps_infra"
+    if ! pulumi stack ls --json 2>/dev/null \
+        | python3 -c "import json,sys; stacks=[s['name'] for s in json.load(sys.stdin)]; sys.exit(0 if 'local-dev.apps-infra.Dev' in stacks else 1)" 2>/dev/null; then
+        log "  Initialising apps_infra stack..."
+        pulumi stack init local-dev.apps-infra.Dev --secrets-provider=passphrase
+    fi
+)
+
+ok "Pulumi stacks ready."
 
 # ---------------------------------------------------------------------------
 # Done

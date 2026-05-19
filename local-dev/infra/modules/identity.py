@@ -119,7 +119,7 @@ def create_identity(  # noqa: PLR0913
             # build-time options mismatch and crash with --optimized.
             "startOptimized": True,
             "hostname": {
-                "hostname": keycloak_hostname,
+                "hostname": f"https://{keycloak_hostname}",
             },
             "http": {
                 "httpEnabled": True,

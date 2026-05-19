@@ -156,20 +156,6 @@ if ! $KEEP_CERTS; then
     fi
 fi
 
-# ---------------------------------------------------------------------------
-# Destroy Pulumi state and k3d cluster
-# ---------------------------------------------------------------------------
-
-log "Destroying Pulumi-managed resources..."
-cd "${REPO_ROOT}/local-dev/infra"
-
-# Destroy Pulumi state (if it exists)
-if pulumi stack ls 2>/dev/null | grep -q "local-dev"; then
-    pulumi destroy --stack local-dev.infra.Dev --yes --logtostderr || true
-    ok "Pulumi resources destroyed."
-else
-    ok "No Pulumi state found (already cleaned up)."
-fi
 
 
 echo ""
