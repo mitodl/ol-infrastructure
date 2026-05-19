@@ -550,6 +550,12 @@ open_metadata_application = kubernetes.helm.v3.Release(
             "commonLabels": k8s_global_labels,
             "openmetadata": {
                 "config": {
+                    # SERVER_HOST tells OpenMetadata its own public URL, used when
+                    # constructing OAuth discovery metadata (e.g. for MCP OAuth).
+                    # Without this it defaults to 0.0.0.0 and falls back to localhost.
+                    "openmetadata": {
+                        "host": open_metadata_config.require("domain"),
+                    },
                     # Ref: https://docs.open-metadata.org/latest/deployment/security/keycloak/kubernetes
                     "authorizer": {
                         "enabled": True,
@@ -571,6 +577,12 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         # publicKeys
                         # authority
                         # clientId
+                        "oidcConfiguration": {
+                            # How long before re-authentication is required (seconds).
+                            "tokenValidity": "21600",  # 6 hours
+                            # Overall session length (seconds).
+                            "sessionExpiry": "604800",  # 7 days
+                        },
                     },
                     "pipelineServiceClientConfig": {
                         "enabled": True,
@@ -588,6 +600,17 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         "port": DEFAULT_HTTPS_PORT,
                         "scheme": "https",
                     },
+                    # Ref: https://docs.open-metadata.org/v1.12.x/deployment/semantic-search
+                    "extraEnvs": [
+                        {
+                            "name": "SEMANTIC_SEARCH_ENABLED",
+                            "value": "true",
+                        },
+                        {
+                            "name": "EMBEDDING_PROVIDER",
+                            "value": "djl",
+                        },
+                    ],
                     "database": {
                         "host": open_metadata_db.db_instance.address,
                         "port": open_metadata_db_config.port,
