@@ -29,7 +29,6 @@ spec:
           python manage.py migrate --noinput
           python manage.py createcachetable
           RUN_DATA_MIGRATIONS=true python manage.py migrate --noinput
-          python manage.py loaddata initial_llm_models
         envFrom:
         - configMapRef:
             name: learn-ai-env
@@ -235,6 +234,8 @@ spec:
         - beat
         - --scheduler
         - celery.beat.PersistentScheduler
+        - --schedule
+        - /tmp/celerybeat-schedule
         envFrom:
         - configMapRef:
             name: learn-ai-env

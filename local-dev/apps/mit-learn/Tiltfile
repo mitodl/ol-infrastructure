@@ -73,23 +73,23 @@ k8s_resource(
 k8s_resource(
     "mitlearn-worker-default",
     labels=["mit-learn"],
-    resource_deps=["mitlearn-webapp"],
+    resource_deps=["local-infra-apps"],
 )
 
 k8s_resource(
     "mitlearn-worker-edx-content",
     labels=["mit-learn"],
-    resource_deps=["mitlearn-webapp"],
+    resource_deps=["local-infra-apps"],
 )
 
 k8s_resource(
     "mitlearn-worker-embeddings",
     labels=["mit-learn"],
-    resource_deps=["mitlearn-webapp"],
+    resource_deps=["local-infra-apps"],
 )
 
 k8s_resource(
     "mitlearn-beat",
     labels=["mit-learn"],
-    resource_deps=["mitlearn-webapp"],
+    resource_deps=["local-infra-apps"],
 )

@@ -18,12 +18,12 @@ registries:
   create:
     name: k3d-registry.localhost
     host: "0.0.0.0"
-    hostPort: "5000"
+    hostPort: "5001"
   config: |
     mirrors:
-      "k3d-registry.localhost:5000":
+      "k3d-registry.localhost:5001":
         endpoint:
-          - "http://k3d-registry.localhost:5000"
+          - "http://k3d-registry.localhost:5001"
 
 # Expose HTTPS and HTTP on host ports 443/80 so that *.mit.dev ingress routes
 # are reachable without a port suffix.
