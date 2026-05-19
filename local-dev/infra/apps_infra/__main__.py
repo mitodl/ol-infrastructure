@@ -45,7 +45,6 @@ mitxonline_client_secret = config.require_secret("mitxonline_client_secret")
 unified_ecommerce_client_secret = config.require_secret(
     "unified_ecommerce_client_secret"
 )
-apisix_oidc_session_secret = config.require_secret("apisix_oidc_session_secret")
 
 _infra_dir = Path(__file__).parent.parent
 _repo_root = _infra_dir.parent.parent
@@ -94,7 +93,6 @@ create_olapps_dev_realm(
     learn_ai_client_secret=learn_ai_client_secret,
     mitxonline_client_secret=mitxonline_client_secret,
     unified_ecommerce_client_secret=unified_ecommerce_client_secret,
-    apisix_oidc_session_secret=apisix_oidc_session_secret,
 )
 
 # ---------------------------------------------------------------------------

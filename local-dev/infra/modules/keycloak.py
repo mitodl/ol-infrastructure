@@ -30,7 +30,6 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     learn_ai_client_secret: Output,
     mitxonline_client_secret: Output,
     unified_ecommerce_client_secret: Output,
-    apisix_oidc_session_secret: Output,
 ) -> None:
     """
     Create the olapps Keycloak realm for local development.
@@ -324,15 +323,20 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         # organizations_enabled=True — adding it as default causes 409 Conflict.
     ]
 
-    def _make_oidc_secret(  # noqa: PLR0913
+    def _make_oidc_secret(
         resource_name: str,
         namespace: str,
         secret_name: str,
         client: keycloak.openid.Client,
         client_secret_value: Output,
-        session_secret_value: Output,
     ) -> k8s.core.v1.Secret:
-        """Create a k8s Secret with OIDC credentials for APISIX secretRef."""
+        """Create a k8s Secret with OIDC credentials for APISIX secretRef.
+
+        Only client_id and client_secret are stored here; session.secret is
+        set inline in each ApisixRoute config so that APISIX does not treat it
+        as a plugin config key during secretRef merging (which would override
+        the JWT verification key and break RS256 token validation).
+        """
         return k8s.core.v1.Secret(
             resource_name,
             metadata={"name": secret_name, "namespace": namespace},
@@ -342,7 +346,6 @@ def create_olapps_dev_realm(  # noqa: PLR0913
                 realm_id=client.realm_id,
                 realm_name="olapps",
                 url=client.realm_id.apply(lambda rid: f"{keycloak_url}/realms/{rid}"),
-                secret=session_secret_value,
             ).apply(
                 lambda args: {
                     "client_id": args["client_id"],
@@ -350,7 +353,6 @@ def create_olapps_dev_realm(  # noqa: PLR0913
                     "realm_id": args["realm_id"],
                     "realm_name": args["realm_name"],
                     "url": args["url"],
-                    "secret": args["secret"],
                     # Convenience composite JSON for apps that read it as one value.
                     "oidc_credentials": json.dumps(
                         {
@@ -395,7 +397,6 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         "ol-unified-ecommerce-oidc",
         ue_client,
         unified_ecommerce_client_secret,
-        apisix_oidc_session_secret,
     )
 
     # --- Learn AI ---
@@ -411,8 +412,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         implicit_flow_enabled=False,
         service_accounts_enabled=False,
         valid_redirect_uris=[
-            "https://learn-ai.ol.mit.dev/*",
-            "https://api.learn-ai.ol.mit.dev/*",
+            "https://ai.learn.mit.dev/*",
         ],
         opts=kc_opts.merge(ResourceOptions(delete_before_replace=True)),
     )
@@ -429,7 +429,6 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         "ol-learn-ai-oidc",
         learn_ai_client,
         learn_ai_client_secret,
-        apisix_oidc_session_secret,
     )
 
     # --- MIT Learn ---
@@ -464,7 +463,6 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         "ol-mitlearn-oidc",
         mitlearn_client,
         mitlearn_client_secret,
-        apisix_oidc_session_secret,
     )
 
     # --- MITx Online ---
@@ -498,7 +496,6 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         "ol-mitxonline-oidc",
         mitxonline_client,
         mitxonline_client_secret,
-        apisix_oidc_session_secret,
     )
 
     # --- MITx Online B2B (service account client for Keycloak Admin API) ---
