@@ -78,6 +78,8 @@ spec:
       enable: true
       secretRef: ol-mitxonline-oidc  # pragma: allowlist secret
       config:
+        discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
+        use_jwks: true
         bearer_only: false
         introspection_endpoint_auth_method: client_secret_basic
         scope: "openid profile email organization:*"
@@ -86,6 +88,7 @@ spec:
         logout_path: "/logout/oidc"
         post_logout_redirect_uri: "https://mitxonline.mit.dev/logout/"
         session:
+          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
           cookie:
             domain: ".mitxonline.mit.dev"
             lifetime: 1209600
@@ -134,6 +137,8 @@ spec:
       enable: true
       secretRef: ol-mitxonline-oidc  # pragma: allowlist secret
       config:
+        discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
+        use_jwks: true
         bearer_only: false
         introspection_endpoint_auth_method: client_secret_basic
         scope: "openid profile email organization:*"
@@ -142,6 +147,7 @@ spec:
         logout_path: "/logout/oidc"
         post_logout_redirect_uri: "https://mitxonline.mit.dev/logout/"
         session:
+          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
           cookie:
             domain: ".mitxonline.mit.dev"
             lifetime: 1209600
@@ -171,6 +177,8 @@ spec:
       enable: true
       secretRef: ol-mitxonline-oidc  # pragma: allowlist secret
       config:
+        discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
+        use_jwks: true
         bearer_only: false
         introspection_endpoint_auth_method: client_secret_basic
         scope: "openid profile email organization:*"
@@ -179,6 +187,7 @@ spec:
         logout_path: "/logout/oidc"
         post_logout_redirect_uri: "https://mitxonline.mit.dev/logout/"
         session:
+          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
           cookie:
             domain: ".mitxonline.mit.dev"
             lifetime: 1209600
