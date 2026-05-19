@@ -291,6 +291,9 @@ oidc_config_secret_config = OLVaultK8SStaticSecretConfig(
         "AUTHENTICATION_AUTHORITY": '{{ get .Secrets "url" }}',
         "AUTHENTICATION_CLIENT_ID": '{{ get .Secrets "client_id" }}',
         "OIDC_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+        # Required for confidential OIDC (MCP OAuth SSO handler initialisation).
+        # Keycloak discovery endpoint is <realm_url>/.well-known/openid-configuration.
+        "OIDC_DISCOVERY_URI": '{{ get .Secrets "url" }}/.well-known/openid-configuration',  # noqa: E501
     },
     vaultauth=vault_k8s_resources.auth_name,
 )
@@ -566,12 +569,19 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     },
                     "authentication": {
                         "provider": "custom-oidc",
+                        # Ref: https://docs.open-metadata.org/v1.12.x/deployment/security/keycloak/kubernetes
+                        "clientType": "confidential",
                         "callbackUrl": f"https://{open_metadata_config.require('domain')}/callback",
-                        # To be loaded from vault via env vars
-                        # publicKeys
-                        # authority
-                        # clientId
+                        # publicKeys, authority, clientId loaded from vault via env vars
                         "oidcConfiguration": {
+                            "enabled": True,
+                            "oidcType": "Keycloak",
+                            # callbackUrl and serverUrl must be the external-facing URL
+                            # so OpenMetadata builds correct OAuth redirect/issuer URLs
+                            # for MCP OAuth.
+                            "callbackUrl": f"https://{open_metadata_config.require('domain')}/callback",
+                            "serverUrl": f"https://{open_metadata_config.require('domain')}",
+                            # discoveryUri loaded from vault via OIDC_DISCOVERY_URI env var.  # noqa: E501
                             # How long before re-authentication is required (seconds).
                             "tokenValidity": "21600",  # 6 hours
                             # Overall session length (seconds).
