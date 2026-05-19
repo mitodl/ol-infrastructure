@@ -306,6 +306,34 @@ oidc_config_secret = OLVaultK8SSecret(
     ),
 )
 
+# The Helm chart's confidential OIDC helper expects a K8s secret named
+# "oidc-secrets" with keys openmetadata-oidc-client-id and
+# openmetadata-oidc-client-secret. Create it from the same Vault path.
+oidc_helm_secret = OLVaultK8SSecret(
+    f"open-metadata-{stack_info.name}-oidc-helm-secret",
+    OLVaultK8SStaticSecretConfig(
+        name="openmetadata-oidc-helm",
+        namespace=open_metadata_namespace,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name="oidc-secrets",  # noqa: S106  # pragma: allowlist secret
+        labels=k8s_global_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/open_metadata",
+        restart_target_kind="Deployment",
+        restart_target_name="openmetadata",
+        templates={
+            "openmetadata-oidc-client-id": '{{ get .Secrets "client_id" }}',
+            "openmetadata-oidc-client-secret": '{{ get .Secrets "client_secret" }}',
+        },
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        parent=vault_k8s_resources,
+    ),
+)
+
 # Connector credentials for OpenMetadata ingestion pipelines.
 # Credentials are read from SOPS-encrypted bridge secrets, written to a
 # dedicated Vault mount, and synced into K8s secrets via vault-secrets-operator.
@@ -676,6 +704,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
             open_metadata_db,
             db_creds_secret,
             oidc_config_secret,
+            oidc_helm_secret,
             open_metadata_irsa_role,
             open_metadata_glue_policy_attachment,
             *connector_secrets,
