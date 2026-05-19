@@ -87,6 +87,7 @@ config:
   - "open_metadata_user"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
+  keycloak_realm:olapps_email_theme: ol-learn
   keycloak_realm:olapps-unified-ecommerce-client-secret:
     secure: v1:M7V+wF8RPj2Wg8Ze:Tyg4FyTtImPBF/Oh1TQZ53feglE8Mzwm2WV+FBS4QZnIMZ/NOmWf28neMCu5I7wW
   keycloak_realm:olapps-learn-ai-client-secret:
