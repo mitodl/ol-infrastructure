@@ -37,8 +37,9 @@ k8s_resource(
     DEPLOY_NAME,
     port_forwards=['8000:8000'],
     labels=['learn-ai'],
+    resource_deps=['local-infra-apps'],
 )
 
-k8s_resource('learnai-celery-default', labels=['learn-ai'])
-k8s_resource('learnai-celery-edx-content', labels=['learn-ai'])
-k8s_resource('learnai-celery-beat', labels=['learn-ai'])
+k8s_resource('learnai-celery-default', labels=['learn-ai'], resource_deps=['local-infra-apps'])
+k8s_resource('learnai-celery-edx-content', labels=['learn-ai'], resource_deps=['local-infra-apps'])
+k8s_resource('learnai-celery-beat', labels=['learn-ai'], resource_deps=['local-infra-apps'])

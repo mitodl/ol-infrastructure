@@ -37,7 +37,8 @@ k8s_resource(
     DEPLOY_NAME,
     port_forwards=['8088:8088'],
     labels=['odl-video-service'],
+    resource_deps=['local-infra-apps'],
 )
 
-k8s_resource('odlvideo-celery', labels=['odl-video-service'])
-k8s_resource('odlvideo-celery-beat', labels=['odl-video-service'])
+k8s_resource('odlvideo-celery', labels=['odl-video-service'], resource_deps=['local-infra-apps'])
+k8s_resource('odlvideo-celery-beat', labels=['odl-video-service'], resource_deps=['local-infra-apps'])

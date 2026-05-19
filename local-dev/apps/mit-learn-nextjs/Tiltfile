@@ -47,6 +47,8 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
             'NEXT_PUBLIC_APPZI_URL': '',
             'NEXT_PUBLIC_HUBSPOT_PORTAL_ID': '',
             'NEXT_PUBLIC_VERSION': 'local',
+            # Required by certificateUtils.ts; invariant raised at module load if absent.
+            'NEXT_PUBLIC_MITX_ONLINE_LEGACY_BASE_URL': 'https://mitxonline.{rd}'.format(rd=_rd),
         },
         # Rebuild when any frontend source or config changes.
         # (Full rebuild is required; no incremental hot-reload in production mode.)

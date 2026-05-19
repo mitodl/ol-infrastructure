@@ -39,7 +39,8 @@ k8s_resource(
     DEPLOY_NAME,
     port_forwards=['8010:8010'],
     labels=['mitxonline'],
+    resource_deps=['local-infra-apps'],
 )
 
-k8s_resource('mitxonline-celery', labels=['mitxonline'])
-k8s_resource('mitxonline-celery-beat', labels=['mitxonline'])
+k8s_resource('mitxonline-celery', labels=['mitxonline'], resource_deps=['local-infra-apps'])
+k8s_resource('mitxonline-celery-beat', labels=['mitxonline'], resource_deps=['local-infra-apps'])

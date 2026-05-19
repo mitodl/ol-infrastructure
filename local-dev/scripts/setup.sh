@@ -220,6 +220,15 @@ need_cmd pulumi
 need_cmd python3
 need_cmd uv
 
+# Warn if Python 3.14+ is the active interpreter; Pulumi's asyncio runtime
+# has known breakages on 3.14 due to event-loop API changes.
+PYTHON_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)")
+PYTHON_MAJOR=$(python3 -c "import sys; print(sys.version_info.major)")
+if [[ "${PYTHON_MAJOR}" -eq 3 && "${PYTHON_MINOR}" -ge 14 ]]; then
+    warn "Python 3.${PYTHON_MINOR} detected. Pulumi requires Python <=3.13."
+    warn "Install Python 3.12 and set it as the default, or use 'uv python pin 3.12'."
+fi
+
 # Docker must be running
 docker info &>/dev/null || err "Docker is not running. Start Docker Desktop or the Docker daemon."
 
