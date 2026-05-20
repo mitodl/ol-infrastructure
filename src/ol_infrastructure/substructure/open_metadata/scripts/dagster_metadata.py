@@ -246,7 +246,7 @@ def _build_tasks(group_assets: list[dict[str, Any]]) -> list[Task]:
         downstream = downstream_in_group.get(task_name) or None
         tasks.append(
             Task(
-                name=EntityName(task_name),
+                name=task_name,
                 displayName="/".join(asset["assetKey"]["path"]),
                 description=asset.get("description"),
                 sourceUrl=SourceUrl(_asset_source_url(asset["assetKey"]["path"])),
