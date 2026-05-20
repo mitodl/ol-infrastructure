@@ -31,10 +31,10 @@ config:
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 100
-      instance_type: c5n.xlarge
+      instance_type: c8i-flex.xlarge
       gpu: false
       labels:
-        node_size: c5n.xlarge
+        node_size: c8i-flex.xlarge
         ondemand: true
         ol.mit.edu/core_node: true
         ol.mit.edu/gpu_node: false

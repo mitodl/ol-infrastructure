@@ -23,10 +23,10 @@ config:
   - kubewatch
   eks:nodegroups:
     worker-xlarge:
-      instance_type: c7a.xlarge
+      instance_type: c8i-flex.xlarge
       labels:
         ondemand: true
-        node_size: c7a.xlarge
+        node_size: c8i-flex.xlarge
         ol.mit.edu/core_node: true
       disk_size_gb: 500
       scaling:
