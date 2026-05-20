@@ -1563,6 +1563,114 @@ mitlearn_k8s_app = OLApplicationK8s(
     ),
 )
 
+##########################################################################
+# Vertical Pod Autoscaler — observation mode (updateMode: Off)
+#
+# VPA is installed cluster-wide by the EKS stack (setup_vpa in vpa.py).
+# These objects collect right-sizing recommendations without evicting pods.
+# After 1-2 weeks of data, update resource requests/limits directly in this
+# file, then switch updateMode to InPlaceOrRecreate for ongoing management.
+##########################################################################
+
+# Webapp VPA — memory only.
+# The webapp HPA scales on both CPU and memory utilisation; VPA must not
+# control CPU to avoid distorting the CPU metric the HPA observes.
+# NOTE: the HPA also uses a memory utilisation metric.  If you later enable
+# VPA updates, remove the memory metric from the HPA (or switch it to an
+# AverageValue target) to prevent the two controllers fighting over memory
+# requests.
+kubernetes.apiextensions.CustomResource(
+    f"mitlearn-webapp-vpa-{stack_info.env_suffix}",
+    api_version="autoscaling.k8s.io/v1",
+    kind="VerticalPodAutoscaler",
+    metadata={
+        "name": "mitlearn-webapp-vpa",
+        "namespace": learn_namespace,
+    },
+    spec={
+        "targetRef": {
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "name": mitlearn_k8s_app.webapp_deployment_name,
+        },
+        "updatePolicy": {"updateMode": "Off"},
+        "resourcePolicy": {
+            "containerPolicies": [
+                {
+                    "containerName": "*",
+                    "controlledResources": ["memory"],
+                    "controlledValues": "RequestsAndLimits",
+                }
+            ]
+        },
+    },
+    opts=ResourceOptions(depends_on=[mitlearn_k8s_app]),
+)
+
+# Celery worker VPAs — CPU + memory.
+# KEDA scales these workers from Redis queue depth, not CPU utilisation, so
+# VPA controlling CPU requests does not conflict with KEDA replica decisions.
+for _worker_deployment_name in mitlearn_k8s_app.celery_deployment_names:
+    kubernetes.apiextensions.CustomResource(
+        f"mitlearn-{_worker_deployment_name}-vpa-{stack_info.env_suffix}",
+        api_version="autoscaling.k8s.io/v1",
+        kind="VerticalPodAutoscaler",
+        metadata={
+            "name": f"{_worker_deployment_name}-vpa",
+            "namespace": learn_namespace,
+        },
+        spec={
+            "targetRef": {
+                "apiVersion": "apps/v1",
+                "kind": "Deployment",
+                "name": _worker_deployment_name,
+            },
+            "updatePolicy": {"updateMode": "Off"},
+            "resourcePolicy": {
+                "containerPolicies": [
+                    {
+                        "containerName": "*",
+                        "controlledResources": ["cpu", "memory"],
+                        "controlledValues": "RequestsAndLimits",
+                    }
+                ]
+            },
+        },
+        opts=ResourceOptions(depends_on=[mitlearn_k8s_app]),
+    )
+
+# Celery beat VPA — CPU + memory.
+# Beat runs a single replica with no autoscaler, so VPA can safely control
+# both dimensions.
+if mitlearn_k8s_app.beat_deployment_name:
+    kubernetes.apiextensions.CustomResource(
+        f"mitlearn-celery-beat-vpa-{stack_info.env_suffix}",
+        api_version="autoscaling.k8s.io/v1",
+        kind="VerticalPodAutoscaler",
+        metadata={
+            "name": "mitlearn-celery-beat-vpa",
+            "namespace": learn_namespace,
+        },
+        spec={
+            "targetRef": {
+                "apiVersion": "apps/v1",
+                "kind": "Deployment",
+                "name": mitlearn_k8s_app.beat_deployment_name,
+            },
+            "updatePolicy": {"updateMode": "Off"},
+            "resourcePolicy": {
+                "containerPolicies": [
+                    {
+                        "containerName": "*",
+                        "controlledResources": ["cpu", "memory"],
+                        "controlledValues": "RequestsAndLimits",
+                    }
+                ]
+            },
+        },
+        opts=ResourceOptions(depends_on=[mitlearn_k8s_app]),
+    )
+
 mitlearn_k8s_app_oidc_resources_no_prefix = OLApisixOIDCResources(
     f"ol-mitlearn-k8s-olapisixoidcresources-no-prefix-{stack_info.env_suffix}",
     oidc_config=OLApisixOIDCConfig(
