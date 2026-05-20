@@ -1149,7 +1149,7 @@ prefix_redirects_dict_id = mitlearn_fastly_service.dictionaries.apply(
 mitlearn_prefix_redirects_dictionary = fastly.ServiceDictionaryItems(
     "mitlearn-prefix-redirects-dictionary",
     dictionary_id=prefix_redirects_dict_id,
-    items={"/articles": "/news"},
+    items={},
     service_id=mitlearn_fastly_service.id,
     manage_items=True,
     opts=fastly_provider,
