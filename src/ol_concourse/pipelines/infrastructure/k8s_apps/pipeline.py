@@ -84,12 +84,7 @@ pipeline_params = {
         app_name="mit-learn-nextjs",
         # No build_target: use the default `runner` stage, which bakes `yarn build`
         # into the Docker image via `output: "standalone"` in next.config.js.
-        #
         # NEXT_PUBLIC_* values are injected at runtime from Kubernetes env vars.
-        # Phase 3c Option A (per-env build args from Vault) OR Option B
-        # (next-runtime-env migration) must be completed before removing the
-        # Kubernetes build Job in __main__.py (Phase 3d). Until then, deploy
-        # Phase 3b and Phase 3d together as a single Pulumi update.
         repo_name="mit-learn",
         dockerfile_path="frontends/main/Dockerfile.web",
         purge_fastly_cache=True,
@@ -447,7 +442,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                             # Purge only HTML pages (tagged with surrogate key "html-pages").
                             # /_next/static/ assets are content-addressed and immutable —
                             # purging them causes missing-chunk errors during rolling deployments.
-                            f"""curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_ci))/purge/html-pages" """,
+                            f'curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_ci))/purge/html-pages"',
                         ],
                     ),
                 ),
@@ -480,7 +475,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                                 # Purge only HTML pages (tagged with surrogate key "html-pages").
                                 # /_next/static/ assets are content-addressed and immutable —
                                 # purging them causes missing-chunk errors during rolling deployments.
-                                f"""curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_qa))/purge/html-pages" """,
+                                f'curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_qa))/purge/html-pages"',
                             ],
                         ),
                     ),
@@ -502,7 +497,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                                 # Purge only HTML pages (tagged with surrogate key "html-pages").
                                 # /_next/static/ assets are content-addressed and immutable —
                                 # purging them causes missing-chunk errors during rolling deployments.
-                                f"""curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_production))/purge/html-pages" """,
+                                f'curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_production))/purge/html-pages"',
                             ],
                         ),
                     ),
