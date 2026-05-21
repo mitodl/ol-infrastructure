@@ -584,7 +584,12 @@ ol_vault_asg_config = OLAutoScaleGroupConfig(
     vpc_zone_identifiers=target_vpc["subnet_ids"],
     instance_refresh_warmup=FIVE_MINUTES * 3,
     instance_refresh_min_healthy_percentage=90,
-    tags=aws_config.merged_tags({"ami_id": vault_ami.id}),
+    tags=aws_config.merged_tags(
+        {
+            "ami_id": vault_ami.id,
+            "instance_type": InstanceTypes[vault_instance_type].value,
+        }
+    ),
 )
 
 ol_vault_as_setup = OLAutoScaling(
