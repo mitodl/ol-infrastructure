@@ -238,22 +238,37 @@ class S3BucketConfig(AWSBase):
     @model_validator(mode="after")
     def check_archive_tiering_config(self) -> "S3BucketConfig":
         """Validate archive access tier configuration."""
+        if not self.intelligent_tiering_enabled:
+            return self
         _ARCHIVE_MIN_DAYS = 90
+        _ARCHIVE_MAX_DAYS = 730
         _DEEP_ARCHIVE_MIN_DAYS = 180
-        if (
-            self.intelligent_tiering_archive_access_days is not None
-            and self.intelligent_tiering_archive_access_days < _ARCHIVE_MIN_DAYS
-        ):
-            error_message = (
-                "intelligent_tiering_archive_access_days must be >= 90 (AWS minimum)"
-            )
-            raise ValueError(error_message)
+        if self.intelligent_tiering_archive_access_days is not None:
+            archive_days = self.intelligent_tiering_archive_access_days
+            if archive_days < _ARCHIVE_MIN_DAYS:
+                error_message = (
+                    "intelligent_tiering_archive_access_days must be "
+                    ">= 90 (AWS minimum)"
+                )
+                raise ValueError(error_message)
+            if archive_days > _ARCHIVE_MAX_DAYS:
+                error_message = (
+                    "intelligent_tiering_archive_access_days must be "
+                    "<= 730 (AWS maximum)"
+                )
+                raise ValueError(error_message)
         if self.intelligent_tiering_deep_archive_access_days is not None:
             deep_days = self.intelligent_tiering_deep_archive_access_days
             if deep_days < _DEEP_ARCHIVE_MIN_DAYS:
                 error_message = (
                     "intelligent_tiering_deep_archive_access_days must be >= 180 "
                     "(AWS minimum)"
+                )
+                raise ValueError(error_message)
+            if deep_days > _ARCHIVE_MAX_DAYS:
+                error_message = (
+                    "intelligent_tiering_deep_archive_access_days must be <= 730 "
+                    "(AWS maximum)"
                 )
                 raise ValueError(error_message)
             if (
