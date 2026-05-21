@@ -314,6 +314,13 @@ live_bucket_config = S3BucketConfig(
         )
     ),
     logging_expected_bucket_owner=aws_account.account_id,
+    # Disable archive access tiers: this bucket is a live CDN origin and objects
+    # that haven't been accessed in 90 days may still be needed for cache misses.
+    # Archive/Deep Archive retrieval latency (minutes/hours) would cause request
+    # failures. The lifecycle rule still transitions objects to INTELLIGENT_TIERING
+    # for Frequent/Infrequent/Archive-Instant-Access savings (all instant retrieval).
+    intelligent_tiering_archive_access_days=None,
+    intelligent_tiering_deep_archive_access_days=None,
     tags=aws_config.tags,
 )
 

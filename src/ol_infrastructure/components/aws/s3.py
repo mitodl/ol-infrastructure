@@ -164,6 +164,29 @@ class S3BucketConfig(AWSBase):
             "Only used if intelligent_tiering_enabled is True."
         ),
     )
+    intelligent_tiering_archive_access_days: int | None = Field(
+        default=90,
+        description=(
+            "Days of no access after which objects in INTELLIGENT_TIERING storage "
+            "class move to the Archive Access tier (68% cheaper than Standard, "
+            "minutes retrieval latency). Must be between 90 and 730. "
+            "Set to None to disable. Do not enable for buckets that serve live "
+            "CDN content — retrieval latency will cause cache-miss delays. "
+            "Only used when intelligent_tiering_enabled is True."
+        ),
+    )
+    intelligent_tiering_deep_archive_access_days: int | None = Field(
+        default=180,
+        description=(
+            "Days of no access after which objects in INTELLIGENT_TIERING storage "
+            "class move to the Deep Archive Access tier (95% cheaper than Standard, "
+            "hours retrieval latency). Must be between 180 and 730 and greater than "
+            "intelligent_tiering_archive_access_days when both are set. "
+            "Set to None to disable. Do not enable for buckets that serve live "
+            "CDN content — retrieval latency will cause cache-miss delays. "
+            "Only used when intelligent_tiering_enabled is True."
+        ),
+    )
     cors_rules: list[s3.BucketCorsConfigurationCorsRuleArgs] | None = Field(
         default=None,
         description="CORS configuration rules for the bucket.",
@@ -206,6 +229,39 @@ class S3BucketConfig(AWSBase):
                 "intelligent_tiering_enabled is True."
             )
             raise ValueError(error_message)
+        return self
+
+    @model_validator(mode="after")
+    def check_archive_tiering_config(self) -> "S3BucketConfig":
+        """Validate archive access tier configuration."""
+        _ARCHIVE_MIN_DAYS = 90
+        _DEEP_ARCHIVE_MIN_DAYS = 180
+        if (
+            self.intelligent_tiering_archive_access_days is not None
+            and self.intelligent_tiering_archive_access_days < _ARCHIVE_MIN_DAYS
+        ):
+            error_message = (
+                "intelligent_tiering_archive_access_days must be >= 90 (AWS minimum)"
+            )
+            raise ValueError(error_message)
+        if self.intelligent_tiering_deep_archive_access_days is not None:
+            deep_days = self.intelligent_tiering_deep_archive_access_days
+            if deep_days < _DEEP_ARCHIVE_MIN_DAYS:
+                error_message = (
+                    "intelligent_tiering_deep_archive_access_days must be >= 180 "
+                    "(AWS minimum)"
+                )
+                raise ValueError(error_message)
+            if (
+                self.intelligent_tiering_archive_access_days is not None
+                and self.intelligent_tiering_deep_archive_access_days
+                <= self.intelligent_tiering_archive_access_days
+            ):
+                error_message = (
+                    "intelligent_tiering_deep_archive_access_days must be greater "
+                    "than intelligent_tiering_archive_access_days"
+                )
+                raise ValueError(error_message)
         return self
 
     @model_validator(mode="after")
@@ -268,13 +324,14 @@ class OLBucket(pulumi.ComponentResource):
     bucket_public_access_block: s3.BucketPublicAccessBlock | None = None
     bucket_logging: s3.BucketLogging | None = None
     bucket_lifecycle: s3.BucketLifecycleConfiguration | None = None
+    bucket_intelligent_tiering: s3.BucketIntelligentTieringConfiguration | None = None
     bucket_website: s3.BucketWebsiteConfiguration | None = None
     bucket_encryption: s3.BucketServerSideEncryptionConfiguration | None = None
     bucket_cors: s3.BucketCorsConfiguration | None = None
     bucket_ownership_controls: s3.BucketOwnershipControls | None = None
     bucket_policy: s3.BucketPolicy | None = None
 
-    def __init__(  # noqa: C901
+    def __init__(  # noqa: C901, PLR0912
         self,
         name: str,
         config: S3BucketConfig,
@@ -409,6 +466,41 @@ class OLBucket(pulumi.ComponentResource):
                 f"{name}-lifecycle",
                 bucket=self.bucket_v2.id,
                 rules=lifecycle_rules,
+                opts=child_opts,
+            )
+
+        # Create BucketIntelligentTieringConfiguration to enable the optional
+        # Archive Access and Deep Archive Access tiers within INTELLIGENT_TIERING.
+        # These tiers require explicit opt-in and provide 68-95% cost savings for
+        # truly cold objects, but have minutes-to-hours retrieval latency - do not
+        # enable on buckets serving live CDN content.
+        if config.intelligent_tiering_enabled and (
+            config.intelligent_tiering_archive_access_days is not None
+            or config.intelligent_tiering_deep_archive_access_days is not None
+        ):
+            archive_tierings: list[
+                s3.BucketIntelligentTieringConfigurationTieringArgs
+            ] = []
+            if config.intelligent_tiering_archive_access_days is not None:
+                archive_tierings.append(
+                    s3.BucketIntelligentTieringConfigurationTieringArgs(
+                        access_tier="ARCHIVE_ACCESS",
+                        days=config.intelligent_tiering_archive_access_days,
+                    )
+                )
+            if config.intelligent_tiering_deep_archive_access_days is not None:
+                archive_tierings.append(
+                    s3.BucketIntelligentTieringConfigurationTieringArgs(
+                        access_tier="DEEP_ARCHIVE_ACCESS",
+                        days=config.intelligent_tiering_deep_archive_access_days,
+                    )
+                )
+            self.bucket_intelligent_tiering = s3.BucketIntelligentTieringConfiguration(
+                f"{name}-intelligent-tiering-config",
+                bucket=self.bucket_v2.id,
+                name="standard-tiering",
+                status="Enabled",
+                tierings=archive_tierings,
                 opts=child_opts,
             )
 
