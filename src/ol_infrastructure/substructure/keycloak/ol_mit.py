@@ -501,11 +501,15 @@ def create_ol_mit_realm(  # noqa: PLR0913
         connection_pooling=True,
         pagination=True,
         use_truststore_spi="ONLY_FOR_LDAPS",
+        # Fail fast rather than hanging indefinitely if the Okta LDAP endpoint
+        # is unreachable or slow.  Values are in milliseconds.
+        connection_timeout="30s",
+        read_timeout="120s",
         # Hourly delta sync picks up group-membership changes for users who have
         # already logged in.  Full sync is disabled to avoid bulk-importing every
         # MIT affiliate into Keycloak; users are provisioned on-demand via the
         # Touchstone SAML first-login flow.
-        changed_sync_period=3600,
+        changed_sync_period=14400,
         opts=resource_options,
     )
 
