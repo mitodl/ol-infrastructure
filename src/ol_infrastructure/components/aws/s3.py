@@ -165,25 +165,29 @@ class S3BucketConfig(AWSBase):
         ),
     )
     intelligent_tiering_archive_access_days: int | None = Field(
-        default=90,
+        default=None,
         description=(
             "Days of no access after which objects in INTELLIGENT_TIERING storage "
             "class move to the Archive Access tier (68% cheaper than Standard, "
             "minutes retrieval latency). Must be between 90 and 730. "
-            "Set to None to disable. Do not enable for buckets that serve live "
-            "CDN content — retrieval latency will cause cache-miss delays. "
+            "Disabled by default (None) -- only opt in for cold-data buckets "
+            "(backups, archives, data lakes) that are never CDN or application "
+            "origins. Retrieval latency will cause cache-miss or request failures "
+            "on any bucket accessed by users or CDN. "
             "Only used when intelligent_tiering_enabled is True."
         ),
     )
     intelligent_tiering_deep_archive_access_days: int | None = Field(
-        default=180,
+        default=None,
         description=(
             "Days of no access after which objects in INTELLIGENT_TIERING storage "
             "class move to the Deep Archive Access tier (95% cheaper than Standard, "
             "hours retrieval latency). Must be between 180 and 730 and greater than "
             "intelligent_tiering_archive_access_days when both are set. "
-            "Set to None to disable. Do not enable for buckets that serve live "
-            "CDN content — retrieval latency will cause cache-miss delays. "
+            "Disabled by default (None) -- only opt in for cold-data buckets "
+            "(backups, archives, data lakes) that are never CDN or application "
+            "origins. Retrieval latency will cause cache-miss or request failures "
+            "on any bucket accessed by users or CDN. "
             "Only used when intelligent_tiering_enabled is True."
         ),
     )

@@ -320,6 +320,9 @@ edxorg_courses_bucket_config = S3BucketConfig(
     bucket_name=edxorg_courses_bucket_name,
     versioning_enabled=True,
     server_side_encryption_enabled=True,
+    # edX.org course tarballs are cold archive data: safe for archive tiers.
+    intelligent_tiering_archive_access_days=90,
+    intelligent_tiering_deep_archive_access_days=180,
     tags=aws_config.tags,
 )
 edxorg_courses_bucket = OLBucket(
