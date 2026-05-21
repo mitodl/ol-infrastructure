@@ -26,6 +26,7 @@ config:
     MIT_LEARN_BASE_URL: https://learn.mit.edu
     OCW_COURSE_STARTER_SLUG: ocw-course-v2
     OCW_EXTRA_COURSE_THEMES: ocw-course-v3
+    OCW_EXTRA_THEMES_GTM_IDS: '{"ocw-course-v3": "GTM-NMJ2CT6T&gtm_auth=TVdLeYWP6BLCRsILCebafA&gtm_preview=env-1&gtm_cookies_win=x"}'
     OCW_GTM_ACCOUNT_ID: GTM-NMQZ25T
     OCW_HUGO_THEMES_SENTRY_DSN: 'https://eee58f41dda54d2b814296e12dced4b7@o48788.ingest.sentry.io/5304953'
     OCW_IMPORT_STARTER_SLUG: ocw-course
