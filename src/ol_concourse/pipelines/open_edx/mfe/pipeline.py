@@ -252,6 +252,12 @@ def mfe_job(  # noqa: C901, PLR0915
             f"Footer.jsx {mfe_build_dir.name}/Footer.jsx"
         ),
         (
+            f"echo 'Copying ResponsiveCourseTabs.jsx...' && "
+            f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+            f"ResponsiveCourseTabs.jsx "
+            f"{mfe_build_dir.name}/ResponsiveCourseTabs.jsx"
+        ),
+        (
             f"echo 'Copying env.config from {slot_config_file}.env.jsx...' && "
             f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
             f"{slot_config_file}.env.jsx "

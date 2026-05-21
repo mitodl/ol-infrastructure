@@ -238,6 +238,10 @@
     overflow: visible !important;
   }
 
+  .nav-underline-tabs {
+    align-items: stretch !important;
+  }
+
   .nav {
     min-width: 0 !important;
     // Prevent nav growth beyond parent; overflow is handled in JS.
@@ -245,33 +249,52 @@
   }
 
   // Responsive tabs dropdown styles (scoped to #courseTabsNavigation)
+  .responsive-tabs-overflow.pgn__tab_more.nav-link {
+    margin-bottom: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
   .responsive-tabs-overflow {
     position: relative;
+    display: flex !important;
+    align-items: stretch !important;
 
     .dropdown {
+      display: flex !important;
+      align-items: stretch !important;
+      height: 100% !important;
+
       // Reset the header's dropdown-toggle styles which would make this white-on-dark
       .dropdown-toggle {
-        color: var(--pgn-color-gray-500) !important;
+        color: var(--pgn-color-gray-700) !important;
         background: transparent !important;
-        border: none !important;
         opacity: 1 !important;
         font-size: inherit !important;
         font-family: inherit !important;
-        padding: 0 0.375rem !important;
-        height: 3rem !important;
+        font-weight: inherit !important;
+        line-height: inherit !important;
+        // Fill the stretched nav row so the label aligns with sibling tab links.
+        height: 100% !important;
+        min-height: 100% !important;
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
         white-space: nowrap;
         flex-direction: row !important;
         gap: 0 !important;
-        margin-left: 0 !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        border-left: 0 !important;
+        border-right: 0 !important;
+        border-top: 4px solid transparent !important;
+        border-bottom: 4px solid transparent !important;
 
         &:hover, &:focus {
-          color: var(--pgn-color-gray-700) !important;
+          color: var(--pgn-color-primary-500) !important;
           background-color: var(--pgn-color-light-400) !important;
           opacity: 1 !important;
-          border: none !important;
+          border-bottom-color: var(--pgn-color-primary-500) !important;
         }
 
         // Hide the default caret — Paragon adds ::after

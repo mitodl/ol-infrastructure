@@ -120,7 +120,7 @@ const ResponsiveCourseTabs = ({ activeTabSlug }) => {
 
       {/* "More..." dropdown for overflow tabs */}
       {overflowTabs.length > 0 && (
-        <div className="nav-item flex-shrink-0 responsive-tabs-overflow">
+        <div className="pgn__tab_more nav-item flex-shrink-0 nav-link responsive-tabs-overflow">
           <Dropdown className="h-100">
             <Dropdown.Toggle
               variant="link"
