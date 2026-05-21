@@ -488,3 +488,125 @@ class TestOLBucketArchiveTieringResource:
         return pulumi.Output.from_input(bucket.bucket_intelligent_tiering).apply(
             check_no_config
         )
+
+
+class TestS3BucketConfigAbortMPUValidation:
+    """Test S3BucketConfig validation for abort_incomplete_mpu_days."""
+
+    @staticmethod
+    def get_valid_tags():
+        return {
+            "OU": "operations",
+            "Environment": "test",
+            "Application": "test-app",
+            "Owner": "test-owner",
+        }
+
+    def test_abort_mpu_default_is_seven(self):
+        """abort_incomplete_mpu_days defaults to 7."""
+        config = S3BucketConfig(
+            bucket_name="test-bucket",
+            tags=self.get_valid_tags(),
+        )
+        assert config.abort_incomplete_mpu_days == 7
+
+    def test_abort_mpu_can_be_disabled(self):
+        """abort_incomplete_mpu_days=None disables the rule."""
+        config = S3BucketConfig(
+            bucket_name="test-bucket",
+            abort_incomplete_mpu_days=None,
+            tags=self.get_valid_tags(),
+        )
+        assert config.abort_incomplete_mpu_days is None
+
+    def test_abort_mpu_valid_custom_value(self):
+        """Any positive integer is accepted."""
+        config = S3BucketConfig(
+            bucket_name="test-bucket",
+            abort_incomplete_mpu_days=30,
+            tags=self.get_valid_tags(),
+        )
+        assert config.abort_incomplete_mpu_days == 30
+
+    def test_abort_mpu_zero_rejected(self):
+        """Zero is rejected."""
+        with pytest.raises(ValueError, match="must be >= 1"):
+            S3BucketConfig(
+                bucket_name="test-bucket",
+                abort_incomplete_mpu_days=0,
+                tags=self.get_valid_tags(),
+            )
+
+    def test_abort_mpu_negative_rejected(self):
+        """Negative values are rejected."""
+        with pytest.raises(ValueError, match="must be >= 1"):
+            S3BucketConfig(
+                bucket_name="test-bucket",
+                abort_incomplete_mpu_days=-1,
+                tags=self.get_valid_tags(),
+            )
+
+
+class TestOLBucketAbortMPUResource:
+    """Test OLBucket creates/omits AbortIncompleteMultipartUpload lifecycle rule."""
+
+    @staticmethod
+    def get_valid_tags():
+        return {
+            "OU": "operations",
+            "Environment": "test",
+            "Application": "test-app",
+            "Owner": "test-owner",
+        }
+
+    @pulumi.runtime.test
+    def test_abort_mpu_rule_present_by_default(self):
+        """OLBucket lifecycle config includes abort-MPU rule by default."""
+        config = S3BucketConfig(
+            bucket_name="test-abort-default",
+            tags=self.get_valid_tags(),
+        )
+        bucket = OLBucket("test-abort-default", config=config)
+
+        def check_abort_rule(args):
+            lifecycle, rules = args
+            assert lifecycle is not None, "BucketLifecycleConfiguration should exist"
+            rule_ids = [r.get("id") for r in (rules or [])]
+            assert "abort-incomplete-multipart-uploads" in rule_ids, (
+                f"Expected abort rule in lifecycle rules, got: {rule_ids}"
+            )
+
+        return pulumi.Output.all(
+            bucket.bucket_lifecycle,
+            bucket.bucket_lifecycle.rules.apply(
+                lambda r: [
+                    {
+                        "id": rule.get("id")
+                        if isinstance(rule, dict)
+                        else getattr(rule, "id", None)
+                    }
+                    for rule in (r or [])
+                ]
+            ),
+        ).apply(check_abort_rule)
+
+    @pulumi.runtime.test
+    def test_abort_mpu_rule_absent_when_disabled(self):
+        """OLBucket omits abort-MPU rule when abort_incomplete_mpu_days=None."""
+        config = S3BucketConfig(
+            bucket_name="test-abort-disabled",
+            intelligent_tiering_enabled=False,
+            abort_incomplete_mpu_days=None,
+            tags=self.get_valid_tags(),
+        )
+        bucket = OLBucket("test-abort-disabled", config=config)
+
+        def check_no_lifecycle(lifecycle):
+            assert lifecycle is None, (
+                "BucketLifecycleConfiguration should not exist when both "
+                "intelligent tiering and abort MPU are disabled"
+            )
+
+        return pulumi.Output.from_input(bucket.bucket_lifecycle).apply(
+            check_no_lifecycle
+        )

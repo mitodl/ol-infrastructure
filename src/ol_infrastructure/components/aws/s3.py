@@ -191,6 +191,17 @@ class S3BucketConfig(AWSBase):
             "Only used when intelligent_tiering_enabled is True."
         ),
     )
+    abort_incomplete_mpu_days: int | None = Field(
+        default=7,
+        description=(
+            "Days after which S3 automatically aborts incomplete multipart uploads "
+            "and deletes the uploaded parts. Defaults to 7 days, which is safe for "
+            "all buckets -- any upload genuinely in progress will complete well "
+            "within 7 days; stale parts from failed uploads are cleaned up "
+            "automatically. Set to None only if a bucket has a known use case "
+            "requiring uploads longer than 7 days."
+        ),
+    )
     cors_rules: list[s3.BucketCorsConfigurationCorsRuleArgs] | None = Field(
         default=None,
         description="CORS configuration rules for the bucket.",
@@ -315,6 +326,17 @@ class S3BucketConfig(AWSBase):
                 f"versioning_status must be 'Enabled', 'Suspended', or 'Disabled', "
                 f"got '{self.versioning_status}'"
             )
+            raise ValueError(error_message)
+        return self
+
+    @model_validator(mode="after")
+    def check_abort_mpu_days(self) -> "S3BucketConfig":
+        """Validate abort_incomplete_mpu_days is a positive integer when set."""
+        if (
+            self.abort_incomplete_mpu_days is not None
+            and self.abort_incomplete_mpu_days < 1
+        ):
+            error_message = "abort_incomplete_mpu_days must be >= 1"
             raise ValueError(error_message)
         return self
 
@@ -464,6 +486,19 @@ class OLBucket(pulumi.ComponentResource):
 
         # Create or enhance BucketLifecycleConfiguration
         lifecycle_rules = list(config.lifecycle_rules) if config.lifecycle_rules else []
+
+        # Add abort-incomplete-multipart-upload rule if enabled (default: 7 days).
+        # This prevents stale MPU parts from accumulating and billing indefinitely.
+        if config.abort_incomplete_mpu_days is not None:
+            lifecycle_rules.append(
+                s3.BucketLifecycleConfigurationRuleArgs(
+                    id="abort-incomplete-multipart-uploads",
+                    status="Enabled",
+                    abort_incomplete_multipart_upload=s3.BucketLifecycleConfigurationRuleAbortIncompleteMultipartUploadArgs(
+                        days_after_initiation=config.abort_incomplete_mpu_days,
+                    ),
+                )
+            )
 
         # Add intelligent tiering rule if enabled
         if config.intelligent_tiering_enabled:
