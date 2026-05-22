@@ -190,6 +190,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="jupyterhub-data",
         pulumi_project_path="applications/jupyterhub_data/",
         pulumi_project_name="ol-application-jupyterhub-data",
+        additional_watched_paths=["src/bridge/secrets/jupyterhub_data/"],
     ),
     "marimo-data": SimplePulumiParams(
         app_name="marimo-data",

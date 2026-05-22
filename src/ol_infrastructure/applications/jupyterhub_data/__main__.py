@@ -8,12 +8,16 @@ per-user JWT auth against Starburst Galaxy without any credential management
 in the notebook itself.
 """
 
+import json
+from pathlib import Path
 from typing import Any
 
+import pulumi_vault as vault
 from pulumi import Config
 from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.jupyterhub_data.deployment import (
     provision_jupyterhub_data_deployment,
 )
@@ -216,6 +220,18 @@ jupyterhub_data_db_config = OLPostgresDBConfig(
     **rds_defaults,
 )
 jupyterhub_data_db = OLAmazonDB(jupyterhub_data_db_config)
+
+# Write the JUPYTERHUB_CRYPT_KEY to Vault from the SOPS-encrypted secrets file.
+# VSO syncs this path into the jupyter-data namespace as a K8s Secret so the
+# hub pod can read it without any manual vault kv put step.
+jupyterhub_data_secrets = read_yaml_secrets(
+    Path(f"jupyterhub_data/secrets.{stack_info.env_suffix}.yaml")
+)
+vault.generic.Secret(
+    f"jupyterhub-data-crypt-key-vault-secret-{stack_info.env_suffix}",
+    path="secret-operations/jupyterhub-data/crypt-key",
+    data_json=json.dumps(jupyterhub_data_secrets["jupyterhub_data"]),
+)
 
 domain_name = jupyterhub_data_config.require("domain")
 trino_host = jupyterhub_data_config.get("trino_host") or ""
