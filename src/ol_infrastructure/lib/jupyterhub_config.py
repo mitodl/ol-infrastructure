@@ -48,12 +48,14 @@ def get_authenticator_config(
     :raises InvalidAuthenticatorError: If ``authenticator_class`` is not one
         of the recognised values.
     """
-    authenticator_type = jupyterhub_deployment_config.get("authenticator_class", "tmp")
+    authenticator_type = (
+        jupyterhub_deployment_config.get("authenticator_class") or "tmp"
+    )
     if authenticator_type not in ["shared-password", "tmp", "generic-oauth"]:
         raise InvalidAuthenticatorError(authenticator_type)
 
-    admin_users_list = jupyterhub_deployment_config.get("admin_users", [])
-    allowed_users_list = jupyterhub_deployment_config.get("allowed_users", [])
+    admin_users_list = jupyterhub_deployment_config.get("admin_users") or []
+    allowed_users_list = jupyterhub_deployment_config.get("allowed_users") or []
     auth_conf: dict[str, Any] = {
         "Authenticator": {
             "admin_users": admin_users_list,
@@ -70,10 +72,11 @@ def get_authenticator_config(
     elif authenticator_type == "tmp":
         auth_conf["JupyterHub"] = {"authenticator_class": "tmp"}
     elif authenticator_type == "generic-oauth":
-        keycloak_base_url = jupyterhub_deployment_config.get(
-            "keycloak_base_url", "https://sso.ol.mit.edu"
+        keycloak_base_url = (
+            jupyterhub_deployment_config.get("keycloak_base_url")
+            or "https://sso.ol.mit.edu"
         )
-        realm = jupyterhub_deployment_config.get("keycloak_realm", "ol-data-platform")
+        realm = jupyterhub_deployment_config.get("keycloak_realm") or "ol-data-platform"
         auth_conf["JupyterHub"] = {"authenticator_class": "generic-oauth"}
         auth_conf["GenericOAuthenticator"] = {
             "authorize_url": (
@@ -85,11 +88,13 @@ def get_authenticator_config(
             "userdata_url": (
                 f"{keycloak_base_url}/realms/{realm}/protocol/openid-connect/userinfo"
             ),
-            "login_service": jupyterhub_deployment_config.get(
-                "login_service", "MIT OL Data Platform"
+            "login_service": (
+                jupyterhub_deployment_config.get("login_service")
+                or "MIT OL Data Platform"
             ),
-            "username_claim": jupyterhub_deployment_config.get(
-                "username_claim", "preferred_username"
+            "username_claim": (
+                jupyterhub_deployment_config.get("username_claim")
+                or "preferred_username"
             ),
             "scope": ["openid", "profile", "email", "ol_roles"],
             "enable_auth_state": True,

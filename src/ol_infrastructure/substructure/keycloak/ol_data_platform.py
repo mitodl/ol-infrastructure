@@ -567,8 +567,10 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0913, PLR0915
         valid_redirect_uris=[
             "https://nb.data.ol.mit.edu/hub/oauth_callback",
             "https://nb-qa.data.ol.mit.edu/hub/oauth_callback",
+            "https://nb-ci.data.ol.mit.edu/hub/oauth_callback",
             "https://nb.data.ol.mit.edu/*",
             "https://nb-qa.data.ol.mit.edu/*",
+            "https://nb-ci.data.ol.mit.edu/*",
         ],
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )

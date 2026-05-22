@@ -148,7 +148,7 @@ marimo_app_trino_secret = OLVaultK8SSecret(
     opts=ResourceOptions(depends_on=[marimo_vault_k8s_resources]),
 )
 
-# APISIX OIDC resources for the notebooks.odl.mit.edu published-apps gateway.
+# APISIX OIDC resources for the published-apps gateway (apps_domain).
 # Published apps require authentication; all authenticated ol-data-platform
 # realm users can view any published app (per v1 scope decision).
 marimo_oidc = OLApisixOIDCResources(
