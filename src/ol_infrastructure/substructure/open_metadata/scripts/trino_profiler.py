@@ -35,6 +35,15 @@ config = {
                 "computeMetrics": True,
                 "computeTableMetrics": True,
                 "computeColumnMetrics": True,
+                # Trino has no system-table metrics implementation in OM
+                # (supported only for BigQuery, Snowflake, Redshift).  With
+                # useStatistics=True (the default) the profiler attempts a
+                # system-table lookup for every table and logs a WARNING:
+                #   "No implementation found for trino"
+                # Setting False skips that path entirely; all metrics are
+                # computed via direct SQL queries, which is the effective
+                # behaviour already (system lookup silently falls back).
+                "useStatistics": False,
                 "includeViews": False,
                 "threadCount": 5,
                 "timeoutSeconds": 43200,

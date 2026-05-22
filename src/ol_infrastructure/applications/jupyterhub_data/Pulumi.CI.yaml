@@ -1,0 +1,14 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+config:
+  jupyterhub_data:domain: nb-ci.data.ol.mit.edu
+  jupyterhub_data:authenticator_class: generic-oauth
+  jupyterhub_data:keycloak_base_url: https://sso-ci.ol.mit.edu
+  jupyterhub_data:keycloak_realm: ol-data-platform
+  jupyterhub_data:trino_host: mitol-ol-data-lake-production.trino.galaxy.starburst.io
+  aws:region: us-east-1
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
+  jupyterhub_data:db_password:
+    secure: v1:wcNJmsiOe8wr5Esa:mhIfFq+dGfNtgHDiirHYyU8vmpP8T3Ro8c4L9l++Pl18kxh4+Vqn3f44Fbp3y84FJuMAfi0qKWo=
+encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagGj/w7JT12nj6r3NjVNTnxXAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMN3aAPXZbowMzRkQ2AgEQgDv8s/kqiiJx4WC0wJXj7WcmEN428Cb5/oo3qqV76FLYUevgTBIAzlmaOmsSYod964ck4lTT/EDAoylcTg==

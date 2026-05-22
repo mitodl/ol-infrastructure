@@ -1,0 +1,204 @@
+"""Marimo Data application stack — published notebook applications.
+
+This stack provisions the shared APISIX/Vault/cert infrastructure for
+published (run-mode) MarimoNotebook CRDs at the domain configured via
+``marimo_data:apps_domain`` (e.g. ``nb.data.ol.mit.edu`` for Production,
+``nb-qa.data.ol.mit.edu`` for QA).
+
+The marimo-operator is installed on the data EKS cluster via the
+``ol-substructure-eks`` stack (``substructure/aws/eks/marimo_operator.py``).
+The operator creates a per-``MarimoNotebook`` ClusterIP Service named after
+each notebook — there is no central gateway.  Individual notebooks need
+their own ``ApisixRoute`` resources that reference the shared OIDC config
+(``marimo_oidc``) and shared plugin config (``marimo_shared_plugins``) from
+this stack.
+
+Published apps use the ol-marimo-app-client service account (client credentials
+flow) for Trino access, so they are not tied to a specific user session.
+
+The JupyterHub development environment is managed by the separate
+``applications.jupyterhub_data`` stack.
+"""
+
+import pulumi_vault as vault
+from pulumi import Config, ResourceOptions
+
+from ol_infrastructure.components.services.apisix import (
+    OLApisixOIDCConfig,
+    OLApisixOIDCResources,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
+)
+from ol_infrastructure.components.services.cert_manager import (
+    OLCertManagerCert,
+    OLCertManagerCertConfig,
+)
+from ol_infrastructure.components.services.vault import (
+    OLVaultK8SResources,
+    OLVaultK8SResourcesConfig,
+    OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
+)
+from ol_infrastructure.lib import pulumi_projects as projects
+from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
+from ol_infrastructure.lib.ol_types import (
+    AWSBase,
+    BusinessUnit,
+    K8sGlobalLabels,
+    Services,
+)
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+    require_stack_output_value,
+)
+from ol_infrastructure.lib.vault import setup_vault_provider
+
+stack_info = parse_stack()
+setup_vault_provider(stack_info)
+
+marimo_data_config = Config("marimo_data")
+vault_config = Config("vault")
+
+cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
+
+setup_k8s_provider(kubeconfig=require_stack_output_value(cluster_stack, "kube_config"))
+
+aws_config = AWSBase(
+    tags={"OU": BusinessUnit.data, "Environment": stack_info.env_suffix}
+)
+
+marimo_namespace = "marimo"
+
+k8s_global_labels = K8sGlobalLabels(
+    service=Services.notebooks,
+    ou=BusinessUnit.data,
+    stack=stack_info,
+).model_dump()
+
+application_labels = k8s_global_labels | {
+    "ol.mit.edu/application": "marimo-data",
+}
+
+apps_domain = marimo_data_config.require("apps_domain")
+
+# Vault policy for marimo published-app pods to read the service-account
+# Trino client credentials (ol-marimo-app-client).
+marimo_vault_policy_hcl = """
+path "secret-operations/data/sso/marimo-app" {
+  capabilities = ["read"]
+}
+path "secret-operations/sso/marimo-app" {
+  capabilities = ["read"]
+}
+"""
+
+marimo_vault_policy = vault.Policy(
+    f"ol-marimo-data-vault-policy-{stack_info.env_suffix}",
+    name="marimo-data",
+    policy=marimo_vault_policy_hcl,
+)
+
+marimo_vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
+    f"ol-marimo-data-vault-k8s-auth-backend-role-{stack_info.env_suffix}",
+    role_name="marimo-data",
+    backend=cluster_stack.require_output("vault_auth_endpoint"),
+    bound_service_account_names=["*"],
+    bound_service_account_namespaces=[marimo_namespace],
+    token_policies=[marimo_vault_policy.name],
+)
+
+marimo_vault_k8s_resources = OLVaultK8SResources(
+    resource_config=OLVaultK8SResourcesConfig(
+        application_name="marimo-data",
+        namespace=marimo_namespace,
+        labels=k8s_global_labels,
+        vault_address=vault_config.require("address"),
+        vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+        vault_auth_role_name=marimo_vault_k8s_auth_backend_role.role_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[marimo_vault_k8s_auth_backend_role],
+    ),
+)
+
+# VaultStaticSecret: syncs ol-marimo-app-client credentials for published apps
+marimo_app_trino_secret = OLVaultK8SSecret(
+    f"marimo-app-trino-secret-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name="marimo-app-oidc-secret",  # pragma: allowlist secret  # noqa: E501, S106
+        exclude_raw=True,
+        excludes=[".*"],
+        includes=["client_id", "client_secret"],
+        labels=k8s_global_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        name="marimo-app-oidc-secret",
+        namespace=marimo_namespace,
+        path="sso/marimo-app",
+        refresh_after="1h",
+        templates={
+            "MARIMO_APP_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+            "MARIMO_APP_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',  # pragma: allowlist secret  # noqa: E501
+        },
+        vaultauth=marimo_vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(depends_on=[marimo_vault_k8s_resources]),
+)
+
+# APISIX OIDC resources for the notebooks.odl.mit.edu published-apps gateway.
+# Published apps require authentication; all authenticated ol-data-platform
+# realm users can view any published app (per v1 scope decision).
+marimo_oidc = OLApisixOIDCResources(
+    f"ol-k8s-apisix-marimo-data-olapisixoidcresources-{stack_info.env_suffix}",
+    oidc_config=OLApisixOIDCConfig(
+        application_name="marimo-data",
+        k8s_labels=application_labels,
+        k8s_namespace=marimo_namespace,
+        oidc_logout_path="/logout/oidc",
+        oidc_scope="openid profile email",
+        vault_mount="secret-operations",
+        vault_path="sso/marimo",
+        vaultauth=marimo_vault_k8s_resources.auth_name,
+    ),
+)
+
+# TLS certificate for the published-apps domain
+apps_tls_secret_name = "marimo-apps-tls-pair"  # noqa: S105  # pragma: allowlist secret
+OLCertManagerCert(
+    f"ol-marimo-data-cert-manager-certificate-{stack_info.env_suffix}",
+    cert_config=OLCertManagerCertConfig(
+        application_name="marimo-data",
+        k8s_namespace=marimo_namespace,
+        k8s_labels=application_labels,
+        create_apisixtls_resource=True,
+        dest_secret_name=apps_tls_secret_name,
+        dns_names=[apps_domain],
+    ),
+)
+
+# Shared APISIX plugin configuration for the published-apps domain.
+# Individual MarimoNotebook deployments reference this via their own
+# ApisixRoute resources — the marimo-operator creates a per-notebook
+# ClusterIP Service named after each MarimoNotebook; there is no single
+# central gateway that can back a static route.
+marimo_shared_plugins = OLApisixSharedPlugins(
+    name="ol-marimo-data-external-service-apisix-plugins",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name="marimo-data",
+        resource_suffix="ol-shared-plugins",
+        k8s_namespace=marimo_namespace,
+        k8s_labels=application_labels,
+        enable_defaults=True,
+    ),
+)
+
+# NOTE: Per-notebook APISIX routes are not managed here.
+# The marimo-operator creates a per-MarimoNotebook ClusterIP Service named
+# after each notebook (e.g. Service/my-notebook in the marimo namespace).
+# Each published notebook therefore needs its own OLApisixRoute pointing at
+# its individual Service, using marimo_oidc.get_full_oidc_plugin_config() and
+# marimo_shared_plugins.resource_name.  Those routes are out-of-band from
+# this stack and should be managed alongside the MarimoNotebook manifests.
