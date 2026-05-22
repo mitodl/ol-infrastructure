@@ -186,6 +186,16 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_path="applications/fastly_redirector/",
         pulumi_project_name="ol-application-fastly-redirector",
     ),
+    "jupyterhub-data": SimplePulumiParams(
+        app_name="jupyterhub-data",
+        pulumi_project_path="applications/jupyterhub_data/",
+        pulumi_project_name="ol-application-jupyterhub-data",
+    ),
+    "marimo-data": SimplePulumiParams(
+        app_name="marimo-data",
+        pulumi_project_path="applications/marimo_data/",
+        pulumi_project_name="ol-application-marimo-data",
+    ),
     "mongodb-atlas": SimplePulumiParams(
         app_name="mongodb-atlas",
         pulumi_project_path="infrastructure/mongodb_atlas/",
