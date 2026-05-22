@@ -402,7 +402,7 @@ _make_cronjob(
 #   "user"              email
 #   "started"           create_time
 #   "end"               end_time
-#   "state" = FINISHED  query_state = COMPLETED
+#   "state" = FINISHED  query_state = FINISHED
 #
 # TrinoLineageSource reads its SQL from the class attribute `sql_stmt` and
 # appends lineage-specific filters from `filters`. We patch both before
@@ -510,12 +510,12 @@ _make_cronjob(
 
 # Glue ↔ Trino table lineage — creates bidirectional lineage edges between
 # Glue and Trino (Starburst Galaxy) entities that represent the same underlying
-# Iceberg tables.  Runs daily at 03:30 UTC, after both metadata jobs (02:00)
+# Iceberg tables.  Runs daily at 02:30 UTC, after both metadata jobs (02:00)
 # and before the dbt enrichment job (03:00) so dbt lineage resolution sees
 # complete table lineage.
 _make_cronjob(
     name="glue-trino-lineage",
-    schedule="30 3 * * *",
+    schedule="30 2 * * *",
     python_script=(
         Path(__file__).parent / "scripts" / "glue_trino_lineage.py"
     ).read_text(),
@@ -543,6 +543,12 @@ _make_cronjob(
         _secret_env("om-connector-trino", "OM_TRINO_CATALOG"),
     ],
     bot_secret_name="om-profiler-bot",  # noqa: S106  # pragma: allowlist secret
+    # Profiler queries all production schemas with 10% sample; increase memory
+    # above default 4Gi to avoid OOM kills observed in recent runs (exit 137).
+    resources={
+        "requests": {"cpu": "500m", "memory": "2Gi"},
+        "limits": {"cpu": "2", "memory": "8Gi"},
+    },
 )
 
 # Trino PII auto-classifier — uses OM's built-in AutoClassificationWorkflow,
