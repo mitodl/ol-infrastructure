@@ -232,9 +232,9 @@
   height: 100vh;
   height: 100dvh;
 
-  // On larger screens, use a smaller height
   @media (min-width: 1025px) {
-    height: 70vh;
+    top: 1rem;
+    height: var(--ai-drawer-height, calc(100dvh - 2rem));
   }
 
   &.ai-drawer-wrapper-fullscreen {
