@@ -91,6 +91,8 @@ PROMETHEUS_OPERATOR_CRD_VERSION = "v0.91.0"
 KEYCLOAK_OPERATOR_CRD_VERSION = "26.2.4"
 # renovate: datasource=helm depName=jupyterhub packageName=jupyterhub registryUrl=https://hub.jupyter.org/helm-chart
 JUPYTERHUB_CHART_VERSION = "4.3.5"
+# renovate: datasource=github-releases depName=marimo-operator packageName=marimo-team/marimo-operator
+MARIMO_OPERATOR_VERSION = "v0.3.0"
 # renovate: datasource=docker depName=marimo-jupyterlab packageName=ghcr.io/mitodl/marimo-jupyterlab
 # TODO(tmacey): pin to a versioned tag once ghcr.io/mitodl/marimo-jupyterlab publishes one.  # noqa: FIX002
 # Renovate is configured above to bump this automatically on the first tagged release.

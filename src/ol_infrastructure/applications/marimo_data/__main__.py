@@ -1,11 +1,17 @@
 """Marimo Data application stack — published notebook applications.
 
-This stack manages the APISIX route and supporting infrastructure that expose
+This stack provisions the shared APISIX/Vault/cert infrastructure for
 published (run-mode) MarimoNotebook CRDs at the domain configured via
 ``marimo_data:apps_domain`` (e.g. ``nb.data.ol.mit.edu`` for Production,
-``nb-qa.data.ol.mit.edu`` for QA).  The marimo-operator is installed and
-managed separately; this stack assumes the operator has already created the
-``marimo-operator-gateway`` Kubernetes Service that APISIX routes to.
+``nb-qa.data.ol.mit.edu`` for QA).
+
+The marimo-operator is installed on the data EKS cluster via the
+``ol-substructure-eks`` stack (``substructure/aws/eks/marimo_operator.py``).
+The operator creates a per-``MarimoNotebook`` ClusterIP Service named after
+each notebook — there is no central gateway.  Individual notebooks need
+their own ``ApisixRoute`` resources that reference the shared OIDC config
+(``marimo_oidc``) and shared plugin config (``marimo_shared_plugins``) from
+this stack.
 
 Published apps use the ol-marimo-app-client service account (client credentials
 flow) for Trino access, so they are not tied to a specific user session.
@@ -20,9 +26,6 @@ from pulumi import Config, ResourceOptions
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
-    OLApisixPluginConfig,
-    OLApisixRoute,
-    OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
 )
@@ -176,7 +179,11 @@ OLCertManagerCert(
     ),
 )
 
-# Shared plugins for the published-apps APISIX route
+# Shared APISIX plugin configuration for the published-apps domain.
+# Individual MarimoNotebook deployments reference this via their own
+# ApisixRoute resources — the marimo-operator creates a per-notebook
+# ClusterIP Service named after each MarimoNotebook; there is no single
+# central gateway that can back a static route.
 marimo_shared_plugins = OLApisixSharedPlugins(
     name="ol-marimo-data-external-service-apisix-plugins",
     plugin_config=OLApisixSharedPluginsConfig(
@@ -188,37 +195,10 @@ marimo_shared_plugins = OLApisixSharedPlugins(
     ),
 )
 
-# APISIX route for the apps domain — openid-connect plugin enforces auth,
-# forwarding to the marimo-operator-gateway service which routes to individual
-# MarimoNotebook services created by the operator.
-#
-# The `marimo-operator-gateway` Kubernetes Service is created by the
-# marimo-operator Helm chart (installed out-of-band via the data EKS cluster
-# substructure stack).  The marimo-operator watches MarimoNotebook CRDs and
-# spins up per-notebook Services that the gateway load-balances across.
-OLApisixRoute(
-    name=f"ol-marimo-data-k8s-apisix-route-{stack_info.env_suffix}",
-    k8s_namespace=marimo_namespace,
-    k8s_labels=application_labels,
-    route_configs=[
-        OLApisixRouteConfig(
-            route_name="marimo-data",
-            priority=0,
-            shared_plugin_config_name=marimo_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    **marimo_oidc.get_full_oidc_plugin_config(unauth_action="auth")
-                ),
-            ],
-            hosts=[apps_domain],
-            paths=["/*"],
-            backend_service_name="marimo-operator-gateway",
-            backend_service_port=8080,
-            websocket=True,
-        ),
-    ],
-    opts=ResourceOptions(
-        delete_before_replace=True,
-        depends_on=[marimo_oidc],
-    ),
-)
+# NOTE: Per-notebook APISIX routes are not managed here.
+# The marimo-operator creates a per-MarimoNotebook ClusterIP Service named
+# after each notebook (e.g. Service/my-notebook in the marimo namespace).
+# Each published notebook therefore needs its own OLApisixRoute pointing at
+# its individual Service, using marimo_oidc.get_full_oidc_plugin_config() and
+# marimo_shared_plugins.resource_name.  Those routes are out-of-band from
+# this stack and should be managed alongside the MarimoNotebook manifests.
