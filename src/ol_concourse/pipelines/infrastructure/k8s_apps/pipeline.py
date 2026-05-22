@@ -45,6 +45,11 @@ class AppPipelineParams(BaseModel):
         dockerfile_path (str): The path to the Dockerfile within the repository. Defaults to "./Dockerfile".
         fastly_service_prefix (Optional[str]): A prefix used to identify Fastly service IDs in Vault.
         purge_fastly_cache (bool): Whether to include steps to purge the Fastly cache after deployment. Defaults to False.
+        fastly_purge_scope (str): Controls which Fastly purge endpoint is called when purge_fastly_cache is True.
+            Use "purge_all" (the default) to purge the entire service cache via POST /purge_all.
+            Pass a surrogate-key string (e.g. "html-pages") to purge only objects tagged with
+            that key via POST /purge/{surrogate_key}.  Use a scoped key when some cached assets
+            (e.g. content-addressed static files) must survive a deployment.
         repo_name (Optional[str]): The name of the git repository. Defaults to app_name if not provided.
     """
 
@@ -53,6 +58,7 @@ class AppPipelineParams(BaseModel):
     dockerfile_path: str = "./Dockerfile"
     fastly_service_prefix: str | None = None
     purge_fastly_cache: bool = False
+    fastly_purge_scope: str = "purge_all"
     repo_name: str | None = None
     repo_main_branch: str = "main"
     repo_rc_branch: str = "release-candidate"
@@ -89,6 +95,7 @@ pipeline_params = {
         dockerfile_path="frontends/main/Dockerfile.web",
         purge_fastly_cache=True,
         fastly_service_prefix="learn_",
+        fastly_purge_scope="html-pages",
     ),
     "xpro": AppPipelineParams(
         app_name="xpro",
@@ -439,10 +446,11 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                         path="sh",
                         args=[
                             "-exc",
-                            # Purge only HTML pages (tagged with surrogate key "html-pages").
-                            # /_next/static/ assets are content-addressed and immutable —
-                            # purging them causes missing-chunk errors during rolling deployments.
-                            f'curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_ci))/purge/html-pages"',
+                            (
+                                f'curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_ci))/purge_all"'
+                                if pipeline_parameters.fastly_purge_scope == "purge_all"
+                                else f'curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_ci))/purge/{pipeline_parameters.fastly_purge_scope}"'
+                            ),
                         ],
                     ),
                 ),
@@ -472,10 +480,12 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                             path="sh",
                             args=[
                                 "-exc",
-                                # Purge only HTML pages (tagged with surrogate key "html-pages").
-                                # /_next/static/ assets are content-addressed and immutable —
-                                # purging them causes missing-chunk errors during rolling deployments.
-                                f'curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_qa))/purge/html-pages"',
+                                (
+                                    f'curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_qa))/purge_all"'
+                                    if pipeline_parameters.fastly_purge_scope
+                                    == "purge_all"
+                                    else f'curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_qa))/purge/{pipeline_parameters.fastly_purge_scope}"'
+                                ),
                             ],
                         ),
                     ),
@@ -494,10 +504,12 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                             path="sh",
                             args=[
                                 "-exc",
-                                # Purge only HTML pages (tagged with surrogate key "html-pages").
-                                # /_next/static/ assets are content-addressed and immutable —
-                                # purging them causes missing-chunk errors during rolling deployments.
-                                f'curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_production))/purge/html-pages"',
+                                (
+                                    f'curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_production))/purge_all"'
+                                    if pipeline_parameters.fastly_purge_scope
+                                    == "purge_all"
+                                    else f'curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_production))/purge/{pipeline_parameters.fastly_purge_scope}"'
+                                ),
                             ],
                         ),
                     ),
