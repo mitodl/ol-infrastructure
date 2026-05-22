@@ -197,6 +197,8 @@ draft_bucket_config = S3BucketConfig(
         )
     ),
     logging_expected_bucket_owner=aws_account.account_id,
+    intelligent_tiering_archive_access_days=None,  # Fastly backend
+    intelligent_tiering_deep_archive_access_days=None,
     tags=aws_config.tags,
 )
 
@@ -257,6 +259,8 @@ test_bucket_config = S3BucketConfig(
         )
     ),
     logging_expected_bucket_owner=aws_account.account_id,
+    intelligent_tiering_archive_access_days=None,  # Fastly backend
+    intelligent_tiering_deep_archive_access_days=None,
     tags=aws_config.tags,
 )
 
@@ -319,6 +323,8 @@ live_bucket_config = S3BucketConfig(
     # Archive/Deep Archive retrieval latency (minutes/hours) would cause request
     # failures. The lifecycle rule still transitions objects to INTELLIGENT_TIERING
     # for Frequent/Infrequent/Archive-Instant-Access savings (all instant retrieval).
+    intelligent_tiering_archive_access_days=None,
+    intelligent_tiering_deep_archive_access_days=None,
     tags=aws_config.tags,
 )
 
@@ -507,6 +513,8 @@ draft_offline_bucket_config = S3BucketConfig(
         )
     ),
     logging_expected_bucket_owner=aws_account.account_id,
+    intelligent_tiering_archive_access_days=None,  # S3 website, user-facing downloads
+    intelligent_tiering_deep_archive_access_days=None,
     tags=aws_config.tags,
 )
 
@@ -582,6 +590,8 @@ live_offline_bucket_config = S3BucketConfig(
         )
     ),
     logging_expected_bucket_owner=aws_account.account_id,
+    intelligent_tiering_archive_access_days=None,  # S3 website, user-facing downloads
+    intelligent_tiering_deep_archive_access_days=None,
     tags=aws_config.tags,
 )
 
@@ -645,6 +655,8 @@ test_offline_bucket_config = S3BucketConfig(
         )
     ),
     logging_expected_bucket_owner=aws_account.account_id,
+    intelligent_tiering_archive_access_days=None,  # S3 website, user-facing downloads
+    intelligent_tiering_deep_archive_access_days=None,
     tags=aws_config.tags,
 )
 

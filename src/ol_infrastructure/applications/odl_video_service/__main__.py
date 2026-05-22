@@ -133,6 +133,8 @@ ovs_main_bucket_config = S3BucketConfig(
     server_side_encryption_enabled=True,
     intelligent_tiering_enabled=True,
     intelligent_tiering_days=90,
+    intelligent_tiering_archive_access_days=None,  # CloudFront origin
+    intelligent_tiering_deep_archive_access_days=None,
     cors_rules=[
         BucketCorsConfigurationCorsRuleArgs(
             allowed_headers=["*"],
@@ -166,6 +168,8 @@ ovs_subtitles_bucket_config = S3BucketConfig(
     sse_algorithm="AES256",  # Use SSE-S3 for CloudFront compatibility
     intelligent_tiering_enabled=True,
     intelligent_tiering_days=90,
+    intelligent_tiering_archive_access_days=None,  # CloudFront origin
+    intelligent_tiering_deep_archive_access_days=None,
     cors_rules=[
         BucketCorsConfigurationCorsRuleArgs(
             allowed_headers=["*"],
@@ -199,6 +203,8 @@ ovs_thumbnails_bucket_config = S3BucketConfig(
     sse_algorithm="AES256",  # Use SSE-S3 for CloudFront compatibility
     intelligent_tiering_enabled=True,
     intelligent_tiering_days=90,
+    intelligent_tiering_archive_access_days=None,  # CloudFront origin
+    intelligent_tiering_deep_archive_access_days=None,
     cors_rules=[
         BucketCorsConfigurationCorsRuleArgs(
             allowed_headers=["*"],
@@ -234,6 +240,8 @@ ovs_transcoded_bucket_config = S3BucketConfig(
     sse_algorithm="AES256",  # Use SSE-S3 for CloudFront compatibility
     intelligent_tiering_enabled=True,
     intelligent_tiering_days=90,
+    intelligent_tiering_archive_access_days=None,  # CloudFront origin
+    intelligent_tiering_deep_archive_access_days=None,
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
