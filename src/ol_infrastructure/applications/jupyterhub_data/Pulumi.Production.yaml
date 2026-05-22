@@ -9,4 +9,6 @@ config:
   aws:region: us-east-1
   vault:address: https://vault.odl.mit.edu
   vault_server:env_namespace: operations.production
+  jupyterhub_data:db_password:
+    secure: v1:vzDcUX38T2mJfAmO:bAeBeiLinFYP6jpTA5WRXYuJtEjVWYUxheMcCrbzPZh7Q0Fq82g2amDzboCfFmykorpYL9OXEjg=
 encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwEPBAev3ZtzAy3TNs9OWCQuAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMDUtmW+PuTPbiZbtIAgEQgDtaNo8ApuL5veX8bLkTQ3sQHl/IcBewHQoxSGtkbfVr5W0rP7vlEOvJemt4O963hzJuM9+J4mbHUvgpCw==
