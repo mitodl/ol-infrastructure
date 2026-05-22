@@ -206,6 +206,7 @@ def mfe_job(  # noqa: C901, PLR0915
     copy_common_config = ""
     mfe_smoot_design_overrides = ""
     copy_ai_drawer_components = []
+    copy_responsive_course_tabs = ""
 
     if mfe.application == OpenEdxMicroFrontend.learn:
         mfe_smoot_design_overrides = """
@@ -240,6 +241,11 @@ def mfe_job(  # noqa: C901, PLR0915
                 f"{mfe_build_dir.name}/SidebarAIDrawerCoordinator.jsx"
             ),
         ]
+        copy_responsive_course_tabs = (
+            f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+            f"ResponsiveCourseTabs.jsx "
+            f"{mfe_build_dir.name}/ResponsiveCourseTabs.jsx"
+        )
 
     is_learning_mfe = mfe.application == OpenEdxMicroFrontend.learn
     mfe_setup_steps = [
@@ -252,12 +258,6 @@ def mfe_job(  # noqa: C901, PLR0915
             f"Footer.jsx {mfe_build_dir.name}/Footer.jsx"
         ),
         (
-            f"echo 'Copying ResponsiveCourseTabs.jsx...' && "
-            f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
-            f"ResponsiveCourseTabs.jsx "
-            f"{mfe_build_dir.name}/ResponsiveCourseTabs.jsx"
-        ),
-        (
             f"echo 'Copying env.config from {slot_config_file}.env.jsx...' && "
             f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
             f"{slot_config_file}.env.jsx "
@@ -267,6 +267,11 @@ def mfe_job(  # noqa: C901, PLR0915
     if copy_common_config:
         mfe_setup_steps.append(
             f"echo 'Copying common-mfe-config.env.jsx...' && {copy_common_config}"
+        )
+    if copy_responsive_course_tabs:
+        mfe_setup_steps.append(
+            f"echo 'Copying ResponsiveCourseTabs.jsx...' && "
+            f"{copy_responsive_course_tabs}"
         )
     if copy_ai_drawer_components:
         mfe_setup_steps.append("echo 'Copying AI drawer components...'")
