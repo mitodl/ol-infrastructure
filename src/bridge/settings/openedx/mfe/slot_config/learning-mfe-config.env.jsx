@@ -8,6 +8,7 @@ import messages from './src/courseware/course/sequence/messages';
 import { useIntl } from '@edx/frontend-platform/i18n';
 import config from './common-mfe-config.env.jsx';
 import SidebarAIDrawerCoordinator from './SidebarAIDrawerCoordinator.jsx';
+import ResponsiveCourseTabs from './ResponsiveCourseTabs.jsx';
 
 // When ENABLE_AI_DRAWER_SLOT is disabled or unset
 const ENABLE_AI_DRAWER_SLOT = process.env.ENABLE_AI_DRAWER_SLOT === "true";
@@ -140,6 +141,24 @@ if (process.env.DEPLOYMENT_NAME?.includes("mitxonline")) {
             widgetId: 'default_trigger',
           },
         ]
+      },
+
+      // Replace default tab links with responsive overflow tabs.
+      'org.openedx.frontend.learning.course_tab_links.v1': {
+        keepDefault: false,
+        plugins: [
+          {
+            op: PLUGIN_OPERATIONS.Insert,
+            widget: {
+              id: 'responsive_course_tabs',
+              type: DIRECT_PLUGIN,
+              priority: 1,
+              RenderWidget: ({ activeTabSlug }) => (
+                <ResponsiveCourseTabs activeTabSlug={activeTabSlug} />
+              ),
+            },
+          },
+        ],
       },
       // Slot-based AskTim Chatbot - only if feature flag is enabled
       ...(ENABLE_AI_DRAWER_SLOT ? {
