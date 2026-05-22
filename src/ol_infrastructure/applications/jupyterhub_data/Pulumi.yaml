@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-jupyterhub-data-application
+name: ol-application-jupyterhub-data
 runtime: python
 description: MIT OL JupyterHub Data Platform Service
 backend:

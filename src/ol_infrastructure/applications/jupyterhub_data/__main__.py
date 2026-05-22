@@ -10,7 +10,7 @@ in the notebook itself.
 
 from typing import Any
 
-from pulumi import Config, StackReference
+from pulumi import Config
 from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
@@ -19,19 +19,23 @@ from ol_infrastructure.applications.jupyterhub_data.deployment import (
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import (
-    Application,
     AWSBase,
     BusinessUnit,
     K8sGlobalLabels,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+    require_stack_output_value,
+)
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
@@ -42,9 +46,11 @@ env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 jupyterhub_data_config = Config("jupyterhub_data")
 vault_config = Config("vault")
 
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
-cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+vault_stack = make_stack_reference(
+    projects.VAULT_SERVER, f"operations.{stack_info.name}"
+)
+cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
 
 data_vpc = network_stack.require_output("data_vpc")
 k8s_pod_subnet_cidrs = data_vpc["k8s_pod_subnet_cidrs"]
@@ -54,7 +60,6 @@ aws_config = AWSBase(
 )
 
 k8s_global_labels = K8sGlobalLabels(
-    application=Application.jupyterhub,
     service=Services.notebooks,
     ou=BusinessUnit.data,
     stack=stack_info,
@@ -64,7 +69,7 @@ application_labels = k8s_global_labels | {
     "ol.mit.edu/application": "jupyterhub-data",
 }
 
-setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
+setup_k8s_provider(kubeconfig=require_stack_output_value(cluster_stack, "kube_config"))
 aws_account = get_caller_identity()
 
 jupyterhub_data_namespace = "jupyter-data"
@@ -137,7 +142,7 @@ jupyterhub_data_lake_policy = iam.Policy(
 jupyterhub_data_service_account_name = "jupyterhub-data-service-account"
 jupyterhub_data_trust_role_config = OLEKSTrustRoleConfig(
     account_id=aws_account.account_id,
-    cluster_name=f"jupyterhub-data-{stack_info.name}",
+    cluster_name=cluster_stack.require_output("cluster_name"),
     cluster_identities=cluster_stack.require_output("cluster_identities"),
     description=(
         "Trust role for JupyterHub data service account "

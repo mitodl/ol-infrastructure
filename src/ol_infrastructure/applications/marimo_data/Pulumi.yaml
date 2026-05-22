@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-marimo-data-application
+name: ol-application-marimo-data
 runtime: python
 description: MIT OL Marimo Data Platform — published notebook applications
 backend:

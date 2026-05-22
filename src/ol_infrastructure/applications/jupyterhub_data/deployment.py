@@ -17,18 +17,17 @@ from pulumi import Config, ResourceOptions, StackReference
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.lib.versions import JUPYTERHUB_CHART_VERSION, MARIMO_JUPYTERLAB_VERSION
-from ol_infrastructure.applications.jupyterhub.values import get_authenticator_config
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole
-from ol_infrastructure.components.services.cert_manager import (
-    OLCertManagerCert,
-    OLCertManagerCertConfig,
-)
-from ol_infrastructure.components.services.k8s import (
+from ol_infrastructure.components.services.apisix import (
     OLApisixRoute,
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+)
+from ol_infrastructure.components.services.cert_manager import (
+    OLCertManagerCert,
+    OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -39,7 +38,8 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
 )
-from ol_infrastructure.lib.ol_types import StackInfo
+from ol_infrastructure.lib.jupyterhub_config import get_authenticator_config
+from ol_infrastructure.lib.pulumi_helper import StackInfo
 from ol_infrastructure.lib.vault import postgres_role_statements
 
 # JupyterHub KubeSpawner pre_spawn_hook: injects the user's Keycloak OIDC access token
@@ -211,7 +211,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
 
     # Vault Database Backend and dynamic credentials secret
     vault_backend_config = OLVaultPostgresDatabaseConfig(
-        db_name=db_config.db_name,
+        db_name=db_config.db_name or "jupyterhub_data",
         mount_point=f"postgres-{base_name}",
         db_admin_username=db_config.username,
         db_admin_password=db_config.password.get_secret_value(),

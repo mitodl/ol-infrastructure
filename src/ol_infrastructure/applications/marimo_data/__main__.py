@@ -12,19 +12,20 @@ by the separate applications.jupyterhub_data stack.
 """
 
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference
+from pulumi import Config, ResourceOptions
 
-from ol_infrastructure.components.services.cert_manager import (
-    OLCertManagerCert,
-    OLCertManagerCertConfig,
-)
-from ol_infrastructure.components.services.k8s import (
+from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+)
+from ol_infrastructure.components.services.cert_manager import (
+    OLCertManagerCert,
+    OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
@@ -32,6 +33,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
@@ -39,7 +41,11 @@ from ol_infrastructure.lib.ol_types import (
     K8sGlobalLabels,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+    require_stack_output_value,
+)
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 stack_info = parse_stack()
@@ -48,9 +54,9 @@ setup_vault_provider(stack_info)
 marimo_data_config = Config("marimo_data")
 vault_config = Config("vault")
 
-cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
+cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
 
-setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
+setup_k8s_provider(kubeconfig=require_stack_output_value(cluster_stack, "kube_config"))
 
 aws_config = AWSBase(
     tags={"OU": BusinessUnit.data, "Environment": stack_info.env_suffix}
@@ -192,7 +198,9 @@ OLApisixRoute(
             priority=0,
             shared_plugin_config_name=marimo_shared_plugins.resource_name,
             plugins=[
-                marimo_oidc.get_full_oidc_plugin_config(unauth_action="auth"),
+                OLApisixPluginConfig(
+                    **marimo_oidc.get_full_oidc_plugin_config(unauth_action="auth")
+                ),
             ],
             hosts=[apps_domain],
             paths=["/*"],
