@@ -49,6 +49,9 @@ results_bucket_config = S3BucketConfig(
     server_side_encryption_enabled=True,
     kms_key_id=s3_kms_key["id"],
     bucket_key_enabled=True,
+    # Query results are cold storage: safe for archive tiers.
+    intelligent_tiering_archive_access_days=90,
+    intelligent_tiering_deep_archive_access_days=180,
     lifecycle_rules=[
         s3.BucketLifecycleConfigurationRuleArgs(
             id="expire_old_query_results",
@@ -107,6 +110,9 @@ data_landing_zone_bucket = OLBucket(
         sse_algorithm="aws:kms",
         bucket_key_enabled=True,
         tags=aws_config.tags,
+        # Data landing zone is write-heavy ingest storage: safe for archive tiers.
+        intelligent_tiering_archive_access_days=90,
+        intelligent_tiering_deep_archive_access_days=180,
     ),
     opts=ResourceOptions(
         aliases=[
@@ -137,6 +143,9 @@ for data_stage in data_stages:
             kms_key_id=s3_kms_key["arn"],
             bucket_key_enabled=True,
             tags=aws_config.merged_tags({"OU": "data"}),
+            # Data lake storage is analytical cold storage: safe for archive tiers.
+            intelligent_tiering_archive_access_days=90,
+            intelligent_tiering_deep_archive_access_days=180,
         ),
         opts=ResourceOptions(
             aliases=[

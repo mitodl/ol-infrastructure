@@ -165,6 +165,8 @@ learn_ai_app_storage_bucket_config = S3BucketConfig(
     block_public_policy=False,
     ignore_public_acls=False,
     restrict_public_buckets=False,
+    intelligent_tiering_archive_access_days=None,  # Fastly backend
+    intelligent_tiering_deep_archive_access_days=None,
     tags=aws_config.tags,
 )
 

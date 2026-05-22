@@ -184,6 +184,8 @@ edxapp_mfe_bucket_config = S3BucketConfig(
             allowed_origins=["*"],
         )
     ],
+    intelligent_tiering_archive_access_days=None,  # Fastly backend
+    intelligent_tiering_deep_archive_access_days=None,
     tags=aws_config.tags,
     bucket_policy_document=cast(
         str,

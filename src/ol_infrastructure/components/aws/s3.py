@@ -164,6 +164,44 @@ class S3BucketConfig(AWSBase):
             "Only used if intelligent_tiering_enabled is True."
         ),
     )
+    intelligent_tiering_archive_access_days: int | None = Field(
+        default=None,
+        description=(
+            "Days of no access after which objects in INTELLIGENT_TIERING storage "
+            "class move to the Archive Access tier (68% cheaper than Standard, "
+            "minutes retrieval latency). Must be between 90 and 730. "
+            "Disabled by default (None) -- only opt in for cold-data buckets "
+            "(backups, archives, data lakes) that are never CDN or application "
+            "origins. Retrieval latency will cause cache-miss or request failures "
+            "on any bucket accessed by users or CDN. "
+            "Only used when intelligent_tiering_enabled is True."
+        ),
+    )
+    intelligent_tiering_deep_archive_access_days: int | None = Field(
+        default=None,
+        description=(
+            "Days of no access after which objects in INTELLIGENT_TIERING storage "
+            "class move to the Deep Archive Access tier (95% cheaper than Standard, "
+            "hours retrieval latency). Must be between 180 and 730 and greater than "
+            "intelligent_tiering_archive_access_days when both are set. "
+            "Disabled by default (None) -- only opt in for cold-data buckets "
+            "(backups, archives, data lakes) that are never CDN or application "
+            "origins. Retrieval latency will cause cache-miss or request failures "
+            "on any bucket accessed by users or CDN. "
+            "Only used when intelligent_tiering_enabled is True."
+        ),
+    )
+    abort_incomplete_mpu_days: int | None = Field(
+        default=7,
+        description=(
+            "Days after which S3 automatically aborts incomplete multipart uploads "
+            "and deletes the uploaded parts. Defaults to 7 days, which is safe for "
+            "all buckets -- any upload genuinely in progress will complete well "
+            "within 7 days; stale parts from failed uploads are cleaned up "
+            "automatically. Set to None only if a bucket has a known use case "
+            "requiring uploads longer than 7 days."
+        ),
+    )
     cors_rules: list[s3.BucketCorsConfigurationCorsRuleArgs] | None = Field(
         default=None,
         description="CORS configuration rules for the bucket.",
@@ -209,6 +247,54 @@ class S3BucketConfig(AWSBase):
         return self
 
     @model_validator(mode="after")
+    def check_archive_tiering_config(self) -> "S3BucketConfig":
+        """Validate archive access tier configuration."""
+        if not self.intelligent_tiering_enabled:
+            return self
+        _ARCHIVE_MIN_DAYS = 90
+        _ARCHIVE_MAX_DAYS = 730
+        _DEEP_ARCHIVE_MIN_DAYS = 180
+        if self.intelligent_tiering_archive_access_days is not None:
+            archive_days = self.intelligent_tiering_archive_access_days
+            if archive_days < _ARCHIVE_MIN_DAYS:
+                error_message = (
+                    "intelligent_tiering_archive_access_days must be "
+                    ">= 90 (AWS minimum)"
+                )
+                raise ValueError(error_message)
+            if archive_days > _ARCHIVE_MAX_DAYS:
+                error_message = (
+                    "intelligent_tiering_archive_access_days must be "
+                    "<= 730 (AWS maximum)"
+                )
+                raise ValueError(error_message)
+        if self.intelligent_tiering_deep_archive_access_days is not None:
+            deep_days = self.intelligent_tiering_deep_archive_access_days
+            if deep_days < _DEEP_ARCHIVE_MIN_DAYS:
+                error_message = (
+                    "intelligent_tiering_deep_archive_access_days must be >= 180 "
+                    "(AWS minimum)"
+                )
+                raise ValueError(error_message)
+            if deep_days > _ARCHIVE_MAX_DAYS:
+                error_message = (
+                    "intelligent_tiering_deep_archive_access_days must be <= 730 "
+                    "(AWS maximum)"
+                )
+                raise ValueError(error_message)
+            if (
+                self.intelligent_tiering_archive_access_days is not None
+                and self.intelligent_tiering_deep_archive_access_days
+                <= self.intelligent_tiering_archive_access_days
+            ):
+                error_message = (
+                    "intelligent_tiering_deep_archive_access_days must be greater "
+                    "than intelligent_tiering_archive_access_days"
+                )
+                raise ValueError(error_message)
+        return self
+
+    @model_validator(mode="after")
     def check_encryption_config(self) -> "S3BucketConfig":
         """Validate encryption configuration.
 
@@ -243,6 +329,17 @@ class S3BucketConfig(AWSBase):
             raise ValueError(error_message)
         return self
 
+    @model_validator(mode="after")
+    def check_abort_mpu_days(self) -> "S3BucketConfig":
+        """Validate abort_incomplete_mpu_days is a positive integer when set."""
+        if (
+            self.abort_incomplete_mpu_days is not None
+            and self.abort_incomplete_mpu_days < 1
+        ):
+            error_message = "abort_incomplete_mpu_days must be >= 1"
+            raise ValueError(error_message)
+        return self
+
 
 class OLBucket(pulumi.ComponentResource):
     """A component resource for creating and managing S3 buckets with best practices.
@@ -268,13 +365,14 @@ class OLBucket(pulumi.ComponentResource):
     bucket_public_access_block: s3.BucketPublicAccessBlock | None = None
     bucket_logging: s3.BucketLogging | None = None
     bucket_lifecycle: s3.BucketLifecycleConfiguration | None = None
+    bucket_intelligent_tiering: s3.BucketIntelligentTieringConfiguration | None = None
     bucket_website: s3.BucketWebsiteConfiguration | None = None
     bucket_encryption: s3.BucketServerSideEncryptionConfiguration | None = None
     bucket_cors: s3.BucketCorsConfiguration | None = None
     bucket_ownership_controls: s3.BucketOwnershipControls | None = None
     bucket_policy: s3.BucketPolicy | None = None
 
-    def __init__(  # noqa: C901
+    def __init__(  # noqa: C901, PLR0912
         self,
         name: str,
         config: S3BucketConfig,
@@ -389,6 +487,19 @@ class OLBucket(pulumi.ComponentResource):
         # Create or enhance BucketLifecycleConfiguration
         lifecycle_rules = list(config.lifecycle_rules) if config.lifecycle_rules else []
 
+        # Add abort-incomplete-multipart-upload rule if enabled (default: 7 days).
+        # This prevents stale MPU parts from accumulating and billing indefinitely.
+        if config.abort_incomplete_mpu_days is not None:
+            lifecycle_rules.append(
+                s3.BucketLifecycleConfigurationRuleArgs(
+                    id="abort-incomplete-multipart-uploads",
+                    status="Enabled",
+                    abort_incomplete_multipart_upload=s3.BucketLifecycleConfigurationRuleAbortIncompleteMultipartUploadArgs(
+                        days_after_initiation=config.abort_incomplete_mpu_days,
+                    ),
+                )
+            )
+
         # Add intelligent tiering rule if enabled
         if config.intelligent_tiering_enabled:
             intelligent_tiering_rule = s3.BucketLifecycleConfigurationRuleArgs(
@@ -409,6 +520,41 @@ class OLBucket(pulumi.ComponentResource):
                 f"{name}-lifecycle",
                 bucket=self.bucket_v2.id,
                 rules=lifecycle_rules,
+                opts=child_opts,
+            )
+
+        # Create BucketIntelligentTieringConfiguration to enable the optional
+        # Archive Access and Deep Archive Access tiers within INTELLIGENT_TIERING.
+        # These tiers require explicit opt-in and provide 68-95% cost savings for
+        # truly cold objects, but have minutes-to-hours retrieval latency - do not
+        # enable on buckets serving live CDN content.
+        if config.intelligent_tiering_enabled and (
+            config.intelligent_tiering_archive_access_days is not None
+            or config.intelligent_tiering_deep_archive_access_days is not None
+        ):
+            archive_tierings: list[
+                s3.BucketIntelligentTieringConfigurationTieringArgs
+            ] = []
+            if config.intelligent_tiering_archive_access_days is not None:
+                archive_tierings.append(
+                    s3.BucketIntelligentTieringConfigurationTieringArgs(
+                        access_tier="ARCHIVE_ACCESS",
+                        days=config.intelligent_tiering_archive_access_days,
+                    )
+                )
+            if config.intelligent_tiering_deep_archive_access_days is not None:
+                archive_tierings.append(
+                    s3.BucketIntelligentTieringConfigurationTieringArgs(
+                        access_tier="DEEP_ARCHIVE_ACCESS",
+                        days=config.intelligent_tiering_deep_archive_access_days,
+                    )
+                )
+            self.bucket_intelligent_tiering = s3.BucketIntelligentTieringConfiguration(
+                f"{name}-intelligent-tiering-config",
+                bucket=self.bucket_v2.id,
+                name="standard-tiering",
+                status="Enabled",
+                tierings=archive_tierings,
                 opts=child_opts,
             )
 
