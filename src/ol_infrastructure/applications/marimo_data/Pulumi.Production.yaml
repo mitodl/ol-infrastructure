@@ -5,3 +5,4 @@ config:
   aws:region: us-east-1
   vault:address: https://vault.odl.mit.edu
   vault_server:env_namespace: operations.production
+encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwGex550MNA0/xwWTb8eyxHDAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMoNdKqb0AyNcw7tBEAgEQgDuH9cHGoJyUrU8vysHGMEnKnuVGgMc02Nwy1F70htiA0gWl2ksniY4Z9SXeRwM9Re90IuLHZpWJVL//Kg==
