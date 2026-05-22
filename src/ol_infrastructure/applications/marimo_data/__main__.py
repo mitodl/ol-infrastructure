@@ -1,14 +1,17 @@
 """Marimo Data application stack — published notebook applications.
 
 This stack manages the APISIX route and supporting infrastructure that expose
-published (run-mode) MarimoNotebook CRDs at notebooks.odl.mit.edu/apps/{name},
-assuming the marimo-operator is installed and managed separately.
+published (run-mode) MarimoNotebook CRDs at the domain configured via
+``marimo_data:apps_domain`` (e.g. ``nb.data.ol.mit.edu`` for Production,
+``nb-qa.data.ol.mit.edu`` for QA).  The marimo-operator is installed and
+managed separately; this stack assumes the operator has already created the
+``marimo-operator-gateway`` Kubernetes Service that APISIX routes to.
 
 Published apps use the ol-marimo-app-client service account (client credentials
 flow) for Trino access, so they are not tied to a specific user session.
 
-The JupyterHub development environment (jupyter-data.odl.mit.edu) is managed
-by the separate applications.jupyterhub_data stack.
+The JupyterHub development environment is managed by the separate
+``applications.jupyterhub_data`` stack.
 """
 
 import pulumi_vault as vault
@@ -185,9 +188,14 @@ marimo_shared_plugins = OLApisixSharedPlugins(
     ),
 )
 
-# APISIX route for notebooks.odl.mit.edu — openid-connect plugin enforces auth,
+# APISIX route for the apps domain — openid-connect plugin enforces auth,
 # forwarding to the marimo-operator-gateway service which routes to individual
 # MarimoNotebook services created by the operator.
+#
+# The `marimo-operator-gateway` Kubernetes Service is created by the
+# marimo-operator Helm chart (installed out-of-band via the data EKS cluster
+# substructure stack).  The marimo-operator watches MarimoNotebook CRDs and
+# spins up per-notebook Services that the gateway load-balances across.
 OLApisixRoute(
     name=f"ol-marimo-data-k8s-apisix-route-{stack_info.env_suffix}",
     k8s_namespace=marimo_namespace,

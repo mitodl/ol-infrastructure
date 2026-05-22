@@ -427,6 +427,8 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     "image": {
                         "name": "ghcr.io/mitodl/marimo-jupyterlab",
                         "tag": MARIMO_JUPYTERLAB_VERSION,
+                        # Use Always while MARIMO_JUPYTERLAB_VERSION is "latest";
+                        # switch to IfNotPresent once pinned to a versioned tag.
                         "pullPolicy": "Always",
                     },
                     "cmd": ["jupyterhub-singleuser"],
