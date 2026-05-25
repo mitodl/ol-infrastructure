@@ -14,7 +14,7 @@ const AI_DRAWER_MESSAGE_TYPES = [
 const SidebarAIDrawerCoordinator = ({ courseId }) => {
     const contextValue = useContext(SidebarContext);
     const currentSidebar = contextValue?.currentSidebar ?? null;
-    const toggleSidebar = contextValue?.toggleSidebar ?? (() => {});
+    const toggleSidebar = contextValue?.toggleSidebar ?? (() => { });
     const shouldDisplayFullScreen = contextValue?.shouldDisplayFullScreen ?? false;
     const unitId = contextValue?.unitId ?? null;
 
@@ -81,28 +81,10 @@ const SidebarAIDrawerCoordinator = ({ courseId }) => {
         prevUnitIdRef.current = unitId;
     }, [unitId, messageOrigin]);
 
-    /**
-     * Sync the .ai-drawer-wrapper height to the visible viewport area so the
-     * entire drawer — including the input bar at the bottom — stays inside the
-     * viewport at every scroll position.
-     *
-     * Background: .ai-drawer-wrapper uses `position: sticky; top: 1rem`. CSS
-     * sticky only engages once the parent has scrolled far enough; until then
-     * the element sits at its natural position (below the platform header and
-     * breadcrumb). With a fixed `height: calc(100dvh - 2rem)`, the panel's
-     * bottom — and therefore the chat input — falls below the viewport when
-     * the user is at the top of the page.
-     *
-     * Fix: each animation frame, compute the panel's actual top in the
-     * viewport (max(parentTop, INSET)) and set --ai-drawer-height to the
-     * remaining viewport minus the bottom inset. The effect is gated by
-     * `showAIDrawer`, `shouldDisplayFullScreen`, and a >=1025px media query so
-     * it only runs when the inline sticky layout is actually in use.
-     */
+    // Keeps --ai-drawer-height in sync with the actual visible area on each
+    // scroll/resize so the sticky drawer never overflows the viewport bottom.
     useEffect(() => {
-        if (typeof window === 'undefined') return undefined;
         const wrapper = wrapperRef.current;
-        if (!wrapper) return undefined;
 
         if (!showAIDrawer || shouldDisplayFullScreen) {
             wrapper.style.removeProperty('--ai-drawer-height');
@@ -124,11 +106,11 @@ const SidebarAIDrawerCoordinator = ({ courseId }) => {
             }
             const parent = wrapper.parentElement;
             if (!parent) return;
-
             const parentRect = parent.getBoundingClientRect();
             const stickyTop = Math.max(parentRect.top, INSET_PX);
             const effectiveBottom = Math.min(window.innerHeight - INSET_PX, parentRect.bottom);
             const available = effectiveBottom - stickyTop;
+
             wrapper.style.setProperty(
                 '--ai-drawer-height',
                 `${Math.max(MIN_HEIGHT_PX, available)}px`,
@@ -149,10 +131,10 @@ const SidebarAIDrawerCoordinator = ({ courseId }) => {
                     resizeObserver = new ResizeObserver(schedule);
                     resizeObserver.observe(wrapper.parentElement);
                 }
+                schedule();
             } else {
                 detach();
             }
-            schedule();
         };
 
         const detach = () => {
@@ -183,8 +165,7 @@ const SidebarAIDrawerCoordinator = ({ courseId }) => {
             {currentSidebar !== null && <Sidebar />}
             <div
                 ref={wrapperRef}
-                className={`ai-drawer-wrapper ml-0 ml-xl-4 align-top ${
-                    shouldDisplayFullScreen ? 'ai-drawer-wrapper-fullscreen' : ''
+                className={`ai-drawer-wrapper ml-0 ml-xl-4 align-top ${shouldDisplayFullScreen ? 'ai-drawer-wrapper-fullscreen' : ''
                 } ${showAIDrawer ? '' : 'd-none'}`}
                 aria-hidden={!showAIDrawer}
             >
