@@ -682,17 +682,13 @@ test_offline_bucket = OLBucket(
 )
 
 if stack_info.env_suffix == "production":
+
     def setup_bucket_replication(
         source_bucket: OLBucket,
         destination_bucket: OLBucket,
         *,
         source_bucket_name: str,
-        source_bucket_arn: str,
-        destination_bucket_arn: str,
-        resource_prefix: str,
-        role_name: str,
-        policy_name: str,
-        rule_id: str,
+        replication_settings: dict[str, str],
     ) -> s3.BucketReplicationConfig:
         """Create imported IAM and replication resources for a source/destination pair.
 
@@ -700,21 +696,23 @@ if stack_info.env_suffix == "production":
             source_bucket: Source OCW bucket component.
             destination_bucket: Destination backup OCW bucket component.
             source_bucket_name: Existing source bucket name used for import IDs.
-            source_bucket_arn: Source bucket ARN string used in linted IAM policy JSON.
-            destination_bucket_arn: Destination bucket ARN string used in IAM policy JSON.
-            resource_prefix: Pulumi logical resource name prefix.
-            role_name: Existing replication IAM role name to import/manage.
-            policy_name: Existing replication IAM policy name to import/manage.
-            rule_id: Existing replication rule identifier.
+            replication_settings: Existing ARNs and names used for imports and
+                replication-rule identity.
 
         Returns:
             The imported BucketReplicationConfig resource for the source bucket.
         """
+        source_bucket_arn = replication_settings["source_bucket_arn"]
+        destination_bucket_arn = replication_settings["destination_bucket_arn"]
+        role_name = replication_settings["role_name"]
+        policy_name = replication_settings["policy_name"]
+        rule_id = replication_settings["rule_id"]
+
         policy_arn = (
             f"arn:aws:iam::{aws_account.account_id}:policy/service-role/{policy_name}"
         )
         replication_role = iam.Role(
-            f"{resource_prefix}-replication-role",
+            f"{source_bucket_name}-replication-role",
             name=role_name,
             path="/service-role/",
             assume_role_policy=json.dumps(
@@ -732,7 +730,7 @@ if stack_info.env_suffix == "production":
             opts=ResourceOptions(import_=role_name),
         )
         replication_policy = iam.Policy(
-            f"{resource_prefix}-replication-policy",
+            f"{source_bucket_name}-replication-policy",
             name=policy_name,
             path="/service-role/",
             policy=lint_iam_policy(
@@ -777,7 +775,7 @@ if stack_info.env_suffix == "production":
             opts=ResourceOptions(import_=policy_arn),
         )
         replication_policy_attachment = iam.RolePolicyAttachment(
-            f"{resource_prefix}-replication-policy-attachment",
+            f"{source_bucket_name}-replication-policy-attachment",
             role=replication_role.name,
             policy_arn=replication_policy.arn,
             opts=ResourceOptions(
@@ -790,7 +788,7 @@ if stack_info.env_suffix == "production":
         )
 
         return s3.BucketReplicationConfig(
-            f"{resource_prefix}-replication",
+            f"{source_bucket_name}-replication",
             bucket=source_bucket.bucket_v2.id,
             role=replication_role.arn,
             rules=[
@@ -825,24 +823,26 @@ if stack_info.env_suffix == "production":
         draft_bucket,
         draft_backup_bucket,
         source_bucket_name=draft_bucket_name,
-        source_bucket_arn=draft_bucket_arn,
-        destination_bucket_arn=draft_backup_bucket_arn,
-        resource_prefix="ocw-content-draft-production",
-        role_name="s3crr_role_for_ocw-content-draft-production",
-        policy_name="s3crr_for_ocw-content-draft-production_8da254",
-        rule_id="OCWContentDraftProductionBackupRule",
+        replication_settings={
+            "source_bucket_arn": draft_bucket_arn,
+            "destination_bucket_arn": draft_backup_bucket_arn,
+            "role_name": "s3crr_role_for_ocw-content-draft-production",
+            "policy_name": "s3crr_for_ocw-content-draft-production_8da254",
+            "rule_id": "OCWContentDraftProductionBackupRule",
+        },
     )
 
     live_bucket_replication = setup_bucket_replication(
         live_bucket,
         live_backup_bucket,
         source_bucket_name=live_bucket_name,
-        source_bucket_arn=live_bucket_arn,
-        destination_bucket_arn=live_backup_bucket_arn,
-        resource_prefix="ocw-content-live-production",
-        role_name="s3crr_role_for_ocw-content-live-production",
-        policy_name="s3crr_for_ocw-content-live-production_565f2a",
-        rule_id="OCWContentLiveProductionBackupRule",
+        replication_settings={
+            "source_bucket_arn": live_bucket_arn,
+            "destination_bucket_arn": live_backup_bucket_arn,
+            "role_name": "s3crr_role_for_ocw-content-live-production",
+            "policy_name": "s3crr_for_ocw-content-live-production_565f2a",
+            "rule_id": "OCWContentLiveProductionBackupRule",
+        },
     )
 
 policy_description = (
