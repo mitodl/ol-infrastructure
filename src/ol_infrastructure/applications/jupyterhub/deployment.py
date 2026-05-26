@@ -351,11 +351,11 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                             "authenticator_class": jupyterhub_deployment_config.get(
                                 "authenticator_class"
                             ),
-                            "admin_users": jupyterhub_deployment_config.get_object(
+                            "admin_users": jupyterhub_deployment_config.get(
                                 "admin_users"
                             )
                             or [],
-                            "allowed_users": jupyterhub_deployment_config.get_object(
+                            "allowed_users": jupyterhub_deployment_config.get(
                                 "allowed_users"
                             )
                             or [],
