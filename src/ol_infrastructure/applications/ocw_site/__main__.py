@@ -682,238 +682,151 @@ test_offline_bucket = OLBucket(
 )
 
 if stack_info.env_suffix == "production":
-    draft_bucket_replication_role_name = "s3crr_role_for_ocw-content-draft-production"
-    draft_bucket_replication_policy_name = (
-        "s3crr_for_ocw-content-draft-production_8da254"
-    )
-    draft_bucket_replication_policy_arn = (
-        f"arn:aws:iam::{aws_account.account_id}:policy/service-role/"
-        f"{draft_bucket_replication_policy_name}"
-    )
-    draft_bucket_replication_role = iam.Role(
-        "ocw-content-draft-production-replication-role",
-        name=draft_bucket_replication_role_name,
-        path="/service-role/",
-        assume_role_policy=json.dumps(
-            {
-                "Version": IAM_POLICY_VERSION,
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Principal": {"Service": "s3.amazonaws.com"},
-                        "Action": "sts:AssumeRole",
-                    }
-                ],
-            }
-        ),
-        opts=ResourceOptions(import_=draft_bucket_replication_role_name),
-    )
-    draft_bucket_replication_policy = iam.Policy(
-        "ocw-content-draft-production-replication-policy",
-        name=draft_bucket_replication_policy_name,
-        path="/service-role/",
-        policy=json.dumps(
-            {
-                "Version": IAM_POLICY_VERSION,
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Action": [
-                            "s3:ListBucket",
-                            "s3:GetReplicationConfiguration",
-                            "s3:GetObjectVersionForReplication",
-                            "s3:GetObjectVersionAcl",
-                            "s3:GetObjectVersionTagging",
-                            "s3:GetObjectRetention",
-                            "s3:GetObjectLegalHold",
-                        ],
-                        "Resource": [
-                            draft_bucket_arn,
-                            f"{draft_bucket_arn}/*",
-                            draft_backup_bucket_arn,
-                            f"{draft_backup_bucket_arn}/*",
-                        ],
-                    },
-                    {
-                        "Effect": "Allow",
-                        "Action": [
-                            "s3:ReplicateObject",
-                            "s3:ReplicateDelete",
-                            "s3:ReplicateTags",
-                            "s3:ObjectOwnerOverrideToBucketOwner",
-                        ],
-                        "Resource": [
-                            f"{draft_bucket_arn}/*",
-                            f"{draft_backup_bucket_arn}/*",
-                        ],
-                    },
-                ],
-            }
-        ),
-        opts=ResourceOptions(import_=draft_bucket_replication_policy_arn),
-    )
-    draft_bucket_replication_policy_attachment = iam.RolePolicyAttachment(
-        "ocw-content-draft-production-replication-policy-attachment",
-        role=draft_bucket_replication_role.name,
-        policy_arn=draft_bucket_replication_policy.arn,
-        opts=ResourceOptions(
-            import_=(
-                f"{draft_bucket_replication_role_name}/"
-                f"{draft_bucket_replication_policy_arn}"
+    def setup_bucket_replication(
+        source_bucket,
+        destination_bucket,
+        *,
+        source_bucket_name,
+        source_bucket_arn,
+        destination_bucket_arn,
+        resource_prefix,
+        role_name,
+        policy_name,
+        rule_id,
+    ):
+        policy_arn = (
+            f"arn:aws:iam::{aws_account.account_id}:policy/service-role/{policy_name}"
+        )
+        replication_role = iam.Role(
+            f"{resource_prefix}-replication-role",
+            name=role_name,
+            path="/service-role/",
+            assume_role_policy=json.dumps(
+                {
+                    "Version": IAM_POLICY_VERSION,
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {"Service": "s3.amazonaws.com"},
+                            "Action": "sts:AssumeRole",
+                        }
+                    ],
+                }
             ),
-            depends_on=[
-                draft_bucket_replication_role,
-                draft_bucket_replication_policy,
-            ],
-        ),
-    )
-
-    draft_bucket_replication = s3.BucketReplicationConfig(
-        "ocw-content-draft-production-replication",
-        bucket=draft_bucket.bucket_v2.id,
-        role=draft_bucket_replication_role.arn,
-        rules=[
-            s3.BucketReplicationConfigRuleArgs(
-                id="OCWContentDraftProductionBackupRule",
-                priority=0,
-                filter=s3.BucketReplicationConfigRuleFilterArgs(),
-                status="Enabled",
-                destination=s3.BucketReplicationConfigRuleDestinationArgs(
-                    bucket=draft_backup_bucket.bucket_v2.arn,
-                ),
-                delete_marker_replication=s3.BucketReplicationConfigRuleDeleteMarkerReplicationArgs(
-                    status="Disabled"
-                ),
-            )
-        ],
-        opts=ResourceOptions(
-            import_=draft_bucket_name,
-            depends_on=[
-                resource
-                for resource in [
-                    draft_bucket.bucket_versioning,
-                    draft_backup_bucket.bucket_versioning,
-                    draft_bucket_replication_policy_attachment,
-                ]
-                if resource is not None
-            ],
-        ),
-    )
-
-    live_bucket_replication_role_name = "s3crr_role_for_ocw-content-live-production"
-    live_bucket_replication_policy_name = "s3crr_for_ocw-content-live-production_565f2a"
-    live_bucket_replication_policy_arn = (
-        f"arn:aws:iam::{aws_account.account_id}:policy/service-role/"
-        f"{live_bucket_replication_policy_name}"
-    )
-    live_bucket_replication_role = iam.Role(
-        "ocw-content-live-production-replication-role",
-        name=live_bucket_replication_role_name,
-        path="/service-role/",
-        assume_role_policy=json.dumps(
-            {
-                "Version": IAM_POLICY_VERSION,
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Principal": {"Service": "s3.amazonaws.com"},
-                        "Action": "sts:AssumeRole",
-                    }
-                ],
-            }
-        ),
-        opts=ResourceOptions(import_=live_bucket_replication_role_name),
-    )
-    live_bucket_replication_policy = iam.Policy(
-        "ocw-content-live-production-replication-policy",
-        name=live_bucket_replication_policy_name,
-        path="/service-role/",
-        policy=json.dumps(
-            {
-                "Version": IAM_POLICY_VERSION,
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Action": [
-                            "s3:ListBucket",
-                            "s3:GetReplicationConfiguration",
-                            "s3:GetObjectVersionForReplication",
-                            "s3:GetObjectVersionAcl",
-                            "s3:GetObjectVersionTagging",
-                            "s3:GetObjectRetention",
-                            "s3:GetObjectLegalHold",
-                        ],
-                        "Resource": [
-                            live_bucket_arn,
-                            f"{live_bucket_arn}/*",
-                            live_backup_bucket_arn,
-                            f"{live_backup_bucket_arn}/*",
-                        ],
-                    },
-                    {
-                        "Effect": "Allow",
-                        "Action": [
-                            "s3:ReplicateObject",
-                            "s3:ReplicateDelete",
-                            "s3:ReplicateTags",
-                            "s3:ObjectOwnerOverrideToBucketOwner",
-                        ],
-                        "Resource": [
-                            f"{live_bucket_arn}/*",
-                            f"{live_backup_bucket_arn}/*",
-                        ],
-                    },
-                ],
-            }
-        ),
-        opts=ResourceOptions(import_=live_bucket_replication_policy_arn),
-    )
-    live_bucket_replication_policy_attachment = iam.RolePolicyAttachment(
-        "ocw-content-live-production-replication-policy-attachment",
-        role=live_bucket_replication_role.name,
-        policy_arn=live_bucket_replication_policy.arn,
-        opts=ResourceOptions(
-            import_=(
-                f"{live_bucket_replication_role_name}/"
-                f"{live_bucket_replication_policy_arn}"
+            opts=ResourceOptions(import_=role_name),
+        )
+        replication_policy = iam.Policy(
+            f"{resource_prefix}-replication-policy",
+            name=policy_name,
+            path="/service-role/",
+            policy=lint_iam_policy(
+                {
+                    "Version": IAM_POLICY_VERSION,
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:ListBucket",
+                                "s3:GetReplicationConfiguration",
+                                "s3:GetObjectVersionForReplication",
+                                "s3:GetObjectVersionAcl",
+                                "s3:GetObjectVersionTagging",
+                                "s3:GetObjectRetention",
+                                "s3:GetObjectLegalHold",
+                            ],
+                            "Resource": [
+                                source_bucket_arn,
+                                f"{source_bucket_arn}/*",
+                                destination_bucket_arn,
+                                f"{destination_bucket_arn}/*",
+                            ],
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:ReplicateObject",
+                                "s3:ReplicateDelete",
+                                "s3:ReplicateTags",
+                                "s3:ObjectOwnerOverrideToBucketOwner",
+                            ],
+                            "Resource": [
+                                f"{source_bucket_arn}/*",
+                                f"{destination_bucket_arn}/*",
+                            ],
+                        },
+                    ],
+                },
+                stringify=True,
             ),
-            depends_on=[
-                live_bucket_replication_role,
-                live_bucket_replication_policy,
+            opts=ResourceOptions(import_=policy_arn),
+        )
+        replication_policy_attachment = iam.RolePolicyAttachment(
+            f"{resource_prefix}-replication-policy-attachment",
+            role=replication_role.name,
+            policy_arn=replication_policy.arn,
+            opts=ResourceOptions(
+                import_=f"{role_name}/{policy_arn}",
+                depends_on=[
+                    replication_role,
+                    replication_policy,
+                ],
+            ),
+        )
+
+        return s3.BucketReplicationConfig(
+            f"{resource_prefix}-replication",
+            bucket=source_bucket.bucket_v2.id,
+            role=replication_role.arn,
+            rules=[
+                s3.BucketReplicationConfigRuleArgs(
+                    id=rule_id,
+                    priority=0,
+                    filter=s3.BucketReplicationConfigRuleFilterArgs(),
+                    status="Enabled",
+                    destination=s3.BucketReplicationConfigRuleDestinationArgs(
+                        bucket=destination_bucket.bucket_v2.arn,
+                    ),
+                    delete_marker_replication=s3.BucketReplicationConfigRuleDeleteMarkerReplicationArgs(
+                        status="Disabled"
+                    ),
+                )
             ],
-        ),
+            opts=ResourceOptions(
+                import_=source_bucket_name,
+                depends_on=[
+                    resource
+                    for resource in [
+                        source_bucket.bucket_versioning,
+                        destination_bucket.bucket_versioning,
+                        replication_policy_attachment,
+                    ]
+                    if resource is not None
+                ],
+            ),
+        )
+
+    draft_bucket_replication = setup_bucket_replication(
+        draft_bucket,
+        draft_backup_bucket,
+        source_bucket_name=draft_bucket_name,
+        source_bucket_arn=draft_bucket_arn,
+        destination_bucket_arn=draft_backup_bucket_arn,
+        resource_prefix="ocw-content-draft-production",
+        role_name="s3crr_role_for_ocw-content-draft-production",
+        policy_name="s3crr_for_ocw-content-draft-production_8da254",
+        rule_id="OCWContentDraftProductionBackupRule",
     )
 
-    live_bucket_replication = s3.BucketReplicationConfig(
-        "ocw-content-live-production-replication",
-        bucket=live_bucket.bucket_v2.id,
-        role=live_bucket_replication_role.arn,
-        rules=[
-            s3.BucketReplicationConfigRuleArgs(
-                id="OCWContentLiveProductionBackupRule",
-                priority=0,
-                filter=s3.BucketReplicationConfigRuleFilterArgs(),
-                status="Enabled",
-                destination=s3.BucketReplicationConfigRuleDestinationArgs(
-                    bucket=live_backup_bucket.bucket_v2.arn,
-                ),
-                delete_marker_replication=s3.BucketReplicationConfigRuleDeleteMarkerReplicationArgs(
-                    status="Disabled"
-                ),
-            )
-        ],
-        opts=ResourceOptions(
-            import_=live_bucket_name,
-            depends_on=[
-                resource
-                for resource in [
-                    live_bucket.bucket_versioning,
-                    live_backup_bucket.bucket_versioning,
-                    live_bucket_replication_policy_attachment,
-                ]
-                if resource is not None
-            ],
-        ),
+    live_bucket_replication = setup_bucket_replication(
+        live_bucket,
+        live_backup_bucket,
+        source_bucket_name=live_bucket_name,
+        source_bucket_arn=live_bucket_arn,
+        destination_bucket_arn=live_backup_bucket_arn,
+        resource_prefix="ocw-content-live-production",
+        role_name="s3crr_role_for_ocw-content-live-production",
+        policy_name="s3crr_for_ocw-content-live-production_565f2a",
+        rule_id="OCWContentLiveProductionBackupRule",
     )
 
 policy_description = (
