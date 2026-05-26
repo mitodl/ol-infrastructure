@@ -20,10 +20,9 @@ from typing import Any
 
 import pulumi_kubernetes as kubernetes
 import yaml as pyyaml
-from pulumi import ResourceOptions, StackReference
+from pulumi import ResourceOptions
 
 from bridge.lib.versions import MARIMO_OPERATOR_VERSION
-from ol_infrastructure.lib.aws.eks_helper import check_cluster_namespace
 
 MARIMO_OPERATOR_MANIFEST_URL = (
     "https://raw.githubusercontent.com/marimo-team/marimo-operator/"
@@ -45,30 +44,24 @@ def _fetch_operator_manifests() -> list[dict[str, Any]]:
 
 def setup_marimo_operator(
     cluster_name: str,
-    cluster_stack: StackReference,
     k8s_provider: kubernetes.Provider,
 ) -> kubernetes.yaml.v2.ConfigGroup:
     """Install the marimo Operator into the marimo-operator-system namespace.
 
     The operator is installed from the upstream ``deploy/install.yaml``
-    manifest, which bundles the ``MarimoNotebook`` CRD, RBAC resources, and
-    the operator Deployment.  It watches all namespaces and reconciles
-    ``MarimoNotebook`` resources by creating per-notebook Deployments and
-    ClusterIP Services.
+    manifest, which bundles the ``MarimoNotebook`` CRD, RBAC resources, the
+    operator Deployment, and the ``marimo-operator-system`` Namespace.  The
+    Namespace is intentionally left in the manifest so the operator owns it
+    rather than the EKS infrastructure stack.
 
     Args:
         cluster_name: Name of the EKS cluster (used for Pulumi resource names).
-        cluster_stack: StackReference to the EKS infrastructure stack, used to
-            validate that the marimo-operator-system namespace exists.
+        cluster_stack: StackReference to the EKS infrastructure stack.
         k8s_provider: Pulumi Kubernetes provider for this cluster.
 
     Returns:
         The ConfigGroup resource representing the operator install.
     """
-    cluster_stack.require_output("namespaces").apply(
-        lambda ns: check_cluster_namespace(MARIMO_OPERATOR_NAMESPACE, ns)
-    )
-
     return kubernetes.yaml.v2.ConfigGroup(
         f"{cluster_name}-marimo-operator",
         objs=_fetch_operator_manifests(),

@@ -342,7 +342,6 @@ if stack_info.env_prefix == "data":
 if stack_info.env_prefix == "data":
     setup_marimo_operator(
         cluster_name=cluster_name,
-        cluster_stack=cluster_stack,
         k8s_provider=k8s_provider,
     )
 

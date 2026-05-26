@@ -31,7 +31,6 @@ config:
   - jupyter-data
   - kubewatch
   - marimo
-  - marimo-operator-system
   - open-metadata
   - qdrant
   - starrocks
