@@ -234,6 +234,7 @@
 
   @media (min-width: 1025px) {
     top: 1rem;
+    height: calc(100vh - 2rem);
     height: var(--ai-drawer-height, calc(100dvh - 2rem));
   }
 

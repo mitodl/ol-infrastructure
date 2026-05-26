@@ -92,7 +92,6 @@ const SidebarAIDrawerCoordinator = ({ courseId }) => {
         }
 
         const INSET_PX = 16; // matches the `1rem` inset in the CSS rule
-        const MIN_HEIGHT_PX = 200;
         const mq = window.matchMedia('(min-width: 1025px)');
 
         let rafId = null;
@@ -113,7 +112,7 @@ const SidebarAIDrawerCoordinator = ({ courseId }) => {
 
             wrapper.style.setProperty(
                 '--ai-drawer-height',
-                `${Math.max(MIN_HEIGHT_PX, available)}px`,
+                `${Math.max(0, available)}px`,
             );
         };
 
