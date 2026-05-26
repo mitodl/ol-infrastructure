@@ -448,8 +448,11 @@ def create_k8s_secrets(
     else:
         typesense_secret = None
 
-    # Webhook tokens secret (conditional - only for mitxonline QA for now)
-    if stack_info.env_prefix == "mitxonline" and stack_info.env_suffix == "qa":
+    # Webhook tokens secret (conditional - only for mitxonline QA/Production)
+    if stack_info.env_prefix == "mitxonline" and stack_info.env_suffix in [
+        "qa",
+        "production",
+    ]:
         webhook_tokens_secret = builder.create_static(
             name="webhook-tokens",
             resource_name="webhook-tokens-secret",
@@ -498,7 +501,8 @@ def create_k8s_secrets(
         if stack_info.env_prefix == "mitxonline"
         else None,
         webhook_tokens_secret_name=webhook_tokens_secret_name
-        if stack_info.env_prefix == "mitxonline" and stack_info.env_suffix == "qa"
+        if stack_info.env_prefix == "mitxonline"
+        and stack_info.env_suffix in ["qa", "production"]
         else None,
         meilisearch_secret_name=meilisearch_secret_name,
         typesense_secret_name=typesense_secret_name,

@@ -505,7 +505,6 @@ ol_web_target_group_config = OLTargetGroupConfig(
     health_check_path="/api/v1/info",
     health_check_port=str(DEFAULT_HTTPS_PORT),
     health_check_protocol="HTTPS",
-    stickiness="lb_cookie",
     tags=aws_config.tags,
 )
 

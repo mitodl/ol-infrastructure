@@ -212,6 +212,7 @@ def build_dagster_docker_pipeline() -> Pipeline:
             get=image.name,
             trigger=True,
             passed=[f"build-dagster-{loc_name}-image"],
+            params={"skip_download": True},
         )
         for loc_name, image in code_location_images.items()
     ]

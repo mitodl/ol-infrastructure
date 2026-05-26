@@ -33,6 +33,9 @@ from ol_infrastructure.substructure.aws.eks.clickhouse_operator import (
 from ol_infrastructure.substructure.aws.eks.grafana import setup_grafana
 from ol_infrastructure.substructure.aws.eks.karpenter import setup_karpenter
 from ol_infrastructure.substructure.aws.eks.keda import setup_keda
+from ol_infrastructure.substructure.aws.eks.marimo_operator import (
+    setup_marimo_operator,
+)
 from ol_infrastructure.substructure.aws.eks.nvidia import setup_nvidia
 from ol_infrastructure.substructure.aws.eks.nvme_setup import setup_nvme_local_storage
 from ol_infrastructure.substructure.aws.eks.starrocks import setup_starrocks
@@ -332,6 +335,13 @@ if stack_info.env_prefix == "data":
     setup_clickhouse_operator(
         cluster_name=cluster_name,
         cluster_stack=cluster_stack,
+        k8s_provider=k8s_provider,
+    )
+
+# Setup marimo operator (data cluster, all environments)
+if stack_info.env_prefix == "data":
+    setup_marimo_operator(
+        cluster_name=cluster_name,
         k8s_provider=k8s_provider,
     )
 

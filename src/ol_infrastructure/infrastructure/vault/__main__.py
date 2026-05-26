@@ -280,6 +280,9 @@ backup_bucket_config = S3BucketConfig(
     kms_key_id=vault_unseal_key["id"],  # CRITICAL: Preserve for Vault auto-unseal
     intelligent_tiering_enabled=True,
     intelligent_tiering_days=30,  # Match existing 30-day transition
+    # Vault backups are write-once cold storage: safe for archive tiers.
+    intelligent_tiering_archive_access_days=90,
+    intelligent_tiering_deep_archive_access_days=180,
     lifecycle_rules=[vault_delete_rule],  # 365-day deletion rule
     tags=aws_config.merged_tags(),
 )
@@ -584,7 +587,12 @@ ol_vault_asg_config = OLAutoScaleGroupConfig(
     vpc_zone_identifiers=target_vpc["subnet_ids"],
     instance_refresh_warmup=FIVE_MINUTES * 3,
     instance_refresh_min_healthy_percentage=90,
-    tags=aws_config.merged_tags({"ami_id": vault_ami.id}),
+    tags=aws_config.merged_tags(
+        {
+            "ami_id": vault_ami.id,
+            "instance_type": InstanceTypes[vault_instance_type].value,
+        }
+    ),
 )
 
 ol_vault_as_setup = OLAutoScaling(

@@ -13,6 +13,7 @@ token from the ``om-ingestion-bot`` K8s secret, and to data sources via
 connector-specific K8s secrets (``om-connector-{name}``).
 """
 
+import hashlib
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
@@ -402,7 +403,7 @@ _make_cronjob(
 #   "user"              email
 #   "started"           create_time
 #   "end"               end_time
-#   "state" = FINISHED  query_state = COMPLETED
+#   "state" = FINISHED  query_state = FINISHED
 #
 # TrinoLineageSource reads its SQL from the class attribute `sql_stmt` and
 # appends lineage-specific filters from `filters`. We patch both before
@@ -510,12 +511,12 @@ _make_cronjob(
 
 # Glue ↔ Trino table lineage — creates bidirectional lineage edges between
 # Glue and Trino (Starburst Galaxy) entities that represent the same underlying
-# Iceberg tables.  Runs daily at 03:30 UTC, after both metadata jobs (02:00)
+# Iceberg tables.  Runs daily at 02:30 UTC, after both metadata jobs (02:00)
 # and before the dbt enrichment job (03:00) so dbt lineage resolution sees
 # complete table lineage.
 _make_cronjob(
     name="glue-trino-lineage",
-    schedule="30 3 * * *",
+    schedule="30 2 * * *",
     python_script=(
         Path(__file__).parent / "scripts" / "glue_trino_lineage.py"
     ).read_text(),
@@ -543,6 +544,12 @@ _make_cronjob(
         _secret_env("om-connector-trino", "OM_TRINO_CATALOG"),
     ],
     bot_secret_name="om-profiler-bot",  # noqa: S106  # pragma: allowlist secret
+    # Profiler queries all production schemas with 10% sample; increase memory
+    # above default 4Gi to avoid OOM kills observed in recent runs (exit 137).
+    resources={
+        "requests": {"cpu": "500m", "memory": "2Gi"},
+        "limits": {"cpu": "2", "memory": "8Gi"},
+    },
 )
 
 # Trino PII auto-classifier — uses OM's built-in AutoClassificationWorkflow,
@@ -565,6 +572,80 @@ _make_cronjob(
         _secret_env("om-connector-trino", "OM_TRINO_CATALOG"),
     ],
     bot_secret_name="om-profiler-bot",  # noqa: S106  # pragma: allowlist secret
+)
+
+# ---------------------------------------------------------------------------
+# Server-side configuration bootstrap
+# ---------------------------------------------------------------------------
+# Applies OM server settings that cannot be expressed in connector workflow
+# configs (e.g. autoClassificationEnabled on PII / PersonalData tags).
+#
+# Uses a regular Kubernetes Job (not a CronOMJob) because this is a
+# one-time-per-change operation, not a recurring ingestion workflow.  The
+# Kubernetes Job name embeds a content hash of the script so Pulumi
+# recreates it — and re-runs it — automatically whenever om_server_config.py
+# changes.  ResourceOptions(delete_before_replace=True) ensures the old Job
+# is deleted before the new one is created (K8s Jobs are immutable once
+# running).
+_server_config_script = (
+    Path(__file__).parent / "scripts" / "om_server_config.py"
+).read_text()
+_server_config_hash = hashlib.sha256(_server_config_script.encode()).hexdigest()[:8]
+
+kubernetes.batch.v1.Job(
+    f"om-server-config-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=f"om-server-config-{_server_config_hash}",
+        namespace=open_metadata_namespace,
+    ),
+    spec=kubernetes.batch.v1.JobSpecArgs(
+        template=kubernetes.core.v1.PodTemplateSpecArgs(
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                labels={"app": "om-server-config"},
+            ),
+            spec=kubernetes.core.v1.PodSpecArgs(
+                restart_policy="OnFailure",
+                service_account_name=ingestion_sa_name,
+                security_context=kubernetes.core.v1.PodSecurityContextArgs(
+                    run_as_user=1000,
+                    run_as_group=1000,
+                    run_as_non_root=True,
+                ),
+                containers=[
+                    kubernetes.core.v1.ContainerArgs(
+                        name="om-server-config",
+                        image=INGESTION_IMAGE,
+                        command=["python", "-c", _server_config_script],
+                        env=[
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="OM_BOT_JWT_TOKEN",
+                                value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                    secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                        name="om-ingestion-bot",
+                                        key="OM_BOT_JWT_TOKEN",
+                                    )
+                                ),
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="OM_SERVER_URL",
+                                value=OM_SERVER_URL,
+                            ),
+                        ],
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            requests={"cpu": "100m", "memory": "128Mi"},
+                            limits={"cpu": "500m", "memory": "256Mi"},
+                        ),
+                    )
+                ],
+            ),
+        ),
+        backoff_limit=3,
+        ttl_seconds_after_finished=86400,  # auto-clean after 24 h
+    ),
+    opts=ResourceOptions(
+        depends_on=[ingestion_irsa_role],
+        delete_before_replace=True,
+    ),
 )
 
 export(

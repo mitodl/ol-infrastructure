@@ -28,7 +28,9 @@ config:
   - clickhouse
   - clickhouse-operator
   - dagster
+  - jupyter-data
   - kubewatch
+  - marimo
   - open-metadata
   - qdrant
   - starrocks
@@ -36,9 +38,9 @@ config:
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 500
-      instance_type: m7i.xlarge
+      instance_type: m8i-flex.xlarge
       labels:
-        node_size: m7i.xlarge
+        node_size: m8i-flex.xlarge
         ondemand: true
         ol.mit.edu/core_node: true
       node_group_options: {}

@@ -200,6 +200,156 @@
     }
   }
 }
+
+// ResponsiveCourseTabs styles.
+#courseTabsNavigation {
+  // Hide content/courseware search
+  .search-toggle {
+    display: none !important;
+  }
+
+  // Hide upstream overflow trigger by targeting its known toggle button ID.
+  // This is the cross-browser-safe approach (no :has() required).
+  // The button itself is hidden, so the dropdown is non-functional even if
+  // the wrapper element retains a zero-size footprint.
+  .nav #learn\.course\.tabs\.navigation\.overflow\.menu {
+    display: none !important;
+  }
+
+  // When :has() is supported, also collapse the parent nav-item wrapper
+  // entirely for a clean layout — no empty space left behind.
+  @supports selector(:has(*)) {
+    .nav > .nav-item:has(> .dropdown > #learn\.course\.tabs\.navigation\.overflow\.menu) {
+      display: none !important;
+    }
+    // Belt-and-suspenders: hide any other non-custom Tabs.jsx overflow element.
+    .nav > .nav-item:not(.responsive-tabs-overflow):has(> .dropdown) {
+      display: none !important;
+    }
+  }
+
+  .container-xl {
+    max-width: 100% !important;
+  }
+
+  // Keep nav measurement stable for JS overflow calculations.
+  .nav-menu {
+    min-width: 0 !important;
+    overflow: visible !important;
+  }
+
+  .nav-underline-tabs {
+    align-items: stretch !important;
+  }
+
+  .nav {
+    min-width: 0 !important;
+    // Prevent nav growth beyond parent; overflow is handled in JS.
+    max-width: 100% !important;
+  }
+
+  // Responsive tabs dropdown styles (scoped to #courseTabsNavigation)
+  .responsive-tabs-overflow.pgn__tab_more.nav-link {
+    margin-bottom: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  .responsive-tabs-overflow {
+    position: relative;
+    display: flex !important;
+    align-items: stretch !important;
+
+    .dropdown {
+      display: flex !important;
+      align-items: stretch !important;
+      height: 100% !important;
+
+      // Reset the header's dropdown-toggle styles which would make this white-on-dark
+      .dropdown-toggle {
+        color: var(--pgn-color-gray-700) !important;
+        background: transparent !important;
+        opacity: 1 !important;
+        font-size: inherit !important;
+        font-family: inherit !important;
+        font-weight: inherit !important;
+        line-height: inherit !important;
+        // Fill the stretched nav row so the label aligns with sibling tab links.
+        height: 100% !important;
+        min-height: 100% !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        white-space: nowrap;
+        flex-direction: row !important;
+        gap: 0 !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        border-left: 0 !important;
+        border-right: 0 !important;
+        border-top: 4px solid transparent !important;
+        border-bottom: 4px solid transparent !important;
+
+        &:hover, &:focus {
+          color: var(--pgn-color-primary-500) !important;
+          background-color: var(--pgn-color-light-400) !important;
+          opacity: 1 !important;
+          border-bottom-color: var(--pgn-color-primary-500) !important;
+        }
+
+        // Hide the default caret — Paragon adds ::after
+        &::after {
+          display: inline-block !important;
+          margin-left: 0.255em;
+        }
+      }
+    }
+
+    // Dropdown menu for overflow tabs
+    .responsive-tabs-dropdown-menu {
+      z-index: 1050 !important;
+      position: absolute !important;
+      right: 0 !important;
+      left: auto !important;
+      min-width: 180px !important;
+      padding: 0.25rem 0 !important;
+      margin: 0.125rem 0 0 !important;
+      background: #fff !important;
+      border: 1px solid rgba(0, 0, 0, 0.15) !important;
+      border-radius: 0.25rem !important;
+      box-shadow: 0 4px 16px 0 rgba(37, 38, 43, 0.15) !important;
+
+      .dropdown-item {
+        display: block !important;
+        width: 100% !important;
+        padding: 0.5rem 1rem !important;
+        color: var(--pgn-color-gray-700) !important;
+        background: transparent !important;
+        font-size: 0.875rem !important;
+        line-height: 1.5 !important;
+        text-decoration: none !important;
+        border: none !important;
+        text-align: left !important;
+
+        &:hover, &:focus {
+          background: var(--pgn-color-light-300) !important;
+          color: var(--pgn-color-gray-700) !important;
+        }
+
+        &.active {
+          color: var(--pgn-color-primary-base) !important;
+          font-weight: 600 !important;
+          background: transparent !important;
+
+          &:hover, &:focus {
+            background: var(--pgn-color-light-300) !important;
+          }
+        }
+      }
+    }
+  }
+}
+
 /**
  * AI Drawer Manager Sidebar Styles
  *

@@ -1,5 +1,5 @@
 # renovate: datasource=github-releases depName=concourse packageName=concourse/concourse
-CONCOURSE_VERSION = "8.2.1"  # (TMM 2026-03-06) - Pin to <8.1.0 because of some login bugs with stale state tokens
+CONCOURSE_VERSION = "8.2.2"  # (TMM 2026-03-06) - Pin to <8.1.0 because of some login bugs with stale state tokens
 # renovate: datasource=github-releases depName=consul-template packageName=hashicorp/consul-template
 CONSUL_TEMPLATE_VERSION = "0.42.0"
 # renovate: datasource=github-releases depName=consul packageName=hashicorp/consul
@@ -7,7 +7,7 @@ CONSUL_VERSION = "1.22.7"
 # renovate: datasource=pypi depName=jupyterhub packageName=jupyterhub
 JUPYTERHUB_VERSION = "5.4.6"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
-KEYCLOAK_VERSION = "26.6.1"
+KEYCLOAK_VERSION = "26.6.2"
 # renovate: datasource=docker depName=leek packageName=kodhive/leek
 LEEK_VERSION = "0.7.7"
 MEILISEARCH_VERSION = (
@@ -22,7 +22,7 @@ TRAEFIK_VERSION = "3.7.1"
 TUTOR_PERMISSIONS_VERSION = "15.3.4"
 TYPESENSE_VERSION = "30.1"
 # renovate: datasource=github-releases depName=vault packageName=hashicorp/vault
-VAULT_VERSION = "2.0.0"
+VAULT_VERSION = "2.0.1"
 # renovate: datasource=docker depName=vector packageName=timberio/vector
 VECTOR_VERSION = "0.40.1"
 
@@ -42,7 +42,7 @@ AWS_NODE_TERMINATION_HANDLER_CHART_VERSION = "0.27.2"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager
 CERT_MANAGER_CHART_VERSION = "v1.16.1"
 # renovate: datasource=helm depName=dagster packageName=dagster registryUrl=https://dagster-io.github.io/helm
-DAGSTER_CHART_VERSION = "1.13.5"
+DAGSTER_CHART_VERSION = "1.13.6"
 # renovate: datasource=aws-eks-addon depName=ebs-csi-driver
 EBS_CSI_DRIVER_VERSION = "v1.40.1-eksbuild.1"
 # renovate: datasource=aws-eks-addon depName=efs-csi-driver
@@ -91,6 +91,12 @@ PROMETHEUS_OPERATOR_CRD_VERSION = "v0.91.0"
 KEYCLOAK_OPERATOR_CRD_VERSION = "26.2.4"
 # renovate: datasource=helm depName=jupyterhub packageName=jupyterhub registryUrl=https://hub.jupyter.org/helm-chart
 JUPYTERHUB_CHART_VERSION = "4.3.5"
+# renovate: datasource=github-releases depName=marimo-operator packageName=marimo-team/marimo-operator
+MARIMO_OPERATOR_VERSION = "v0.3.0"
+# renovate: datasource=docker depName=marimo-jupyterlab packageName=ghcr.io/mitodl/marimo-jupyterlab
+# TODO(tmacey): pin to a versioned tag once ghcr.io/mitodl/marimo-jupyterlab publishes one.  # noqa: FIX002
+# Renovate is configured above to bump this automatically on the first tagged release.
+MARIMO_JUPYTERLAB_VERSION = "latest"
 # renovate: datasource=helm depName=k8s-monitoring packageName=k8s-monitoring registryUrl=https://grafana.github.io/helm-charts
 GRAFANA_K8S_MONITORING_CHART_VERSION = "4.1.3"
 # renovate: datasource=helm depName=dcgm-exporter packageName=dcgm-exporter registryUrl=https://nvidia.github.io/dcgm-exporter/helm-charts
@@ -102,8 +108,8 @@ PGBOUNCER_VERSION = "1.25.2"
 # renovate: datasource=github-releases depName=local-path-provisioner packageName=rancher/local-path-provisioner
 LOCAL_PATH_PROVISIONER_CHART_VERSION = "0.0.36"
 # renovate: datasource=github-releases depName=qdrant packageName=qdrant/qdrant
-QDRANT_VERSION = "v1.17.1"
+QDRANT_VERSION = "v1.18.0"
 # renovate: datasource=helm depName=typesense-operator packageName=typesense-operator registryUrl=https://akyriako.github.io/typesense-operator
-TYPESENSE_OPERATOR_CHART_VERSION = "0.4.0"
+TYPESENSE_OPERATOR_CHART_VERSION = "0.4.1"
 # renovate: datasource=helm depName=vertical-pod-autoscaler packageName=vertical-pod-autoscaler registryUrl=https://kubernetes.github.io/autoscaler
 VPA_CHART_VERSION = "0.9.0"

@@ -11,7 +11,6 @@ from pulumi import Config, ResourceOptions, StackReference
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.lib.versions import JUPYTERHUB_CHART_VERSION
 from ol_infrastructure.applications.jupyterhub.values import (
-    get_authenticator_config,
     get_prepuller_config_for_images,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
@@ -36,6 +35,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib.jupyterhub_config import get_authenticator_config
 from ol_infrastructure.lib.ol_types import StackInfo
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements
@@ -346,7 +346,36 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                         }
                     },
                     "extraConfig": {"dynamicImageConfig.py": extra_config},
-                    "config": get_authenticator_config(jupyterhub_deployment_config),
+                    "config": get_authenticator_config(
+                        {
+                            "authenticator_class": jupyterhub_deployment_config.get(
+                                "authenticator_class"
+                            ),
+                            "admin_users": jupyterhub_deployment_config.get(
+                                "admin_users"
+                            )
+                            or [],
+                            "allowed_users": jupyterhub_deployment_config.get(
+                                "allowed_users"
+                            )
+                            or [],
+                            "shared_password": jupyterhub_deployment_config.get(
+                                "shared_password"
+                            ),
+                            "keycloak_base_url": jupyterhub_deployment_config.get(
+                                "keycloak_base_url"
+                            ),
+                            "keycloak_realm": jupyterhub_deployment_config.get(
+                                "keycloak_realm"
+                            ),
+                            "login_service": jupyterhub_deployment_config.get(
+                                "login_service"
+                            ),
+                            "username_claim": jupyterhub_deployment_config.get(
+                                "username_claim"
+                            ),
+                        }
+                    ),
                     "resources": {
                         "requests": {
                             "cpu": "100m",
