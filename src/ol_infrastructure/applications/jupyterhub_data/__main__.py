@@ -185,7 +185,7 @@ rds_defaults["instance_size"] = (
 )
 rds_defaults["use_blue_green"] = False
 rds_defaults["read_replica"] = None
-rds_password = jupyterhub_data_config.require("rds_password")
+rds_password = jupyterhub_data_config.require("db_password")
 
 jupyterhub_data_db_security_group = ec2.SecurityGroup(
     f"jupyterhub-data-db-security-group-{env_name}",
