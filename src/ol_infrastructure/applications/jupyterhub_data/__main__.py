@@ -45,7 +45,11 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 
 stack_info = parse_stack()
 setup_vault_provider(stack_info)
-env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+env_name = (
+    f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+    if stack_info.env_prefix
+    else stack_info.env_suffix
+)
 
 jupyterhub_data_config = Config("jupyterhub_data")
 vault_config = Config("vault")
@@ -128,8 +132,9 @@ parliament_config: dict[str, Any] = {
 jupyterhub_data_lake_policy = iam.Policy(
     f"jupyterhub-data-lake-iam-policy-{stack_info.env_suffix}",
     path=(
-        f"/ol-applications/jupyterhub-data"
-        f"/{stack_info.env_prefix}/{stack_info.env_suffix}/"
+        f"/ol-applications/jupyterhub-data/{stack_info.env_suffix}/"
+        if not stack_info.env_prefix
+        else f"/{stack_info.env_prefix}/{stack_info.env_suffix}/"
     ),
     description=(
         "Read-only access to OL data lake S3 and Glue catalog "
