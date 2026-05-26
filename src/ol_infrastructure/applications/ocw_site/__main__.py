@@ -686,13 +686,13 @@ if stack_info.env_suffix == "production":
         source_bucket: OLBucket,
         destination_bucket: OLBucket,
         *,
-        source_bucket_name,
-        source_bucket_arn,
-        destination_bucket_arn,
-        resource_prefix,
-        role_name,
-        policy_name,
-        rule_id,
+        source_bucket_name: str,
+        source_bucket_arn: str,
+        destination_bucket_arn: str,
+        resource_prefix: str,
+        role_name: str,
+        policy_name: str,
+        rule_id: str,
     ) -> s3.BucketReplicationConfig:
         """Set up imported S3 same-region replication resources for one bucket pair."""
         policy_arn = (
