@@ -694,7 +694,22 @@ if stack_info.env_suffix == "production":
         policy_name: str,
         rule_id: str,
     ) -> s3.BucketReplicationConfig:
-        """Set up imported S3 same-region replication resources for one bucket pair."""
+        """Create imported IAM and replication resources for a source/destination pair.
+
+        Args:
+            source_bucket: Source OCW bucket component.
+            destination_bucket: Destination backup OCW bucket component.
+            source_bucket_name: Existing source bucket name used for import IDs.
+            source_bucket_arn: Source bucket ARN string used in linted IAM policy JSON.
+            destination_bucket_arn: Destination bucket ARN string used in IAM policy JSON.
+            resource_prefix: Pulumi logical resource name prefix.
+            role_name: Existing replication IAM role name to import/manage.
+            policy_name: Existing replication IAM policy name to import/manage.
+            rule_id: Existing replication rule identifier.
+
+        Returns:
+            The imported BucketReplicationConfig resource for the source bucket.
+        """
         policy_arn = (
             f"arn:aws:iam::{aws_account.account_id}:policy/service-role/{policy_name}"
         )
