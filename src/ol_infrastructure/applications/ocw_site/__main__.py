@@ -683,8 +683,8 @@ test_offline_bucket = OLBucket(
 
 if stack_info.env_suffix == "production":
     def setup_bucket_replication(
-        source_bucket,
-        destination_bucket,
+        source_bucket: OLBucket,
+        destination_bucket: OLBucket,
         *,
         source_bucket_name,
         source_bucket_arn,
@@ -693,7 +693,8 @@ if stack_info.env_suffix == "production":
         role_name,
         policy_name,
         rule_id,
-    ):
+    ) -> s3.BucketReplicationConfig:
+        """Set up imported S3 same-region replication resources for one bucket pair."""
         policy_arn = (
             f"arn:aws:iam::{aws_account.account_id}:policy/service-role/{policy_name}"
         )
