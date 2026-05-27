@@ -771,6 +771,16 @@ if stack_info.env_suffix == "production":
                     ],
                 },
                 stringify=True,
+                parliament_config={
+                    # s3:ObjectOwnerOverrideToBucketOwner is a legitimate S3
+                    # cross-account replication action that parliament incorrectly
+                    # classifies as a permissions-management action.
+                    "PERMISSIONS_MANAGEMENT_ACTIONS": {
+                        "ignore_locations": [
+                            {"actions": ["s3:objectowneroverridetobucketowner"]}
+                        ]
+                    }
+                },
             ),
             opts=ResourceOptions(import_=policy_arn),
         )
