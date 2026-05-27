@@ -45,6 +45,8 @@ config:
   - ["new_studio_mfe.use_tagging_taxonomy_list_page", "--create", "--superusers",
     "--everyone"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
+  - ["send_to_submission_course.enable", "--create", "--superusers", "--everyone",
+    "--staff", "--authenticated"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["studio.library_authoring_mfe", "--deactivate"]
   - ["legacy_studio.certificates", "--create", "--everyone"]
@@ -83,7 +85,7 @@ config:
   edxapp:worker_disk_size: "50"
   edxapp:worker_instance_type: "m7a.xlarge"
   edxapp:enable_xqueue: "true"
-  edxapp:xqueue_domain: xqueue.mitx.odl.mit.edu
+  edxapp:xqueue_domain: unused-placeholder
   mongodb:atlas_project_id: 61b728704656cb4747e589a0
   redis:instance_type: cache.r7g.2xlarge
   vault:address: https://vault-production.odl.mit.edu

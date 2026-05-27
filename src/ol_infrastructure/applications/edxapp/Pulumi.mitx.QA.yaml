@@ -44,6 +44,8 @@ config:
   - ["new_studio_mfe.use_tagging_taxonomy_list_page", "--create", "--superusers",
     "--everyone"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
+  - ["send_to_submission_course.enable", "--create", "--superusers", "--everyone",
+    "--staff", "--authenticated"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["studio.library_authoring_mfe", "--deactivate"]
   - ["legacy_studio.certificates", "--create", "--everyone"]
@@ -80,7 +82,7 @@ config:
   edxapp:sender_email_address: mitx-support+qa@mit.edu
   edxapp:target_vpc: residential_mitx_vpc
   edxapp:enable_xqueue: "true"
-  edxapp:xqueue_domain: xqueue.mitx.qa.odl.mit.edu
+  edxapp:xqueue_domain: unused-placeholder
   mongodb:atlas_project_id: 61a8f2d2c263e144f50f13b4
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
