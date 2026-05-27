@@ -9,7 +9,7 @@ config:
   xqwatcher:min_replicas: 2
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
-  xqwatcher:xqueue_server_url: https://xqueue.mitx.odl.mit.edu
+  xqwatcher:xqueue_server_url: https://lms.mitx.mit.edu
   xqwatcher:queues:
     Watcher-MITx-6.00x:
       CONNECTIONS: 5

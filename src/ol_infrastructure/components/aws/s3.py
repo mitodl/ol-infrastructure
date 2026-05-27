@@ -110,10 +110,10 @@ class S3BucketConfig(AWSBase):
     logging_expected_bucket_owner: str | None = Field(
         default=None,
         description=(
-            "The AWS account ID of the expected bucket owner for the target "
-            "logging bucket. If specified, operations will fail if the bucket "
-            "is owned by a different account. Recommended for security to "
-            "prevent accidental writes to the wrong bucket."
+            "Deprecated: the pulumi-aws provider has removed support for "
+            "expected_bucket_owner on BucketLogging. This field is retained "
+            "for backward compatibility but is no longer passed to the "
+            "underlying resource."
         ),
     )
     lifecycle_rules: list[s3.BucketLifecycleConfigurationRuleArgs] | None = Field(
@@ -480,7 +480,6 @@ class OLBucket(pulumi.ComponentResource):
                 target_prefix=config.logging_target_prefix,
                 target_grants=config.logging_target_grants,
                 target_object_key_format=config.logging_target_object_key_format,
-                expected_bucket_owner=config.logging_expected_bucket_owner,
                 opts=child_opts,
             )
 

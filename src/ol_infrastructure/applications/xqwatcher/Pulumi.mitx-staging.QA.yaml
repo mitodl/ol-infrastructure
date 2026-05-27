@@ -9,7 +9,7 @@ config:
   xqwatcher:min_replicas: 1
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
-  xqwatcher:xqueue_server_url: https://xqueue.mitx-staging-qa.odl.mit.edu
+  xqwatcher:xqueue_server_url: https://mitx-qa-draft.mitx.mit.edu
   xqwatcher:queues:
     Watcher-MITx-staging-6.00x:
       CONNECTIONS: 5
