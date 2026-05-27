@@ -12,8 +12,7 @@ config = {
             "config": {
                 "type": "Airbyte",
                 "hostPort": os.environ["OM_AIRBYTE_HOST_PORT"],
-                "username": os.environ["OM_AIRBYTE_USERNAME"],
-                "password": os.environ["OM_AIRBYTE_PASSWORD"],
+                "apiVersion": "api/public/v1",
             }
         },
         "sourceConfig": {"config": {"type": "PipelineMetadata"}},

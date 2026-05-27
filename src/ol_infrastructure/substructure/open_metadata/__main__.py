@@ -356,8 +356,6 @@ if om_config.get_bool("enable_airbyte_connector"):
             _plain_env("OM_SERVER_URL", OM_SERVER_URL),
             _plain_env("OM_SERVICE_NAME", service_name_airbyte),
             _secret_env("om-connector-airbyte", "OM_AIRBYTE_HOST_PORT"),
-            _secret_env("om-connector-airbyte", "OM_AIRBYTE_USERNAME"),
-            _secret_env("om-connector-airbyte", "OM_AIRBYTE_PASSWORD"),
         ],
     )
 
