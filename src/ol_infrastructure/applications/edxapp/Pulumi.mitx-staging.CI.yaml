@@ -35,6 +35,8 @@ config:
   - ["new_studio_mfe.use_tagging_taxonomy_list_page", "--create", "--superusers",
     "--everyone"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
+  - ["send_to_submission_course.enable", "--create", "--superusers", "--everyone",
+    "--staff", "--authenticated"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["legacy_studio.certificates", "--create", "--everyone"]
   - ["instructor.legacy_instructor_dashboard", "--create", "--everyone"]
@@ -69,7 +71,7 @@ config:
   edxapp:sender_email_address: mitx-support+staging-ci@mit.edu
   edxapp:target_vpc: residential_mitx_staging_vpc
   edxapp:enable_xqueue: "true"
-  edxapp:xqueue_domain: xqueue.mitx-staging-ci.odl.mit.edu
+  edxapp:xqueue_domain: unused-placeholder
   mongodb:atlas_project_id: 6193f02d576a70760e8bcb02
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci

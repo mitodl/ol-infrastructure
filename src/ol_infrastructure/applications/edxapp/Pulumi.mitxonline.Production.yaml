@@ -47,6 +47,8 @@ config:
   - ["notifications.enable_email_notifications", "--create", "--everyone"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone",
     "--staff", "--authenticated"]
+  - ["send_to_submission_course.enable", "--create", "--superusers", "--everyone",
+    "--staff", "--authenticated"]
   - ["seo.enable_anonymous_courseware_access", "--create", "--superusers", "--staff",
     "--authenticated"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
@@ -90,7 +92,7 @@ config:
   edxapp:email_use_course_id_from_for_bulk: "True"
   edxapp:bulk_email_default_from_email: no-reply@edxapp-mail.learn.mit.edu
   edxapp:enable_xqueue: "true"
-  edxapp:xqueue_domain: xqueue.mitxonline.odl.mit.edu
+  edxapp:xqueue_domain: unused-placeholder
   edxapp:web_instance_type: m7a.2xlarge
   edxapp:worker_instance_type: "r7a.large"
   edxapp:backend_lms_domain: courses-backend.learn.mit.edu

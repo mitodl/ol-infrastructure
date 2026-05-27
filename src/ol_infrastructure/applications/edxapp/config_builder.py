@@ -484,7 +484,7 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
             "PRESS_EMAIL": "support@xpro.mit.edu",
             "MITX_REDIRECT_ENABLED": True,
             "MITX_REDIRECT_ALLOW_RE_LIST": [
-                "^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/)",
+                "^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|xqueue|asset-v1:|assets/courseware/)",
                 "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler",
                 "^/courses/.*/courseware-navigation-sidebar/toggles/?$",
                 "^/courses/.*/courseware-search/enabled/?$",
@@ -543,7 +543,7 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
             "ENABLE_DATES_COURSE_APP": True,
             "MITX_REDIRECT_ENABLED": True,
             "MITX_REDIRECT_ALLOW_RE_LIST": [
-                "^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|asset-v1:|assets/courseware/|lti_provider)",
+                "^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|xqueue|asset-v1:|assets/courseware/|lti_provider)",
                 "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler",
                 "^/v1/accounts/bulk_retire_users",
                 "^/courses/course-v1:.*?/xqueue/.*$",

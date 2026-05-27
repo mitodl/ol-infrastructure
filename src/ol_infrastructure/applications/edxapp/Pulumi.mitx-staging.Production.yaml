@@ -35,6 +35,8 @@ config:
   - ["new_studio_mfe.use_tagging_taxonomy_list_page", "--create", "--superusers",
     "--everyone"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
+  - ["send_to_submission_course.enable", "--create", "--superusers", "--everyone",
+    "--staff", "--authenticated"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["studio.library_authoring_mfe", "--deactivate"]
   - ["legacy_studio.certificates", "--create", "--everyone"]
@@ -68,7 +70,7 @@ config:
   edxapp:sender_email_address: mitx-support+staging@mit.edu
   edxapp:target_vpc: residential_mitx_staging_vpc
   edxapp:enable_xqueue: "true"
-  edxapp:xqueue_domain: xqueue.mitx-staging-prod.odl.mit.edu
+  edxapp:xqueue_domain: unused-placeholder
   edxapp:web_instance_type: general_purpose_xlarge
   edxapp:worker_instance_type: "m7a.xlarge"
   mongodb:atlas_project_id: 61b72cf6148de8714e671440
