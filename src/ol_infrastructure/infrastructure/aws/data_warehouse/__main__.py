@@ -39,6 +39,7 @@ data_stages = (
     "staging",
     "intermediate",
     "mart",
+    "integrations",
     "external",
     "dimensional",
     "reporting",
