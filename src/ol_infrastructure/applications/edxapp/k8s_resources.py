@@ -577,8 +577,8 @@ def create_k8s_resources(  # noqa: C901
         for source_name in lms_edxapp_config_sources
     ]
 
-    # The config-aggregator init container is no longer needed: OLLMSProductionSettings
-    # in lms.envs.ol_production reads directly from /openedx/config-sources via
+    # The config-aggregator init container is no longer needed: LMSProductionSettings
+    # in lms.envs.aqueduct reads directly from /openedx/config-sources via
     # YamlConfigSettingsSource, so the cat-merge step has been removed.
 
     lms_app = OLApplicationK8s(
@@ -878,8 +878,8 @@ def create_k8s_resources(  # noqa: C901
         for source_name in cms_edxapp_config_sources
     ]
 
-    # The config-aggregator init container is no longer needed: OLCMSProductionSettings
-    # in cms.envs.ol_production reads directly from /openedx/config-sources via
+    # The config-aggregator init container is no longer needed: CMSProductionSettings
+    # in cms.envs.aqueduct reads directly from /openedx/config-sources via
     # YamlConfigSettingsSource, so the cat-merge step has been removed.
 
     cms_app = OLApplicationK8s(
@@ -1049,6 +1049,40 @@ def create_k8s_resources(  # noqa: C901
         for vm in common_extra_volume_mounts
         if vm.name != configmaps.uwsgi_ini_config_name
     ]
+    # Celery pods need the config-source subdirs mounted so that
+    # lms/cms.envs.aqueduct can read YAML files directly via
+    # YamlConfigSettingsSource (no config-aggregator init container needed).
+    lms_celery_volume_mounts = celery_volume_mounts + lms_edxapp_init_volume_mounts
+    cms_celery_volume_mounts = celery_volume_mounts + cms_edxapp_init_volume_mounts
+
+    # Flat env ConfigMap envFrom refs for hand-rolled celery/batch deployments.
+    # Mirrors what OLApplicationK8s does via env_from_configmap_names.
+    def _envfrom_configmaps(
+        names: list[str],
+    ) -> list[kubernetes.core.v1.EnvFromSourceArgs]:
+        return [
+            kubernetes.core.v1.EnvFromSourceArgs(
+                config_map_ref=kubernetes.core.v1.ConfigMapEnvSourceArgs(name=name)
+            )
+            for name in names
+        ]
+
+    lms_celery_envfrom = _envfrom_configmaps(
+        [
+            configmaps.general_env_config_name,
+            configmaps.interpolated_env_config_name,
+            configmaps.lms_general_env_config_name,
+            configmaps.lms_interpolated_env_config_name,
+        ]
+    )
+    cms_celery_envfrom = _envfrom_configmaps(
+        [
+            configmaps.general_env_config_name,
+            configmaps.interpolated_env_config_name,
+            configmaps.cms_general_env_config_name,
+            configmaps.cms_interpolated_env_config_name,
+        ]
+    )
 
     celery_env_vars = [
         kubernetes.core.v1.EnvVarArgs(
@@ -1120,21 +1154,6 @@ def create_k8s_resources(  # noqa: C901
                                 ),
                             ],
                         ),
-                        kubernetes.core.v1.ContainerArgs(
-                            name="config-aggregator",
-                            image=cached_image_uri("busybox:1.35"),
-                            command=["/bin/sh", "-c"],
-                            args=[
-                                "cat /openedx/config-sources/*/*.yaml > /openedx/config/lms.env.yml"
-                            ],
-                            volume_mounts=[
-                                *lms_edxapp_init_volume_mounts,
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="edxapp-config",
-                                    mount_path="/openedx/config",
-                                ),
-                            ],
-                        ),
                     ],
                     containers=[
                         kubernetes.core.v1.ContainerArgs(
@@ -1167,6 +1186,7 @@ def create_k8s_resources(  # noqa: C901
                                 ),
                                 *celery_env_vars,
                             ],
+                            env_from=lms_celery_envfrom,
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={
                                     "cpu": resources_dict["celery"]["lms"][
@@ -1182,7 +1202,7 @@ def create_k8s_resources(  # noqa: C901
                                     ],
                                 },
                             ),
-                            volume_mounts=celery_volume_mounts,
+                            volume_mounts=lms_celery_volume_mounts,
                         )
                     ],
                 ),
@@ -1255,21 +1275,6 @@ def create_k8s_resources(  # noqa: C901
                                 ),
                             ],
                         ),
-                        kubernetes.core.v1.ContainerArgs(
-                            name="config-aggregator",
-                            image=cached_image_uri("busybox:1.35"),
-                            command=["/bin/sh", "-c"],
-                            args=[
-                                "cat /openedx/config-sources/*/*.yaml > /openedx/config/lms.env.yml"
-                            ],
-                            volume_mounts=[
-                                *lms_edxapp_init_volume_mounts,
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="edxapp-config",
-                                    mount_path="/openedx/config",
-                                ),
-                            ],
-                        ),
                     ],
                     containers=[
                         kubernetes.core.v1.ContainerArgs(
@@ -1288,7 +1293,8 @@ def create_k8s_resources(  # noqa: C901
                                     value="lms.envs.aqueduct",
                                 ),
                             ],
-                            volume_mounts=celery_volume_mounts,
+                            env_from=lms_celery_envfrom,
+                            volume_mounts=lms_celery_volume_mounts,
                         ),
                     ],
                 ),
@@ -1357,21 +1363,6 @@ def create_k8s_resources(  # noqa: C901
                                 ),
                             ],
                         ),
-                        kubernetes.core.v1.ContainerArgs(
-                            name="config-aggregator",
-                            image=cached_image_uri("busybox:1.35"),
-                            command=["/bin/sh", "-c"],
-                            args=[
-                                "cat /openedx/config-sources/*/*.yaml > /openedx/config/cms.env.yml"
-                            ],
-                            volume_mounts=[
-                                *cms_edxapp_init_volume_mounts,
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="edxapp-config",
-                                    mount_path="/openedx/config",
-                                ),
-                            ],
-                        ),
                     ],
                     containers=[
                         kubernetes.core.v1.ContainerArgs(
@@ -1404,6 +1395,7 @@ def create_k8s_resources(  # noqa: C901
                                 ),
                                 *celery_env_vars,
                             ],
+                            env_from=cms_celery_envfrom,
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={
                                     "cpu": resources_dict["celery"]["cms"][
@@ -1419,7 +1411,7 @@ def create_k8s_resources(  # noqa: C901
                                     ],
                                 },
                             ),
-                            volume_mounts=celery_volume_mounts,
+                            volume_mounts=cms_celery_volume_mounts,
                         )
                     ],
                 ),

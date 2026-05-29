@@ -442,72 +442,51 @@ def create_k8s_configmaps(  # noqa: PLR0915
     # Load interpolated configuration from dictionary
     interpolated_config_name = "60-interpolated-config-yaml"
     interpolated_env_config_name = "60-interpolated-config-env"
-    interpolated_config_map = Output.all(
+
+    def _make_interpolated_configmaps(
+        runtime_config: dict[str, Any],
+    ) -> tuple[kubernetes.core.v1.ConfigMap, kubernetes.core.v1.ConfigMap]:
+        """Build both interpolated ConfigMaps from a single dict construction."""
+        full_dict = _build_interpolated_config_dict(
+            stack_info=stack_info,
+            edxapp_config=edxapp_config,
+            runtime_config=runtime_config,
+            storage_bucket_name=storage_bucket_name,
+            course_bucket_name=course_bucket_name,
+            grades_bucket_name=grades_bucket_name,
+            ses_configuration_set=ses_configuration_set,
+            env_name=env_name,
+        )
+        flat, complex_ = partition_config(full_dict)
+        yaml_cm = kubernetes.core.v1.ConfigMap(
+            f"ol-{stack_info.env_prefix}-edxapp-interpolated-config-{stack_info.env_suffix}",
+            metadata={
+                "name": interpolated_config_name,
+                "namespace": namespace,
+                "labels": k8s_global_labels,
+            },
+            data={"60-interpolated-config.yaml": render_yaml(complex_)},
+            opts=ResourceOptions(delete_before_replace=True),
+        )
+        env_cm = kubernetes.core.v1.ConfigMap(
+            f"ol-{stack_info.env_prefix}-edxapp-interpolated-env-config-{stack_info.env_suffix}",
+            metadata={
+                "name": interpolated_env_config_name,
+                "namespace": namespace,
+                "labels": k8s_global_labels,
+            },
+            data=flat,
+            opts=ResourceOptions(delete_before_replace=True),
+        )
+        return yaml_cm, env_cm
+
+    _interpolated_both = Output.all(
         redis_hostname=edxapp_cache.address,
         opensearch_hostname=opensearch_hostname,
         notes_domain=notes_stack.require_output("notes_domain"),
-    ).apply(
-        lambda runtime_config: (
-            lambda full_dict: (
-                kubernetes.core.v1.ConfigMap(
-                    f"ol-{stack_info.env_prefix}-edxapp-interpolated-config-{stack_info.env_suffix}",
-                    metadata={
-                        "name": interpolated_config_name,
-                        "namespace": namespace,
-                        "labels": k8s_global_labels,
-                    },
-                    data={
-                        "60-interpolated-config.yaml": render_yaml(
-                            partition_config(full_dict)[1]
-                        ),
-                    },
-                    opts=ResourceOptions(delete_before_replace=True),
-                )
-            )(
-                _build_interpolated_config_dict(
-                    stack_info=stack_info,
-                    edxapp_config=edxapp_config,
-                    runtime_config=runtime_config,
-                    storage_bucket_name=storage_bucket_name,
-                    course_bucket_name=course_bucket_name,
-                    grades_bucket_name=grades_bucket_name,
-                    ses_configuration_set=ses_configuration_set,
-                    env_name=env_name,
-                )
-            )
-        )
-    )
-    interpolated_env_config_map = Output.all(
-        redis_hostname=edxapp_cache.address,
-        opensearch_hostname=opensearch_hostname,
-        notes_domain=notes_stack.require_output("notes_domain"),
-    ).apply(
-        lambda runtime_config: (
-            lambda full_dict: (
-                kubernetes.core.v1.ConfigMap(
-                    f"ol-{stack_info.env_prefix}-edxapp-interpolated-env-config-{stack_info.env_suffix}",
-                    metadata={
-                        "name": interpolated_env_config_name,
-                        "namespace": namespace,
-                        "labels": k8s_global_labels,
-                    },
-                    data=partition_config(full_dict)[0],
-                    opts=ResourceOptions(delete_before_replace=True),
-                )
-            )(
-                _build_interpolated_config_dict(
-                    stack_info=stack_info,
-                    edxapp_config=edxapp_config,
-                    runtime_config=runtime_config,
-                    storage_bucket_name=storage_bucket_name,
-                    course_bucket_name=course_bucket_name,
-                    grades_bucket_name=grades_bucket_name,
-                    ses_configuration_set=ses_configuration_set,
-                    env_name=env_name,
-                )
-            )
-        )
-    )
+    ).apply(_make_interpolated_configmaps)
+    interpolated_config_map = _interpolated_both.apply(lambda pair: pair[0])
+    interpolated_env_config_map = _interpolated_both.apply(lambda pair: pair[1])
 
     # CMS general configuration
     cms_general_config_name = "71-cms-general-config-yaml"
