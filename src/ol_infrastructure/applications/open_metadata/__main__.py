@@ -389,8 +389,7 @@ if open_metadata_connector_secrets:
         },
         "airbyte": {
             "OM_AIRBYTE_HOST_PORT": '{{ index .Secrets "airbyte" "host_port" }}',
-            "OM_AIRBYTE_USERNAME": '{{ index .Secrets "airbyte" "username" }}',
-            "OM_AIRBYTE_PASSWORD": '{{ index .Secrets "airbyte" "password" }}',
+            "OM_AIRBYTE_PIPELINE_URL": '{{ index .Secrets "airbyte" "pipeline_url" }}',
         },
         "superset": {
             "OM_SUPERSET_OIDC_REALM_URL": (

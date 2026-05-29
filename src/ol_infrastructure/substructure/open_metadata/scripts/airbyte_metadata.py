@@ -12,8 +12,7 @@ config = {
             "config": {
                 "type": "Airbyte",
                 "hostPort": os.environ["OM_AIRBYTE_HOST_PORT"],
-                "username": os.environ["OM_AIRBYTE_USERNAME"],
-                "password": os.environ["OM_AIRBYTE_PASSWORD"],
+                "apiVersion": "api/public/v1",
             }
         },
         "sourceConfig": {"config": {"type": "PipelineMetadata"}},
@@ -28,5 +27,9 @@ config = {
     },
 }
 workflow = MetadataWorkflow.create(config)
+# Override the UI link prefix so pipeline sourceUrls point to the external
+# Airbyte web UI rather than the internal K8s service URL used for API calls.
+if pipeline_url := os.environ.get("OM_AIRBYTE_PIPELINE_URL"):
+    workflow.source.source_url_prefix = pipeline_url
 workflow.execute()
 workflow.raise_from_status()

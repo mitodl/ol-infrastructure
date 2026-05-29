@@ -9,3 +9,4 @@ config:
   open_metadata:service_name_airbyte: Airbyte
   open_metadata:service_name_superset: Superset
   open_metadata:service_name_iceberg: Iceberg
+  open_metadata:enable_airbyte_connector: "true"
