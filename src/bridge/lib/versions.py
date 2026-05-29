@@ -1,5 +1,5 @@
 # renovate: datasource=github-releases depName=concourse packageName=concourse/concourse
-CONCOURSE_VERSION = "8.2.2"  # (TMM 2026-03-06) - Pin to <8.1.0 because of some login bugs with stale state tokens
+CONCOURSE_VERSION = "8.2.3"  # (TMM 2026-03-06) - Pin to <8.1.0 because of some login bugs with stale state tokens
 # renovate: datasource=github-releases depName=consul-template packageName=hashicorp/consul-template
 CONSUL_TEMPLATE_VERSION = "0.42.0"
 # renovate: datasource=github-releases depName=consul packageName=hashicorp/consul
