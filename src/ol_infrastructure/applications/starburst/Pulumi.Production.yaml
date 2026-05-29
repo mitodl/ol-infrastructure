@@ -107,3 +107,13 @@ config:
       - name: "ol-data-lake-production"
         privileges:
         - name: "UseCluster"
+
+    mit_learn_etl:
+      description: "Service account role for MIT Learn Trino-pull ETL tasks."
+      clusters:
+      - name: "ol-data-interactive"
+        privileges:
+        - name: "UseCluster"
+      - name: "ol-data-lake-production"
+        privileges:
+        - name: "UseCluster"
