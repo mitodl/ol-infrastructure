@@ -577,14 +577,9 @@ def create_k8s_resources(  # noqa: C901
         for source_name in lms_edxapp_config_sources
     ]
 
-    # Config aggregator for LMS: concatenates all config sources into lms.env.yml.
-    # All mounts come via extra_volume_mounts + extra_init_volume_mounts injection.
-    lms_config_aggregator_init_container = kubernetes.core.v1.ContainerArgs(
-        name="config-aggregator",
-        image=cached_image_uri("busybox:1.35"),
-        command=["/bin/sh", "-c"],
-        args=["cat /openedx/config-sources/*/*.yaml > /openedx/config/lms.env.yml"],
-    )
+    # The config-aggregator init container is no longer needed: OLLMSProductionSettings
+    # in lms.envs.ol_production reads directly from /openedx/config-sources via
+    # YamlConfigSettingsSource, so the cat-merge step has been removed.
 
     lms_app = OLApplicationK8s(
         OLApplicationK8sConfig(
@@ -595,7 +590,7 @@ def create_k8s_resources(  # noqa: C901
             registry="dockerhub",
             application_config={
                 "SERVICE_VARIANT": "lms",
-                "DJANGO_SETTINGS_MODULE": "lms.envs.production",
+                "DJANGO_SETTINGS_MODULE": "lms.envs.aqueduct",
                 "UWSGI_WORKERS": "2",
             },
             application_lb_service_name=lms_webapp_deployment_name,
@@ -611,6 +606,12 @@ def create_k8s_resources(  # noqa: C901
             vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
             k8s_global_labels=k8s_global_labels,
             env_from_secret_names=[],
+            env_from_configmap_names=[
+                configmaps.general_env_config_name,
+                configmaps.interpolated_env_config_name,
+                configmaps.lms_general_env_config_name,
+                configmaps.lms_interpolated_env_config_name,
+            ],
             project_root=Path(__file__).parent,
             import_nginx_config=False,
             import_uwsgi_config=False,
@@ -689,11 +690,12 @@ def create_k8s_resources(  # noqa: C901
             },
             pod_security_context=pod_security_context,
             extra_volumes=lms_edxapp_volumes,
-            extra_volume_mounts=common_extra_volume_mounts,
-            extra_init_volume_mounts=lms_edxapp_init_volume_mounts,
+            # Main containers now read config-sources directly via ol_production.py;
+            # mount both the shared config dir and all config-source subdirs.
+            extra_volume_mounts=common_extra_volume_mounts
+            + lms_edxapp_init_volume_mounts,
             extra_init_containers=[
                 export_course_repos_init_container,
-                lms_config_aggregator_init_container,
             ],
             extra_sidecar_containers=[_make_vector_sidecar("lms")],
             pre_deploy_commands=[
@@ -876,12 +878,9 @@ def create_k8s_resources(  # noqa: C901
         for source_name in cms_edxapp_config_sources
     ]
 
-    cms_config_aggregator_init_container = kubernetes.core.v1.ContainerArgs(
-        name="config-aggregator",
-        image=cached_image_uri("busybox:1.35"),
-        command=["/bin/sh", "-c"],
-        args=["cat /openedx/config-sources/*/*.yaml > /openedx/config/cms.env.yml"],
-    )
+    # The config-aggregator init container is no longer needed: OLCMSProductionSettings
+    # in cms.envs.ol_production reads directly from /openedx/config-sources via
+    # YamlConfigSettingsSource, so the cat-merge step has been removed.
 
     cms_app = OLApplicationK8s(
         OLApplicationK8sConfig(
@@ -892,7 +891,7 @@ def create_k8s_resources(  # noqa: C901
             registry="dockerhub",
             application_config={
                 "SERVICE_VARIANT": "cms",
-                "DJANGO_SETTINGS_MODULE": "cms.envs.production",
+                "DJANGO_SETTINGS_MODULE": "cms.envs.aqueduct",
                 "UWSGI_WORKERS": "2",
             },
             application_lb_service_name=cms_webapp_deployment_name,
@@ -908,6 +907,12 @@ def create_k8s_resources(  # noqa: C901
             vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
             k8s_global_labels=k8s_global_labels,
             env_from_secret_names=[],
+            env_from_configmap_names=[
+                configmaps.general_env_config_name,
+                configmaps.interpolated_env_config_name,
+                configmaps.cms_general_env_config_name,
+                configmaps.cms_interpolated_env_config_name,
+            ],
             project_root=Path(__file__).parent,
             import_nginx_config=False,
             import_uwsgi_config=False,
@@ -986,11 +991,12 @@ def create_k8s_resources(  # noqa: C901
             },
             pod_security_context=pod_security_context,
             extra_volumes=cms_edxapp_volumes,
-            extra_volume_mounts=common_extra_volume_mounts,
-            extra_init_volume_mounts=cms_edxapp_init_volume_mounts,
+            # Main containers now read config-sources directly via cms.envs.aqueduct;
+            # mount both the shared config dir and all config-source subdirs.
+            extra_volume_mounts=common_extra_volume_mounts
+            + cms_edxapp_init_volume_mounts,
             extra_init_containers=[
                 export_course_repos_init_container,
-                cms_config_aggregator_init_container,
             ],
             extra_sidecar_containers=[_make_vector_sidecar("cms")],
             pre_deploy_commands=[
@@ -1157,7 +1163,7 @@ def create_k8s_resources(  # noqa: C901
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="DJANGO_SETTINGS_MODULE",
-                                    value="lms.envs.production",
+                                    value="lms.envs.aqueduct",
                                 ),
                                 *celery_env_vars,
                             ],
@@ -1279,7 +1285,7 @@ def create_k8s_resources(  # noqa: C901
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="DJANGO_SETTINGS_MODULE",
-                                    value="lms.envs.production",
+                                    value="lms.envs.aqueduct",
                                 ),
                             ],
                             volume_mounts=celery_volume_mounts,
@@ -1394,7 +1400,7 @@ def create_k8s_resources(  # noqa: C901
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="DJANGO_SETTINGS_MODULE",
-                                    value="cms.envs.production",
+                                    value="cms.envs.aqueduct",
                                 ),
                                 *celery_env_vars,
                             ],

@@ -651,6 +651,44 @@ def build_general_config(env_prefix: str) -> ConfigDict:
     return deep_merge(base, overrides)
 
 
+def partition_config(config: ConfigDict) -> tuple[dict[str, str], ConfigDict]:
+    """Split a settings dict into flat env-var entries and complex YAML entries.
+
+    Flat entries — strings, ints, floats, and bools — are suitable for direct
+    injection as Kubernetes environment variables via ``envFrom: configMapRef``.
+    pydantic-settings coerces them back to the declared Python type on load.
+
+    Complex entries — lists, nested dicts, and ``None`` — require YAML file
+    representation because they cannot be expressed as single env-var strings
+    without lossy JSON encoding.
+
+    ``None`` values are dropped from *both* outputs: they carry no information
+    and pydantic will fall back to the field default.
+
+    Args:
+        config: Raw settings dictionary (output of a ``build_*`` function).
+
+    Returns:
+        ``(flat, complex)`` where ``flat`` values are already serialised to
+        strings ready for a Kubernetes ConfigMap ``data`` block, and
+        ``complex`` values are kept as-is for YAML rendering.
+    """
+    flat: dict[str, str] = {}
+    complex_: ConfigDict = {}
+    for key, value in config.items():
+        if value is None:
+            # Omit — pydantic will use the field default.
+            continue
+        elif isinstance(value, bool):
+            # Must come before int check: bool is a subclass of int.
+            flat[key] = "true" if value else "false"
+        elif isinstance(value, (str, int, float)):
+            flat[key] = str(value)
+        else:
+            complex_[key] = value
+    return flat, complex_
+
+
 def render_yaml(config: ConfigDict) -> str:
     """Render configuration dictionary to YAML string.
 

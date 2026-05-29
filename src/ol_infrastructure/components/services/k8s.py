@@ -296,6 +296,7 @@ class OLApplicationK8sConfig(BaseModel):
     application_deployment_use_anti_affinity: bool = True
     k8s_global_labels: dict[str, str]
     env_from_secret_names: list[str]
+    env_from_configmap_names: list[str] = []
     application_security_group_id: Output[str]
     application_security_group_name: Output[str]
     application_service_account_name: str | Output[str] | None = None
@@ -907,13 +908,21 @@ class OLApplicationK8s(ComponentResource):
         application_deployment_env_vars.append(
             kubernetes.core.v1.EnvVarArgs(name="PORT", value=str(DEFAULT_WSGI_PORT))
         )
-        # Build a list of sensitive env vars for the deployment config via envFrom
+        # Build a list of env sources for the deployment config via envFrom
         application_deployment_envfrom = []
         for secret_name in ol_app_k8s_config.env_from_secret_names:
             application_deployment_envfrom.append(  # noqa: PERF401
                 kubernetes.core.v1.EnvFromSourceArgs(
                     secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
                         name=secret_name,
+                    ),
+                )
+            )
+        for configmap_name in ol_app_k8s_config.env_from_configmap_names:
+            application_deployment_envfrom.append(  # noqa: PERF401
+                kubernetes.core.v1.EnvFromSourceArgs(
+                    config_map_ref=kubernetes.core.v1.ConfigMapEnvSourceArgs(
+                        name=configmap_name,
                     ),
                 )
             )
