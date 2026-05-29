@@ -102,7 +102,7 @@ GRAFANA_K8S_MONITORING_CHART_VERSION = "4.1.3"
 # renovate: datasource=helm depName=dcgm-exporter packageName=dcgm-exporter registryUrl=https://nvidia.github.io/dcgm-exporter/helm-charts
 NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.8.2"
 # renovate: datasource=helm depName=nvidia-device-plugin packageName=nvidia-device-plugin registryUrl=https://nvidia.github.io/k8s-device-plugin
-NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION = "0.19.1"
+NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION = "0.19.2"
 # renovate: datasource=docker depName=pgbouncer packageName=ghcr.io/cloudnative-pg/pgbouncer
 PGBOUNCER_VERSION = "1.25.2"
 # renovate: datasource=github-releases depName=local-path-provisioner packageName=rancher/local-path-provisioner
