@@ -277,12 +277,15 @@ def _build_interpolated_config_dict(
 
     # MITx Online-specific configuration
     elif stack_info.env_prefix == "mitxonline":
+        config["CORS_ORIGIN_WHITELIST"].append("https://idp.mit.edu")
         config["CSRF_TRUSTED_ORIGINS"] = [
+            "https://canvas.mit.edu",
             f"https://{domains['lms']}",
             f"https://{domains['studio']}",
         ]
         config.update(
             {
+                "CANVAS_BASE_URL": edxapp_config.require("canvas_base_url"),
                 "COURSE_ABOUT_VISIBILITY_PERMISSION": "see_about_page",
                 "MITXONLINE_BASE_URL": f"https://{marketing_domain}/",
                 "ENROLLMENT_WEBHOOK_URL": f"https://{marketing_domain}/api/openedx_webhook/enrollment/",
