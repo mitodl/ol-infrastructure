@@ -412,6 +412,14 @@ QUERY_LOGGER = None
 # Maximum number of rows returned for any analytical database query
 SQL_MAX_ROW = 500000
 
+# Disable the Superset 6.1.0 streaming CSV export path for chart data.
+# That path re-runs the query inside a new app context (no active request
+# scope) which fails against Trino, yielding __STREAM_ERROR__:Export failed.
+# Setting the threshold above SQL_MAX_ROW means no chart will trigger it;
+# all CSV exports use the proven in-memory path instead.
+# Revisit once the streaming path is validated against the Trino driver.
+CSV_STREAMING_ROW_THRESHOLD = 1_000_000
+
 # SQLALCHEMY Settings
 # Values based on number of instances and DB type and connections
 # Formula is LEAST({DBInstanceClassMemory/9531392},5000)
