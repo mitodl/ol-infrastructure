@@ -80,7 +80,7 @@ def build_notes_pipeline(
                         type="registry-image",
                         source={
                             "repository": "mitodl/dcind",
-                            "tag": "0.20.3",
+                            "tag": "latest",
                         },
                     ),
                     inputs=[
