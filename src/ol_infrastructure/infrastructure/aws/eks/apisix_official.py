@@ -138,6 +138,55 @@ def setup_apisix(
                 },
                 # --- Pod Configuration ---
                 "tolerations": operations_tolerations,
+                # Spread gateway pods across availability zones and nodes so that:
+                # - An AZ-level failure takes out at most one pod
+                # - A rolling update never places two consecutive pods on the same node,
+                #   which reduces the window where a pod with a stale services_conf_version
+                #   can block the ADC sidecar's sync on a newly-started ingress controller.
+                # ScheduleAnyway keeps scheduling unblocked when perfect balance is
+                # impossible (e.g. when scaled to fewer pods than AZs).
+                "topologySpreadConstraints": [
+                    {
+                        "maxSkew": 1,
+                        "topologyKey": "topology.kubernetes.io/zone",
+                        "whenUnsatisfiable": "ScheduleAnyway",
+                        "labelSelector": {
+                            "matchLabels": {
+                                "app.kubernetes.io/name": "apache-apisix",
+                                "app.kubernetes.io/component": "gateway",
+                            },
+                        },
+                    },
+                    {
+                        "maxSkew": 1,
+                        "topologyKey": "kubernetes.io/hostname",
+                        "whenUnsatisfiable": "ScheduleAnyway",
+                        "labelSelector": {
+                            "matchLabels": {
+                                "app.kubernetes.io/name": "apache-apisix",
+                                "app.kubernetes.io/component": "gateway",
+                            },
+                        },
+                    },
+                ],
+                "affinity": {
+                    "podAntiAffinity": {
+                        "preferredDuringSchedulingIgnoredDuringExecution": [
+                            {
+                                "weight": 100,
+                                "podAffinityTerm": {
+                                    "labelSelector": {
+                                        "matchLabels": {
+                                            "app.kubernetes.io/name": "apache-apisix",
+                                            "app.kubernetes.io/component": "gateway",
+                                        }
+                                    },
+                                    "topologyKey": "kubernetes.io/hostname",
+                                },
+                            }
+                        ]
+                    }
+                },
                 "readinessProbe": {
                     # Temporarily relax readiness to break chicken-egg problem
                     # Workers need to be in service to receive config via Admin API
@@ -154,6 +203,42 @@ def setup_apisix(
                     "limits": {
                         "memory": eks_config.get("apisix_memory") or "400Mi",
                     },
+                },
+                # --- Rolling Update Strategy and Pod Lifecycle ---
+                # maxSurge: 0 / maxUnavailable: 1 (drain-first) ensures that an old
+                # pod — which may hold a high services_conf_version accumulated over
+                # days of ADC syncs — is fully removed from endpoint slices BEFORE a
+                # replacement pod starts.  This eliminates the race where a freshly
+                # restarted ingress-controller ADC sidecar resolves a mix of old (high-
+                # version) and new (version-0) APISix pod IPs and gets a
+                # "services_conf_version must be >= N" rejection from the old pod.
+                #
+                # The tradeoff is a brief capacity dip to (desired-1) pods during each
+                # step, which the PDB (maxUnavailable: 1) already accounts for.
+                #
+                # minReadySeconds: 30 forces Kubernetes to observe the new pod as
+                # healthy for 30 s before advancing to the next rollout step, preventing
+                # a bad image from racing through the entire fleet undetected.
+                "updateStrategy": {
+                    "type": "RollingUpdate",
+                    "rollingUpdate": {
+                        "maxSurge": 0,
+                        "maxUnavailable": 1,
+                    },
+                },
+                "minReadySeconds": 30,
+                # Give in-flight requests up to 120 s to complete after the pod is
+                # removed from the NLB target group and endpoint slice.  The preStop
+                # sleep bridges the gap between endpoint-slice propagation (< 5 s) and
+                # the last long-lived connection draining; 90 s < 120 s leaves a 30 s
+                # hard-kill buffer so the kubelet never has to SIGKILL the process.
+                "terminationGracePeriodSeconds": 120,
+                "lifecycle": {
+                    "preStop": {
+                        "exec": {
+                            "command": ["/bin/sh", "-c", "sleep 90"],
+                        }
+                    }
                 },
                 # --- Service (LoadBalancer) ---
                 "service": {
@@ -395,16 +480,94 @@ def setup_apisix(
                                 "memory": "256Mi",
                             },
                         },
+                        # Surge-first rolling update (maxUnavailable: 0): a new IC pod
+                        # comes up and resolves *current* APISix endpoint IPs before the
+                        # old IC pod is terminated.  This means every new ADC sidecar
+                        # starts with a fresh, consistent view of the APISix fleet — no
+                        # stale pod IPs that could produce services_conf_version conflicts.
+                        # minReadySeconds: 30 ensures the new IC pod has successfully
+                        # completed at least one ADC sync cycle before the old pod is
+                        # decommissioned.
+                        "strategy": {
+                            "type": "RollingUpdate",
+                            "rollingUpdate": {
+                                "maxSurge": 1,
+                                "maxUnavailable": 0,
+                            },
+                        },
+                        "minReadySeconds": 30,
+                        # Allow in-flight ADC sync operations and leader-election
+                        # transitions to complete gracefully before the pod exits.
+                        "terminationGracePeriodSeconds": 60,
+                        "lifecycle": {
+                            "preStop": {
+                                "exec": {
+                                    "command": ["/bin/sh", "-c", "sleep 20"],
+                                }
+                            }
+                        },
+                        # Spread ingress-controller pods across AZs and nodes to prevent
+                        # all three replicas landing on the same node/AZ, which would
+                        # make a single node failure take down the entire control plane.
+                        "topologySpreadConstraints": [
+                            {
+                                "maxSkew": 1,
+                                "topologyKey": "topology.kubernetes.io/zone",
+                                "whenUnsatisfiable": "ScheduleAnyway",
+                                "labelSelector": {
+                                    "matchLabels": {
+                                        "app.kubernetes.io/name": "apisix-ingress-controller",
+                                    },
+                                },
+                            },
+                            {
+                                "maxSkew": 1,
+                                "topologyKey": "kubernetes.io/hostname",
+                                "whenUnsatisfiable": "ScheduleAnyway",
+                                "labelSelector": {
+                                    "matchLabels": {
+                                        "app.kubernetes.io/name": "apisix-ingress-controller",
+                                    },
+                                },
+                            },
+                        ],
+                        "affinity": {
+                            "podAntiAffinity": {
+                                "preferredDuringSchedulingIgnoredDuringExecution": [
+                                    {
+                                        "weight": 100,
+                                        "podAffinityTerm": {
+                                            "labelSelector": {
+                                                "matchLabels": {
+                                                    "app.kubernetes.io/name": "apisix-ingress-controller",
+                                                }
+                                            },
+                                            "topologyKey": "kubernetes.io/hostname",
+                                        },
+                                    }
+                                ]
+                            }
+                        },
+                    },
+                    # Protect the ingress-controller fleet from simultaneous evictions
+                    # during node drains and rolling updates.  With 3 replicas this
+                    # keeps at least 2 IC pods running so the APISix fleet always has a
+                    # functioning control-plane sidecar pushing configuration.
+                    "podDisruptionBudget": {
+                        "enabled": True,
+                        "maxUnavailable": 1,
                     },
                 },
                 # --- Pod Disruption Budget ---
-                # Protect against simultaneous evictions during VPA-triggered pod restarts,
-                # node drains, and rolling updates. minAvailable=2 guarantees at least 2
-                # APISIX pods are always serving while permitting more disruptions as the
-                # HPA scales the replica count above the 3-pod floor.
+                # maxUnavailable: 1 scales correctly as the HPA grows the replica count
+                # above the 3-pod floor: it always limits disruptions to at most one pod
+                # at a time, regardless of the current scale.  minAvailable: 2 would
+                # permit up to 3 simultaneous evictions at maxReplicas: 5, which could
+                # cascade a VPA eviction, a node drain, and a rolling-update step into
+                # a single disruptive event.
                 "podDisruptionBudget": {
                     "enabled": True,
-                    "minAvailable": 2,
+                    "maxUnavailable": 1,
                 },
                 # --- Metrics ---
                 "metrics": {
