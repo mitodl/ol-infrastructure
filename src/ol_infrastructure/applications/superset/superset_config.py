@@ -661,9 +661,11 @@ MCP_JWT_ISSUER = OIDC_URL
 def _mcp_user_resolver(app: object, access_token: object) -> str:  # noqa: ARG001
     """Resolve a Superset username from a validated Keycloak JWT.
 
-    Checks claims in the same order as
-    ``CustomSsoSecurityManager.load_user_jwt`` so both the UI and MCP paths
-    identify the same Superset user from a given Keycloak token.
+    Tries ``preferred_username`` first (the canonical Keycloak claim), then
+    falls back to ``username``, ``email``, and the ``sub`` subject claim in
+    that order.  The primary ``preferred_username`` path aligns with
+    ``CustomSsoSecurityManager.load_user_jwt``; the additional fallbacks handle
+    machine/service-account tokens that may omit ``preferred_username``.
     """
     payload: dict[str, object] = getattr(access_token, "payload", {})
     return (

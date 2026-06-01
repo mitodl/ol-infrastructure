@@ -897,6 +897,25 @@ mcp_deployment = kubernetes.apps.v1.Deployment(
                             ),
                         ],
                         env_from=_mcp_env_from,
+                        # tcpSocket probes are used because the /mcp endpoint
+                        # speaks JSON-RPC (not plain HTTP GET), so an HTTP probe
+                        # would receive an unexpected response code.
+                        readiness_probe=kubernetes.core.v1.ProbeArgs(
+                            tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
+                                port=5008,
+                            ),
+                            initial_delay_seconds=10,
+                            period_seconds=5,
+                            failure_threshold=3,
+                        ),
+                        liveness_probe=kubernetes.core.v1.ProbeArgs(
+                            tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
+                                port=5008,
+                            ),
+                            initial_delay_seconds=15,
+                            period_seconds=10,
+                            failure_threshold=3,
+                        ),
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(
                             limits={"cpu": "500m", "memory": "512Mi"},
                             requests={"cpu": "100m", "memory": "256Mi"},
@@ -979,8 +998,9 @@ gateway_config = OLEKSGatewayConfig(
         ),
     ],
     routes=[
-        # Route /mcp to the MCP server before the catch-all / route so Traefik
-        # matches the more-specific prefix first.
+        # Each OLEKSGatewayRouteConfig becomes a separate HTTPRoute resource;
+        # list order does not affect matching.  Gateway API selects the most
+        # specific matching route by prefix length, so /mcp always wins over /.
         OLEKSGatewayRouteConfig(
             backend_service_name="superset-mcp",
             backend_service_namespace=superset_namespace,
