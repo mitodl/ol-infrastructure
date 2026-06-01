@@ -91,7 +91,7 @@ def build_codejail_pipeline(
                             start_docker;
                             cd {codejail_lehrer_repo.name};
                             PYTHON_VERSION={openedx_release.python_version};
-                            DAGGER_LOG_LEVEL=debug dagger call build-codejail --codejail-config ./codejail_config --python-version $PYTHON_VERSION --release-name {release_name} export --path ../artifacts/image.tar;
+                            DAGGER_LOG_LEVEL=debug dagger call build-codejail --progress plain --codejail-config ./codejail_config --python-version $PYTHON_VERSION --release-name {release_name} export --path ../artifacts/image.tar;
                             """,
                         ],
                     ),
