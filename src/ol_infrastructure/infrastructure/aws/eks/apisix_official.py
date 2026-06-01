@@ -138,13 +138,15 @@ def setup_apisix(
                 },
                 # --- Pod Configuration ---
                 "tolerations": operations_tolerations,
-                # Spread gateway pods across availability zones and nodes so that:
-                # - An AZ-level failure takes out at most one pod
-                # - A rolling update never places two consecutive pods on the same node,
-                #   which reduces the window where a pod with a stale services_conf_version
-                #   can block the ADC sidecar's sync on a newly-started ingress controller.
-                # ScheduleAnyway keeps scheduling unblocked when perfect balance is
-                # impossible (e.g. when scaled to fewer pods than AZs).
+                # Spread gateway pods across availability zones and nodes to reduce
+                # the likelihood that an AZ-level failure takes out multiple pods and
+                # to lower the probability that a rolling update places consecutive pods
+                # on the same node (which shrinks the window where a pod with a stale
+                # services_conf_version can block ADC sidecar syncs on a freshly
+                # restarted ingress controller).
+                # These are soft constraints (ScheduleAnyway + preferred anti-affinity):
+                # they improve distribution where possible but do not block scheduling
+                # when the topology cannot be perfectly balanced.
                 "topologySpreadConstraints": [
                     {
                         "maxSkew": 1,
@@ -506,9 +508,11 @@ def setup_apisix(
                                 }
                             }
                         },
-                        # Spread ingress-controller pods across AZs and nodes to prevent
-                        # all three replicas landing on the same node/AZ, which would
-                        # make a single node failure take down the entire control plane.
+                        # Spread ingress-controller pods across AZs and nodes to reduce
+                        # the likelihood of multiple replicas landing on the same node or
+                        # AZ.  These are soft constraints (ScheduleAnyway + preferred
+                        # anti-affinity): they improve distribution where possible but do
+                        # not block scheduling when the topology cannot be balanced.
                         "topologySpreadConstraints": [
                             {
                                 "maxSkew": 1,
