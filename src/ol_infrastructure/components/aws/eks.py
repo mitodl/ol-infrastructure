@@ -296,6 +296,11 @@ class OLEKSTrustRoleConfig(AWSBase):
     service_account_identifier: str | list[str] | None = None
     service_account_name: str | list[str] | None = None
     service_account_namespace: str | None = None
+    # Maximum duration (seconds) for STS sessions issued via AssumeRoleWithWebIdentity.
+    # AWS default is 3600 (1 hour); maximum is 43200 (12 hours).
+    # Long-running pipeline workloads (e.g. large S3 bulk-loads) may need more than
+    # 1 hour.  Set this to 43200 for Dagster or similar batch-processing deployments.
+    max_session_duration: int = 3600
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @model_validator(mode="after")
@@ -381,6 +386,7 @@ class OLEKSTrustRole(pulumi.ComponentResource):
                     )
                 ),
                 description=role_config.description,
+                max_session_duration=role_config.max_session_duration,
                 tags=role_config.tags,
                 opts=pulumi.ResourceOptions(parent=self).merge(opts),
             )

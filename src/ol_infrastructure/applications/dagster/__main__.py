@@ -435,6 +435,10 @@ dagster_auth_binding = OLEKSAuthBinding(
         ],
         k8s_labels=k8s_global_labels,
         parliament_config=parliament_config,
+        # Dagster pipelines can run for several hours (e.g. bulk edxorg S3 loads).
+        # The AWS default of 1 hour causes ExpiredToken errors mid-pipeline.
+        # 12 hours (the AWS maximum) gives ample headroom for all workloads.
+        irsa_max_session_duration=43200,
     )
 )
 

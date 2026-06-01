@@ -55,6 +55,11 @@ class OLEKSAuthBindingConfig(BaseModel):
     # Set to False (default) when the ServiceAccount is managed externally (e.g. by
     # Helm) or already exists in the cluster.
     create_irsa_service_account: bool = False
+    # Maximum STS session duration for the IRSA role (seconds).
+    # AWS default is 3600 (1 hour); maximum allowed by AWS is 43200 (12 hours).
+    # Increase this for deployments that run long pipeline jobs (e.g. bulk S3 loads)
+    # that would otherwise hit ExpiredToken after 1 hour.
+    irsa_max_session_duration: int = 3600
 
     @model_validator(mode="after")
     def validate_vault_policy(self):
@@ -133,6 +138,7 @@ class OLEKSAuthBinding(ComponentResource):
                 role_name=config.application_name,
                 service_account_name=config.irsa_service_account_name,
                 service_account_namespace=config.namespace,
+                max_session_duration=config.irsa_max_session_duration,
                 tags=config.aws_config.tags,
             ),
             opts=ResourceOptions(parent=self),
