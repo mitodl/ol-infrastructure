@@ -553,13 +553,14 @@ def setup_apisix(
                             }
                         },
                     },
-                    # Protect the ingress-controller fleet from simultaneous evictions
-                    # during node drains and rolling updates.  With 3 replicas this
-                    # keeps at least 2 IC pods running so the APISix fleet always has a
-                    # functioning control-plane sidecar pushing configuration.
+                    # The ingress-controller sub-chart's built-in PDB is disabled because
+                    # apisix-ingress-controller v1.1.1 has a template name mismatch bug:
+                    # pdb.yaml references "apisix-ingress-controller.fullname" but _helpers.tpl
+                    # only defines "apisix-ingress-controller-manager.*" variants, causing Helm
+                    # to fail with "no template 'apisix-ingress-controller.fullname'".  A
+                    # standalone PodDisruptionBudget Pulumi resource is created below instead.
                     "podDisruptionBudget": {
-                        "enabled": True,
-                        "maxUnavailable": 1,
+                        "enabled": False,
                     },
                 },
                 # --- Pod Disruption Budget ---
@@ -612,6 +613,37 @@ def setup_apisix(
                 lb_controller,
                 error_pages_configmap,
             ],
+        ),
+    )
+
+    # Standalone PDB for the ingress-controller deployment.
+    # The sub-chart's built-in PDB (podDisruptionBudget.enabled) is disabled because
+    # apisix-ingress-controller v1.1.1 has a template name mismatch: pdb.yaml calls
+    # "apisix-ingress-controller.fullname" but _helpers.tpl only defines
+    # "apisix-ingress-controller-manager.*" helpers, causing a Helm render failure.
+    # We replicate the same policy here using the actual pod selector labels:
+    #   app.kubernetes.io/name: apisix-ingress-controller  (chart name)
+    #   app.kubernetes.io/instance: apache-apisix           (release name)
+    kubernetes.policy.v1.PodDisruptionBudget(
+        f"{cluster_name}-apisix-ingress-controller-pdb",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="apache-apisix-apisix-ingress-controller",
+            namespace="operations",
+            labels=k8s_global_labels,
+        ),
+        spec=kubernetes.policy.v1.PodDisruptionBudgetSpecArgs(
+            max_unavailable=1,
+            selector=kubernetes.meta.v1.LabelSelectorArgs(
+                match_labels={
+                    "app.kubernetes.io/name": "apisix-ingress-controller",
+                    "app.kubernetes.io/instance": "apache-apisix",
+                },
+            ),
+        ),
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=operations_namespace,
+            depends_on=[apisix_helm_release],
         ),
     )
 
