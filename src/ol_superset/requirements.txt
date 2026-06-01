@@ -4,6 +4,7 @@ starrocks
 mysqlclient
 celery-redbeat
 duckdb
+fastmcp
 flask-caching
 flask-oidc
 flask-openid

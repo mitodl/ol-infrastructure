@@ -614,6 +614,92 @@ def _interpolate_env_vars(value: str | None) -> str | None:
     return _ENV_VAR_PATTERN.sub(_replace, value)
 
 
+# ---------------------------------------------------
+# MCP Server Configuration
+# ---------------------------------------------------
+# The MCP server runs as a separate Kubernetes Deployment (superset-mcp)
+# alongside the main Superset web pods.  It exposes the Superset MCP API at
+# /mcp, routed through the existing Gateway listener at https://{domain}/mcp.
+#
+# Authentication re-uses the Keycloak RS256 JWT tokens already issued for
+# Superset UI access.  The MCP server validates incoming Bearer tokens against
+# the Keycloak JWKS endpoint and resolves the Superset user by
+# preferred_username, which mirrors the existing
+# CustomSsoSecurityManager.load_user_jwt path.
+#
+# Multi-pod session state is backed by Redis DB 3 (distinct from the Superset
+# metadata cache on DB 0, Celery broker on DB 1, and Celery results on DB 2)
+# so that all MCP replicas share session context.
+#
+# Requires: fastmcp package in the Superset image (pip install fastmcp).
+
+MCP_SERVICE_HOST = "0.0.0.0"  # noqa: S104 - bind all interfaces in k8s
+MCP_SERVICE_PORT = 5008
+# Public-facing base URL for MCP-generated links (e.g. chart preview URLs).
+# Injected at runtime via SUPERSET_MCP_PUBLIC_URL env var set in Pulumi.
+MCP_SERVICE_URL = os.environ.get("SUPERSET_MCP_PUBLIC_URL")
+
+# JWT authentication via Keycloak RS256 JWKS endpoint.
+# OIDC_URL is the Keycloak realm base URL injected from the oidc k8s secret
+# (e.g. https://keycloak.example.com/realms/master).
+MCP_AUTH_ENABLED = True
+MCP_JWT_ALGORITHM = "RS256"
+# Keycloak publishes its realm signing keys at this well-known path.
+MCP_JWKS_URI = f"{OIDC_URL}/protocol/openid-connect/certs" if OIDC_URL else None
+# Keycloak sets the 'iss' claim to the realm URL.
+MCP_JWT_ISSUER = OIDC_URL
+
+
+def _mcp_user_resolver(app: object, access_token: object) -> str:  # noqa: ARG001
+    """Resolve a Superset username from a validated Keycloak JWT.
+
+    Checks claims in the same order as
+    ``CustomSsoSecurityManager.load_user_jwt`` so both the UI and MCP paths
+    identify the same Superset user from a given Keycloak token.
+    """
+    payload: dict[str, object] = getattr(access_token, "payload", {})
+    return (
+        str(payload.get("preferred_username") or "")
+        or str(payload.get("username") or "")
+        or str(payload.get("email") or "")
+        or str(getattr(access_token, "subject", "") or "")
+        or ""
+    )
+
+
+MCP_USER_RESOLVER = _mcp_user_resolver
+
+# Redis-backed session store so all MCP replicas share session state.
+# Uses Redis DB 3 — distinct from metadata cache (DB 0), Celery broker (DB 1),
+# and Celery results backend (DB 2).
+MCP_STORE_CONFIG = {
+    "enabled": True,
+    "CACHE_REDIS_URL": f"rediss://default:{REDIS_TOKEN}@{REDIS_HOST}:{REDIS_PORT}/3",
+    "event_store_max_events": 100,
+    "event_store_ttl": 3600,
+}
+
+# Response caching for read-heavy tool calls (dashboard/dataset listings).
+# Mutating and non-deterministic tools are always excluded.
+MCP_CACHE_CONFIG = {
+    "enabled": True,
+    "CACHE_KEY_PREFIX": "superset_mcp_cache",
+    "list_tools_ttl": 300,
+    "list_resources_ttl": 300,
+    "list_prompts_ttl": 300,
+    "read_resource_ttl": 3600,
+    "get_prompt_ttl": 3600,
+    "call_tool_ttl": 3600,
+    "max_item_size": 1048576,  # 1 MB per cached response
+    "excluded_tools": [
+        "execute_sql",
+        "generate_dashboard",
+        "generate_chart",
+        "update_chart",
+    ],
+}
+
+
 def DB_CONNECTION_MUTATOR(  # noqa: N802
     uri: URL,
     params: dict[str, object],
