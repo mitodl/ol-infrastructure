@@ -118,7 +118,14 @@ class OidcCallbackHandler(BaseHTTPRequestHandler):
         """Handle the OIDC callback."""
         parsed = urllib.parse.urlparse(self.path)
         params = urllib.parse.parse_qs(parsed.query)
-        self.server.token = params["code"][0]  # type: ignore[attr-defined]
+        code_values = params.get("code")
+        if not code_values or not code_values[0]:
+            self.send_response(400)
+            self.end_headers()
+            self.wfile.write(b"Missing authorization code")
+            return
+
+        self.server.token = code_values[0]  # type: ignore[attr-defined]
         self.send_response(200)
         self.end_headers()
         self.wfile.write(SELF_CLOSING_PAGE.encode())
