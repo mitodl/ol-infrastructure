@@ -837,10 +837,11 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
             SamlIdpConfig(
                 idp_alias="SEU",
                 idp_display_name="Georgian National University Seu",
-                org_saml_metadata_url="https://auth.seu.edu.ge/realms/seu-realm/protocol/saml/descriptor",
+                org_saml_metadata_url="https://emis1.seu.edu.ge/saml/metadata",
                 principal_type="ATTRIBUTE",
                 principal_attribute="urn:oid:0.9.2342.19200300.100.1.3",
-                name_id_format=NameIdFormat.unspecified,
+                name_id_format=NameIdFormat.email,
+                single_sign_on_service_url="https://emis1.seu.edu.ge/saml/sso/mit",
                 keycloak_url=keycloak_url,
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
