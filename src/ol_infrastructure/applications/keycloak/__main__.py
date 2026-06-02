@@ -415,14 +415,7 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
         labels=k8s_global_labels,
     ),
     spec={
-        "update": {"strategy": "RollingUpdate"},
-        # rolling-updates:v2 coordinates Infinispan cache-sync during rolling
-        # updates so the embedded cluster topology change no longer causes a
-        # brief HTTP 503 on /health/ready, eliminating the zero-endpoint window
-        # that produces downtime on 2-replica deployments.
-        "features": {
-            "enabled": ["rolling-updates:v2"],
-        },
+        "update": {"strategy": "Auto"},
         "instances": keycloak_config.get_int("replicas") or 2,
         "image": cached_image_uri(f"mitodl/keycloak@{KEYCLOAK_DOCKER_DIGEST}"),
         "db": {
