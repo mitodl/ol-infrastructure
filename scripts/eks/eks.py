@@ -309,8 +309,12 @@ def build_kubeconfig(
 
 def login_oidc_get_token() -> str:
     """Wait for the Vault OIDC callback and return the authorization code."""
-    httpd = OidcHttpServer(("", OIDC_CALLBACK_PORT), OidcCallbackHandler)
+    httpd = OidcHttpServer(("127.0.0.1", OIDC_CALLBACK_PORT), OidcCallbackHandler)
     httpd.handle_request()
+    if not httpd.token:
+        msg = "Vault OIDC callback did not return an authorization code"
+        raise RuntimeError(msg)
+    return httpd.token
     if not httpd.token:
         msg = "Vault OIDC callback did not return an authorization code"
         raise RuntimeError(msg)
