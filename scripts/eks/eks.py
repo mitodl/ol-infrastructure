@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 import urllib.parse
 import webbrowser
 from dataclasses import asdict, dataclass
@@ -37,6 +38,7 @@ PULUMI_EKS_PROJECT_DIR = (
 )
 PRODUCTION_VAULT_ADDRESS = "https://vault-production.odl.mit.edu"
 PREFERRED_DEFAULT_CONTEXT = "applications-qa"
+PYTHON_EXECUTABLE = str(Path(sys.executable).resolve())
 SELF_CLOSING_PAGE = """
 <!doctype html>
 <html>
@@ -214,8 +216,6 @@ def fetch_all_cluster_configs() -> list[ClusterConfig]:
 def kubeconfig_exec_args(cluster: ClusterConfig, mode: AccessMode) -> list[str]:
     """Build exec args for kubeconfig user entries."""
     args = [
-        "run",
-        "python",
         str(Path(__file__).resolve()),
         "exec-credential",
         "--cluster-name",
@@ -277,7 +277,7 @@ def build_kubeconfig(
                 "user": {
                     "exec": {
                         "apiVersion": "client.authentication.k8s.io/v1beta1",
-                        "command": "uv",
+                        "command": PYTHON_EXECUTABLE,
                         "args": kubeconfig_exec_args(cluster, mode),
                         "interactiveMode": "IfAvailable",
                         "provideClusterInfo": False,
