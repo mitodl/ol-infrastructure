@@ -415,7 +415,14 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
         labels=k8s_global_labels,
     ),
     spec={
-        "update": {"strategy": "Auto"},
+        "update": {"strategy": "RollingUpdate"},
+        # rolling-updates:v2 coordinates Infinispan cache-sync during rolling
+        # updates so the embedded cluster topology change no longer causes a
+        # brief HTTP 503 on /health/ready, eliminating the zero-endpoint window
+        # that produces downtime on 2-replica deployments.
+        "features": {
+            "enabled": ["rolling-updates:v2"],
+        },
         "instances": keycloak_config.get_int("replicas") or 2,
         "image": cached_image_uri(f"mitodl/keycloak@{KEYCLOAK_DOCKER_DIGEST}"),
         "db": {
@@ -452,6 +459,9 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
         "unsupported": {
             "podTemplate": {
                 "spec": {
+                    # Give Infinispan enough time to gracefully leave the
+                    # cluster before the pod is force-killed.
+                    "terminationGracePeriodSeconds": 60,
                     "containers": [
                         {
                             "name": "keycloak",
@@ -490,7 +500,7 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
                                 ),
                             ],
                         },
-                    ]
+                    ],
                 }
             },
         },
@@ -560,6 +570,31 @@ keycloak_service_monitor = kubernetes.apiextensions.CustomResource(
     ),
 )
 
+# PodDisruptionBudget: ensures at least (replicas - 1) pods remain available
+# during voluntary disruptions (node drain, cluster upgrades).  With 3 replicas
+# this guarantees 2 serving pods at all times, which is also the minimum
+# required for the embedded Infinispan cluster to avoid a topology-change 503.
+keycloak_pdb = kubernetes.policy.v1.PodDisruptionBudget(
+    f"{env_name}-keycloak-pdb",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=f"{keycloak_resource_name}-pdb",
+        namespace=keycloak_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec=kubernetes.policy.v1.PodDisruptionBudgetSpecArgs(
+        max_unavailable=1,
+        selector=kubernetes.meta.v1.LabelSelectorArgs(
+            match_labels={
+                "app": "keycloak",
+                "app.kubernetes.io/instance": keycloak_resource_name,
+            },
+        ),
+    ),
+    opts=ResourceOptions(
+        depends_on=[keycloak_resource],
+    ),
+)
+
 gateway_config = OLEKSGatewayConfig(
     cert_issuer="letsencrypt-production",
     cert_issuer_class="cluster-issuer",
@@ -603,7 +638,7 @@ keycloak_server_vault_mount = vault.Mount(
     "keycloak-server-configuration-secrets-mount",
     path="secret-keycloak",
     type="kv-v2",
-    options={"version": 2},
+    options={"version": "2"},
     description="Storage of configuration credentials and secrets used by keycloak",
     opts=ResourceOptions(delete_before_replace=True),
 )
