@@ -121,8 +121,8 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                 password="((dockerhub.password))",  # noqa: S106
             )
 
-            # Deployment-specific lehrer parameters (moved from lehrer core in
-            # https://github.com/mitodl/lehrer/pull/41).
+            # Per-deployment lehrer parameters (values previously hardcoded inside
+            # lehrer core, extracted in https://github.com/mitodl/lehrer/pull/41).
             translations_repo = (
                 "mitodl/mitxonline-translations"
                 if deployment_name == "mitxonline"
@@ -134,7 +134,8 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                 if deployment_name == "mitxonline"
                 else ""
             )
-            proctortrack_url = "git+https://git@github.com/verificient/edx-proctoring-proctortrack.git#f0fa9edbd16aa5af5a41ac309d2609e529ea8732"
+            # Proctortrack is the same package for all deployments
+            proctortrack_url = "git+https://github.com/verificient/edx-proctoring-proctortrack.git#f0fa9edbd16aa5af5a41ac309d2609e529ea8732"
 
             # Each earthly build requires several inputs, build that list pre-emptively
             earthly_build_job = Job(
