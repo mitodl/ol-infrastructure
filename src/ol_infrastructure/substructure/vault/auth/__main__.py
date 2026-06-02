@@ -28,7 +28,7 @@ stack_info = parse_stack()
 keycloak_config = Config("keycloak")
 keycloak_url = keycloak_config.require("url")
 keycloak_client_id = keycloak_config.require("client_id")
-keycloak_client_secret = keycloak_config.require("client_secret")
+keycloak_client_secret = keycloak_config.require_secret("client_secret")
 
 vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
