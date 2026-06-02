@@ -17,13 +17,4 @@ PIPELINE_CONFIGS = {
         "client_repo_branch": "main",
         "client_repo_subpath": "mitxonline-api-axios",
     },
-    "unified-ecommerce": {
-        "source_repo_name": "unified-ecommerce",
-        "source_repo_uri": "https://github.com/mitodl/unified-ecommerce",
-        "source_repo_branch": "release",
-        "client_repo_name": "unified-ecommerce-api-clients",
-        "client_repo_uri": "git@github.com:mitodl/unified-ecommerce-api-clients.git",
-        "client_repo_branch": "main",
-        "client_repo_subpath": "unified-ecommerce-api-axios",
-    },
 }

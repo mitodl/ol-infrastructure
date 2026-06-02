@@ -99,15 +99,6 @@ config:
   keycloak_realm:olapps-open-discussions-client-redirect-uris: ["https://discussions-ci.odl.mit.edu/*"]
   keycloak_realm:olapps-open-discussions-client-secret:
     secure: v1:uAB+cVrN2bsEepg6:HZazIFvhKkr4xVJ3QN9nU02QG5p6T54aZTkCtqzlS1Y15ceGGU7cK/tmJiIq7YTj
-  keycloak_realm:olapps-unified-ecommerce-client-logout-uris:
-  - "/establish_session*"
-  - ".apisix/redirect/*"
-  keycloak_realm:olapps-unified-ecommerce-client-redirect-uris:
-  - "https://pay-ci.ol.mit.edu/*"
-  - "https://api-pay-ci.ol.mit.edu/*"
-  keycloak_realm:olapps-unified-ecommerce-client-roles: ["https://api-pay-ci.ol.mit.edu/*"]
-  keycloak_realm:olapps-unified-ecommerce-client-secret:
-    secure: v1:56Sc/lnkJ3zwDj62:YmgdAN9f8QQK1L5hIygF3I31St5PS8IjlwRyFkP/i2hxNxoNzKsbJQCIskQ58bte
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
   keycloak_realm:session_secret:

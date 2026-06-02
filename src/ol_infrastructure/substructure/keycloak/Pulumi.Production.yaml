@@ -27,13 +27,6 @@ config:
     secure: v1:iwlNVKpViup/xmjh:1nzhVf0/XBinQsI78YdpTcBZQiHgr9heAg+qv9T0rw==
   keycloak_realm:mit_email_username:
     secure: v1:ixrI5oZwMK2WCpQr:NaqM67NVCRDfOCsTlyrnN4tNmrPXcSOs
-  keycloak_realm:olapps-unified-ecommerce-client-redirect-uris:
-  - "https://pay.ol.mit.edu/*"
-  - "https://api-pay.ol.mit.edu/*"
-  keycloak_realm:olapps-unified-ecommerce-client-logout-uris:
-  - "/establish_session*"
-  - ".apisix/redirect/*"
-  keycloak_realm:olapps-unified-ecommerce-client-roles: ["https://api-pay.ol.mit.edu/*"]
   keycloak_realm:olapps-learn-ai-redirect-uris:
   - "https://learn-ai.ol.mit.edu/*"
   - "https://api-learn-ai.ol.mit.edu/*"
@@ -88,8 +81,6 @@ config:
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   keycloak_realm:olapps_email_theme: ol-learn
-  keycloak_realm:olapps-unified-ecommerce-client-secret:
-    secure: v1:M7V+wF8RPj2Wg8Ze:Tyg4FyTtImPBF/Oh1TQZ53feglE8Mzwm2WV+FBS4QZnIMZ/NOmWf28neMCu5I7wW
   keycloak_realm:olapps-learn-ai-client-secret:
     secure: v1:MvvmStk26rnq2N4+:+Y2bvHkdIfHaWwJ/X7qQuPgffR6MzJOUv6fqoxTszk135voTcnJb6Dhz8dWT6Yhs
   keycloak_realm:olapps-mitlearn-client-secret:
