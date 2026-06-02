@@ -78,6 +78,7 @@ def test_build_kubeconfig_for_readonly_mode(eks_module):
 
     assert kubeconfig["clusters"][0]["name"] == "applications-qa"
     assert kubeconfig["contexts"][0]["name"] == "applications-qa"
+    assert kubeconfig["current-context"] == "applications-qa"
     exec_config = kubeconfig["users"][0]["user"]["exec"]
     assert exec_config["command"] == "uv"
     assert "exec-credential" in exec_config["args"]
@@ -105,6 +106,29 @@ def test_build_kubeconfig_for_admin_mode_includes_admin_role(eks_module):
     assert "admin" in exec_args
     assert "--admin-role-arn" in exec_args
     assert "arn:aws:iam::123456789012:role/cluster-admin" in exec_args
+
+
+@pytest.mark.unit
+def test_resolve_current_context_falls_back_to_first_cluster(eks_module):
+    """The first cluster should be used when the preferred default is absent."""
+    clusters = [
+        eks_module.ClusterConfig(
+            cluster_name="operations-ci",
+            stack_name="operations.CI",
+            server="https://operations-ci.example.invalid",
+            certificate_authority_data="ca1",
+            admin_role_arn="arn:aws:iam::123456789012:role/admin-1",
+        ),
+        eks_module.ClusterConfig(
+            cluster_name="data-ci",
+            stack_name="data.CI",
+            server="https://data-ci.example.invalid",
+            certificate_authority_data="ca2",
+            admin_role_arn="arn:aws:iam::123456789012:role/admin-2",
+        ),
+    ]
+
+    assert eks_module.resolve_current_context(clusters, None) == "operations-ci"
 
 
 @pytest.mark.unit

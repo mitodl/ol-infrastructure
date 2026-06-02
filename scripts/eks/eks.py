@@ -36,6 +36,7 @@ PULUMI_EKS_PROJECT_DIR = (
     / "eks"
 )
 PRODUCTION_VAULT_ADDRESS = "https://vault-production.odl.mit.edu"
+PREFERRED_DEFAULT_CONTEXT = "applications-qa"
 SELF_CLOSING_PAGE = """
 <!doctype html>
 <html>
@@ -227,6 +228,20 @@ def kubeconfig_exec_args(cluster: ClusterConfig, mode: AccessMode) -> list[str]:
     return args
 
 
+def resolve_current_context(
+    clusters: list[ClusterConfig], current_context: str | None
+) -> str | None:
+    """Choose an explicit or sensible default current context."""
+    if current_context:
+        return current_context
+    cluster_names = [cluster.cluster_name for cluster in clusters]
+    if PREFERRED_DEFAULT_CONTEXT in cluster_names:
+        return PREFERRED_DEFAULT_CONTEXT
+    if cluster_names:
+        return cluster_names[0]
+    return None
+
+
 def build_kubeconfig(
     clusters: list[ClusterConfig],
     mode: AccessMode,
@@ -279,8 +294,9 @@ def build_kubeconfig(
         "contexts": contexts,
         "users": users,
     }
-    if current_context:
-        kube_config["current-context"] = current_context
+    resolved_current_context = resolve_current_context(clusters, current_context)
+    if resolved_current_context:
+        kube_config["current-context"] = resolved_current_context
     return kube_config
 
 
