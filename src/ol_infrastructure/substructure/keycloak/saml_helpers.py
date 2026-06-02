@@ -4,7 +4,7 @@ import logging
 import xml.etree.ElementTree as ET
 from typing import Any
 from urllib.parse import urlparse
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,15 @@ def _fetch_and_parse_saml_metadata(metadata_url: str) -> ET.Element | None:
     try:
         # Set timeout and limit response size
         MAX_METADATA_SIZE = 10 * 1024 * 1024  # 10MB
-        with urlopen(metadata_url, timeout=10) as metadata_file:  # noqa: S310
+        # Use a browser-like User-Agent; some IdP endpoints (e.g. behind Cloudflare)
+        # return 403 when they see Python's default urllib User-Agent.
+        request = Request(  # noqa: S310
+            metadata_url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (compatible; Keycloak-metadata-fetcher)"
+            },
+        )
+        with urlopen(request, timeout=10) as metadata_file:  # noqa: S310
             metadata_bytes = metadata_file.read(MAX_METADATA_SIZE + 1)
             if len(metadata_bytes) > MAX_METADATA_SIZE:
                 logger.warning(
