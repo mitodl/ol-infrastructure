@@ -80,8 +80,12 @@ def test_build_kubeconfig_for_readonly_mode(eks_module):
     assert kubeconfig["contexts"][0]["name"] == "applications-qa"
     assert kubeconfig["current-context"] == "applications-qa"
     exec_config = kubeconfig["users"][0]["user"]["exec"]
-    assert exec_config["command"] == eks_module.PYTHON_EXECUTABLE
-    assert exec_config["args"][0] == str(Path(eks_module.__file__).resolve())
+    assert exec_config["command"] == "uv"
+    assert exec_config["args"][:3] == [
+        "run",
+        "python",
+        str(Path(eks_module.__file__).resolve()),
+    ]
     assert "exec-credential" in exec_config["args"]
     assert "readonly" in exec_config["args"]
     assert "--admin-role-arn" not in exec_config["args"]
