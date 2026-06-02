@@ -1,3 +1,5 @@
+"""Configure Vault authentication, policies, and shared EKS access roles."""
+
 import json
 from pathlib import Path
 
@@ -24,6 +26,9 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 vault_config = Config("vault")
 stack_info = parse_stack()
 keycloak_config = Config("keycloak")
+keycloak_url = keycloak_config.require("url")
+keycloak_client_id = keycloak_config.require("client_id")
+keycloak_client_secret = keycloak_config.require("client_secret")
 
 vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
@@ -75,11 +80,20 @@ vault_oidc_keycloak_auth = jwt.AuthBackend(
     path="oidc",
     type="oidc",
     description="OIDC auth Keycloak integration for vault client",
-    oidc_discovery_url=f"{keycloak_config.get('url')}/realms/ol-platform-engineering",
-    oidc_client_id=keycloak_config.get("client_id"),
-    oidc_client_secret=keycloak_config.get("client_secret"),
+    oidc_discovery_url=f"{keycloak_url}/realms/ol-platform-engineering",
+    oidc_client_id=keycloak_client_id,
+    oidc_client_secret=keycloak_client_secret,
     default_role="developer",
     opts=ResourceOptions(delete_before_replace=True),
+)
+
+# Readonly policy definition
+readonly_policy = Policy(
+    "readonly-policy",
+    name="readonly",
+    policy=Path(__file__)
+    .parent.parent.joinpath("policies/readonly/readonly.hcl")
+    .read_text(),
 )
 
 # Developer policy definition
@@ -94,7 +108,7 @@ developer_policy = Policy(
 github.Team(
     "vault-github-auth-developer",
     team="vault-developer-access",
-    policies=[developer_policy.name],
+    policies=[readonly_policy.name, developer_policy.name],
 )
 
 # Admin policy definition
@@ -110,6 +124,21 @@ github.Team(
     "vault-github-auth-devops", team="vault-devops-access", policies=[admin_policy.name]
 )
 
+# Configure OIDC readonly role
+readonly_role = jwt.AuthBackendRole(
+    "readonly-role",
+    backend=vault_oidc_keycloak_auth.path,
+    role_name="readonly",
+    token_policies=[readonly_policy.name],
+    allowed_redirect_uris=[
+        "http://localhost:8250/oidc/callback",
+        f"{vault_config.get('address')}/ui/vault/auth/oidc/oidc/callback",
+    ],
+    bound_audiences=[keycloak_client_id],
+    user_claim="email",
+    role_type="oidc",
+)
+
 # Configure OIDC developer role
 developer_role = jwt.AuthBackendRole(
     "developer-role",
@@ -120,7 +149,7 @@ developer_role = jwt.AuthBackendRole(
         "http://localhost:8250/oidc/callback",
         f"{vault_config.get('address')}/ui/vault/auth/oidc/oidc/callback",
     ],
-    bound_audiences=[keycloak_config.get("client_id")],
+    bound_audiences=[keycloak_client_id],
     user_claim="email",
     role_type="oidc",
 )
@@ -135,7 +164,7 @@ admin_role = jwt.AuthBackendRole(
         "http://localhost:8250/oidc/callback",
         f"{vault_config.get('address')}/ui/vault/auth/oidc/oidc/callback",
     ],
-    bound_audiences=[keycloak_config.get("client_id")],
+    bound_audiences=[keycloak_client_id],
     user_claim="email",
     role_type="oidc",
     bound_claims={"roles": "admin, vault-admins"},
@@ -164,28 +193,48 @@ aws.AuthBackendRole(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
-# This is the shared developer role that will be assumed by developers using vault
+# These are the shared roles assumed by users via Vault-generated AWS credentials
 if stack_info.name == "Production":
-    eks_shared_developer_role = iam.Role(
-        "eks-cluster-shared-developer-role",
-        assume_role_policy=vault_stack.require_output("vault_server").apply(
-            lambda vs: json.dumps(
-                {
-                    "Version": "2012-10-17",
-                    "Statement": [
-                        {
-                            "Effect": "Allow",
-                            "Principal": {"AWS": vs["instance_role_arn"]},
-                            "Action": "sts:AssumeRole",
-                        }
-                    ],
-                }
-            )
-        ),
+    shared_assume_role_policy = vault_stack.require_output("vault_server").apply(
+        lambda vs: json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {"AWS": vs["instance_role_arn"]},
+                        "Action": "sts:AssumeRole",
+                    }
+                ],
+            }
+        )
+    )
+
+    eks_shared_readonly_role = iam.Role(
+        "eks-cluster-shared-readonly-role",
+        assume_role_policy=shared_assume_role_policy,
         max_session_duration=EIGHT_HOURS_SECONDS,
     )
 
-    eks_shared_developer_role_vault_backend_role = aws.SecretBackendRole(
+    aws.SecretBackendRole(
+        "eks-cluster-shared-readonly-role-vault-backend-role",
+        name="eks-cluster-shared-readonly-role",
+        backend="aws-mitx",
+        credential_type="assumed_role",
+        default_sts_ttl=EIGHT_HOURS_SECONDS,
+        max_sts_ttl=EIGHT_HOURS_SECONDS,
+        iam_tags={"OU": "operations", "environment": "production"},
+        role_arns=[eks_shared_readonly_role.arn],
+        opts=ResourceOptions(delete_before_replace=True),
+    )
+
+    eks_shared_developer_role = iam.Role(
+        "eks-cluster-shared-developer-role",
+        assume_role_policy=shared_assume_role_policy,
+        max_session_duration=EIGHT_HOURS_SECONDS,
+    )
+
+    aws.SecretBackendRole(
         "eks-cluster-shared-developer-role-vault-backend-role",
         name="eks-cluster-shared-developer-role",
         backend="aws-mitx",
@@ -197,4 +246,5 @@ if stack_info.name == "Production":
         opts=ResourceOptions(delete_before_replace=True),
     )
 
+    export("eks_shared_readonly_role_arn", eks_shared_readonly_role.arn)
     export("eks_shared_developer_role_arn", eks_shared_developer_role.arn)
