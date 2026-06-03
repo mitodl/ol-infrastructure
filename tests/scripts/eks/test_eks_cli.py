@@ -81,8 +81,10 @@ def test_build_kubeconfig_for_readonly_mode(eks_module):
     assert kubeconfig["current-context"] == "applications-qa"
     exec_config = kubeconfig["users"][0]["user"]["exec"]
     assert Path(exec_config["command"]).name == "uv"
-    assert exec_config["args"][:3] == [
+    assert exec_config["args"][:5] == [
         "run",
+        "--project",
+        str(eks_module.repo_root()),
         "python",
         str(Path(eks_module.__file__).resolve()),
     ]
