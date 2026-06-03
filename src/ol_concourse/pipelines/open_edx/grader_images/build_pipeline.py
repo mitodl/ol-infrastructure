@@ -107,9 +107,9 @@ def grader_image_pipeline(config: GraderPipelineConfig) -> Pipeline:
         private_key=config.github_private_key,
     )
 
-    # Grader base image via ECR pull-through cache — avoids Docker Hub rate limits
-    # while still triggering this pipeline when a new base image is published to
-    # DockerHub (ECR pull-through cache syncs automatically).
+    # Grader base image via ECR pull-through cache — avoids Docker Hub rate limits.
+    # Concourse's periodic `check` on this registry-image resource polls ECR
+    # (not push events), which is what prompts pull-through cache refreshes.
     grader_base_image = registry_image(
         name=Identifier("grader-base-image"),
         image_repository=dockerhub_ecr_image_uri(config.grader_base_dockerhub_repo),
