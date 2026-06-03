@@ -620,4 +620,62 @@ def create_ol_mit_realm(  # noqa: PLR0913
     )
     # ODL VIDEO SERVICE [END]
 
+    # OCW STUDIO [START]
+    ol_mit_ocw_studio_client = keycloak.openid.Client(
+        "ol-mit-ocw-studio-client",
+        name="ol-mit-ocw-studio-client",
+        realm_id=ol_mit_realm.id,
+        client_id="ocw-studio-app",
+        client_secret=keycloak_realm_config.get("ol-mit-ocw-studio-client-secret"),
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        direct_access_grants_enabled=False,
+        service_accounts_enabled=False,
+        valid_redirect_uris=keycloak_realm_config.get_object(
+            "ol-mit-ocw-studio-redirect-uris"
+        ),
+        valid_post_logout_redirect_uris=keycloak_realm_config.get_object(
+            "ol-mit-ocw-studio-logout-uris"
+        ),
+        web_origins=keycloak_realm_config.get_object("ol-mit-ocw-studio-web-origins"),
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+
+    keycloak.openid.AudienceProtocolMapper(
+        "ol-mit-ocw-studio-audience-mapper",
+        realm_id=ol_mit_realm.id,
+        client_id=ol_mit_ocw_studio_client.id,
+        name="audience",
+        included_client_audience=ol_mit_ocw_studio_client.client_id,
+        add_to_id_token=True,
+        add_to_access_token=True,
+        opts=resource_options,
+    )
+
+    vault.generic.Secret(
+        "ol-mit-ocw-studio-client-vault-oidc-credentials",
+        path="secret-operations/sso/ocw-studio",
+        data_json=Output.all(
+            url=ol_mit_ocw_studio_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
+            server_url=keycloak_url,
+            client_id=ol_mit_ocw_studio_client.client_id,
+            client_secret=ol_mit_ocw_studio_client.client_secret,
+            secret=session_secret,
+            realm_id=ol_mit_ocw_studio_client.realm_id,
+            realm_name="ol-mit",
+            realm_public_key=ol_mit_ocw_studio_client.realm_id.apply(
+                lambda realm_id: (
+                    fetch_realm_public_key_partial(realm_id)
+                    .removeprefix("-----BEGIN PUBLIC KEY-----\n")
+                    .removesuffix("\n-----END PUBLIC KEY-----")
+                )
+            ),
+        ).apply(json.dumps),
+    )
+    # OCW STUDIO [END]
+
     return ol_mit_realm
