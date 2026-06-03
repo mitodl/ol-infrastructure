@@ -957,8 +957,17 @@ xpro_fastly_tls = fastly.TlsSubscription(
     f"fastly-xpro-{stack_info.env_suffix}-tls-subscription",
     # valid values are certainly, lets-encrypt, or globalsign
     certificate_authority="certainly",
+    # Only include the frontend domain (xpro.mit.edu) in the Fastly TLS subscription.
+    # backend_domain (xpro-web.odl.mit.edu) is the K8s/APISix origin endpoint and its
+    # TLS is managed exclusively by cert-manager. Including it here causes Fastly's
+    # "certainly" CA to create a permanent _acme-challenge CNAME in Route53, which
+    # blocks cert-manager's DNS-01 solver from placing its TXT record at the same name.
+    # common_name must be set explicitly to match the new domain list — Fastly requires
+    # the common_name to be present in domains, and the state has the old value
+    # (xpro-web.odl.mit.edu) as common_name which would fail validation otherwise.
+    common_name=frontend_domain,
     domains=xpro_service.domains.apply(
-        lambda domains: [domain.name for domain in domains]
+        lambda domains: [d.name for d in domains if d.name != backend_domain]
     ),
     # Retrieved from https://manage.fastly.com/network/tls-configurations
     configuration_id=xpro_tls_configuration.id,
