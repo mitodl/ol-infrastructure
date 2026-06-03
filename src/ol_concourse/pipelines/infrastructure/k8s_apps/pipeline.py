@@ -19,6 +19,7 @@ from ol_concourse.lib.models.pipeline import (
     Pipeline,
     Platform,
     PutStep,
+    RegistryImage,
     Resource,
     ResourceType,
     TaskConfig,
@@ -81,6 +82,33 @@ class AppPipelineParams(BaseModel):
         """Set the repo_name based on the app_name if not provided."""
         if not self.repo_name:
             self.repo_name = self.app_name
+        return self
+
+    @model_validator(mode="after")
+    def validate_fastly_config(self) -> "AppPipelineParams":
+        """Enforce that fastly_domains is fully specified when cache purging is enabled.
+
+        Raises:
+            ValueError: if ``purge_fastly_cache`` is True but ``fastly_domains`` is
+                not set, or if any of the required keys (``ci``, ``qa``,
+                ``production``) are missing from ``fastly_domains``.
+        """
+        if not self.purge_fastly_cache:
+            return self
+        if self.fastly_domains is None:
+            msg = (
+                f"{self.app_name}: purge_fastly_cache=True requires fastly_domains "
+                "to be set with keys 'ci', 'qa', and 'production'."
+            )
+            raise ValueError(msg)
+        required_envs = {"ci", "qa", "production"}
+        missing = required_envs - self.fastly_domains.keys()
+        if missing:
+            msg = (
+                f"{self.app_name}: fastly_domains is missing required environment "
+                f"keys: {sorted(missing)}"
+            )
+            raise ValueError(msg)
         return self
 
 
@@ -604,7 +632,13 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         app_rc_image,  # Needed for QA/Prod deployment trigger
         docker_ci_image,
         docker_rc_image,
-        *([fastly_ci, fastly_qa, fastly_prod] if fastly_ci else []),
+        *(
+            [fastly_ci, fastly_qa, fastly_prod]
+            if fastly_ci is not None
+            and fastly_qa is not None
+            and fastly_prod is not None
+            else []
+        ),
     ]
 
     ci_deployment_fragment = PipelineFragment(
