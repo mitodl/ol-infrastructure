@@ -93,7 +93,9 @@ class OLApisixHTTPRouteConfig(BaseModel):
         if not any(plugin.name == "request-id" for plugin in v):
             v.append(
                 OLApisixPluginConfig(
-                    name="request-id", config={"include_in_response": True}
+                    name="request-id",
+                    secretRef=None,
+                    config={"include_in_response": True},
                 )
             )
         return v
@@ -119,11 +121,25 @@ class OLApisixHTTPRoute(ComponentResource):
     """
     HTTPRoute configuration for Gateway API with APISIX.
 
-    Creates HTTPRoute and associated ApisixPluginConfig resources for routing
-    traffic through the Gateway API. This is the modern replacement for ApisixRoute.
+    Creates HTTPRoute and associated PluginConfig (apisix.apache.org/v1alpha1)
+    resources for routing traffic through the Gateway API.  This is the modern
+    replacement for ApisixRoute.
+
+    NOTE ON CRD KINDS
+    -----------------
+    APISIX exposes two plugin-config CRD types:
+
+    * ``apisix.apache.org/v2 / ApisixPluginConfig`` — for legacy ApisixRoute and
+      Kubernetes Ingress resources only.  The APISIX ingress-controller's HTTPRoute
+      reconciler does **not** read this kind when processing ExtensionRef filters;
+      references to it are silently ignored.
+
+    * ``apisix.apache.org/v1alpha1 / PluginConfig`` — the Gateway-API-aligned
+      type that the HTTPRoute reconciler **does** process via ExtensionRef filters.
+      This component uses this kind exclusively.
 
     The component automatically:
-    - Creates ApisixPluginConfig resources for unique plugin combinations
+    - Creates PluginConfig (v1alpha1) resources for unique plugin combinations
     - Converts APISIX path patterns to Gateway API PathPrefix matches
     - Links routes to plugins via ExtensionRef filters
     - Supports both service backends and upstreams
@@ -222,6 +238,34 @@ class OLApisixHTTPRoute(ComponentResource):
         sanitized_route_name = route_name.replace("_", "-").lower()
         return f"{sanitized_httproute_name}-{sanitized_route_name}-{plugin_hash}"
 
+    @staticmethod
+    def _active_plugins(
+        plugins: list[OLApisixPluginConfig],
+    ) -> list[OLApisixPluginConfig]:
+        """Return only plugins where ``enable`` is True.
+
+        v1alpha1 PluginConfig has no ``enable`` flag, so disabled plugins must
+        be dropped rather than serialised.  Using the same filtered list for
+        both name-hashing and spec-generation keeps the PluginConfig resource
+        name consistent with its contents.
+        """
+        return [p for p in plugins if p.enable]
+
+    @staticmethod
+    def _serialize_plugin_for_v1alpha1(
+        plugin: OLApisixPluginConfig,
+    ) -> dict[str, Any]:
+        """Serialise an OLApisixPluginConfig for the v1alpha1 PluginConfig CRD.
+
+        The v1alpha1 PluginConfig schema only accepts ``name`` and ``config``
+        fields — it has no ``enable`` or ``secretRef`` fields (those belong to
+        the legacy v2 ApisixPluginConfig CRD used with ApisixRoute/Ingress).
+        """
+        result: dict[str, Any] = {"name": plugin.name}
+        if plugin.config:  # omit empty config dicts
+            result["config"] = plugin.config
+        return result
+
     def _create_plugin_configs(
         self,
         httproute_name: str,
@@ -230,7 +274,13 @@ class OLApisixHTTPRoute(ComponentResource):
         k8s_labels: dict[str, str],
         resource_options: ResourceOptions,
     ) -> dict[str, kubernetes.apiextensions.CustomResource]:
-        """Create ApisixPluginConfig resources for unique plugin combinations."""
+        """Create PluginConfig (apisix.apache.org/v1alpha1) resources for unique plugin combinations.
+
+        Uses v1alpha1/PluginConfig — the correct CRD for Gateway API HTTPRoute
+        ExtensionRef filters.  The v2/ApisixPluginConfig CRD is for legacy
+        ApisixRoute/Ingress resources only and is silently ignored by the
+        HTTPRoute reconciler.
+        """
         plugin_configs = {}
 
         for route_config in route_configs:
@@ -242,17 +292,22 @@ class OLApisixHTTPRoute(ComponentResource):
             if not route_config.plugins:
                 continue
 
+            # Only enabled plugins are written to v1alpha1 PluginConfig.
+            active = self._active_plugins(route_config.plugins)
+            if not active:
+                continue
+
             # Generate unique name for this plugin combination
             config_name = self._generate_plugin_config_name(
-                httproute_name, route_config.route_name, route_config.plugins
+                httproute_name, route_config.route_name, active
             )
 
             # Only create if we haven't seen this exact plugin combo before
             if config_name not in plugin_configs:
                 plugin_configs[config_name] = kubernetes.apiextensions.CustomResource(
-                    f"ApisixPluginConfig-{config_name}",
-                    api_version="apisix.apache.org/v2",
-                    kind="ApisixPluginConfig",
+                    f"PluginConfig-{config_name}",
+                    api_version="apisix.apache.org/v1alpha1",
+                    kind="PluginConfig",
                     metadata=kubernetes.meta.v1.ObjectMetaArgs(
                         name=config_name,
                         labels=k8s_labels,
@@ -260,8 +315,7 @@ class OLApisixHTTPRoute(ComponentResource):
                     ),
                     spec={
                         "plugins": [
-                            p.model_dump(by_alias=True, exclude_none=True)
-                            for p in route_config.plugins
+                            self._serialize_plugin_for_v1alpha1(p) for p in active
                         ]
                     },
                     opts=resource_options,
@@ -326,32 +380,39 @@ class OLApisixHTTPRoute(ComponentResource):
                 "backendRefs": backend_refs,
             }
 
-            # Add plugin config via ExtensionRef filter if plugins are configured
+            # Add plugin config via ExtensionRef filter if plugins are configured.
+            # Both paths use kind=PluginConfig (apisix.apache.org/v1alpha1) — the
+            # type the APISIX HTTPRoute reconciler actually processes.  The legacy
+            # v2/ApisixPluginConfig kind is silently ignored by the reconciler.
             if route_config.shared_plugin_config_name:
                 rule["filters"] = [
                     {
                         "type": "ExtensionRef",
                         "extensionRef": {
                             "group": "apisix.apache.org",
-                            "kind": "ApisixPluginConfig",
+                            "kind": "PluginConfig",
                             "name": route_config.shared_plugin_config_name,
                         },
                     }
                 ]
             elif route_config.plugins:
-                config_name = self._generate_plugin_config_name(
-                    httproute_name, route_config.route_name, route_config.plugins
-                )
-                rule["filters"] = [
-                    {
-                        "type": "ExtensionRef",
-                        "extensionRef": {
-                            "group": "apisix.apache.org",
-                            "kind": "ApisixPluginConfig",
-                            "name": config_name,
-                        },
-                    }
-                ]
+                # Use the same enabled-plugin subset that was used to create
+                # the PluginConfig resource so the name always matches.
+                active = self._active_plugins(route_config.plugins)
+                if active:
+                    config_name = self._generate_plugin_config_name(
+                        httproute_name, route_config.route_name, active
+                    )
+                    rule["filters"] = [
+                        {
+                            "type": "ExtensionRef",
+                            "extensionRef": {
+                                "group": "apisix.apache.org",
+                                "kind": "PluginConfig",
+                                "name": config_name,
+                            },
+                        }
+                    ]
 
             rules.append(rule)
 

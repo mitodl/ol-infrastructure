@@ -4,7 +4,7 @@
 from typing import Any, Literal
 
 import pulumi_kubernetes as kubernetes
-from pulumi import ComponentResource, ResourceOptions
+from pulumi import ComponentResource, Output, ResourceOptions
 from pydantic import BaseModel, Field, NonNegativeInt, field_validator, model_validator
 
 from ol_infrastructure.components.services.vault import (
@@ -14,6 +14,13 @@ from ol_infrastructure.components.services.vault import (
 
 
 class OLApisixPluginConfig(BaseModel):
+    """Configuration for a single APISIX plugin instance.
+
+    Used with both legacy ApisixRoute/ApisixPluginConfig (v2) and Gateway API
+    HTTPRoute/PluginConfig (v1alpha1).  When targeting v1alpha1, the ``enable``
+    and ``secretRef`` fields are ignored — see ``OLApisixHTTPRoute`` for details.
+    """
+
     name: str
     enable: bool = True
     secret_ref: str | None = Field(
@@ -24,6 +31,8 @@ class OLApisixPluginConfig(BaseModel):
 
 
 class OLApisixRouteConfig(BaseModel):
+    """Configuration for a single ApisixRoute rule (legacy CRD path)."""
+
     route_name: str
     priority: int = 0
     shared_plugin_config_name: str | None = None
@@ -60,7 +69,9 @@ class OLApisixRouteConfig(BaseModel):
         if not any(plugin.name == "request-id" for plugin in v):
             v.append(
                 OLApisixPluginConfig(
-                    name="request-id", config={"include_in_response": True}
+                    name="request-id",
+                    secretRef=None,
+                    config={"include_in_response": True},
                 )
             )
         return v
@@ -161,11 +172,18 @@ class OLApisixRoute(ComponentResource):
 
 
 class OLApisixOIDCConfig(BaseModel):
+    """Configuration for APISIX OIDC authentication resources.
+
+    Holds Vault path details and OIDC plugin settings used to create the
+    per-application Kubernetes Secret (via OLVaultK8SSecret) and generate
+    the openid-connect plugin configuration block.
+    """
+
     application_name: str
     k8s_labels: dict[str, str] = {}
     k8s_namespace: str
     vault_mount: str = "secret-operations"
-    vault_mount_type: str = "kv-v1"
+    vault_mount_type: Literal["kv-v1", "kv-v2"] = "kv-v1"
     vault_path: str
     vaultauth: str
 
@@ -209,7 +227,7 @@ class OLApisixOIDCResources(ComponentResource):
 
         self.secret_name = f"ol-apisix-{oidc_config.application_name}-oidc-secrets"
 
-        __templates = {
+        __templates: dict[str, str | Output[str]] = {
             "client_id": '{{ get .Secrets "client_id" }}',
             "client_secret": '{{ get .Secrets "client_secret" }}',
             "realm": '{{ get .Secrets "realm_name" }}',
@@ -287,6 +305,13 @@ class OLApisixOIDCResources(ComponentResource):
 
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_pluginconfig_v2/
 class OLApisixSharedPluginsConfig(BaseModel):
+    """Configuration for OLApisixSharedPlugins.
+
+    Defines the plugin list that will be materialised as both a v2
+    ApisixPluginConfig (for legacy ApisixRoute/Ingress) and a v1alpha1
+    PluginConfig (for Gateway API HTTPRoute).
+    """
+
     application_name: str
     resource_suffix: str = "shared-plugins"
     enable_defaults: bool = True
@@ -297,8 +322,20 @@ class OLApisixSharedPluginsConfig(BaseModel):
 
 class OLApisixSharedPlugins(ComponentResource):
     """
-    Shared plugin configuration for apisix
-    Defines and creates an "ApisixPluginConfig" resource in the k8s cluster
+    Shared plugin configuration for APISIX.
+
+    Creates two Kubernetes CRD resources with the same ``metadata.name``:
+
+    * ``apisix.apache.org/v2 / ApisixPluginConfig`` — consumed by legacy
+      ``ApisixRoute`` and ``Ingress`` resources via ``plugin_config_name``.
+
+    * ``apisix.apache.org/v1alpha1 / PluginConfig`` — consumed by Gateway API
+      ``HTTPRoute`` resources via ExtensionRef filters (``kind: PluginConfig``).
+      The v1alpha1 schema only accepts ``name`` and ``config`` per plugin;
+      ``enable: false`` plugins are omitted entirely and ``secretRef`` is dropped.
+
+    Callers can use ``self.resource_name`` in both ``OLApisixRouteConfig`` (legacy)
+    and ``OLApisixHTTPRouteConfig`` (Gateway API) without any distinction.
     """
 
     def __init__(
@@ -356,6 +393,8 @@ class OLApisixSharedPlugins(ComponentResource):
         self.resource_name = (
             f"{plugin_config.application_name}-{plugin_config.resource_suffix}"
         )
+        # v2/ApisixPluginConfig — consumed by legacy ApisixRoute/Ingress resources
+        # via ``plugin_config_name`` in the route spec.
         self.shared_plugin_apisix_pluginconfig_resource = (
             kubernetes.apiextensions.CustomResource(
                 f"OLApisixSharedPlugin-{self.resource_name}",
@@ -372,9 +411,46 @@ class OLApisixSharedPlugins(ComponentResource):
                 opts=resource_options,
             )
         )
+        # v1alpha1/PluginConfig — consumed by Gateway API HTTPRoute resources
+        # via ExtensionRef filters (kind: PluginConfig).  Both resources share
+        # the same metadata.name; callers pass self.resource_name to either
+        # OLApisixRouteConfig (legacy) or OLApisixHTTPRouteConfig (Gateway API)
+        # without distinction.
+        #
+        # The v1alpha1 schema only allows ``name`` and ``config`` per plugin;
+        # ``enable`` and ``secretRef`` are v2-only fields.  Plugins with
+        # ``enable: false`` are omitted so they don't appear in the Gateway API
+        # path either.
+        _v1alpha1_plugins = [
+            {"name": p["name"], **({"config": p["config"]} if p.get("config") else {})}
+            for p in plugin_config.plugins
+            if p.get("enable", True)
+        ]
+        self.shared_plugin_pluginconfig_resource = (
+            kubernetes.apiextensions.CustomResource(
+                f"OLApisixSharedPluginConfig-{self.resource_name}",
+                api_version="apisix.apache.org/v1alpha1",
+                kind="PluginConfig",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=self.resource_name,
+                    labels=plugin_config.k8s_labels,
+                    namespace=plugin_config.k8s_namespace,
+                ),
+                spec={
+                    "plugins": _v1alpha1_plugins,
+                },
+                opts=resource_options,
+            )
+        )
 
 
 class OLApisixExternalUpstreamConfig(BaseModel):
+    """Configuration for OLApisixExternalUpstream.
+
+    Defines an external (non-Kubernetes) upstream service to be proxied
+    through APISIX.
+    """
+
     application_name: str
     resource_suffix: str = "external-upstream"
     k8s_labels: dict[str, str] = {}
