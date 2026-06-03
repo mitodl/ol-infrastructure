@@ -320,4 +320,25 @@ def create_ocw_studio_k8s_secrets(
         secret_names.append(secret_name)
         secret_resources.append(secret_resource)
 
+    # 7. Keycloak OIDC credentials for python-social-auth
+    keycloak_secret_name, keycloak_secret = _create_static_secret(
+        stack_info=stack_info,
+        secret_base_name="ocw-studio-keycloak-sso",  # pragma: allowlist secret
+        namespace=ocw_studio_namespace,
+        labels=k8s_global_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/ocw-studio",
+        templates={
+            "SOCIAL_AUTH_KEYCLOAK_KEY": '{{ get .Secrets "client_id" }}',
+            "SOCIAL_AUTH_KEYCLOAK_SECRET": '{{ get .Secrets "client_secret" }}',  # pragma: allowlist secret
+            "SOCIAL_AUTH_KEYCLOAK_PUBLIC_KEY": '{{ get .Secrets "realm_public_key" }}',
+            "SOCIAL_AUTH_KEYCLOAK_AUTHORIZATION_URL": '{{ printf "%s/protocol/openid-connect/auth" (get .Secrets "url") }}',
+            "SOCIAL_AUTH_KEYCLOAK_ACCESS_TOKEN_URL": '{{ printf "%s/protocol/openid-connect/token" (get .Secrets "url") }}',
+        },
+        vaultauth=vaultauth,
+    )
+    secret_names.append(keycloak_secret_name)
+    secret_resources.append(keycloak_secret)
+
     return secret_names, secret_resources

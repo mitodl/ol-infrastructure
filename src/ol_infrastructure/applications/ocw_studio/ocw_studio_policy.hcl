@@ -34,6 +34,11 @@ path "secret-concourse/data/web" {
   capabilities = ["read"]
 }
 
+# Keycloak OIDC credentials for OCW Studio
+path "secret-operations/sso/ocw-studio" {
+  capabilities = ["read"]
+}
+
 # Vault-secrets-operator lease management
 path "sys/leases/renew" {
   capabilities = ["update"]

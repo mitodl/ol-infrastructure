@@ -112,5 +112,11 @@ config:
   - "https://video-ci.odl.mit.edu/"
   keycloak_realm:ol-mit-ovs-web-origins:
   - "https://video-ci.odl.mit.edu"
+  keycloak_realm:ol-mit-ocw-studio-redirect-uris:
+  - "https://ocw-studio-ci.odl.mit.edu/auth/complete/keycloak/"
+  keycloak_realm:ol-mit-ocw-studio-logout-uris:
+  - "https://ocw-studio-ci.odl.mit.edu/"
+  keycloak_realm:ol-mit-ocw-studio-web-origins:
+  - "https://ocw-studio-ci.odl.mit.edu"
   keycloak_realm:ol-mit-ldap-bind-password:
     secure: v1:dOWj9QsOafyn3p+F:XdKusQqhsxVDx20tFJTdUG3Nc5/FJ4N/ZChyzakYHlXyXpcxRkICJA==
