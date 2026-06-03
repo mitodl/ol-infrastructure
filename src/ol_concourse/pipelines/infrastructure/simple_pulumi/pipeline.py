@@ -15,9 +15,11 @@ from ol_concourse.lib.resources import git_repo, github_issues, registry_image
 from pydantic import BaseModel, model_validator
 
 from ol_concourse.pipelines.constants import (
+    ECR_REGION,
     GH_ISSUES_DEFAULT_REPOSITORY,
     PULUMI_CODE_PATH,
     PULUMI_WATCHED_PATHS,
+    dockerhub_ecr_image_uri,
 )
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 
@@ -26,8 +28,11 @@ class DockerImageConfig(BaseModel):
     """Configuration for a Docker image input.
 
     Attributes:
-        image_repository: Docker image repository (e.g., "kodhive/leek").
+        image_repository: Docker image repository. Use
+            :func:`~ol_concourse.pipelines.constants.dockerhub_ecr_image_uri` to
+            route Docker Hub images through the ECR pull-through cache.
         image_tag: Optional tag to watch (default: "latest").
+        ecr_region: Set to ECR_REGION to pull via ECR pull-through cache.
         username: Optional Docker registry username.
         password: Optional Docker registry password.
         env_var_for_digest: Optional environment variable name to pass digest to Pulumi.
@@ -36,6 +41,7 @@ class DockerImageConfig(BaseModel):
 
     image_repository: str
     image_tag: str | None = "latest"
+    ecr_region: str | None = None
     username: str | None = None
     password: str | None = None
     env_var_for_digest: str | None = None
@@ -159,8 +165,9 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_path="applications/celery_monitoring/",
         pulumi_project_name="ol-application-celery-monitoring",
         docker_image=DockerImageConfig(
-            image_repository="kodhive/leek",
+            image_repository=dockerhub_ecr_image_uri("kodhive/leek"),
             image_tag="0.7.5",  # Must match LEEK_VERSION in bridge.lib.versions
+            ecr_region=ECR_REGION,
         ),
     ),
     "clickhouse": SimplePulumiParams(
@@ -391,6 +398,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             image_tag=params.docker_image.image_tag,
             username=params.docker_image.username,
             password=params.docker_image.password,
+            ecr_region=params.docker_image.ecr_region,
         )
         docker_dependencies.append(
             GetStep(get=docker_image_resource.name, trigger=True)

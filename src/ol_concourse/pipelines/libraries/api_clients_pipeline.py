@@ -14,13 +14,12 @@ from ol_concourse.lib.models.pipeline import (
     Output,
     Pipeline,
     PutStep,
-    RegistryImage,
-    Resource,
     TaskConfig,
     TaskStep,
 )
-from ol_concourse.lib.resources import git_repo, ssh_git_repo
+from ol_concourse.lib.resources import git_repo, registry_image, ssh_git_repo
 
+from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 from ol_concourse.pipelines.libraries.configuration import PIPELINE_CONFIGS
 
 
@@ -65,32 +64,23 @@ def generate_api_client_pipeline(  # noqa: PLR0913
     commit_script: str = "api-clients-commit-changes.sh"
     publish_script: str = "api-clients-publish-node.sh"
 
-    openapi_generator_image = Resource(
+    openapi_generator_image = registry_image(
         name=Identifier("openapi-generator-image"),
-        type="registry-image",
-        icon="docker",
-        source={
-            "repository": "openapitools/openapi-generator-cli",
-            "tag": openapi_generator_tag,
-        },
+        image_repository=dockerhub_ecr_image_uri("openapitools/openapi-generator-cli"),
+        image_tag=openapi_generator_tag,
+        ecr_region=ECR_REGION,
     )
-    python_image = Resource(
+    python_image = registry_image(
         name=Identifier("python-image"),
-        type="registry-image",
-        icon="docker",
-        source={
-            "repository": "python",
-            "tag": python_image_tag,
-        },
+        image_repository=dockerhub_ecr_image_uri("python"),
+        image_tag=python_image_tag,
+        ecr_region=ECR_REGION,
     )
-    node_image = Resource(
+    node_image = registry_image(
         name=Identifier("node-image"),
-        type="registry-image",
-        icon="docker",
-        source={
-            "repository": "node",
-            "tag": node_image_tag,
-        },
+        image_repository=dockerhub_ecr_image_uri("node"),
+        image_tag=node_image_tag,
+        ecr_region=ECR_REGION,
     )
 
     # Define source and client repositories using parameters
@@ -162,9 +152,13 @@ def generate_api_client_pipeline(  # noqa: PLR0913
                     inputs=[Input(name=api_clients_repository.name)],
                     outputs=[Output(name=api_clients_repository.name)],
                     image_resource=AnonymousResource(
-                        source=RegistryImage(
-                            repository="concourse/buildroot", tag="git"
-                        ),
+                        source={
+                            "repository": dockerhub_ecr_image_uri(
+                                "concourse/buildroot"
+                            ),
+                            "tag": "git",
+                            "aws_region": ECR_REGION,
+                        },
                         type="registry-image",
                     ),
                     platform="linux",

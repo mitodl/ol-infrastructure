@@ -15,7 +15,6 @@ from ol_concourse.lib.models.pipeline import (
     Output,
     Platform,
     PutStep,
-    RegistryImage,
     TaskConfig,
     TaskStep,
 )
@@ -27,7 +26,12 @@ from ol_concourse.lib.resources import (
 )
 
 from bridge.lib.versions import KEYCLOAK_VERSION
-from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
+from ol_concourse.pipelines.constants import (
+    ECR_REGION,
+    PULUMI_CODE_PATH,
+    PULUMI_WATCHED_PATHS,
+    dockerhub_ecr_image_uri,
+)
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 
 
@@ -143,7 +147,11 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
                     ],
                     image_resource=AnonymousResource(
                         type=REGISTRY_IMAGE,
-                        source=RegistryImage(repository="debian", tag="12-slim"),
+                        source={
+                            "repository": dockerhub_ecr_image_uri("debian"),
+                            "tag": "12-slim",
+                            "aws_region": ECR_REGION,
+                        },
                     ),
                     run=Command(
                         path="sh",

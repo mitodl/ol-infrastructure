@@ -11,13 +11,14 @@ from ol_concourse.lib.models.pipeline import (
     Pipeline,
     Platform,
     PutStep,
-    RegistryImage,
     TaskConfig,
     TaskStep,
 )
 from ol_concourse.lib.notifications import notification
 from ol_concourse.lib.resource_types import slack_notification_resource as snr_type
 from ol_concourse.lib.resources import schedule, slack_notification, ssh_git_repo
+
+from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 
 build_schedule = schedule(Identifier("build-schedule"), "1h")
 
@@ -63,17 +64,29 @@ alertmanager_config = ssh_git_repo(
 
 grizzly_registry_image = AnonymousResource(
     type=REGISTRY_IMAGE,
-    source=RegistryImage(repository="grafana/grizzly", tag="0.2.0-beta3-amd64"),
+    source={
+        "repository": dockerhub_ecr_image_uri("grafana/grizzly"),
+        "tag": "0.2.0-beta3-amd64",
+        "aws_region": ECR_REGION,
+    },
 )
 
 cortextool_registry_image = AnonymousResource(
     type=REGISTRY_IMAGE,
-    source=RegistryImage(repository="grafana/cortex-tools", tag="v0.10.7"),
+    source={
+        "repository": dockerhub_ecr_image_uri("grafana/cortex-tools"),
+        "tag": "v0.10.7",
+        "aws_region": ECR_REGION,
+    },
 )
 
 git_registry_image = AnonymousResource(
     type=REGISTRY_IMAGE,
-    source=RegistryImage(repository="bitnamilegacy/git", tag="2.35.1"),
+    source={
+        "repository": dockerhub_ecr_image_uri("bitnamilegacy/git"),
+        "tag": "2.35.1",
+        "aws_region": ECR_REGION,
+    },
 )
 
 commit_managed_dashboards_job = Job(

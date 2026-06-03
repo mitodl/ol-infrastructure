@@ -13,11 +13,17 @@ from ol_concourse.lib.models.pipeline import (
     Output,
     Pipeline,
     Platform,
-    RegistryImage,
     TaskConfig,
     TaskStep,
 )
 from ol_concourse.lib.resources import git_repo, schedule
+
+from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+
+_TUBULAR_IMAGE_SOURCE = {
+    "repository": dockerhub_ecr_image_uri("mitodl/openedx-tubular"),
+    "aws_region": ECR_REGION,
+}
 
 
 def tubular_pipeline() -> Pipeline:
@@ -42,7 +48,7 @@ def tubular_pipeline() -> Pipeline:
                     platform=Platform.linux,
                     image_resource=AnonymousResource(
                         type=REGISTRY_IMAGE,
-                        source=RegistryImage(repository="mitodl/openedx-tubular"),
+                        source=_TUBULAR_IMAGE_SOURCE,
                     ),
                     inputs=[Input(name=Identifier("tubular-pipeline-config"))],
                     outputs=[tubular_retirees],
@@ -72,7 +78,7 @@ def tubular_pipeline() -> Pipeline:
                     platform=Platform.linux,
                     image_resource=AnonymousResource(
                         type=REGISTRY_IMAGE,
-                        source=RegistryImage(repository="mitodl/openedx-tubular"),
+                        source=_TUBULAR_IMAGE_SOURCE,
                     ),
                     inputs=[Input(name=tubular_retirees.name)],
                     # inline bash script to generate retirees yaml
@@ -116,7 +122,7 @@ def tubular_pipeline() -> Pipeline:
                     platform=Platform.linux,
                     image_resource=AnonymousResource(
                         type=REGISTRY_IMAGE,
-                        source=RegistryImage(repository="mitodl/openedx-tubular"),
+                        source=_TUBULAR_IMAGE_SOURCE,
                     ),
                     inputs=[
                         Input(name=tubular_retirees.name),

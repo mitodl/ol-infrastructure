@@ -29,7 +29,13 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resources import git_repo
 
-# (concourse-pipeline-name, repo-relative script path)
+from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+
+_OL_INFRA_IMAGE_SOURCE = {
+    "repository": dockerhub_ecr_image_uri("mitodl/ol-infrastructure"),
+    "tag": "latest",
+    "aws_region": ECR_REGION,
+}
 PIPELINE_CONFIGS: list[tuple[str, str]] = [
     (
         "pulumi-aws",
@@ -93,10 +99,7 @@ def meta_job(pipeline_name: str, script_path: str) -> Job:
                     platform=Platform.linux,
                     image_resource=AnonymousResource(
                         type="registry-image",
-                        source={
-                            "repository": "mitodl/ol-infrastructure",
-                            "tag": "latest",
-                        },
+                        source=_OL_INFRA_IMAGE_SOURCE,
                     ),
                     inputs=[
                         Input(name=Identifier("infrastructure-pipeline-definitions"))
@@ -152,10 +155,7 @@ def meta_pipeline() -> Pipeline:
                         platform=Platform.linux,
                         image_resource=AnonymousResource(
                             type="registry-image",
-                            source={
-                                "repository": "mitodl/ol-infrastructure",
-                                "tag": "latest",
-                            },
+                            source=_OL_INFRA_IMAGE_SOURCE,
                         ),
                         inputs=[
                             Input(

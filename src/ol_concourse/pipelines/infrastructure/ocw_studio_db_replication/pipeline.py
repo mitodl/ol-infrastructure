@@ -8,13 +8,19 @@ from ol_concourse.lib.models.pipeline import (
     Output,
     Pipeline,
     Platform,
-    RegistryImage,
     TaskConfig,
     TaskStep,
 )
 
+from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+
 postgres_resource = AnonymousResource(
-    type=REGISTRY_IMAGE, source=RegistryImage(repository="postgres", tag="12")
+    type=REGISTRY_IMAGE,
+    source={
+        "repository": dockerhub_ecr_image_uri("postgres"),
+        "tag": "12",
+        "aws_region": ECR_REGION,
+    },
 )
 
 

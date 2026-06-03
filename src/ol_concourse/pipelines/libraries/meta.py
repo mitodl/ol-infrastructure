@@ -15,6 +15,7 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resources import git_repo
 
+from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 from ol_concourse.pipelines.libraries.configuration import PIPELINE_CONFIGS
 
 # Resource for the ol-concourse code itself
@@ -34,8 +35,9 @@ python_image = Resource(
     type="registry-image",
     icon="docker",
     source={
-        "repository": "mitodl/ol-infrastructure",
+        "repository": dockerhub_ecr_image_uri("mitodl/ol-infrastructure"),
         "tag": "latest",
+        "aws_region": ECR_REGION,
     },
 )
 

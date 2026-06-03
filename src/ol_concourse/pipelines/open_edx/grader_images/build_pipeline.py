@@ -41,6 +41,8 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resources import registry_image, ssh_git_repo
 
+from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+
 _AWS_ACCOUNT_ID = "610119931565"
 _AWS_REGION = "us-east-1"
 
@@ -105,14 +107,14 @@ def grader_image_pipeline(config: GraderPipelineConfig) -> Pipeline:
         private_key=config.github_private_key,
     )
 
-    # Grader base image on DockerHub — used as a build trigger so that
-    # rebuilding the base image automatically causes this pipeline to run.
+    # Grader base image via ECR pull-through cache — avoids Docker Hub rate limits.
+    # Concourse's periodic `check` on this registry-image resource polls ECR
+    # (not push events), which is what prompts pull-through cache refreshes.
     grader_base_image = registry_image(
         name=Identifier("grader-base-image"),
-        image_repository=config.grader_base_dockerhub_repo,
+        image_repository=dockerhub_ecr_image_uri(config.grader_base_dockerhub_repo),
         image_tag="latest",
-        username="((dockerhub.username))",
-        password="((dockerhub.password))",  # noqa: S106
+        ecr_region=config.aws_region,
     )
 
     # Private ECR image for this course's grader.
@@ -146,7 +148,12 @@ def grader_image_pipeline(config: GraderPipelineConfig) -> Pipeline:
                     platform=Platform.linux,
                     image_resource={
                         "type": "registry-image",
-                        "source": {"repository": "concourse/oci-build-task"},
+                        "source": {
+                            "repository": dockerhub_ecr_image_uri(
+                                "concourse/oci-build-task"
+                            ),
+                            "aws_region": ECR_REGION,
+                        },
                     },
                     params={
                         "CONTEXT": str(grader_repo.name),

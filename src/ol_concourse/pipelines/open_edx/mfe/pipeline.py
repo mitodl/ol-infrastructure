@@ -37,7 +37,11 @@ from bridge.settings.openedx.types import (
     OpenEdxSupportedRelease,
 )
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
-from ol_concourse.pipelines.constants import GH_ISSUES_DEFAULT_REPOSITORY
+from ol_concourse.pipelines.constants import (
+    ECR_REGION,
+    GH_ISSUES_DEFAULT_REPOSITORY,
+    dockerhub_ecr_image_uri,
+)
 
 
 class OpenEdxVars(BaseModel):
@@ -312,7 +316,11 @@ def mfe_job(  # noqa: C901, PLR0915
                 platform=Platform.linux,
                 image_resource=AnonymousResource(
                     type="registry-image",
-                    source={"repository": "debian", "tag": "trixie-slim"},
+                    source={
+                        "repository": dockerhub_ecr_image_uri("debian"),
+                        "tag": "trixie-slim",
+                        "aws_region": ECR_REGION,
+                    },
                 ),
                 inputs=[Input(name=mfe_repo.name), Input(name=mfe_configs.name)],
                 outputs=[mfe_build_dir],
@@ -333,8 +341,9 @@ def mfe_job(  # noqa: C901, PLR0915
                 image_resource=AnonymousResource(
                     type="registry-image",
                     source={
-                        "repository": "node",
+                        "repository": dockerhub_ecr_image_uri("node"),
                         "tag": f"{mfe.runtime_version}-trixie-slim",
+                        "aws_region": ECR_REGION,
                     },
                 ),
                 inputs=[Input(name=mfe_build_dir.name)],

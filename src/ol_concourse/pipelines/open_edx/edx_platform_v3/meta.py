@@ -16,6 +16,8 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resources import git_repo
 
+from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+
 pipeline_code = git_repo(
     name=Identifier("edxapp-pipeline-code"),
     uri="https://github.com/mitodl/ol-infrastructure",
@@ -47,8 +49,11 @@ def build_meta_job(pipeline_name: str):
                     image_resource=AnonymousResource(
                         type="registry-image",
                         source={
-                            "repository": "mitodl/ol-infrastructure",
+                            "repository": dockerhub_ecr_image_uri(
+                                "mitodl/ol-infrastructure"
+                            ),
                             "tag": "latest",
+                            "aws_region": ECR_REGION,
                         },
                     ),
                     inputs=[Input(name=Identifier(pipeline_code.name))],

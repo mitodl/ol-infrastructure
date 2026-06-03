@@ -18,7 +18,12 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resources import git_repo, github_release, registry_image
 
-from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
+from ol_concourse.pipelines.constants import (
+    ECR_REGION,
+    PULUMI_CODE_PATH,
+    PULUMI_WATCHED_PATHS,
+    dockerhub_ecr_image_uri,
+)
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 
 
@@ -88,7 +93,11 @@ def build_superset_docker_pipeline() -> Pipeline:
                     platform=Platform.linux,
                     image_resource=AnonymousResource(
                         type="registry-image",
-                        source={"repository": "amazon/aws-cli", "tag": "latest"},
+                        source={
+                            "repository": dockerhub_ecr_image_uri("amazon/aws-cli"),
+                            "tag": "latest",
+                            "aws_region": ECR_REGION,
+                        },
                     ),
                     params={
                         "REPO_NAME": superset_image.source["repository"],

@@ -12,13 +12,13 @@ from ol_concourse.lib.models.pipeline import (
     Job,
     Pipeline,
     Platform,
-    RegistryImage,
     TaskConfig,
     TaskStep,
 )
 from ol_concourse.lib.resources import git_repo, schedule
 
 from bridge.secrets.sops import read_yaml_secrets
+from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 
 qa_dyno_map = {
     "ocw-studio-ci": {
@@ -179,7 +179,11 @@ ol_infra_git_repo = git_repo(
 
 heroku_cli_resource = AnonymousResource(
     type=REGISTRY_IMAGE,
-    source=RegistryImage(repository="mitodl/heroku-cli", tag="latest"),
+    source={
+        "repository": dockerhub_ecr_image_uri("mitodl/heroku-cli"),
+        "tag": "latest",
+        "aws_region": ECR_REGION,
+    },
 )
 
 
