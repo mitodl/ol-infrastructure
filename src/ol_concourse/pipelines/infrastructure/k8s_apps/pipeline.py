@@ -203,7 +203,7 @@ def _define_release_resources(
         name=Identifier(f"{app_name}-release"),
         uri=f"https://github.com/{github_repo}",
         branch=repo_main_branch,
-        access_token="((github.access_token))",  # noqa: S106
+        access_token="((github.release_resource_access_token))",  # noqa: S106
         repository=github_repo,
     )
     # Closed release issues gate production deployments.
@@ -214,6 +214,7 @@ def _define_release_resources(
         issue_title_template=f"Release {app_name}",
         issue_state="closed",
         skip_if_labeled=["abandoned"],
+        access_token="((github.release_issues_access_token))",  # noqa: S106
         gh_host=None,
     )
     # Open release issues are created after each QA deployment.
@@ -224,17 +225,20 @@ def _define_release_resources(
         issue_title_template=f"Release {app_name}",
         issue_state="open",
         labels=["release"],
+        access_token="((github.release_issues_access_token))",  # noqa: S106
         gh_host=None,
     )
     deployment_rc = github_deployment(
         name=Identifier(f"{app_name}-deployment-rc"),
         repository=github_repo,
         environment="RC",
+        access_token="((github.release_resource_access_token))",  # noqa: S106
     )
     deployment_prod = github_deployment(
         name=Identifier(f"{app_name}-deployment-production"),
         repository=github_repo,
         environment="Production",
+        access_token="((github.release_resource_access_token))",  # noqa: S106
     )
     return release_res, release_gate, release_issue, deployment_rc, deployment_prod
 
