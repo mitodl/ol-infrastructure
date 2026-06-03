@@ -214,7 +214,7 @@ def _define_release_resources(
         issue_title_template=f"Release {app_name}",
         issue_state="closed",
         skip_if_labeled=["abandoned"],
-        access_token="((github.release_issues_access_token))",  # noqa: S106
+        access_token="((github.release_resource_access_token))",  # noqa: S106
         gh_host=None,
     )
     # Open release issues are created after each QA deployment.
@@ -225,7 +225,7 @@ def _define_release_resources(
         issue_title_template=f"Release {app_name}",
         issue_state="open",
         labels=["release"],
-        access_token="((github.release_issues_access_token))",  # noqa: S106
+        access_token="((github.release_resource_access_token))",  # noqa: S106
         gh_host=None,
     )
     deployment_rc = github_deployment(
