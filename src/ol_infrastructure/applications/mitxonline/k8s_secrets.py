@@ -226,6 +226,8 @@ def create_mitxonline_k8s_secrets(
             "base_name": "collected",
             "path": "collected-static-secrets",
             "templates": {
+                "FASTLY_AUTH_TOKEN": '{{ index .Secrets "fastly" "api_key" }}',
+                "FASTLY_SERVICE_ID": '{{ index .Secrets "fastly" "service_id" }}',
                 "HUBSPOT_HOME_PAGE_FORM_GUID": '{{ index .Secrets "hubspot" "formId" }}',
                 "HUBSPOT_PORTAL_ID": '{{ index .Secrets "hubspot" "portalId" }}',
                 "MITOL_GOOGLE_SHEETS_DRIVE_API_PROJECT_ID": '{{ index .Secrets "google-sheets" "drive-api-project-id" }}',
