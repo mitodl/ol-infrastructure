@@ -428,6 +428,7 @@ def setup_apisix(
                     "rbac": {
                         "create": True,
                     },
+                    "webhook": {"enabled": True},
                     "serviceAccount": {
                         "create": True,
                         "name": "apache-apisix-ingress-controller",
