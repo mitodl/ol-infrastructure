@@ -8,11 +8,12 @@ from ol_concourse.lib.models.pipeline import (
     Job,
     Pipeline,
     Platform,
-    RegistryImage,
     TaskConfig,
     TaskStep,
 )
 from ol_concourse.lib.resources import git_repo, schedule
+
+from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 
 cloud_custodian_release = git_repo(
     Identifier("ol-infrastructure"),
@@ -23,7 +24,11 @@ build_schedule = schedule(Identifier("build-schedule"), "24h")
 
 custodian_registry_image = AnonymousResource(
     type=REGISTRY_IMAGE,
-    source=RegistryImage(repository="cloudcustodian/c7n", tag="0.9.15.0"),
+    source={
+        "repository": dockerhub_ecr_image_uri("cloudcustodian/c7n"),
+        "tag": "0.9.15.0",
+        "aws_region": ECR_REGION,
+    },
 )
 
 job_filename_dict = {

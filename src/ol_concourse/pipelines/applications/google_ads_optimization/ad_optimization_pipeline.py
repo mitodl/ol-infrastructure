@@ -12,7 +12,6 @@ from ol_concourse.lib.models.pipeline import (
     Output,
     Pipeline,
     Platform,
-    RegistryImage,
     TaskConfig,
     TaskStep,
 )
@@ -21,6 +20,8 @@ from ol_concourse.lib.resource_types import (
     slack_notification_resource as slack_notification_resource_type,
 )
 from ol_concourse.lib.resources import schedule, slack_notification
+
+from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 
 COURSES = ["ml", "gen_ai", "sys_think", "sys_eng"]
 
@@ -49,7 +50,10 @@ def ad_optimization_pipeline() -> Pipeline:
                     platform=Platform.linux,
                     image_resource=AnonymousResource(
                         type=REGISTRY_IMAGE,
-                        source=RegistryImage(repository="mitodl/ad-opt"),
+                        source={
+                            "repository": dockerhub_ecr_image_uri("mitodl/ad-opt"),
+                            "aws_region": ECR_REGION,
+                        },
                     ),
                     params={
                         "WLSACCESSID": "((google_ads_optimization.gurobi_wls_access_id))",
@@ -98,7 +102,11 @@ def ad_optimization_pipeline() -> Pipeline:
                     platform=Platform.linux,
                     image_resource=AnonymousResource(
                         type="registry-image",
-                        source=RegistryImage(repository="debian", tag="12-slim"),
+                        source={
+                            "repository": dockerhub_ecr_image_uri("debian"),
+                            "tag": "12-slim",
+                            "aws_region": ECR_REGION,
+                        },
                     ),
                     run=Command(
                         path="bash",

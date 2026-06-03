@@ -30,6 +30,14 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resources import git_repo
 
+from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+
+_OL_INFRA_IMAGE_SOURCE = {
+    "repository": dockerhub_ecr_image_uri("mitodl/ol-infrastructure"),
+    "tag": "latest",
+    "aws_region": ECR_REGION,
+}
+
 
 def meta_job(app_name: str) -> Job:
     """Generate a job that creates/updates the pipeline for a specific app.
@@ -53,10 +61,7 @@ def meta_job(app_name: str) -> Job:
                     platform=Platform.linux,
                     image_resource=AnonymousResource(
                         type="registry-image",
-                        source={
-                            "repository": "mitodl/ol-infrastructure",
-                            "tag": "latest",
-                        },
+                        source=_OL_INFRA_IMAGE_SOURCE,
                     ),
                     inputs=[
                         Input(name=Identifier("simple-pulumi-pipeline-definitions"))
@@ -124,10 +129,7 @@ def meta_pipeline(
                         platform=Platform.linux,
                         image_resource=AnonymousResource(
                             type="registry-image",
-                            source={
-                                "repository": "mitodl/ol-infrastructure",
-                                "tag": "latest",
-                            },
+                            source=_OL_INFRA_IMAGE_SOURCE,
                         ),
                         inputs=[
                             Input(name=Identifier("simple-pulumi-pipeline-definitions"))

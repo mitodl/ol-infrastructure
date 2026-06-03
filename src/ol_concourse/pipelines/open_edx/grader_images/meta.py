@@ -33,6 +33,7 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resources import git_repo
 
+from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 from ol_concourse.pipelines.open_edx.grader_images.build_pipeline import (
     GRADER_PIPELINES,
 )
@@ -52,8 +53,9 @@ pipeline_code = git_repo(
 _OL_INFRA_IMAGE = AnonymousResource(
     type="registry-image",
     source={
-        "repository": "mitodl/ol-infrastructure",
+        "repository": dockerhub_ecr_image_uri("mitodl/ol-infrastructure"),
         "tag": "latest",
+        "aws_region": ECR_REGION,
     },
 )
 

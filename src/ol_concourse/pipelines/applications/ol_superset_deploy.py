@@ -14,6 +14,8 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resources import git_repo
 
+from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+
 ol_data_platform_repo = git_repo(
     name=Identifier("ol-data-platform-repository"),
     uri="https://github.com/mitodl/ol-data-platform",
@@ -69,8 +71,11 @@ deploy_pipeline = Pipeline(
                         image_resource=AnonymousResource(
                             type="registry-image",
                             source={
-                                "repository": "mitodl/ol-superset",
+                                "repository": dockerhub_ecr_image_uri(
+                                    "mitodl/ol-superset"
+                                ),
                                 "tag": "latest",
+                                "aws_region": ECR_REGION,
                             },
                         ),
                         inputs=[Input(name=ol_data_platform_repo.name)],

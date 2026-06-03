@@ -18,6 +18,8 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resources import git_repo, github_release
 
+from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+
 ol_inf_repo = git_repo(
     name=Identifier("ol-infrastructure-repository"),
     uri="https://github.com/mitodl/ol-infrastructure",
@@ -61,8 +63,9 @@ docker_pipeline = Pipeline(
                         image_resource=AnonymousResource(
                             type="registry-image",
                             source={
-                                "repository": "alpine",
+                                "repository": dockerhub_ecr_image_uri("alpine"),
                                 "tag": "3",
+                                "aws_region": ECR_REGION,
                             },
                         ),
                         inputs=[Input(name=dagger_release.name)],

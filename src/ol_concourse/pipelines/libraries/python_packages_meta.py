@@ -18,6 +18,8 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resources import git_repo
 
+from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+
 OL_INFRASTRUCTURE_REPO = git_repo(
     name=Identifier("python-package-pipeline-definitions"),
     uri="https://github.com/mitodl/ol-infrastructure",
@@ -46,8 +48,9 @@ OL_DJANGO_REPO = git_repo(
 PIPELINE_IMAGE = AnonymousResource(
     type="registry-image",
     source={
-        "repository": "mitodl/ol-infrastructure",
+        "repository": dockerhub_ecr_image_uri("mitodl/ol-infrastructure"),
         "tag": "latest",
+        "aws_region": ECR_REGION,
     },
 )
 

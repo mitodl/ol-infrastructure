@@ -19,7 +19,6 @@ from ol_concourse.lib.models.pipeline import (
     Pipeline,
     Platform,
     PutStep,
-    RegistryImage,
     Resource,
     ResourceType,
     TaskConfig,
@@ -29,7 +28,11 @@ from ol_concourse.lib.resource_types import pulumi_provisioner_resource
 from ol_concourse.lib.resources import git_repo, pulumi_provisioner, registry_image
 from pydantic import BaseModel, model_validator
 
-from ol_concourse.pipelines.constants import PULUMI_WATCHED_PATHS
+from ol_concourse.pipelines.constants import (
+    ECR_REGION,
+    PULUMI_WATCHED_PATHS,
+    dockerhub_ecr_image_uri,
+)
 from ol_concourse.pipelines.jobs import pulumi_job, pulumi_jobs_chain
 
 
@@ -267,7 +270,11 @@ def _build_image_job(
                         platform=Platform.linux,
                         image_resource=AnonymousResource(
                             type=REGISTRY_IMAGE,
-                            source=RegistryImage(repository="alpine"),
+                            source={
+                                "repository": dockerhub_ecr_image_uri("alpine"),
+                                "tag": "latest",
+                                "aws_region": ECR_REGION,
+                            },
                         ),
                         inputs=[Input(name=git_repo_resource.name)],
                         outputs=[Output(name=Identifier(version_output_dir))],
@@ -327,7 +334,11 @@ def _build_image_job(
                 platform=Platform.linux,
                 image_resource=AnonymousResource(
                     type="registry-image",
-                    source={"repository": "amazon/aws-cli", "tag": "latest"},
+                    source={
+                        "repository": dockerhub_ecr_image_uri("amazon/aws-cli"),
+                        "tag": "latest",
+                        "aws_region": ECR_REGION,
+                    },
                 ),
                 params={
                     "REPO_NAME": ecr_registry_image_resource.source["repository"],
@@ -440,7 +451,11 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                     platform=Platform.linux,
                     image_resource=AnonymousResource(
                         type=REGISTRY_IMAGE,
-                        source=RegistryImage(repository="alpine/curl"),
+                        source={
+                            "repository": dockerhub_ecr_image_uri("alpine/curl"),
+                            "tag": "latest",
+                            "aws_region": ECR_REGION,
+                        },
                     ),
                     run=Command(
                         path="sh",
@@ -474,7 +489,11 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                         platform=Platform.linux,
                         image_resource=AnonymousResource(
                             type=REGISTRY_IMAGE,
-                            source=RegistryImage(repository="alpine/curl"),
+                            source={
+                                "repository": dockerhub_ecr_image_uri("alpine/curl"),
+                                "tag": "latest",
+                                "aws_region": ECR_REGION,
+                            },
                         ),
                         run=Command(
                             path="sh",
@@ -498,7 +517,11 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                         platform=Platform.linux,
                         image_resource=AnonymousResource(
                             type=REGISTRY_IMAGE,
-                            source=RegistryImage(repository="alpine/curl"),
+                            source={
+                                "repository": dockerhub_ecr_image_uri("alpine/curl"),
+                                "tag": "latest",
+                                "aws_region": ECR_REGION,
+                            },
                         ),
                         run=Command(
                             path="sh",
