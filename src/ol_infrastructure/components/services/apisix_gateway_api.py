@@ -239,6 +239,19 @@ class OLApisixHTTPRoute(ComponentResource):
         return f"{sanitized_httproute_name}-{sanitized_route_name}-{plugin_hash}"
 
     @staticmethod
+    def _active_plugins(
+        plugins: list[OLApisixPluginConfig],
+    ) -> list[OLApisixPluginConfig]:
+        """Return only plugins where ``enable`` is True.
+
+        v1alpha1 PluginConfig has no ``enable`` flag, so disabled plugins must
+        be dropped rather than serialised.  Using the same filtered list for
+        both name-hashing and spec-generation keeps the PluginConfig resource
+        name consistent with its contents.
+        """
+        return [p for p in plugins if p.enable]
+
+    @staticmethod
     def _serialize_plugin_for_v1alpha1(
         plugin: OLApisixPluginConfig,
     ) -> dict[str, Any]:
@@ -279,9 +292,14 @@ class OLApisixHTTPRoute(ComponentResource):
             if not route_config.plugins:
                 continue
 
+            # Only enabled plugins are written to v1alpha1 PluginConfig.
+            active = self._active_plugins(route_config.plugins)
+            if not active:
+                continue
+
             # Generate unique name for this plugin combination
             config_name = self._generate_plugin_config_name(
-                httproute_name, route_config.route_name, route_config.plugins
+                httproute_name, route_config.route_name, active
             )
 
             # Only create if we haven't seen this exact plugin combo before
@@ -297,8 +315,7 @@ class OLApisixHTTPRoute(ComponentResource):
                     ),
                     spec={
                         "plugins": [
-                            self._serialize_plugin_for_v1alpha1(p)
-                            for p in route_config.plugins
+                            self._serialize_plugin_for_v1alpha1(p) for p in active
                         ]
                     },
                     opts=resource_options,
@@ -379,19 +396,23 @@ class OLApisixHTTPRoute(ComponentResource):
                     }
                 ]
             elif route_config.plugins:
-                config_name = self._generate_plugin_config_name(
-                    httproute_name, route_config.route_name, route_config.plugins
-                )
-                rule["filters"] = [
-                    {
-                        "type": "ExtensionRef",
-                        "extensionRef": {
-                            "group": "apisix.apache.org",
-                            "kind": "PluginConfig",
-                            "name": config_name,
-                        },
-                    }
-                ]
+                # Use the same enabled-plugin subset that was used to create
+                # the PluginConfig resource so the name always matches.
+                active = self._active_plugins(route_config.plugins)
+                if active:
+                    config_name = self._generate_plugin_config_name(
+                        httproute_name, route_config.route_name, active
+                    )
+                    rule["filters"] = [
+                        {
+                            "type": "ExtensionRef",
+                            "extensionRef": {
+                                "group": "apisix.apache.org",
+                                "kind": "PluginConfig",
+                                "name": config_name,
+                            },
+                        }
+                    ]
 
             rules.append(rule)
 
