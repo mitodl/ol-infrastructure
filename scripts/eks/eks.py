@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import urllib.parse
 import webbrowser
@@ -218,10 +219,21 @@ def fetch_all_cluster_configs() -> list[ClusterConfig]:
     return [fetch_cluster_config(stack_name) for stack_name in read_stack_names()]
 
 
+def resolve_executable(name: str) -> str:
+    """Return an absolute executable path visible from the current environment."""
+    executable_path = shutil.which(name)
+    if not executable_path:
+        msg = f"Unable to find required executable on PATH: {name}"
+        raise RuntimeError(msg)
+    return executable_path
+
+
 def kubeconfig_exec_args(cluster: ClusterConfig, mode: AccessMode) -> list[str]:
     """Build exec args for kubeconfig user entries."""
     args = [
         "run",
+        "--project",
+        str(repo_root()),
         "python",
         str(Path(__file__).resolve()),
         "exec-credential",
@@ -233,6 +245,14 @@ def kubeconfig_exec_args(cluster: ClusterConfig, mode: AccessMode) -> list[str]:
     if mode is AccessMode.ADMIN:
         args.extend(["--admin-role-arn", cluster.admin_role_arn])
     return args
+
+
+def kubeconfig_exec_env() -> list[dict[str, str]]:
+    """Build environment overrides for kubeconfig exec users."""
+    path_value = os.environ.get("PATH")
+    if not path_value:
+        return []
+    return [{"name": "PATH", "value": path_value}]
 
 
 def resolve_current_context(
@@ -284,8 +304,9 @@ def build_kubeconfig(
                 "user": {
                     "exec": {
                         "apiVersion": "client.authentication.k8s.io/v1beta1",
-                        "command": "uv",
+                        "command": resolve_executable("uv"),
                         "args": kubeconfig_exec_args(cluster, mode),
+                        "env": kubeconfig_exec_env(),
                         "interactiveMode": "IfAvailable",
                         "provideClusterInfo": False,
                     },
