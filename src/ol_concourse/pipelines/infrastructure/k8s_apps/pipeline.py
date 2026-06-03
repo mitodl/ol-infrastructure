@@ -205,6 +205,7 @@ def _define_release_resources(
         branch=repo_main_branch,
         access_token="((github.release_resource_access_token))",  # noqa: S106
         repository=github_repo,
+        semver_tag_fallback=True,
     )
     # Closed release issues gate production deployments.
     release_gate = github_issues(
