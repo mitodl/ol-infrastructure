@@ -82,6 +82,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
         paths=[
             *PULUMI_WATCHED_PATHS,
             str(PULUMI_CODE_PATH.joinpath("applications/keycloak/")),
+            "src/bridge/lib/versions.py",
         ],
     )
 
