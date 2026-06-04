@@ -409,7 +409,7 @@ else:
 keycloak_resource_name = f"keycloak-{stack_info.env_suffix}"
 keycloak_resource = kubernetes.apiextensions.CustomResource(
     f"{env_name}-keycloak",
-    api_version="k8s.keycloak.org/v2alpha1",
+    api_version="k8s.keycloak.org/v2beta1",
     kind="Keycloak",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=keycloak_resource_name,
@@ -497,11 +497,13 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
                 else []
             ),
         ],
+        # Disable the operator-managed Ingress; we expose Keycloak through our
+        # own APISix Gateway instead.
+        "ingress": {"enabled": False},
+        # Configure the ServiceMonitor the operator auto-creates when
+        # metrics-enabled is set in the image build.
+        "serviceMonitor": {"interval": "30s", "scrapeTimeout": "10s"},
         "additionalOptions": [
-            {
-                "name": "disable-external-access",
-                "value": "true",
-            },
             {"name": "metrics-enabled", "value": "true"},
             {
                 "name": "spi-realm-restapi-extension-scim-admin-url-check",
@@ -528,38 +530,6 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
     opts=ResourceOptions(
         delete_before_replace=True,
         depends_on=[keycloak_resources, db_creds_secret],
-    ),
-)
-
-keycloak_service_monitor = kubernetes.apiextensions.CustomResource(
-    f"{env_name}-keycloak-service-monitor",
-    api_version="monitoring.coreos.com/v1",
-    kind="ServiceMonitor",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=f"{keycloak_resource_name}-monitor",
-        namespace=keycloak_namespace,
-        labels=k8s_global_labels,
-    ),
-    spec={
-        "selector": {
-            "matchLabels": {
-                "app": "keycloak",
-                "app.kubernetes.io/instance": keycloak_resource_name,
-            }
-        },
-        "endpoints": [
-            {
-                "port": "management",
-                "path": "/metrics",
-                "scheme": "https",
-                "interval": "30s",
-                "tlsConfig": {"insecureSkipVerify": True},
-            }
-        ],
-        "namespaceSelector": {"matchNames": [keycloak_namespace]},
-    },
-    opts=ResourceOptions(
-        depends_on=[keycloak_resource],
     ),
 )
 
