@@ -11,6 +11,7 @@ import requests
 import yaml
 from pulumi import Config, Output, ResourceOptions, export
 from pulumi_aws import ec2, get_caller_identity, iam
+from pydantic import SecretStr
 
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
@@ -289,9 +290,10 @@ rds_password = keycloak_config.require("rds_password")
 
 keycloak_db_config = OLPostgresDBConfig(
     instance_name=f"keycloak-{stack_info.env_suffix}",
-    password=rds_password,
-    storage=keycloak_config.get("db_capacity")
-    or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
+    password=SecretStr(rds_password),
+    storage=int(
+        keycloak_config.get("db_capacity") or AWS_RDS_DEFAULT_DATABASE_CAPACITY
+    ),
     subnet_group_name=target_vpc["rds_subnet"],
     security_groups=[keycloak_database_security_group],
     db_name="keycloak",
@@ -305,7 +307,7 @@ db_address = keycloak_db.db_instance.address
 db_port = keycloak_db.db_instance.port
 
 keycloak_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
-    db_name=keycloak_db_config.db_name,
+    db_name=keycloak_db_config.db_name or "keycloak",
     mount_point=f"{keycloak_db_config.engine}-keycloak",
     db_admin_username=keycloak_db_config.username,
     db_admin_password=rds_password,
@@ -415,6 +417,13 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
         labels=k8s_global_labels,
     ),
     spec={
+        # Auto is the correct strategy now that unsupported.podTemplate has been
+        # removed. Previously, the operator could not reliably replicate the
+        # podTemplate into the compatibility-check Job, causing it to always fall
+        # back to RecreateUpdate and creating a reconciliation storm. With only
+        # spec.env and first-class CR fields in use, the Job replicates correctly
+        # and Auto can detect when a rolling update is safe (e.g. patch releases).
+        # See: https://www.keycloak.org/operator/rolling-updates
         "update": {"strategy": "Auto"},
         "instances": keycloak_config.get_int("replicas") or 2,
         "image": cached_image_uri(f"mitodl/keycloak@{KEYCLOAK_DOCKER_DIGEST}"),
@@ -449,54 +458,45 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
         "http": {
             "tlsSecret": keycloak_tls_secret_name,
         },
-        "unsupported": {
-            "podTemplate": {
-                "spec": {
-                    # Give Infinispan enough time to gracefully leave the
-                    # cluster before the pod is force-killed.
-                    "terminationGracePeriodSeconds": 60,
-                    "containers": [
-                        {
-                            "name": "keycloak",
-                            "env": [
-                                {
-                                    "name": "QUARKUS_HTTP_LIMITS_MAX_HEADER_SIZE",
-                                    "value": "128k",
-                                },
-                                {
-                                    "name": "QUARKUS_HTTP_LIMITS_MAX_HEADER_LIST_SIZE",
-                                    "value": "32768",
-                                },
-                                {
-                                    "name": "POSTHOG_API_KEY",
-                                    "value": posthog_api_key,
-                                },
-                                {
-                                    "name": "POSTHOG_API_HOST",
-                                    "value": posthog_api_host,
-                                },
-                                # The Docker image is built with --tracing-enabled=true,
-                                # baking the Quarkus OTel extension into the binary at
-                                # build time. KC_TRACING_ENABLED=false (from the CR's
-                                # tracing.enabled: false) only disables Keycloak-level
-                                # trace emission; it does not prevent the OTel SDK from
-                                # initialising and attempting to export to the default
-                                # OTLP endpoint (localhost:4317). Without a telemetry
-                                # receiver those connection attempts time out and
-                                # destabilise the pod. OTEL_SDK_DISABLED is the
-                                # OpenTelemetry-spec env var that suppresses the entire
-                                # SDK regardless of build-time compilation.
-                                *(
-                                    [{"name": "OTEL_SDK_DISABLED", "value": "true"}]
-                                    if stack_info.name == "CI"
-                                    else []
-                                ),
-                            ],
-                        },
-                    ],
-                }
+        # spec.env is the correct field for custom environment variables that have no
+        # first-class CR field and should not be in additionalOptions.
+        # Using unsupported.podTemplate.spec.containers[].env instead triggers a
+        # persistent HasErrors warning ("The name of the keycloak container cannot be
+        # modified") because specifying *any* name: in the containers list is treated
+        # as a rename attempt rather than a selector.
+        # See: https://www.keycloak.org/operator/advanced-configuration
+        "env": [
+            {
+                "name": "QUARKUS_HTTP_LIMITS_MAX_HEADER_SIZE",
+                "value": "128k",
             },
-        },
+            {
+                "name": "QUARKUS_HTTP_LIMITS_MAX_HEADER_LIST_SIZE",
+                "value": "32768",
+            },
+            {
+                "name": "POSTHOG_API_KEY",
+                "value": posthog_api_key,
+            },
+            {
+                "name": "POSTHOG_API_HOST",
+                "value": posthog_api_host,
+            },
+            # The Docker image is built with --tracing-enabled=true, baking the
+            # Quarkus OTel extension into the binary at build time.
+            # KC_TRACING_ENABLED=false (from tracing.enabled: false) only disables
+            # Keycloak-level trace emission; it does not prevent the OTel SDK from
+            # initialising and attempting to export to the default OTLP endpoint
+            # (localhost:4317). Without a receiver those connection attempts time out
+            # and destabilise the pod. OTEL_SDK_DISABLED is the OpenTelemetry-spec
+            # env var that suppresses the entire SDK regardless of build-time
+            # compilation.
+            *(
+                [{"name": "OTEL_SDK_DISABLED", "value": "true"}]
+                if stack_info.name == "CI"
+                else []
+            ),
+        ],
         "additionalOptions": [
             {
                 "name": "disable-external-access",
