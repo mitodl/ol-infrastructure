@@ -87,8 +87,8 @@ VAULT_SECRETS_OPERATOR_CHART_VERSION = "1.4.0"
 NGINX_VERSION = "1.31.1"
 # renovate: datasource=github-releases depName=prometheus-operator packageName=prometheus-operator/prometheus-operator
 PROMETHEUS_OPERATOR_CRD_VERSION = "v0.91.0"
-# renovate: datasource=github-releases depName=keycloak-k8s-resources packageName=keycloak/keycloak-k8s-resources
-KEYCLOAK_OPERATOR_CRD_VERSION = "26.2.4"
+# renovate: datasource=github-tags depName=keycloak-k8s-resources packageName=keycloak/keycloak-k8s-resources
+KEYCLOAK_OPERATOR_CRD_VERSION = "26.6.2"
 # renovate: datasource=helm depName=jupyterhub packageName=jupyterhub registryUrl=https://hub.jupyter.org/helm-chart
 JUPYTERHUB_CHART_VERSION = "4.3.5"
 # renovate: datasource=github-releases depName=marimo-operator packageName=marimo-team/marimo-operator
