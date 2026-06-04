@@ -531,6 +531,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
             PutStep(
                 put=fastly_ci.name,
                 params=_fastly_purge_params(pipeline_parameters.fastly_purge_scope),
+                no_get=True,
             )
         )
 
@@ -567,9 +568,13 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     if fastly_qa is not None and fastly_prod is not None:
         purge_params = _fastly_purge_params(pipeline_parameters.fastly_purge_scope)
         qa_purge_steps: list[GetStep | PutStep | TaskStep] = []
-        qa_purge_steps.append(PutStep(put=fastly_qa.name, params=purge_params))
+        qa_purge_steps.append(
+            PutStep(put=fastly_qa.name, params=purge_params, no_get=True)
+        )
         prod_purge_steps: list[GetStep | PutStep | TaskStep] = []
-        prod_purge_steps.append(PutStep(put=fastly_prod.name, params=purge_params))
+        prod_purge_steps.append(
+            PutStep(put=fastly_prod.name, params=purge_params, no_get=True)
+        )
         additional_post_steps = {0: qa_purge_steps, 1: prod_purge_steps}
 
     # QA and Production Deployments
