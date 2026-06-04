@@ -1,5 +1,6 @@
 import json
 from functools import lru_cache, partial
+from typing import Any
 
 import boto3
 import pulumi
@@ -87,7 +88,7 @@ def get_eks_addon_version(addon_name: str, cluster_version: str | None = None) -
 
 @lru_cache
 def get_k8s_provider(
-    kubeconfig: str,
+    kubeconfig: pulumi.Output[Any] | str,
     provider_name: str | None,
 ):
     return Provider(
@@ -97,7 +98,7 @@ def get_k8s_provider(
 
 
 def set_k8s_provider(
-    kubeconfig: str,
+    kubeconfig: pulumi.Output[Any] | str,
     provider_name: str | None,
     resource_args: pulumi.ResourceTransformationArgs,
 ) -> pulumi.ResourceTransformationResult:
@@ -113,7 +114,7 @@ def set_k8s_provider(
 
 
 def setup_k8s_provider(
-    kubeconfig: str | dict[str, object],
+    kubeconfig: pulumi.Output[Any] | str | dict[str, object],
     provider_name: str | None = None,
 ):
     # lru_cache requires hashable arguments; serialize dict kubeconfigs to JSON
@@ -173,7 +174,7 @@ def access_entry_opts(
             import_=resource_id,
         )
     except ClientError as e:
-        if e.response["Error"]["Code"] != "ResourceNotFoundException":
+        if e.response.get("Error", {}).get("Code") != "ResourceNotFoundException":
             raise
         # Access entry doesn't exist, create new one
         opts = pulumi.ResourceOptions()
