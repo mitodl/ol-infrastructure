@@ -19,6 +19,7 @@ from ol_concourse.lib.models.pipeline import (
     Pipeline,
     Platform,
     PutStep,
+    RegistryImage,
     Resource,
     ResourceType,
     TaskConfig,
@@ -46,7 +47,11 @@ class AppPipelineParams(BaseModel):
         app_name (str): The name of the application.
         build_target (Optional[str]): The specific target stage to build within the Dockerfile.
         dockerfile_path (str): The path to the Dockerfile within the repository. Defaults to "./Dockerfile".
-        fastly_service_prefix (Optional[str]): A prefix used to identify Fastly service IDs in Vault.
+        fastly_domains (Optional[dict[str, str]]): Per-environment hostnames served by the Fastly
+            service for this app.  When set together with ``purge_fastly_cache=True``, the
+            pipeline registers a Fastly resource for each environment and resolves the service ID
+            automatically from the domain name at pipeline runtime — no opaque service IDs need to
+            be stored in Vault.  Keys must be ``"ci"``, ``"qa"``, and ``"production"``.
         purge_fastly_cache (bool): Whether to include steps to purge the Fastly cache after deployment. Defaults to False.
         fastly_purge_scope (str): Controls which Fastly purge endpoint is called when purge_fastly_cache is True.
             Use "purge_all" (the default) to purge the entire service cache via POST /purge_all.
@@ -59,7 +64,7 @@ class AppPipelineParams(BaseModel):
     app_name: str
     build_target: str | None = None
     dockerfile_path: str = "./Dockerfile"
-    fastly_service_prefix: str | None = None
+    fastly_domains: dict[str, str] | None = None
     purge_fastly_cache: bool = False
     fastly_purge_scope: str = "purge_all"
     repo_name: str | None = None
@@ -77,6 +82,33 @@ class AppPipelineParams(BaseModel):
         """Set the repo_name based on the app_name if not provided."""
         if not self.repo_name:
             self.repo_name = self.app_name
+        return self
+
+    @model_validator(mode="after")
+    def validate_fastly_config(self) -> "AppPipelineParams":
+        """Enforce that fastly_domains is fully specified when cache purging is enabled.
+
+        Raises:
+            ValueError: if ``purge_fastly_cache`` is True but ``fastly_domains`` is
+                not set, or if any of the required keys (``ci``, ``qa``,
+                ``production``) are missing from ``fastly_domains``.
+        """
+        if not self.purge_fastly_cache:
+            return self
+        if self.fastly_domains is None:
+            msg = (
+                f"{self.app_name}: purge_fastly_cache=True requires fastly_domains "
+                "to be set with keys 'ci', 'qa', and 'production'."
+            )
+            raise ValueError(msg)
+        required_envs = {"ci", "qa", "production"}
+        missing = required_envs - self.fastly_domains.keys()
+        if missing:
+            msg = (
+                f"{self.app_name}: fastly_domains is missing required environment "
+                f"keys: {sorted(missing)}"
+            )
+            raise ValueError(msg)
         return self
 
 
@@ -97,7 +129,11 @@ pipeline_params = {
         repo_name="mit-learn",
         dockerfile_path="frontends/main/Dockerfile.web",
         purge_fastly_cache=True,
-        fastly_service_prefix="learn_",
+        fastly_domains={
+            "ci": "next.ci.learn.mit.edu",
+            "qa": "next.rc.learn.mit.edu",
+            "production": "next.learn.mit.edu",
+        },
         fastly_purge_scope="html-pages",
     ),
     "xpro": AppPipelineParams(
@@ -215,6 +251,60 @@ def _define_registry_image_resources(
         **ecr_kwargs,
     )
     return docker_ci_image, docker_rc_image, ecr_ci_image, ecr_rc_image
+
+
+def _define_fastly_resources(
+    app_name: str,
+    fastly_domains: dict[str, str],
+) -> tuple[ResourceType, Resource, Resource, Resource]:
+    """Define the Fastly resource type and per-environment cache-purge resources.
+
+    :param app_name: The application name; used as a prefix for resource identifiers.
+    :param fastly_domains: Mapping of environment name to the hostname served by the
+        Fastly service for that environment (e.g.
+        ``{"ci": "next.ci.learn.mit.edu", "qa": "next.rc.learn.mit.edu",
+        "production": "next.learn.mit.edu"}``).  The Fastly resource resolves the
+        service ID automatically from the domain at pipeline runtime — no opaque
+        service IDs need to be stored in Vault.
+    :returns: A 4-tuple of
+        ``(resource_type, ci_resource, qa_resource, production_resource)``.
+    """
+    fastly_resource_type = ResourceType(
+        name=Identifier("fastly"),
+        type=REGISTRY_IMAGE,
+        source=RegistryImage(repository="mitodl/concourse-fastly-resource"),
+    )
+
+    def _env_resource(env: str) -> Resource:
+        return Resource(
+            name=Identifier(f"{app_name}-fastly-{env}"),
+            type="fastly",
+            check_every="never",
+            source={
+                "api_token": "((fastly.fastly_api_token))",
+                "domain": fastly_domains[env],
+            },
+        )
+
+    return (
+        fastly_resource_type,
+        _env_resource("ci"),
+        _env_resource("qa"),
+        _env_resource("production"),
+    )
+
+
+def _fastly_purge_params(purge_scope: str) -> dict[str, str]:
+    """Return ``put`` params for a Fastly purge step.
+
+    :param purge_scope: Either ``"purge_all"`` to purge the entire service cache
+        (``mode: purge_all``), or a surrogate-key string (e.g. ``"html-pages"``)
+        to purge only objects tagged with that key (``mode: surrogate_key``).
+    :returns: A ``params`` dict suitable for a Concourse :class:`PutStep`.
+    """
+    if purge_scope == "purge_all":
+        return {"mode": "purge_all"}
+    return {"mode": "surrogate_key", "surrogate_key": purge_scope}
 
 
 def _define_pulumi_resources(
@@ -393,6 +483,18 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         app_name, ol_infra_repo.name
     )
 
+    # Optionally define Fastly resources for post-deployment cache purging
+    fastly_rtype: ResourceType | None = None
+    fastly_ci: Resource | None = None
+    fastly_qa: Resource | None = None
+    fastly_prod: Resource | None = None
+
+    if pipeline_parameters.purge_fastly_cache and pipeline_parameters.fastly_domains:
+        fastly_rtype, fastly_ci, fastly_qa, fastly_prod = _define_fastly_resources(
+            app_name=app_name,
+            fastly_domains=pipeline_parameters.fastly_domains,
+        )
+
     # Retrieve any special configurations needed from mapping above,
     # default to no special configuration if app name is not found in mapping
 
@@ -422,6 +524,16 @@ def build_app_pipeline(app_name: str) -> Pipeline:
 
     # Define Deployment Jobs
 
+    # Build CI post-steps list with the correct union type so Pyright is satisfied
+    ci_post_steps: list[GetStep | PutStep | TaskStep] = []
+    if fastly_ci is not None:
+        ci_post_steps.append(
+            PutStep(
+                put=fastly_ci.name,
+                params=_fastly_purge_params(pipeline_parameters.fastly_purge_scope),
+            )
+        )
+
     # CI Deployment
     ci_fragment = pulumi_job(
         pulumi_code=ol_infra_repo,
@@ -444,101 +556,21 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                 reveal=True,
             ),
         ],
-        additional_post_steps=[
-            TaskStep(
-                task=Identifier("purge-fastly-cache"),
-                config=TaskConfig(
-                    platform=Platform.linux,
-                    image_resource=AnonymousResource(
-                        type=REGISTRY_IMAGE,
-                        source={
-                            "repository": dockerhub_ecr_image_uri("alpine/curl"),
-                            "tag": "latest",
-                            "aws_region": ECR_REGION,
-                        },
-                    ),
-                    run=Command(
-                        path="sh",
-                        args=[
-                            "-exc",
-                            (
-                                f'curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_ci))/purge_all"'
-                                if pipeline_parameters.fastly_purge_scope == "purge_all"
-                                else f'curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_ci))/purge/{pipeline_parameters.fastly_purge_scope}"'
-                            ),
-                        ],
-                    ),
-                ),
-            ),
-        ]
-        if pipeline_parameters.purge_fastly_cache
-        else [],
+        additional_post_steps=ci_post_steps,
         additional_env_vars={
             f"{app_name.replace('-', '_').upper()}_DOCKER_SHA": "((.:image_digest))",
         },
         slack_url_path="eks.slack_url",
     )
 
-    additional_post_steps: dict[int, list[TaskStep]] = {}
-    if pipeline_parameters.purge_fastly_cache:
-        additional_post_steps = {
-            0: [
-                TaskStep(
-                    task=Identifier("purge-fastly-cache"),
-                    config=TaskConfig(
-                        platform=Platform.linux,
-                        image_resource=AnonymousResource(
-                            type=REGISTRY_IMAGE,
-                            source={
-                                "repository": dockerhub_ecr_image_uri("alpine/curl"),
-                                "tag": "latest",
-                                "aws_region": ECR_REGION,
-                            },
-                        ),
-                        run=Command(
-                            path="sh",
-                            args=[
-                                "-exc",
-                                (
-                                    f'curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_qa))/purge_all"'
-                                    if pipeline_parameters.fastly_purge_scope
-                                    == "purge_all"
-                                    else f'curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_qa))/purge/{pipeline_parameters.fastly_purge_scope}"'
-                                ),
-                            ],
-                        ),
-                    ),
-                ),
-            ],
-            1: [
-                TaskStep(
-                    task=Identifier("purge-fastly-cache"),
-                    config=TaskConfig(
-                        platform=Platform.linux,
-                        image_resource=AnonymousResource(
-                            type=REGISTRY_IMAGE,
-                            source={
-                                "repository": dockerhub_ecr_image_uri("alpine/curl"),
-                                "tag": "latest",
-                                "aws_region": ECR_REGION,
-                            },
-                        ),
-                        run=Command(
-                            path="sh",
-                            args=[
-                                "-exc",
-                                (
-                                    f'curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_production))/purge_all"'
-                                    if pipeline_parameters.fastly_purge_scope
-                                    == "purge_all"
-                                    else f'curl -H "Fastly-Key: ((fastly.fastly_api_token))" -H "Accept: application/json" -i -X POST "https://api.fastly.com/service/((fastly.{pipeline_parameters.fastly_service_prefix}service_id_production))/purge/{pipeline_parameters.fastly_purge_scope}"'
-                                ),
-                            ],
-                        ),
-                    ),
-                ),
-            ],
-        }
+    additional_post_steps: dict[int, list[GetStep | PutStep | TaskStep]] = {}
+    if fastly_qa is not None and fastly_prod is not None:
+        purge_params = _fastly_purge_params(pipeline_parameters.fastly_purge_scope)
+        qa_purge_steps: list[GetStep | PutStep | TaskStep] = []
+        qa_purge_steps.append(PutStep(put=fastly_qa.name, params=purge_params))
+        prod_purge_steps: list[GetStep | PutStep | TaskStep] = []
+        prod_purge_steps.append(PutStep(put=fastly_prod.name, params=purge_params))
+        additional_post_steps = {0: qa_purge_steps, 1: prod_purge_steps}
 
     # QA and Production Deployments
     qa_and_production_fragment = pulumi_jobs_chain(
@@ -600,10 +632,21 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         app_rc_image,  # Needed for QA/Prod deployment trigger
         docker_ci_image,
         docker_rc_image,
+        *(
+            [fastly_ci, fastly_qa, fastly_prod]
+            if fastly_ci is not None
+            and fastly_qa is not None
+            and fastly_prod is not None
+            else []
+        ),
     ]
 
     ci_deployment_fragment = PipelineFragment(
-        resource_types=[pulumi_resource_type, *ci_fragment.resource_types],
+        resource_types=[
+            pulumi_resource_type,
+            *ci_fragment.resource_types,
+            *([fastly_rtype] if fastly_rtype else []),
+        ],
         resources=[*deployment_resources, *ci_fragment.resources],
         jobs=ci_fragment.jobs,
     )
