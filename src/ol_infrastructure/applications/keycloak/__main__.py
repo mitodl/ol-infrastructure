@@ -9,7 +9,7 @@ import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 import requests
 import yaml
-from pulumi import Config, Output, ResourceOptions, export
+from pulumi import Alias, Config, Output, ResourceOptions, export
 from pulumi_aws import ec2, get_caller_identity, iam
 from pydantic import SecretStr
 
@@ -528,6 +528,11 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
         },
     },
     opts=ResourceOptions(
+        # Alias the old v2alpha1 type so Pulumi matches the existing stack state
+        # entry rather than deleting and recreating the Keycloak instance.
+        # Both versions are served by the same CRD storage; this is a state
+        # identity change only, not a resource replacement.
+        aliases=[Alias(type_="kubernetes:k8s.keycloak.org/v2alpha1:Keycloak")],
         delete_before_replace=True,
         depends_on=[keycloak_resources, db_creds_secret],
     ),
