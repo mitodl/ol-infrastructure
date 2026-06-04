@@ -130,9 +130,9 @@ pipeline_params = {
         dockerfile_path="frontends/main/Dockerfile.web",
         purge_fastly_cache=True,
         fastly_domains={
-            "ci": "next.ci.learn.mit.edu",
-            "qa": "next.rc.learn.mit.edu",
-            "production": "next.learn.mit.edu",
+            "ci": "ci.learn.mit.edu",
+            "qa": "rc.learn.mit.edu",
+            "production": "learn.mit.edu",
         },
         fastly_purge_scope="html-pages",
     ),
