@@ -666,6 +666,14 @@ for worker_def in concourse_config.get_object("workers") or []:
             role=concourse_worker_instance_role.name,
         )
 
+    # Attach the describe_instances policy to all workers so they can authenticate
+    # with ECR and pull images through the ECR pull-through cache.
+    iam.RolePolicyAttachment(
+        f"concourse-instance-policy-worker-{worker_class_name}-ecr-pull-through-{stack_info.env_suffix}",
+        policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
+        role=concourse_worker_instance_role.name,
+    )
+
     concourse_worker_instance_profile = iam.InstanceProfile(
         f"concourse-instance-profile-worker-{worker_class_name}-{stack_info.env_suffix}",
         role=concourse_worker_instance_role.name,
