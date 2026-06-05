@@ -1,3 +1,5 @@
+"""Generate a kubeconfig from the EKS Pulumi stack outputs."""
+
 # ruff:  noqa: E501
 
 # This script is only for devops to use. Requires access to the pulumi state files.
@@ -28,6 +30,7 @@ role_arn_name = "admin_role_arn"
 
 
 def extract_kube_config_params(role_arn, cluster_ca, cluster_endpoint, cluster_name):
+    """Append cluster, context, and user entries for a single EKS cluster."""
     clusters.append(
         {
             "name": cluster_name,
@@ -78,7 +81,7 @@ def extract_kube_config_params(role_arn, cluster_ca, cluster_endpoint, cluster_n
 
 
 stack_defs = glob.glob(  # noqa: PTH207
-    str(Path(__file__).parent.joinpath("Pulumi.infrastructure.*.yaml"))
+    str(Path(__file__).parent.joinpath("Pulumi.*.*.yaml"))
 )
 
 for stack in stack_defs:
