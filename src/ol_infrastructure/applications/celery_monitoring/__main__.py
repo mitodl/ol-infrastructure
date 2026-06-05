@@ -3,6 +3,7 @@
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
@@ -69,21 +70,21 @@ setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 
 def build_broker_subscriptions(
-    project_outputs: list[tuple[str, Output]],
+    project_outputs: list[tuple[str, Output[Any], int]],
 ) -> str:
-    """Create a dict of Redis cache configs for each edxapp stack"""
+    """Create a dict of Redis broker subscriptions for monitored Celery apps."""
     broker_subs = []
 
     def stack_to_app(stack):
         return re.sub(r"[^a-zA-Z]", "", "".join(stack.split(".")[1:-1]))
 
-    for stack, project_output in project_outputs:
+    for stack, project_output, redis_database_index in project_outputs:
         app_name = stack_to_app(stack)
         if app_name.endswith("mitx"):
             app_name += "live"
         broker_subs.append(
             {
-                "broker": f"rediss://default:{project_output['redis_token']}@{project_output['redis']}:6379/1?ssl_cert_reqs=required",
+                "broker": f"rediss://default:{project_output['redis_token']}@{project_output['redis']}:6379/{redis_database_index}?ssl_cert_reqs=required",
                 "broker_management_url": None,
                 "exchange": "celeryev",
                 "queue": "leek.fanout",
@@ -117,85 +118,98 @@ def build_broker_subscriptions(
     return json.dumps(arbitrary_dict)
 
 
-# List of (legacy_name, project_const, short_stack_name, output_key) tuples.
-# legacy_name is preserved so that build_broker_subscriptions/stack_to_app can
-# still derive the app label from the historical dotted namespace.
+# List of (legacy_name, project_const, short_stack_name, output_key,
+# redis_database_index) tuples. legacy_name is preserved so that
+# build_broker_subscriptions/stack_to_app can still derive the app label from the
+# historical dotted namespace.
 stacks = [
     (
         f"applications.edxapp.xpro.{stack_info.name}",
         projects.EDXAPP,
         f"xpro.{stack_info.name}",
         "edxapp",
+        1,
     ),
     (
         f"applications.edxapp.mitx.{stack_info.name}",
         projects.EDXAPP,
         f"mitx.{stack_info.name}",
         "edxapp",
+        1,
     ),
     (
         f"applications.edxapp.mitx-staging.{stack_info.name}",
         projects.EDXAPP,
         f"mitx-staging.{stack_info.name}",
         "edxapp",
+        1,
     ),
     (
         f"applications.edxapp.mitxonline.{stack_info.name}",
         projects.EDXAPP,
         f"mitxonline.{stack_info.name}",
         "edxapp",
+        1,
     ),
     (
         f"applications.superset.{stack_info.name}",
         projects.SUPERSET,
         stack_info.name,
         "superset",
+        1,
     ),
     (
         f"applications.mitxonline.{stack_info.name}",
         projects.MITXONLINE,
         stack_info.name,
         "mitxonline",
+        1,
     ),
     (
         f"applications.mit_learn.{stack_info.name}",
         projects.MIT_LEARN,
         stack_info.name,
         "mit_learn",
+        1,
     ),
     (
         f"applications.learn_ai.{stack_info.name}",
         projects.LEARN_AI,
         stack_info.name,
         "learn_ai",
+        1,
     ),
-    (f"applications.xpro.{stack_info.name}", projects.XPRO, stack_info.name, "xpro"),
+    (f"applications.xpro.{stack_info.name}", projects.XPRO, stack_info.name, "xpro", 1),
     (
         f"applications.ocw_studio.{stack_info.name}",
         projects.OCW_STUDIO,
         stack_info.name,
         "ocw_studio",
+        1,
     ),
     (
         f"applications.odl_video_service.{stack_info.name}",
         projects.ODL_VIDEO_SERVICE,
         stack_info.name,
         "odl_video_service",
+        0,
     ),
     (
         f"applications.micromasters.{stack_info.name}",
         projects.MICROMASTERS,
         stack_info.name,
         "micromasters",
+        1,
     ),
 ]
 
-redis_outputs: list[tuple[str, Output]] = []
-for legacy_name, project_const, short_stack, output_key in stacks:
+redis_outputs: list[tuple[str, Output[Any], int]] = []
+for legacy_name, project_const, short_stack, output_key, redis_database_index in stacks:
     redis_outputs.append(
         (
             legacy_name,
             make_stack_reference(project_const, short_stack).require_output(output_key),
+            redis_database_index,
         )
     )
 redis_broker_subscriptions = Output.all(*redis_outputs).apply(
