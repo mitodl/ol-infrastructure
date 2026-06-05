@@ -100,6 +100,7 @@ target_vpc_name = ovs_config.get("target_vpc") or "applications_vpc"
 target_vpc = network_stack.require_output(target_vpc_name)
 target_vpc_id = target_vpc["id"]
 data_vpc = network_stack.require_output("data_vpc")
+operations_vpc = network_stack.require_output("operations_vpc")
 
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
@@ -559,6 +560,13 @@ ovs_redis_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,
             description=("Allow access from OVS K8s pods to Redis"),
+        ),
+        ec2.SecurityGroupIngressArgs(
+            cidr_blocks=operations_vpc["k8s_pod_subnet_cidrs"],
+            protocol="tcp",
+            from_port=DEFAULT_REDIS_PORT,
+            to_port=DEFAULT_REDIS_PORT,
+            description="Allow Operations VPC celery monitoring pods to Redis",
         ),
     ],
     egress=default_egress_args,
@@ -1212,6 +1220,7 @@ celery_deployment = kubernetes.apps.v1.Deployment(
                             "-A",
                             "odl_video",
                             "worker",
+                            "-E",
                             "-B",
                             "-l",
                             celery_log_level,
