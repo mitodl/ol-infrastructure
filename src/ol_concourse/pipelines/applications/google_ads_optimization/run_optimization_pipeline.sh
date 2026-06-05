@@ -35,7 +35,7 @@ uv run python scripts/pull_input_data.py --google-ads-yaml=google-ads.yaml --cus
 uv run python scripts/run_pipeline.py --course ${COURSE_NAME} --time-limit="1800.0" 2>&1 | tee -a "optimization_pipeline.log"
 
 # shellcheck disable=SC2086
-uv run python scripts/push_output_data.py --google-ads-yaml=google-ads.yaml --customer-id=${CUSTOMER_ID_FOR_COURSE} --output-course=${COURSE_NAME} --datasets=budget,cpc,bid_adj --execute 2>&1 | tee -a "optimization_pipeline.log"
+uv run python scripts/push_output_data.py --google-ads-yaml=google-ads.yaml --customer-id=${CUSTOMER_ID_FOR_COURSE} --output-course=${COURSE_NAME} --datasets=budget --execute 2>&1 | tee -a "optimization_pipeline.log"
 
 echo "Pipeline finished. Checking for warnings in the log..."
 
