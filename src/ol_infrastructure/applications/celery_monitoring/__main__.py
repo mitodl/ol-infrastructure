@@ -177,6 +177,12 @@ stacks = [
         "ocw_studio",
     ),
     (
+        f"applications.odl_video_service.{stack_info.name}",
+        projects.ODL_VIDEO_SERVICE,
+        stack_info.name,
+        "odl_video_service",
+    ),
+    (
         f"applications.micromasters.{stack_info.name}",
         projects.MICROMASTERS,
         stack_info.name,

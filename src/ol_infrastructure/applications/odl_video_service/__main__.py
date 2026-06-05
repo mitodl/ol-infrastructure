@@ -1264,7 +1264,8 @@ export(
     "odl_video_service",
     {
         "rds_host": db_address,
-        "redis_cluster": ovs_server_redis_cluster.address,
+        "redis_token": ovs_server_redis_cluster.cache_cluster.auth_token,
+        "redis": ovs_server_redis_cluster.address,
         "mediaconvert_queue": ovs_mediaconvert.queue.id,
     },
 )
