@@ -163,6 +163,7 @@ mitxonline = [
         enable_jumpnav="true",
         enable_ai_drawer_slot="true",
         enable_auto_language_selection="true",
+        enable_tagging_taxonomy_pages="true",
     ),
     OpenEdxVars(
         about_us_url="https://mitxonline.mit.edu/about-us/",
@@ -194,6 +195,7 @@ mitxonline = [
         enable_ai_drawer_slot="true",
         appzi_url="https://w.appzi.io/w.js?token=Q2pSI",
         enable_auto_language_selection="true",
+        enable_tagging_taxonomy_pages="true",
     ),
 ]
 
