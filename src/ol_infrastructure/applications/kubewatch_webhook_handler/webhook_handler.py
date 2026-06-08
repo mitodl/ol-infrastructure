@@ -11,6 +11,7 @@ This service receives webhook events from kubewatch and:
 import json
 import logging
 import os
+import re
 from http import HTTPStatus
 from typing import Any
 
@@ -24,6 +25,13 @@ MAX_IMAGE_LENGTH = 50
 MAX_SLACK_FIELDS = 10
 MAX_LABELS_DISPLAYED = 5
 SLACK_FIELD_BUFFER = 9  # Leave room for labels field
+
+RELEASE_VERSION_RE = re.compile(r"^\d{4}\.\d{2}\.\d{2}\.\d+$")
+
+
+def _is_release_image(image_tag: str) -> bool:
+    return bool(RELEASE_VERSION_RE.match(image_tag))
+
 
 # Configure logging
 logging.basicConfig(
@@ -472,6 +480,49 @@ def format_slack_message(  # noqa: C901
                     {
                         "type": "mrkdwn",
                         "text": f"_{deployment_details['progressing_message']}_",
+                    }
+                ],
+            }
+        )
+
+    # Add "Promote to Production" button for RC (release version) deployments
+    image = deployment_details.get("image", "")
+    image_tag = image.rsplit(":", 1)[-1] if ":" in image else ""
+    # Prefer the ol.mit.edu/application label (set by OLApplicationK8s) since the
+    # Deployment name is typically "{app}-app" but REPOS_CONFIG keys are "{app}".
+    labels = deployment_details.get("labels", {})
+    app_name = labels.get("ol.mit.edu/application") or (
+        name[:-4] if name.endswith("-app") else name
+    )
+    if _is_release_image(image_tag):
+        blocks.append(
+            {
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "🚀 Promote to Production",
+                        },
+                        "style": "primary",
+                        "action_id": "promote_production",
+                        "value": f"{app_name}:{image_tag}",
+                        "confirm": {
+                            "title": {
+                                "type": "plain_text",
+                                "text": "Promote to Production?",
+                            },
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": (
+                                    f"Deploy `{image_tag}` of "
+                                    f"`{app_name}` to Production?"
+                                ),
+                            },
+                            "confirm": {"type": "plain_text", "text": "Promote"},
+                            "deny": {"type": "plain_text", "text": "Cancel"},
+                        },
                     }
                 ],
             }
