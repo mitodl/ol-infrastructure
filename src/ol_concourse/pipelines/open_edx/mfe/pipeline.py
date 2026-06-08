@@ -87,6 +87,7 @@ class OpenEdxVars(BaseModel):
     enable_auto_language_selection: Literal["true", "false"] | None = None
     enable_tagging_taxonomy_pages: Literal["true", "false"] | None = None
     enable_course_import_in_library: Literal["true", "false"] | None = None
+    purge_fastly_cache: bool = True
 
     @property
     def release_name(self) -> OpenEdxSupportedRelease:
@@ -163,7 +164,7 @@ def mfe_params(
     }
 
 
-def mfe_job(  # noqa: C901, PLR0915
+def mfe_job(  # noqa: C901, PLR0912, PLR0915
     open_edx: OpenEdxVars,
     mfe: OpenEdxApplicationVersion,
     open_edx_deployment: DeploymentEnvRelease,
@@ -336,10 +337,14 @@ def mfe_job(  # noqa: C901, PLR0915
         ),
     )
 
-    fastly_resource = fastly_service(
-        name=Identifier(f"fastly-{open_edx.environment}"),
-        domain=open_edx.lms_domain,
-        check_every="never",
+    fastly_resource = (
+        fastly_service(
+            name=Identifier(f"fastly-{open_edx.environment}"),
+            domain=open_edx.lms_domain,
+            check_every="never",
+        )
+        if open_edx.purge_fastly_cache
+        else None
     )
 
     mfe_build_plan = [
@@ -401,12 +406,18 @@ def mfe_job(  # noqa: C901, PLR0915
                 ],
             },
         ),
-        PutStep(
-            put=fastly_resource.name,
-            params={
-                "mode": "url",
-                "url": f"https://{open_edx.lms_domain}/{mfe.application.path}/",
-            },
+        *(
+            [
+                PutStep(
+                    put=fastly_resource.name,
+                    params={
+                        "mode": "url",
+                        "url": f"https://{open_edx.lms_domain}/{mfe.application.path}/",
+                    },
+                )
+            ]
+            if fastly_resource is not None
+            else []
         ),
     ]
 
@@ -453,8 +464,11 @@ def mfe_job(  # noqa: C901, PLR0915
         plan=mfe_setup_plan + mfe_build_plan,
         on_success=create_gh_issue,
     )
+    fragment_resources = [mfe_repo, mfe_configs, gh_issues_post]
+    if fastly_resource is not None:
+        fragment_resources.append(fastly_resource)
     return PipelineFragment(
-        resources=[mfe_repo, mfe_configs, gh_issues_post, fastly_resource],
+        resources=fragment_resources,
         jobs=[mfe_job_definition],
     )
 
