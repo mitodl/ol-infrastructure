@@ -256,7 +256,7 @@ keycloak_database_security_group = ec2.SecurityGroup(
                 data_vpc["security_groups"]["integrator"],
             ],
             # TODO: @Ardiea 20250521 Why are we opening the entire VPC?  # noqa: FIX002, TD002, E501
-            cidr_blocks=[target_vpc["cidr"]],
+            cidr_blocks=[target_vpc["cidr"], data_vpc["cidr"]],
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
