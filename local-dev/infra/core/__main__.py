@@ -106,6 +106,45 @@ ingress = create_ingress(
     apisix_version=apisix_version,
 )
 
+# ---------------------------------------------------------------------------
+# In-cluster DNS override
+#
+# Public hostnames (sso.ol.<domain>, api.learn.<domain>, etc.) only exist in
+# the developer's /etc/hosts, where they point at 127.0.0.1. Inside a pod that
+# resolves to the pod's own loopback, so server-to-server calls over those
+# hostnames -- APISIX fetching the Keycloak discovery/token endpoints, and
+# cross-app API calls -- fail with "connection refused".
+#
+# k3s mounts a `coredns-custom` ConfigMap into CoreDNS and imports `*.server`
+# files as sibling server blocks. We answer every name in the root domain zone
+# with the APISIX gateway ClusterIP so in-cluster traffic enters through the
+# same ingress the browser uses (TLS + routing handled by APISIX).
+# ---------------------------------------------------------------------------
+apisix_gateway = k8s.core.v1.Service.get(
+    "apisix-gateway-lookup",
+    id="operations/apache-apisix-gateway",
+    opts=_k8s(depends_on=[ingress.apisix]),
+)
+
+k8s.core.v1.ConfigMap(
+    "coredns-custom",
+    metadata={"name": "coredns-custom", "namespace": "kube-system"},
+    data={
+        f"{root_domain}.server": apisix_gateway.spec.cluster_ip.apply(
+            lambda ip: (
+                f"{root_domain}:53 {{\n"
+                "    errors\n"
+                "    cache 30\n"
+                "    template IN A {\n"
+                f'        answer "{{{{ .Name }}}} 60 IN A {ip}"\n'
+                "    }\n"
+                "}\n"
+            )
+        ),
+    },
+    opts=_k8s(depends_on=[ingress.apisix]),
+)
+
 create_cache(_k8s, namespaces["local-infra"])
 
 search = create_search(_k8s, namespaces["local-infra"])

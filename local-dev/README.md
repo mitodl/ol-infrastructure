@@ -84,7 +84,7 @@ From the `ol-infrastructure` repo root:
 
 This will:
 1. Check all prerequisites
-2. Create the `local-dev` k3d cluster with a local image registry on port 5000
+2. Create the `local-dev` k3d cluster with a local image registry on port 5001
 3. Generate a wildcard TLS certificate with `mkcert` (trusted by your OS)
 4. Add all `.dev` hostnames to `/etc/hosts` (requires `sudo`)
 
@@ -187,7 +187,8 @@ ol-infrastructure/
     ├── scripts/
     │   ├── setup.sh                  # One-time bootstrap (cluster, certs, /etc/hosts)
     │   ├── start.sh                  # Start the environment (validate setup, sync deps, tilt up)
-    │   ├── teardown.sh               # Cluster teardown
+    │   ├── stop.sh                   # Pause the cluster (fast resume via start.sh)
+    │   ├── teardown.sh               # Destroy the cluster
     │   └── seed.sh                   # CLI seeding wrapper (kubectl exec into pods)
     │
     ├── certs/                        # mkcert output (gitignored)

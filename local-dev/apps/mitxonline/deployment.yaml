@@ -19,94 +19,111 @@ spec:
         app: mitxonline-webapp
     spec:
       initContainers:
-      - name: bootstrap
-        image: mitodl/mitxonline-app:latest
-        imagePullPolicy: IfNotPresent
-        command:
-        - /bin/sh
-        - -c
-        - |
-          python manage.py collectstatic --noinput --clear
-          python manage.py migrate --noinput
-          python manage.py createcachetable
-          python manage.py configure_wagtail
-        envFrom:
-        - configMapRef:
-            name: mitxonline-env
-        - secretRef:
-            name: mitxonline-secrets
-        volumeMounts:
-        - name: static-files
-          mountPath: /src/staticfiles
-        - name: mkcert-root-ca
-          mountPath: /etc/ssl/local-dev
-          readOnly: true
+        # Merge the image's system CA bundle with the mkcert root so pods trust
+        # both public HTTPS endpoints and local-dev TLS.
+        - name: ca-bundle-merge
+          image: mitodl/mitxonline-app:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+          volumeMounts:
+            - name: mkcert-root-ca
+              mountPath: /mkcert
+              readOnly: true
+            - name: combined-ca
+              mountPath: /etc/ssl/local-dev
+        - name: bootstrap
+          image: mitodl/mitxonline-app:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              python manage.py collectstatic --noinput --clear
+              python manage.py migrate --noinput
+              python manage.py createcachetable
+              python manage.py configure_wagtail
+          envFrom:
+            - configMapRef:
+                name: mitxonline-env
+            - secretRef:
+                name: mitxonline-secrets
+          volumeMounts:
+            - name: static-files
+              mountPath: /src/staticfiles
+            - name: combined-ca
+              mountPath: /etc/ssl/local-dev
+              readOnly: true
       containers:
-      - name: app
-        image: mitodl/mitxonline-app:latest
-        imagePullPolicy: IfNotPresent
-        command:
-        - uwsgi
-        - --http-socket
-        - 0.0.0.0:8011
-        - --module
-        - main.wsgi:application
-        - --workers
-        - "2"
-        - --threads
-        - "2"
-        ports:
-        - containerPort: 8011
-          name: uwsgi
-        envFrom:
-        - configMapRef:
-            name: mitxonline-env
-        - secretRef:
-            name: mitxonline-secrets
-        resources:
-          requests:
-            cpu: 250m
-            memory: 512Mi
-          limits:
-            memory: 1Gi
-        readinessProbe:
-          httpGet:
-            path: /health/readiness
-            port: 8011
-          initialDelaySeconds: 20
-          periodSeconds: 10
-        volumeMounts:
-        - name: static-files
-          mountPath: /src/staticfiles
-        - name: mkcert-root-ca
-          mountPath: /etc/ssl/local-dev
-          readOnly: true
-      - name: nginx
-        image: nginx:1.25-alpine
-        ports:
-        - containerPort: 8010
-          name: http
-        volumeMounts:
-        - name: nginx-conf
-          mountPath: /etc/nginx/conf.d/default.conf
-          subPath: default.conf
-        - name: static-files
-          mountPath: /src/staticfiles
-        resources:
-          requests:
-            cpu: 50m
-            memory: 64Mi
-          limits:
-            memory: 128Mi
+        - name: app
+          image: mitodl/mitxonline-app:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - uwsgi
+            - --http-socket
+            - 0.0.0.0:8011
+            - --module
+            - main.wsgi:application
+            - --workers
+            - "2"
+            - --threads
+            - "2"
+          ports:
+            - containerPort: 8011
+              name: uwsgi
+          envFrom:
+            - configMapRef:
+                name: mitxonline-env
+            - secretRef:
+                name: mitxonline-secrets
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: 8011
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: static-files
+              mountPath: /src/staticfiles
+            - name: combined-ca
+              mountPath: /etc/ssl/local-dev
+              readOnly: true
+        - name: nginx
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 8010
+              name: http
+          volumeMounts:
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+            - name: static-files
+              mountPath: /src/staticfiles
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
       volumes:
-      - name: nginx-conf
-        configMap:
-          name: mitxonline-nginx-conf
-      - name: static-files
-        emptyDir: {}
-      - name: mkcert-root-ca
-        configMap:
-          name: mkcert-root-ca
+        - name: nginx-conf
+          configMap:
+            name: mitxonline-nginx-conf
+        - name: static-files
+          emptyDir: {}
+        - name: mkcert-root-ca
+          configMap:
+            name: mkcert-root-ca
+        - name: combined-ca
+          emptyDir: {}
 ---
 # Celery worker (mitxonline uses a single default queue)
 apiVersion: apps/v1
@@ -126,38 +143,53 @@ spec:
       labels:
         app: mitxonline-celery
     spec:
+      initContainers:
+        - name: ca-bundle-merge
+          image: mitodl/mitxonline-app:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+          volumeMounts:
+            - name: mkcert-root-ca
+              mountPath: /mkcert
+              readOnly: true
+            - name: combined-ca
+              mountPath: /etc/ssl/local-dev
       containers:
-      - name: celery
-        image: mitodl/mitxonline-app:latest
-        imagePullPolicy: IfNotPresent
-        command:
-        - celery
-        - -A
-        - main.celery:app
-        - worker
-        - -Q
-        - default
-        - -c
-        - "2"
-        envFrom:
-        - configMapRef:
-            name: mitxonline-env
-        - secretRef:
-            name: mitxonline-secrets
-        resources:
-          requests:
-            cpu: 100m
-            memory: 256Mi
-          limits:
-            memory: 1Gi
-        volumeMounts:
-        - name: mkcert-root-ca
-          mountPath: /etc/ssl/local-dev
-          readOnly: true
+        - name: celery
+          image: mitodl/mitxonline-app:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - celery
+            - -A
+            - main.celery:app
+            - worker
+            - -Q
+            - default
+            - -c
+            - "2"
+          envFrom:
+            - configMapRef:
+                name: mitxonline-env
+            - secretRef:
+                name: mitxonline-secrets
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+          volumeMounts:
+            - name: combined-ca
+              mountPath: /etc/ssl/local-dev
+              readOnly: true
       volumes:
-      - name: mkcert-root-ca
-        configMap:
-          name: mkcert-root-ca
+        - name: mkcert-root-ca
+          configMap:
+            name: mkcert-root-ca
+        - name: combined-ca
+          emptyDir: {}
 ---
 # Celery beat scheduler
 apiVersion: apps/v1
@@ -177,34 +209,51 @@ spec:
       labels:
         app: mitxonline-celery-beat
     spec:
+      initContainers:
+        - name: ca-bundle-merge
+          image: mitodl/mitxonline-app:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+          volumeMounts:
+            - name: mkcert-root-ca
+              mountPath: /mkcert
+              readOnly: true
+            - name: combined-ca
+              mountPath: /etc/ssl/local-dev
       containers:
-      - name: celery-beat
-        image: mitodl/mitxonline-app:latest
-        imagePullPolicy: IfNotPresent
-        command:
-        - celery
-        - -A
-        - main.celery:app
-        - beat
-        envFrom:
-        - configMapRef:
-            name: mitxonline-env
-        - secretRef:
-            name: mitxonline-secrets
-        resources:
-          requests:
-            cpu: 50m
-            memory: 128Mi
-          limits:
-            memory: 256Mi
-        volumeMounts:
-        - name: mkcert-root-ca
-          mountPath: /etc/ssl/local-dev
-          readOnly: true
+        - name: celery-beat
+          image: mitodl/mitxonline-app:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - celery
+            - -A
+            - main.celery:app
+            - beat
+            - --schedule
+            - /tmp/celerybeat-schedule
+          envFrom:
+            - configMapRef:
+                name: mitxonline-env
+            - secretRef:
+                name: mitxonline-secrets
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: combined-ca
+              mountPath: /etc/ssl/local-dev
+              readOnly: true
       volumes:
-      - name: mkcert-root-ca
-        configMap:
-          name: mkcert-root-ca
+        - name: mkcert-root-ca
+          configMap:
+            name: mkcert-root-ca
+        - name: combined-ca
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -217,6 +266,6 @@ spec:
   selector:
     app: mitxonline-webapp
   ports:
-  - name: http
-    port: 8010
-    targetPort: http
+    - name: http
+      port: 8010
+      targetPort: http

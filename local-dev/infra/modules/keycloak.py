@@ -261,13 +261,13 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     ol_profile_scope = keycloak.openid.ClientScope(
         "ol-profile-client-scope",
         name="ol-profile",
-        realm_id=realm.id,
+        realm_id=realm.realm,
         opts=kc_opts,
     )
 
     keycloak.openid.UserAttributeProtocolMapper(
         "email-optin-mapper",
-        realm_id=realm.id,
+        realm_id=realm.realm,
         client_scope_id=ol_profile_scope.id,
         name="email-optin-mapper",
         user_attribute="emailOptIn",
@@ -276,7 +276,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     )
     keycloak.openid.UserAttributeProtocolMapper(
         "fullname-mapper",
-        realm_id=realm.id,
+        realm_id=realm.realm,
         client_scope_id=ol_profile_scope.id,
         name="fullname-mapper",
         user_attribute="fullName",
@@ -289,15 +289,15 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     # -------------------------------------------------------------------------
 
     ol_first_login_flow = create_organization_first_broker_login_flows(
-        realm.id, "olapps", opts=kc_opts
+        realm.realm, "olapps", opts=kc_opts
     )
     ol_browser_flow = create_organization_browser_flows(
-        realm.id, "olapps", opts=kc_opts
+        realm.realm, "olapps", opts=kc_opts
     )
 
     keycloak.authentication.Bindings(
         "ol-apps-flow-bindings",
-        realm_id=realm.id,
+        realm_id=realm.realm,
         browser_flow=ol_browser_flow.alias,
         first_broker_login_flow=ol_first_login_flow.alias,
         opts=kc_opts,
@@ -372,7 +372,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     ue_client = keycloak.openid.Client(
         "olapps-unified-ecommerce-client",
         name="ol-unified-ecommerce-client",
-        realm_id=realm.id,
+        realm_id=realm.realm,
         client_id="ol-unified-ecommerce-client",
         client_secret=unified_ecommerce_client_secret,
         enabled=True,
@@ -386,7 +386,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     )
     keycloak.openid.ClientDefaultScopes(
         "olapps-ue-default-scopes",
-        realm_id=realm.id,
+        realm_id=realm.realm,
         client_id=ue_client.id,
         default_scopes=DEFAULT_SCOPES,
         opts=kc_opts,
@@ -403,7 +403,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     learn_ai_client = keycloak.openid.Client(
         "olapps-learn-ai-client",
         name="ol-learn-ai-client",
-        realm_id=realm.id,
+        realm_id=realm.realm,
         client_id="ol-learn-ai-client",
         client_secret=learn_ai_client_secret,
         enabled=True,
@@ -418,7 +418,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     )
     keycloak.openid.ClientDefaultScopes(
         "olapps-learn-ai-default-scopes",
-        realm_id=realm.id,
+        realm_id=realm.realm,
         client_id=learn_ai_client.id,
         default_scopes=DEFAULT_SCOPES,
         opts=kc_opts,
@@ -435,7 +435,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     mitlearn_client = keycloak.openid.Client(
         "olapps-mitlearn-client",
         name="ol-mitlearn-client",
-        realm_id=realm.id,
+        realm_id=realm.realm,
         client_id="ol-mitlearn-client",
         client_secret=mitlearn_client_secret,
         enabled=True,
@@ -452,7 +452,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     )
     keycloak.openid.ClientDefaultScopes(
         "olapps-mitlearn-default-scopes",
-        realm_id=realm.id,
+        realm_id=realm.realm,
         client_id=mitlearn_client.id,
         default_scopes=DEFAULT_SCOPES,
         opts=kc_opts,
@@ -469,7 +469,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     mitxonline_client = keycloak.openid.Client(
         "olapps-mitxonline-client",
         name="ol-mitxonline-client",
-        realm_id=realm.id,
+        realm_id=realm.realm,
         client_id="ol-mitxonline-client",
         client_secret=mitxonline_client_secret,
         enabled=True,
@@ -485,7 +485,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     )
     keycloak.openid.ClientDefaultScopes(
         "olapps-mitxonline-default-scopes",
-        realm_id=realm.id,
+        realm_id=realm.realm,
         client_id=mitxonline_client.id,
         default_scopes=DEFAULT_SCOPES,
         opts=kc_opts,
@@ -502,7 +502,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     mitxonline_b2b_client = keycloak.openid.Client(
         "olapps-mitxonline-b2b-client",
         name="mitxonline-b2b-client",
-        realm_id=realm.id,
+        realm_id=realm.realm,
         client_id="mitxonline-b2b-client",
         enabled=True,
         access_type="CONFIDENTIAL",
@@ -515,7 +515,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     )
 
     realm_management_client = keycloak.openid.get_client_output(
-        realm_id=realm.id,
+        realm_id=realm.realm,
         client_id="realm-management",
         opts=InvokeOptions(provider=keycloak_provider),
     )
@@ -527,7 +527,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     ]:
         keycloak.openid.ClientServiceAccountRole(
             f"olapps-mitxonline-{resource_name}",
-            realm_id=realm.id,
+            realm_id=realm.realm,
             service_account_user_id=mitxonline_b2b_client.service_account_user_id,
             client_id=realm_management_client.id,
             role=role,
@@ -559,7 +559,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
 
     fake_touchstone = keycloak.saml.IdentityProvider(
         "fake-touchstone",
-        realm=realm.id,
+        realm=realm.realm,
         alias="fake-touchstone",
         display_name="Fake Touchstone",
         entity_id=f"{keycloak_url}/realms/olapps",
@@ -588,7 +588,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     ]:
         keycloak.AttributeImporterIdentityProviderMapper(
             f"fake-touchstone-{mapper_name}",
-            realm=realm.id,
+            realm=realm.realm,
             attribute_name=attr_name,
             identity_provider_alias=fake_touchstone.alias,
             user_attribute=user_attr,

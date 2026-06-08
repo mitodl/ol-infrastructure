@@ -16,7 +16,10 @@ data:
   ODL_VIDEO_LOG_LEVEL: "INFO"
   NODE_ENV: "production"
   USE_SHIBBOLETH: "False"
-  DEBUG: "True"
+  # DEBUG must stay False: the prod image does not ship the nplusone profiler,
+  # which settings.py imports unconditionally when DEBUG is True, crashing the
+  # app. Auth is handled by USE_SHIBBOLETH=False, not DEBUG.
+  DEBUG: "False"
   ALLOWED_HOSTS: "*"
   USE_X_FORWARDED_HOST: "True"
   USE_X_FORWARDED_PORT: "True"
