@@ -527,6 +527,12 @@ def create_k8s_configmaps(  # noqa: PLR0915
     cms_general_config_content["FEATURES"] = cms_features
 
     cms_flat, cms_complex = partition_config(cms_general_config_content)
+    # BULK_EMAIL settings are LMS-only in edx-platform base settings and not
+    # available in the CMS settings context. Inject them directly into the YAML
+    # config (not env vars) so Django picks them up when CMS Celery workers
+    # import LMS modules that access these settings at module level.
+    cms_complex["BULK_EMAIL_DEFAULT_RETRY_DELAY"] = 30
+    cms_complex["BULK_EMAIL_MAX_RETRIES"] = 5
 
     cms_general_config_map = kubernetes.core.v1.ConfigMap(
         f"ol-{stack_info.env_prefix}-edxapp-cms-general-config-{stack_info.env_suffix}",
@@ -613,6 +619,8 @@ def create_k8s_configmaps(  # noqa: PLR0915
         "API_DOCUMENTATION_URL": "http://course-catalog-api-guide.readthedocs.io/en/latest/",
         "AUDIT_CERT_CUTOFF_DATE": None,
         "AUTH_DOCUMENTATION_URL": "http://course-catalog-api-guide.readthedocs.io/en/latest/authentication/index.html",
+        "BULK_EMAIL_DEFAULT_RETRY_DELAY": 30,
+        "BULK_EMAIL_MAX_RETRIES": 5,
         "BULK_EMAIL_ROUTING_KEY_SMALL_JOBS": "edx.lms.core.default",
         "COMMUNICATIONS_MICROFRONTEND_URL": "/communications",
         "CONTACT_MAILING_ADDRESS": "SET-ME-PLEASE",

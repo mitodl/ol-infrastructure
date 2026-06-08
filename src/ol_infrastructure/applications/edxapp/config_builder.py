@@ -260,6 +260,12 @@ def build_base_general_config() -> ConfigDict:
         "CSRF_COOKIE_MASKED": False,
         "DASHBOARD_COURSE_LIMIT": None,
         "DATA_DIR": "/openedx/data",
+        "COURSES_ROOT": "/openedx/data",
+        "COMMON_ROOT": "/openedx/edx-platform/common",
+        "ENV_ROOT": "/openedx",
+        "OPENEDX_ROOT": "/openedx/edx-platform/openedx",
+        "REPO_ROOT": "/openedx/edx-platform",
+        "XMODULE_ROOT": "/openedx/edx-platform/xmodule",
         "DEFAULT_COURSE_VISIBILITY_IN_CATALOG": "both",
         "DEFAULT_FILE_STORAGE": "storages.backends.s3boto3.S3Boto3Storage",
         "DEFAULT_MOBILE_AVAILABLE": False,
@@ -308,7 +314,7 @@ def build_base_general_config() -> ConfigDict:
         "LOGGING_ENV": "sandbox",
         "LOG_DIR": "/openedx/data/var/log/edx",
         "MAINTENANCE_BANNER_TEXT": "Sample banner message",
-        "MEDIA_ROOT": "media/",
+        "MEDIA_ROOT": "/openedx/data/media/",
         "MEDIA_URL": "/media/",
         "MICROSITE_CONFIGURATION": {},
         "MKTG_URL_LINK_MAP": {
@@ -375,6 +381,8 @@ def build_base_general_config() -> ConfigDict:
         "SESSION_COOKIE_SAMESITE_FORCE_ALL": True,
         "SESSION_COOKIE_SECURE": True,
         "SESSION_SAVE_EVERY_REQUEST": False,
+        "SOCIAL_MEDIA_FOOTER_NAMES": [],
+        "SOCIAL_MEDIA_FOOTER_DISPLAY": {},
         "SOCIAL_MEDIA_FOOTER_URLS": {},
         "SOCIAL_MEDIA_FOOTER_ACE_URLS": {},
         "SOCIAL_MEDIA_LOGO_URLS": {},
@@ -466,6 +474,7 @@ def build_base_general_config() -> ConfigDict:
         "SHOW_BUMPER_PERIODICITY": 7 * 24 * 3600,  # 7 days in seconds
         "SHOW_FOOTER_LANGUAGE_SELECTOR": False,
         "SHOW_HEADER_LANGUAGE_SELECTOR": False,
+        "SURVEY_REPORT_ENABLE": False,
         "CERTIFICATES_HTML_VIEW": False,
         # ============================================================================
         # FEATURES dict - for remaining feature flags without module-level equivalents
@@ -519,6 +528,21 @@ def build_base_general_config() -> ConfigDict:
             "RESTRICT_ENROLL_BY_REG_METHOD": False,
             "SESSION_COOKIE_SECURE": True,
             "SKIP_EMAIL_VALIDATION": True,
+            "SQUELCH_PII_IN_LOGS": True,
+            # Compatibility mirror for code paths that still read settings.FEATURES[...] directly.
+            "DISABLE_START_DATES": False,
+            "EMBARGO": True,
+            "ENABLE_CORS_HEADERS": True,
+            "ENABLE_DISCUSSION_SERVICE": True,
+            "ENABLE_MKTG_SITE": False,
+            "ENABLE_MOBILE_REST_API": True,
+            "ENABLE_OAUTH2_PROVIDER": True,
+            "ENABLE_SPECIAL_EXAMS": True,
+            "ENABLE_TEAMS": True,
+            "ENABLE_TEXTBOOK": True,
+            "ENABLE_PREREQUISITE_COURSES": False,
+            "SHOW_FOOTER_LANGUAGE_SELECTOR": False,
+            "SHOW_HEADER_LANGUAGE_SELECTOR": False,
         },
     }
 
