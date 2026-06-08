@@ -932,12 +932,19 @@ if site_project_deployment:
 # Optionally build Site Project VCL snippets.
 _site_project_snippets: list[fastly.ServiceVclSnippetArgs] = []
 if site_project_deployment:
+    if not site_project_mfe_apps:
+        msg = (
+            "edxapp:site_project.mfe_apps must be a non-empty list "
+            "when edxapp:site_project is configured"
+        )
+        raise ValueError(msg)
     _sp = site_project_deployment
     _apps_alt = "|".join(site_project_mfe_apps)
     _site_project_snippets.append(
         fastly.ServiceVclSnippetArgs(
             content=textwrap.dedent(
                 f"""\
+                unset req.http.X-Site-Project;
                 if (req.url.path ~ "^/apps/{_sp}-site/") {{
                   set req.http.X-Site-Project = "1";
                   set req.url = regsub(req.url.path, "^/apps/", "/");

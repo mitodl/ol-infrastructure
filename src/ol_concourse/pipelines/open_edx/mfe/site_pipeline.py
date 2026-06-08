@@ -245,7 +245,6 @@ def site_build_job(
 def site_promote_job(
     env: SiteProjectEnv,
     source_env: SiteProjectEnv,
-    previous_job: Job,
     trigger_resource: Identifier,
 ) -> PipelineFragment:
     """Generate a QA or Production promotion job.
@@ -263,7 +262,6 @@ def site_promote_job(
         GetStep(
             get=trigger_resource,
             trigger=True,
-            passed=[previous_job.name],
         ),
         TaskStep(
             attempts=3,
@@ -317,11 +315,18 @@ def site_pipeline(deployment_name: str) -> Pipeline:
     Produces three jobs: CI (build + upload via Dagger), QA (rclone promote),
     Production (rclone promote).  Called by meta.py analogously to pipeline.py.
     """
-    project = next(p for p in SITE_PROJECTS if p.deployment_name == deployment_name)
+    _by_name = {p.deployment_name: p for p in SITE_PROJECTS}
+    project = _by_name.get(deployment_name)
+    if project is None:
+        supported = ", ".join(_by_name)
+        msg = (
+            f"Unknown deployment {deployment_name!r}. "
+            f"Supported deployments: {supported}"
+        )
+        raise SystemExit(msg)
     ci_env, qa_env, prod_env = project.envs
 
     ci_fragment = site_build_job(ci_env)
-    ci_job = ci_fragment.jobs[0]
 
     ci_trigger = _gh_issues_trigger(deployment_name, ci_env.environment_stage)
     if ci_trigger.name is None:
@@ -331,10 +336,8 @@ def site_pipeline(deployment_name: str) -> Pipeline:
     qa_fragment = site_promote_job(
         env=qa_env,
         source_env=ci_env,
-        previous_job=ci_job,
         trigger_resource=ci_trigger.name,
     )
-    qa_job = qa_fragment.jobs[0]
 
     qa_trigger = _gh_issues_trigger(deployment_name, qa_env.environment_stage)
     if qa_trigger.name is None:
@@ -344,7 +347,6 @@ def site_pipeline(deployment_name: str) -> Pipeline:
     prod_fragment = site_promote_job(
         env=prod_env,
         source_env=qa_env,
-        previous_job=qa_job,
         trigger_resource=qa_trigger.name,
     )
 
