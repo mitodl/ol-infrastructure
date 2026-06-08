@@ -599,7 +599,6 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0913, PLR0915
             "basic",
             "email",
             "ol_roles",
-            "openid",
             "profile",
             "roles",
             "web-origins",
