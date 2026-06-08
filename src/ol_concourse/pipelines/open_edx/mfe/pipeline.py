@@ -22,8 +22,12 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from ol_concourse.lib.resource_types import github_issues_resource, rclone
-from ol_concourse.lib.resources import git_repo, github_issues
+from ol_concourse.lib.resource_types import (
+    fastly_resource_type,
+    github_issues_resource,
+    rclone,
+)
+from ol_concourse.lib.resources import fastly_service, git_repo, github_issues
 from pydantic import BaseModel
 
 from bridge.settings.github.team_members import DEVOPS_MIT
@@ -83,6 +87,7 @@ class OpenEdxVars(BaseModel):
     enable_auto_language_selection: Literal["true", "false"] | None = None
     enable_tagging_taxonomy_pages: Literal["true", "false"] | None = None
     enable_course_import_in_library: Literal["true", "false"] | None = None
+    purge_fastly_cache: bool = True
 
     @property
     def release_name(self) -> OpenEdxSupportedRelease:
@@ -159,7 +164,7 @@ def mfe_params(
     }
 
 
-def mfe_job(  # noqa: C901, PLR0915
+def mfe_job(  # noqa: C901, PLR0912, PLR0915
     open_edx: OpenEdxVars,
     mfe: OpenEdxApplicationVersion,
     open_edx_deployment: DeploymentEnvRelease,
@@ -332,6 +337,16 @@ def mfe_job(  # noqa: C901, PLR0915
         ),
     )
 
+    fastly_resource = (
+        fastly_service(
+            name=Identifier(f"fastly-{open_edx.environment}"),
+            domain=open_edx.lms_domain,
+            check_every="never",
+        )
+        if open_edx.purge_fastly_cache
+        else None
+    )
+
     mfe_build_plan = [
         TaskStep(
             attempts=3,
@@ -391,6 +406,19 @@ def mfe_job(  # noqa: C901, PLR0915
                 ],
             },
         ),
+        *(
+            [
+                PutStep(
+                    put=fastly_resource.name,
+                    params={
+                        "mode": "url",
+                        "url": f"https://{open_edx.lms_domain}/{mfe.application.path}/",
+                    },
+                )
+            ]
+            if fastly_resource is not None
+            else []
+        ),
     ]
 
     # GitHub Issue resource for success notification
@@ -436,8 +464,11 @@ def mfe_job(  # noqa: C901, PLR0915
         plan=mfe_setup_plan + mfe_build_plan,
         on_success=create_gh_issue,
     )
+    fragment_resources = [mfe_repo, mfe_configs, gh_issues_post]
+    if fastly_resource is not None:
+        fragment_resources.append(fastly_resource)
     return PipelineFragment(
-        resources=[mfe_repo, mfe_configs, gh_issues_post],
+        resources=fragment_resources,
         jobs=[mfe_job_definition],
     )
 
@@ -515,6 +546,7 @@ def mfe_pipeline(
         resource_types=[
             rclone(),
             github_issues_resource(),
+            fastly_resource_type(),
             *combined_fragments.resource_types,
         ],
         resources=[

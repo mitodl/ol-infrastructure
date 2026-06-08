@@ -1,3 +1,5 @@
+"""Environment variable values for MFE pipelines across all Open edX deployments."""
+
 from ol_concourse.pipelines.open_edx.mfe.pipeline import OpenEdxVars
 
 mitx = [
@@ -6,6 +8,7 @@ mitx = [
         environment_stage="CI",
         enable_certificate_page="false",
         deployment_name="mitx",
+        purge_fastly_cache=False,
         favicon_url="https://lms-ci.mitx.mit.edu/static/mitx/images/favicon.ico",
         lms_domain="lms-ci.mitx.mit.edu",
         logo_url="https://lms-ci.mitx.mit.edu/static/mitx/images/logo.svg",
@@ -58,6 +61,7 @@ mitx_staging = [
         environment="mitx-staging-ci",
         environment_stage="CI",
         enable_certificate_page="false",
+        purge_fastly_cache=False,
         favicon_url="https://staging-ci.mitx.mit.edu/static/mitx-staging/images/favicon.ico",
         lms_domain="staging-ci.mitx.mit.edu",
         logo_url="https://staging-ci.mitx.mit.edu/static/mitx-staging/images/logo.svg",
@@ -111,6 +115,7 @@ mitxonline = [
         display_feedback_widget="false",
         environment="mitxonline-ci",
         environment_stage="CI",
+        purge_fastly_cache=False,
         enable_certificate_page="false",
         favicon_url="https://courses.ci.learn.mit.edu/static/mitxonline/images/favicon.ico",
         honor_code_url="https://ci.mitxonline.mit.edu/honor-code/",
@@ -207,6 +212,7 @@ xpro = [
         deployment_name="xpro",
         environment="xpro-ci",
         environment_stage="CI",
+        purge_fastly_cache=False,
         enable_certificate_page="false",
         favicon_url="https://courses-ci.xpro.mit.edu/static/xpro/images/favicon.ico",
         honor_code_url="https://ci.xpro.mit.edu/honor-code/",
