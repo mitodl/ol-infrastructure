@@ -245,10 +245,14 @@ def fetch_all_cluster_configs(mode: AccessMode) -> list[ClusterConfig]:
 
 
 def kubeconfig_exec_args(cluster: ClusterConfig, mode: AccessMode) -> list[str]:
-    """Build exec args for a kubeconfig user entry."""
+    """Build exec args for a kubeconfig user entry.
+
+    Uses the venv Python that is running this script as the interpreter so the
+    exec-credential command is immune to working-directory and environment
+    differences (e.g. when called by GUI tools such as Headlamp that spawn
+    subprocesses with a reduced environment).
+    """
     args = [
-        "run",
-        "python",
         str(Path(__file__).resolve()),
         "exec-credential",
         "--cluster-name",
@@ -328,7 +332,7 @@ def build_kubeconfig(
                     "user": {
                         "exec": {
                             "apiVersion": "client.authentication.k8s.io/v1beta1",
-                            "command": "uv",
+                            "command": sys.executable,
                             "args": kubeconfig_exec_args(cluster, operator_mode),
                             "interactiveMode": "IfAvailable",
                             "provideClusterInfo": False,
@@ -355,7 +359,7 @@ def build_kubeconfig(
                     "user": {
                         "exec": {
                             "apiVersion": "client.authentication.k8s.io/v1beta1",
-                            "command": "uv",
+                            "command": sys.executable,
                             "args": kubeconfig_exec_args(cluster, AccessMode.READONLY),
                             "interactiveMode": "IfAvailable",
                             "provideClusterInfo": False,
@@ -380,7 +384,7 @@ def build_kubeconfig(
                     "user": {
                         "exec": {
                             "apiVersion": "client.authentication.k8s.io/v1beta1",
-                            "command": "uv",
+                            "command": sys.executable,
                             "args": kubeconfig_exec_args(cluster, AccessMode.READONLY),
                             "interactiveMode": "IfAvailable",
                             "provideClusterInfo": False,
