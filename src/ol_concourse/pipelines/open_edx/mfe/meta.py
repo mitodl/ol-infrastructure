@@ -51,6 +51,7 @@ def meta_job(
                     ),
                     inputs=[Input(name=Identifier("mfe-pipeline-definitions"))],
                     outputs=[Output(name=Identifier("pipeline"))],
+                    params={"PYTHONPATH": "../mfe-pipeline-definitions/src"},
                     run=Command(
                         path="python",
                         dir="pipeline",
@@ -116,6 +117,7 @@ def meta_pipeline() -> Pipeline:
                         ),
                         inputs=[Input(name=Identifier("mfe-pipeline-definitions"))],
                         outputs=[Output(name=Identifier("pipeline"))],
+                        params={"PYTHONPATH": "../mfe-pipeline-definitions/src"},
                         run=Command(
                             path="python",
                             dir="pipeline",

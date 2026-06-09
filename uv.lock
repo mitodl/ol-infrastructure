@@ -1430,8 +1430,8 @@ dependencies = [
     { name = "hvac", extra = ["parser"] },
     { name = "kubernetes" },
     { name = "ol-concourse" },
+    { name = "ol-parliament" },
     { name = "packaging" },
-    { name = "parliament" },
     { name = "pulumi" },
     { name = "pulumi-aws" },
     { name = "pulumi-aws-native" },
@@ -1483,8 +1483,8 @@ requires-dist = [
     { name = "hvac", extras = ["parser"], specifier = ">=2.0.0,<3" },
     { name = "kubernetes", specifier = ">=34.1.0" },
     { name = "ol-concourse", specifier = ">=0.8.4,<0.9" },
+    { name = "ol-parliament", specifier = ">=1.7.0" },
     { name = "packaging", specifier = ">=24.2" },
-    { name = "parliament", git = "https://github.com/mitodl/parliament" },
     { name = "pulumi", specifier = ">=3.39.1,<4" },
     { name = "pulumi-aws", specifier = ">=7.1,<8" },
     { name = "pulumi-aws-native", specifier = ">=1.25.0,<2" },
@@ -1525,6 +1525,21 @@ dev = [
     { name = "pytest-testinfra", specifier = ">=10.0.0,<11" },
     { name = "ruff", specifier = ">=0.12,<1" },
     { name = "types-boto3", specifier = ">=1.42.65" },
+]
+
+[[package]]
+name = "ol-parliament"
+version = "1.7.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "boto3" },
+    { name = "jmespath" },
+    { name = "json-cfg" },
+    { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3b/1e/c91f9efbaa4fc2d5b0943f781062b51b2360b9fa47ce4b306d4bb8faee37/ol_parliament-1.7.0.tar.gz", hash = "sha256:8a2899108904c4122e7c42f0af9752d8d51df5c8e31bc812a053f7586ee1e203", size = 680329, upload-time = "2026-05-28T18:33:36.279Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/87/47/2e46ecdcabeb0486f7e687fc67b8186e188875c756a04ab0ee8fbf59d4ab/ol_parliament-1.7.0-py3-none-any.whl", hash = "sha256:9ecc61c90df02d96444c5d8ff825db5bab0f37cefaddbcb33db90aabceca1b4a", size = 715211, upload-time = "2026-05-28T18:33:34.749Z" },
 ]
 
 [[package]]
@@ -1660,17 +1675,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/1f/e7/81fdcbc7f190cdb058cffc9431587eb289833bdd633e2002455ca9bb13d4/paramiko-4.0.0.tar.gz", hash = "sha256:6a25f07b380cc9c9a88d2b920ad37167ac4667f8d9886ccebd8f90f654b5d69f", size = 1630743, upload-time = "2025-08-04T01:02:03.711Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a9/90/a744336f5af32c433bd09af7854599682a383b37cfd78f7de263de6ad6cb/paramiko-4.0.0-py3-none-any.whl", hash = "sha256:0e20e00ac666503bf0b4eda3b6d833465a2b7aff2e2b3d79a8bba5ef144ee3b9", size = 223932, upload-time = "2025-08-04T01:02:02.029Z" },
-]
-
-[[package]]
-name = "parliament"
-version = "1.7.0"
-source = { git = "https://github.com/mitodl/parliament#504b694459dc1852ee48ec2950ae83ef01cde78b" }
-dependencies = [
-    { name = "boto3" },
-    { name = "jmespath" },
-    { name = "json-cfg" },
-    { name = "pyyaml" },
 ]
 
 [[package]]
