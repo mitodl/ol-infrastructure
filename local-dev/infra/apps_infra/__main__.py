@@ -46,9 +46,6 @@ unified_ecommerce_client_secret = config.require_secret(
     "unified_ecommerce_client_secret"
 )
 
-_infra_dir = Path(__file__).parent.parent
-_repo_root = _infra_dir.parent.parent
-
 # ---------------------------------------------------------------------------
 # Kubernetes provider
 # ---------------------------------------------------------------------------

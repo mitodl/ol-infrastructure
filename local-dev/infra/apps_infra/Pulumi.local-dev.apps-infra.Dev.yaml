@@ -12,5 +12,4 @@ config:
   ol-local-dev-apps-infra:learn_ai_client_secret: "local-dev-learn-ai-secret" # pragma: allowlist secret
   ol-local-dev-apps-infra:mitxonline_client_secret: "local-dev-mitxonline-secret" # pragma: allowlist secret
   ol-local-dev-apps-infra:unified_ecommerce_client_secret: "local-dev-unified-ecommerce-secret" # pragma: allowlist secret
-  ol-local-dev-apps-infra:apisix_oidc_session_secret: "local-dev-apisix-oidc-session-secret" # pragma: allowlist secret
 encryptionsalt: v1:PidwC1BukA0=:v1:fQSvxydFUaIrKsEE:C/DV/mn+diHPVUfZrl/5F5QXOYhEuw==
