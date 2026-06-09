@@ -5,6 +5,8 @@ from __future__ import annotations
 import importlib.util
 import sys
 from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 import yaml
@@ -31,86 +33,173 @@ def eks_module():
     return load_eks_module()
 
 
-@pytest.mark.unit
-def test_cluster_name_for_stack(eks_module):
-    """Cluster names should be derived from Pulumi stack names."""
-    assert eks_module.cluster_name_for_stack("applications.QA") == "applications-qa"
-    assert eks_module.cluster_name_for_stack("operations.Production") == (
-        "operations-production"
-    )
+@pytest.fixture
+def two_clusters(eks_module):
+    """Two ClusterConfig fixtures covering common test cases."""
+    return [
+        eks_module.ClusterConfig(
+            cluster_name="applications-qa",
+            server="https://applications-qa.example.invalid",
+            certificate_authority_data="ca1",
+            admin_role_arn="arn:aws:iam::123456789012:role/applications-qa-admin",
+        ),
+        eks_module.ClusterConfig(
+            cluster_name="data-production",
+            server="https://data-production.example.invalid",
+            certificate_authority_data="ca2",
+            admin_role_arn="arn:aws:iam::123456789012:role/data-production-admin",
+        ),
+    ]
+
+
+# ---------------------------------------------------------------------------
+# build_kubeconfig — developer mode (dual contexts)
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-def test_read_stack_names_uses_current_eks_stack_files(
-    tmp_path, eks_module, monkeypatch
+def test_build_kubeconfig_developer_mode_produces_dual_contexts(
+    eks_module, two_clusters
 ):
-    """Stack discovery should use sorted Pulumi stack config filenames."""
-    for filename in [
-        "Pulumi.operations.QA.yaml",
-        "Pulumi.applications.CI.yaml",
-        "Pulumi.data.Production.yaml",
-    ]:
-        (tmp_path / filename).write_text("config: {}\n")
+    """Developer mode: one operator context and one readonly context per cluster."""
+    kubeconfig = eks_module.build_kubeconfig(
+        two_clusters, eks_module.AccessMode.DEVELOPER, None
+    )
 
-    monkeypatch.setattr(eks_module, "PULUMI_EKS_PROJECT_DIR", tmp_path)
-
-    assert eks_module.read_stack_names() == [
-        "applications.CI",
-        "data.Production",
-        "operations.QA",
+    context_names = [ctx["name"] for ctx in kubeconfig["contexts"]]
+    assert context_names == [
+        "applications-qa",
+        "applications-qa-readonly",
+        "data-production",
+        "data-production-readonly",
     ]
 
 
 @pytest.mark.unit
-def test_build_kubeconfig_for_readonly_mode(eks_module):
-    """Readonly kubeconfigs should call the exec helper without admin role args."""
-    cluster = eks_module.ClusterConfig(
-        cluster_name="applications-qa",
-        stack_name="applications.QA",
-        server="https://example.invalid",
-        certificate_authority_data="abc123",
-        admin_role_arn="arn:aws:iam::123456789012:role/admin",
-    )
-
+def test_build_kubeconfig_developer_operator_context_uses_developer_exec(
+    eks_module, two_clusters
+):
+    """The operator context's exec args should include --mode developer."""
     kubeconfig = eks_module.build_kubeconfig(
-        [cluster], eks_module.AccessMode.READONLY, None
+        two_clusters, eks_module.AccessMode.DEVELOPER, None
     )
 
-    assert kubeconfig["clusters"][0]["name"] == "applications-qa"
-    assert kubeconfig["contexts"][0]["name"] == "applications-qa"
+    operator_user = next(
+        u for u in kubeconfig["users"] if u["name"] == "applications-qa-developer"
+    )
+    args = operator_user["user"]["exec"]["args"]
+    assert "--mode" in args
+    assert args[args.index("--mode") + 1] == "developer"
+    assert "--admin-role-arn" not in args
+
+
+@pytest.mark.unit
+def test_build_kubeconfig_developer_readonly_context_uses_readonly_exec(
+    eks_module, two_clusters
+):
+    """The readonly context's exec args should include --mode readonly."""
+    kubeconfig = eks_module.build_kubeconfig(
+        two_clusters, eks_module.AccessMode.DEVELOPER, None
+    )
+
+    readonly_user = next(
+        u for u in kubeconfig["users"] if u["name"] == "applications-qa-readonly"
+    )
+    args = readonly_user["user"]["exec"]["args"]
+    assert "--mode" in args
+    assert args[args.index("--mode") + 1] == "readonly"
+
+
+@pytest.mark.unit
+def test_build_kubeconfig_developer_current_context_is_operator(
+    eks_module, two_clusters
+):
+    """Default current-context should be the operator context, not the readonly one."""
+    kubeconfig = eks_module.build_kubeconfig(
+        two_clusters, eks_module.AccessMode.DEVELOPER, None
+    )
+    # PREFERRED_DEFAULT_CONTEXT is "applications-qa"
     assert kubeconfig["current-context"] == "applications-qa"
-    exec_config = kubeconfig["users"][0]["user"]["exec"]
-    assert exec_config["command"] == "uv"
-    assert exec_config["args"][:3] == [
-        "run",
-        "python",
-        str(Path(eks_module.__file__).resolve()),
-    ]
-    assert "exec-credential" in exec_config["args"]
-    assert "readonly" in exec_config["args"]
-    assert "--admin-role-arn" not in exec_config["args"]
+
+
+# ---------------------------------------------------------------------------
+# build_kubeconfig — admin mode (dual contexts)
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-def test_build_kubeconfig_for_admin_mode_includes_admin_role(eks_module):
-    """Admin kubeconfigs should pass the cluster-specific admin role ARN."""
-    cluster = eks_module.ClusterConfig(
-        cluster_name="operations-production",
-        stack_name="operations.Production",
-        server="https://example.invalid",
-        certificate_authority_data="xyz789",
-        admin_role_arn="arn:aws:iam::123456789012:role/cluster-admin",
-    )
-
+def test_build_kubeconfig_admin_mode_produces_dual_contexts(eks_module, two_clusters):
+    """Admin mode should emit one admin context and one readonly context per cluster."""
     kubeconfig = eks_module.build_kubeconfig(
-        [cluster], eks_module.AccessMode.ADMIN, "operations-production"
+        two_clusters, eks_module.AccessMode.ADMIN, None
     )
 
-    assert kubeconfig["current-context"] == "operations-production"
-    exec_args = kubeconfig["users"][0]["user"]["exec"]["args"]
-    assert "admin" in exec_args
-    assert "--admin-role-arn" in exec_args
-    assert "arn:aws:iam::123456789012:role/cluster-admin" in exec_args
+    context_names = [ctx["name"] for ctx in kubeconfig["contexts"]]
+    assert context_names == [
+        "applications-qa",
+        "applications-qa-readonly",
+        "data-production",
+        "data-production-readonly",
+    ]
+
+
+@pytest.mark.unit
+def test_build_kubeconfig_admin_operator_context_includes_admin_role(
+    eks_module, two_clusters
+):
+    """The admin operator context should pass --admin-role-arn in exec args."""
+    kubeconfig = eks_module.build_kubeconfig(
+        two_clusters, eks_module.AccessMode.ADMIN, "data-production"
+    )
+
+    assert kubeconfig["current-context"] == "data-production"
+    admin_user = next(
+        u for u in kubeconfig["users"] if u["name"] == "applications-qa-admin"
+    )
+    args = admin_user["user"]["exec"]["args"]
+    assert "--admin-role-arn" in args
+    assert "arn:aws:iam::123456789012:role/applications-qa-admin" in args
+
+
+@pytest.mark.unit
+def test_build_kubeconfig_admin_readonly_context_does_not_include_admin_role(
+    eks_module, two_clusters
+):
+    """The readonly context paired with admin mode must not pass an admin role ARN."""
+    kubeconfig = eks_module.build_kubeconfig(
+        two_clusters, eks_module.AccessMode.ADMIN, None
+    )
+
+    readonly_user = next(
+        u for u in kubeconfig["users"] if u["name"] == "applications-qa-readonly"
+    )
+    args = readonly_user["user"]["exec"]["args"]
+    assert "--admin-role-arn" not in args
+    assert args[args.index("--mode") + 1] == "readonly"
+
+
+# ---------------------------------------------------------------------------
+# build_kubeconfig — readonly mode (single contexts)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_build_kubeconfig_readonly_mode_produces_single_contexts(
+    eks_module, two_clusters
+):
+    """Readonly mode: single context per cluster, no -readonly suffix."""
+    kubeconfig = eks_module.build_kubeconfig(
+        two_clusters, eks_module.AccessMode.READONLY, None
+    )
+
+    context_names = [ctx["name"] for ctx in kubeconfig["contexts"]]
+    assert context_names == ["applications-qa", "data-production"]
+    assert not any("-readonly" in name for name in context_names)
+
+
+# ---------------------------------------------------------------------------
+# resolve_current_context
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
@@ -119,57 +208,112 @@ def test_resolve_current_context_falls_back_to_first_cluster(eks_module):
     clusters = [
         eks_module.ClusterConfig(
             cluster_name="operations-ci",
-            stack_name="operations.CI",
             server="https://operations-ci.example.invalid",
             certificate_authority_data="ca1",
-            admin_role_arn="arn:aws:iam::123456789012:role/admin-1",
+            admin_role_arn="",
         ),
         eks_module.ClusterConfig(
             cluster_name="data-ci",
-            stack_name="data.CI",
             server="https://data-ci.example.invalid",
             certificate_authority_data="ca2",
-            admin_role_arn="arn:aws:iam::123456789012:role/admin-2",
+            admin_role_arn="",
         ),
     ]
-
     assert eks_module.resolve_current_context(clusters, None) == "operations-ci"
 
 
-@pytest.mark.unit
-def test_setup_writes_managed_kubeconfig(tmp_path, eks_module, monkeypatch):
-    """Setup should write a full kubeconfig file to the requested path."""
-    output_path = tmp_path / "config"
-    clusters = [
-        eks_module.ClusterConfig(
-            cluster_name="applications-ci",
-            stack_name="applications.CI",
-            server="https://applications-ci.example.invalid",
-            certificate_authority_data="ca1",
-            admin_role_arn="arn:aws:iam::123456789012:role/admin-1",
-        ),
-        eks_module.ClusterConfig(
-            cluster_name="data-qa",
-            stack_name="data.QA",
-            server="https://data-qa.example.invalid",
-            certificate_authority_data="ca2",
-            admin_role_arn="arn:aws:iam::123456789012:role/admin-2",
-        ),
-    ]
+# ---------------------------------------------------------------------------
+# fetch_admin_role_arn
+# ---------------------------------------------------------------------------
 
-    monkeypatch.setattr(eks_module, "fetch_all_cluster_configs", lambda: clusters)
+
+@pytest.mark.unit
+def test_fetch_admin_role_arn_returns_cluster_admin_entry(eks_module):
+    """fetch_admin_role_arn should return the ARN with AmazonEKSClusterAdminPolicy."""
+    admin_arn = "arn:aws:iam::123456789012:role/applications-qa-cluster-admin"
+    readonly_arn = "arn:aws:iam::123456789012:role/eks-cluster-shared-readonly-role"
+    developer_arn = "arn:aws:iam::123456789012:role/eks-cluster-shared-developer-role"
+
+    mock_eks = MagicMock()
+    mock_paginator = MagicMock()
+    mock_paginator.paginate.return_value = [
+        {"accessEntries": [readonly_arn, developer_arn, admin_arn]}
+    ]
+    mock_eks.get_paginator.return_value = mock_paginator
+
+    def mock_list_policies(**kwargs: Any):
+        if kwargs["principalArn"] == admin_arn:
+            return {
+                "associatedAccessPolicies": [
+                    {
+                        "policyArn": (
+                            "arn:aws:eks::aws:cluster-access-policy/"
+                            "AmazonEKSClusterAdminPolicy"
+                        )
+                    }
+                ]
+            }
+        return {"associatedAccessPolicies": []}
+
+    mock_eks.list_associated_access_policies.side_effect = mock_list_policies
+
+    result = eks_module.fetch_admin_role_arn(mock_eks, "applications-qa")
+    assert result == admin_arn
+
+
+@pytest.mark.unit
+def test_fetch_admin_role_arn_raises_when_none_found(eks_module):
+    """fetch_admin_role_arn should raise when no admin entry exists."""
+    mock_eks = MagicMock()
+    mock_paginator = MagicMock()
+    mock_paginator.paginate.return_value = [{"accessEntries": []}]
+    mock_eks.get_paginator.return_value = mock_paginator
+
+    with pytest.raises(RuntimeError, match="No cluster admin role found"):
+        eks_module.fetch_admin_role_arn(mock_eks, "empty-cluster")
+
+
+# ---------------------------------------------------------------------------
+# setup command
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_setup_writes_kubeconfig_with_dual_contexts(
+    tmp_path, eks_module, monkeypatch, two_clusters
+):
+    """Setup in developer mode should write a kubeconfig with dual contexts."""
+    output_path = tmp_path / "config"
+    monkeypatch.setattr(
+        eks_module, "fetch_all_cluster_configs", lambda _mode: two_clusters
+    )
 
     eks_module.setup(
         mode=eks_module.AccessMode.DEVELOPER,
-        current_context="data-qa",
+        current_context="applications-qa",
         output_path=output_path,
     )
 
     kubeconfig = yaml.safe_load(output_path.read_text())
-    assert kubeconfig["current-context"] == "data-qa"
+    assert kubeconfig["current-context"] == "applications-qa"
     assert len(kubeconfig["clusters"]) == 2
-    assert [context["name"] for context in kubeconfig["contexts"]] == [
-        "applications-ci",
-        "data-qa",
+
+    context_names = [ctx["name"] for ctx in kubeconfig["contexts"]]
+    assert context_names == [
+        "applications-qa",
+        "applications-qa-readonly",
+        "data-production",
+        "data-production-readonly",
     ]
-    assert kubeconfig["users"][1]["user"]["exec"]["args"][-1] == "developer"
+
+    # Operator user uses developer exec
+    developer_user = next(
+        u for u in kubeconfig["users"] if u["name"] == "applications-qa-developer"
+    )
+    assert "developer" in developer_user["user"]["exec"]["args"]
+
+    # Readonly user uses readonly exec
+    readonly_user = next(
+        u for u in kubeconfig["users"] if u["name"] == "applications-qa-readonly"
+    )
+    assert "readonly" in readonly_user["user"]["exec"]["args"]

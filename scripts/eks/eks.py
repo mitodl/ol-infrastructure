@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 import urllib.parse
 import webbrowser
 from dataclasses import asdict, dataclass
@@ -15,6 +16,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
 
+import boto3
 import cyclopts
 import hvac
 import yaml
@@ -27,16 +29,18 @@ CACHE_DIR = Path.home() / ".cache" / "ol-infrastructure" / "eks"
 KUBECONFIG_DEFAULT_PATH = Path.home() / ".kube" / "config"
 OIDC_CALLBACK_PORT = 8250
 OIDC_REDIRECT_URI = f"http://localhost:{OIDC_CALLBACK_PORT}/oidc/callback"
-PULUMI_EKS_PROJECT_DIR = (
-    Path(__file__).resolve().parents[2]
-    / "src"
-    / "ol_infrastructure"
-    / "infrastructure"
-    / "aws"
-    / "eks"
-)
 PRODUCTION_VAULT_ADDRESS = "https://vault-production.odl.mit.edu"
 PREFERRED_DEFAULT_CONTEXT = "applications-qa"
+
+# Role names registered as EKS access entries that are NOT the cluster admin role.
+# Used to filter access entries when discovering the admin role ARN.
+SHARED_ACCESS_ENTRY_ROLE_NAMES: frozenset[str] = frozenset(
+    {
+        "eks-cluster-shared-readonly-role",
+        "eks-cluster-shared-developer-role",
+    }
+)
+
 SELF_CLOSING_PAGE = """
 <!doctype html>
 <html>
@@ -79,10 +83,9 @@ class AccessMode(StrEnum):
 
 @dataclass(slots=True)
 class ClusterConfig:
-    """Cluster connection details sourced from Pulumi stack outputs."""
+    """Cluster connection details sourced from the AWS EKS API."""
 
     cluster_name: str
-    stack_name: str
     server: str
     certificate_authority_data: str
     admin_role_arn: str
@@ -132,11 +135,6 @@ def json_datetime_now() -> datetime:
     return datetime.now(tz=UTC)
 
 
-def repo_root() -> Path:
-    """Return the repository root directory."""
-    return Path(__file__).resolve().parents[2]
-
-
 def cache_file(name: str) -> Path:
     """Return the cache file path for a given cache key."""
     return CACHE_DIR / f"{name}.json"
@@ -153,20 +151,6 @@ def dump_json(path: Path, payload: dict[str, Any]) -> None:
     """Write JSON payloads to a cache file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True))
-
-
-def cluster_name_for_stack(stack_name: str) -> str:
-    """Translate a Pulumi stack name into a cluster name."""
-    stack_parts = stack_name.split(".")
-    return f"{stack_parts[-2]}-{stack_parts[-1].lower()}"
-
-
-def read_stack_names() -> list[str]:
-    """Discover all EKS Pulumi stacks from stack config files."""
-    stack_files = sorted(PULUMI_EKS_PROJECT_DIR.glob("Pulumi.*.yaml"))
-    return [
-        path.name.removeprefix("Pulumi.").removesuffix(".yaml") for path in stack_files
-    ]
 
 
 def run_command(
@@ -190,29 +174,79 @@ def run_command(
     return completed.stdout
 
 
-def fetch_cluster_config(stack_name: str) -> ClusterConfig:
-    """Fetch cluster connection details from Pulumi outputs."""
-    command_output = run_command(
-        ["pulumi", "stack", "output", "-j", "-s", stack_name, "kube_config_data"],
-        cwd=PULUMI_EKS_PROJECT_DIR,
-    )
-    output_data = json.loads(command_output)
-    return ClusterConfig(
-        cluster_name=cluster_name_for_stack(stack_name),
-        stack_name=stack_name,
-        server=output_data["server"],
-        certificate_authority_data=output_data["certificate-authority-data"]["data"],
-        admin_role_arn=output_data["admin_role_arn"],
+def make_eks_client(credentials: AwsCredentialsCache) -> Any:
+    """Create a boto3 EKS client authenticated with Vault-generated credentials."""
+    return boto3.client(
+        "eks",
+        region_name=AWS_REGION,
+        aws_access_key_id=credentials.access_key,
+        aws_secret_access_key=credentials.secret_key,
+        aws_session_token=credentials.session_token,
     )
 
 
-def fetch_all_cluster_configs() -> list[ClusterConfig]:
-    """Load all known cluster configs from Pulumi."""
-    return [fetch_cluster_config(stack_name) for stack_name in read_stack_names()]
+def fetch_admin_role_arn(eks_client: Any, cluster_name: str) -> str:
+    """Find the cluster admin IAM role ARN via EKS access entries.
+
+    Iterates access entries for the cluster and returns the ARN of the first entry
+    that has AmazonEKSClusterAdminPolicy associated with it, skipping known shared
+    roles.
+    """
+    paginator = eks_client.get_paginator("list_access_entries")
+    for page in paginator.paginate(clusterName=cluster_name):
+        for entry_arn in page["accessEntries"]:
+            role_name = entry_arn.split("/")[-1]
+            if role_name in SHARED_ACCESS_ENTRY_ROLE_NAMES:
+                continue
+            policies_response = eks_client.list_associated_access_policies(
+                clusterName=cluster_name, principalArn=entry_arn
+            )
+            for policy in policies_response["associatedAccessPolicies"]:
+                if "AmazonEKSClusterAdminPolicy" in policy["policyArn"]:
+                    return entry_arn
+    msg = f"No cluster admin role found in EKS access entries for cluster {cluster_name!r}"
+    raise RuntimeError(msg)
+
+
+def fetch_all_cluster_configs(mode: AccessMode) -> list[ClusterConfig]:
+    """Discover all EKS clusters via the AWS API using Vault-generated credentials.
+
+    Uses readonly credentials for cluster discovery regardless of operator mode —
+    listing and describing clusters requires only read access to the EKS API.
+    For admin mode, also discovers each cluster's admin IAM role from access entries.
+    """
+    # All modes use the readonly AWS role for cluster discovery.
+    # Admin mode authenticates via the admin OIDC role but requests readonly
+    # AWS credentials, which are sufficient for eks:ListClusters / DescribeCluster.
+    discovery_mode = AccessMode.READONLY if mode is AccessMode.ADMIN else mode
+    discovery_credentials = load_valid_aws_credentials(discovery_mode)
+    eks_client = make_eks_client(discovery_credentials)
+
+    paginator = eks_client.get_paginator("list_clusters")
+    cluster_names: list[str] = []
+    for page in paginator.paginate():
+        cluster_names.extend(page["clusters"])
+    cluster_names.sort()
+
+    configs: list[ClusterConfig] = []
+    for cluster_name in cluster_names:
+        detail = eks_client.describe_cluster(name=cluster_name)["cluster"]
+        admin_role_arn = ""
+        if mode is AccessMode.ADMIN:
+            admin_role_arn = fetch_admin_role_arn(eks_client, cluster_name)
+        configs.append(
+            ClusterConfig(
+                cluster_name=cluster_name,
+                server=detail["endpoint"],
+                certificate_authority_data=detail["certificateAuthority"]["data"],
+                admin_role_arn=admin_role_arn,
+            )
+        )
+    return configs
 
 
 def kubeconfig_exec_args(cluster: ClusterConfig, mode: AccessMode) -> list[str]:
-    """Build exec args for kubeconfig user entries."""
+    """Build exec args for a kubeconfig user entry."""
     args = [
         "run",
         "python",
@@ -231,7 +265,10 @@ def kubeconfig_exec_args(cluster: ClusterConfig, mode: AccessMode) -> list[str]:
 def resolve_current_context(
     clusters: list[ClusterConfig], current_context: str | None
 ) -> str | None:
-    """Choose an explicit or sensible default current context."""
+    """Choose an explicit or sensible default current context.
+
+    The default context is always an operator context (not a -readonly suffixed one).
+    """
     if current_context:
         return current_context
     cluster_names = [cluster.cluster_name for cluster in clusters]
@@ -244,15 +281,26 @@ def resolve_current_context(
 
 def build_kubeconfig(
     clusters: list[ClusterConfig],
-    mode: AccessMode,
+    operator_mode: AccessMode,
     current_context: str | None,
 ) -> dict[str, Any]:
-    """Build kubeconfig content for all clusters."""
+    """Build a kubeconfig covering all clusters with dual contexts per cluster.
+
+    For operator modes (developer, admin) each cluster gets two contexts:
+      - ``<cluster-name>``          — operator credentials (read/write)
+      - ``<cluster-name>-readonly`` — readonly credentials (safe for agents)
+
+    For readonly mode a single context per cluster is generated since there is
+    no separate operator credential to pair it with.
+
+    The current-context always points to the operator (non-readonly) context.
+    """
     kube_clusters = []
     contexts = []
     users = []
 
     for cluster in clusters:
+        # One cluster entry shared by both contexts
         kube_clusters.append(
             {
                 "name": cluster.cluster_name,
@@ -262,31 +310,87 @@ def build_kubeconfig(
                 },
             }
         )
-        contexts.append(
-            {
-                "name": cluster.cluster_name,
-                "context": {
-                    "cluster": cluster.cluster_name,
-                    "user": cluster.cluster_name,
-                },
-            }
-        )
-        users.append(
-            {
-                "name": cluster.cluster_name,
-                "user": {
-                    "exec": {
-                        "apiVersion": "client.authentication.k8s.io/v1beta1",
-                        "command": "uv",
-                        "args": kubeconfig_exec_args(cluster, mode),
-                        "interactiveMode": "IfAvailable",
-                        "provideClusterInfo": False,
-                    },
-                },
-            }
-        )
 
-    kube_config = {
+        if operator_mode is not AccessMode.READONLY:
+            # Operator context — developer or admin credentials
+            operator_user = f"{cluster.cluster_name}-{operator_mode.value}"
+            contexts.append(
+                {
+                    "name": cluster.cluster_name,
+                    "context": {
+                        "cluster": cluster.cluster_name,
+                        "user": operator_user,
+                    },
+                }
+            )
+            users.append(
+                {
+                    "name": operator_user,
+                    "user": {
+                        "exec": {
+                            "apiVersion": "client.authentication.k8s.io/v1beta1",
+                            "command": "uv",
+                            "args": kubeconfig_exec_args(cluster, operator_mode),
+                            "interactiveMode": "IfAvailable",
+                            "provideClusterInfo": False,
+                        },
+                    },
+                }
+            )
+
+            # Readonly context — always present alongside operator contexts
+            readonly_context_name = f"{cluster.cluster_name}-readonly"
+            readonly_user = f"{cluster.cluster_name}-readonly"
+            contexts.append(
+                {
+                    "name": readonly_context_name,
+                    "context": {
+                        "cluster": cluster.cluster_name,
+                        "user": readonly_user,
+                    },
+                }
+            )
+            users.append(
+                {
+                    "name": readonly_user,
+                    "user": {
+                        "exec": {
+                            "apiVersion": "client.authentication.k8s.io/v1beta1",
+                            "command": "uv",
+                            "args": kubeconfig_exec_args(cluster, AccessMode.READONLY),
+                            "interactiveMode": "IfAvailable",
+                            "provideClusterInfo": False,
+                        },
+                    },
+                }
+            )
+        else:
+            # Readonly-only setup — single context per cluster
+            contexts.append(
+                {
+                    "name": cluster.cluster_name,
+                    "context": {
+                        "cluster": cluster.cluster_name,
+                        "user": cluster.cluster_name,
+                    },
+                }
+            )
+            users.append(
+                {
+                    "name": cluster.cluster_name,
+                    "user": {
+                        "exec": {
+                            "apiVersion": "client.authentication.k8s.io/v1beta1",
+                            "command": "uv",
+                            "args": kubeconfig_exec_args(cluster, AccessMode.READONLY),
+                            "interactiveMode": "IfAvailable",
+                            "provideClusterInfo": False,
+                        },
+                    },
+                }
+            )
+
+    kube_config: dict[str, Any] = {
         "apiVersion": "v1",
         "kind": "Config",
         "preferences": {},
@@ -364,9 +468,18 @@ def parse_expiration(value: str) -> datetime:
 
 
 def load_valid_aws_credentials(mode: AccessMode) -> AwsCredentialsCache:
-    """Load cached AWS credentials or generate fresh credentials from Vault."""
+    """Load cached AWS credentials or generate fresh ones from Vault.
+
+    Admin mode does not have a dedicated shared AWS role — it authenticates via
+    the admin OIDC role but requests readonly AWS credentials for cluster discovery.
+    The admin mode exec-credential path uses ``aws eks get-token --role`` directly
+    with the per-cluster admin IAM role rather than Vault-vended STS credentials.
+    """
     if mode is AccessMode.ADMIN:
-        msg = "Admin mode does not use Vault-generated shared AWS credentials"
+        msg = (
+            "Admin mode does not use a shared Vault AWS role. "
+            "Use AccessMode.READONLY for cluster discovery in admin setup."
+        )
         raise RuntimeError(msg)
 
     aws_role_name = VAULT_AWS_ROLE_BY_MODE[mode.value]
@@ -414,16 +527,49 @@ def aws_env_from_credentials(credentials: AwsCredentialsCache) -> dict[str, str]
 
 @app.command
 def setup(
-    mode: AccessMode = AccessMode.READONLY,
+    mode: AccessMode = AccessMode.DEVELOPER,
     current_context: str | None = None,
     output_path: Path = KUBECONFIG_DEFAULT_PATH,
 ) -> None:
-    """Generate and write a kubeconfig covering all OL EKS clusters."""
-    clusters = fetch_all_cluster_configs()
+    """Generate a kubeconfig covering all OL EKS clusters.
+
+    Cluster metadata is discovered via the AWS EKS API using Vault-generated
+    credentials — no Pulumi CLI or state is required.
+
+    For developer and admin modes each cluster gets two contexts:
+      - ``<cluster-name>``          — operator credentials (read/write)
+      - ``<cluster-name>-readonly`` — readonly credentials for agents/automation
+
+    For readonly mode a single context per cluster is generated.
+
+    EXAMPLES:
+      # Developer access (default) — human read/write + agent readonly contexts
+      uv run python scripts/eks/eks.py setup
+
+      # Admin access — cluster-admin + agent readonly contexts
+      uv run python scripts/eks/eks.py setup --mode admin
+
+      # Readonly only — for automation or read-only users
+      uv run python scripts/eks/eks.py setup --mode readonly
+    """
+    clusters = fetch_all_cluster_configs(mode)
+    if not clusters:
+        print("Warning: No EKS clusters found in this AWS account.", file=sys.stderr)
+
     kube_config = build_kubeconfig(clusters, mode, current_context)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(yaml.safe_dump(kube_config, sort_keys=False))
-    print(f"Wrote kubeconfig for {len(clusters)} clusters to {output_path}")
+
+    context_count = len(kube_config.get("contexts", []))
+    print(
+        f"Wrote kubeconfig: {len(clusters)} clusters, "
+        f"{context_count} contexts to {output_path}"
+    )
+    if mode is not AccessMode.READONLY:
+        print(f"  Operator contexts  : {', '.join(c.cluster_name for c in clusters)}")
+        print(
+            f"  Readonly contexts  : {', '.join(c.cluster_name + '-readonly' for c in clusters)}"
+        )
 
 
 @app.command(name="exec-credential")
@@ -432,7 +578,12 @@ def exec_credential(
     mode: AccessMode,
     admin_role_arn: str | None = None,
 ) -> None:
-    """Emit an ExecCredential document for kubectl/kubeconfig exec auth."""
+    """Emit an ExecCredential document for kubectl/kubeconfig exec auth.
+
+    Called automatically by kubectl via the kubeconfig exec plugin; not intended
+    for direct invocation.  Handles Vault OIDC auth, credential generation, and
+    local caching transparently.
+    """
     command = [
         "aws",
         "eks",

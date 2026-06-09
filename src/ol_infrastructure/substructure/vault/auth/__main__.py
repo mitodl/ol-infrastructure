@@ -210,10 +210,38 @@ if stack_info.name == "Production":
         )
     )
 
+    # IAM policy granting the read-only EKS API access needed for cluster
+    # discovery (list_clusters / describe_cluster / list_access_entries).
+    # This is separate from Kubernetes RBAC — it controls AWS API calls made
+    # during `eks.py setup` to bootstrap the kubeconfig without Pulumi.
+    eks_discovery_policy_document = json.dumps(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "eks:ListClusters",
+                        "eks:DescribeCluster",
+                        "eks:ListAccessEntries",
+                        "eks:ListAssociatedAccessPolicies",
+                    ],
+                    "Resource": "*",
+                }
+            ],
+        }
+    )
+
     eks_shared_readonly_role = iam.Role(
         "eks-cluster-shared-readonly-role",
         assume_role_policy=shared_assume_role_policy,
         max_session_duration=EIGHT_HOURS_SECONDS,
+    )
+
+    iam.RolePolicy(
+        "eks-cluster-shared-readonly-role-discovery-policy",
+        role=eks_shared_readonly_role.name,
+        policy=eks_discovery_policy_document,
     )
 
     aws.SecretBackendRole(
@@ -232,6 +260,12 @@ if stack_info.name == "Production":
         "eks-cluster-shared-developer-role",
         assume_role_policy=shared_assume_role_policy,
         max_session_duration=EIGHT_HOURS_SECONDS,
+    )
+
+    iam.RolePolicy(
+        "eks-cluster-shared-developer-role-discovery-policy",
+        role=eks_shared_developer_role.name,
+        policy=eks_discovery_policy_document,
     )
 
     aws.SecretBackendRole(
