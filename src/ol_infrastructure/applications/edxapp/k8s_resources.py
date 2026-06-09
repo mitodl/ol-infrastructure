@@ -96,6 +96,7 @@ def create_k8s_resources(  # noqa: C901
 
     lms_celery_deployment_name = f"{env_name}-edxapp-lms-celery"
     cms_celery_deployment_name = f"{env_name}-edxapp-cms-celery"
+    lms_beat_deployment_name = f"{env_name}-edxapp-lms-beat"
 
     # All deployments that consume MariaDB credentials and need to restart on rotation.
     # Includes both OLApplicationK8s-managed webapps and hand-rolled celery/batch deployments.
@@ -104,6 +105,7 @@ def create_k8s_resources(  # noqa: C901
         "cms-edxapp-app",  # CMS webapp (OLApplicationK8s application_name="cms-edxapp")
         lms_celery_deployment_name,
         cms_celery_deployment_name,
+        lms_beat_deployment_name,
         f"{env_name}-edxapp-lms-process-scheduled-emails",
     ]
 
@@ -1140,7 +1142,6 @@ def create_k8s_resources(  # noqa: C901
                             args=[
                                 "--app=lms.celery",
                                 "worker",
-                                "-B",
                                 "-E",
                                 "--loglevel=info",
                                 "--hostname=edx.lms.core.default.%h",
@@ -1175,6 +1176,107 @@ def create_k8s_resources(  # noqa: C901
                                         "memory_limit"
                                     ],
                                 },
+                            ),
+                            volume_mounts=celery_volume_mounts,
+                        )
+                    ],
+                ),
+            ),
+        ),
+        opts=pulumi.ResourceOptions(
+            depends_on=[v for v in lms_edxapp_config_sources.values() if v is not None]
+        ),
+    )
+
+    ############################################
+    # Dedicated LMS celery beat deployment
+    # Runs exactly one replica of `celery beat` using the stdlib PersistentScheduler.
+    # A dedicated pod (not embedded in the worker via -B) is simpler to reason about:
+    # no distributed locking needed, KEDA can freely scale worker replicas without
+    # spawning competing schedulers.
+    ############################################
+    lms_beat_selector_labels = k8s_global_labels | {
+        "ol.mit.edu/component": "edxapp-lms-beat",
+        "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
+    }
+    lms_beat_labels = lms_beat_selector_labels | {
+        "ol.mit.edu/edxapp-celery-sg": "true",
+    }
+    lms_beat_deployment = kubernetes.apps.v1.Deployment(
+        f"ol-{stack_info.env_prefix}-edxapp-lms-beat-deployment-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=lms_beat_deployment_name,
+            namespace=namespace,
+            labels=lms_beat_labels,
+        ),
+        spec=kubernetes.apps.v1.DeploymentSpecArgs(
+            replicas=1,
+            selector=kubernetes.meta.v1.LabelSelectorArgs(
+                match_labels=lms_beat_selector_labels
+            ),
+            template=kubernetes.core.v1.PodTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=lms_beat_labels),
+                spec=kubernetes.core.v1.PodSpecArgs(
+                    service_account_name=vault_k8s_resources.service_account_name,
+                    security_context=pod_security_context,
+                    volumes=lms_edxapp_volumes,
+                    init_containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="export-course-repos-mkdir",
+                            image=cached_image_uri("busybox:1.35"),
+                            command=[
+                                "/bin/sh",
+                                "-c",
+                                "mkdir -p /openedx/data/export_course_repos",
+                            ],
+                            volume_mounts=[
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="openedx-data",
+                                    mount_path="/openedx/data",
+                                ),
+                            ],
+                        ),
+                        kubernetes.core.v1.ContainerArgs(
+                            name="config-aggregator",
+                            image=cached_image_uri("busybox:1.35"),
+                            command=["/bin/sh", "-c"],
+                            args=[
+                                "cat /openedx/config-sources/*/*.yaml > /openedx/config/lms.env.yml"
+                            ],
+                            volume_mounts=[
+                                *lms_edxapp_init_volume_mounts,
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="edxapp-config",
+                                    mount_path="/openedx/config",
+                                ),
+                            ],
+                        ),
+                    ],
+                    containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="lms-edxapp",
+                            image=cached_image_uri(
+                                f"mitodl/edxapp@{EDXAPP_DOCKER_IMAGE_DIGEST}"
+                            ),
+                            command=["celery"],
+                            args=[
+                                "--app=lms.celery",
+                                "beat",
+                                "--scheduler=celery.beat.PersistentScheduler",
+                                "--loglevel=info",
+                            ],
+                            env=[
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="SERVICE_VARIANT", value="lms"
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="DJANGO_SETTINGS_MODULE",
+                                    value="lms.envs.production",
+                                ),
+                            ],
+                            resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                requests={"cpu": "100m", "memory": "512Mi"},
+                                limits={"memory": "1Gi"},
                             ),
                             volume_mounts=celery_volume_mounts,
                         )
@@ -1377,7 +1479,6 @@ def create_k8s_resources(  # noqa: C901
                             args=[
                                 "--app=cms.celery",
                                 "worker",
-                                "-B",
                                 "-E",
                                 "--loglevel=info",
                                 "--hostname=edx.cms.core.default.%h",
