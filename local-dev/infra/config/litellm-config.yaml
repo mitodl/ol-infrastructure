@@ -1,8 +1,9 @@
+---
 model_list:
-  - model_name: "*"
-    litellm_params:
-      model: openai/*
-      api_key: os.environ/OPENAI_API_KEY  # pragma: allowlist secret
+- model_name: "*"
+  litellm_params:
+    model: openai/*
+    api_key: os.environ/OPENAI_API_KEY    # pragma: allowlist secret
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY  # pragma: allowlist secret
   database_url: postgresql://app:localdev@local-pg-rw.local-infra.svc.cluster.local/litellm  # pragma: allowlist secret
