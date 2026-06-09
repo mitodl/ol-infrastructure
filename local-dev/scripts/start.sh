@@ -41,6 +41,19 @@ if ! k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
 fi
 ok "Cluster '${CLUSTER_NAME}' found."
 
+# Start the cluster if it is stopped (stop.sh pauses it via 'k3d cluster stop').
+# The SERVERS column reports running/total (e.g. "1/1" running, "0/1" stopped).
+SERVERS_STATUS="$(k3d cluster list "${CLUSTER_NAME}" --no-headers 2>/dev/null | awk '{print $2}')"
+if [[ "${SERVERS_STATUS}" == 0/* ]]; then
+	log "Cluster '${CLUSTER_NAME}' is stopped. Starting it..."
+	if ! k3d cluster start "${CLUSTER_NAME}"; then
+		err "Failed to start cluster '${CLUSTER_NAME}'. Try 'k3d cluster start ${CLUSTER_NAME}' manually."
+	fi
+	ok "Cluster '${CLUSTER_NAME}' started."
+else
+	ok "Cluster '${CLUSTER_NAME}' is running."
+fi
+
 # Check that kubeconfig context exists
 if ! kubectl config get-contexts "local-dev" &>/dev/null; then
 	err "kubectl context 'local-dev' not found. Run ./local-dev/scripts/setup.sh first."
