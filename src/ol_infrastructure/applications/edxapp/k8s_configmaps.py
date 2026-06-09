@@ -192,6 +192,22 @@ def _build_interpolated_config_dict(
         "OTEL_SERVICE_NAME": env_name + "-edxapp",
         "OTEL_LOG_LEVEL": "info",
         "ECOMMERCE_PUBLIC_URL_ROOT": domains["lms"],
+        "ENABLE_MFE_CONFIG_API": True,
+        "FRONTEND_SITE_CONFIG": {
+            "lmsBaseUrl": f"https://{domains['lms']}",
+            "loginUrl": f"https://{domains['lms']}/login",
+            "logoutUrl": f"https://{domains['lms']}/logout",
+            "headerLogoImageUrl": f"https://{domains['lms']}/static/{stack_info.env_prefix}/images/logo.svg",
+            "accessTokenCookieName": f"{env_name}-edx-jwt-cookie-header-payload",
+            "languagePreferenceCookieName": f"{env_name}-openedx-language-preference",
+            "userInfoCookieName": f"{env_name}-edx-user-info",
+            "csrfTokenApiPath": "/csrf/api/v1/token",
+            "commonAppConfig": {
+                "mitolFooter": {
+                    "accessibilityUrl": "https://accessibility.mit.edu/",
+                },
+            },
+        },
     }
 
     # Ref: https://docs.openedx.org/en/latest/site_ops/how-tos/use_typesense_search_backend.html
@@ -247,6 +263,16 @@ def _build_interpolated_config_dict(
                 },
             }
         )
+        config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolFooter"].update(
+            {
+                "privacyPolicyUrl": f"https://{marketing_domain}/privacy",
+                "termsOfServiceUrl": f"https://{marketing_domain}/terms",
+                "honorCodeUrl": f"https://{marketing_domain}/honor-code/",
+                "aboutUrl": f"https://{marketing_domain}/about",
+                "supportUrl": f"https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/",
+                "copyrightText": "\u00a9 MIT Open Learning. All rights reserved except where noted.",
+            }
+        )
 
     # xPro-specific configuration
     elif stack_info.env_prefix == "xpro":
@@ -272,6 +298,16 @@ def _build_interpolated_config_dict(
                 "MKTG_URLS": {
                     "ROOT": f"https://{marketing_domain}/",
                 },
+            }
+        )
+        config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolFooter"].update(
+            {
+                "privacyPolicyUrl": f"https://{marketing_domain}/privacy-policy/",
+                "termsOfServiceUrl": f"https://{marketing_domain}/terms-of-service/",
+                "honorCodeUrl": f"https://{marketing_domain}/honor-code/",
+                "aboutUrl": f"https://{marketing_domain}/about-us",
+                "supportUrl": f"https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/",
+                "copyrightText": "\u00a9 MIT xPRO. All rights reserved except where noted.",
             }
         )
 
@@ -321,6 +357,16 @@ def _build_interpolated_config_dict(
                         "fail_silently": False,
                     }
                 },
+            }
+        )
+        config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolFooter"].update(
+            {
+                "privacyPolicyUrl": f"https://{marketing_domain}/privacy-policy/",
+                "termsOfServiceUrl": f"https://{marketing_domain}/terms-of-service/",
+                "honorCodeUrl": f"https://{marketing_domain}/honor-code/",
+                "aboutUrl": f"https://{marketing_domain}/about-us/",
+                "supportUrl": f"https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/",
+                "copyrightText": "\u00a9 MIT Open Learning. All rights reserved except where noted.",
             }
         )
 
