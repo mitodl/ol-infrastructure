@@ -1,6 +1,5 @@
 ---
-# mitxonline webapp Deployment (uwsgi + nginx sidecar)
-# mitxonline uses uwsgi, not granian. We run it with --http-socket for simplicity.
+# mitxonline webapp Deployment (granian + nginx sidecar)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -60,18 +59,19 @@ spec:
           image: mitodl/mitxonline-app:latest
           imagePullPolicy: IfNotPresent
           command:
-            - uwsgi
-            - --http-socket
-            - 0.0.0.0:8011
-            - --module
-            - main.wsgi:application
+            - granian
+            - --interface
+            - wsgi
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8011"
             - --workers
             - "2"
-            - --threads
-            - "2"
+            - main.wsgi:application
           ports:
             - containerPort: 8011
-              name: uwsgi
+              name: http-wsgi
           envFrom:
             - configMapRef:
                 name: mitxonline-env
