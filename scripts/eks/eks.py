@@ -32,14 +32,12 @@ OIDC_REDIRECT_URI = f"http://localhost:{OIDC_CALLBACK_PORT}/oidc/callback"
 PRODUCTION_VAULT_ADDRESS = "https://vault-production.odl.mit.edu"
 PREFERRED_DEFAULT_CONTEXT = "applications-qa"
 
-# Role names registered as EKS access entries that are NOT the cluster admin role.
-# Used to filter access entries when discovering the admin role ARN.
-SHARED_ACCESS_ENTRY_ROLE_NAMES: frozenset[str] = frozenset(
-    {
-        "eks-cluster-shared-readonly-role",
-        "eks-cluster-shared-developer-role",
-    }
-)
+# Truncation-safe prefix of the "eks-admin-role" infix that Pulumi uses when
+# naming the cluster admin IAM role.  Pulumi truncates IAM role names that would
+# exceed 64 characters by dropping characters from the resource name before the
+# hash/timestamp suffix.  Eight characters ("eks-admi") survive truncation for
+# every cluster name in use in this repository.
+EKS_ADMIN_ROLE_INFIX = "eks-admi"
 
 SELF_CLOSING_PAGE = """
 <!doctype html>
@@ -188,22 +186,23 @@ def make_eks_client(credentials: AwsCredentialsCache) -> Any:
 def fetch_admin_role_arn(eks_client: Any, cluster_name: str) -> str:
     """Find the cluster admin IAM role ARN via EKS access entries.
 
-    Iterates access entries for the cluster and returns the ARN of the first entry
-    that has AmazonEKSClusterAdminPolicy associated with it, skipping known shared
-    roles.
+    The admin role is identified by the naming convention used in the EKS
+    Pulumi stack: ``<cluster-name>-eks-admin-role-<pulumi-suffix>``.
+
+    For long cluster names Pulumi truncates the physical IAM role name before
+    appending the suffix, so we match on a prefix short enough to survive any
+    truncation: ``<cluster-name>-eks-admi``.
+
+    IAM user entries and all other non-matching roles are skipped automatically
+    because their last ARN segment will not start with the expected prefix.
     """
+    admin_name_prefix = f"{cluster_name}-{EKS_ADMIN_ROLE_INFIX}"
     paginator = eks_client.get_paginator("list_access_entries")
     for page in paginator.paginate(clusterName=cluster_name):
         for entry_arn in page["accessEntries"]:
             role_name = entry_arn.split("/")[-1]
-            if role_name in SHARED_ACCESS_ENTRY_ROLE_NAMES:
-                continue
-            policies_response = eks_client.list_associated_access_policies(
-                clusterName=cluster_name, principalArn=entry_arn
-            )
-            for policy in policies_response["associatedAccessPolicies"]:
-                if "AmazonEKSClusterAdminPolicy" in policy["policyArn"]:
-                    return entry_arn
+            if role_name.startswith(admin_name_prefix):
+                return entry_arn
     msg = f"No cluster admin role found in EKS access entries for cluster {cluster_name!r}"
     raise RuntimeError(msg)
 

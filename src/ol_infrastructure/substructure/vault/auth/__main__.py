@@ -224,7 +224,6 @@ if stack_info.name == "Production":
                         "eks:ListClusters",
                         "eks:DescribeCluster",
                         "eks:ListAccessEntries",
-                        "eks:ListAssociatedAccessPolicies",
                     ],
                     "Resource": "*",
                 }

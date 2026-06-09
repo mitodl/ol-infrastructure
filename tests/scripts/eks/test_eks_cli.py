@@ -5,7 +5,6 @@ from __future__ import annotations
 import importlib.util
 import sys
 from pathlib import Path
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -229,35 +228,52 @@ def test_resolve_current_context_falls_back_to_first_cluster(eks_module):
 
 @pytest.mark.unit
 def test_fetch_admin_role_arn_returns_cluster_admin_entry(eks_module):
-    """fetch_admin_role_arn should return the ARN with AmazonEKSClusterAdminPolicy."""
-    admin_arn = "arn:aws:iam::123456789012:role/applications-qa-cluster-admin"
-    readonly_arn = "arn:aws:iam::123456789012:role/eks-cluster-shared-readonly-role"
-    developer_arn = "arn:aws:iam::123456789012:role/eks-cluster-shared-developer-role"
+    """fetch_admin_role_arn should return the ARN matching the naming convention."""
+    # The production admin role is truncated by Pulumi (IAM 64-char limit):
+    # 'applications-production-eks-admin-role-<suffix>' would be 65 chars, so
+    # Pulumi emits 'applications-production-eks-admi<suffix>' instead.
+    admin_arn = (
+        "arn:aws:iam::123456789012:role/ol-infrastructure/eks/applications-production/"
+        "applications-production-eks-admi20241203204503342200000005"
+    )
+    developer_arn = (
+        "arn:aws:iam::123456789012:role/eks-cluster-shared-developer-role-c79eb98"
+    )
+    creator_arn = (
+        "arn:aws:iam::123456789012:role/ol-infrastructure/eks/shared/"
+        "eks-cluster-creator-role-b2b132f"
+    )
+    user_arn = "arn:aws:iam::123456789012:user/tmacey"
+    backup_arn = (
+        "arn:aws:iam::123456789012:role/ol-infrastructure/eks/applications-production/"
+        "backup/applications-production-eks-backup-role"
+    )
 
     mock_eks = MagicMock()
     mock_paginator = MagicMock()
     mock_paginator.paginate.return_value = [
-        {"accessEntries": [readonly_arn, developer_arn, admin_arn]}
+        {"accessEntries": [developer_arn, creator_arn, user_arn, backup_arn, admin_arn]}
     ]
     mock_eks.get_paginator.return_value = mock_paginator
 
-    def mock_list_policies(**kwargs: Any):
-        if kwargs["principalArn"] == admin_arn:
-            return {
-                "associatedAccessPolicies": [
-                    {
-                        "policyArn": (
-                            "arn:aws:eks::aws:cluster-access-policy/"
-                            "AmazonEKSClusterAdminPolicy"
-                        )
-                    }
-                ]
-            }
-        return {"associatedAccessPolicies": []}
+    result = eks_module.fetch_admin_role_arn(mock_eks, "applications-production")
+    assert result == admin_arn
+    mock_eks.list_associated_access_policies.assert_not_called()
 
-    mock_eks.list_associated_access_policies.side_effect = mock_list_policies
 
-    result = eks_module.fetch_admin_role_arn(mock_eks, "applications-qa")
+@pytest.mark.unit
+def test_fetch_admin_role_arn_works_for_short_cluster_name(eks_module):
+    """fetch_admin_role_arn also matches non-truncated names (short cluster names)."""
+    admin_arn = (
+        "arn:aws:iam::123456789012:role/ol-infrastructure/eks/data-qa/"
+        "data-qa-eks-admin-role-20241203183334260200000005"
+    )
+    mock_eks = MagicMock()
+    mock_paginator = MagicMock()
+    mock_paginator.paginate.return_value = [{"accessEntries": [admin_arn]}]
+    mock_eks.get_paginator.return_value = mock_paginator
+
+    result = eks_module.fetch_admin_role_arn(mock_eks, "data-qa")
     assert result == admin_arn
 
 
