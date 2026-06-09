@@ -1,0 +1,48 @@
+---
+# k3d cluster configuration for the MIT Learn local development environment.
+# Usage: k3d cluster create --config local-dev/cluster/k3d-config.yaml
+# Or let setup.sh manage cluster lifecycle.
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+
+metadata:
+  name: local-dev
+
+servers: 1
+agents: 2
+
+image: docker.io/rancher/k3s:v1.31.4-k3s1
+
+# Local image registry — images built by Tilt are pushed here.
+registries:
+  create:
+    name: k3d-registry.localhost
+    host: "0.0.0.0"
+    hostPort: "5001"
+  config: |
+    mirrors:
+      "k3d-registry.localhost:5001":
+        endpoint:
+          - "http://k3d-registry.localhost:5001"
+
+# Expose HTTPS and HTTP on host ports 443/80 so that *.mit.dev ingress routes
+# are reachable without a port suffix.
+ports:
+- port: 80:30080
+  nodeFilters:
+  - loadbalancer
+- port: 443:30443
+  nodeFilters:
+  - loadbalancer
+
+# Disable Traefik — APISIX Ingress Controller replaces it.
+options:
+  k3s:
+    extraArgs:
+    - arg: --disable=traefik
+      nodeFilters:
+      - server:*
+
+kubeAPI:
+  hostIP: "0.0.0.0"
+  hostPort: "6550"

@@ -1,0 +1,180 @@
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixPluginConfig
+metadata:
+  name: learnai-shared-plugins
+  namespace: learn-ai
+spec:
+  plugins:
+  - name: redirect
+    enable: true
+    config:
+      http_to_https: true
+  - name: cors
+    enable: true
+    config:
+      allow_origins: "https://ai.learn.mit.dev,https://learn.mit.dev"
+      allow_methods: "GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS"
+      allow_headers: "Authorization,Content-Type,X-CSRFToken,X-Requested-With"
+      expose_headers: "X-CSRFToken"
+      allow_credential: true
+      max_age: 3600
+  - name: response-rewrite
+    enable: true
+    config:
+      headers:
+        set:
+          Referrer-Policy: "origin"
+  - name: prometheus
+    enable: true
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: learnai-tls
+  namespace: learn-ai
+spec:
+  ingressClassName: apache-apisix
+  hosts:
+  - "ai.learn.mit.dev"
+  secret:
+    name: local-dev-tls
+    namespace: learn-ai
+---
+# ApisixRoute for ai.learn.mit.dev.
+#
+# Sub-routes match QA pattern:
+#   websocket  : /ws/*          (pass, websocket enabled)
+#   passauth   : /*             (pass — injects X-Userinfo if session present)
+#   logout-redirect : /logout/* (redirect to /logout)
+#   reqauth    : /admin/login/*, /http/login/* (require authentication)
+#
+# No explicit redirect_uri — lua-resty-openidc auto-derives it from the
+# initiating request URL so the callback round-trips to the same path.
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: learnai-route
+  namespace: learn-ai
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: websocket
+    priority: 1
+    match:
+      hosts:
+      - "ai.learn.mit.dev"
+      paths:
+      - "/ws/*"
+    backends:
+    - serviceName: learnai-webapp
+      servicePort: 8000
+    plugin_config_name: learnai-shared-plugins
+    plugins:
+    - name: openid-connect
+      enable: true
+      secretRef: ol-learn-ai-oidc  # pragma: allowlist secret
+      config:
+        discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
+        use_jwks: true
+        bearer_only: false
+        introspection_endpoint_auth_method: client_secret_basic
+        scope: "openid profile email"
+        ssl_verify: false
+        renew_access_token_on_expiry: true
+        logout_path: "/logout"
+        post_logout_redirect_uri: "/"
+        session:
+          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+        session_contents:
+          access_token: true
+          enc_id_token: true
+          id_token: true
+          user: true
+        unauth_action: pass
+    websocket: true
+
+  - name: passauth
+    priority: 2
+    match:
+      hosts:
+      - "ai.learn.mit.dev"
+      paths:
+      - "/*"
+    backends:
+    - serviceName: learnai-webapp
+      servicePort: 8000
+    plugin_config_name: learnai-shared-plugins
+    plugins:
+    - name: openid-connect
+      enable: true
+      secretRef: ol-learn-ai-oidc  # pragma: allowlist secret
+      config:
+        discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
+        use_jwks: true
+        bearer_only: false
+        introspection_endpoint_auth_method: client_secret_basic
+        scope: "openid profile email"
+        ssl_verify: false
+        renew_access_token_on_expiry: true
+        logout_path: "/logout"
+        post_logout_redirect_uri: "/"
+        session:
+          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+        session_contents:
+          access_token: true
+          enc_id_token: true
+          id_token: true
+          user: true
+        unauth_action: pass
+
+  - name: logout-redirect
+    priority: 10
+    match:
+      hosts:
+      - "ai.learn.mit.dev"
+      paths:
+      - "/logout/*"
+    backends:
+    - serviceName: learnai-webapp
+      servicePort: 8000
+    plugins:
+    - name: redirect
+      enable: true
+      config:
+        uri: "/logout"
+
+  - name: reqauth
+    priority: 10
+    match:
+      hosts:
+      - "ai.learn.mit.dev"
+      paths:
+      - "/admin/login/*"
+      - "/http/login/*"
+    backends:
+    - serviceName: learnai-webapp
+      servicePort: 8000
+    plugin_config_name: learnai-shared-plugins
+    plugins:
+    - name: openid-connect
+      enable: true
+      secretRef: ol-learn-ai-oidc  # pragma: allowlist secret
+      config:
+        discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
+        use_jwks: true
+        bearer_only: false
+        introspection_endpoint_auth_method: client_secret_basic
+        scope: "openid profile email"
+        ssl_verify: false
+        renew_access_token_on_expiry: true
+        logout_path: "/logout"
+        post_logout_redirect_uri: "/"
+        session:
+          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+        session_contents:
+          access_token: true
+          enc_id_token: true
+          id_token: true
+          user: true
+        unauth_action: auth

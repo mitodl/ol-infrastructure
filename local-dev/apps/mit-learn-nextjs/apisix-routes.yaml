@@ -1,0 +1,44 @@
+---
+# TLS for learn.mit.dev (frontend domain).
+# The wildcard *.learn.mit.dev SAN covers this.
+# Secret is already copied to mit-learn namespace by Pulumi.
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: mitlearn-nextjs-tls
+  namespace: mit-learn
+spec:
+  ingressClassName: apache-apisix
+  hosts:
+  - "learn.mit.dev"
+  secret:
+    name: local-dev-tls
+    namespace: mit-learn
+---
+# ApisixRoute — learn.mit.dev → Next.js frontend
+# No OIDC at this layer: auth happens via the Django API (api.learn.mit.dev).
+# The frontend itself calls the API with credentials; CSRF is cookie-based.
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: mitlearn-nextjs-route
+  namespace: mit-learn
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: frontend
+    match:
+      hosts:
+      - "learn.mit.dev"
+      paths:
+      - "/*"
+    backends:
+    - serviceName: mitlearn-nextjs
+      servicePort: 3000
+    plugins:
+    - name: response-rewrite
+      enable: true
+      config:
+        headers:
+          set:
+            Referrer-Policy: "origin"

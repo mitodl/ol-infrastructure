@@ -1,0 +1,45 @@
+# learn-ai Tiltfile
+# Builds the learn-ai Django/ASGI app and deploys it to the learn-ai namespace.
+# When the sibling learn-ai repo is not checked out, Tilt uses the prebuilt
+# DockerHub image (mitodl/learn-ai-app:latest) without attempting a local build.
+
+load("../../tiltlib.star", "k8s_yaml_with_domain")
+
+workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
+APP_DIR = os.path.join(workspace_root, "learn-ai")
+IMAGE = 'mitodl/learn-ai-app'
+NAMESPACE = 'learn-ai'
+DEPLOY_NAME = 'learnai-webapp'
+
+if os.path.exists(os.path.join(APP_DIR, '.git')):
+    docker_build(
+        IMAGE,
+        context=APP_DIR,
+        dockerfile=APP_DIR + '/Dockerfile',
+        live_update=[
+            sync(APP_DIR + '/main', '/src/main'),
+            run(
+                'cd /src && pip install -r requirements.txt',
+                trigger=[APP_DIR + '/requirements.txt'],
+            ),
+        ],
+    )
+
+k8s_yaml([
+    'configmaps/app-env.yaml',
+    'configmaps/nginx.yaml',
+    'secrets.yaml',
+    'deployment.yaml',
+    'apisix-routes.yaml',
+])
+
+k8s_resource(
+    DEPLOY_NAME,
+    port_forwards=['8000:8000'],
+    labels=['learn-ai'],
+    resource_deps=['local-infra-apps'],
+)
+
+k8s_resource('learnai-celery-default', labels=['learn-ai'], resource_deps=['local-infra-apps'])
+k8s_resource('learnai-celery-edx-content', labels=['learn-ai'], resource_deps=['local-infra-apps'])
+k8s_resource('learnai-celery-beat', labels=['learn-ai'], resource_deps=['local-infra-apps'])

@@ -1,0 +1,19 @@
+{
+  "enabled_apps": ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"],
+
+  "per_app_databases": false,
+
+  "openedx_mode": "qa",
+
+  "prebuilt_tags": [
+    "mit-learn=0.62.0",
+    "mit-learn-nextjs=0.62.0",
+    "learn-ai=0.28.3",
+    "mitxonline=1.144.5",
+    "odl-video-service=0.85.0"
+  ],
+
+  "openai_api_key": "",
+  "langsmith_api_key": "",
+  "canvas_ai_token": ""
+}

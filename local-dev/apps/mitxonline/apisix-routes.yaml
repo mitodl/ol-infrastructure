@@ -1,0 +1,199 @@
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixPluginConfig
+metadata:
+  name: mitxonline-shared-plugins
+  namespace: mitxonline
+spec:
+  plugins:
+  - name: redirect
+    enable: true
+    config:
+      http_to_https: true
+  - name: cors
+    enable: true
+    config:
+      allow_origins: "https://mitxonline.mit.dev,https://learn.mit.dev"
+      allow_methods: "GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS"
+      allow_headers: "Authorization,Content-Type,X-CSRFToken,X-Requested-With"
+      expose_headers: "X-CSRFToken"
+      allow_credential: true
+      max_age: 3600
+  - name: response-rewrite
+    enable: true
+    config:
+      headers:
+        set:
+          Referrer-Policy: "origin"
+  - name: prometheus
+    enable: true
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: mitxonline-tls
+  namespace: mitxonline
+spec:
+  ingressClassName: apache-apisix
+  hosts:
+  - "mitxonline.mit.dev"
+  - "api.mitxonline.mit.dev"
+  secret:
+    name: local-dev-tls
+    namespace: mitxonline
+---
+# ApisixRoute for mitxonline.mit.dev and api.mitxonline.mit.dev.
+#
+# Sub-routes match QA pattern:
+#   passauth        : /*              (pass — injects X-Userinfo if session present)
+#   logout-redirect : /logout/oidc/* (redirect to /logout/oidc)
+#   reqauth         : /login/*, /admin/login/*, /login*, /login/oidc*
+#   cart            : /cart, /cart/, /cart/* (require authentication, priority 20)
+#
+# No explicit redirect_uri — lua-resty-openidc auto-derives it.
+# session.cookie.domain set to .mitxonline.mit.dev so the cookie is shared
+# between the frontend (mitxonline.mit.dev) and API (api.mitxonline.mit.dev).
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: mitxonline-route
+  namespace: mitxonline
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: passauth
+    priority: 0
+    match:
+      hosts:
+      - "mitxonline.mit.dev"
+      - "api.mitxonline.mit.dev"
+      paths:
+      - "/*"
+    backends:
+    - serviceName: mitxonline-webapp
+      servicePort: 8010
+    plugin_config_name: mitxonline-shared-plugins
+    plugins:
+    - name: openid-connect
+      enable: true
+      secretRef: ol-mitxonline-oidc  # pragma: allowlist secret
+      config:
+        discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
+        use_jwks: true
+        bearer_only: false
+        introspection_endpoint_auth_method: client_secret_basic
+        scope: "openid profile email organization:*"
+        ssl_verify: false
+        renew_access_token_on_expiry: true
+        logout_path: "/logout/oidc"
+        post_logout_redirect_uri: "https://mitxonline.mit.dev/logout/"
+        session:
+          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          cookie:
+            domain: ".mitxonline.mit.dev"
+            lifetime: 1209600
+        session_contents:
+          access_token: true
+          enc_id_token: true
+          id_token: true
+          user: true
+        unauth_action: pass
+
+  - name: logout-redirect
+    priority: 10
+    match:
+      hosts:
+      - "mitxonline.mit.dev"
+      - "api.mitxonline.mit.dev"
+      paths:
+      - "/logout/oidc/*"
+    backends:
+    - serviceName: mitxonline-webapp
+      servicePort: 8010
+    plugin_config_name: mitxonline-shared-plugins
+    plugins:
+    - name: redirect
+      enable: true
+      config:
+        uri: "/logout/oidc"
+
+  - name: reqauth
+    priority: 10
+    match:
+      hosts:
+      - "mitxonline.mit.dev"
+      - "api.mitxonline.mit.dev"
+      paths:
+      - "/login/*"
+      - "/admin/login/*"
+      - "/login*"
+      - "/login/oidc*"
+    backends:
+    - serviceName: mitxonline-webapp
+      servicePort: 8010
+    plugin_config_name: mitxonline-shared-plugins
+    plugins:
+    - name: openid-connect
+      enable: true
+      secretRef: ol-mitxonline-oidc  # pragma: allowlist secret
+      config:
+        discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
+        use_jwks: true
+        bearer_only: false
+        introspection_endpoint_auth_method: client_secret_basic
+        scope: "openid profile email organization:*"
+        ssl_verify: false
+        renew_access_token_on_expiry: true
+        logout_path: "/logout/oidc"
+        post_logout_redirect_uri: "https://mitxonline.mit.dev/logout/"
+        session:
+          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          cookie:
+            domain: ".mitxonline.mit.dev"
+            lifetime: 1209600
+        session_contents:
+          access_token: true
+          enc_id_token: true
+          id_token: true
+          user: true
+        unauth_action: auth
+
+  - name: cart
+    priority: 20
+    match:
+      hosts:
+      - "mitxonline.mit.dev"
+      - "api.mitxonline.mit.dev"
+      paths:
+      - "/cart"
+      - "/cart/"
+      - "/cart/*"
+    backends:
+    - serviceName: mitxonline-webapp
+      servicePort: 8010
+    plugin_config_name: mitxonline-shared-plugins
+    plugins:
+    - name: openid-connect
+      enable: true
+      secretRef: ol-mitxonline-oidc  # pragma: allowlist secret
+      config:
+        discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
+        use_jwks: true
+        bearer_only: false
+        introspection_endpoint_auth_method: client_secret_basic
+        scope: "openid profile email organization:*"
+        ssl_verify: false
+        renew_access_token_on_expiry: true
+        logout_path: "/logout/oidc"
+        post_logout_redirect_uri: "https://mitxonline.mit.dev/logout/"
+        session:
+          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          cookie:
+            domain: ".mitxonline.mit.dev"
+            lifetime: 1209600
+        session_contents:
+          access_token: true
+          enc_id_token: true
+          id_token: true
+          user: true
+        unauth_action: auth

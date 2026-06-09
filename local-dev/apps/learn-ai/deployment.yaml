@@ -1,0 +1,338 @@
+---
+# learn-ai webapp Deployment (granian ASGI + nginx sidecar)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: learnai-webapp
+  namespace: learn-ai
+  labels:
+    app: learnai-webapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: learnai-webapp
+  template:
+    metadata:
+      labels:
+        app: learnai-webapp
+    spec:
+      initContainers:
+        # Merge the image's system CA bundle with the mkcert root so pods trust
+        # both public HTTPS endpoints (e.g. OpenAI) and local-dev TLS.
+        - name: ca-bundle-merge
+          image: mitodl/learn-ai-app:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+          volumeMounts:
+            - name: mkcert-root-ca
+              mountPath: /mkcert
+              readOnly: true
+            - name: combined-ca
+              mountPath: /etc/ssl/local-dev
+        - name: bootstrap
+          image: mitodl/learn-ai-app:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              python manage.py collectstatic --noinput --clear
+              python manage.py migrate --noinput
+              python manage.py createcachetable
+              RUN_DATA_MIGRATIONS=true python manage.py migrate --noinput
+          envFrom:
+            - configMapRef:
+                name: learn-ai-env
+            - secretRef:
+                name: learn-ai-secrets
+          volumeMounts:
+            - name: static-files
+              mountPath: /src/staticfiles
+            - name: combined-ca
+              mountPath: /etc/ssl/local-dev
+              readOnly: true
+      containers:
+        - name: app
+          image: mitodl/learn-ai-app:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - granian
+            - --interface
+            - asgi
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8001"
+            - main.asgi:application
+          ports:
+            - containerPort: 8001
+              name: granian
+          envFrom:
+            - configMapRef:
+                name: learn-ai-env
+            - secretRef:
+                name: learn-ai-secrets
+          resources:
+            requests:
+              cpu: 250m
+              memory: 1Gi
+            limits:
+              memory: 2Gi
+          readinessProbe:
+            httpGet:
+              path: /health/
+              port: 8001
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: static-files
+              mountPath: /src/staticfiles
+            - name: combined-ca
+              mountPath: /etc/ssl/local-dev
+              readOnly: true
+        - name: nginx
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 8000
+              name: http
+          volumeMounts:
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+            - name: static-files
+              mountPath: /src/staticfiles
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+      volumes:
+        - name: nginx-conf
+          configMap:
+            name: learnai-nginx-conf
+        - name: static-files
+          emptyDir: {}
+        - name: mkcert-root-ca
+          configMap:
+            name: mkcert-root-ca
+        - name: combined-ca
+          emptyDir: {}
+---
+# Celery worker — default queue
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: learnai-celery-default
+  namespace: learn-ai
+  labels:
+    app: learnai-celery-default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: learnai-celery-default
+  template:
+    metadata:
+      labels:
+        app: learnai-celery-default
+    spec:
+      initContainers:
+        - name: ca-bundle-merge
+          image: mitodl/learn-ai-app:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+          volumeMounts:
+            - name: mkcert-root-ca
+              mountPath: /mkcert
+              readOnly: true
+            - name: combined-ca
+              mountPath: /etc/ssl/local-dev
+      containers:
+        - name: celery
+          image: mitodl/learn-ai-app:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - celery
+            - -A
+            - main.celery:app
+            - worker
+            - -Q
+            - default
+            - -c
+            - "2"
+          envFrom:
+            - configMapRef:
+                name: learn-ai-env
+            - secretRef:
+                name: learn-ai-secrets
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 2Gi
+          volumeMounts:
+            - name: combined-ca
+              mountPath: /etc/ssl/local-dev
+              readOnly: true
+      volumes:
+        - name: mkcert-root-ca
+          configMap:
+            name: mkcert-root-ca
+        - name: combined-ca
+          emptyDir: {}
+---
+# Celery worker — edx_content queue
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: learnai-celery-edx-content
+  namespace: learn-ai
+  labels:
+    app: learnai-celery-edx-content
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: learnai-celery-edx-content
+  template:
+    metadata:
+      labels:
+        app: learnai-celery-edx-content
+    spec:
+      initContainers:
+        - name: ca-bundle-merge
+          image: mitodl/learn-ai-app:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+          volumeMounts:
+            - name: mkcert-root-ca
+              mountPath: /mkcert
+              readOnly: true
+            - name: combined-ca
+              mountPath: /etc/ssl/local-dev
+      containers:
+        - name: celery
+          image: mitodl/learn-ai-app:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - celery
+            - -A
+            - main.celery:app
+            - worker
+            - -Q
+            - edx_content
+            - -c
+            - "2"
+          envFrom:
+            - configMapRef:
+                name: learn-ai-env
+            - secretRef:
+                name: learn-ai-secrets
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 2Gi
+          volumeMounts:
+            - name: combined-ca
+              mountPath: /etc/ssl/local-dev
+              readOnly: true
+      volumes:
+        - name: mkcert-root-ca
+          configMap:
+            name: mkcert-root-ca
+        - name: combined-ca
+          emptyDir: {}
+---
+# Celery beat scheduler
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: learnai-celery-beat
+  namespace: learn-ai
+  labels:
+    app: learnai-celery-beat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: learnai-celery-beat
+  template:
+    metadata:
+      labels:
+        app: learnai-celery-beat
+    spec:
+      initContainers:
+        - name: ca-bundle-merge
+          image: mitodl/learn-ai-app:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+          volumeMounts:
+            - name: mkcert-root-ca
+              mountPath: /mkcert
+              readOnly: true
+            - name: combined-ca
+              mountPath: /etc/ssl/local-dev
+      containers:
+        - name: celery-beat
+          image: mitodl/learn-ai-app:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - celery
+            - -A
+            - main.celery:app
+            - beat
+            - --scheduler
+            - celery.beat.PersistentScheduler
+            - --schedule
+            - /tmp/celerybeat-schedule
+          envFrom:
+            - configMapRef:
+                name: learn-ai-env
+            - secretRef:
+                name: learn-ai-secrets
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: combined-ca
+              mountPath: /etc/ssl/local-dev
+              readOnly: true
+      volumes:
+        - name: mkcert-root-ca
+          configMap:
+            name: mkcert-root-ca
+        - name: combined-ca
+          emptyDir: {}
+---
+# Service (nginx sidecar is the HTTP frontend)
+apiVersion: v1
+kind: Service
+metadata:
+  name: learnai-webapp
+  namespace: learn-ai
+  labels:
+    app: learnai-webapp
+spec:
+  selector:
+    app: learnai-webapp
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
