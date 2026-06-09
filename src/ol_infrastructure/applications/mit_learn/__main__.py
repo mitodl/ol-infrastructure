@@ -1096,6 +1096,11 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             .read_text(),
             type="fetch",
         ),
+        fastly.ServiceVclSnippetArgs(
+            name="Strip noindex header from NextJS backend",
+            content="unset resp.http.X-Robots-Tag;",
+            type="deliver",
+        ),
     ],
     logging_https=[
         fastly.ServiceVclLoggingHttpArgs(

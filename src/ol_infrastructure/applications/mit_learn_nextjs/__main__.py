@@ -326,6 +326,19 @@ gateway = OLEKSGateway(
                 name="mit-learn-nextjs-https",
                 listener_name="https",
                 port=8443,
+                filters=[
+                    {
+                        "type": "ResponseHeaderModifier",
+                        "responseHeaderModifier": {
+                            "add": [
+                                {
+                                    "name": "X-Robots-Tag",
+                                    "value": "noindex, nofollow",
+                                }
+                            ]
+                        },
+                    }
+                ],
             ),
         ],
     ),
