@@ -187,6 +187,10 @@ _POD_SECURITY_CONTEXT = {
     "runAsNonRoot": True,
 }
 
+# Enable JSON-structured logs from the Python ingestion-base container.
+# Supported by the ingestion-base image; passed through as LOG_FORMAT env var.
+_LOG_FORMAT_ENV = {"name": "LOG_FORMAT", "value": "json"}
+
 
 def _bot_jwt_env(bot_secret_name: str) -> dict[str, object]:
     """Return the env-var entry that injects the OM bot JWT from a K8s secret.
@@ -253,7 +257,7 @@ def _make_cronjob(  # noqa: PLR0913
         ``_POD_RESOURCES`` (500m/1Gi request, 2/4Gi limit). Override for
         connectors that require more memory (e.g. Trino full-catalog ingestion).
     """
-    env = [_bot_jwt_env(bot_secret_name), *(extra_env or [])]
+    env = [_bot_jwt_env(bot_secret_name), _LOG_FORMAT_ENV, *(extra_env or [])]
     command = Output.from_input(python_script).apply(lambda s: ["python", "-c", s])
 
     return kubernetes.apiextensions.CustomResource(

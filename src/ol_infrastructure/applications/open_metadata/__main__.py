@@ -655,7 +655,11 @@ open_metadata_application = kubernetes.helm.v3.Release(
             "hpa": {
                 "enabled": True,
             },
-            # Ref: https://docs.open-metadata.org/v1.12.x/deployment/semantic-search
+            # Ref: https://docs.open-metadata.org/v1.13.x/deployment/semantic-search
+            # 1.13: hybrid search is now automatic when SEMANTIC_SEARCH_ENABLED=true;
+            # the per-query semanticSearch flag is removed. Run the Search Index App
+            # after upgrading to populate vector fields in OpenSearch.
+            # LOG_FORMAT=json (1.13) enables JSON-structured Dropwizard server logs.
             "extraEnvs": [
                 {
                     "name": "SEMANTIC_SEARCH_ENABLED",
@@ -664,6 +668,10 @@ open_metadata_application = kubernetes.helm.v3.Release(
                 {
                     "name": "EMBEDDING_PROVIDER",
                     "value": "djl",
+                },
+                {
+                    "name": "LOG_FORMAT",
+                    "value": "json",
                 },
             ],
             "serviceAccount": {
