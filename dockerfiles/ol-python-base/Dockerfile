@@ -35,7 +35,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install uv (pinned via the upstream tag; bump deliberately).
-COPY --from=ghcr.io/astral-sh/uv:0.4.18 /uv /uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.15 /uv /uvx /usr/local/bin/
 
 # Non-root runtime user and the directories the apps expect to own.
 RUN adduser --disabled-password --gecos "" mitodl && \
