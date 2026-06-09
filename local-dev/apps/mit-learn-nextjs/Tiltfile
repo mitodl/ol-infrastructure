@@ -29,6 +29,8 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
             'NEXT_PUBLIC_MITOL_SUPPORT_EMAIL': 'mitlearn-support@mit.edu',
             'NEXT_PUBLIC_CSRF_COOKIE_NAME': 'csrftoken',
             'NEXT_PUBLIC_MITOL_AXIOS_WITH_CREDENTIALS': 'true',
+            'NEXT_PUBLIC_MITX_ONLINE_BASE_URL': 'https://mitxonline.{rd}'.format(rd=_rd),
+            'NEXT_PUBLIC_MITX_ONLINE_CSRF_COOKIE_NAME': 'csrf_mitxonline',
 
             # AI endpoints (point to learn-ai local service)
             'NEXT_PUBLIC_LEARN_AI_RECOMMENDATION_ENDPOINT':
@@ -47,7 +49,6 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
             'NEXT_PUBLIC_APPZI_URL': '',
             'NEXT_PUBLIC_HUBSPOT_PORTAL_ID': '',
             'NEXT_PUBLIC_VERSION': 'local',
-            # Required by certificateUtils.ts; invariant raised at module load if absent.
             'NEXT_PUBLIC_MITX_ONLINE_LEGACY_BASE_URL': 'https://mitxonline.{rd}'.format(rd=_rd),
         },
         # Rebuild when any frontend source or config changes.
