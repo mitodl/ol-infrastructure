@@ -45,7 +45,7 @@ if os.path.exists(os.path.join(MIT_LEARN_DIR, ".git")):
 # ─────────────────────────────────────────────────────────────
 
 # Apply all manifests in order.
-k8s_yaml([
+k8s_yaml_with_domain([
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/configmaps/nginx.yaml"),
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/configmaps/app-env.yaml"),
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/secrets.yaml"),
