@@ -909,6 +909,73 @@ fastly_access_logging_iam_role = monitoring_stack.require_output(
 
 
 mfe_regex = "^/({})/".format("|".join(edxapp_mfe_paths))
+
+# OEP-65 Site Project routing (optional, additive — legacy MFE rules are unchanged).
+# Set edxapp:site_project in the stack YAML with two keys:
+#   deployment — the Site Project deployment name (e.g. mitxonline)
+#   mfe_apps   — list of MFE app path names served by this Site Project (e.g. instructor-dashboard)
+site_project_config = edxapp_config.get_object("site_project")
+site_project_deployment = (
+    site_project_config.get("deployment") if site_project_config else None
+)
+site_project_mfe_apps: list[str] = (
+    list(site_project_config.get("mfe_apps", [])) if site_project_config else []
+)
+
+# When a Site Project is active, recv snippets tag matching requests with
+# X-Site-Project before rewriting the URL.  The backend condition checks this
+# flag so the MFE S3 Bucket backend is selected even after rewriting.
+_mfe_path_condition = f'req.url.path ~ "{mfe_regex}"'
+if site_project_deployment:
+    _mfe_path_condition = f'{_mfe_path_condition} || req.http.X-Site-Project == "1"'
+
+# Optionally build Site Project VCL snippets.
+_site_project_snippets: list[fastly.ServiceVclSnippetArgs] = []
+if site_project_deployment:
+    if not site_project_mfe_apps:
+        msg = (
+            "edxapp:site_project.mfe_apps must be a non-empty list "
+            "when edxapp:site_project is configured"
+        )
+        raise ValueError(msg)
+    _sp = site_project_deployment
+    _apps_alt = "|".join(site_project_mfe_apps)
+    _site_project_snippets.append(
+        fastly.ServiceVclSnippetArgs(
+            content=textwrap.dedent(
+                f"""\
+                unset req.http.X-Site-Project;
+                if (req.url.path ~ "^/apps/{_sp}-site/") {{
+                  set req.http.X-Site-Project = "1";
+                  set req.url = regsub(req.url.path, "^/apps/", "/");
+                  unset req.http.Cookie;
+                }} else if (req.url.path ~ "^/apps/({_apps_alt})(/|$)") {{
+                  set req.http.X-Site-Project = "1";
+                  set req.url = "/{_sp}-site/index.html";
+                  unset req.http.Cookie;
+                }}"""
+            ),
+            name="Handle Site Project routing",
+            priority=90,
+            type="recv",
+        )
+    )
+    # index.html is the SPA entry point; it must never be cached so deploys
+    # take effect immediately.  Versioned chunk files may be cached indefinitely.
+    _site_project_snippets.append(
+        fastly.ServiceVclSnippetArgs(
+            content=textwrap.dedent(
+                f"""\
+                if (req.url ~ "/{_sp}-site/index\\.html$") {{
+                  set beresp.ttl = 0s;
+                  set beresp.http.Cache-Control = "no-cache, no-store, must-revalidate";
+                }}"""
+            ),
+            name="No-cache for Site Project index.html",
+            type="fetch",
+        )
+    )
+
 edxapp_fastly_service = fastly.ServiceVcl(
     f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}",
     name=f"{stack_info.env_prefix} {stack_info.env_suffix} edX",
@@ -980,7 +1047,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
         ),
         fastly.ServiceVclConditionArgs(
             name="MFE Path",
-            statement=f'req.url.path ~ "{mfe_regex}"',
+            statement=_mfe_path_condition,
             type="REQUEST",
         ),
     ],
@@ -1016,6 +1083,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
         )
     ],
     snippets=[
+        *_site_project_snippets,
         fastly.ServiceVclSnippetArgs(
             content=textwrap.dedent(
                 """\

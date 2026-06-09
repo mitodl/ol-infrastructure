@@ -17,6 +17,7 @@ from ol_concourse.lib.resources import git_repo
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.open_edx.mfe.site_pipeline import SITE_PROJECTS
 from ol_concourse.pipelines.open_edx.mfe.values import deployments
 
 
@@ -75,6 +76,51 @@ def meta_job(
     )
 
 
+def site_meta_job(deployment_name: str) -> Job:
+    """Generate a meta job that creates the Site Project pipeline for one deployment."""
+    return Job(
+        name=Identifier(f"create-{deployment_name}-site-pipeline"),
+        plan=[
+            GetStep(
+                get="mfe-pipeline-definitions",
+                trigger=True,
+            ),
+            TaskStep(
+                task=Identifier(f"generate-{deployment_name}-site-pipeline-file"),
+                config=TaskConfig(
+                    platform=Platform.linux,
+                    image_resource=AnonymousResource(
+                        type="registry-image",
+                        source={
+                            "repository": dockerhub_ecr_image_uri(
+                                "mitodl/ol-infrastructure"
+                            ),
+                            "tag": "latest",
+                            "aws_region": ECR_REGION,
+                        },
+                    ),
+                    inputs=[Input(name=Identifier("mfe-pipeline-definitions"))],
+                    outputs=[Output(name=Identifier("pipeline"))],
+                    run=Command(
+                        path="python",
+                        dir="pipeline",
+                        user="root",
+                        args=[
+                            "../mfe-pipeline-definitions/src/ol_concourse/pipelines/open_edx/mfe/site_pipeline.py",
+                            deployment_name,
+                        ],
+                    ),
+                ),
+            ),
+            SetPipelineStep(
+                team=Identifier(deployment_name),
+                set_pipeline=Identifier(f"{deployment_name}-site-pipeline"),
+                file="pipeline/definition.json",
+            ),
+        ],
+    )
+
+
 def meta_pipeline() -> Pipeline:
     pipeline_jobs = []
     mfe_definitions = git_repo(
@@ -93,6 +139,9 @@ def meta_pipeline() -> Pipeline:
         for deployment in deployments
         for release in OpenLearningOpenEdxDeployment.get_item(deployment).releases
     ]
+    pipeline_jobs.extend(
+        site_meta_job(project.deployment_name) for project in SITE_PROJECTS
+    )
     pipeline_jobs.append(
         Job(
             name=Identifier("set-mfe-meta-pipeline"),
