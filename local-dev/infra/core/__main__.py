@@ -156,12 +156,12 @@ create_cache(_k8s, namespaces["local-infra"])
 
 search = create_search(_k8s, namespaces["local-infra"])
 
-create_ai_services(_k8s, namespaces["local-infra"], None, _infra_dir)
-
 messaging = create_messaging(_k8s, namespaces["local-infra"])
 
-# Create database cluster (needed by Keycloak instance) before identity
+# Create database cluster (needed by Keycloak, LiteLLM)
 db = create_database(_k8s, namespaces["local-infra"], cnpg_version)
+
+create_ai_services(_k8s, namespaces["local-infra"], db.cluster, _infra_dir)
 
 # Deploy Keycloak operator and instance (but not realm — that's in apps-infra)
 identity = create_identity_core(

@@ -1,5 +1,5 @@
 # mitxonline Tiltfile
-# Builds the mitxonline Django app (uwsgi) and deploys it to the mitxonline namespace.
+# Builds the mitxonline Django app (granian) and deploys it to the mitxonline namespace.
 # When the sibling mitxonline repo is not checked out, Tilt uses the prebuilt
 # DockerHub image (mitodl/mitxonline-app:latest) without attempting a local build.
 
@@ -27,7 +27,7 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         ],
     )
 
-k8s_yaml([
+k8s_yaml_with_domain([
     'configmaps/app-env.yaml',
     'configmaps/nginx.yaml',
     'secrets.yaml',
