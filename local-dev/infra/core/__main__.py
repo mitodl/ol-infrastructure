@@ -138,6 +138,13 @@ k8s.core.v1.ConfigMap(
                 "    template IN A {\n"
                 f'        answer "{{{{ .Name }}}} 60 IN A {ip}"\n'
                 "    }\n"
+                # Answer AAAA with NODATA (NOERROR, no answer) instead of
+                # letting the query fall through to SERVFAIL. glibc
+                # getaddrinfo issues parallel A+AAAA lookups; a SERVFAIL on
+                # the AAAA leg surfaces as EAI_AGAIN even when A succeeds.
+                "    template IN AAAA {\n"
+                "        rcode NOERROR\n"
+                "    }\n"
                 "}\n"
             )
         ),
