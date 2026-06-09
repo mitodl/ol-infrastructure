@@ -118,3 +118,7 @@ config:
   typesense:enabled: "true"
   typesense:course_search_enabled: "true"
   typesense:forum_search_enabled: "false"
+  edxapp:site_project:
+    deployment: xpro
+    mfe_apps:
+    - instructor-dashboard
