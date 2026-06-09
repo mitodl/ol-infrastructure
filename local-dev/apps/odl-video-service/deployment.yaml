@@ -56,18 +56,19 @@ spec:
           image: mitodl/odl-video-service-app:latest
           imagePullPolicy: IfNotPresent
           command:
-            - uwsgi
-            - --http-socket
-            - 0.0.0.0:8089
-            - --module
-            - odl_video.wsgi:application
+            - granian
+            - --interface
+            - wsgi
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8089"
             - --workers
             - "2"
-            - --threads
-            - "2"
+            - odl_video.wsgi:application
           ports:
             - containerPort: 8089
-              name: uwsgi
+              name: http-wsgi
           envFrom:
             - configMapRef:
                 name: odlvideo-env
