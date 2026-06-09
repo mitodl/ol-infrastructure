@@ -67,6 +67,7 @@ def meta_job(app_name: str) -> Job:
                         Input(name=Identifier("simple-pulumi-pipeline-definitions"))
                     ],
                     outputs=[Output(name=Identifier("pipeline"))],
+                    params={"PYTHONPATH": "../simple-pulumi-pipeline-definitions/src"},
                     run=Command(
                         path="python",
                         dir="pipeline",
@@ -135,6 +136,9 @@ def meta_pipeline(
                             Input(name=Identifier("simple-pulumi-pipeline-definitions"))
                         ],
                         outputs=[Output(name=Identifier("pipeline"))],
+                        params={
+                            "PYTHONPATH": "../simple-pulumi-pipeline-definitions/src"
+                        },
                         run=Command(
                             path="python",
                             dir="pipeline",

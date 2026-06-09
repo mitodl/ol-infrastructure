@@ -105,6 +105,7 @@ def meta_job(pipeline_name: str, script_path: str) -> Job:
                         Input(name=Identifier("infrastructure-pipeline-definitions"))
                     ],
                     outputs=[Output(name=Identifier("pipeline"))],
+                    params={"PYTHONPATH": "../infrastructure-pipeline-definitions/src"},
                     run=Command(
                         path="python",
                         dir="pipeline",
@@ -163,6 +164,9 @@ def meta_pipeline() -> Pipeline:
                             )
                         ],
                         outputs=[Output(name=Identifier("pipeline"))],
+                        params={
+                            "PYTHONPATH": "../infrastructure-pipeline-definitions/src"
+                        },
                         run=Command(
                             path="python",
                             dir="pipeline",

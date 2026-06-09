@@ -75,6 +75,7 @@ def _generate_pipeline_task(
             image_resource=_OL_INFRA_IMAGE,
             inputs=[Input(name=pipeline_code.name)],
             outputs=[Output(name=Identifier("pipeline"))],
+            params={"PYTHONPATH": f"../{pipeline_code.name}/src"},
             run=Command(
                 path="python",
                 dir="pipeline",

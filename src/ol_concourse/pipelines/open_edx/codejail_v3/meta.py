@@ -64,6 +64,7 @@ def build_meta_job(release_name):
                     ),
                     inputs=[Input(name=Identifier(pipeline_code.name))],
                     outputs=[Output(name=Identifier("pipeline"))],
+                    params={"PYTHONPATH": f"../{pipeline_code.name}/src"},
                     run=Command(
                         path="python",
                         dir="pipeline",
