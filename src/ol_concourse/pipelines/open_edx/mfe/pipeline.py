@@ -180,8 +180,7 @@ def mfe_job(  # noqa: C901, PLR0912, PLR0915
     )
     mfe_configs = git_repo(
         name=Identifier("mfe-slots-config"),
-        uri="https://github.com/mitodl/ol-infrastructure",
-        paths=["src/bridge/settings/openedx/mfe/slot_config/"],
+        uri="https://github.com/mitodl/ol-openedx-mfe-overrides",
         branch="main",
     )
 
@@ -226,7 +225,7 @@ def mfe_job(  # noqa: C901, PLR0912, PLR0915
         """
         slot_config_file = "learning-mfe-config"
         copy_common_config = (
-            f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+            f"cp {mfe_configs.name}/"
             f"{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx "
             f"{mfe_build_dir.name}/common-mfe-config.env.jsx"
         )
@@ -238,20 +237,20 @@ def mfe_job(  # noqa: C901, PLR0912, PLR0915
         copy_ai_drawer_components = [
             (
                 f"echo 'Copying AIDrawerManagerSidebar.jsx...' && "
-                f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+                f"cp -v {mfe_configs.name}/"
                 f"AIDrawerManagerSidebar.jsx "
                 f"{mfe_build_dir.name}/AIDrawerManagerSidebar.jsx"
             ),
             (
                 f"echo 'Copying {coordinator_source} "
                 f"as SidebarAIDrawerCoordinator.jsx...' && "
-                f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+                f"cp -v {mfe_configs.name}/"
                 f"{coordinator_source} "
                 f"{mfe_build_dir.name}/SidebarAIDrawerCoordinator.jsx"
             ),
         ]
         copy_responsive_course_tabs = (
-            f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+            f"cp -v {mfe_configs.name}/"
             f"ResponsiveCourseTabs.jsx "
             f"{mfe_build_dir.name}/ResponsiveCourseTabs.jsx"
         )
@@ -263,12 +262,12 @@ def mfe_job(  # noqa: C901, PLR0912, PLR0915
         f"cp -r {mfe_repo.name}/* {mfe_build_dir.name}",
         (
             f"echo 'Copying Footer.jsx...' && "
-            f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+            f"cp -v {mfe_configs.name}/"
             f"Footer.jsx {mfe_build_dir.name}/Footer.jsx"
         ),
         (
             f"echo 'Copying env.config from {slot_config_file}.env.jsx...' && "
-            f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+            f"cp -v {mfe_configs.name}/"
             f"{slot_config_file}.env.jsx "
             f"{mfe_build_dir.name}/env.config.jsx"
         ),
@@ -300,14 +299,14 @@ def mfe_job(  # noqa: C901, PLR0912, PLR0915
     # Add styles.scss copy for Residential deployments
     if open_edx_deployment.deployment_name in ["mitx", "mitx-staging"]:
         mfe_setup_steps.append(
-            f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+            f"cp {mfe_configs.name}/"
             f"mitx-styles.scss {mfe_build_dir.name}/mitx-styles.scss"
         )
 
     # Add styles.scss copy for MITx Online deployment
     if open_edx_deployment.deployment_name == "mitxonline":
         mfe_setup_steps.append(
-            f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
+            f"cp {mfe_configs.name}/"
             f"mitxonline-styles.scss {mfe_build_dir.name}/mitxonline-styles.scss"
         )
 
