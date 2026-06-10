@@ -20,10 +20,12 @@ from bridge.lib.versions import JUPYTERHUB_CHART_VERSION, MARIMO_JUPYTERLAB_VERS
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole
 from ol_infrastructure.components.services.apisix import (
-    OLApisixRoute,
-    OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+)
+from ol_infrastructure.components.services.apisix_gateway_api import (
+    OLApisixHTTPRoute,
+    OLApisixHTTPRouteConfig,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -249,7 +251,9 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
         opts=ResourceOptions(depends_on=app_vault_backend),
     )
 
-    # APISIX shared plugins (request-id, etc.) — no OIDC plugin; JupyterHub owns auth
+    # APISIX shared plugins (request-id, prometheus, etc.) — creates both v2
+    # ApisixPluginConfig (legacy) and v1alpha1 PluginConfig (Gateway API) resources
+    # under the same name so OLApisixHTTPRoute can reference it via ExtensionRef.
     shared_plugins = OLApisixSharedPlugins(
         name=f"ol-{base_name}-external-service-apisix-plugins",
         plugin_config=OLApisixSharedPluginsConfig(
@@ -261,7 +265,8 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
         ),
     )
 
-    # TLS certificate for the JupyterHub domain
+    # TLS certificate for the JupyterHub domain. ApisixTls is still required
+    # for APISIX to perform TLS termination even when routing via HTTPRoute.
     api_tls_secret_name = f"api-{base_name}-tls-pair"
     OLCertManagerCert(
         f"ol-{base_name}-cert-manager-certificate-{stack_info.env_suffix}",
@@ -275,24 +280,29 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
         ),
     )
 
-    # APISIX route: TLS termination + WebSocket proxying. No openid-connect plugin.
-    OLApisixRoute(
-        name=f"ol-{base_name}-k8s-apisix-route-{stack_info.env_suffix}",
-        k8s_namespace=namespace,
-        k8s_labels=application_labels,
+    # Gateway API HTTPRoute — replaces legacy ApisixRoute CRD.
+    # External-DNS reads spec.hostnames and creates the Route53 record automatically
+    # (via --source=gateway-httproute) pointing at the APISIX ELB, so no manual
+    # eks:apisix_domains entry is needed.
+    # Port 80 is passed as a numeric value because proxy-public exposes port 80
+    # named "http", and the port-name-to-number mapping in OLApisixHTTPRoute
+    # defaults "http" to the nginx default (8071) which is wrong here.
+    OLApisixHTTPRoute(
+        name=f"ol-{base_name}-k8s-apisix-httproute-{stack_info.env_suffix}",
         route_configs=[
-            OLApisixRouteConfig(
+            OLApisixHTTPRouteConfig(
                 route_name=base_name,
-                priority=0,
                 shared_plugin_config_name=shared_plugins.resource_name,
                 plugins=[],
                 hosts=[domain_name],
                 paths=["/*"],
                 backend_service_name="proxy-public",
-                backend_service_port="http",
+                backend_service_port=80,
                 websocket=True,
             ),
         ],
+        k8s_namespace=namespace,
+        k8s_labels=application_labels,
         opts=ResourceOptions(delete_before_replace=True),
     )
 
