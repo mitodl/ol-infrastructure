@@ -8,6 +8,7 @@ from ol_infrastructure.components.aws.eks import (
     OLEKSGateway,
     OLEKSGatewayConfig,
     OLEKSGatewayListenerConfig,
+    OLEKSGatewayRateLimitConfig,
     OLEKSGatewayRouteConfig,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
@@ -307,6 +308,10 @@ gateway = OLEKSGateway(
         gateway_name="mit-learn-nextjs-gateway",
         labels=k8s_app_labels,
         namespace=learn_namespace,
+        rate_limit=OLEKSGatewayRateLimitConfig(
+            average=nextjs_config.get_int("rate_limit_average") or 300,
+            burst=nextjs_config.get_int("rate_limit_burst") or 600,
+        ),
         listeners=[
             OLEKSGatewayListenerConfig(
                 name="https",

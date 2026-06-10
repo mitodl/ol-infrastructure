@@ -1377,6 +1377,7 @@ learn_external_service_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=learn_namespace,
         k8s_labels=application_labels,
         enable_defaults=True,
+        enable_rate_limiting=True,
     ),
 )
 
