@@ -185,6 +185,8 @@ def _build_dagger_legacy_cmd(
     open_edx_deployment: DeploymentEnvRelease,
 ) -> str:
     """Return a bash script that runs build-legacy-configured and exports dist."""
+    # Build from the pinned MFE checkout (a sibling Concourse input) rather than
+    # re-cloning, so the exact revision that passed CI is what gets promoted.
     args: list[str] = [
         "dagger",
         "call",
@@ -192,10 +194,8 @@ def _build_dagger_legacy_cmd(
         "build-legacy-configured",
         "--mfe-name",
         mfe_name,
-        "--mfe-repo",
-        mfe.git_origin,
-        "--mfe-branch",
-        mfe.release_branch,
+        "--mfe-source",
+        f"../mfe-app-{mfe_name}",
         "--node-version",
         str(mfe.runtime_version),
         "--deployment-name",
@@ -252,7 +252,7 @@ def mfe_job(
         ],
     )
 
-    is_ci = previous_job is None and open_edx.environment_stage != "production"
+    is_ci = previous_job is None and open_edx.environment_stage != "Production"
     clone_lehrer = GetStep(get=lehrer.name, trigger=is_ci)
     clone_mfe_repo = GetStep(get=mfe_repo.name, trigger=is_ci)
 
@@ -284,7 +284,7 @@ def mfe_job(
                         "tag": "latest",
                     },
                 ),
-                inputs=[Input(name=lehrer.name)],
+                inputs=[Input(name=lehrer.name), Input(name=mfe_repo.name)],
                 outputs=[Output(name=Identifier("compiled-mfe"))],
                 run=Command(
                     path="bash",
