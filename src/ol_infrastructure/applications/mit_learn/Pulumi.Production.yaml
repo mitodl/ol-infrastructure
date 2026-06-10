@@ -106,7 +106,7 @@ config:
     POSTHOG_TIMEOUT_MS: 1000
     SEE_API_ENABLED: "true"
     SENTRY_PROFILES_SAMPLE_RATE: "0.1"
-    SENTRY_TRACES_SAMPLE_RATE: "0.1"
+    SENTRY_TRACES_SAMPLE_RATE: "0.001"
     SESSION_COOKIE_NAME: "session_mitlearn"
     SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT: "https://sso.ol.mit.edu/realms/olapps"
     TIKA_SERVER_ENDPOINT: "https://tika-production.ol.mit.edu"
