@@ -10,11 +10,11 @@ config:
   starrocks:oidc_enabled: "false"
   starrocks:fe_config:
     replicas: 3
-    cpu_request: 8000m
-    memory_request: 16Gi
-    memory_limit: 16Gi
-    # 87.5% of 16Gi container limit; leaves ~2Gi headroom for JVM off-heap memory.
-    jvm_heap_mb: 14336
+    cpu_request: 2000m
+    memory_request: 6Gi
+    memory_limit: 6Gi
+    # 87.5% of 6Gi container limit; leaves ~768Mi headroom for JVM off-heap memory.
+    jvm_heap_mb: 5376
     # Raise optimizer timeout to tolerate slow AWS Glue metadata responses.
     # StarRocks default is 3000 ms.
     planner_optimize_timeout_ms: 30000
@@ -23,9 +23,9 @@ config:
   starrocks:use_be: "false"
   starrocks:be_config:
     replicas: 3
-    cpu_request: 16000m
-    memory_request: 32Gi
-    memory_limit: 32Gi
+    cpu_request: 4000m
+    memory_request: 8Gi
+    memory_limit: 8Gi
     storage: 1Ti
     log_storage: 100Gi
   starrocks:use_cn: "true"
@@ -33,9 +33,9 @@ config:
     min_replicas: 1
     max_replicas: 10
     cpu_target_utilization_percentage: 80
-    cpu_request: 16000m
-    memory_request: 32Gi
-    memory_limit: 32Gi
+    cpu_request: 4000m
+    memory_request: 8Gi
+    memory_limit: 8Gi
   starrocks:enable_data_lake_integration: "true"
   starrocks:ssl_enabled: "true"
   # ssl_force_secure_transport is intentionally false: the StarRocks operator

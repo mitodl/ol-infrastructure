@@ -5,10 +5,10 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-operations-ci.odl.mit.edu
   keycloak:replicas: 3
-  keycloak:memory_request: 1Gi
-  keycloak:memory_limit: 2Gi
-  keycloak:cpu_request: 1000m
-  keycloak:cpu_limit: 2000m
+  keycloak:memory_request: 384Mi
+  keycloak:memory_limit: 512Mi
+  keycloak:cpu_request: 200m
+  keycloak:cpu_limit: 400m
   keycloak:db_capacity: "50"
   keycloak:instance_type: burstable_medium
   keycloak:domain: sso-ci.ol.mit.edu

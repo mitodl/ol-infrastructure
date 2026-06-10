@@ -60,6 +60,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
     default_psg_egress_args,
     get_default_psg_ingress_args,
 )
+from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -392,8 +393,8 @@ def create_k8s_resources(  # noqa: C901
                 ),
             ],
             resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                requests={"cpu": "100m", "memory": "512Mi"},
-                limits={"memory": "512Mi"},
+                requests={"cpu": "10m", "memory": "96Mi"},
+                limits={"memory": "128Mi"},
             ),
             volume_mounts=[
                 kubernetes.core.v1.VolumeMountArgs(
@@ -1629,6 +1630,54 @@ def create_k8s_resources(  # noqa: C901
                 backend_service_port="http",
             ),
         ],
+    )
+
+    # VPA objects — edxapp uses KEDA (Prometheus request-rate / Redis queue depth)
+    # for scaling so VPA may control both CPU and memory on all targets.
+    _webapp_vpa_bounds = {
+        "min_allowed": {"cpu": "50m", "memory": "256Mi"},
+        "max_allowed": {"cpu": "2000m", "memory": "4Gi"},
+    }
+    _worker_vpa_bounds = {
+        "min_allowed": {"cpu": "25m", "memory": "128Mi"},
+        "max_allowed": {"cpu": "1000m", "memory": "2Gi"},
+    }
+
+    make_vpa(
+        name=f"{env_name}-edxapp-lms-webapp-vpa",
+        namespace=namespace,
+        target_kind="Deployment",
+        target_name=lms_app.webapp_deployment_name,
+        controlled_resources=["cpu", "memory"],
+        **_webapp_vpa_bounds,
+        opts=ResourceOptions(depends_on=[lms_app]),
+    )
+    make_vpa(
+        name=f"{env_name}-edxapp-cms-webapp-vpa",
+        namespace=namespace,
+        target_kind="Deployment",
+        target_name=cms_app.webapp_deployment_name,
+        controlled_resources=["cpu", "memory"],
+        **_webapp_vpa_bounds,
+        opts=ResourceOptions(depends_on=[cms_app]),
+    )
+    make_vpa(
+        name=f"{env_name}-edxapp-lms-celery-vpa",
+        namespace=namespace,
+        target_kind="Deployment",
+        target_name=lms_celery_deployment_name,
+        controlled_resources=["cpu", "memory"],
+        **_worker_vpa_bounds,
+        opts=ResourceOptions(depends_on=[lms_celery_deployment]),
+    )
+    make_vpa(
+        name=f"{env_name}-edxapp-cms-celery-vpa",
+        namespace=namespace,
+        target_kind="Deployment",
+        target_name=cms_celery_deployment_name,
+        controlled_resources=["cpu", "memory"],
+        **_worker_vpa_bounds,
+        opts=ResourceOptions(depends_on=[cms_celery_deployment]),
     )
 
     return {

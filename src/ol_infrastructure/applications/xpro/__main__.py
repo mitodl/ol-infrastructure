@@ -71,6 +71,7 @@ from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
 )
+from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -627,6 +628,44 @@ if k8s_deploy:
         k8s_namespace=xpro_namespace,
         k8s_labels=k8s_app_labels,
     )
+
+    # VPA objects for xpro workloads.
+    # xpro has no CPU-based HPA (scaling is KEDA / replicas-only), so VPA controls both
+    # CPU and memory on all targets.
+    _worker_vpa_bounds = {
+        "min_allowed": {"cpu": "25m", "memory": "128Mi"},
+        "max_allowed": {"cpu": "1000m", "memory": "2Gi"},
+    }
+    make_vpa(
+        name="xpro-webapp-vpa",
+        namespace=xpro_namespace,
+        target_kind="Deployment",
+        target_name=xpro_k8s_app.webapp_deployment_name,
+        controlled_resources=["cpu", "memory"],
+        min_allowed={"cpu": "50m", "memory": "256Mi"},
+        max_allowed={"cpu": "2000m", "memory": "4Gi"},
+        opts=ResourceOptions(depends_on=[xpro_k8s_app]),
+    )
+    for _celery_name in xpro_k8s_app.celery_deployment_names:
+        make_vpa(
+            name=f"{_celery_name}-vpa",
+            namespace=xpro_namespace,
+            target_kind="Deployment",
+            target_name=_celery_name,
+            controlled_resources=["cpu", "memory"],
+            **_worker_vpa_bounds,
+            opts=ResourceOptions(depends_on=[xpro_k8s_app]),
+        )
+    if xpro_k8s_app.beat_deployment_name:
+        make_vpa(
+            name=f"{xpro_k8s_app.beat_deployment_name}-vpa",
+            namespace=xpro_namespace,
+            target_kind="Deployment",
+            target_name=xpro_k8s_app.beat_deployment_name,
+            controlled_resources=["cpu", "memory"],
+            **_worker_vpa_bounds,
+            opts=ResourceOptions(depends_on=[xpro_k8s_app]),
+        )
 
 vector_log_proxy_secrets = read_yaml_secrets(
     Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
