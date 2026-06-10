@@ -355,6 +355,28 @@ class OLApisixSharedPluginsConfig(BaseModel):
     k8s_labels: dict[str, str] = {}
     k8s_namespace: str
     plugins: list[dict[str, Any]] = []
+    # Per-client-IP rate limiting as a DDoS backstop.  Opt-in (default off) so
+    # that enabling it on one application does not change the behaviour of the
+    # other services that share this component.  Limits are enforced per APISIX
+    # pod (node-local shared memory), so the effective ceiling scales with the
+    # gateway replica count; this is intended to throttle single-source floods,
+    # not to replace edge/volumetric protection.
+    enable_rate_limiting: bool = False
+    # Key used to bucket requests.  ``remote_addr`` resolves to the real client
+    # IP because the gateway trusts Fastly's X-Forwarded-For (see trustedAddresses).
+    rate_limit_key: str = "remote_addr"
+    rate_limit_rejected_code: int = 429
+    # Thresholds are deliberately generous: large shared-NAT egress points (most
+    # notably the MIT campus network) collapse many legitimate users onto a single
+    # public IP, so a tight per-IP ceiling would throttle real traffic at peak.
+    # These values target single-source flood abuse, not normal aggregated load.
+    # limit-req: leaky-bucket request rate (requests/second) plus burst slack.
+    rate_limit_requests_per_second: int = 300
+    rate_limit_burst: int = 150
+    # limit-conn: maximum concurrent in-flight requests plus burst slack.  A SPA
+    # behind shared NAT can hold many parallel XHRs open, so this stays high.
+    rate_limit_max_concurrent: int = 400
+    rate_limit_concurrent_burst: int = 200
 
 
 class OLApisixSharedPlugins(ComponentResource):
@@ -434,10 +456,46 @@ class OLApisixSharedPlugins(ComponentResource):
             "config": {"sampler": {"name": "always_on"}},
         }
 
+        # limit-conn caps concurrent in-flight requests per client; limit-req
+        # applies a leaky-bucket request-rate ceiling.  Both set
+        # ``allow_degradation`` so that if the plugin's shared-memory store is
+        # unavailable the request is allowed through rather than failing closed
+        # — a rate-limiting backstop must never become its own outage.
+        __rate_limit_plugins: list[dict[str, Any]] = [
+            {
+                "name": "limit-conn",
+                "enable": True,
+                "config": {
+                    "conn": plugin_config.rate_limit_max_concurrent,
+                    "burst": plugin_config.rate_limit_concurrent_burst,
+                    "default_conn_delay": 0.1,
+                    "key_type": "var",
+                    "key": plugin_config.rate_limit_key,
+                    "rejected_code": plugin_config.rate_limit_rejected_code,
+                    "allow_degradation": True,
+                },
+            },
+            {
+                "name": "limit-req",
+                "enable": True,
+                "config": {
+                    "rate": plugin_config.rate_limit_requests_per_second,
+                    "burst": plugin_config.rate_limit_burst,
+                    "nodelay": True,
+                    "key_type": "var",
+                    "key": plugin_config.rate_limit_key,
+                    "rejected_code": plugin_config.rate_limit_rejected_code,
+                    "allow_degradation": True,
+                },
+            },
+        ]
+
         resource_options = ResourceOptions(parent=self).merge(opts)
 
         if plugin_config.enable_defaults:
             plugin_config.plugins.extend(__default_plugins)
+        if plugin_config.enable_rate_limiting:
+            plugin_config.plugins.extend(__rate_limit_plugins)
 
         # Gate on CI to match the cluster-level plugin enablement: APISIX does not
         # load the opentelemetry plugin on CI, so attaching it to a route there
