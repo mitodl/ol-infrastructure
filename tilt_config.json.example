@@ -15,5 +15,7 @@
 
   "openai_api_key": "",
   "langsmith_api_key": "",
-  "canvas_ai_token": ""
+  "canvas_ai_token": "",
+
+  "root_domain": "mit.dev"
 }

@@ -1,6 +1,6 @@
 ---
 # nginx config for the odl-video-service webapp sidecar.
-# odl-video-service uses uwsgi on port 8089 (its default PORT env).
+# odl-video-service runs granian on port 8089, nginx proxies to it.
 apiVersion: v1
 kind: ConfigMap
 metadata:

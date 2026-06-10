@@ -19,106 +19,107 @@ spec:
       initContainers:
         # Merge the image's system CA bundle with the mkcert root so pods trust
         # both public HTTPS endpoints and local-dev TLS.
-        - name: ca-bundle-merge
-          image: mitodl/odl-video-service-app:latest
-          imagePullPolicy: IfNotPresent
-          command: ["/bin/sh", "-c"]
-          args:
-            - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
-          volumeMounts:
-            - name: mkcert-root-ca
-              mountPath: /mkcert
-              readOnly: true
-            - name: combined-ca
-              mountPath: /etc/ssl/local-dev
-        - name: bootstrap
-          image: mitodl/odl-video-service-app:latest
-          imagePullPolicy: IfNotPresent
-          command:
-            - /bin/sh
-            - -c
-            - |
-              python manage.py collectstatic --noinput --clear
-              python manage.py migrate --noinput
-          envFrom:
-            - configMapRef:
-                name: odlvideo-env
-            - secretRef:
-                name: odlvideo-secrets
-          volumeMounts:
-            - name: static-files
-              mountPath: /src/staticfiles
-            - name: combined-ca
-              mountPath: /etc/ssl/local-dev
-              readOnly: true
-      containers:
-        - name: app
-          image: mitodl/odl-video-service-app:latest
-          imagePullPolicy: IfNotPresent
-          command:
-            - uwsgi
-            - --http-socket
-            - 0.0.0.0:8089
-            - --module
-            - odl_video.wsgi:application
-            - --workers
-            - "2"
-            - --threads
-            - "2"
-          ports:
-            - containerPort: 8089
-              name: uwsgi
-          envFrom:
-            - configMapRef:
-                name: odlvideo-env
-            - secretRef:
-                name: odlvideo-secrets
-          resources:
-            requests:
-              cpu: 250m
-              memory: 512Mi
-            limits:
-              memory: 1Gi
-          readinessProbe:
-            tcpSocket:
-              port: 8089
-            initialDelaySeconds: 20
-            periodSeconds: 10
-            timeoutSeconds: 5
-          volumeMounts:
-            - name: static-files
-              mountPath: /src/staticfiles
-            - name: combined-ca
-              mountPath: /etc/ssl/local-dev
-              readOnly: true
-        - name: nginx
-          image: nginx:1.25-alpine
-          ports:
-            - containerPort: 8088
-              name: http
-          volumeMounts:
-            - name: nginx-conf
-              mountPath: /etc/nginx/conf.d/default.conf
-              subPath: default.conf
-            - name: static-files
-              mountPath: /src/staticfiles
-          resources:
-            requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              memory: 128Mi
-      volumes:
-        - name: nginx-conf
-          configMap:
-            name: odlvideo-nginx-conf
-        - name: static-files
-          emptyDir: {}
+      - name: ca-bundle-merge
+        image: mitodl/odl-video-service-app:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+        - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+        volumeMounts:
         - name: mkcert-root-ca
-          configMap:
-            name: mkcert-root-ca
+          mountPath: /mkcert
+          readOnly: true
         - name: combined-ca
-          emptyDir: {}
+          mountPath: /etc/ssl/local-dev
+      - name: bootstrap
+        image: mitodl/odl-video-service-app:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/sh
+        - -c
+        - |
+          python manage.py collectstatic --noinput --clear
+          python manage.py migrate --noinput
+        envFrom:
+        - configMapRef:
+            name: odlvideo-env
+        - secretRef:
+            name: odlvideo-secrets
+        volumeMounts:
+        - name: static-files
+          mountPath: /src/staticfiles
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      containers:
+      - name: app
+        image: mitodl/odl-video-service-app:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - granian
+        - --interface
+        - wsgi
+        - --host
+        - 0.0.0.0
+        - --port
+        - "8089"
+        - --workers
+        - "2"
+        - odl_video.wsgi:application
+        ports:
+        - containerPort: 8089
+          name: http-wsgi
+        envFrom:
+        - configMapRef:
+            name: odlvideo-env
+        - secretRef:
+            name: odlvideo-secrets
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            memory: 1Gi
+        readinessProbe:
+          tcpSocket:
+            port: 8089
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: static-files
+          mountPath: /src/staticfiles
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      - name: nginx
+        image: nginx:1.25-alpine
+        ports:
+        - containerPort: 8088
+          name: http
+        volumeMounts:
+        - name: nginx-conf
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: default.conf
+        - name: static-files
+          mountPath: /src/staticfiles
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 128Mi
+      volumes:
+      - name: nginx-conf
+        configMap:
+          name: odlvideo-nginx-conf
+      - name: static-files
+        emptyDir: {}
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
+      - name: combined-ca
+        emptyDir: {}
 ---
 # Celery worker
 apiVersion: apps/v1
@@ -139,50 +140,50 @@ spec:
         app: odlvideo-celery
     spec:
       initContainers:
-        - name: ca-bundle-merge
-          image: mitodl/odl-video-service-app:latest
-          imagePullPolicy: IfNotPresent
-          command: ["/bin/sh", "-c"]
-          args:
-            - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
-          volumeMounts:
-            - name: mkcert-root-ca
-              mountPath: /mkcert
-              readOnly: true
-            - name: combined-ca
-              mountPath: /etc/ssl/local-dev
-      containers:
-        - name: celery
-          image: mitodl/odl-video-service-app:latest
-          imagePullPolicy: IfNotPresent
-          command:
-            - celery
-            - -A
-            - odl_video.celery:app
-            - worker
-            - -c
-            - "2"
-          envFrom:
-            - configMapRef:
-                name: odlvideo-env
-            - secretRef:
-                name: odlvideo-secrets
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              memory: 1Gi
-          volumeMounts:
-            - name: combined-ca
-              mountPath: /etc/ssl/local-dev
-              readOnly: true
-      volumes:
+      - name: ca-bundle-merge
+        image: mitodl/odl-video-service-app:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+        - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+        volumeMounts:
         - name: mkcert-root-ca
-          configMap:
-            name: mkcert-root-ca
+          mountPath: /mkcert
+          readOnly: true
         - name: combined-ca
-          emptyDir: {}
+          mountPath: /etc/ssl/local-dev
+      containers:
+      - name: celery
+        image: mitodl/odl-video-service-app:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - celery
+        - -A
+        - odl_video.celery:app
+        - worker
+        - -c
+        - "2"
+        envFrom:
+        - configMapRef:
+            name: odlvideo-env
+        - secretRef:
+            name: odlvideo-secrets
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 1Gi
+        volumeMounts:
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
+      - name: combined-ca
+        emptyDir: {}
 ---
 # Celery beat scheduler
 apiVersion: apps/v1
@@ -203,50 +204,50 @@ spec:
         app: odlvideo-celery-beat
     spec:
       initContainers:
-        - name: ca-bundle-merge
-          image: mitodl/odl-video-service-app:latest
-          imagePullPolicy: IfNotPresent
-          command: ["/bin/sh", "-c"]
-          args:
-            - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
-          volumeMounts:
-            - name: mkcert-root-ca
-              mountPath: /mkcert
-              readOnly: true
-            - name: combined-ca
-              mountPath: /etc/ssl/local-dev
-      containers:
-        - name: celery-beat
-          image: mitodl/odl-video-service-app:latest
-          imagePullPolicy: IfNotPresent
-          command:
-            - celery
-            - -A
-            - odl_video.celery:app
-            - beat
-            - --schedule
-            - /tmp/celerybeat-schedule
-          envFrom:
-            - configMapRef:
-                name: odlvideo-env
-            - secretRef:
-                name: odlvideo-secrets
-          resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              memory: 256Mi
-          volumeMounts:
-            - name: combined-ca
-              mountPath: /etc/ssl/local-dev
-              readOnly: true
-      volumes:
+      - name: ca-bundle-merge
+        image: mitodl/odl-video-service-app:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+        - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+        volumeMounts:
         - name: mkcert-root-ca
-          configMap:
-            name: mkcert-root-ca
+          mountPath: /mkcert
+          readOnly: true
         - name: combined-ca
-          emptyDir: {}
+          mountPath: /etc/ssl/local-dev
+      containers:
+      - name: celery-beat
+        image: mitodl/odl-video-service-app:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - celery
+        - -A
+        - odl_video.celery:app
+        - beat
+        - --schedule
+        - /tmp/celerybeat-schedule
+        envFrom:
+        - configMapRef:
+            name: odlvideo-env
+        - secretRef:
+            name: odlvideo-secrets
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            memory: 256Mi
+        volumeMounts:
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
+      - name: combined-ca
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -259,6 +260,6 @@ spec:
   selector:
     app: odlvideo-webapp
   ports:
-    - name: http
-      port: 8088
-      targetPort: http
+  - name: http
+    port: 8088
+    targetPort: http

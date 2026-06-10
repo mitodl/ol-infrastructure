@@ -45,9 +45,7 @@ repos:
     exclude: |
       (?x)(
         src/ol_infrastructure/applications/edxapp/files/edxapp/.*/.*\.yaml|
-        charts/|
-        local-dev/apps/|
-        local-dev/infra/
+        charts/
       )
 - repo: https://github.com/adrienverge/yamllint.git
   rev: v1.38.0
@@ -57,9 +55,7 @@ repos:
     exclude: |
       (?x)(
         src/ol_infrastructure/applications/edxapp/files/edxapp/.*/.*\.yaml|
-        charts/|
-        local-dev/apps/|
-        local-dev/infra/
+        charts/
       )
 - repo: https://github.com/Yelp/detect-secrets
   rev: v1.5.0
