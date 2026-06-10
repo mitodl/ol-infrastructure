@@ -1737,6 +1737,7 @@ learn_external_service_shared_plugins = OLApisixSharedPlugins(
             # an OIDC session cookie over cleartext.
             oidc_gateway_pre_function_plugin(),
         ],
+        enable_rate_limiting=True,
     ),
 )
 
