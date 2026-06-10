@@ -1477,6 +1477,7 @@ learn_external_service_shared_plugins = OLApisixSharedPlugins(
                 cookie_domains=[mitlearn_api_domain.removeprefix("api")],
             ),
         ],
+        enable_rate_limiting=True,
     ),
 )
 
