@@ -535,6 +535,12 @@ def create_ol_mit_realm(  # noqa: PLR0913
             "eduPersonPrimaryAffiliation",
             "eduPersonPrimaryAffiliation",
         ),
+        (
+            "ol-mit-ldap-first-name-mapper",
+            "first name",
+            "givenName",
+            "firstName",
+        ),
     ]:
         keycloak.ldap.UserAttributeMapper(
             resource_name,
