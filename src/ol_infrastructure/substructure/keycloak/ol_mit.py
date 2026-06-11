@@ -550,6 +550,23 @@ def create_ol_mit_realm(  # noqa: PLR0913
             "givenName",
             "firstName",
         ),
+        # createTimestamp/modifyTimestamp mappers are normally auto-created by
+        # Keycloak's default mapper set.  Since delete_default_mappers=True
+        # suppresses those, re-add them explicitly: the delta sync driven by
+        # changed_sync_period relies on modifyTimestamp to detect which LDAP
+        # entries have changed since the last sync.
+        (
+            "ol-mit-ldap-creation-date-mapper",
+            "creation date",
+            "createTimestamp",
+            "createTimestamp",
+        ),
+        (
+            "ol-mit-ldap-modify-date-mapper",
+            "modify date",
+            "modifyTimestamp",
+            "modifyTimestamp",
+        ),
         (
             "ol-mit-ldap-edu-person-principal-name-mapper",
             "eduPersonPrincipalName",
