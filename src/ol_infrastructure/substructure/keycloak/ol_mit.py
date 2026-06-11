@@ -517,7 +517,7 @@ def create_ol_mit_realm(  # noqa: PLR0913
         # than letting the default mapper shadow our intent or collide on
         # the "first name" name.
         delete_default_mappers=True,
-        opts=resource_options,
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
     # Standard attribute mappers.  These replace the default mappers Keycloak
