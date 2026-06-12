@@ -1,0 +1,51 @@
+# openedx integration Tiltfile for ol-infrastructure local dev.
+#
+# Deploys edx-platform (LMS/CMS), codejail, edx-notes-api, and compiled MFEs
+# into the openedx namespace, sharing ol-infrastructure's Valkey and OpenSearch.
+# MySQL and MongoDB are deployed here since ol-infrastructure doesn't include them.
+#
+# Prerequisites:
+#   - MITOL_WORKSPACE_ROOT must be set (or lehrer must be at <workspace_root>/lehrer)
+#   - lehrer repo must be checked out alongside ol-infrastructure
+
+workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/../../..")
+lehrer_dir = os.path.join(workspace_root, "lehrer")
+
+if not os.path.exists(os.path.join(lehrer_dir, ".git")):
+    print("WARNING: lehrer repo not found at " + lehrer_dir + " — skipping openedx deployment.")
+    print("  Set MITOL_WORKSPACE_ROOT to the directory containing the lehrer repo.")
+else:
+    # ---- Globals consumed by lehrer-core.star ----
+
+    LEHRER_DEPLOY_CONFIG   = os.path.join(lehrer_dir, "deployments/mit-ol")
+    LEHRER_REGISTRY        = "localhost:5001"                           # ol-infra registry (host-side)
+    LEHRER_REGISTRY_K8S    = "k3d-registry.localhost:5001"             # ol-infra registry (cluster-side)
+    LEHRER_REDIS_HOST      = "valkey-primary.local-infra.svc.cluster.local"
+    LEHRER_OPENSEARCH_HOST = "opensearch-master.local-infra.svc.cluster.local"
+    LEHRER_NAMESPACE       = "openedx"
+    LEHRER_MANAGE_INFRA    = False    # Valkey and OpenSearch come from ol-infra
+    LEHRER_MYSQL_MANAGED   = True     # ol-infra doesn't have MySQL — deploy it here
+    LEHRER_MONGO_MANAGED   = True     # ol-infra doesn't have MongoDB — deploy it here
+    LEHRER_INGRESS         = "apisix"
+    LEHRER_MFE_HOT_RELOAD  = False
+    LEHRER_NOTES_REPO      = "https://github.com/openedx/edx-notes-api"
+    LEHRER_HELM_OVERRIDE_DIR = config.main_dir + "/helm"
+    LEHRER_LOCAL_DEV_DIR   = os.path.join(lehrer_dir, "local-dev")
+    LEHRER_LMS_BASE_URL    = "https://lms.mit.dev"
+    LEHRER_CMS_BASE_URL    = "https://studio.mit.dev"
+    LEHRER_NOTES_PUBLIC_URL = "https://notes.mit.dev"
+    # Integration Tiltfile applies its own configmaps pointing at ol-infra services.
+    LEHRER_APPLY_PLATFORM_CONFIGMAPS = False
+
+    LEHRER_RELEASE_NAME    = "master"
+    LEHRER_DEPLOY_NAME     = "mitxonline"
+    LEHRER_SETTINGS_NS     = "mitol"
+
+    # Apply integration-specific configmaps (Valkey, ol-infra OpenSearch, public URLs).
+    k8s_yaml(config.main_dir + "/configmaps/lms-config.yaml")
+    k8s_yaml(config.main_dir + "/configmaps/cms-config.yaml")
+
+    include(os.path.join(lehrer_dir, "local-dev/lehrer-core.star"))
+
+    # APISIX routes for lms/studio/notes/mfe on the ol-infra cluster
+    k8s_yaml(config.main_dir + "/apisix-routes.yaml")
