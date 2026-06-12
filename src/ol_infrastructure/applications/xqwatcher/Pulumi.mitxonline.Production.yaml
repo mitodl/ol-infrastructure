@@ -26,6 +26,7 @@ config:
           image_pull_policy: always
     edxorg-686x:
       SERVER_REF: edxorg
+      NAME_OVERRIDE: mitx-686xgrader
       CONNECTIONS: 5
       HANDLERS:
       - HANDLER: xqueue_watcher.containergrader.ContainerGrader

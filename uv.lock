@@ -10,7 +10,6 @@ resolution-markers = [
 members = [
     "ol-infrastructure",
     "pulumi-qdrant-cloud",
-    "pulumi-rootly",
 ]
 
 [[package]]
@@ -1445,7 +1444,6 @@ dependencies = [
     { name = "pulumi-mailgun" },
     { name = "pulumi-mongodbatlas" },
     { name = "pulumi-qdrant-cloud" },
-    { name = "pulumi-rootly" },
     { name = "pulumi-terraform" },
     { name = "pulumi-tls" },
     { name = "pulumi-vault" },
@@ -1498,7 +1496,6 @@ requires-dist = [
     { name = "pulumi-mailgun", specifier = ">=3.0.0,<4" },
     { name = "pulumi-mongodbatlas", specifier = ">=4,<5" },
     { name = "pulumi-qdrant-cloud", editable = "sdks/qdrant-cloud" },
-    { name = "pulumi-rootly", editable = "sdks/rootly" },
     { name = "pulumi-terraform", specifier = ">=6.0.1" },
     { name = "pulumi-tls", specifier = ">=5.0.0,<6" },
     { name = "pulumi-vault", specifier = ">=7,<8" },
@@ -2050,24 +2047,6 @@ wheels = [
 name = "pulumi-qdrant-cloud"
 version = "1.19.3"
 source = { editable = "sdks/qdrant-cloud" }
-dependencies = [
-    { name = "parver" },
-    { name = "pulumi" },
-    { name = "semver" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "parver", specifier = ">=0.2.1" },
-    { name = "pulumi", specifier = ">=3.165.0,<4.0.0" },
-    { name = "semver", specifier = ">=2.8.1" },
-    { name = "typing-extensions", marker = "python_full_version < '3.11'", specifier = ">=4.11,<5" },
-]
-
-[[package]]
-name = "pulumi-rootly"
-version = "5.13.0"
-source = { editable = "sdks/rootly" }
 dependencies = [
     { name = "parver" },
     { name = "pulumi" },
