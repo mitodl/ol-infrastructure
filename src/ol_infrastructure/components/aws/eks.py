@@ -55,37 +55,6 @@ class OLEKSGatewayListenerConfig(BaseModel):
         return self
 
 
-class OLEKSGatewayRateLimitConfig(BaseModel):
-    """Per-client-IP rate limiting for Traefik HTTPRoutes (DDoS backstop).
-
-    Materialised as a Traefik ``Middleware`` CRD referenced from every route via
-    an ExtensionRef filter.  Limits are enforced per Traefik pod, so the effective
-    ceiling scales with the controller replica count; this throttles single-source
-    floods rather than replacing edge/volumetric protection.
-    """
-
-    # Thresholds are deliberately generous: large shared-NAT egress points (most
-    # notably the MIT campus network) collapse many legitimate users onto a single
-    # public IP, so a tight per-IP ceiling would throttle real traffic at peak.
-    # Average number of requests permitted per ``period``.
-    average: PositiveInt = 300
-    # Maximum burst of requests tolerated above the average before throttling.
-    burst: PositiveInt = 600
-    period: str = "1s"
-    # Depth of the client IP within X-Forwarded-For, counted from the right.
-    # 1 matches a single trusted CDN hop (Fastly), whose X-Forwarded-For the
-    # Traefik controller trusts (see forwardedHeaders.trustedIPs), so the bucket
-    # keys on the real client IP rather than the Fastly edge address.
-    ip_strategy_depth: PositiveInt = 1
-
-    @model_validator(mode="after")
-    def check_rate_limit_thresholds(self) -> "OLEKSGatewayRateLimitConfig":
-        if self.burst < self.average:
-            msg = "rate_limit.burst must be >= rate_limit.average"
-            raise ValueError(msg)
-        return self
-
-
 class OLEKSGatewayConfig(BaseModel):
     annotations: dict[str, str] | None = None
     cert_issuer: str | None = None
@@ -99,7 +68,6 @@ class OLEKSGatewayConfig(BaseModel):
     namespace: str
     listeners: list[OLEKSGatewayListenerConfig] = []
     routes: list[OLEKSGatewayRouteConfig] = []
-    rate_limit: OLEKSGatewayRateLimitConfig | None = None
 
     @model_validator(mode="after")
     def check_cert_issuer(self):
@@ -225,17 +193,10 @@ class OLEKSGateway(pulumi.ComponentResource):
                 opts=pulumi.ResourceOptions(parent=self).merge(opts),
             )
 
-        # Materialise a Traefik Middleware that applies per-client-IP rate
-        # limiting, then reference it from every route via an ExtensionRef
-        # filter.  The http-redirect route above is intentionally left out: it
-        # only issues a 301 and never reaches a backend, so throttling it would
-        # add no protection.
-        rate_limit_filters = self.__build_rate_limit_filters(gateway_config, opts)
-
         for route_config in gateway_config.routes:
             # Build the rule configuration
             rule = {
-                "filters": [*(route_config.filters or []), *rate_limit_filters],
+                "filters": route_config.filters,
                 "matches": route_config.matches,
             }
 
@@ -323,53 +284,6 @@ class OLEKSGateway(pulumi.ComponentResource):
             },
             opts=pulumi.ResourceOptions(parent=self).merge(opts),
         )
-
-    def __build_rate_limit_filters(
-        self,
-        gateway_config: OLEKSGatewayConfig,
-        opts: pulumi.ResourceOptions | None,
-    ) -> list[dict[str, Any]]:
-        """Create the rate-limit Middleware and return its ExtensionRef filter.
-
-        Returns an empty list when no rate limit is configured, so callers can
-        unconditionally splat the result into a route's filter list.
-        """
-        if gateway_config.rate_limit is None:
-            return []
-        rate_limit_middleware_name = f"{gateway_config.gateway_name}-ratelimit"
-        kubernetes.apiextensions.CustomResource(
-            f"{gateway_config.gateway_name}-ratelimit-middleware-resource",
-            api_version="traefik.io/v1alpha1",
-            kind="Middleware",
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                name=rate_limit_middleware_name,
-                labels=gateway_config.labels,
-                namespace=gateway_config.namespace,
-            ),
-            spec={
-                "rateLimit": {
-                    "average": gateway_config.rate_limit.average,
-                    "burst": gateway_config.rate_limit.burst,
-                    "period": gateway_config.rate_limit.period,
-                    "sourceCriterion": {
-                        "ipStrategy": {
-                            "depth": gateway_config.rate_limit.ip_strategy_depth,
-                        },
-                    },
-                },
-            },
-            opts=pulumi.ResourceOptions(parent=self).merge(opts),
-        )
-        return [
-            {
-                "type": "ExtensionRef",
-                "extensionRef": {
-                    "group": "traefik.io",
-                    "kind": "Middleware",
-                    "name": rate_limit_middleware_name,
-                },
-            }
-        ]
 
 
 class OLEKSTrustRoleConfig(AWSBase):
