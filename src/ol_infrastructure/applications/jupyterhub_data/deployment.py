@@ -9,6 +9,8 @@ Key differences from the existing jupyterhub/deployment.py:
 - No course image pre-puller
 """
 
+import base64
+import json
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
@@ -159,6 +161,35 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
             delete_before_replace=True,
             depends_on=[vault_k8s_auth_backend_role],
         ),
+    )
+
+    # Docker-registry pull secret for ghcr.io/mitodl private images.
+    # The odlbot GitHub PAT (read:packages scope) is read from Vault at deploy time
+    # and written as a kubernetes.io/dockerconfigjson secret so KubeSpawner can pull
+    # ghcr.io/mitodl/marimo-jupyterlab without anonymous auth (which GHCR denies).
+    odlbot_github_token = vault.generic.get_secret_output(
+        path="secret-operations/global/odlbot-github-access-token",
+    )
+    ghcr_pull_secret_name = f"{base_name}-ghcr-pull-secret"
+
+    def _make_dockerconfig_json(token: str) -> str:
+        auth = base64.b64encode(f"odlbot:{token}".encode()).decode()
+        return json.dumps({"auths": {"ghcr.io": {"auth": auth}}})
+
+    ghcr_pull_secret = kubernetes.core.v1.Secret(
+        f"{base_name}-ghcr-pull-secret-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=ghcr_pull_secret_name,
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        type="kubernetes.io/dockerconfigjson",
+        string_data={
+            ".dockerconfigjson": odlbot_github_token.data["value"].apply(
+                _make_dockerconfig_json
+            ),
+        },
+        opts=ResourceOptions(depends_on=[vault_k8s_resources]),
     )
 
     # VaultStaticSecret: syncs ol-marimo-client OIDC credentials into the namespace
@@ -441,6 +472,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                         # Use Always while MARIMO_JUPYTERLAB_VERSION is "latest";
                         # switch to IfNotPresent once pinned to a versioned tag.
                         "pullPolicy": "Always",
+                        "pullSecrets": [ghcr_pull_secret_name],
                     },
                     "cmd": ["jupyterhub-singleuser"],
                     "startTimeout": 300,
@@ -473,6 +505,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                 app_db_creds_dynamic_secret,
                 oidc_static_secret,
                 crypt_key_static_secret,
+                ghcr_pull_secret,
             ],
         ),
     )
