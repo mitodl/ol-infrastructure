@@ -1,0 +1,23 @@
+# MongoDB for edx-platform (modulestore + forums) in ol-infrastructure integrated mode.
+architecture: standalone
+
+auth:
+  enabled: true
+  rootPassword: openedx-dev  # pragma: allowlist secret
+  username: edxapp
+  password: openedx-dev  # pragma: allowlist secret
+  database: edxapp
+
+persistence:
+  enabled: false
+
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+
+metrics:
+  enabled: false

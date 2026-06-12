@@ -145,6 +145,30 @@ APPS = [
             },
         ],
     },
+    {
+        "name": "openedx",
+        "dir": "lehrer",
+        "namespace": "openedx",
+        "deploy_name": "lms",
+        "tiltfile": "./local-dev/apps/openedx/Tiltfile",
+        "seed_commands": [
+            {
+                "label": "seed-openedx-migrate",
+                "description": "Run edx-platform database migrations",
+                "cmd": "python manage.py lms migrate --run-syncdb",
+            },
+            {
+                "label": "seed-openedx-superuser",
+                "description": "Create a superuser (requires DJANGO_SUPERUSER_PASSWORD env var)",
+                "cmd": "python manage.py lms createsuperuser --noinput --username admin --email admin@example.com",
+            },
+            {
+                "label": "seed-openedx-assets",
+                "description": "Collect static assets (run after migrations)",
+                "cmd": "python manage.py lms collectstatic --noinput",
+            },
+        ],
+    },
 ]
 
 # ---------------------------------------------------------------------------

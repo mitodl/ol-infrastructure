@@ -1,0 +1,31 @@
+# MySQL for edx-platform in ol-infrastructure integrated mode.
+# Deployed into the openedx namespace since ol-infrastructure doesn't include MySQL.
+architecture: standalone
+
+auth:
+  rootPassword: openedx-dev  # pragma: allowlist secret
+  database: edxapp
+  username: edxapp
+  password: openedx-dev  # pragma: allowlist secret
+  existingSecret: ""
+
+primary:
+  configuration: |
+    [mysqld]
+    character-set-server=utf8mb4
+    collation-server=utf8mb4_unicode_ci
+    sql_mode=
+    max_connections=500
+  persistence:
+    enabled: false
+  initdb:
+    scripts:
+      create-dbs.sql: |
+        CREATE DATABASE IF NOT EXISTS notes CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+        CREATE DATABASE IF NOT EXISTS csmh CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+        GRANT ALL PRIVILEGES ON notes.* TO 'edxapp'@'%';
+        GRANT ALL PRIVILEGES ON csmh.* TO 'edxapp'@'%';
+        FLUSH PRIVILEGES;
+
+metrics:
+  enabled: false

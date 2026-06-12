@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cms-config
+  namespace: openedx
+data:
+  MYSQL_HOST: "mysql.openedx.svc.cluster.local"
+  MYSQL_PORT: "3306"
+  MYSQL_DB_NAME: "edxapp"
+  MYSQL_USER: "edxapp"
+
+  CELERY_BROKER_TRANSPORT: "redis"
+  CELERY_BROKER_HOSTNAME: "valkey-primary.local-infra.svc.cluster.local"
+  CELERY_BROKER_USER: ""
+  CELERY_BROKER_PASSWORD: ""
+  CELERY_BROKER_VHOST: ""
+
+  MONGODB_HOST: "mongodb.openedx.svc.cluster.local"
+  MONGODB_PORT: "27017"
+  MONGODB_USER: "edxapp"
+  MONGODB_DB: "edxapp"
+
+  ELASTIC_SEARCH_HOST: "opensearch-master.local-infra.svc.cluster.local"
+  ELASTIC_SEARCH_PORT: "9200"
+
+  LMS_BASE_URL: "https://lms.mit.dev"
+  CMS_BASE_URL: "https://studio.mit.dev"
+
+  STATIC_ROOT_BASE: "/openedx/staticfiles"
+  LOG_DIR: "/openedx/data/var/log/edx"
+  LOGGING_ENV: "sandbox"
+  LOCAL_LOGLEVEL: "INFO"
+
+  DEBUG: "false"
+  ALLOWED_HOSTS: "*"
+  HTTPS: "on"
+
+  OL_SETTINGS_DIR: ""
+  SERVICE_VARIANT: "cms"
