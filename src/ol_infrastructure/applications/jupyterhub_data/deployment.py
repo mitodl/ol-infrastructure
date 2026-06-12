@@ -477,6 +477,24 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     "cmd": ["jupyterhub-singleuser"],
                     "startTimeout": 300,
                     "networkPolicy": {"enabled": False},
+                    # Seed a getting-started notebook into the user's home on
+                    # first login. cp -n is a no-op if the file already exists,
+                    # so user edits are never overwritten by a pod restart.
+                    "lifecycleHooks": {
+                        "postStart": {
+                            "exec": {
+                                "command": [
+                                    "sh",
+                                    "-c",
+                                    "mkdir -p /home/jovyan/notebooks && "
+                                    "cp -n "
+                                    "/usr/local/share/marimo/templates/"
+                                    "getting_started.py "
+                                    "/home/jovyan/notebooks/getting_started.py",
+                                ]
+                            }
+                        }
+                    },
                     # Configure marimo-jupyter-extension to run each notebook in
                     # an isolated uv virtual environment (sandbox mode). uvx reads
                     # the `/// script` PEP 723 inline metadata header in each .py
