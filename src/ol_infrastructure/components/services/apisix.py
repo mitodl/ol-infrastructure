@@ -24,7 +24,7 @@ class OLApisixPluginConfig(BaseModel):
     name: str
     enable: bool = True
     secret_ref: str | None = Field(
-        None,
+        default=None,
         alias="secretRef",
     )
     config: dict[str, Any] = {}
@@ -36,9 +36,10 @@ class OLApisixRouteConfig(BaseModel):
     route_name: str
     priority: int = 0
     shared_plugin_config_name: str | None = None
-    plugins: list[OLApisixPluginConfig] = []
+    plugins: list[Any] = []
     hosts: list[str] = []
     paths: list[str] = []
+    match_exprs: list[dict[str, Any]] = []
     backend_service_name: str | None = None
     backend_service_port: str | NonNegativeInt | None = None
     # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_route/#service-resolution-granularity
@@ -60,13 +61,15 @@ class OLApisixRouteConfig(BaseModel):
 
     @field_validator("plugins")
     @classmethod
-    def ensure_request_id_plugin(
-        cls, v: list[OLApisixPluginConfig]
-    ) -> list[OLApisixPluginConfig]:
+    def ensure_request_id_plugin(cls, v: list[Any]) -> list[Any]:
         """
         Ensure that the request-id plugin is always added to the plugins list
         """
-        if not any(plugin.name == "request-id" for plugin in v):
+        if not any(
+            (plugin.get("name") if isinstance(plugin, dict) else plugin.name)
+            == "request-id"
+            for plugin in v
+        ):
             v.append(
                 OLApisixPluginConfig(
                     name="request-id",
@@ -141,7 +144,9 @@ class OLApisixRoute(ComponentResource):
                 "name": route_config.route_name,
                 "priority": route_config.priority,
                 "plugins": [
-                    p.model_dump(by_alias=True, exclude_none=True)
+                    p
+                    if isinstance(p, dict)
+                    else p.model_dump(by_alias=True, exclude_none=True)
                     for p in route_config.plugins
                 ],
                 "match": {
@@ -155,6 +160,8 @@ class OLApisixRoute(ComponentResource):
                     "read": route_config.timeout_read,
                 },
             }
+            if route_config.match_exprs:
+                route["match"]["exprs"] = route_config.match_exprs
             if route_config.shared_plugin_config_name is not None:
                 route["plugin_config_name"] = route_config.shared_plugin_config_name
             if route_config.upstream:
