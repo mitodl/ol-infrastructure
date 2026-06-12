@@ -14,8 +14,8 @@ from ol_concourse.lib.resources import git_repo
 
 ad_opt_repository = git_repo(
     name=Identifier("ad-opt-resource"),
-    uri="https://github.com/josephine-situ/ad_opt",
-    branch="main",
+    uri="https://github.com/josephine-situ/ad_opt_v2",
+    branch="master",
     check_every="24h",
 )
 
