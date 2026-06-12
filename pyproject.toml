@@ -41,7 +41,7 @@ dependencies = [
     "pulumi-qdrant-cloud",
     "pulumi-terraform>=6.0.1",
     "pulumi-command>=1.0,<2",
-    "ol-concourse>=0.8.4,<0.9",
+    "ol-concourse>=0.8.5,<0.8.6",
 ]
 
 [project.urls]

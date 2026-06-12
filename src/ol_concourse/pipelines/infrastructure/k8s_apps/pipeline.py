@@ -555,8 +555,8 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     This function orchestrates all the resources and jobs required to build, test,
     and deploy a dockerized application to Kubernetes.
     """
-    pipeline_parameters = pipeline_params.get(
-        app_name, AppPipelineParams(app_name=app_name)
+    pipeline_parameters = pipeline_params.get(app_name) or AppPipelineParams(
+        app_name=app_name
     )
     # Define Resources
     main_repo, ol_infra_repo = _define_git_resources(
