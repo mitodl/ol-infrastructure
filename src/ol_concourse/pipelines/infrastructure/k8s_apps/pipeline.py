@@ -681,17 +681,18 @@ def build_app_pipeline(app_name: str) -> Pipeline:
             },
         ),
     ]
+    additional_post_steps: dict[int, list[GetStep | PutStep | TaskStep]] = {
+        0: qa_post_steps,
+        1: prod_post_steps,
+    }
     if fastly_qa is not None and fastly_prod is not None:
         purge_params = _fastly_purge_params(pipeline_parameters.fastly_purge_scope)
-        qa_purge_steps: list[GetStep | PutStep | TaskStep] = []
-        qa_purge_steps.append(
+        additional_post_steps[0].append(
             PutStep(put=fastly_qa.name, params=purge_params, no_get=True)
         )
-        prod_purge_steps: list[GetStep | PutStep | TaskStep] = []
-        prod_purge_steps.append(
+        additional_post_steps[1].append(
             PutStep(put=fastly_prod.name, params=purge_params, no_get=True)
         )
-        additional_post_steps = {0: qa_purge_steps, 1: prod_purge_steps}
 
     # QA and Production Deployments
     qa_and_production_fragment = pulumi_jobs_chain(
