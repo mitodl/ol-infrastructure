@@ -15,7 +15,6 @@ from ol_concourse.lib.models.pipeline import (
     Input,
     Job,
     LoadVarStep,
-    Output,
     Pipeline,
     Platform,
     PutStep,
@@ -25,8 +24,20 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from ol_concourse.lib.resource_types import pulumi_provisioner_resource
-from ol_concourse.lib.resources import git_repo, pulumi_provisioner, registry_image
+from ol_concourse.lib.resource_types import (
+    github_deployments_resource,
+    pulumi_provisioner_resource,
+    release_resource_type,
+)
+from ol_concourse.lib.resources import (
+    git_repo,
+    github_deployment,
+    github_issues,
+    pulumi_provisioner,
+    registry_image,
+    release_resource,
+)
+from ol_concourse.lib.tasks import bump_version_task
 from pydantic import BaseModel, model_validator
 
 from ol_concourse.pipelines.constants import (
@@ -39,6 +50,7 @@ from ol_concourse.pipelines.jobs import pulumi_job, pulumi_jobs_chain
 
 class AppPipelineParams(BaseModel):
     """Parameters for the application pipeline.
+
     This class defines the parameters needed to configure the pipeline for
     different applications, including the app name, build target, Dockerfile path,
     Fastly service prefix, cache purging options, and repository name.
@@ -59,6 +71,8 @@ class AppPipelineParams(BaseModel):
             that key via POST /purge/{surrogate_key}.  Use a scoped key when some cached assets
             (e.g. content-addressed static files) must survive a deployment.
         repo_name (Optional[str]): The name of the git repository. Defaults to app_name if not provided.
+        github_repo (Optional[str]): The GitHub repository in ``owner/repo`` form used for release resources
+            and GitHub Deployments. Defaults to ``mitodl/{repo_name}``.
     """
 
     app_name: str
@@ -69,19 +83,17 @@ class AppPipelineParams(BaseModel):
     fastly_purge_scope: str = "purge_all"
     repo_name: str | None = None
     repo_main_branch: str = "main"
-    repo_rc_branch: str = "release-candidate"
-    repo_release_branch: str = "release"
     ol_infra_branch: str = "main"
     settings_dir: str = "main"
-    version_file: str | None = (
-        None  # Repo-relative path to a standalone VERSION file (e.g. "VERSION"); if set, overrides Django settings grep
-    )
+    github_repo: str | None = None
 
     @model_validator(mode="after")
     def set_repo_name(self) -> "AppPipelineParams":
-        """Set the repo_name based on the app_name if not provided."""
+        """Set the repo_name and github_repo based on app_name if not provided."""
         if not self.repo_name:
             self.repo_name = self.app_name
+        if not self.github_repo:
+            self.github_repo = f"mitodl/{self.repo_name}"
         return self
 
     @model_validator(mode="after")
@@ -118,7 +130,6 @@ pipeline_params = {
         build_target="production",
         repo_main_branch="master",
         settings_dir="micromasters",
-        version_file="VERSION",
     ),
     "mitxonline": AppPipelineParams(app_name="mitxonline", build_target="production"),
     "mit-learn-nextjs": AppPipelineParams(
@@ -161,30 +172,13 @@ def _define_git_resources(
     app_name: str,
     repo_name: str | None,
     repo_main_branch: str,
-    repo_rc_branch: str,
-    repo_release_branch: str,
     ol_infra_branch: str,
-) -> tuple[Resource, Resource, Resource, Resource]:
+) -> tuple[Resource, Resource]:
     """Define the git resources needed for the pipeline."""
     main_repo = git_repo(
         name=Identifier(f"{app_name}-{repo_main_branch}"),
         uri=f"https://github.com/mitodl/{repo_name}",
         branch=repo_main_branch,
-    )
-
-    release_candidate_repo = git_repo(
-        name=Identifier(f"{app_name}-{repo_rc_branch}"),
-        uri=f"https://github.com/mitodl/{repo_name}",
-        branch=repo_rc_branch,
-        fetch_tags=True,
-    )
-
-    release_repo = git_repo(
-        name=Identifier(f"{app_name}-{repo_release_branch}"),
-        uri=f"http://github.com/mitodl/{repo_name}",
-        branch=repo_release_branch,
-        fetch_tags=True,
-        tag_regex=r"v[0-9]+\.[0-9]+\.[0-9]+",  # examples v0.24.0, v0.26.3
     )
 
     ol_infra_repo = git_repo(
@@ -196,12 +190,58 @@ def _define_git_resources(
             *PULUMI_WATCHED_PATHS,
         ],
     )
-    return (
-        main_repo,
-        release_candidate_repo,
-        release_repo,
-        ol_infra_repo,
+    return main_repo, ol_infra_repo
+
+
+def _define_release_resources(
+    app_name: str,
+    github_repo: str,
+    repo_main_branch: str = "main",
+) -> tuple[Resource, Resource, Resource, Resource, Resource]:
+    """Define the release-flow resources: release resource, gates, issues, and GitHub Deployments."""
+    release_res = release_resource(
+        name=Identifier(f"{app_name}-release"),
+        uri=f"https://github.com/{github_repo}",
+        branch=repo_main_branch,
+        access_token="((github.release_resource_access_token))",  # noqa: S106
+        repository=github_repo,
+        semver_tag_fallback=True,
     )
+    # Closed release issues gate production deployments.
+    release_gate = github_issues(
+        name=Identifier(f"{app_name}-release-gate"),
+        repository=github_repo,
+        issue_prefix=f"Release {app_name}",
+        issue_title_template=f"Release {app_name}",
+        issue_state="closed",
+        skip_if_labeled=["abandoned"],
+        access_token="((github.release_resource_access_token))",  # noqa: S106
+        gh_host=None,
+    )
+    # Open release issues are created after each QA deployment.
+    release_issue = github_issues(
+        name=Identifier(f"{app_name}-release-issue"),
+        repository=github_repo,
+        issue_prefix=f"Release {app_name}",
+        issue_title_template=f"Release {app_name}",
+        issue_state="open",
+        labels=["release"],
+        access_token="((github.release_resource_access_token))",  # noqa: S106
+        gh_host=None,
+    )
+    deployment_rc = github_deployment(
+        name=Identifier(f"{app_name}-deployment-rc"),
+        repository=github_repo,
+        environment="RC",
+        access_token="((github.release_resource_access_token))",  # noqa: S106
+    )
+    deployment_prod = github_deployment(
+        name=Identifier(f"{app_name}-deployment-production"),
+        repository=github_repo,
+        environment="Production",
+        access_token="((github.release_resource_access_token))",  # noqa: S106
+    )
+    return release_res, release_gate, release_issue, deployment_rc, deployment_prod
 
 
 def _define_registry_image_resources(
@@ -325,99 +365,36 @@ def _define_pulumi_resources(
 
 def _build_image_job(
     app_name: str,
-    branch_type: str,
     dockerfile_path: str,
     git_repo_resource: Resource,
     dockerhub_registry_image_resource: Resource,
     ecr_registry_image_resource: Resource,
     build_target: str | None = None,
-    django_settings_dir: str = "main",
-    repo_version_file: str | None = None,
 ) -> Job:
-    """Generate an image build job for a specific branch type (main or rc)."""
-    job_name = f"build-{app_name}-image-from-{branch_type}"
-    version_var = f"{branch_type}_version"
-    version_output_dir = f"{branch_type}_version"
-    version_file = f"{version_output_dir}/version"
+    """Generate an image build job triggered by the configured git resource."""
+    job_name = f"build-{app_name}-image-from-{git_repo_resource.source['branch']}"
+
+    additional_build_params = {}
+    if build_target:
+        additional_build_params = {"TARGET": build_target}
 
     plan = [
         GetStep(get=git_repo_resource.name, trigger=True),
-    ]
-
-    # Add version extraction steps only for release_candidate
-    version_args = {}
-    additional_build_params = {}
-    if build_target:
-        additional_build_params = {
-            "TARGET": build_target,
-        }
-    if branch_type == "release_candidate":
-        plan.extend(
-            [
-                TaskStep(
-                    task=Identifier("fetch-rc-version"),
-                    config=TaskConfig(
-                        platform=Platform.linux,
-                        image_resource=AnonymousResource(
-                            type=REGISTRY_IMAGE,
-                            source={
-                                "repository": dockerhub_ecr_image_uri("alpine"),
-                                "tag": "latest",
-                                "aws_region": ECR_REGION,
-                            },
-                        ),
-                        inputs=[Input(name=git_repo_resource.name)],
-                        outputs=[Output(name=Identifier(version_output_dir))],
-                        run=Command(
-                            path="sh",
-                            args=[
-                                "-c",
-                                rf"""cat {git_repo_resource.name}/{repo_version_file} > {version_file}"""
-                                if repo_version_file
-                                else rf"""grep -E -o '^VERSION = "[0-9]+\.[0-9]+\.[0-9]+"$' {git_repo_resource.name}/{django_settings_dir}/settings.py | cut -d\" -f2 > {version_file}""",
-                            ],
-                        ),
-                    ),
-                ),
-                LoadVarStep(
-                    load_var=version_var,
-                    file=version_file,
-                    reveal=True,
-                ),
-            ]
-        )
-        version_args = {"BUILD_ARG_RELEASE_VERSION": f"((.:{version_var}))"}
-
-    plan.extend(
-        [
-            LoadVarStep(
-                load_var="git_ref",
-                file=f"{git_repo_resource.name}/.git/ref",
-                reveal=True,
-            ),
-            container_build_task(
-                inputs=[Input(name=git_repo_resource.name)],
-                build_parameters={
-                    "CONTEXT": git_repo_resource.name,
-                    "DOCKERFILE": f"{git_repo_resource.name}/{dockerfile_path}",
-                    "BUILD_ARG_GIT_REF": "((.:git_ref))",
-                    **version_args,
-                    **additional_build_params,
-                },
-                build_args=[],
-            ),
-        ]
-    )
-
-    put_params: dict[str, Any] = {
-        "image": "image/image.tar",
-        "additional_tags": f"./{git_repo_resource.name}/.git/short_ref",
-    }
-    if branch_type != "main":
-        put_params["version"] = f"((.:{version_var}))"
-        put_params["bump_aliases"] = True
-
-    plan.append(
+        LoadVarStep(
+            load_var="git_ref",
+            file=f"{git_repo_resource.name}/.git/ref",
+            reveal=True,
+        ),
+        container_build_task(
+            inputs=[Input(name=git_repo_resource.name)],
+            build_parameters={
+                "CONTEXT": git_repo_resource.name,
+                "DOCKERFILE": f"{git_repo_resource.name}/{dockerfile_path}",
+                "BUILD_ARG_GIT_REF": "((.:git_ref))",
+                **additional_build_params,
+            },
+            build_args=[],
+        ),
         TaskStep(
             task=Identifier("ensure-ecr-repository"),
             config=TaskConfig(
@@ -442,10 +419,122 @@ def _build_image_job(
                     ],
                 ),
             ),
-        )
-    )
-    plan.append(PutStep(put=dockerhub_registry_image_resource.name, params=put_params))
-    plan.append(PutStep(put=ecr_registry_image_resource.name, params=put_params))
+        ),
+        PutStep(
+            put=dockerhub_registry_image_resource.name,
+            params={
+                "image": "image/image.tar",
+                "additional_tags": f"./{git_repo_resource.name}/.git/short_ref",
+            },
+        ),
+        PutStep(
+            put=ecr_registry_image_resource.name,
+            params={
+                "image": "image/image.tar",
+                "additional_tags": f"./{git_repo_resource.name}/.git/short_ref",
+            },
+        ),
+    ]
+
+    return Job(name=Identifier(job_name), build_log_retention={"builds": 10}, plan=plan)
+
+
+def _build_release_image_job(
+    app_name: str,
+    dockerfile_path: str,
+    main_repo: Resource,
+    release_res: Resource,
+    dockerhub_registry_image_resource: Resource,
+    ecr_registry_image_resource: Resource,
+    build_target: str | None = None,
+) -> Job:
+    """Generate an image build job triggered by the release resource.
+
+    This job:
+    1. Gets the release resource (trigger) and main repo source.
+    2. Bumps the version in the app source using bumpver.
+    3. Creates the release commit, branch, and tag via the release resource.
+    4. Builds and pushes a versioned Docker image to DockerHub and ECR.
+    """
+    job_name = f"build-{app_name}-release-image"
+
+    additional_build_params = {}
+    if build_target:
+        additional_build_params = {"TARGET": build_target}
+
+    put_params: dict[str, Any] = {
+        "image": "image/image.tar",
+        "additional_tags": f"./{release_res.name}/.git/short_ref",
+        "version": "((.:release_version))",
+        "bump_aliases": True,
+    }
+
+    plan = [
+        GetStep(get=release_res.name, trigger=True),
+        GetStep(get=main_repo.name, trigger=False),
+        LoadVarStep(
+            load_var="release_version",
+            file=f"{release_res.name}/version",
+            reveal=True,
+        ),
+        bump_version_task(
+            version_file=f"{release_res.name}/version",
+            repository=str(main_repo.name),
+        ),
+        PutStep(
+            put=release_res.name,
+            params={
+                "action": "create",
+                "repo_dir": str(main_repo.name),
+                "version_file": f"{release_res.name}/version",
+            },
+        ),
+        # Load git_ref from the release resource AFTER the release commit is created,
+        # so the image is stamped with the correct post-release commit SHA.
+        LoadVarStep(
+            load_var="git_ref",
+            file=f"{release_res.name}/.git/ref",
+            reveal=True,
+        ),
+        container_build_task(
+            inputs=[Input(name=release_res.name)],
+            build_parameters={
+                "CONTEXT": release_res.name,
+                "DOCKERFILE": f"{release_res.name}/{dockerfile_path}",
+                "BUILD_ARG_GIT_REF": "((.:git_ref))",
+                "BUILD_ARG_RELEASE_VERSION": "((.:release_version))",
+                **additional_build_params,
+            },
+            build_args=[],
+        ),
+        TaskStep(
+            task=Identifier("ensure-ecr-repository"),
+            config=TaskConfig(
+                platform=Platform.linux,
+                image_resource=AnonymousResource(
+                    type="registry-image",
+                    source={
+                        "repository": dockerhub_ecr_image_uri("amazon/aws-cli"),
+                        "tag": "latest",
+                        "aws_region": ECR_REGION,
+                    },
+                ),
+                params={
+                    "REPO_NAME": ecr_registry_image_resource.source["repository"],
+                    "AWS_PAGER": "cat",
+                },
+                run=Command(
+                    path="sh",
+                    args=[
+                        "-exc",
+                        "aws ecr describe-repositories --repository-names ${REPO_NAME} || aws ecr create-repository --repository-name ${REPO_NAME}",
+                    ],
+                ),
+            ),
+        ),
+        PutStep(put=dockerhub_registry_image_resource.name, params=put_params),
+        PutStep(put=ecr_registry_image_resource.name, params=put_params),
+    ]
 
     return Job(name=Identifier(job_name), build_log_retention={"builds": 10}, plan=plan)
 
@@ -460,17 +549,10 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         app_name, AppPipelineParams(app_name=app_name)
     )
     # Define Resources
-    (
-        main_repo,
-        release_candidate_repo,
-        release_repo,
-        ol_infra_repo,
-    ) = _define_git_resources(
+    main_repo, ol_infra_repo = _define_git_resources(
         app_name=app_name,
         repo_name=pipeline_parameters.repo_name,
         repo_main_branch=pipeline_parameters.repo_main_branch,
-        repo_rc_branch=pipeline_parameters.repo_rc_branch,
-        repo_release_branch=pipeline_parameters.repo_release_branch,
         ol_infra_branch=pipeline_parameters.ol_infra_branch,
     )
     (
@@ -495,31 +577,35 @@ def build_app_pipeline(app_name: str) -> Pipeline:
             fastly_domains=pipeline_parameters.fastly_domains,
         )
 
-    # Retrieve any special configurations needed from mapping above,
-    # default to no special configuration if app name is not found in mapping
+    (
+        release_res,
+        release_gate,
+        release_issue,
+        deployment_rc,
+        deployment_prod,
+    ) = _define_release_resources(
+        app_name=app_name,
+        github_repo=pipeline_parameters.github_repo or f"mitodl/{app_name}",
+        repo_main_branch=pipeline_parameters.repo_main_branch,
+    )
 
     # Define Build Jobs
     main_image_build_job = _build_image_job(
         app_name=app_name,
-        branch_type="main",
         dockerfile_path=pipeline_parameters.dockerfile_path,
         git_repo_resource=main_repo,
         dockerhub_registry_image_resource=docker_ci_image,
         ecr_registry_image_resource=app_ci_image,
         build_target=pipeline_parameters.build_target,
-        django_settings_dir=pipeline_parameters.settings_dir or "main",
-        repo_version_file=pipeline_parameters.version_file,
     )
-    rc_image_build_job = _build_image_job(
+    release_image_build_job = _build_release_image_job(
         app_name=app_name,
-        branch_type="release_candidate",
         dockerfile_path=pipeline_parameters.dockerfile_path,
-        git_repo_resource=release_candidate_repo,
+        main_repo=main_repo,
+        release_res=release_res,
         dockerhub_registry_image_resource=docker_rc_image,
         ecr_registry_image_resource=app_rc_image,
         build_target=pipeline_parameters.build_target,
-        django_settings_dir=pipeline_parameters.settings_dir or "main",
-        repo_version_file=pipeline_parameters.version_file,
     )
 
     # Define Deployment Jobs
@@ -564,7 +650,37 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         slack_url_path="eks.slack_url",
     )
 
-    additional_post_steps: dict[int, list[GetStep | PutStep | TaskStep]] = {}
+    # Build per-stack additional_post_steps and custom_dependencies for QA+Production
+    qa_post_steps: list[GetStep | PutStep | TaskStep] = [
+        # Open a GitHub Release Issue with the checklist from the release resource.
+        PutStep(
+            put=release_issue.name,
+            params={
+                "body_file": f"{release_res.name}/checklist.md",
+                "labels": ["release"],
+            },
+        ),
+        # Mark the RC GitHub Deployment as successful.
+        PutStep(
+            put=deployment_rc.name,
+            params={
+                "action": "finish",
+                "deployment_file": f"{deployment_rc.name}/deployment.json",
+                "state": "success",
+            },
+        ),
+    ]
+    prod_post_steps: list[GetStep | PutStep | TaskStep] = [
+        # Mark the Production GitHub Deployment as successful.
+        PutStep(
+            put=deployment_prod.name,
+            params={
+                "action": "finish",
+                "deployment_file": f"{deployment_prod.name}/deployment.json",
+                "state": "success",
+            },
+        ),
+    ]
     if fastly_qa is not None and fastly_prod is not None:
         purge_params = _fastly_purge_params(pipeline_parameters.fastly_purge_scope)
         qa_purge_steps: list[GetStep | PutStep | TaskStep] = []
@@ -591,29 +707,40 @@ def build_app_pipeline(app_name: str) -> Pipeline:
             GetStep(
                 get=app_rc_image.name,
                 trigger=True,
-                passed=[rc_image_build_job.name],
+                passed=[release_image_build_job.name],
                 params={"skip_download": True},
             ),
             LoadVarStep(
                 load_var="image_tag", file=f"{app_rc_image.name}/tag", reveal=True
             ),
         ],
+        # QA: get checklist.md from release resource; start RC GitHub Deployment.
+        # Production: wait for release gate (closed release issue); start prod deployment.
+        custom_dependencies={
+            0: [
+                GetStep(
+                    get=release_res.name,
+                    trigger=False,
+                    passed=[release_image_build_job.name],
+                ),
+                PutStep(
+                    put=deployment_rc.name,
+                    params={"action": "start", "ref": "((.:image_tag))"},
+                ),
+            ],
+            1: [
+                GetStep(get=release_gate.name, trigger=True, version="every"),
+                PutStep(
+                    put=deployment_prod.name,
+                    params={"action": "start", "ref": "((.:image_tag))"},
+                ),
+            ],
+        },
         additional_env_vars={
             f"{app_name.replace('-', '_').upper()}_DOCKER_TAG": "((.:image_tag))",
         },
         enable_github_issue_resource=False,
         slack_url_path="eks.slack_url",
-    )
-
-    # Trigger a production deploy when the release branch is updated
-    qa_and_production_fragment.jobs[-1].plan.insert(
-        0, GetStep(get=release_repo.name, trigger=True)
-    )
-
-    # Make the release-candidate branch code available to the RC
-    # pulumi deployment job similar to how it is available to production
-    qa_and_production_fragment.jobs[0].plan.insert(
-        0, GetStep(get=release_candidate_repo.name, trigger=False)
     )
 
     # Group into Fragments
@@ -623,16 +750,24 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         jobs=[main_image_build_job],
     )
 
-    release_candidate_container_fragment = PipelineFragment(
-        resources=[release_candidate_repo, app_rc_image, docker_rc_image],
-        jobs=[rc_image_build_job],
+    release_container_fragment = PipelineFragment(
+        resource_types=[release_resource_type(), github_deployments_resource()],
+        resources=[
+            release_res,
+            release_gate,
+            release_issue,
+            deployment_rc,
+            deployment_prod,
+            app_rc_image,
+            docker_rc_image,
+        ],
+        jobs=[release_image_build_job],
     )
 
     # Consolidate resources for deployment fragments
     deployment_resources = [
         ol_infra_repo,
         pulumi_resource,
-        release_repo,
         app_ci_image,  # Needed for CI deployment trigger
         app_rc_image,  # Needed for QA/Prod deployment trigger
         docker_ci_image,
@@ -656,18 +791,12 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         jobs=ci_fragment.jobs,
     )
 
-    # Update qa_and_production_fragment resources similarly if needed,
-    # though pulumi_jobs_chain handles its own resource management internally.
-    # Ensure app_image is available to qa_and_production_fragment jobs.
-    # The dependency GetStep already references app_image.name.
-
     # Combine all fragments
-
     combined_fragment = PipelineFragment.combine_fragments(
         ci_deployment_fragment,
         qa_and_production_fragment,
         main_branch_container_fragement,
-        release_candidate_container_fragment,
+        release_container_fragment,
     )
     return combined_fragment.to_pipeline()
 
