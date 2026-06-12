@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference
+from pulumi import Config, InvokeOptions, ResourceOptions, StackReference
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.lib.versions import JUPYTERHUB_CHART_VERSION, MARIMO_JUPYTERLAB_VERSION
@@ -169,6 +169,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
     # ghcr.io/mitodl/marimo-jupyterlab without anonymous auth (which GHCR denies).
     odlbot_github_token = vault.generic.get_secret_output(
         path="secret-operations/global/odlbot-github-access-token",
+        opts=InvokeOptions(parent=vault_policy),
     )
     ghcr_pull_secret_name = f"{base_name}-ghcr-pull-secret"
 
