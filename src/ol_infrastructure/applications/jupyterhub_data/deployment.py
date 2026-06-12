@@ -328,6 +328,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
             "keycloak_realm": keycloak_realm,
             "login_service": "MIT OL Data Platform",
             "username_claim": "preferred_username",
+            "base_url": f"https://{domain_name}",
         }
     )
 

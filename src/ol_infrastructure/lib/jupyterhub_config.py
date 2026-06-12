@@ -43,6 +43,11 @@ def get_authenticator_config(
           ``"MIT OL Data Platform"``); used with ``"generic-oauth"``.
         * ``username_claim`` — JWT claim mapped to the JupyterHub username
           (default ``"preferred_username"``); used with ``"generic-oauth"``.
+        * ``base_url`` — public HTTPS base URL of this JupyterHub instance
+          (e.g. ``"https://nb.data.ol.mit.edu"``); when provided the explicit
+          ``oauth_callback_url`` is set so that the redirect_uri sent to the
+          identity provider uses ``https://`` even when JupyterHub runs behind
+          a TLS-terminating proxy; used with ``"generic-oauth"``.
 
     :returns: Dict suitable for use as the ``hub.config`` Helm value.
     :raises InvalidAuthenticatorError: If ``authenticator_class`` is not one
@@ -99,4 +104,9 @@ def get_authenticator_config(
             "scope": ["openid", "profile", "email", "ol_roles"],
             "enable_auth_state": True,
         }
+        base_url = jupyterhub_deployment_config.get("base_url")
+        if base_url:
+            auth_conf["GenericOAuthenticator"]["oauth_callback_url"] = (
+                f"{base_url.rstrip('/')}/hub/oauth_callback"
+            )
     return auth_conf
