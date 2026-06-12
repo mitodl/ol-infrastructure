@@ -85,6 +85,7 @@ class OLEKSGatewayRateLimitConfig(BaseModel):
             raise ValueError(msg)
         return self
 
+
 class OLEKSGatewayConfig(BaseModel):
     annotations: dict[str, str] | None = None
     cert_issuer: str | None = None
