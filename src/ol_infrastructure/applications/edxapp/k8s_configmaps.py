@@ -328,6 +328,7 @@ def _build_interpolated_config_dict(
                     "use_extracted_html_block", False
                 ),
                 "DATAPLATFORM_CERTIFICATE_BASE_URL": f"https://{data_platform_domain}/superset/dashboard/da9e03d3-e1bb-45b8-981f-208deca90e7a/",
+                "DATAPLATFORM_CERTIFICATE_NATIVE_FILTER_ID": "NATIVE_FILTER-UVtY6Gfiky0BXiPZ5w2qr",
                 "ENABLE_AUTO_LANGUAGE_SELECTION": edxapp_config.get_bool(
                     "enable_auto_language_selection"
                 )
