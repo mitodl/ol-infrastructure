@@ -505,6 +505,7 @@ def build_base_general_config() -> ConfigDict:
             "ENABLE_DISCUSSION_HOME_PANEL": True,
             "ENABLE_EDX_USERNAME_CHANGER": True,
             "ENABLE_ENROLLMENT_RESET": False,
+            "ENABLE_ENROLLMENT_TRACK_USER_PARTITION": True,
             "ENABLE_EXPORT_GIT": True,
             "ENABLE_GIT_AUTO_EXPORT": True,
             "ENABLE_AUTO_GITHUB_REPO_CREATION": True,
