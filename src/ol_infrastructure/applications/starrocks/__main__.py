@@ -484,9 +484,9 @@ if (
     ssl_enabled
     or starrocks_config.get_bool("use_cn")
     or starrocks_config.get_bool("use_be")
-) and (STARROCKS_CHART_VERSION != "1.11.4"):
+) and (STARROCKS_CHART_VERSION != "1.11.5"):
     msg = (
-        f"_FE_CONFIG_BASE was sourced from chart 1.11.4; review defaults for"
+        f"_FE_CONFIG_BASE was sourced from chart 1.11.5; review defaults for"
         f" {STARROCKS_CHART_VERSION} before deploying with SSL or CN enabled"
     )
     raise ValueError(msg)
