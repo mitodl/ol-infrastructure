@@ -1,4 +1,5 @@
 # ruff: noqa: ERA001, FIX002, E501
+"""Pulumi program for deploying the MIT Learn application to Kubernetes."""
 
 import base64
 import json
@@ -1332,11 +1333,31 @@ learn_external_service_shared_plugins = OLApisixSharedPlugins(
             # host-only one predates the move to a parent-domain cookie in
             # #5182 (and is also what mitxonline's /mitxonline/* routes on this
             # host used to set), and the domain-scoped one is what #5182
-            # replaced it with.  Every route on this host references this
-            # shared config, and clearing the .learn.mit.edu entry from here
-            # also clears it for analytics.<env>.learn.mit.edu, since a
-            # domain-scoped cookie is a single entry in the browser's jar.
-            # Safe to delete once the old cookies have aged out of circulation.
+            # replaced it with.  Every ol-shared-plugins/ol-browser-shared-plugins
+            # route on this host references one of these two shared configs, and
+            # clearing the .learn.mit.edu entry from here also clears it for
+            # analytics.<env>.learn.mit.edu, since a domain-scoped cookie is a
+            # single entry in the browser's jar. Safe to delete once the old
+            # cookies have aged out of circulation.
+            stale_session_cookie_cleanup_plugin(
+                cookie_domains=[mitlearn_api_domain.removeprefix("api")],
+            ),
+        ],
+    ),
+)
+learn_external_service_browser_shared_plugins = OLApisixSharedPlugins(
+    name="ol-mitlearn-external-service-browser-apisix-plugins",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name="mitlearn",
+        resource_suffix="ol-browser-shared-plugins",
+        k8s_namespace=learn_namespace,
+        k8s_labels=application_labels,
+        enable_defaults=True,
+        # Same stale-cookie cleanup as the base shared plugins above -- the
+        # browser-* routes split real end-user browser traffic off onto this
+        # config, so it needs the same cleanup or logged-in users hitting
+        # these routes stop getting their old session cookie cleared.
+        plugins=[
             stale_session_cookie_cleanup_plugin(
                 cookie_domains=[mitlearn_api_domain.removeprefix("api")],
             ),
@@ -1716,12 +1737,128 @@ proxy_rewrite_plugin_config = OLApisixPluginConfig(
         ],
     },
 )
+browser_api_match_exprs = [
+    {
+        "subject": {"scope": "Header", "name": "Origin"},
+        "op": "RegexMatch",
+        "value": r"^https://(ci\.|rc\.)?learn\.mit\.edu$",
+    }
+]
+fastly_api_match_exprs = [
+    {
+        "subject": {"scope": "Header", "name": "Fastly-Client-IP"},
+        "op": "RegexMatch",
+        "value": r".+",
+    }
+]
 
 learn_external_service_apisix_route_no_prefix = OLApisixRoute(
     name=f"ol-mitlearn-k8s-apisix-route-no-prefix-{stack_info.env_suffix}",
     k8s_namespace=learn_namespace,
     k8s_labels=application_labels,
     route_configs=[
+        OLApisixRouteConfig(
+            route_name="fastly-passauth",
+            priority=40,
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/*"],
+            exprs=fastly_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="fastly-logout-redirect",
+            priority=50,
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/logout/oidc/*"],
+            exprs=fastly_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="fastly-reqauth",
+            priority=50,
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
+                    unauth_action="auth"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=[
+                "/admin/login/*",
+                "/login",
+                "/login/*",
+            ],
+            exprs=fastly_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="browser-passauth",
+            priority=20,
+            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/*"],
+            exprs=browser_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="browser-logout-redirect",
+            priority=30,
+            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/logout/oidc/*"],
+            exprs=browser_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="browser-reqauth",
+            priority=30,
+            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
+                    unauth_action="auth"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=[
+                "/admin/login/*",
+                "/login",
+                "/login/*",
+            ],
+            exprs=browser_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
         OLApisixRouteConfig(
             route_name="passauth",
             priority=0,
@@ -1742,7 +1879,9 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             priority=10,
             shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
             plugins=[
-                OLApisixPluginConfig(name="redirect", config={"uri": "/logout/oidc"}),
+                OLApisixPluginConfig(
+                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
+                ),
             ],
             hosts=[mitlearn_api_domain],
             paths=["/logout/oidc/*"],
@@ -1780,6 +1919,108 @@ learn_external_service_apisix_route = OLApisixRoute(
     k8s_labels=application_labels,
     route_configs=[
         OLApisixRouteConfig(
+            route_name="fastly-passauth",
+            priority=40,
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/learn/*"],
+            exprs=fastly_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="fastly-logout-redirect",
+            priority=50,
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/learn/logout/oidc/*"],
+            exprs=fastly_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="fastly-reqauth",
+            priority=50,
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="auth"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=[
+                "/learn/admin/login/*",
+                "/learn/login",
+                "/learn/login/*",
+            ],
+            exprs=fastly_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="browser-passauth",
+            priority=20,
+            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/learn/*"],
+            exprs=browser_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="browser-logout-redirect",
+            priority=30,
+            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/learn/logout/oidc/*"],
+            exprs=browser_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="browser-reqauth",
+            priority=30,
+            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="auth"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=[
+                "/learn/admin/login/*",
+                "/learn/login",
+                "/learn/login/*",
+            ],
+            exprs=browser_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
             route_name="passauth",
             priority=0,
             shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
@@ -1799,7 +2040,9 @@ learn_external_service_apisix_route = OLApisixRoute(
             priority=10,
             shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
             plugins=[
-                OLApisixPluginConfig(name="redirect", config={"uri": "/logout/oidc"}),
+                OLApisixPluginConfig(
+                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
+                ),
             ],
             hosts=[mitlearn_api_domain],
             paths=["/learn/logout/oidc/*"],
