@@ -1,6 +1,7 @@
 # ruff: noqa: PLR0913, E501
 """Generate Concourse pipeline definitions for building and deploying dockerized applications to Kubernetes via Pulumi."""
 
+import subprocess
 import sys
 from typing import Any
 
@@ -48,6 +49,17 @@ from ol_concourse.pipelines.constants import (
 from ol_concourse.pipelines.jobs import pulumi_job, pulumi_jobs_chain
 
 
+def _get_github_default_branch(github_repo: str) -> str:
+    """Query GitHub for the default branch of a repository."""
+    result = subprocess.run(  # noqa: S603
+        ["gh", "api", f"repos/{github_repo}", "--jq", ".default_branch"],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
+
+
 class AppPipelineParams(BaseModel):
     """Parameters for the application pipeline.
 
@@ -89,11 +101,13 @@ class AppPipelineParams(BaseModel):
 
     @model_validator(mode="after")
     def set_repo_name(self) -> "AppPipelineParams":
-        """Set the repo_name and github_repo based on app_name if not provided."""
+        """Set the repo_name, github_repo, and repo_main_branch based on app_name if not provided."""
         if not self.repo_name:
             self.repo_name = self.app_name
         if not self.github_repo:
             self.github_repo = f"mitodl/{self.repo_name}"
+        if "repo_main_branch" not in self.model_fields_set:
+            self.repo_main_branch = _get_github_default_branch(self.github_repo)
         return self
 
     @model_validator(mode="after")
@@ -128,7 +142,6 @@ pipeline_params = {
     "micromasters": AppPipelineParams(
         app_name="micromasters",
         build_target="production",
-        repo_main_branch="master",
         settings_dir="micromasters",
     ),
     "mitxonline": AppPipelineParams(app_name="mitxonline", build_target="production"),
@@ -150,18 +163,15 @@ pipeline_params = {
     "xpro": AppPipelineParams(
         app_name="xpro",
         repo_name="mitxpro",
-        repo_main_branch="master",
         build_target="production",
         settings_dir="mitxpro",
     ),
     "ocw-studio": AppPipelineParams(
         app_name="ocw-studio",
-        repo_main_branch="master",
         build_target="production",
     ),
     "odl-video-service": AppPipelineParams(
         app_name="odl-video-service",
-        repo_main_branch="master",
         build_target="production",
         settings_dir="odl_video",
     ),
@@ -196,7 +206,7 @@ def _define_git_resources(
 def _define_release_resources(
     app_name: str,
     github_repo: str,
-    repo_main_branch: str = "main",
+    repo_main_branch: str,
 ) -> tuple[Resource, Resource, Resource, Resource, Resource]:
     """Define the release-flow resources: release resource, gates, issues, and GitHub Deployments."""
     release_res = release_resource(
