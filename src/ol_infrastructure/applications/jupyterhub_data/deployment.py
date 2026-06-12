@@ -477,18 +477,21 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     "cmd": ["jupyterhub-singleuser"],
                     "startTimeout": 300,
                     "networkPolicy": {"enabled": False},
-                    # Configure marimo-jupyter-extension to use the conda marimo
-                    # binary directly (non-sandbox mode) so the WebSocket proxy
-                    # can start per-file marimo sessions. Without an explicit
-                    # marimo_path, the extension may attempt uvx sandbox mode
-                    # which is not available in this image, causing every
-                    # /marimo/ws WebSocket connection to return 404.
+                    # Configure marimo-jupyter-extension to run each notebook in
+                    # an isolated uv virtual environment (sandbox mode). uvx reads
+                    # the `/// script` PEP 723 inline metadata header in each .py
+                    # file to install exactly the packages that notebook declares,
+                    # ensuring reproducibility. UV_CACHE_DIR points to the EFS home
+                    # volume so venvs persist across pod restarts and are not
+                    # recreated on every open. timeout=120 covers the first-open
+                    # cost of downloading and building the per-notebook venv.
                     "extraFiles": {
                         "jupyter-server-config": {
                             "mountPath": "/etc/jupyter/jupyter_server_config.py",
                             "stringData": (
-                                "c.MarimoProxyConfig.marimo_path"
-                                ' = "/opt/conda/bin/marimo"\n'
+                                "c.MarimoProxyConfig.uvx_path"
+                                ' = "/usr/local/bin/uvx"\n'
+                                "c.MarimoProxyConfig.timeout = 120\n"
                             ),
                         }
                     },
@@ -498,6 +501,8 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                         "JUPYTERHUB_SINGLEUSER_APP": (
                             "jupyter_server.serverapp.ServerApp"
                         ),
+                        # uv cache on EFS so per-notebook venvs survive pod restarts
+                        "UV_CACHE_DIR": "/home/jovyan/.cache/uv",
                     },
                     "storage": {
                         "type": "dynamic",
