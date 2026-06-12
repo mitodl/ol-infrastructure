@@ -68,16 +68,22 @@ class OLEKSGatewayRateLimitConfig(BaseModel):
     # notably the MIT campus network) collapse many legitimate users onto a single
     # public IP, so a tight per-IP ceiling would throttle real traffic at peak.
     # Average number of requests permitted per ``period``.
-    average: int = 300
+    average: PositiveInt = 300
     # Maximum burst of requests tolerated above the average before throttling.
-    burst: int = 600
+    burst: PositiveInt = 600
     period: str = "1s"
     # Depth of the client IP within X-Forwarded-For, counted from the right.
     # 1 matches a single trusted CDN hop (Fastly), whose X-Forwarded-For the
     # Traefik controller trusts (see forwardedHeaders.trustedIPs), so the bucket
     # keys on the real client IP rather than the Fastly edge address.
-    ip_strategy_depth: int = 1
+    ip_strategy_depth: PositiveInt = 1
 
+    @model_validator(mode="after")
+    def check_rate_limit_thresholds(self) -> "OLEKSGatewayRateLimitConfig":
+        if self.burst < self.average:
+            msg = "rate_limit.burst must be >= rate_limit.average"
+            raise ValueError(msg)
+        return self
 
 class OLEKSGatewayConfig(BaseModel):
     annotations: dict[str, str] | None = None
