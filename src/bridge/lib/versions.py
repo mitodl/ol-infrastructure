@@ -62,9 +62,9 @@ KUBEWATCH_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=meilisearch packageName=meilisearch registryUrl=https://meilisearch.github.io/meilisearch-kubernetes
 MEILISEARCH_CHART_VERSION = "0.32.0"
 # renovate: datasource=helm depName=operator packageName=operator registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
-STARROCKS_OPERATOR_CHART_VERSION = "1.11.4"
+STARROCKS_OPERATOR_CHART_VERSION = "1.11.5"
 # renovate: datasource=helm depName=operator packageName=starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
-STARROCKS_CHART_VERSION = "1.11.4"
+STARROCKS_CHART_VERSION = "1.11.5"
 # renovate: datasource=docker depName=starrocks packageName=starrocks/fe-ubuntu
 STARROCKS_VERSION = "4.1.1"
 # renovate: datasource=github-releases depName=starrocks-vault-plugin packageName=mitodl/vault-plugin-database-starrocks
