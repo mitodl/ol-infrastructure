@@ -78,6 +78,37 @@ def build_base_general_config() -> ConfigDict:
         "ACCOUNT_MICROFRONTEND_URL": None,
         "ACTIVATION_EMAIL_SUPPORT_LINK": "",
         "AFFILIATE_COOKIE_NAME": "dev_affiliate_id",
+        # ── aqueduct OPAQUE/None defaults ──────────────────────────────────────
+        # aqueduct cannot serialize regex strings or lazy-translated dicts as
+        # Pydantic field defaults.  These plain-string / plain-dict copies of the
+        # openedx/envs/common.py and lms/envs/common.py values ensure the
+        # settings are always present in the generated YAML so the Pydantic model
+        # never falls back to its None default.
+        #
+        # Patterns (from openedx/core/constants.py and lms/envs/common.py):
+        "ASSET_KEY_PATTERN": r"(?P<asset_key_string>(?:/?c4x(:/)?/[^/]+/[^/]+/[^/]+/[^@]+(?:@[^/]+)?)|(?:[^/]+))",
+        "CHECKPOINT_PATTERN": r"(?P<checkpoint_name>[^/]+)",
+        "COURSE_ID_PATTERN": r"(?P<course_id>[^/+]+(/|\+)[^/+]+(/|\+)[^/?]+)",
+        "COURSE_KEY_PATTERN": r"(?P<course_key_string>[^/+]+(/|\+)[^/+]+(/|\+)[^/?]+)",
+        "USAGE_ID_PATTERN": r"(?P<usage_id>(?:i4x://?[^/]+/[^/]+/[^/]+/[^@]+(?:@[^/]+)?)|(?:[^/]+))",
+        "USAGE_KEY_PATTERN": r"(?P<usage_key_string>(?:i4x://?[^/]+/[^/]+/[^/]+/[^@]+(?:@[^/]+)?)|(?:[^/]+))",
+        # CELERYBEAT_SCHEDULE is OPAQUE because plugins inject timedelta objects;
+        # the base lms/envs/common.py default is {}.  Per-deployment entries are
+        # added in the deployment overrides below (e.g. mitxonline).
+        "CELERYBEAT_SCHEDULE": {},
+        # YOUTUBE (plain-string copy — openedx/envs/common.py):
+        "YOUTUBE": {
+            "API": "https://www.youtube.com/iframe_api",
+            "TEST_TIMEOUT": 1500,
+            "METADATA_URL": "https://www.googleapis.com/youtube/v3/videos/",
+            "TRANSCRIPTS": {
+                "CAPTION_TRACKS_REGEX": r'captionTracks"\:\[(?P<caption_tracks>[^\]]+)',
+                "YOUTUBE_URL_BASE": "https://www.youtube.com/watch?v=",
+                "ALLOWED_LANGUAGE_CODES": ["en", "en-US", "en-GB"],
+            },
+            "IMAGE_API": "http://img.youtube.com/vi/{youtube_id}/0.jpg",
+        },
+        # ──────────────────────────────────────────────────────────────────────
         "AUTH_PASSWORD_VALIDATORS": [
             {
                 "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
@@ -132,12 +163,94 @@ def build_base_general_config() -> ConfigDict:
         ],
         "COMPREHENSIVE_THEME_LOCALE_PATHS": [],
         "CORS_ORIGIN_ALLOW_ALL": False,
+        # django_countries fails if COUNTRIES_OVERRIDE is None; provide the
+        # same default as lms/envs/common.py (lazy _() stripped to plain str).
+        "COUNTRIES_OVERRIDE": {
+            "TW": "Taiwan",
+            "XK": "Kosovo",
+        },
         "COURSES_WITH_UNSAFE_CODE": [],
         "COURSES_INVITE_ONLY": True,
         "COURSE_ABOUT_VISIBILITY_PERMISSION": "see_exists",
         "COURSE_CATALOG_API_URL": "http://localhost:8008/api/v1",
         "COURSE_CATALOG_URL_ROOT": "http://localhost:8008",
         "COURSE_CATALOG_VISIBILITY_PERMISSION": "staff",
+        # aqueduct serializes this as None (lazy _() display_names aren't
+        # JSON-serializable); provide plain-string defaults from openedx/envs/common.py.
+        "COURSE_ENROLLMENT_MODES": {
+            "audit": {
+                "id": 1,
+                "slug": "audit",
+                "display_name": "Audit",
+                "min_price": 0,
+            },
+            "verified": {
+                "id": 2,
+                "slug": "verified",
+                "display_name": "Verified",
+                "min_price": 1,
+            },
+            "professional": {
+                "id": 3,
+                "slug": "professional",
+                "display_name": "Professional",
+                "min_price": 1,
+            },
+            "no-id-professional": {
+                "id": 4,
+                "slug": "no-id-professional",
+                "display_name": "No-Id-Professional",
+                "min_price": 0,
+            },
+            "credit": {
+                "id": 5,
+                "slug": "credit",
+                "display_name": "Credit",
+                "min_price": 0,
+            },
+            "honor": {
+                "id": 6,
+                "slug": "honor",
+                "display_name": "Honor",
+                "min_price": 0,
+            },
+            "masters": {
+                "id": 7,
+                "slug": "masters",
+                "display_name": "Master's",
+                "min_price": 0,
+            },
+            "executive-education": {
+                "id": 8,
+                "slug": "executive-educations",
+                "display_name": "Executive Education",
+                "min_price": 1,
+            },
+            "unpaid-executive-education": {
+                "id": 9,
+                "slug": "unpaid-executive-education",
+                "display_name": "Unpaid Executive Education",
+                "min_price": 0,
+            },
+            "paid-executive-education": {
+                "id": 10,
+                "slug": "paid-executive-education",
+                "display_name": "Paid Executive Education",
+                "min_price": 1,
+            },
+            "unpaid-bootcamp": {
+                "id": 11,
+                "slug": "unpaid-bootcamp",
+                "display_name": "Unpaid Bootcamp",
+                "min_price": 0,
+            },
+            "paid-bootcamp": {
+                "id": 12,
+                "slug": "paid-bootcamp",
+                "display_name": "Paid Bootcamp",
+                "min_price": 1,
+            },
+        },
         "CREDENTIALS_INTERNAL_SERVICE_URL": "http://localhost:8005",
         "CREDENTIALS_PUBLIC_SERVICE_URL": "http://localhost:8005",
         "CREDIT_PROVIDER_SECRET_KEYS": {},  # pragma: allowlist secret
@@ -146,6 +259,12 @@ def build_base_general_config() -> ConfigDict:
         "CSRF_COOKIE_MASKED": False,
         "DASHBOARD_COURSE_LIMIT": None,
         "DATA_DIR": "/openedx/data",
+        "COURSES_ROOT": "/openedx/data",
+        "COMMON_ROOT": "/openedx/edx-platform/common",
+        "ENV_ROOT": "/openedx",
+        "OPENEDX_ROOT": "/openedx/edx-platform/openedx",
+        "REPO_ROOT": "/openedx/edx-platform",
+        "XMODULE_ROOT": "/openedx/edx-platform/xmodule",
         "DEFAULT_COURSE_VISIBILITY_IN_CATALOG": "both",
         "DEFAULT_FILE_STORAGE": "storages.backends.s3boto3.S3Boto3Storage",
         "DEFAULT_MOBILE_AVAILABLE": False,
@@ -194,7 +313,7 @@ def build_base_general_config() -> ConfigDict:
         "LOGGING_ENV": "sandbox",
         "LOG_DIR": "/openedx/data/var/log/edx",
         "MAINTENANCE_BANNER_TEXT": "Sample banner message",
-        "MEDIA_ROOT": "media/",
+        "MEDIA_ROOT": "/openedx/data/media/",
         "MEDIA_URL": "/media/",
         "MICROSITE_CONFIGURATION": {},
         "MKTG_URL_LINK_MAP": {
@@ -260,6 +379,8 @@ def build_base_general_config() -> ConfigDict:
         "SESSION_COOKIE_SAMESITE_FORCE_ALL": True,
         "SESSION_COOKIE_SECURE": True,
         "SESSION_SAVE_EVERY_REQUEST": False,
+        "SOCIAL_MEDIA_FOOTER_NAMES": [],
+        "SOCIAL_MEDIA_FOOTER_DISPLAY": {},
         "SOCIAL_MEDIA_FOOTER_URLS": {},
         "SOCIAL_MEDIA_FOOTER_ACE_URLS": {},
         "SOCIAL_MEDIA_LOGO_URLS": {},
@@ -279,6 +400,9 @@ def build_base_general_config() -> ConfigDict:
         "TECH_SUPPORT_EMAIL": "odl-devops@mit.edu",
         "TIME_ZONE": "America/New_York",
         "USERNAME_REPLACEMENT_WORKER": "OVERRIDE THIS WITH A VALID USERNAME",
+        # aqueduct marks this OPAQUE (regex not serialisable as a Pydantic default).
+        # Value mirrors openedx/envs/common.py: fr'(?P<username>{USERNAME_REGEX_PARTIAL})'
+        "USERNAME_PATTERN": r"(?P<username>[\w .@_+-]+)",
         "USE_X_FORWARDED_HOST": True,  # Trust X-Forwarded-Host from APISIX proxy
         "VIDEO_IMAGE_MAX_AGE": 31536000,
         "VIDEO_IMAGE_SETTINGS": {
@@ -348,6 +472,7 @@ def build_base_general_config() -> ConfigDict:
         "SHOW_BUMPER_PERIODICITY": 7 * 24 * 3600,  # 7 days in seconds
         "SHOW_FOOTER_LANGUAGE_SELECTOR": False,
         "SHOW_HEADER_LANGUAGE_SELECTOR": False,
+        "SURVEY_REPORT_ENABLE": False,
         "CERTIFICATES_HTML_VIEW": False,
         # ============================================================================
         # FEATURES dict - for remaining feature flags without module-level equivalents
@@ -378,6 +503,7 @@ def build_base_general_config() -> ConfigDict:
             "ENABLE_DISCUSSION_HOME_PANEL": True,
             "ENABLE_EDX_USERNAME_CHANGER": True,
             "ENABLE_ENROLLMENT_RESET": False,
+            "ENABLE_ENROLLMENT_TRACK_USER_PARTITION": True,
             "ENABLE_EXPORT_GIT": True,
             "ENABLE_GIT_AUTO_EXPORT": True,
             "ENABLE_AUTO_GITHUB_REPO_CREATION": True,
@@ -401,6 +527,21 @@ def build_base_general_config() -> ConfigDict:
             "RESTRICT_ENROLL_BY_REG_METHOD": False,
             "SESSION_COOKIE_SECURE": True,
             "SKIP_EMAIL_VALIDATION": True,
+            "SQUELCH_PII_IN_LOGS": True,
+            # Compatibility mirror for code paths that still read settings.FEATURES[...] directly.
+            "DISABLE_START_DATES": False,
+            "EMBARGO": True,
+            "ENABLE_CORS_HEADERS": True,
+            "ENABLE_DISCUSSION_SERVICE": True,
+            "ENABLE_MKTG_SITE": False,
+            "ENABLE_MOBILE_REST_API": True,
+            "ENABLE_OAUTH2_PROVIDER": True,
+            "ENABLE_SPECIAL_EXAMS": True,
+            "ENABLE_TEAMS": True,
+            "ENABLE_TEXTBOOK": True,
+            "ENABLE_PREREQUISITE_COURSES": False,
+            "SHOW_FOOTER_LANGUAGE_SELECTOR": False,
+            "SHOW_HEADER_LANGUAGE_SELECTOR": False,
         },
     }
 
@@ -445,6 +586,7 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
         ],
         # Module-level settings overrides for residential
         "DISABLE_START_DATES": False,
+        "ENABLE_LTI_PROVIDER": True,  # Extracted to module-level
         "ENABLE_MKTG_SITE": False,  # Extracted to module-level
         # FEATURES overrides for residential (only non-module-level flags)
         "FEATURES": {
@@ -452,7 +594,6 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
             "DISABLE_HONOR_CERTIFICATES": True,
             "ENABLE_CANVAS_INTEGRATION": True,
             "ENABLE_CONTENT_LIBRARIES": True,
-            "ENABLE_LTI_PROVIDER": True,
             "ENABLE_ORA_USERNAMES_ON_DATA_EXPORT": False,
             "ENABLE_RAPID_RESPONSE_AUTHOR_VIEW": True,
             "ENABLE_THIRD_PARTY_ONLY_AUTH": True,
@@ -522,11 +663,11 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
                 "COMPLETE",
             ],
             # Module-level settings overrides for xpro
+            "ENABLE_LTI_PROVIDER": False,  # Extracted to module-level
             "ENABLE_MKTG_SITE": True,  # Extracted to module-level
             "LICENSING": True,  # Extracted to module-level
             # FEATURES overrides for xpro (only non-module-level flags)
             "FEATURES": {
-                "ENABLE_LTI_PROVIDER": False,
                 "ENABLE_ORA_USERNAMES_ON_DATA_EXPORT": True,
                 "ENABLE_SYSADMIN_DASHBOARD": True,
                 "REROUTE_ACTIVATION_EMAIL": "support@xpro.mit.edu",
@@ -534,6 +675,19 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
         },
         "mitxonline": {
             "AWS_SES_SEND_MESSAGE_TAGS": {"edxapp-mitxonline": "true"},
+            "COURSE_MODE_DEFAULTS": {
+                "name": "Professional",
+                "android_sku": None,
+                "bulk_sku": None,
+                "currency": "usd",
+                "description": None,
+                "expiration_datetime": None,
+                "ios_sku": None,
+                "min_price": 0,
+                "sku": None,
+                "slug": "no-id-professional",
+                "suggested_prices": "",
+            },
             "DEFAULT_SITE_THEME": "mitxonline",
             "PLATFORM_NAME": "MIT Learn",
             "PLATFORM_DESCRIPTION": "MIT Learn",
@@ -596,11 +750,11 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
             "LICENSING": True,  # Extracted to module-level
             "MILESTONES_APP": True,  # Extracted to module-level
             # FEATURES overrides for mitxonline (only non-module-level flags)
+            "ENABLE_LTI_PROVIDER": True,  # Extracted to module-level
             "FEATURES": {
                 "ALLOW_COURSE_STAFF_GRADE_DOWNLOADS": True,
                 "ENABLE_EXAM_SETTINGS_HTML_VIEW": True,
                 "ENABLE_FORUM_DAILY_DIGEST": True,
-                "ENABLE_LTI_PROVIDER": True,
                 "ENABLE_V2_CERT_DISPLAY_SETTINGS": True,
                 "ENABLE_BULK_USER_RETIREMENT": True,
                 "ENABLE_PROCTORED_EXAMS": True,
@@ -647,6 +801,44 @@ def build_general_config(env_prefix: str) -> ConfigDict:
 
     # Merge FEATURES and OAUTH2_PROVIDER nested dicts properly
     return deep_merge(base, overrides)
+
+
+def partition_config(config: ConfigDict) -> tuple[dict[str, str], ConfigDict]:
+    """Split a settings dict into flat env-var entries and complex YAML entries.
+
+    Flat entries — strings, ints, floats, and bools — are suitable for direct
+    injection as Kubernetes environment variables via ``envFrom: configMapRef``.
+    pydantic-settings coerces them back to the declared Python type on load.
+
+    Complex entries — lists, nested dicts, and ``None`` — require YAML file
+    representation because they cannot be expressed as single env-var strings
+    without lossy JSON encoding.
+
+    ``None`` values are dropped from *both* outputs: they carry no information
+    and pydantic will fall back to the field default.
+
+    Args:
+        config: Raw settings dictionary (output of a ``build_*`` function).
+
+    Returns:
+        ``(flat, complex)`` where ``flat`` values are already serialised to
+        strings ready for a Kubernetes ConfigMap ``data`` block, and
+        ``complex`` values are kept as-is for YAML rendering.
+    """
+    flat: dict[str, str] = {}
+    complex_: ConfigDict = {}
+    for key, value in config.items():
+        if value is None:
+            # Omit — pydantic will use the field default.
+            continue
+        elif isinstance(value, bool):
+            # Must come before int check: bool is a subclass of int.
+            flat[key] = "true" if value else "false"
+        elif isinstance(value, (str, int, float)):
+            flat[key] = str(value)
+        else:
+            complex_[key] = value
+    return flat, complex_
 
 
 def render_yaml(config: ConfigDict) -> str:
