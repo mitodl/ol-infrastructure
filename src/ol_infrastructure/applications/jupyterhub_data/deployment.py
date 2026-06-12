@@ -477,6 +477,21 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     "cmd": ["jupyterhub-singleuser"],
                     "startTimeout": 300,
                     "networkPolicy": {"enabled": False},
+                    # Configure marimo-jupyter-extension to use the conda marimo
+                    # binary directly (non-sandbox mode) so the WebSocket proxy
+                    # can start per-file marimo sessions. Without an explicit
+                    # marimo_path, the extension may attempt uvx sandbox mode
+                    # which is not available in this image, causing every
+                    # /marimo/ws WebSocket connection to return 404.
+                    "extraFiles": {
+                        "jupyter-server-config": {
+                            "mountPath": "/etc/jupyter/jupyter_server_config.py",
+                            "stringData": (
+                                "c.MarimoProxyConfig.marimo_path"
+                                ' = "/opt/conda/bin/marimo"\n'
+                            ),
+                        }
+                    },
                     "extraEnv": {
                         "TRINO_HOST": trino_host,
                         "TRINO_PORT": "443",
