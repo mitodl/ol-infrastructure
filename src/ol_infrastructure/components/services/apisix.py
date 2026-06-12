@@ -42,7 +42,7 @@ class OLApisixPluginConfig(BaseModel):
     name: str
     enable: bool = True
     secret_ref: str | None = Field(
-        None,
+        default=None,
         alias="secretRef",
     )
     config: dict[str, Any] = {}
@@ -285,7 +285,7 @@ class OLApisixRouteConfig(BaseModel):
     route_name: str
     priority: int = 0
     shared_plugin_config_name: str | None = None
-    plugins: list[OLApisixPluginConfig] = []
+    plugins: list[Any] = []
     hosts: list[str] = []
     paths: list[str] = []
     # Optional ApisixRoute ``match.exprs`` entries for matching on headers,
@@ -316,13 +316,15 @@ class OLApisixRouteConfig(BaseModel):
 
     @field_validator("plugins")
     @classmethod
-    def ensure_request_id_plugin(
-        cls, v: list[OLApisixPluginConfig]
-    ) -> list[OLApisixPluginConfig]:
+    def ensure_request_id_plugin(cls, v: list[Any]) -> list[Any]:
         """
         Ensure that the request-id plugin is always added to the plugins list
         """
-        if not any(plugin.name == "request-id" for plugin in v):
+        if not any(
+            (plugin.get("name") if isinstance(plugin, dict) else plugin.name)
+            == "request-id"
+            for plugin in v
+        ):
             v.append(
                 OLApisixPluginConfig(
                     name="request-id",
@@ -397,7 +399,9 @@ class OLApisixRoute(ComponentResource):
                 "name": route_config.route_name,
                 "priority": route_config.priority,
                 "plugins": [
-                    p.model_dump(by_alias=True, exclude_none=True)
+                    p
+                    if isinstance(p, dict)
+                    else p.model_dump(by_alias=True, exclude_none=True)
                     for p in route_config.plugins
                 ],
                 "match": {
