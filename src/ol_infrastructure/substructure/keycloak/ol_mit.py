@@ -510,13 +510,63 @@ def create_ol_mit_realm(  # noqa: PLR0913
         # MIT affiliate into Keycloak; users are provisioned on-demand via the
         # Touchstone SAML first-login flow.
         changed_sync_period=14400,
-        opts=resource_options,
+        # Disable Keycloak's auto-created default mappers so we can take full
+        # control of the standard attribute mappings below.  The default "first
+        # name" mapper maps the LDAP "cn" attribute onto firstName; we instead
+        # want "givenName", so we define the full standard set explicitly rather
+        # than letting the default mapper shadow our intent or collide on
+        # the "first name" name.
+        delete_default_mappers=True,
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
-    # MIT-specific attribute mappers.  Standard attributes (username, email,
-    # firstName, lastName) are handled by the default mappers that Keycloak
-    # creates automatically when delete_default_mappers is not set.
+    # Standard attribute mappers.  These replace the default mappers Keycloak
+    # would otherwise auto-create (disabled via delete_default_mappers above).
+    # The only deviation from the Keycloak defaults is "first name", which maps
+    # from "givenName" instead of "cn".
+    # MIT-specific attribute mappers follow.
     for resource_name, mapper_name, ldap_attr, model_attr in [
+        (
+            "ol-mit-ldap-username-mapper",
+            "username",
+            "uid",
+            "username",
+        ),
+        (
+            "ol-mit-ldap-email-mapper",
+            "email",
+            "mail",
+            "email",
+        ),
+        (
+            "ol-mit-ldap-last-name-mapper",
+            "last name",
+            "sn",
+            "lastName",
+        ),
+        (
+            "ol-mit-ldap-first-name-mapper",
+            "first name",
+            "givenName",
+            "firstName",
+        ),
+        # createTimestamp/modifyTimestamp mappers are normally auto-created by
+        # Keycloak's default mapper set.  Since delete_default_mappers=True
+        # suppresses those, re-add them explicitly: the delta sync driven by
+        # changed_sync_period relies on modifyTimestamp to detect which LDAP
+        # entries have changed since the last sync.
+        (
+            "ol-mit-ldap-creation-date-mapper",
+            "creation date",
+            "createTimestamp",
+            "createTimestamp",
+        ),
+        (
+            "ol-mit-ldap-modify-date-mapper",
+            "modify date",
+            "modifyTimestamp",
+            "modifyTimestamp",
+        ),
         (
             "ol-mit-ldap-edu-person-principal-name-mapper",
             "eduPersonPrincipalName",
