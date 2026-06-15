@@ -466,7 +466,6 @@ def _build_release_image_job(
         "image": "image/image.tar",
         "additional_tags": f"./{release_res.name}/.git/short_ref",
         "version": "((.:release_version))",
-        "bump_aliases": True,
     }
 
     plan = [
