@@ -1,7 +1,6 @@
 # ruff: noqa: PLR0913, E501
 """Generate Concourse pipeline definitions for building and deploying dockerized applications to Kubernetes via Pulumi."""
 
-import subprocess
 import sys
 from typing import Any
 
@@ -49,17 +48,6 @@ from ol_concourse.pipelines.constants import (
 from ol_concourse.pipelines.jobs import pulumi_job, pulumi_jobs_chain
 
 
-def _get_github_default_branch(github_repo: str) -> str:
-    """Query GitHub for the default branch of a repository."""
-    result = subprocess.run(  # noqa: S603
-        ["gh", "api", f"repos/{github_repo}", "--jq", ".default_branch"],  # noqa: S607
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return result.stdout.strip()
-
-
 class AppPipelineParams(BaseModel):
     """Parameters for the application pipeline.
 
@@ -101,13 +89,11 @@ class AppPipelineParams(BaseModel):
 
     @model_validator(mode="after")
     def set_repo_name(self) -> "AppPipelineParams":
-        """Set the repo_name, github_repo, and repo_main_branch based on app_name if not provided."""
+        """Set the repo_name and github_repo based on app_name if not provided."""
         if not self.repo_name:
             self.repo_name = self.app_name
         if not self.github_repo:
             self.github_repo = f"mitodl/{self.repo_name}"
-        if "repo_main_branch" not in self.model_fields_set:
-            self.repo_main_branch = _get_github_default_branch(self.github_repo)
         return self
 
     @model_validator(mode="after")
@@ -142,6 +128,7 @@ pipeline_params = {
     "micromasters": AppPipelineParams(
         app_name="micromasters",
         build_target="production",
+        repo_main_branch="master",
         settings_dir="micromasters",
     ),
     "mitxonline": AppPipelineParams(app_name="mitxonline", build_target="production"),
@@ -163,15 +150,18 @@ pipeline_params = {
     "xpro": AppPipelineParams(
         app_name="xpro",
         repo_name="mitxpro",
+        repo_main_branch="master",
         build_target="production",
         settings_dir="mitxpro",
     ),
     "ocw-studio": AppPipelineParams(
         app_name="ocw-studio",
+        repo_main_branch="master",
         build_target="production",
     ),
     "odl-video-service": AppPipelineParams(
         app_name="odl-video-service",
+        repo_main_branch="master",
         build_target="production",
         settings_dir="odl_video",
     ),
@@ -507,10 +497,10 @@ def _build_release_image_job(
             reveal=True,
         ),
         container_build_task(
-            inputs=[Input(name=release_res.name)],
+            inputs=[Input(name=main_repo.name)],
             build_parameters={
-                "CONTEXT": release_res.name,
-                "DOCKERFILE": f"{release_res.name}/{dockerfile_path}",
+                "CONTEXT": main_repo.name,
+                "DOCKERFILE": f"{main_repo.name}/{dockerfile_path}",
                 "BUILD_ARG_GIT_REF": "((.:git_ref))",
                 "BUILD_ARG_RELEASE_VERSION": "((.:release_version))",
                 **additional_build_params,
@@ -547,6 +537,36 @@ def _build_release_image_job(
     ]
 
     return Job(name=Identifier(job_name), build_log_retention={"builds": 10}, plan=plan)
+
+
+def _build_abandon_release_job(
+    app_name: str,
+    main_repo: Resource,
+    release_res: Resource,
+) -> Job:
+    """Generate a manually-triggered job that abandons an in-flight release.
+
+    Running this job deletes the ``releases/{version}`` branch and version tag
+    from the remote so that the next ``check`` sees no in-flight release and
+    recomputes the next version normally.  Use it when a release was cut but
+    must be cancelled before it reaches production.
+    """
+    return Job(
+        name=Identifier(f"abandon-{app_name}-release"),
+        build_log_retention={"builds": 10},
+        plan=[
+            GetStep(get=release_res.name, trigger=False),
+            GetStep(get=main_repo.name, trigger=False),
+            PutStep(
+                put=release_res.name,
+                params={
+                    "action": "abandon",
+                    "repo_dir": str(main_repo.name),
+                    "version_file": f"{release_res.name}/version",
+                },
+            ),
+        ],
+    )
 
 
 def build_app_pipeline(app_name: str) -> Pipeline:
@@ -616,6 +636,11 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         dockerhub_registry_image_resource=docker_rc_image,
         ecr_registry_image_resource=app_rc_image,
         build_target=pipeline_parameters.build_target,
+    )
+    abandon_release_job = _build_abandon_release_job(
+        app_name=app_name,
+        main_repo=main_repo,
+        release_res=release_res,
     )
 
     # Define Deployment Jobs
@@ -690,6 +715,16 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                 "state": "success",
             },
         ),
+        # Merge the release branch back into the main branch and delete it so
+        # subsequent check calls no longer see a release as in-flight.
+        PutStep(
+            put=release_res.name,
+            params={
+                "action": "finish",
+                "repo_dir": str(main_repo.name),
+                "version_file": f"{release_res.name}/version",
+            },
+        ),
     ]
     additional_post_steps: dict[int, list[GetStep | PutStep | TaskStep]] = {
         0: qa_post_steps,
@@ -741,6 +776,17 @@ def build_app_pipeline(app_name: str) -> Pipeline:
             ],
             1: [
                 GetStep(get=release_gate.name, trigger=True, version="every"),
+                # release_res and main_repo are needed by the action=finish post-step.
+                GetStep(
+                    get=release_res.name,
+                    trigger=False,
+                    passed=[release_image_build_job.name],
+                ),
+                GetStep(
+                    get=main_repo.name,
+                    trigger=False,
+                    passed=[release_image_build_job.name],
+                ),
                 PutStep(
                     put=deployment_prod.name,
                     params={"action": "start", "ref": "((.:image_tag))"},
@@ -772,7 +818,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
             app_rc_image,
             docker_rc_image,
         ],
-        jobs=[release_image_build_job],
+        jobs=[release_image_build_job, abandon_release_job],
     )
 
     # Consolidate resources for deployment fragments
