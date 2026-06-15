@@ -432,6 +432,12 @@ def oidc_login(client: hvac.Client, role: str) -> str:
     auth_url_nonce = params["nonce"][0]
     auth_url_state = params["state"][0]
 
+    print(
+        "Attempting to open Vault OIDC login in your browser. "
+        "If it does not open automatically, click or copy this URL:\n"
+        f"{auth_url}",
+        file=sys.stderr,
+    )
     webbrowser.open(auth_url)
     code = login_oidc_get_token()
     auth_result = client.auth.oidc.oidc_callback(
