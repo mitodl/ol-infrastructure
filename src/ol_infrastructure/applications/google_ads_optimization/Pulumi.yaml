@@ -1,0 +1,7 @@
+---
+name: ol-application-google-ads-opt
+runtime: python
+description: Pulumi project for deploying the infrastructure needed by Google Ads
+  Optimization
+backend:
+  url: s3://mitol-pulumi-state/ # should not be changed
