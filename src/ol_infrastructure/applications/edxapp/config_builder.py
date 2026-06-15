@@ -381,6 +381,8 @@ def build_base_general_config() -> ConfigDict:
             "ENABLE_EXPORT_GIT": True,
             "ENABLE_GIT_AUTO_EXPORT": True,
             "ENABLE_AUTO_GITHUB_REPO_CREATION": True,
+            "ENABLE_GIT_AUTO_LIBRARY_EXPORT": True,
+            "ENABLE_AUTO_GITHUB_LIBRARY_REPO_CREATION": True,
             "ENABLE_GRADE_DOWNLOADS": True,
             "ENABLE_INSTRUCTOR_ANALYTICS": False,
             "ENABLE_INSTRUCTOR_EMAIL": True,
