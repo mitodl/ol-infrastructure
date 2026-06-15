@@ -26,8 +26,11 @@ transforms:
       if abort_name_match {
         abort
       }
-      ## Any metrics that match these prefixes will have the 'instance' label removed
-      remove_instance_label_match, err = match_any(.name, [r'^concourse_workers_.*'])
+      ## Cluster-state metrics have the same value on every web node (they reflect the
+      ## shared database). Strip the instance label so CloudWatch treats them as a
+      ## single aggregate time series rather than N per-host series, making alarm
+      ## thresholds straightforward.
+      remove_instance_label_match, err = match_any(.name, [r'^concourse_workers_.*', r'^concourse_builds_running$', r'^concourse_steps_waiting$', r'^concourse_jobs_scheduling$'])
       if remove_instance_label_match {
         del(.tags.instance)
       }

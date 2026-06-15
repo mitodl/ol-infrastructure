@@ -152,7 +152,7 @@ concourse_config_map = {
         enable_job_auditing=False,
         enable_pipeline_auditing=False,
         enable_resource_auditing=False,
-        enable_rerun_when_worker_disappears=False,
+        enable_rerun_when_worker_disappears=True,
         enable_system_auditing=False,
         enable_team_auditing=False,
         enable_volume_auditing=False,
@@ -244,9 +244,12 @@ vault_template_map = {
 }
 
 # Install Concourse
+# Web nodes need awscli + jq for the stalled-worker reaper; workers need awscli
+# for the spot/lifecycle drain helpers.
 install_baseline_packages(
     packages=["curl", "btrfs-progs"]
     + (["awscli"] if node_type == CONCOURSE_WORKER_NODE_TYPE else [])
+    + (["awscli", "jq"] if node_type == CONCOURSE_WEB_NODE_TYPE else [])
 )
 concourse_install_changed = install_concourse(concourse_base_config)
 concourse_config_changed = configure_concourse(concourse_config)
@@ -405,6 +408,43 @@ if host.get_fact(HasSystemd):
             ]
         )
         traefik_service(traefik_config=traefik_config, do_reload=traefik_config_changed)
+
+        # Install the stalled-worker reaper. It reconciles Concourse's worker
+        # registry against EC2 and prunes "stalled" workers whose instance is
+        # gone, recovering the cleanup behaviour of the `ephemeral` flag without
+        # its cache-wiping hair-trigger. Runs on a 3-minute systemd timer.
+        files.put(
+            name="Upload concourse-worker-reaper script",
+            src=str(FILES_DIRECTORY.joinpath("concourse-worker-reaper")),
+            dest="/usr/local/bin/concourse-worker-reaper",
+            user="root",
+            group="root",
+            mode="755",
+        )
+        reaper_unit_files = [
+            "concourse-worker-reaper.service",
+            "concourse-worker-reaper.timer",
+        ]
+        reaper_units_changed = False
+        for unit_file in reaper_unit_files:
+            result = files.put(
+                name=f"Upload {unit_file} systemd unit",
+                src=str(FILES_DIRECTORY.joinpath(unit_file)),
+                dest=f"/etc/systemd/system/{unit_file}",
+                user="root",
+                group="root",
+                mode="644",
+            )
+            reaper_units_changed = reaper_units_changed or result.changed
+        # Enable the timer (not the service directly); the timer triggers the
+        # oneshot service on its schedule.
+        systemd.service(
+            name="Enable and start concourse-worker-reaper timer",
+            service="concourse-worker-reaper.timer",
+            running=True,
+            enabled=True,
+            daemon_reload=reaper_units_changed,
+        )
     else:
         watched_concourse_files.extend(
             [

@@ -17,8 +17,9 @@ from string import Template
 import pulumi_vault as vault
 import yaml
 from pulumi import Config, Output, export
-from pulumi_aws import ec2, get_caller_identity, iam, route53
+from pulumi_aws import cloudwatch, ec2, get_caller_identity, iam, route53
 from pulumi_aws.autoscaling import LifecycleHook
+from pulumi_aws.autoscaling import Policy as AutoscalingPolicy
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
@@ -758,14 +759,14 @@ for worker_def in concourse_config.get_object("workers") or []:
     )
     ol_worker_target_group_config = OLTargetGroupConfig(
         vpc_id=ops_vpc_id,
-        health_check_interval=60,
+        health_check_interval=30,
         health_check_healthy_threshold=2,
         health_check_matcher="200",
         health_check_path="/",
         health_check_port=str(CONCOURSE_WORKER_HEALTHCHECK_PORT),
         health_check_protocol="HTTP",
         health_check_timeout=20,
-        health_check_unhealthy_threshold=5,
+        health_check_unhealthy_threshold=3,
         tags=aws_config.merged_tags({"Name": worker_name_tag}, worker_def["aws_tags"]),
     )
 
@@ -818,6 +819,76 @@ for worker_def in concourse_config.get_object("workers") or []:
         heartbeat_timeout=600,
         lifecycle_transition="autoscaling:EC2_INSTANCE_TERMINATING",
         name=f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}-drain",
+    )
+
+    # ASG scaling policies driven by Concourse Prometheus metrics that Vector
+    # ships to CloudWatch (namespace = consul datacenter, e.g. "operations-production").
+    # Scale-out: add one instance when build steps are waiting for a worker for
+    # two consecutive 1-minute periods. Steps waiting > 0 means workers are saturated.
+    # Scale-in: remove one instance when the cluster has very few running builds
+    # sustained over 20 minutes AND we are above the minimum size.
+    scale_out_policy = AutoscalingPolicy(
+        f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}-scale-out",
+        autoscaling_group_name=ol_worker_as_setup.auto_scale_group.name,
+        adjustment_type="ChangeInCapacity",
+        scaling_adjustment=1,
+        cooldown=300,
+        policy_type="SimpleScaling",
+    )
+    scale_in_policy = AutoscalingPolicy(
+        f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}-scale-in",
+        autoscaling_group_name=ol_worker_as_setup.auto_scale_group.name,
+        adjustment_type="ChangeInCapacity",
+        scaling_adjustment=-1,
+        cooldown=600,
+        policy_type="SimpleScaling",
+    )
+
+    # concourse_steps_waiting is emitted by the web node's Prometheus endpoint and
+    # forwarded to CloudWatch by Vector. The metric has no dimensions that vary
+    # across worker classes — it reflects global cluster queue depth. A sustained
+    # non-zero value means at least one worker class should grow.
+    # Each worker ASG reacts independently so that specialist classes (ocw, infra)
+    # can scale without requiring every class to respond.
+    cloudwatch.MetricAlarm(
+        f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}-steps-waiting",
+        name=f"concourse-{worker_class_name}-{stack_info.env_suffix}-steps-waiting",
+        namespace=consul_datacenter,
+        metric_name="concourse_steps_waiting",
+        statistic="Sum",
+        period=60,
+        evaluation_periods=2,
+        threshold=1,
+        comparison_operator="GreaterThanOrEqualToThreshold",
+        treat_missing_data="notBreaching",
+        alarm_description=(
+            f"Concourse build steps are waiting for a worker in the "
+            f"{worker_class_name} pool — scale out to reduce queue depth."
+        ),
+        alarm_actions=[scale_out_policy.arn],
+        ok_actions=[],
+    )
+
+    # Scale in when builds_running (cluster-wide) drops near zero for 20 minutes.
+    # Using a high evaluation_periods + cooldown prevents aggressive scale-in
+    # during brief idle gaps between pipeline runs.
+    cloudwatch.MetricAlarm(
+        f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}-low-load",
+        name=f"concourse-{worker_class_name}-{stack_info.env_suffix}-low-load",
+        namespace=consul_datacenter,
+        metric_name="concourse_builds_running",
+        statistic="Average",
+        period=60,
+        evaluation_periods=20,
+        threshold=2,
+        comparison_operator="LessThanThreshold",
+        treat_missing_data="notBreaching",
+        alarm_description=(
+            f"Concourse cluster has very few active builds for 20 minutes — "
+            f"scale in {worker_class_name} workers to reduce cost."
+        ),
+        alarm_actions=[scale_in_policy.arn],
+        ok_actions=[],
     )
 
 

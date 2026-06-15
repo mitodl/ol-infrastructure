@@ -4,6 +4,9 @@ sources:
     type: journald
     include_units:
     - concourse
+    - concourse-worker-spot-watch
+    - concourse-worker-lifecycle-hook
+    - concourse-worker-reaper
 
 transforms:
   parse_concourse_logs:
@@ -24,10 +27,15 @@ transforms:
     inputs:
     - "parse_concourse_logs"
     source: |
-      # Drop all 'INFO' level messages
-      abort_match_info, err = (match_any(.level, [r'info']))
-      if abort_match_info {
-        abort
+      # For the concourse process itself, drop INFO to reduce volume —
+      # but keep all logs from the worker drain helper services since they
+      # are low-volume and operationally critical.
+      is_concourse_service = (.__SYSTEMD_UNIT == "concourse.service")
+      if is_concourse_service {
+        abort_match_info, err = (match_any(.level, [r'info']))
+        if abort_match_info {
+          abort
+        }
       }
 
   enrich_concourse_logs:

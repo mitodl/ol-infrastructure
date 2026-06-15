@@ -1,0 +1,17 @@
+[Unit]
+Description=Periodically reconcile Concourse stalled workers against EC2
+Documentation=https://concourse-ci.org/concourse-worker.html#worker-lifecycle
+
+[Timer]
+# Wait a bit after boot so the ATC is up and serving the API.
+OnBootSec=5min
+# Run every 3 minutes. A genuinely-dead worker is pruned within one interval
+# of EC2 reporting its instance gone, while a partitioned worker (instance
+# still live) is always left to reconnect.
+OnUnitActiveSec=3min
+# Spread runs across the web fleet so they don't all hammer the API at once.
+RandomizedDelaySec=60
+AccuracySec=30
+
+[Install]
+WantedBy=timers.target
