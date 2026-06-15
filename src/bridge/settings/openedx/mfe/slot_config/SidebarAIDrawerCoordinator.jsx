@@ -5,11 +5,20 @@ import { getConfig } from '@edx/frontend-platform';
 import Sidebar from './src/courseware/course/sidebar/Sidebar';
 import SidebarContext from './src/courseware/course/sidebar/SidebarContext';
 import AIDrawerManagerSidebar from './AIDrawerManagerSidebar';
+import FeedbackDrawerSlot from './FeedbackDrawerSlot';
 
 const AI_DRAWER_MESSAGE_TYPES = [
     'smoot-design::ai-drawer-open',
     'smoot-design::tutor-drawer-open',
 ];
+
+// When true, the per-block feedback renders INLINE in this sidebar column
+// (mutually exclusive with the AskTIM drawer and the discussions sidebar),
+// instead of as a right-side overlay. Default off keeps the overlay behavior.
+const FEEDBACK_SLOT_MODE = process.env.FEEDBACK_SLOT_MODE === 'true';
+const FEEDBACK_OPEN_MESSAGE = 'ol-feedback::drawer-open';
+const FEEDBACK_CLOSE_MESSAGE = 'ol-feedback::drawer-close';
+const AI_DRAWER_CLOSE_MESSAGE = 'smoot-design::ai-drawer-close';
 
 const SidebarAIDrawerCoordinator = ({ courseId }) => {
     const contextValue = useContext(SidebarContext);
@@ -19,8 +28,10 @@ const SidebarAIDrawerCoordinator = ({ courseId }) => {
     const unitId = contextValue?.unitId ?? null;
 
     const [showAIDrawer, setShowAIDrawer] = useState(false);
+    const [showFeedback, setShowFeedback] = useState(false);
     const prevUnitIdRef = useRef(unitId);
     const showAIDrawerRef = useRef(false);
+    const showFeedbackRef = useRef(false);
     const wrapperRef = useRef(null);
 
     const messageOrigin = useMemo(() => {
@@ -40,8 +51,25 @@ const SidebarAIDrawerCoordinator = ({ courseId }) => {
             return;
         }
 
-        if (event.data?.type && AI_DRAWER_MESSAGE_TYPES.includes(event.data.type)) {
+        const messageType = event.data?.type;
+
+        if (messageType && AI_DRAWER_MESSAGE_TYPES.includes(messageType)) {
             setShowAIDrawer(true);
+            // Opening AskTIM hides feedback (they share this column).
+            if (FEEDBACK_SLOT_MODE) {
+                setShowFeedback(false);
+                window.postMessage({ type: FEEDBACK_CLOSE_MESSAGE }, messageOrigin);
+            }
+            if (currentSidebar !== null) {
+                toggleSidebar(null);
+            }
+        } else if (FEEDBACK_SLOT_MODE && messageType === FEEDBACK_OPEN_MESSAGE) {
+            setShowFeedback(true);
+            // Opening feedback hides AskTIM and the discussions sidebar.
+            if (showAIDrawerRef.current) {
+                window.postMessage({ type: AI_DRAWER_CLOSE_MESSAGE }, messageOrigin);
+            }
+            setShowAIDrawer(false);
             if (currentSidebar !== null) {
                 toggleSidebar(null);
             }
@@ -58,12 +86,21 @@ const SidebarAIDrawerCoordinator = ({ courseId }) => {
     useEffect(() => {
         if (currentSidebar !== null) {
             setShowAIDrawer(false);
+            // Opening the discussions sidebar also hides feedback.
+            if (FEEDBACK_SLOT_MODE) {
+                setShowFeedback(false);
+                window.postMessage({ type: FEEDBACK_CLOSE_MESSAGE }, messageOrigin);
+            }
         }
-    }, [currentSidebar]);
+    }, [currentSidebar, messageOrigin]);
 
     useEffect(() => {
         showAIDrawerRef.current = showAIDrawer;
     }, [showAIDrawer]);
+
+    useEffect(() => {
+        showFeedbackRef.current = showFeedback;
+    }, [showFeedback]);
 
     useEffect(() => {
         if (prevUnitIdRef.current && prevUnitIdRef.current !== unitId && unitId !== null) {
@@ -71,12 +108,19 @@ const SidebarAIDrawerCoordinator = ({ courseId }) => {
             if (showAIDrawerRef.current) {
                 window.postMessage(
                     {
-                        type: 'smoot-design::ai-drawer-close',
+                        type: AI_DRAWER_CLOSE_MESSAGE,
                     },
                     messageOrigin
                 );
             }
             setShowAIDrawer(false);
+            // Auto-close feedback on unit change too (mirrors AskTIM).
+            if (FEEDBACK_SLOT_MODE) {
+                if (showFeedbackRef.current) {
+                    window.postMessage({ type: FEEDBACK_CLOSE_MESSAGE }, messageOrigin);
+                }
+                setShowFeedback(false);
+            }
         }
         prevUnitIdRef.current = unitId;
     }, [unitId, messageOrigin]);
@@ -170,6 +214,14 @@ const SidebarAIDrawerCoordinator = ({ courseId }) => {
             >
                 <AIDrawerManagerSidebar />
             </div>
+            {FEEDBACK_SLOT_MODE && (
+                <div
+                    className={`ai-drawer-wrapper ml-0 ml-xl-4 align-top ${showFeedback ? '' : 'd-none'}`}
+                    aria-hidden={!showFeedback}
+                >
+                    <FeedbackDrawerSlot />
+                </div>
+            )}
         </>
     );
 };

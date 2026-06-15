@@ -9,9 +9,18 @@ import { useIntl } from '@edx/frontend-platform/i18n';
 import config from './common-mfe-config.env.jsx';
 import SidebarAIDrawerCoordinator from './SidebarAIDrawerCoordinator.jsx';
 import ResponsiveCourseTabs from './ResponsiveCourseTabs.jsx';
+import FeedbackDrawerManagerSidebar from './FeedbackDrawerManagerSidebar.jsx';
+import FeedbackLauncherSlot from './FeedbackLauncherSlot.jsx';
 
 // When ENABLE_AI_DRAWER_SLOT is disabled or unset
 const ENABLE_AI_DRAWER_SLOT = process.env.ENABLE_AI_DRAWER_SLOT === "true";
+// Per-block feedback (in-iframe megaphone -> drawer).
+const ENABLE_FEEDBACK_SLOT = process.env.ENABLE_FEEDBACK_SLOT === "true";
+// When true, per-block feedback renders inline in the AskTIM sidebar column
+// (handled by SidebarAIDrawerCoordinator); when false it uses the overlay loader.
+const FEEDBACK_SLOT_MODE = process.env.FEEDBACK_SLOT_MODE === "true";
+// Generic/per-unit feedback: floating three-reaction launcher in learner_tools.
+const ENABLE_FEEDBACK_LAUNCHER = process.env.ENABLE_FEEDBACK_LAUNCHER === "true";
 
 if (!ENABLE_AI_DRAWER_SLOT) {
   import(
@@ -160,17 +169,49 @@ if (process.env.DEPLOYMENT_NAME?.includes("mitxonline")) {
           },
         ],
       },
-      // Slot-based AskTim Chatbot - only if feature flag is enabled
-      ...(ENABLE_AI_DRAWER_SLOT ? {
+      // Sidebar slot: AskTIM AI drawer and/or per-block feedback drawer (flag-gated).
+      // Both share this one slot, so they're merged into a single definition to
+      // avoid the later key silently overwriting the earlier one.
+      ...((ENABLE_AI_DRAWER_SLOT || ENABLE_FEEDBACK_SLOT) ? {
         'org.openedx.frontend.learning.notifications_discussions_sidebar.v1': {
             keepDefault: false,
             plugins: [
-                {
+                // Coordinator owns the sidebar column. Mount it for AskTIM, and also
+                // when feedback runs in slot mode (it renders feedback inline there).
+                ...((ENABLE_AI_DRAWER_SLOT || (ENABLE_FEEDBACK_SLOT && FEEDBACK_SLOT_MODE)) ? [{
                     op: PLUGIN_OPERATIONS.Insert,
                     widget: {
                         id: 'coordinated_sidebar_with_ai_drawer',
                         type: DIRECT_PLUGIN,
                         RenderWidget: ({ courseId }) => <SidebarAIDrawerCoordinator courseId={courseId} />,
+                    },
+                }] : []),
+                // Overlay loader only when feedback is enabled and NOT in slot mode.
+                ...((ENABLE_FEEDBACK_SLOT && !FEEDBACK_SLOT_MODE) ? [{
+                    op: PLUGIN_OPERATIONS.Insert,
+                    widget: {
+                        id: 'feedback_drawer_loader',
+                        type: DIRECT_PLUGIN,
+                        RenderWidget: () => <FeedbackDrawerManagerSidebar />,
+                    },
+                }] : []),
+            ],
+        },
+      } : {}),
+
+      // Generic/per-unit feedback: floating three-reaction launcher mounted in the
+      // learner_tools slot (portals to document.body; desktop/tablet only).
+      ...(ENABLE_FEEDBACK_LAUNCHER ? {
+        'org.openedx.frontend.learning.learner_tools.v1': {
+            plugins: [
+                {
+                    op: PLUGIN_OPERATIONS.Insert,
+                    widget: {
+                        id: 'feedback_reaction_launcher',
+                        type: DIRECT_PLUGIN,
+                        RenderWidget: ({ courseId, unitId }) => (
+                            <FeedbackLauncherSlot courseId={courseId} unitId={unitId} />
+                        ),
                     },
                 },
             ],
