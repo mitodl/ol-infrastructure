@@ -330,7 +330,21 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                 paths=["/*"],
                 backend_service_name="proxy-public",
                 backend_service_port=80,
+                # APISIX only upgrades WebSockets when the routed Service port
+                # advertises appProtocol: kubernetes.io/ws. z2jh's proxy-public
+                # can't set that on its main port, so websocket=True makes the
+                # component create a sibling "proxy-public-ws" Service (selecting
+                # the CHP proxy pods) with the hint and route through it. Without
+                # this, /marimo/ws (and all kernel/terminal sockets) arrive as
+                # plain GETs and marimo reports "kernel not found".
                 websocket=True,
+                websocket_backend_selector={
+                    "app": "jupyterhub",
+                    "component": "proxy",
+                    "release": base_name,
+                },
+                # proxy-public maps numeric port 80 -> named targetPort "http".
+                websocket_backend_target_port="http",
             ),
         ],
         k8s_namespace=namespace,

@@ -27,31 +27,32 @@ class OLApisixHTTPRouteConfig(BaseModel):
     Note on WebSocket support:
         WebSocket uses HTTP Upgrade protocol (RFC 6455) - clients send HTTP requests
         with Upgrade headers, and servers respond with 101 Switching Protocols.
-        Gateway controllers handle WebSocket upgrades automatically in most cases.
 
-        Gateway API v1.2 added Service appProtocol field as an OPTIONAL hint:
+        Contrary to GEP-1911's guidance that gateways SHOULD upgrade WebSockets
+        even without a hint, the APISIX ingress controller (verified on 2.1.0 /
+        APISIX 3.16.0) does NOT auto-upgrade: WebSocket Upgrade requests routed to
+        a plain HTTP backend are forwarded as ordinary GETs, which surfaces as
+        WebSocket-only endpoints returning 404. APISIX only enables the upgrade
+        when the backend Service referenced by the HTTPRoute carries
+        ``appProtocol: kubernetes.io/ws`` on the target port.
 
-        1. appProtocol is OPTIONAL - gateways should support WebSocket upgrades even
-           without it (per GEP-1911: "Absence of appProtocol does not imply the
-           implementation should disable any features (eg. websocket upgrades)")
+        Because that hint lives on the Service (not the HTTPRoute/backendRef) and
+        the real backend Service is frequently owned by a Helm chart that cannot
+        set appProtocol on its main port (e.g. z2jh proxy-public), setting
+        ``websocket=True`` here makes this component create a dedicated, sibling
+        Service named ``<backend_service_name>-ws`` that selects the same pods via
+        ``websocket_backend_selector`` and exposes the port with
+        ``appProtocol: kubernetes.io/ws``. The generated HTTPRoute backendRef is
+        rewritten to point at that ``-ws`` Service. This keeps ownership clean (the
+        component owns the WebSocket-enabled Service) without patching Helm-managed
+        resources.
 
-        2. If set, appProtocol signals gateway about protocol support:
-           - kubernetes.io/ws: WebSocket over cleartext (RFC 6455)
-           - kubernetes.io/wss: WebSocket over TLS (RFC 6455)
-
-        3. Setting appProtocol does NOT force all requests to use that protocol.
-           It's an informational hint that may optimize gateway behavior (e.g.,
-           timeouts, health checks). Regular HTTP requests still work normally.
-
-        4. APISix ingress controller 2.0.0-rc5+ supports appProtocol resolution,
-           but WebSocket likely works without it via auto-detection.
-
-        The 'websocket' field in this config model is retained for compatibility
-        with ApisixRoute but has NO effect on HTTPRoute generation.
+        ``websocket`` only applies to service backends; it is ignored for
+        ``upstream`` backends (APISIX upstreams configure WebSocket separately).
 
         Reference: https://kubernetes.io/blog/2024/11/21/gateway-api-v1-2/
         GEP-1911: https://gateway-api.sigs.k8s.io/geps/gep-1911/
-        APISix support: https://github.com/apache/apisix-ingress-controller/pull/2601
+        APISIX appProtocol/WebSocket: https://apisix.apache.org/docs/ingress-controller/concepts/gateway-api/
 
     Note on priority:
         The Gateway API HTTPRoute does not have a native 'priority' field.
@@ -82,7 +83,15 @@ class OLApisixHTTPRouteConfig(BaseModel):
         "service"  # NOT used in Gateway API HTTPRoute
     )
     upstream: str | None = None
-    websocket: bool = False  # NOT used in Gateway API HTTPRoute - see class docstring for proper WebSocket setup
+    websocket: bool = False  # Service backends only: creates a <name>-ws Service with appProtocol=kubernetes.io/ws - see class docstring
+    # Pod selector for the generated WebSocket Service. Required when
+    # websocket=True with a service backend; must match the backend pods (e.g.
+    # the same selector the backend Service uses).
+    websocket_backend_selector: dict[str, str] | None = None
+    # targetPort for the generated WebSocket Service. Defaults to
+    # backend_service_port when omitted; set this when the backend Service maps a
+    # numeric port to a named targetPort (e.g. proxy-public 80 -> "http").
+    websocket_backend_target_port: str | NonNegativeInt | None = None
 
     @field_validator("plugins")
     @classmethod
@@ -113,6 +122,24 @@ class OLApisixHTTPRouteConfig(BaseModel):
                 raise ValueError(msg)
         elif backend_service_name is None or backend_service_port is None:
             msg = "If 'upstream' is not provided, both 'backend_service_name' and 'backend_service_port' must be provided."
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def check_websocket_selector(self) -> "OLApisixHTTPRouteConfig":
+        """Require a pod selector when WebSocket support is enabled on a service.
+
+        WebSocket support is implemented by creating a sibling Service with
+        ``appProtocol: kubernetes.io/ws`` that selects the backend pods directly,
+        so the selector is mandatory. ``websocket`` has no effect on ``upstream``
+        backends, so it is left untouched there.
+        """
+        if (
+            self.websocket
+            and self.upstream is None
+            and not self.websocket_backend_selector
+        ):
+            msg = "When 'websocket' is True with a service backend, 'websocket_backend_selector' must be provided."
             raise ValueError(msg)
         return self
 
@@ -176,6 +203,12 @@ class OLApisixHTTPRoute(ComponentResource):
         # Create PluginConfig resources for unique plugin combinations
         self._create_plugin_configs(
             name, route_configs, k8s_namespace, k8s_labels, resource_options
+        )
+
+        # Create WebSocket-enabled (<name>-ws) Services for routes with
+        # websocket=True so APISIX upgrades the connection (appProtocol hint).
+        self._create_websocket_services(
+            route_configs, k8s_namespace, k8s_labels, resource_options
         )
 
         # Build HTTPRoute rules
@@ -323,6 +356,93 @@ class OLApisixHTTPRoute(ComponentResource):
 
         return plugin_configs
 
+    @staticmethod
+    def _resolve_backend_port(port: str | int | None) -> int:
+        """Resolve a Service port to the numeric value Gateway API requires.
+
+        Gateway API backendRef ports must be numeric. Named ports are mapped to
+        APISIX's conventional defaults, matching the logic used when building
+        backendRefs.
+        """
+        if isinstance(port, str):
+            port_mapping = {
+                "http": 8071,  # DEFAULT_NGINX_PORT
+                "https": 443,
+                "http-alt": 8080,
+            }
+            return port_mapping.get(port, 8071)
+        return port if port is not None else 8071
+
+    @staticmethod
+    def _ws_service_name(backend_service_name: str) -> str:
+        """Name of the WebSocket-enabled sibling Service for a backend."""
+        return f"{backend_service_name}-ws"
+
+    def _create_websocket_services(
+        self,
+        route_configs: list[OLApisixHTTPRouteConfig],
+        k8s_namespace: str,
+        k8s_labels: dict[str, str],
+        resource_options: ResourceOptions,
+    ) -> dict[str, kubernetes.core.v1.Service]:
+        """Create ``<backend>-ws`` Services for routes with WebSocket enabled.
+
+        APISIX only upgrades WebSocket connections when the backend Service port
+        advertises ``appProtocol: kubernetes.io/ws``. Since the real backend
+        Service is often Helm-owned and cannot set that hint on its main port,
+        this creates a component-owned sibling Service that selects the same pods
+        and carries the hint. The HTTPRoute backendRef is later pointed at it.
+        """
+        ws_services: dict[str, kubernetes.core.v1.Service] = {}
+
+        for route_config in route_configs:
+            # WebSocket support only applies to service backends.
+            if not route_config.websocket or route_config.upstream:
+                continue
+
+            backend_name = route_config.backend_service_name
+            # Guaranteed non-None for service backends by the model validators.
+            if backend_name is None:
+                continue
+
+            ws_name = self._ws_service_name(backend_name)
+            # De-dup when multiple routes share the same backend Service.
+            if ws_name in ws_services:
+                continue
+
+            port = self._resolve_backend_port(route_config.backend_service_port)
+            target_port: str | int = (
+                route_config.websocket_backend_target_port
+                if route_config.websocket_backend_target_port is not None
+                else port
+            )
+
+            ws_services[ws_name] = kubernetes.core.v1.Service(
+                f"OLApisixHTTPRoute-ws-service-{ws_name}",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=ws_name,
+                    namespace=k8s_namespace,
+                    labels=k8s_labels,
+                ),
+                spec=kubernetes.core.v1.ServiceSpecArgs(
+                    type="ClusterIP",
+                    selector=route_config.websocket_backend_selector,
+                    ports=[
+                        kubernetes.core.v1.ServicePortArgs(
+                            name="ws",
+                            port=port,
+                            target_port=target_port,
+                            protocol="TCP",
+                            # The hint that makes APISIX perform the HTTP Upgrade.
+                            app_protocol="kubernetes.io/ws",
+                        )
+                    ],
+                ),
+                opts=resource_options,
+            )
+
+        return ws_services
+
     def _build_http_route_rules(
         self,
         httproute_name: str,
@@ -358,18 +478,17 @@ class OLApisixHTTPRoute(ComponentResource):
             else:
                 # For service references - these are guaranteed to be non-None by validator
                 # Gateway API requires port to be numeric, not a string port name
-                port = route_config.backend_service_port
-                if isinstance(port, str):
-                    # Convert common port names to numbers
-                    port_mapping = {
-                        "http": 8071,  # DEFAULT_NGINX_PORT
-                        "https": 443,
-                        "http-alt": 8080,
-                    }
-                    port = port_mapping.get(port, 8071)  # Default to DEFAULT_NGINX_PORT
+                port = self._resolve_backend_port(route_config.backend_service_port)
+
+                # When WebSocket is enabled, route to the component-owned
+                # <backend>-ws Service (appProtocol: kubernetes.io/ws) instead of
+                # the plain backend, so APISIX performs the HTTP Upgrade.
+                backend_name = route_config.backend_service_name
+                if route_config.websocket and backend_name is not None:
+                    backend_name = self._ws_service_name(backend_name)
 
                 backend_ref: dict[str, Any] = {
-                    "name": route_config.backend_service_name,
+                    "name": backend_name,
                     "port": port,
                 }
                 backend_refs = [backend_ref]
