@@ -82,7 +82,6 @@ class OpenEdxVars(BaseModel):
     mit_open_learning_site_link: str | None = None
     mit_base_url: str | None = None
     mit_learn_base_url: str | None = None
-    plugin_slot_config_file_map: dict[str, str] | None = None
     privacy_policy_url: str | None = None
     schedule_email_section: str | None = None
     site_name: str
