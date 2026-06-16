@@ -1,3 +1,5 @@
+"""Helpers for configuring Keycloak OIDC identity providers."""
+
 import logging
 from typing import Any
 
@@ -82,5 +84,10 @@ def oidc_identity_provider_args_from_discovery_url(
         ):
             msg = f"OIDC provider at {discovery_url} does not support private_key_jwt client auth method"  # noqa: E501
             raise RuntimeError(msg)
+        # pulumi-keycloak >=6.12.0 marks client_secret/client_secret_wo as
+        # required even when Keycloak is configured for private_key_jwt client
+        # authentication. Provide an explicit empty value to satisfy provider
+        # schema validation without configuring shared-secret authentication.
+        oidc_idp_args["client_secret"] = ""
         oidc_idp_args["extra_config"] = {"clientAuthMethod": "private_key_jwt"}
     return oidc_idp_args
