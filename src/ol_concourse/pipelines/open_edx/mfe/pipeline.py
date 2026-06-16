@@ -192,6 +192,8 @@ def _build_dagger_legacy_cmd(
         "call",
         "mfe",
         "build-legacy-configured",
+        "--progress",
+        "plain",
         "--mfe-name",
         mfe_name,
         "--mfe-source",
