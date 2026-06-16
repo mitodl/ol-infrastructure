@@ -968,13 +968,15 @@ for purpose in ("draft", "live", "test"):
                 name="not course media or old akamai",
                 statement=(
                     'req.url.path !~ "^/coursemedia" && req.url.path !~ "^/ans\\d+"'
+                    ' && req.url.path !~ "^/largefiles" && req.url.path !~ "^/zipfiles"'
                 ),
                 type="REQUEST",
             ),
             fastly.ServiceVclConditionArgs(
                 name="is old Akamai file",
                 statement=(
-                    'req.url.path ~ "^/ans\\d+" && req.url.path !~'
+                    '(req.url.path ~ "^/ans\\d+" || req.url.path ~ "^/largefiles"'
+                    ' || req.url.path ~ "^/zipfiles") && req.url.path !~'
                     ' "/ans7870/21f/21f.027"'
                 ),
                 type="REQUEST",
