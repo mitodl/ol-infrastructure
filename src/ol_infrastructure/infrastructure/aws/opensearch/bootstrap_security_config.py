@@ -88,15 +88,7 @@ read_write_role = {
             "index_patterns": [
                 "*"
             ],  # TODO: Define actual indices  # noqa: FIX002, TD002
-            "allowed_actions": [
-                "crud",
-                "create_index",
-                "indices_all",
-                "indices:data/read/scroll",
-                "indices:data/read/scroll/clear",
-                "indices:data/read/scroll*",
-                "indices:data/read/scroll/clear*",
-            ],  # TODO: Confirm this is all that is needed  # noqa: FIX002, TD002
+            "allowed_actions": ["*"],
         }
     ],
 }
