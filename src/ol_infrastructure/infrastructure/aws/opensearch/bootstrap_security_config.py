@@ -4,9 +4,11 @@ import logging
 import os
 from pathlib import Path
 
+import boto3
 import requests
 
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.lib.aws.iam_helper import DEVOPS_ADMIN_USERNAMES
 
 # Configure logging
 logging.basicConfig(
@@ -37,8 +39,9 @@ dry_run = args["dry_run"]
 if dry_run:
     logger.info("DRY RUN MODE: No changes will be applied")
 
-env_prefix = args["stack"].split(".")[-2]
-env_suffix = args["stack"].split(".")[-1].lower()
+local_stack = args["stack"].split("/")[-1]  # strips org/project prefix if present
+env_prefix = local_stack.split(".")[-2]
+env_suffix = local_stack.split(".")[-1].lower()
 
 logger.info("Processing stack: %s", args["stack"])
 logger.info("Environment: %s.%s", env_prefix, env_suffix)
@@ -98,6 +101,11 @@ read_write_role = {
     ],
 }
 
+account_id = boto3.client("sts").get_caller_identity()["Account"]
+devops_iam_arns = [
+    f"arn:aws:iam::{account_id}:user/{username}" for username in DEVOPS_ADMIN_USERNAMES
+]
+
 logger.debug("Loading user passwords from secrets")
 read_only_user = {
     "password": read_yaml_secrets(secrets_path)["read_only_user_password"],
@@ -121,6 +129,12 @@ users = {
 }
 
 role_mappings = {
+    "all_access": {
+        "hosts": [],
+        "users": devops_iam_arns,
+        "backend_roles": [],
+        "and_backend_roles": [],
+    },
     "read_only_role": {
         "hosts": [],
         "users": ["read_only_user"],
