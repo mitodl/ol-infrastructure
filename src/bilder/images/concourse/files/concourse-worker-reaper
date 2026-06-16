@@ -79,19 +79,29 @@ LOCAL_USER_LINE=$(grep -E '^CONCOURSE_ADD_LOCAL_USER=' "${CONCOURSE_ENV_FILE}" |
 ADMIN_USER=${LOCAL_USER_LINE%%:*}
 ADMIN_PASS=${LOCAL_USER_LINE#*:}
 
-if ! "${FLY_BIN}" -t "${FLY_TARGET}" login \
-        -c "${ATC_URL}" -u "${ADMIN_USER}" -p "${ADMIN_PASS}" -n main >/dev/null 2>&1; then
-    fail "fly login to ${ATC_URL} failed; aborting (fail-closed)"
+# Reuse the cached token from a prior run when it is still valid; only perform a
+# fresh login when the cached token is missing or expired. fly caches per-target
+# in ~/.flyrc, so the steady-state cost across the 3-minute timer is one cheap
+# `workers` probe rather than a full login round-trip each run.
+if ! "${FLY_BIN}" -t "${FLY_TARGET}" workers >/dev/null 2>&1; then
+    if ! "${FLY_BIN}" -t "${FLY_TARGET}" login \
+            -c "${ATC_URL}" -u "${ADMIN_USER}" -p "${ADMIN_PASS}" -n main >/dev/null 2>&1; then
+        fail "fly login to ${ATC_URL} failed; aborting (fail-closed)"
+    fi
 fi
 
-# --- Gather ground truth: private IPs of all running worker instances -----
+# --- Gather ground truth: private IPs of all live worker instances --------
 # Worker names default to the EC2 hostname (e.g. "ip-10-1-2-3"), which encodes
 # the private IPv4 address. We compare each stalled worker's name against the
 # set of live worker instance IPs.
+#
+# Only "pending" and "running" count as live: an instance in stopping/
+# shutting-down is on its way out and will never host a recovering worker, so a
+# stalled worker pinned to it should be pruned, not preserved.
 LIVE_IPS=$(aws ec2 describe-instances \
     --region "${AWS_REGION}" \
     --filters "Name=tag:Name,Values=${WORKER_NAME_TAG}" \
-              "Name=instance-state-name,Values=pending,running,stopping,shutting-down" \
+              "Name=instance-state-name,Values=pending,running" \
     --query 'Reservations[].Instances[].PrivateIpAddress' \
     --output text 2>/dev/null) || fail "describe-instances failed; aborting (fail-closed)"
 
@@ -134,6 +144,12 @@ while IFS= read -r worker_name; do
 
     log "Worker '${worker_name}' (${worker_ip}) has no live instance; pruning"
     if "${FLY_BIN}" -t "${FLY_TARGET}" prune-worker -w "${worker_name}" >/dev/null 2>&1; then
+        pruned=$((pruned + 1))
+    elif ! "${FLY_BIN}" -t "${FLY_TARGET}" workers --json \
+            | jq -e --arg n "${worker_name}" 'any(.[]; .name == $n)' >/dev/null 2>&1; then
+        # The worker is already gone — a reaper on another web node won the race
+        # (each node runs this independently). That's the intended outcome, not an
+        # error, so count it as pruned and stay quiet.
         pruned=$((pruned + 1))
     else
         log "Warning: failed to prune worker '${worker_name}' (it may have changed state)"
