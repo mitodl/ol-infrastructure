@@ -1,0 +1,14 @@
+[Unit]
+Description=Reconcile Concourse stalled workers against EC2 and prune orphans
+Documentation=https://concourse-ci.org/concourse-worker.html#worker-lifecycle
+After=concourse.service network-online.target
+Wants=network-online.target
+# Only meaningful on web nodes where the local ATC is reachable.
+ConditionPathExists=/etc/default/concourse
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/concourse-worker-reaper
+# The reaper fails closed; a non-zero exit just means "pruned nothing this run".
+# Don't let a transient failure mark the unit failed and spam alerts.
+SuccessExitStatus=0 1

@@ -1,11 +1,24 @@
 #!/usr/bin/env bash
-# Poll the EC2 instance metadata service for a spot interruption notice.
-# When one is detected, immediately initiate a graceful concourse worker
-# retirement so running builds can complete before the instance is reclaimed.
+# Poll the EC2 instance metadata service for spot rebalance recommendations and
+# interruption notices, and react appropriately to each:
+#
+#   - Rebalance recommendation (advisory, ~10-30 min lead time): the instance is
+#     at elevated risk of interruption but is NOT guaranteed to be reclaimed.
+#     Proactively mark it Unhealthy so the Auto Scaling Group replaces it through
+#     the existing termination lifecycle hook — that drains gracefully (up to
+#     10 min) AND launches a replacement, keeping desired capacity intact. This
+#     avoids both a risky last-second 2-minute drain and the capacity erosion of
+#     simply parking the worker.
+#
+#   - Interruption notice (authoritative, 2 min): AWS will reclaim the instance
+#     regardless, so drain immediately to let in-flight builds finish, then wait
+#     for the OS to shut down.
 set -euo pipefail
 
 POLL_INTERVAL=${POLL_INTERVAL:-5}
-TERMINATION_TIME_URL="http://169.254.169.254/latest/meta-data/spot/termination-time"
+METADATA_BASE="http://169.254.169.254/latest/meta-data"
+REBALANCE_URL="${METADATA_BASE}/events/recommendations/rebalance"
+TERMINATION_TIME_URL="${METADATA_BASE}/spot/termination-time"
 TOKEN_URL="http://169.254.169.254/latest/api/token"
 
 log() {
@@ -18,28 +31,71 @@ get_imds_token() {
         --connect-timeout 2 --max-time 5 2>/dev/null || echo ""
 }
 
+imds_status() {
+    local url="$1"
+    local token="$2"
+    if [ -n "${token}" ]; then
+        curl -s -o /dev/null -w "%{http_code}" \
+            -H "X-aws-ec2-metadata-token: ${token}" \
+            --connect-timeout 2 --max-time 5 \
+            "${url}" 2>/dev/null || echo "000"
+    else
+        curl -s -o /dev/null -w "%{http_code}" \
+            --connect-timeout 2 --max-time 5 \
+            "${url}" 2>/dev/null || echo "000"
+    fi
+}
+
+imds_get() {
+    local path="$1"
+    local token="$2"
+    curl -s -H "X-aws-ec2-metadata-token: ${token}" \
+        --connect-timeout 2 --max-time 5 \
+        "${METADATA_BASE}/${path}" 2>/dev/null || echo ""
+}
+
+# Identity used to ask the ASG to replace this instance on a rebalance signal.
+TOKEN=$(get_imds_token)
+INSTANCE_ID=$(imds_get "instance-id" "${TOKEN}")
+REGION=$(imds_get "placement/region" "${TOKEN}")
+
+handle_rebalance() {
+    log "EC2 rebalance recommendation received"
+    if [ -n "${INSTANCE_ID}" ] && [ -n "${REGION}" ] && \
+       aws autoscaling set-instance-health \
+            --instance-id "${INSTANCE_ID}" \
+            --health-status Unhealthy \
+            --region "${REGION}" 2>/dev/null; then
+        log "Marked instance Unhealthy; ASG will drain via lifecycle hook and launch a replacement"
+    else
+        # Could not reach the ASG API (or no identity) — fall back to draining
+        # locally so in-flight builds still finish before any interruption.
+        log "set-instance-health unavailable; draining locally as a fallback"
+        /usr/local/bin/concourse-worker-drain
+    fi
+    # We've acted on the signal; stop watching so we don't repeatedly react to
+    # the (sticky) rebalance endpoint. systemd stops this service at shutdown.
+    sleep infinity
+}
+
+handle_interruption() {
+    log "Spot interruption notice detected — initiating graceful worker retirement"
+    /usr/local/bin/concourse-worker-drain
+    log "Drain complete; waiting for OS shutdown"
+    sleep infinity
+}
+
 log "Starting spot interruption watch (poll interval: ${POLL_INTERVAL}s)"
 
 while true; do
     TOKEN=$(get_imds_token)
 
-    if [ -n "${TOKEN}" ]; then
-        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "X-aws-ec2-metadata-token: ${TOKEN}" \
-            --connect-timeout 2 --max-time 5 \
-            "${TERMINATION_TIME_URL}" 2>/dev/null || echo "000")
-    else
-        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-            --connect-timeout 2 --max-time 5 \
-            "${TERMINATION_TIME_URL}" 2>/dev/null || echo "000")
+    if [ "$(imds_status "${REBALANCE_URL}" "${TOKEN}")" = "200" ]; then
+        handle_rebalance
     fi
 
-    if [ "${HTTP_CODE}" = "200" ]; then
-        log "Spot interruption notice detected — initiating graceful worker retirement"
-        /usr/local/bin/concourse-worker-drain
-        log "Drain complete; waiting for OS shutdown"
-        # Sleep indefinitely; systemd will stop this service when the OS shuts down.
-        sleep infinity
+    if [ "$(imds_status "${TERMINATION_TIME_URL}" "${TOKEN}")" = "200" ]; then
+        handle_interruption
     fi
 
     sleep "${POLL_INTERVAL}"

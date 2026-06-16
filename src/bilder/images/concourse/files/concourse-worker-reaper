@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+# Reconcile Concourse's worker registry against EC2 ground truth and prune
+# "stalled" workers whose backing instance no longer exists.
+#
+# Why this exists:
+#   When a spot worker is reclaimed (or its instance otherwise dies) without
+#   completing a graceful drain, the ATC marks it "stalled" but never deletes
+#   it. Stalled workers linger in the database, hold stale resource-cache
+#   references, and add build friction until manually pruned. The `ephemeral`
+#   worker flag would auto-delete them, but it deletes on a ~60-90s heartbeat
+#   gap — which, with our churning web/TSA fleet, wrongly wipes the volume
+#   cache of healthy-but-transiently-disconnected workers. See ADR / branch
+#   notes for the full analysis.
+#
+#   This reaper takes the safe middle path: it only prunes a stalled worker
+#   when EC2 confirms the instance is genuinely gone, so a worker that is
+#   merely partitioned (and will reconnect, restoring its cache for free) is
+#   never pruned.
+#
+# Safety properties:
+#   - Only ever prunes workers in the "stalled" state (never running/landing).
+#   - Only prunes when the worker's instance is confirmed absent from EC2.
+#   - Fails closed: any error querying EC2 or the ATC results in zero prunes.
+#
+# Environment overrides (optional):
+#   ATC_URL          - local ATC address (default: http://localhost:8080)
+#   CONCOURSE_ENV_FILE - path to env file holding CONCOURSE_ADD_LOCAL_USER
+#                        (default: /etc/default/concourse)
+#   FLY_BIN          - path to the fly binary (default: /usr/local/bin/fly)
+#   AWS_REGION       - region for EC2 queries (default: from IMDS)
+#   WORKER_NAME_TAG  - EC2 Name tag glob identifying worker instances
+#                      (default: concourse-worker-*)
+set -euo pipefail
+
+ATC_URL=${ATC_URL:-http://localhost:8080}
+CONCOURSE_ENV_FILE=${CONCOURSE_ENV_FILE:-/etc/default/concourse}
+FLY_BIN=${FLY_BIN:-/usr/local/bin/fly}
+FLY_TARGET=local-reaper
+WORKER_NAME_TAG=${WORKER_NAME_TAG:-concourse-worker-*}
+
+log() {
+    echo "[concourse-worker-reaper] $*" | systemd-cat -t concourse-worker-reaper -p info
+}
+
+fail() {
+    echo "[concourse-worker-reaper] $*" | systemd-cat -t concourse-worker-reaper -p err
+    exit 1
+}
+
+# --- Resolve region from IMDS if not provided -----------------------------
+get_imds_token() {
+    curl -s -X PUT "http://169.254.169.254/latest/api/token" \
+        -H "X-aws-ec2-metadata-token-ttl-seconds: 300" \
+        --connect-timeout 2 --max-time 5 2>/dev/null || echo ""
+}
+
+if [ -z "${AWS_REGION:-}" ]; then
+    IMDS_TOKEN=$(get_imds_token)
+    AWS_REGION=$(curl -s -H "X-aws-ec2-metadata-token: ${IMDS_TOKEN}" \
+        --connect-timeout 2 --max-time 5 \
+        "http://169.254.169.254/latest/meta-data/placement/region" 2>/dev/null || echo "")
+fi
+[ -n "${AWS_REGION}" ] || fail "Could not determine AWS region; aborting (fail-closed)"
+
+# --- Ensure a fly binary is available, version-matched to the ATC ---------
+if [ ! -x "${FLY_BIN}" ]; then
+    log "fly binary not found at ${FLY_BIN}; downloading from local ATC"
+    if ! curl -fsSL "${ATC_URL}/api/v1/cli?arch=amd64&platform=linux" -o "${FLY_BIN}.tmp"; then
+        fail "Failed to download fly from ${ATC_URL}; aborting (fail-closed)"
+    fi
+    chmod 0755 "${FLY_BIN}.tmp"
+    mv "${FLY_BIN}.tmp" "${FLY_BIN}"
+fi
+
+# --- Authenticate to the local ATC as the local admin user ----------------
+# CONCOURSE_ADD_LOCAL_USER is rendered into the env file as "user:password".
+LOCAL_USER_LINE=$(grep -E '^CONCOURSE_ADD_LOCAL_USER=' "${CONCOURSE_ENV_FILE}" | head -1 | cut -d= -f2-)
+[ -n "${LOCAL_USER_LINE}" ] || fail "CONCOURSE_ADD_LOCAL_USER not found in ${CONCOURSE_ENV_FILE}"
+ADMIN_USER=${LOCAL_USER_LINE%%:*}
+ADMIN_PASS=${LOCAL_USER_LINE#*:}
+
+# Reuse the cached token from a prior run when it is still valid; only perform a
+# fresh login when the cached token is missing or expired. fly caches per-target
+# in ~/.flyrc, so the steady-state cost across the 3-minute timer is one cheap
+# `workers` probe rather than a full login round-trip each run.
+if ! "${FLY_BIN}" -t "${FLY_TARGET}" workers >/dev/null 2>&1; then
+    if ! "${FLY_BIN}" -t "${FLY_TARGET}" login \
+            -c "${ATC_URL}" -u "${ADMIN_USER}" -p "${ADMIN_PASS}" -n main >/dev/null 2>&1; then
+        fail "fly login to ${ATC_URL} failed; aborting (fail-closed)"
+    fi
+fi
+
+# --- Gather ground truth: private IPs of all live worker instances --------
+# Worker names default to the EC2 hostname (e.g. "ip-10-1-2-3"), which encodes
+# the private IPv4 address. We compare each stalled worker's name against the
+# set of live worker instance IPs.
+#
+# Only "pending" and "running" count as live: an instance in stopping/
+# shutting-down is on its way out and will never host a recovering worker, so a
+# stalled worker pinned to it should be pruned, not preserved.
+LIVE_IPS=$(aws ec2 describe-instances \
+    --region "${AWS_REGION}" \
+    --filters "Name=tag:Name,Values=${WORKER_NAME_TAG}" \
+              "Name=instance-state-name,Values=pending,running" \
+    --query 'Reservations[].Instances[].PrivateIpAddress' \
+    --output text 2>/dev/null) || fail "describe-instances failed; aborting (fail-closed)"
+
+# Normalize whitespace into a newline-delimited set for matching.
+LIVE_IP_SET=$(echo "${LIVE_IPS}" | tr '[:space:]' '\n' | grep -v '^$' || true)
+LIVE_COUNT=$(echo "${LIVE_IP_SET}" | grep -c . || true)
+log "Found ${LIVE_COUNT} live worker instance(s) in ${AWS_REGION}"
+
+# --- Identify stalled workers and prune the orphans -----------------------
+STALLED_WORKERS=$("${FLY_BIN}" -t "${FLY_TARGET}" workers --json \
+    | jq -r '.[] | select(.state == "stalled") | .name' 2>/dev/null || true)
+
+if [ -z "${STALLED_WORKERS}" ]; then
+    log "No stalled workers found; nothing to do"
+    exit 0
+fi
+
+pruned=0
+skipped=0
+while IFS= read -r worker_name; do
+    [ -n "${worker_name}" ] || continue
+
+    # Derive the private IP encoded in the hostname-style worker name.
+    # "ip-10-1-2-3" -> "10.1.2.3". Names that don't match are left alone.
+    if [[ "${worker_name}" =~ ^ip-([0-9]+)-([0-9]+)-([0-9]+)-([0-9]+) ]]; then
+        worker_ip="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}.${BASH_REMATCH[4]}"
+    else
+        log "Worker '${worker_name}' name is not IP-derived; skipping (cannot verify instance)"
+        skipped=$((skipped + 1))
+        continue
+    fi
+
+    if echo "${LIVE_IP_SET}" | grep -qxF "${worker_ip}"; then
+        # Instance still exists -> worker is partitioned, not dead. Leave it;
+        # it will reconnect and recover its cache for free.
+        log "Worker '${worker_name}' (${worker_ip}) instance still live; leaving stalled worker to recover"
+        skipped=$((skipped + 1))
+        continue
+    fi
+
+    log "Worker '${worker_name}' (${worker_ip}) has no live instance; pruning"
+    if "${FLY_BIN}" -t "${FLY_TARGET}" prune-worker -w "${worker_name}" >/dev/null 2>&1; then
+        pruned=$((pruned + 1))
+    elif ! "${FLY_BIN}" -t "${FLY_TARGET}" workers --json \
+            | jq -e --arg n "${worker_name}" 'any(.[]; .name == $n)' >/dev/null 2>&1; then
+        # The worker is already gone — a reaper on another web node won the race
+        # (each node runs this independently). That's the intended outcome, not an
+        # error, so count it as pruned and stay quiet.
+        pruned=$((pruned + 1))
+    else
+        log "Warning: failed to prune worker '${worker_name}' (it may have changed state)"
+    fi
+done <<< "${STALLED_WORKERS}"
+
+log "Reaper run complete: ${pruned} pruned, ${skipped} left in place"

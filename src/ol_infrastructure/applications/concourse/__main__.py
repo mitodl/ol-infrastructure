@@ -758,14 +758,14 @@ for worker_def in concourse_config.get_object("workers") or []:
     )
     ol_worker_target_group_config = OLTargetGroupConfig(
         vpc_id=ops_vpc_id,
-        health_check_interval=60,
+        health_check_interval=30,
         health_check_healthy_threshold=2,
         health_check_matcher="200",
         health_check_path="/",
         health_check_port=str(CONCOURSE_WORKER_HEALTHCHECK_PORT),
         health_check_protocol="HTTP",
         health_check_timeout=20,
-        health_check_unhealthy_threshold=5,
+        health_check_unhealthy_threshold=3,
         tags=aws_config.merged_tags({"Name": worker_name_tag}, worker_def["aws_tags"]),
     )
 
