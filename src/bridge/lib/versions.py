@@ -80,7 +80,7 @@ CLICKHOUSE_KEEPER_VERSION = "26.5-alpine"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
 TRAEFIK_CHART_VERSION = "40.3.0"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
-VANTAGE_K8S_AGENT_CHART_VERSION = "1.6.0"
+VANTAGE_K8S_AGENT_CHART_VERSION = "1.8.2"
 # renovate: datasource=helm depName=vault-secrets-operator packageName=vault-secrets-operator registryUrl=https://helm.releases.hashicorp.com
 VAULT_SECRETS_OPERATOR_CHART_VERSION = "1.4.0"
 # renovate: datasource=docker depName=nginx
