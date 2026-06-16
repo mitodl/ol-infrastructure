@@ -268,7 +268,7 @@ def _define_registry_image_resources(
         image_tag=None,
         # While check_every=never, defining tag_regex helps Concourse UI understand
         # resource versions
-        tag_regex=r"[0-9]+\.[0-9]+\.[0-9]+",  # examples 0.24.0, 0.26.3
+        tag_regex=r"[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+",  # calver YYYY.M.D.N e.g. 2026.6.15.1
         sort_by_creation=True,
         **dockerhub_kwargs,
     )
@@ -286,7 +286,7 @@ def _define_registry_image_resources(
         image_tag=None,
         # While check_every=never, defining tag_regex helps Concourse UI understand
         # resource versions
-        tag_regex=r"[0-9]+\.[0-9]+\.[0-9]+",  # examples 0.24.0, 0.26.3
+        tag_regex=r"[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+",  # calver YYYY.M.D.N e.g. 2026.6.15.1
         sort_by_creation=True,
         **ecr_kwargs,
     )
@@ -464,8 +464,12 @@ def _build_release_image_job(
 
     put_params: dict[str, Any] = {
         "image": "image/image.tar",
-        "additional_tags": f"./{release_res.name}/.git/short_ref",
-        "version": "((.:release_version))",
+        # Use the version file as additional_tags so the calver tag is pushed
+        # without triggering the registry-image resource's semver validation
+        # (which rejects 4-part calver strings like 2026.6.15.1).
+        # The primary push tag is source.tag ("latest"); the calver version is
+        # pushed as an extra tag that downstream deployment jobs reference.
+        "additional_tags": f"{release_res.name}/version",
     }
 
     plan = [
@@ -755,19 +759,22 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                 passed=[release_image_build_job.name],
                 params={"skip_download": True},
             ),
+            # release_res carries the authoritative calver version; load it here
+            # so image_tag is available to all jobs in the chain, including the
+            # GitHub Deployment start steps and the Pulumi DOCKER_TAG env var.
+            GetStep(
+                get=release_res.name,
+                trigger=False,
+                passed=[release_image_build_job.name],
+            ),
             LoadVarStep(
-                load_var="image_tag", file=f"{app_rc_image.name}/tag", reveal=True
+                load_var="image_tag", file=f"{release_res.name}/version", reveal=True
             ),
         ],
         # QA: get checklist.md from release resource; start RC GitHub Deployment.
         # Production: wait for release gate (closed release issue); start prod deployment.
         custom_dependencies={
             0: [
-                GetStep(
-                    get=release_res.name,
-                    trigger=False,
-                    passed=[release_image_build_job.name],
-                ),
                 PutStep(
                     put=deployment_rc.name,
                     params={"action": "start", "ref": "((.:image_tag))"},
@@ -775,12 +782,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
             ],
             1: [
                 GetStep(get=release_gate.name, trigger=True, version="every"),
-                # release_res and main_repo are needed by the action=finish post-step.
-                GetStep(
-                    get=release_res.name,
-                    trigger=False,
-                    passed=[release_image_build_job.name],
-                ),
+                # main_repo is needed by the action=finish post-step.
                 GetStep(
                     get=main_repo.name,
                     trigger=False,
