@@ -642,6 +642,7 @@ if k8s_deploy:
         target_kind="Deployment",
         target_name=xpro_k8s_app.webapp_deployment_name,
         controlled_resources=["cpu", "memory"],
+        container_name="xpro-app",
         min_allowed={"cpu": "50m", "memory": "256Mi"},
         max_allowed={"cpu": "2000m", "memory": "4Gi"},
         opts=ResourceOptions(depends_on=[xpro_k8s_app]),
@@ -653,6 +654,7 @@ if k8s_deploy:
             target_kind="Deployment",
             target_name=_celery_name,
             controlled_resources=["cpu", "memory"],
+            container_name="celery-worker",
             **_worker_vpa_bounds,
             opts=ResourceOptions(depends_on=[xpro_k8s_app]),
         )
@@ -663,6 +665,7 @@ if k8s_deploy:
             target_kind="Deployment",
             target_name=xpro_k8s_app.beat_deployment_name,
             controlled_resources=["cpu", "memory"],
+            container_name="celery-worker",
             **_worker_vpa_bounds,
             opts=ResourceOptions(depends_on=[xpro_k8s_app]),
         )

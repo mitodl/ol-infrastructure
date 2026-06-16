@@ -774,6 +774,7 @@ make_vpa(
     target_kind="Deployment",
     target_name=application_name,
     controlled_resources=["cpu", "memory"],
+    container_name="vector",
     min_allowed={"cpu": "10m", "memory": "64Mi"},
     max_allowed={"cpu": "2000m", "memory": "4Gi"},
     opts=ResourceOptions(depends_on=[vector_deployment]),

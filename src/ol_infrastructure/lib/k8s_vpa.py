@@ -15,6 +15,7 @@ def make_vpa(  # noqa: PLR0913
     controlled_resources: list[str],
     min_allowed: dict[str, str],
     max_allowed: dict[str, str],
+    container_name: str = "*",
     k8s_provider: kubernetes.Provider | None = None,
     opts: ResourceOptions | None = None,
 ) -> kubernetes.apiextensions.CustomResource:
@@ -27,6 +28,11 @@ def make_vpa(  # noqa: PLR0913
     When a CPU-based HPA is present on the same target, pass
     controlled_resources=["memory"] to avoid the known HPA/VPA conflict where
     VPA-adjusted CPU requests distort the utilization percentage the HPA observes.
+
+    Pass container_name to target a specific container rather than all containers
+    ("*"). Targeting "*" applies the same bounds to every container in the pod,
+    including sidecars such as nginx or vector, which can override their independent
+    resource requests and undermine per-container rightsizing.
     """
     return kubernetes.apiextensions.CustomResource(
         name,
@@ -48,7 +54,7 @@ def make_vpa(  # noqa: PLR0913
             "resourcePolicy": {
                 "containerPolicies": [
                     {
-                        "containerName": "*",
+                        "containerName": container_name,
                         "controlledResources": controlled_resources,
                         "controlledValues": "RequestsAndLimits",
                         "minAllowed": min_allowed,

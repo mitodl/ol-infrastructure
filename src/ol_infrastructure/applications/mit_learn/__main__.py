@@ -1737,6 +1737,7 @@ make_vpa(
     target_kind="Deployment",
     target_name=mitlearn_k8s_app.webapp_deployment_name,
     controlled_resources=["memory"],
+    container_name="mitlearn-app",
     min_allowed={"memory": "256Mi"},
     max_allowed={"memory": "4Gi"},
     opts=ResourceOptions(depends_on=[mitlearn_k8s_app]),
@@ -1748,6 +1749,7 @@ for _celery_name in mitlearn_k8s_app.celery_deployment_names:
         target_kind="Deployment",
         target_name=_celery_name,
         controlled_resources=["cpu", "memory"],
+        container_name="celery-worker",
         **_worker_vpa_bounds,
         opts=ResourceOptions(depends_on=[mitlearn_k8s_app]),
     )
@@ -1758,6 +1760,7 @@ if mitlearn_k8s_app.beat_deployment_name:
         target_kind="Deployment",
         target_name=mitlearn_k8s_app.beat_deployment_name,
         controlled_resources=["cpu", "memory"],
+        container_name="celery-worker",
         **_worker_vpa_bounds,
         opts=ResourceOptions(depends_on=[mitlearn_k8s_app]),
     )

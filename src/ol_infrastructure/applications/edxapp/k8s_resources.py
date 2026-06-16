@@ -1548,6 +1548,7 @@ def create_k8s_resources(  # noqa: C901
         target_kind="Deployment",
         target_name=lms_app.webapp_deployment_name,
         controlled_resources=["cpu", "memory"],
+        container_name="lms-edxapp-app",
         **_webapp_vpa_bounds,
         opts=ResourceOptions(depends_on=[lms_app]),
     )
@@ -1557,6 +1558,7 @@ def create_k8s_resources(  # noqa: C901
         target_kind="Deployment",
         target_name=cms_app.webapp_deployment_name,
         controlled_resources=["cpu", "memory"],
+        container_name="cms-edxapp-app",
         **_webapp_vpa_bounds,
         opts=ResourceOptions(depends_on=[cms_app]),
     )
@@ -1566,6 +1568,7 @@ def create_k8s_resources(  # noqa: C901
         target_kind="Deployment",
         target_name=lms_celery_deployment_name,
         controlled_resources=["cpu", "memory"],
+        container_name="lms-edxapp",
         **_worker_vpa_bounds,
         opts=ResourceOptions(depends_on=[lms_celery_deployment]),
     )
@@ -1575,6 +1578,7 @@ def create_k8s_resources(  # noqa: C901
         target_kind="Deployment",
         target_name=cms_celery_deployment_name,
         controlled_resources=["cpu", "memory"],
+        container_name="cms-edxapp",
         **_worker_vpa_bounds,
         opts=ResourceOptions(depends_on=[cms_celery_deployment]),
     )
