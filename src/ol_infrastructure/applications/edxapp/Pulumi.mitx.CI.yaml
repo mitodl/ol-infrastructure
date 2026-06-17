@@ -49,7 +49,7 @@ config:
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["studio.library_authoring_mfe", "--deactivate"]
   - ["legacy_studio.certificates", "--create", "--everyone"]
-  - ["instructor.legacy_instructor_dashboard", "--create", "--everyone"]
+  - ["instructor.legacy_instructor_dashboard", "--deactivate"]
   edxapp:business_unit: residential
   edxapp:canvas_base_url: https://mit.test.instructure.com
   edxapp:db_password:
