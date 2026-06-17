@@ -507,6 +507,16 @@ fe_jvm_heap_mb: int = fe_config.get(
 fe_planner_optimize_timeout_ms: int = fe_config.get(
     "planner_optimize_timeout_ms", 30000
 )
+# background_refresh_metadata_enable instructs the FE to continuously sync
+# all external catalog (Iceberg/Glue) metadata in the background so that
+# tables added or modified in Glue are visible to StarRocks without a manual
+# REFRESH CATALOG command.  10 minutes is short enough to pick up new
+# dbt-materialized tables within one Dagster run cycle, long enough to avoid
+# hammering the Glue API.  Configurable via
+# starrocks:fe_config:background_refresh_metadata_interval_ms.
+fe_background_refresh_interval_ms: int = fe_config.get(
+    "background_refresh_metadata_interval_ms", 600_000
+)
 _FE_CONFIG_BASE = (
     "LOG_DIR = ${STARROCKS_HOME}/log\n"
     'DATE = "$(date +%Y%m%d-%H%M%S)"\n'
@@ -520,6 +530,9 @@ _FE_CONFIG_BASE = (
     "sys_log_level = INFO\n"
     "min_graceful_exit_time_second = 25\n"
     f"new_planner_optimize_timeout = {fe_planner_optimize_timeout_ms}\n"
+    "background_refresh_metadata_enable = true\n"
+    "background_refresh_metadata_interval_millis"
+    f" = {fe_background_refresh_interval_ms}\n"
 )
 
 
