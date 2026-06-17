@@ -195,6 +195,7 @@ def _build_interpolated_config_dict(
         "ECOMMERCE_PUBLIC_URL_ROOT": domains["lms"],
         "ENABLE_MFE_CONFIG_API": True,
         "FRONTEND_SITE_CONFIG": {
+            "basename": "/apps/",
             "lmsBaseUrl": f"https://{domains['lms']}",
             "loginUrl": f"https://{domains['lms']}/login",
             "logoutUrl": f"https://{domains['lms']}/logout",
