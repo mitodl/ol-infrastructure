@@ -144,3 +144,7 @@ config:
   meilisearch:memory_limit: "1Gi"
   typesense:deploy: "true"
   typesense:enabled: "false"
+  edxapp:site_project:
+    deployment: mitx
+    mfe_apps:
+    - instructor-dashboard
