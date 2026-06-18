@@ -68,6 +68,7 @@ config:
     disk_size_gb: 500
     iam_policies:
     - base
+    - ecr_push
     - operations
     instance_type: m7a.xlarge
     name: generic
