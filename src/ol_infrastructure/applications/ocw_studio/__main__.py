@@ -395,7 +395,7 @@ app_env_vars = {
     "AWS_ROLE_NAME": ocw_studio_mediaconvert.role.name,
     "AWS_STORAGE_BUCKET_NAME": f"ol-ocw-studio-app-{stack_info.env_suffix}",
     "AWS_TEST_BUCKET_NAME": f"ocw-content-test-{stack_info.env_suffix}",
-    "CONCOURSE_USERNAME": "ocw",
+    "CONCOURSE_USERNAME": "oldevops",
     "COURSE_V3_CANONICAL_DOMAIN": "learn.mit.edu",
     "CONTENT_SYNC_BACKEND": "content_sync.backends.github.GithubBackend",
     "CONTENT_SYNC_PIPELINE": "content_sync.pipelines.concourse.ConcourseGithubPipeline",
