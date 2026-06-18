@@ -59,10 +59,6 @@ PIPELINE_CONFIGS: list[tuple[str, str]] = [
         "src/ol_concourse/pipelines/container_images/mitodl_concourse_npm_resource.py",
     ),
     (
-        "docker-ol-concourse-github-issues-image",
-        "src/ol_concourse/pipelines/container_images/ol_concourse_github_issues_resource.py",
-    ),
-    (
         "ol-python-base-docker",
         "src/ol_concourse/pipelines/container_images/ol_python_base.py",
     ),
