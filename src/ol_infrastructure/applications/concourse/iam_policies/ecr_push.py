@@ -1,5 +1,7 @@
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 
+# AWS Permissions Document
+# Allow Concourse workers to push images to ECR repositories under mitodl/*.
 policy_definition = {
     "Version": IAM_POLICY_VERSION,
     "Statement": [
