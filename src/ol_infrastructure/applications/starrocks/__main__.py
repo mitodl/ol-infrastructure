@@ -371,6 +371,13 @@ starrocks_values: dict[str, Any] = {
             "storageSize": fe_config.get("storage", "100Gi"),
             "logStorageSize": fe_config.get("log_storage", "100Gi"),
         },
+        # After extended downtime, FE must replay accumulated starmgr BDB journals
+        # before it can serve traffic. The default 300s startup probe is too short
+        # when replaying several days of journals. 7200s (2 hours) is sufficient
+        # headroom for even multi-day recovery scenarios.
+        "startupProbeFailureSeconds": fe_config.get(
+            "startup_probe_failure_seconds", 7200
+        ),
         **(
             {"feEnvVars": [{"name": "JAVA_TOOL_OPTIONS", "value": irsa_jvm_opts}]}
             if irsa_jvm_opts is not None
