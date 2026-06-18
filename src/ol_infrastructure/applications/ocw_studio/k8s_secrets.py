@@ -301,7 +301,7 @@ def create_ocw_studio_k8s_secrets(
             "mount": "secret-concourse",
             "path": "web",
             "templates": {
-                "CONCOURSE_PASSWORD": '{{ get .Secrets "ocw_user_password" }}',
+                "CONCOURSE_PASSWORD": '{{ get .Secrets "admin_password" }}',
             },
         },
     ]
