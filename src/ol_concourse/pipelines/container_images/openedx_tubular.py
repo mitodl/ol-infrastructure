@@ -1,6 +1,6 @@
 import sys
 
-from ol_concourse.lib.containers import container_build_task
+from ol_concourse.lib.containers import container_build_task, ensure_ecr_task
 from ol_concourse.lib.models.pipeline import (
     GetStep,
     Identifier,
@@ -10,7 +10,9 @@ from ol_concourse.lib.models.pipeline import (
     PutStep,
     Resource,
 )
-from ol_concourse.lib.resources import git_repo
+from ol_concourse.lib.resources import git_repo, registry_image
+
+from ol_concourse.pipelines.constants import ECR_REGION
 
 tubular_repository = git_repo(
     name=Identifier("openedx-tubular"),
@@ -31,21 +33,38 @@ tubular_image = Resource(
     },
 )
 
+tubular_ecr_image = registry_image(
+    name=Identifier("openedx-tubular-image-ecr"),
+    image_repository="mitodl/openedx-tubular",
+    image_tag="latest",
+    ecr_region=ECR_REGION,
+)
+
 build_task = container_build_task(
     inputs=[Input(name=tubular_repository.name)],
     build_parameters={"CONTEXT": tubular_repository.name},
 )
 
 docker_pipeline = Pipeline(
-    resources=[tubular_repository, tubular_image],
+    resources=[tubular_repository, tubular_image, tubular_ecr_image],
     jobs=[
         Job(
             name=Identifier("build-and-publish-container"),
             plan=[
                 GetStep(get=tubular_repository.name, trigger=True),
                 build_task,
+                ensure_ecr_task("mitodl/openedx-tubular"),
                 PutStep(
                     put=tubular_image.name,
+                    params={
+                        "image": "image/image.tar",
+                        "additional_tags": (
+                            f"./{tubular_repository.name}/.git/describe_ref"
+                        ),
+                    },
+                ),
+                PutStep(
+                    put=tubular_ecr_image.name,
                     params={
                         "image": "image/image.tar",
                         "additional_tags": (

@@ -1,6 +1,6 @@
 import sys
 
-from ol_concourse.lib.containers import container_build_task
+from ol_concourse.lib.containers import container_build_task, ensure_ecr_task
 from ol_concourse.lib.models.pipeline import (
     GetStep,
     Identifier,
@@ -10,7 +10,9 @@ from ol_concourse.lib.models.pipeline import (
     PutStep,
     Resource,
 )
-from ol_concourse.lib.resources import git_repo
+from ol_concourse.lib.resources import git_repo, registry_image
+
+from ol_concourse.pipelines.constants import ECR_REGION
 
 concourse_npm_resource_repository = git_repo(
     name=Identifier("mitodl-concourse-npm-resource"),
@@ -31,21 +33,40 @@ concourse_npm_resource_image = Resource(
     },
 )
 
+concourse_npm_resource_ecr_image = registry_image(
+    name=Identifier("mitodl-concourse-npm-resource-image-ecr"),
+    image_repository="mitodl/concourse-npm-resource",
+    image_tag="latest",
+    ecr_region=ECR_REGION,
+)
+
 build_task = container_build_task(
     inputs=[Input(name=concourse_npm_resource_repository.name)],
     build_parameters={"CONTEXT": concourse_npm_resource_repository.name},
 )
 
 docker_pipeline = Pipeline(
-    resources=[concourse_npm_resource_repository, concourse_npm_resource_image],
+    resources=[
+        concourse_npm_resource_repository,
+        concourse_npm_resource_image,
+        concourse_npm_resource_ecr_image,
+    ],
     jobs=[
         Job(
             name=Identifier("build-and-publish-container"),
             plan=[
                 GetStep(get=concourse_npm_resource_repository.name, trigger=True),
                 build_task,
+                ensure_ecr_task("mitodl/concourse-npm-resource"),
                 PutStep(
                     put=concourse_npm_resource_image.name,
+                    params={
+                        "image": "image/image.tar",
+                        "additional_tags": f"./{concourse_npm_resource_repository.name}/.git/describe_ref",  # noqa: E501
+                    },
+                ),
+                PutStep(
+                    put=concourse_npm_resource_ecr_image.name,
                     params={
                         "image": "image/image.tar",
                         "additional_tags": f"./{concourse_npm_resource_repository.name}/.git/describe_ref",  # noqa: E501
