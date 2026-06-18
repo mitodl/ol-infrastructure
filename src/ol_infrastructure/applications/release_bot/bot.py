@@ -144,16 +144,15 @@ async def _cmd_hotfix(repos, ack, respond, command, _context):
         return
     cfg = repos[app_name]
     try:
-        build_url = await concourse.trigger_job(
-            cfg.pipeline, "create-hotfix", commit_hash=commit_hash
-        )
+        build_url = await concourse.trigger_job(cfg.pipeline, "create-hotfix")
     except Exception:
         log.exception("Failed to trigger hotfix for %s", app_name)
         await respond(f"❌ Failed to trigger hotfix for `{app_name}`.")
         return
     await respond(
-        f"🔧 Hotfix triggered for `{app_name}` at "
-        f"`{commit_hash[:8]}`. Build: {build_url}"
+        f"🔧 Hotfix job triggered for `{app_name}`. Build: {build_url}\n"
+        f"Commit `{commit_hash}` must be set via the pipeline's hotfix resource "
+        f"— the Concourse trigger API does not accept runtime variables."
     )
 
 
