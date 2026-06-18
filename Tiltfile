@@ -22,6 +22,8 @@ openedx_mode = cfg.get("openedx_mode", "qa")
 # Root domain: configurable via tilt config or LOCAL_DEV_ROOT_DOMAIN env var.
 # All service hostnames are derived from this value — changing it rewires
 # every URL, CORS origin, APISIX route, and Keycloak redirect URI at once.
+# NOTE: root_domain is passed to Pulumi and k8s manifests via LOCAL_DEV_ROOT_DOMAIN;
+# tilt config root_domain takes precedence over the env var.
 root_domain = cfg.get("root_domain") or os.environ.get("LOCAL_DEV_ROOT_DOMAIN", "mit.dev")
 
 # Parse prebuilt_tags list (["app=tag", ...]) into a lookup dict.

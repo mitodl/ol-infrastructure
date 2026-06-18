@@ -1,7 +1,6 @@
 ---
 # nginx config for the mitxonline webapp sidecar.
-# mitxonline uses uwsgi (not granian); uwsgi listens on a Unix socket.
-# For local dev simplicity, we run uwsgi with HTTP (--http-socket) on port 8011.
+# mitxonline runs granian on port 8011, nginx proxies to it.
 apiVersion: v1
 kind: ConfigMap
 metadata:

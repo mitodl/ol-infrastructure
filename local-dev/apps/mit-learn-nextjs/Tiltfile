@@ -62,7 +62,7 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         ],
     )
 
-k8s_yaml([
+k8s_yaml_with_domain([
     'deployment.yaml',
     'apisix-routes.yaml',
 ])
