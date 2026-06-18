@@ -1,7 +1,0 @@
----
-secretsprovider: awskms://alias/infrastructure-secrets-ci
-# Run `pulumi stack init` or `pulumi stack change-secrets-provider` to generate this value.
-encryptedkey: "<REPLACE_WITH_OUTPUT_OF_pulumi_stack_init>"
-config:
-  vault:address: https://vault-ci.odl.mit.edu
-  release_bot:concourse_url: https://cicd.odl.mit.edu
