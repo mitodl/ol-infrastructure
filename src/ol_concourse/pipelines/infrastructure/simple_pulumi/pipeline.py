@@ -354,6 +354,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_path="applications/release_bot/",
         pulumi_project_name="ol-infrastructure-release-bot",
         stack_prefix="applications.release_bot.applications",
+        stages=["Production"],
         additional_watched_paths=["src/bridge/secrets/release_bot/"],
         docker_image=DockerImageConfig(
             image_repository="release-bot-ci",
