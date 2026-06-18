@@ -73,11 +73,14 @@ if [ ! -x "${FLY_BIN}" ]; then
 fi
 
 # --- Authenticate to the local ATC as the local admin user ----------------
-# CONCOURSE_ADD_LOCAL_USER is rendered into the env file as "user:password".
+# CONCOURSE_ADD_LOCAL_USER is rendered into the env file as a comma-separated
+# list of "user:password" pairs (e.g. "oldevops:pw,release-bot:pw2"). Extract
+# only the first pair — the admin user — for fly login.
 LOCAL_USER_LINE=$(grep -E '^CONCOURSE_ADD_LOCAL_USER=' "${CONCOURSE_ENV_FILE}" | head -1 | cut -d= -f2-)
 [ -n "${LOCAL_USER_LINE}" ] || fail "CONCOURSE_ADD_LOCAL_USER not found in ${CONCOURSE_ENV_FILE}"
-ADMIN_USER=${LOCAL_USER_LINE%%:*}
-ADMIN_PASS=${LOCAL_USER_LINE#*:}
+FIRST_USER_PAIR=${LOCAL_USER_LINE%%,*}
+ADMIN_USER=${FIRST_USER_PAIR%%:*}
+ADMIN_PASS=${FIRST_USER_PAIR#*:}
 
 # Reuse the cached token from a prior run when it is still valid; only perform a
 # fresh login when the cached token is missing or expired. fly caches per-target

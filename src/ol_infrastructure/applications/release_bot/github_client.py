@@ -70,7 +70,9 @@ async def commits_since_last_tag(repo_slug: str) -> list[dict[str, Any]]:
             async with session.get(compare_url, headers=_auth_headers()) as resp:
                 resp.raise_for_status()
                 compare_data = await resp.json()
-            raw_commits = compare_data["commits"]
+            # "diverged" status means the tag is not an ancestor of the branch;
+            # the response omits "commits" entirely in that case.
+            raw_commits = compare_data.get("commits", [])
         else:
             url = f"{GITHUB_API}/repos/{repo_slug}/commits"
             async with session.get(

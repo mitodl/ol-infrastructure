@@ -39,21 +39,16 @@ async def _get_token() -> str:
     return _token
 
 
-async def trigger_job(pipeline: str, job: str, **job_vars: str) -> str:
+async def trigger_job(pipeline: str, job: str) -> str:
     """Trigger a Concourse job and return the build URL."""
     token = await _get_token()
     url = (
         f"{CONCOURSE_URL}/api/v1/teams/{CONCOURSE_TEAM}"
         f"/pipelines/{pipeline}/jobs/{job}/builds"
     )
-    payload: dict[str, str] = dict(job_vars) if job_vars else {}
     async with (
         aiohttp.ClientSession() as session,
-        session.post(
-            url,
-            headers={"Authorization": f"Bearer {token}"},
-            json=payload,
-        ) as resp,
+        session.post(url, headers={"Authorization": f"Bearer {token}"}) as resp,
     ):
         resp.raise_for_status()
         build = await resp.json()
