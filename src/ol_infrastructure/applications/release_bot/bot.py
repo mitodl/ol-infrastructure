@@ -21,7 +21,6 @@ _USAGE = (
     "• `/doof release-status [app]` — check release issue status\n"
     "• `/doof promote <app>` — promote to production\n"
     "• `/doof publish <app>` — publish a library\n"
-    "• `/doof hotfix <app> <commit>` — trigger a hotfix\n"
     "• `/doof abandon <app>` — abandon an in-progress release\n"
 )
 
@@ -132,30 +131,6 @@ async def _cmd_publish(repos, ack, respond, command, _context):
     await respond(f"📦 Publish triggered for `{library}`. Build: {build_url}")
 
 
-async def _cmd_hotfix(repos, ack, respond, command, _context):
-    await ack()
-    parts = command["text"].split(None, 1)
-    if len(parts) != 2:  # noqa: PLR2004
-        await respond("Usage: `/doof hotfix <app> <commit-hash>`")
-        return
-    app_name, commit_hash = parts
-    if app_name not in repos:
-        await respond(f"Unknown app `{app_name}`. Known apps: {', '.join(repos)}")
-        return
-    cfg = repos[app_name]
-    try:
-        build_url = await concourse.trigger_job(cfg.pipeline, "create-hotfix")
-    except Exception:
-        log.exception("Failed to trigger hotfix for %s", app_name)
-        await respond(f"❌ Failed to trigger hotfix for `{app_name}`.")
-        return
-    await respond(
-        f"🔧 Hotfix job triggered for `{app_name}`. Build: {build_url}\n"
-        f"Commit `{commit_hash}` must be set via the pipeline's hotfix resource "
-        f"— the Concourse trigger API does not accept runtime variables."
-    )
-
-
 async def _cmd_abandon(repos, ack, respond, command, _context):
     await ack()
     app_name = command["text"].strip()
@@ -215,7 +190,6 @@ _SUBCOMMANDS = {
     "release-status": _cmd_release_status,
     "promote": _cmd_promote,
     "publish": _cmd_publish,
-    "hotfix": _cmd_hotfix,
     "abandon": _cmd_abandon,
 }
 
