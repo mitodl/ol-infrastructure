@@ -174,6 +174,7 @@ concourse_config_map = {
         vault_client_token="token-gets-overridden-by-vault-agent",  # noqa: S106
         vault_insecure_skip_verify=True,
         vault_path_prefix="/secret-concourse",
+        vault_shared_path="shared",
         vault_url=f"http://localhost:{VAULT_HTTP_PORT}",
     ),
     CONCOURSE_WORKER_NODE_TYPE: partial(
