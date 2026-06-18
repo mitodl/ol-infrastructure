@@ -510,6 +510,14 @@ if starrocks_config.get_bool("use_cn"):
                 ],
             },
         },
+        # CN registration requires the starmgr to have a stable leader after FE
+        # recovery. With extended FE downtime, starmgr journal replay takes time,
+        # during which ADD COMPUTE NODE commands fail. 7200s gives CN enough
+        # time to succeed once the starmgr settles. Configurable via
+        # cn_config:startup_probe_failure_seconds.
+        "startupProbeFailureSeconds": cn_config.get(
+            "startup_probe_failure_seconds", 7200
+        ),
         **(
             {"cnEnvVars": [{"name": "JAVA_TOOL_OPTIONS", "value": irsa_jvm_opts}]}
             if irsa_jvm_opts is not None
