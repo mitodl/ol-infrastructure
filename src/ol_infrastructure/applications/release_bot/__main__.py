@@ -40,6 +40,12 @@ setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 bot_secrets = read_yaml_secrets(
     Path(f"release_bot/secrets.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
 )
+concourse_ops_secrets = read_yaml_secrets(
+    Path(f"concourse/operations.{stack_info.env_suffix.lower()}.yaml")
+)
+github_token = concourse_ops_secrets["infrastructure/github"][
+    "issues_resource_access_token"
+]
 
 bot_config = Config("release_bot")
 concourse_url = bot_config.get("concourse_url") or "https://cicd.odl.mit.edu"
@@ -137,7 +143,7 @@ bot_secret = kubernetes.core.v1.Secret(
         "slack-app-token": bot_secrets["slack-app-token"],
         "concourse-user": bot_secrets["concourse-username"],
         "concourse-password": bot_secrets["concourse-password"],
-        "github-token": bot_secrets["github-token"],
+        "github-token": github_token,
     },
 )
 
