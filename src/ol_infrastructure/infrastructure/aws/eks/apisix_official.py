@@ -19,6 +19,122 @@ from ol_infrastructure.lib.aws.eks_helper import (
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
+# APISIX's default enabled-plugins list for the version shipped by the pinned
+# chart (chart 2.12.x => APISIX 3.14.x), extracted verbatim from
+# https://github.com/apache/apisix/blob/3.14.0/apisix/cli/config.lua
+#
+# Setting ``apisix.plugins`` in the Helm values REPLACES this default list
+# rather than extending it, so the full list must be reproduced here.  We do
+# this solely to add ``opentelemetry`` (which is NOT enabled by default) without
+# silently dropping any plugin that applications already rely on.
+#
+# IMPORTANT: revisit this list on every APISIX major/minor upgrade.  If it
+# drifts from the APISIX default for the running version, plugins omitted here
+# will stop loading.  ``opentelemetry`` is appended at the end below.
+APISIX_DEFAULT_PLUGINS_3_14: list[str] = [
+    "real-ip",
+    "ai",
+    "client-control",
+    "proxy-control",
+    "request-id",
+    "zipkin",
+    "ext-plugin-pre-req",
+    "fault-injection",
+    "mocking",
+    "serverless-pre-function",
+    "cors",
+    "ip-restriction",
+    "ua-restriction",
+    "referer-restriction",
+    "csrf",
+    "uri-blocker",
+    "request-validation",
+    "chaitin-waf",
+    "multi-auth",
+    "openid-connect",
+    "cas-auth",
+    "authz-casbin",
+    "authz-casdoor",
+    "wolf-rbac",
+    "ldap-auth",
+    "hmac-auth",
+    "basic-auth",
+    "jwt-auth",
+    "jwe-decrypt",
+    "key-auth",
+    "consumer-restriction",
+    "attach-consumer-label",
+    "forward-auth",
+    "opa",
+    "authz-keycloak",
+    "proxy-cache",
+    "body-transformer",
+    "ai-prompt-template",
+    "ai-prompt-decorator",
+    "ai-prompt-guard",
+    "ai-rag",
+    "ai-rate-limiting",
+    "ai-proxy-multi",
+    "ai-proxy",
+    "ai-aws-content-moderation",
+    "ai-aliyun-content-moderation",
+    "proxy-mirror",
+    "proxy-rewrite",
+    "workflow",
+    "api-breaker",
+    "limit-conn",
+    "limit-count",
+    "limit-req",
+    "gzip",
+    "traffic-split",
+    "redirect",
+    "response-rewrite",
+    "mcp-bridge",
+    "degraphql",
+    "kafka-proxy",
+    "grpc-transcode",
+    "grpc-web",
+    "http-dubbo",
+    "public-api",
+    "prometheus",
+    "datadog",
+    "lago",
+    "loki-logger",
+    "elasticsearch-logger",
+    "echo",
+    "loggly",
+    "http-logger",
+    "splunk-hec-logging",
+    "skywalking-logger",
+    "google-cloud-logging",
+    "sls-logger",
+    "tcp-logger",
+    "kafka-logger",
+    "rocketmq-logger",
+    "syslog",
+    "udp-logger",
+    "file-logger",
+    "clickhouse-logger",
+    "tencent-cloud-cls",
+    "inspect",
+    "example-plugin",
+    "aws-lambda",
+    "azure-functions",
+    "openwhisk",
+    "openfunction",
+    "serverless-post-function",
+    "ext-plugin-post-req",
+    "ext-plugin-post-resp",
+    "ai-request-rewrite",
+]
+
+# Full enabled-plugins list applied via the Helm chart: APISIX defaults plus the
+# opentelemetry plugin, which emits OTLP traces (not metrics) for every request.
+APISIX_ENABLED_PLUGINS: list[str] = [
+    *APISIX_DEFAULT_PLUGINS_3_14,
+    "opentelemetry",
+]
+
 
 def setup_apisix(
     cluster_name: str,
@@ -73,6 +189,13 @@ def setup_apisix(
     # APISIX chart uses a different chart version scheme
     # Chart version 2.12.x contains APISIX 3.14.x
     apisix_chart_version = versions["APISIX_CHART"]
+
+    # OpenTelemetry tracing is exported to the in-cluster Grafana Alloy receiver,
+    # which only exists where the grafana k8s-monitoring stack is installed (it is
+    # skipped on CI -- see substructure/aws/eks/grafana.py).  Gate both the plugin
+    # enablement and its collector config on non-CI environments so APISIX does not
+    # repeatedly fail to reach a non-existent collector.
+    otel_tracing_enabled = stack_info.env_suffix.lower() != "ci"
 
     # Create apache-apisix specific labels that include both global labels
     # and app-specific labels for proper service selector matching
@@ -284,6 +407,58 @@ def setup_apisix(
                             "config_provider": "yaml",
                         },
                     },
+                    # Enable the opentelemetry plugin globally (it is NOT in the
+                    # APISIX default plugin list).  Setting ``plugins`` replaces the
+                    # default list, so APISIX_ENABLED_PLUGINS reproduces the full
+                    # default set plus opentelemetry.  Omitted on CI so the default
+                    # list (which already excludes opentelemetry) remains in effect.
+                    **(
+                        {"plugins": APISIX_ENABLED_PLUGINS}
+                        if otel_tracing_enabled
+                        else {}
+                    ),
+                    # Configure the opentelemetry plugin's collector and span
+                    # defaults.  ``pluginAttrs`` renders to ``plugin_attr`` in
+                    # config.yaml and is additive (it does not replace defaults for
+                    # other plugins).  The plugin only supports binary OTLP over
+                    # HTTP, so it targets the Alloy receiver's HTTP port (4318); the
+                    # plugin appends ``/v1/traces`` to the address itself.  From the
+                    # receiver, traces flow through the existing tail-sampling
+                    # pipeline to Grafana Cloud (see grafana.py gc-otlp-endpoint).
+                    **(
+                        {
+                            "pluginAttrs": {
+                                "opentelemetry": {
+                                    # Generate spec-compliant random trace ids.  Do
+                                    # NOT use "x-request-id" here: APISIX uses that
+                                    # header value verbatim as the trace id with no
+                                    # validation, and the request-id plugin emits a
+                                    # 36-char UUID (with dashes) which is not a valid
+                                    # 16-byte OTLP trace id -- Tempo silently drops
+                                    # the resulting malformed spans.
+                                    "trace_id_source": "random",
+                                    "resource": {
+                                        "service.name": "apisix",
+                                        "deployment.environment": stack_info.env_suffix.lower(),
+                                    },
+                                    "collector": {
+                                        "address": "grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318",
+                                        "request_timeout": 3,
+                                    },
+                                    "batch_span_processor": {
+                                        "drop_on_queue_full": False,
+                                        "max_queue_size": 1024,
+                                        "batch_timeout": 2,
+                                        "inactive_timeout": 1,
+                                        "max_export_batch_size": 16,
+                                    },
+                                    "set_ngx_var": False,
+                                },
+                            }
+                        }
+                        if otel_tracing_enabled
+                        else {}
+                    ),
                     "trustedAddresses": fastly_ips,
                     "admin": {
                         "enabled": True,
