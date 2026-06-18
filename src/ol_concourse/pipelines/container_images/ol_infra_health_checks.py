@@ -1,6 +1,6 @@
 import sys
 
-from ol_concourse.lib.containers import container_build_task
+from ol_concourse.lib.containers import container_build_task, ensure_ecr_task
 from ol_concourse.lib.models.pipeline import (
     GetStep,
     Identifier,
@@ -10,15 +10,17 @@ from ol_concourse.lib.models.pipeline import (
     PutStep,
     Resource,
 )
-from ol_concourse.lib.resources import git_repo
+from ol_concourse.lib.resources import git_repo, registry_image
 
-concourse_github_issues_repository = git_repo(
+from ol_concourse.pipelines.constants import ECR_REGION
+
+ol_infra_health_checks_repository = git_repo(
     name=Identifier("ol-infra-health-checks-github"),
     uri="https://github.com/mitodl/ol-infra-health-checks",
     branch="main",
 )
 
-concourse_github_issues_image = Resource(
+ol_infra_health_checks_image = Resource(
     name=Identifier("ol-infra-health-checks-image"),
     type="registry-image",
     icon="docker",
@@ -30,24 +32,43 @@ concourse_github_issues_image = Resource(
     },
 )
 
+ol_infra_health_checks_ecr_image = registry_image(
+    name=Identifier("ol-infra-health-checks-image-ecr"),
+    image_repository="mitodl/ol-infra-health-checks",
+    image_tag="latest",
+    ecr_region=ECR_REGION,
+)
+
 build_task = container_build_task(
-    inputs=[Input(name=concourse_github_issues_repository.name)],
-    build_parameters={"CONTEXT": concourse_github_issues_repository.name},
+    inputs=[Input(name=ol_infra_health_checks_repository.name)],
+    build_parameters={"CONTEXT": ol_infra_health_checks_repository.name},
 )
 
 docker_pipeline = Pipeline(
-    resources=[concourse_github_issues_repository, concourse_github_issues_image],
+    resources=[
+        ol_infra_health_checks_repository,
+        ol_infra_health_checks_image,
+        ol_infra_health_checks_ecr_image,
+    ],
     jobs=[
         Job(
             name=Identifier("build-and-publish-container"),
             plan=[
-                GetStep(get=concourse_github_issues_repository.name, trigger=True),
+                GetStep(get=ol_infra_health_checks_repository.name, trigger=True),
                 build_task,
+                ensure_ecr_task("mitodl/ol-infra-health-checks"),
                 PutStep(
-                    put=concourse_github_issues_image.name,
+                    put=ol_infra_health_checks_image.name,
                     params={
                         "image": "image/image.tar",
-                        "additional_tags": f"./{concourse_github_issues_repository.name}/.git/describe_ref",  # noqa: E501
+                        "additional_tags": f"./{ol_infra_health_checks_repository.name}/.git/describe_ref",  # noqa: E501
+                    },
+                ),
+                PutStep(
+                    put=ol_infra_health_checks_ecr_image.name,
+                    params={
+                        "image": "image/image.tar",
+                        "additional_tags": f"./{ol_infra_health_checks_repository.name}/.git/describe_ref",  # noqa: E501
                     },
                 ),
             ],

@@ -1,6 +1,6 @@
 import sys
 
-from ol_concourse.lib.containers import container_build_task
+from ol_concourse.lib.containers import container_build_task, ensure_ecr_task
 from ol_concourse.lib.models.pipeline import (
     GetStep,
     Identifier,
@@ -10,7 +10,9 @@ from ol_concourse.lib.models.pipeline import (
     PutStep,
     Resource,
 )
-from ol_concourse.lib.resources import git_repo
+from ol_concourse.lib.resources import git_repo, registry_image
+
+from ol_concourse.pipelines.constants import ECR_REGION
 
 ol_data_platform_repo = git_repo(
     name=Identifier("ol-data-platform-repository"),
@@ -36,8 +38,15 @@ ol_superset_image = Resource(
     },
 )
 
+ol_superset_ecr_image = registry_image(
+    name=Identifier("ol-superset-image-ecr"),
+    image_repository="mitodl/ol-superset",
+    image_tag="latest",
+    ecr_region=ECR_REGION,
+)
+
 docker_pipeline = Pipeline(
-    resources=[ol_data_platform_repo, ol_superset_image],
+    resources=[ol_data_platform_repo, ol_superset_image, ol_superset_ecr_image],
     jobs=[
         Job(
             name=Identifier("build-and-publish-ol-superset-image"),
@@ -50,11 +59,14 @@ docker_pipeline = Pipeline(
                         "DOCKERFILE": f"{ol_data_platform_repo.name}/src/ol_superset/Dockerfile",  # noqa: E501
                     },
                 ),
+                ensure_ecr_task("mitodl/ol-superset"),
                 PutStep(
                     put=ol_superset_image.name,
-                    params={
-                        "image": "image/image.tar",
-                    },
+                    params={"image": "image/image.tar"},
+                ),
+                PutStep(
+                    put=ol_superset_ecr_image.name,
+                    params={"image": "image/image.tar"},
                 ),
             ],
         )

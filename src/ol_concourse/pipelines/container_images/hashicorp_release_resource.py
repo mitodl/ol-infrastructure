@@ -1,6 +1,6 @@
 import sys
 
-from ol_concourse.lib.containers import container_build_task
+from ol_concourse.lib.containers import container_build_task, ensure_ecr_task
 from ol_concourse.lib.models.pipeline import (
     GetStep,
     Identifier,
@@ -10,7 +10,9 @@ from ol_concourse.lib.models.pipeline import (
     PutStep,
     Resource,
 )
-from ol_concourse.lib.resources import git_repo
+from ol_concourse.lib.resources import git_repo, registry_image
+
+from ol_concourse.pipelines.constants import ECR_REGION
 
 hashicorp_release_repository = git_repo(
     name=Identifier("hashicorp-release-resource"),
@@ -31,21 +33,42 @@ hashicorp_release_image = Resource(
     },
 )
 
+hashicorp_release_ecr_image = registry_image(
+    name=Identifier("hashicorp-release-resource-image-ecr"),
+    image_repository="mitodl/hashicorp-release-resource",
+    image_tag="latest",
+    ecr_region=ECR_REGION,
+)
+
 build_task = container_build_task(
     inputs=[Input(name=hashicorp_release_repository.name)],
     build_parameters={"CONTEXT": hashicorp_release_repository.name},
 )
 
 docker_pipeline = Pipeline(
-    resources=[hashicorp_release_repository, hashicorp_release_image],
+    resources=[
+        hashicorp_release_repository,
+        hashicorp_release_image,
+        hashicorp_release_ecr_image,
+    ],
     jobs=[
         Job(
             name=Identifier("build-and-publish-container"),
             plan=[
                 GetStep(get=hashicorp_release_repository.name, trigger=True),
                 build_task,
+                ensure_ecr_task("mitodl/hashicorp-release-resource"),
                 PutStep(
                     put=hashicorp_release_image.name,
+                    params={
+                        "image": "image/image.tar",
+                        "additional_tags": (
+                            f"./{hashicorp_release_repository.name}/.git/describe_ref"
+                        ),
+                    },
+                ),
+                PutStep(
+                    put=hashicorp_release_ecr_image.name,
                     params={
                         "image": "image/image.tar",
                         "additional_tags": (

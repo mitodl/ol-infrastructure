@@ -1,6 +1,6 @@
 import sys
 
-from ol_concourse.lib.containers import container_build_task
+from ol_concourse.lib.containers import container_build_task, ensure_ecr_task
 from ol_concourse.lib.models.pipeline import (
     GetStep,
     Identifier,
@@ -10,7 +10,9 @@ from ol_concourse.lib.models.pipeline import (
     PutStep,
     Resource,
 )
-from ol_concourse.lib.resources import git_repo
+from ol_concourse.lib.resources import git_repo, registry_image
+
+from ol_concourse.pipelines.constants import ECR_REGION
 
 concourse_github_issues_repository = git_repo(
     name=Identifier("ol-concourse-github-issues"),
@@ -31,21 +33,40 @@ concourse_github_issues_image = Resource(
     },
 )
 
+concourse_github_issues_ecr_image = registry_image(
+    name=Identifier("ol-concourse-github-issues-image-ecr"),
+    image_repository="mitodl/ol-concourse-github-issues",
+    image_tag="latest",
+    ecr_region=ECR_REGION,
+)
+
 build_task = container_build_task(
     inputs=[Input(name=concourse_github_issues_repository.name)],
     build_parameters={"CONTEXT": concourse_github_issues_repository.name},
 )
 
 docker_pipeline = Pipeline(
-    resources=[concourse_github_issues_repository, concourse_github_issues_image],
+    resources=[
+        concourse_github_issues_repository,
+        concourse_github_issues_image,
+        concourse_github_issues_ecr_image,
+    ],
     jobs=[
         Job(
             name=Identifier("build-and-publish-container"),
             plan=[
                 GetStep(get=concourse_github_issues_repository.name, trigger=True),
                 build_task,
+                ensure_ecr_task("mitodl/ol-concourse-github-issues"),
                 PutStep(
                     put=concourse_github_issues_image.name,
+                    params={
+                        "image": "image/image.tar",
+                        "additional_tags": f"./{concourse_github_issues_repository.name}/.git/describe_ref",  # noqa: E501
+                    },
+                ),
+                PutStep(
+                    put=concourse_github_issues_ecr_image.name,
                     params={
                         "image": "image/image.tar",
                         "additional_tags": f"./{concourse_github_issues_repository.name}/.git/describe_ref",  # noqa: E501

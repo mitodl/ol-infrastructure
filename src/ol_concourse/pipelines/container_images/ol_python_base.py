@@ -1,6 +1,6 @@
 import sys
 
-from ol_concourse.lib.containers import container_build_task
+from ol_concourse.lib.containers import container_build_task, ensure_ecr_task
 from ol_concourse.lib.models.pipeline import (
     GetStep,
     Identifier,
@@ -11,7 +11,9 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resources import git_repo, registry_image
 
-PYTHON_VERSIONS = ("3.11", "3.12", "3.13")
+from ol_concourse.pipelines.constants import ECR_REGION
+
+PYTHON_VERSIONS = ("3.11", "3.12", "3.13", "3.14")
 
 ol_infrastructure_repo = git_repo(
     name=Identifier("ol-infrastructure"),
@@ -31,6 +33,16 @@ image_resources = {
     for version in PYTHON_VERSIONS
 }
 
+ecr_image_resources = {
+    version: registry_image(
+        name=Identifier(f"ol-python-base-{version.replace('.', '')}-image-ecr"),
+        image_repository="mitodl/ol-python-base",
+        image_tag=version,
+        ecr_region=ECR_REGION,
+    )
+    for version in PYTHON_VERSIONS
+}
+
 
 def build_job(python_version: str) -> Job:
     context = f"{ol_infrastructure_repo.name}/dockerfiles/ol-python-base"
@@ -46,8 +58,14 @@ def build_job(python_version: str) -> Job:
                     "BUILD_ARG_PYTHON_VERSION": python_version,
                 },
             ),
+            ensure_ecr_task("mitodl/ol-python-base"),
             PutStep(
                 put=image_resources[python_version].name,
+                inputs="detect",
+                params={"image": "image/image.tar"},
+            ),
+            PutStep(
+                put=ecr_image_resources[python_version].name,
                 inputs="detect",
                 params={"image": "image/image.tar"},
             ),
@@ -56,7 +74,11 @@ def build_job(python_version: str) -> Job:
 
 
 ol_python_base_pipeline = Pipeline(
-    resources=[ol_infrastructure_repo, *image_resources.values()],
+    resources=[
+        ol_infrastructure_repo,
+        *image_resources.values(),
+        *ecr_image_resources.values(),
+    ],
     jobs=[build_job(v) for v in PYTHON_VERSIONS],
 )
 
