@@ -219,6 +219,9 @@ for iam_policy in iam_policy_names or []:
         policy=lint_iam_policy(
             policy_module.policy_definition,
             parliament_config={
+                "CREDENTIALS_EXPOSURE": {
+                    "ignore_locations": [{"actions": ["ecr:getauthorizationtoken"]}]
+                },
                 "PERMISSIONS_MANAGEMENT_ACTIONS": {
                     "ignore_locations": [{"actions": ["ec2:modifysnapshotattributte"]}]
                 },
