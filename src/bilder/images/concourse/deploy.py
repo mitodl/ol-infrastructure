@@ -100,6 +100,16 @@ concourse_config_map = {
             "{{ .Data.data.admin_password }}"
             "{{ end }}"
         ),
+        ocw_user_password=(  # noqa: S106
+            '{{ with secret "secret-concourse/web" }}'
+            "{{ .Data.data.ocw_user_password }}"
+            "{{ end }}"
+        ),
+        release_bot_password=(  # noqa: S106
+            '{{ with secret "secret-concourse/web" }}'
+            "{{ .Data.data.release_bot_password }}"
+            "{{ end }}"
+        ),
         container_placement_strategy="fewest-build-containers,volume-locality",
         database_user=(
             '{{ with secret "postgres-concourse/creds/app" }}'
