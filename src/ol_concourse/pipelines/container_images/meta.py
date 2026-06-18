@@ -55,20 +55,12 @@ PIPELINE_CONFIGS: list[tuple[str, str]] = [
         "src/ol_concourse/pipelines/container_images/hashicorp_release_resource.py",
     ),
     (
-        "docker-herokuconfigurator-image",
-        "src/ol_concourse/pipelines/container_images/heroku_configurator.py",
-    ),
-    (
         "docker-mitodl-concourse-npm-resource",
         "src/ol_concourse/pipelines/container_images/mitodl_concourse_npm_resource.py",
     ),
     (
         "docker-ol-concourse-github-issues-image",
         "src/ol_concourse/pipelines/container_images/ol_concourse_github_issues_resource.py",
-    ),
-    (
-        "docker-ol-infra-health-checks",
-        "src/ol_concourse/pipelines/container_images/ol_infra_health_checks.py",
     ),
     (
         "ol-python-base-docker",
