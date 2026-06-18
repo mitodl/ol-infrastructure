@@ -349,6 +349,17 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_name="ol-substructure-xpro-partner-dns",
         stages=["default"],
     ),
+    "release-bot": SimplePulumiParams(
+        app_name="release-bot",
+        pulumi_project_path="applications/release_bot/",
+        pulumi_project_name="ol-infrastructure-release-bot",
+        stack_prefix="applications.release_bot.applications",
+        additional_watched_paths=["src/bridge/secrets/release_bot/"],
+        docker_image=DockerImageConfig(
+            image_repository="release-bot-ci",
+            ecr_region=ECR_REGION,
+        ),
+    ),
 }
 
 
