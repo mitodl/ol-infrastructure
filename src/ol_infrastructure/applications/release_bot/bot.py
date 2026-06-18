@@ -14,7 +14,19 @@ from slack_bolt.async_app import AsyncApp
 log = logging.getLogger(__name__)
 
 
-async def _cmd_release(repos, ack, respond, command):
+_USAGE = (
+    "Usage:\n"
+    "• `/doof release <app>` — cut a release\n"
+    "• `/doof release-notes <app>` — show unreleased commits\n"
+    "• `/doof release-status [app]` — check release issue status\n"
+    "• `/doof promote <app>` — promote to production\n"
+    "• `/doof publish <app>` — publish a library\n"
+    "• `/doof hotfix <app> <commit>` — trigger a hotfix\n"
+    "• `/doof abandon <app>` — abandon an in-progress release\n"
+)
+
+
+async def _cmd_release(repos, ack, respond, command, _context):
     await ack()
     app_name = command["text"].strip()
     if app_name not in repos:
@@ -30,7 +42,7 @@ async def _cmd_release(repos, ack, respond, command):
     await respond(f"🚀 Release triggered for `{app_name}`. Build: {build_url}")
 
 
-async def _cmd_release_notes(repos, ack, respond, command):
+async def _cmd_release_notes(repos, ack, respond, command, _context):
     await ack()
     app_name = command["text"].strip()
     if app_name not in repos:
@@ -52,7 +64,7 @@ async def _cmd_release_notes(repos, ack, respond, command):
     await respond(f"*Release notes for `{app_name}`*\n" + "\n".join(lines))
 
 
-async def _cmd_release_status(repos, ack, respond, command):
+async def _cmd_release_status(repos, ack, respond, command, _context):
     await ack()
     app_filter = command["text"].strip() or None
     if app_filter and app_filter not in repos:
@@ -93,7 +105,7 @@ async def _cmd_promote(repos, ack, respond, command, context):
         await github.close_release_issue(
             cfg.repo,
             issues[0]["number"],
-            comment=f"Promoted to Production by <@{user}> via `/promote`.",
+            comment=f"Promoted to Production by <@{user}> via `/doof promote`.",
         )
     except Exception:
         log.exception("Failed to promote %s", app_name)
@@ -104,7 +116,7 @@ async def _cmd_promote(repos, ack, respond, command, context):
     )
 
 
-async def _cmd_publish(repos, ack, respond, command):
+async def _cmd_publish(repos, ack, respond, command, _context):
     await ack()
     library = command["text"].strip()
     if library not in repos:
@@ -120,11 +132,11 @@ async def _cmd_publish(repos, ack, respond, command):
     await respond(f"📦 Publish triggered for `{library}`. Build: {build_url}")
 
 
-async def _cmd_hotfix(repos, ack, respond, command):
+async def _cmd_hotfix(repos, ack, respond, command, _context):
     await ack()
     parts = command["text"].split(None, 1)
     if len(parts) != 2:  # noqa: PLR2004
-        await respond("Usage: `/hotfix <app> <commit-hash>`")
+        await respond("Usage: `/doof hotfix <app> <commit-hash>`")
         return
     app_name, commit_hash = parts
     if app_name not in repos:
@@ -145,7 +157,7 @@ async def _cmd_hotfix(repos, ack, respond, command):
     )
 
 
-async def _cmd_abandon(repos, ack, respond, command):
+async def _cmd_abandon(repos, ack, respond, command, _context):
     await ack()
     app_name = command["text"].strip()
     if app_name not in repos:
@@ -198,16 +210,32 @@ async def _handle_promote_button(repos, ack, body, say):
     )
 
 
+_SUBCOMMANDS = {
+    "release": _cmd_release,
+    "release-notes": _cmd_release_notes,
+    "release-status": _cmd_release_status,
+    "promote": _cmd_promote,
+    "publish": _cmd_publish,
+    "hotfix": _cmd_hotfix,
+    "abandon": _cmd_abandon,
+}
+
+
+async def _cmd_doof(repos, ack, respond, command, context):
+    parts = command["text"].split(None, 1)
+    if not parts or parts[0] not in _SUBCOMMANDS:
+        await ack()
+        await respond(_USAGE)
+        return
+    subcommand, *rest = parts
+    sub_command = dict(command, text=rest[0] if rest else "")
+    await _SUBCOMMANDS[subcommand](repos, ack, respond, sub_command, context)
+
+
 def create_app():
     repos = config.load_repos_config()
     app = AsyncApp(token=os.environ["SLACK_BOT_TOKEN"])
-    app.command("/release")(partial(_cmd_release, repos))
-    app.command("/release-notes")(partial(_cmd_release_notes, repos))
-    app.command("/release-status")(partial(_cmd_release_status, repos))
-    app.command("/promote")(partial(_cmd_promote, repos))
-    app.command("/publish")(partial(_cmd_publish, repos))
-    app.command("/hotfix")(partial(_cmd_hotfix, repos))
-    app.command("/abandon")(partial(_cmd_abandon, repos))
+    app.command("/doof")(partial(_cmd_doof, repos))
     app.action("promote_production")(partial(_handle_promote_button, repos))
     return app
 
