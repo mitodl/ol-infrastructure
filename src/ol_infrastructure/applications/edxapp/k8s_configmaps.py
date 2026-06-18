@@ -342,7 +342,7 @@ def _build_interpolated_config_dict(
                     f"https://{edxapp_config.require('mit_learn_api_domain')}/logout",
                 ],
                 "MKTG_URLS": {
-                    "ROOT": f"https://{marketing_domain}/",
+                    "ROOT": f"https://{edxapp_config.require('mit_learn_domain')}/",
                 },
                 "MKTG_URL_OVERRIDES": {
                     "TOS": f"https://{edxapp_config.require('mit_learn_domain')}/terms",
