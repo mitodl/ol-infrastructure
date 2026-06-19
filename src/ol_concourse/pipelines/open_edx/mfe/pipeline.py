@@ -331,6 +331,7 @@ def mfe_job(
                     "mode": "url",
                     "url": f"https://{open_edx.lms_domain}/{mfe.application.path}/",
                 },
+                no-get=True,
             )
         )
 
