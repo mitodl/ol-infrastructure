@@ -635,7 +635,7 @@ def create_k8s_configmaps(  # noqa: PLR0915
         "PROGRAM_CONSOLE_MICROFRONTEND_URL": None,
         "REGISTRATION_VALIDATION_RATELIMIT": "1000000/minute",
         "REGISTRATION_RATELIMIT": "1000000/minute",
-        "RATELIMIT_RATE": "600/m",
+        "RATELIMIT_RATE": "1200/m",
         "RECALCULATE_GRADES_ROUTING_KEY": "edx.lms.core.default",
         "STUDENT_FILEUPLOAD_MAX_SIZE": 52428800,
         "TRACKING_SEGMENTIO_WEBHOOK_SECRET": "",
