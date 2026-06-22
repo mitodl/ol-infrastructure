@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import subprocess
@@ -14,7 +15,6 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
-import fcntl
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
@@ -432,7 +432,9 @@ def build_kubeconfig(
                             "exec": {
                                 "apiVersion": "client.authentication.k8s.io/v1beta1",
                                 "command": sys.executable,
-                                "args": kubeconfig_exec_args(cluster, AccessMode.READONLY),
+                                "args": kubeconfig_exec_args(
+                                    cluster, AccessMode.READONLY
+                                ),
                                 "interactiveMode": "IfAvailable",
                                 "provideClusterInfo": False,
                             },
@@ -688,7 +690,7 @@ def aws_env_from_credentials(credentials: AwsCredentialsCache) -> dict[str, str]
 def setup(
     mode: AccessMode = AccessMode.DEVELOPER,
     current_context: str | None = None,
-        include_readonly_contexts: bool = False,
+    include_readonly_contexts: bool = False,
     output_path: Path = KUBECONFIG_DEFAULT_PATH,
 ) -> None:
     """Generate a kubeconfig covering all OL EKS clusters.

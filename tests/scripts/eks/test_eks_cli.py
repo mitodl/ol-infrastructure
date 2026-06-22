@@ -143,10 +143,15 @@ def test_load_valid_vault_token_rechecks_cache_after_lock(eks_module, monkeypatc
     monkeypatch.setattr(
         eks_module,
         "oidc_login",
-        lambda _client, _role: pytest.fail("oidc_login should not run after cache refill"),
+        lambda _client, _role: pytest.fail(
+            "oidc_login should not run after cache refill"
+        ),
     )
 
-    assert eks_module.load_valid_vault_token(eks_module.AccessMode.DEVELOPER) == "cached-token"
+    assert (
+        eks_module.load_valid_vault_token(eks_module.AccessMode.DEVELOPER)
+        == "cached-token"
+    )
 
 
 @pytest.mark.unit
@@ -158,7 +163,9 @@ def test_load_valid_vault_token_refuses_noninteractive_login(eks_module, monkeyp
     monkeypatch.setattr(
         eks_module,
         "oidc_login",
-        lambda _client, _role: pytest.fail("oidc_login should not run for non-interactive exec callers"),
+        lambda _client, _role: pytest.fail(
+            "oidc_login should not run for non-interactive exec callers"
+        ),
     )
 
     with pytest.raises(RuntimeError, match="non-interactive"):
