@@ -7,7 +7,7 @@ import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 
-def create_ol_data_platform_realm(  # noqa: C901, PLR0913, PLR0915
+def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     env_name: str,
@@ -546,6 +546,84 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0913, PLR0915
             ],
             opts=resource_options,
         )
+
+    if "ol_researcher" in ol_data_platform_starrocks_client_role_refs:
+        keycloak.Role(
+            "ol-starrocks-researcher-composite",
+            realm_id=ol_data_platform_realm.id,
+            name="ol-starrocks-researcher",
+            description=(
+                "StarRocks researcher with read-only access to analytics"
+                " and research data"
+            ),
+            composite_roles=[
+                ol_data_platform_starrocks_client_role_refs["ol_researcher"].id
+            ],
+            opts=resource_options,
+        )
+
+    if "ol_instructor" in ol_data_platform_starrocks_client_role_refs:
+        keycloak.Role(
+            "ol-starrocks-instructor-composite",
+            realm_id=ol_data_platform_realm.id,
+            name="ol-starrocks-instructor",
+            description=(
+                "StarRocks instructor with read-only access to gold-tier course data"
+            ),
+            composite_roles=[
+                ol_data_platform_starrocks_client_role_refs["ol_instructor"].id
+            ],
+            opts=resource_options,
+        )
+
+    if "ol_business_analyst" in ol_data_platform_starrocks_client_role_refs:
+        keycloak.Role(
+            "ol-starrocks-business-analyst-composite",
+            realm_id=ol_data_platform_realm.id,
+            name="ol-starrocks-business-analyst",
+            description=(
+                "StarRocks business analyst with read-only access to"
+                " operational and gold-tier data"
+            ),
+            composite_roles=[
+                ol_data_platform_starrocks_client_role_refs["ol_business_analyst"].id
+            ],
+            opts=resource_options,
+        )
+
+    # Emit StarRocks client roles as a role_keys claim in the JWT so that
+    # external tooling and future StarRocks group-provider integration can
+    # read the user's StarRocks role without parsing resource_access.<client>.
+    keycloak.openid.UserClientRoleProtocolMapper(
+        "ol-data-platform-starrocks-role-keys-mapper",
+        claim_name="role_keys",
+        realm_id=ol_data_platform_realm.id,
+        add_to_access_token=True,
+        add_to_id_token=True,
+        add_to_userinfo=True,
+        claim_value_type="String",
+        client_id=ol_data_platform_starrocks_client.id,
+        client_id_for_role_mappings="ol-starrocks-client",
+        multivalued=True,
+        name="starrocks-role-keys",
+        opts=resource_options,
+    )
+
+    keycloak.openid.ClientDefaultScopes(
+        "ol-data-platform-starrocks-client-default-scopes",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_starrocks_client.id,
+        default_scopes=[
+            "acr",
+            "basic",
+            "email",
+            "ol_roles",
+            "profile",
+            "roles",
+            "web-origins",
+        ],
+        opts=resource_options,
+    )
     # STARROCKS [END] # noqa: ERA001
 
     # MARIMO [START] # noqa: ERA001

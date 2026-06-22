@@ -154,7 +154,7 @@ if starrocks_config.get_bool("oidc_enabled"):
             "OIDC_ISSUER_URL": '{{ get .Secrets "url" }}',
             "OIDC_CLIENT_ID": '{{ get .Secrets "client_id" }}',
             "OIDC_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
-            "OIDC_JWKS_URI": '{{ get .Secrets "url" }}/protocol/openid-connect/certs',
+            "OIDC_JWKS_URL": '{{ get .Secrets "url" }}/protocol/openid-connect/certs',
         },
         vaultauth=starrocks_auth_binding.vault_k8s_resources.auth_name,
     )
@@ -533,6 +533,10 @@ _FE_CONFIG_BASE = (
     "background_refresh_metadata_enable = true\n"
     "background_refresh_metadata_interval_millis"
     f" = {fe_background_refresh_interval_ms}\n"
+    # Keycloak exposes preferred_username (human-readable) rather than sub (UUID).
+    # Set this FE-level default so OAuth2/JWT-authenticated sessions map to the
+    # same username regardless of per-user settings.
+    "oauth2_principal_field = preferred_username\n"
 )
 
 

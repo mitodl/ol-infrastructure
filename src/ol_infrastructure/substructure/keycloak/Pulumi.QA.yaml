@@ -84,8 +84,14 @@ config:
   - "open_metadata_user"
   keycloak_realm:ol-data-platform-starrocks-redirect-uris:
   - "https://lakehouse.qa.starrocks.ol.mit.edu/*"
-  - "https://lakehouse.qa.starrocks.ol.mit.edu/oauth2/callback"
+  - "https://lakehouse.qa.starrocks.ol.mit.edu/api/oauth2"
   keycloak_realm:ol-data-platform-starrocks-client-roles:
+  - "ol_platform_admin"
+  - "ol_data_engineer"
+  - "ol_data_analyst"
+  - "ol_researcher"
+  - "ol_instructor"
+  - "ol_business_analyst"
   - "ol_platform_admin"
   - "ol_data_engineer"
   - "ol_data_analyst"
