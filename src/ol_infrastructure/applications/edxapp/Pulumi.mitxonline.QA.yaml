@@ -55,7 +55,7 @@ config:
     "--authenticated"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["teams.enable_teams_app", "--create", "--superusers", "--staff"]
-  - ["instructor.legacy_instructor_dashboard", "--deactivate"]
+  - ["instructor.legacy_instructor_dashboard", "--create", "--everyone"]
   edxapp:use_extracted_html_block: "false"
   edxapp:business_unit: mitxonline
   edxapp:db_password:
