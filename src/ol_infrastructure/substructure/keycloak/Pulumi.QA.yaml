@@ -92,10 +92,6 @@ config:
   - "ol_researcher"
   - "ol_instructor"
   - "ol_business_analyst"
-  - "ol_platform_admin"
-  - "ol_data_engineer"
-  - "ol_data_analyst"
-  - "ol_researcher"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
   keycloak_realm:olapps-learn-ai-client-secret:

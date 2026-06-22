@@ -538,24 +538,36 @@ if oidc_enabled:
     # APISIX and exposed at the domain root.
     _oidc_redirect_url = f"https://{starrocks_config.require('domain')}/api/oauth2"
 
+    def _build_integration_sql(args: list[str]) -> str:
+        # json.dumps()[1:-1] produces a backslash-escaped string body safe for
+        # embedding inside a SQL double-quoted string literal.  This guards
+        # against values that contain double-quotes or backslashes (e.g. a
+        # rotated client_secret generated with special characters).
+        issuer = json.dumps(args[0])[1:-1]
+        client_id = json.dumps(args[1])[1:-1]
+        client_secret = json.dumps(args[2])[1:-1]
+        _n = _OIDC_SECURITY_INTEGRATION_NAME
+        return (
+            f"DROP SECURITY INTEGRATION IF EXISTS {_n};\n"
+            f"CREATE SECURITY INTEGRATION {_n} PROPERTIES (\n"
+            '    "type" = "authentication_oauth2",\n'
+            f'    "auth_server_url" = "{issuer}'
+            '/protocol/openid-connect/auth",\n'
+            f'    "token_server_url" = "{issuer}'
+            '/protocol/openid-connect/token",\n'
+            f'    "client_id" = "{client_id}",\n'
+            f'    "client_secret" = "{client_secret}",\n'
+            f'    "redirect_url" = "{_oidc_redirect_url}",\n'
+            f'    "jwks_url" = "{issuer}'
+            '/protocol/openid-connect/certs",\n'
+            '    "principal_field" = "preferred_username",\n'
+            f'    "required_issuer" = "{issuer}"\n'
+            ");"
+        )
+
     _integration_sql: pulumi.Output[str] = pulumi.Output.all(
         _oidc_issuer_url, _oidc_client_id, _oidc_client_secret
-    ).apply(
-        lambda args: (
-            f"""DROP SECURITY INTEGRATION IF EXISTS {_OIDC_SECURITY_INTEGRATION_NAME};
-CREATE SECURITY INTEGRATION {_OIDC_SECURITY_INTEGRATION_NAME} PROPERTIES (
-    "type" = "authentication_oauth2",
-    "auth_server_url" = "{args[0]}/protocol/openid-connect/auth",
-    "token_server_url" = "{args[0]}/protocol/openid-connect/token",
-    "client_id" = "{args[1]}",
-    "client_secret" = "{args[2]}",
-    "redirect_url" = "{_oidc_redirect_url}",
-    "jwks_url" = "{args[0]}/protocol/openid-connect/certs",
-    "principal_field" = "preferred_username",
-    "required_issuer" = "{args[0]}"
-);"""
-        )
-    )
+    ).apply(_build_integration_sql)
     _drop_integration_sql = (
         f"DROP SECURITY INTEGRATION IF EXISTS {_OIDC_SECURITY_INTEGRATION_NAME};"
     )
@@ -609,48 +621,52 @@ CREATE SECURITY INTEGRATION {_OIDC_SECURITY_INTEGRATION_NAME} PROPERTIES (
 
     # Pre-create OAuth2-authenticated user accounts from config.
     # Each entry must supply:
-    #   username    - the Keycloak preferred_username value (matches principal_field)
+    #   username    - the Keycloak preferred_username value (matches principal_field);
+    #                 whitespace is stripped, empty strings are rejected
     #   keycloak_role - one of the six governance role names in _GOVERNANCE_ROLES
     #                   (ol_platform_admin / ol_data_engineer / ol_data_analyst /
     #                    ol_researcher / ol_instructor / ol_business_analyst)
     # The keycloak_role value matches the StarRocks role name exactly (1:1 mapping).
+    # One Pulumi resource is created per user so that removing an entry from config
+    # during `pulumi up` triggers the DROP USER for that specific account.
     # Users not listed here can be created manually:
     #   CREATE USER 'username'@'%' IDENTIFIED WITH authentication_oauth2;
     #   GRANT <governance_role> TO USER 'username'@'%';
     #   ALTER USER 'username'@'%' DEFAULT ROLE <governance_role>;
     oidc_users: list[dict[str, str]] = starrocks_config.get_object("oidc_users") or []
-    if oidc_users:
-        for _u in oidc_users:
-            _role = _u.get("keycloak_role", "")
-            if _role not in _GOVERNANCE_ROLES:
-                msg = (
-                    f"starrocks:oidc_users entry for '{_u.get('username')}' has"
-                    f" invalid keycloak_role '{_role}'."
-                    f" Must be one of: {sorted(_GOVERNANCE_ROLES)}"
-                )
-                raise ValueError(msg)
-        _oidc_users_sql = "\n".join(
-            f"CREATE USER IF NOT EXISTS '{u['username']}'@'%'"
+    for _u in oidc_users:
+        _username = _u.get("username", "").strip()
+        _role = _u.get("keycloak_role", "").strip()
+        if not _username:
+            msg = "starrocks:oidc_users entry is missing or has a blank 'username'"
+            raise ValueError(msg)
+        if _role not in _GOVERNANCE_ROLES:
+            msg = (
+                f"starrocks:oidc_users entry for '{_username}' has"
+                f" invalid keycloak_role '{_role}'."
+                f" Must be one of: {sorted(_GOVERNANCE_ROLES)}"
+            )
+            raise ValueError(msg)
+        _user_sql = (
+            f"CREATE USER IF NOT EXISTS '{_username}'@'%'"
             f" IDENTIFIED WITH authentication_oauth2;"
-            f"\nGRANT {u['keycloak_role']} TO USER '{u['username']}'@'%';"
-            f"\nALTER USER '{u['username']}'@'%'"
-            f" DEFAULT ROLE {u['keycloak_role']};"
-            for u in oidc_users
+            f"\nGRANT {_role} TO USER '{_username}'@'%';"
+            f"\nALTER USER '{_username}'@'%' DEFAULT ROLE {_role};"
         )
-        _oidc_users_drop_sql = "\n".join(
-            f"DROP USER IF EXISTS '{u['username']}'@'%';" for u in oidc_users
-        )
+        _user_drop_sql = f"DROP USER IF EXISTS '{_username}'@'%';"
+        # Sanitize username for use as a Pulumi resource name component.
+        _safe_name = _username.replace("@", "-at-").replace(".", "-")
         command.local.Command(
-            f"starrocks-{stack_info.env_suffix}-oidc-users-setup",
+            f"starrocks-{stack_info.env_suffix}-oidc-user-{_safe_name}",
             create=_exec_sql,
             update=_exec_sql,
             delete=_exec_delete_sql,
             environment={
                 **_mysql_env,
-                "STARROCKS_SQL": _oidc_users_sql,
-                "STARROCKS_DELETE_SQL": _oidc_users_drop_sql,
+                "STARROCKS_SQL": _user_sql,
+                "STARROCKS_DELETE_SQL": _user_drop_sql,
             },
-            triggers=[hashlib.sha256(_oidc_users_sql.encode()).hexdigest()],
+            triggers=[hashlib.sha256(_user_sql.encode()).hexdigest()],
             opts=ResourceOptions(
                 delete_before_replace=True,
                 depends_on=[security_integration_cmd],
