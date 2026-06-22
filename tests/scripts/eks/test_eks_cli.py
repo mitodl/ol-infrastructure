@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -52,17 +53,33 @@ def two_clusters(eks_module):
 
 
 # ---------------------------------------------------------------------------
-# build_kubeconfig — developer mode (dual contexts)
+# build_kubeconfig — developer mode
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-def test_build_kubeconfig_developer_mode_produces_dual_contexts(
+def test_build_kubeconfig_developer_mode_produces_operator_contexts_by_default(
     eks_module, two_clusters
 ):
-    """Developer mode: one operator context and one readonly context per cluster."""
+    """Developer mode defaults to operator contexts only."""
     kubeconfig = eks_module.build_kubeconfig(
         two_clusters, eks_module.AccessMode.DEVELOPER, None
+    )
+
+    context_names = [ctx["name"] for ctx in kubeconfig["contexts"]]
+    assert context_names == ["applications-qa", "data-production"]
+
+
+@pytest.mark.unit
+def test_build_kubeconfig_developer_mode_can_include_readonly_contexts(
+    eks_module, two_clusters
+):
+    """Developer mode can optionally include paired readonly contexts."""
+    kubeconfig = eks_module.build_kubeconfig(
+        two_clusters,
+        eks_module.AccessMode.DEVELOPER,
+        None,
+        include_readonly_contexts=True,
     )
 
     context_names = [ctx["name"] for ctx in kubeconfig["contexts"]]
@@ -98,7 +115,10 @@ def test_build_kubeconfig_developer_readonly_context_uses_readonly_exec(
 ):
     """The readonly context's exec args should include --mode readonly."""
     kubeconfig = eks_module.build_kubeconfig(
-        two_clusters, eks_module.AccessMode.DEVELOPER, None
+        two_clusters,
+        eks_module.AccessMode.DEVELOPER,
+        None,
+        include_readonly_contexts=True,
     )
 
     readonly_user = next(
@@ -107,6 +127,71 @@ def test_build_kubeconfig_developer_readonly_context_uses_readonly_exec(
     args = readonly_user["user"]["exec"]["args"]
     assert "--mode" in args
     assert args[args.index("--mode") + 1] == "readonly"
+
+
+@pytest.mark.unit
+def test_load_valid_vault_token_rechecks_cache_after_lock(eks_module, monkeypatch):
+    """A concurrent cache refresh should be reused instead of starting another login."""
+    observed_tokens = iter([None, "cached-token"])
+
+    monkeypatch.setattr(
+        eks_module,
+        "cached_vault_token",
+        lambda _mode: next(observed_tokens),
+    )
+    monkeypatch.setattr(eks_module, "cache_lock", lambda _name: nullcontext())
+    monkeypatch.setattr(
+        eks_module,
+        "oidc_login",
+        lambda _client, _role: pytest.fail("oidc_login should not run after cache refill"),
+    )
+
+    assert eks_module.load_valid_vault_token(eks_module.AccessMode.DEVELOPER) == "cached-token"
+
+
+@pytest.mark.unit
+def test_load_valid_vault_token_refuses_noninteractive_login(eks_module, monkeypatch):
+    """Non-interactive exec clients should not trigger browser-based OIDC login."""
+    monkeypatch.setattr(eks_module, "cached_vault_token", lambda _mode: None)
+    monkeypatch.setattr(eks_module, "cache_lock", lambda _name: nullcontext())
+    monkeypatch.setattr(eks_module, "exec_invocation_is_interactive", lambda: False)
+    monkeypatch.setattr(
+        eks_module,
+        "oidc_login",
+        lambda _client, _role: pytest.fail("oidc_login should not run for non-interactive exec callers"),
+    )
+
+    with pytest.raises(RuntimeError, match="non-interactive"):
+        eks_module.load_valid_vault_token(eks_module.AccessMode.DEVELOPER)
+
+
+@pytest.mark.unit
+def test_exec_invocation_is_interactive_uses_exec_info(eks_module, monkeypatch):
+    """KUBERNETES_EXEC_INFO should control interactive prompting behavior."""
+    monkeypatch.setenv(
+        "KUBERNETES_EXEC_INFO",
+        '{"apiVersion":"client.authentication.k8s.io/v1beta1","spec":{"interactive":false}}',
+    )
+    assert eks_module.exec_invocation_is_interactive() is False
+
+    monkeypatch.setenv(
+        "KUBERNETES_EXEC_INFO",
+        '{"apiVersion":"client.authentication.k8s.io/v1beta1","spec":{"interactive":true}}',
+    )
+    assert eks_module.exec_invocation_is_interactive() is True
+
+
+@pytest.mark.unit
+def test_append_exec_debug_event_is_disabled_by_default(
+    eks_module, monkeypatch, tmp_path
+):
+    """Debug logging should be opt-in so normal runs do not create a log file."""
+    monkeypatch.setattr(eks_module, "EXEC_DEBUG_LOG_PATH", tmp_path / "exec-debug.log")
+    monkeypatch.delenv(eks_module.EXEC_DEBUG_ENV_VAR, raising=False)
+
+    eks_module.append_exec_debug_event("test-event")
+
+    assert not eks_module.EXEC_DEBUG_LOG_PATH.exists()
 
 
 @pytest.mark.unit
@@ -122,15 +207,33 @@ def test_build_kubeconfig_developer_current_context_is_operator(
 
 
 # ---------------------------------------------------------------------------
-# build_kubeconfig — admin mode (dual contexts)
+# build_kubeconfig — admin mode
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-def test_build_kubeconfig_admin_mode_produces_dual_contexts(eks_module, two_clusters):
-    """Admin mode should emit one admin context and one readonly context per cluster."""
+def test_build_kubeconfig_admin_mode_produces_operator_contexts_by_default(
+    eks_module, two_clusters
+):
+    """Admin mode defaults to admin contexts only."""
     kubeconfig = eks_module.build_kubeconfig(
         two_clusters, eks_module.AccessMode.ADMIN, None
+    )
+
+    context_names = [ctx["name"] for ctx in kubeconfig["contexts"]]
+    assert context_names == ["applications-qa", "data-production"]
+
+
+@pytest.mark.unit
+def test_build_kubeconfig_admin_mode_can_include_readonly_contexts(
+    eks_module, two_clusters
+):
+    """Admin mode can optionally include paired readonly contexts."""
+    kubeconfig = eks_module.build_kubeconfig(
+        two_clusters,
+        eks_module.AccessMode.ADMIN,
+        None,
+        include_readonly_contexts=True,
     )
 
     context_names = [ctx["name"] for ctx in kubeconfig["contexts"]]
@@ -166,7 +269,10 @@ def test_build_kubeconfig_admin_readonly_context_does_not_include_admin_role(
 ):
     """The readonly context paired with admin mode must not pass an admin role ARN."""
     kubeconfig = eks_module.build_kubeconfig(
-        two_clusters, eks_module.AccessMode.ADMIN, None
+        two_clusters,
+        eks_module.AccessMode.ADMIN,
+        None,
+        include_readonly_contexts=True,
     )
 
     readonly_user = next(
@@ -295,10 +401,10 @@ def test_fetch_admin_role_arn_raises_when_none_found(eks_module):
 
 
 @pytest.mark.unit
-def test_setup_writes_kubeconfig_with_dual_contexts(
+def test_setup_writes_kubeconfig_with_operator_contexts_by_default(
     tmp_path, eks_module, monkeypatch, two_clusters
 ):
-    """Setup in developer mode should write a kubeconfig with dual contexts."""
+    """Setup in developer mode should write operator contexts by default."""
     output_path = tmp_path / "config"
     monkeypatch.setattr(
         eks_module, "fetch_all_cluster_configs", lambda _mode: two_clusters
@@ -315,12 +421,7 @@ def test_setup_writes_kubeconfig_with_dual_contexts(
     assert len(kubeconfig["clusters"]) == 2
 
     context_names = [ctx["name"] for ctx in kubeconfig["contexts"]]
-    assert context_names == [
-        "applications-qa",
-        "applications-qa-readonly",
-        "data-production",
-        "data-production-readonly",
-    ]
+    assert context_names == ["applications-qa", "data-production"]
 
     # Operator user uses developer exec
     developer_user = next(
@@ -328,8 +429,5 @@ def test_setup_writes_kubeconfig_with_dual_contexts(
     )
     assert "developer" in developer_user["user"]["exec"]["args"]
 
-    # Readonly user uses readonly exec
-    readonly_user = next(
-        u for u in kubeconfig["users"] if u["name"] == "applications-qa-readonly"
-    )
-    assert "readonly" in readonly_user["user"]["exec"]["args"]
+    user_names = [user["name"] for user in kubeconfig["users"]]
+    assert "applications-qa-readonly" not in user_names

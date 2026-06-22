@@ -29,6 +29,12 @@ Optional current context:
 uv run python scripts/eks/eks.py setup --mode readonly --current-context applications-qa
 ```
 
+Optional paired readonly contexts for automation tools:
+
+```bash
+uv run python scripts/eks/eks.py setup --mode developer --include-readonly-contexts
+```
+
 ## How auth works
 
 The generated kubeconfig uses an `exec` plugin that calls back into
@@ -40,6 +46,9 @@ The generated kubeconfig uses an `exec` plugin that calls back into
 - Users do **not** need to run `source eks.env` or manually refresh temporary
   AWS credentials before using `kubectl`.
 - The tool currently manages and overwrites `~/.kube/config` directly.
+- Developer and admin kubeconfigs write only operator contexts by default.
+  Add `--include-readonly-contexts` if you also want paired `-readonly`
+  contexts for automation.
 
 ## Access modes
 

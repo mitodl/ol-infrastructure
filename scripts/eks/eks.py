@@ -9,9 +9,12 @@ import subprocess
 import sys
 import urllib.parse
 import webbrowser
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
+import fcntl
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
@@ -26,6 +29,8 @@ app = cyclopts.App(help="Manage MIT Open Learning EKS kubeconfig setup and auth.
 AWS_REGION = "us-east-1"
 AWS_DEFAULT_REGION = "us-east-1"
 CACHE_DIR = Path.home() / ".cache" / "ol-infrastructure" / "eks"
+EXEC_DEBUG_LOG_PATH = CACHE_DIR / "exec-debug.log"
+EXEC_DEBUG_ENV_VAR = "OL_EKS_DEBUG_EXEC"
 KUBECONFIG_DEFAULT_PATH = Path.home() / ".kube" / "config"
 OIDC_CALLBACK_PORT = 8250
 OIDC_REDIRECT_URI = f"http://localhost:{OIDC_CALLBACK_PORT}/oidc/callback"
@@ -151,6 +156,19 @@ def dump_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True))
 
 
+@contextmanager
+def cache_lock(name: str) -> Iterator[None]:
+    """Serialize refreshes for a cache key across concurrent processes."""
+    lock_path = CACHE_DIR / f"{name}.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("w") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
 def run_command(
     command: list[str], cwd: Path | None = None, env: dict[str, str] | None = None
 ) -> str:
@@ -170,6 +188,59 @@ def run_command(
         msg = f"Command failed: {' '.join(command)}\n{details}"
         raise RuntimeError(msg)
     return completed.stdout
+
+
+def exec_debug_context() -> dict[str, Any]:
+    """Summarize current exec-plugin invocation details for local debugging."""
+    debug_context: dict[str, Any] = {
+        "argv": sys.argv[1:],
+        "has_exec_info": False,
+        "ppid": os.getppid(),
+        "stdin_isatty": sys.stdin.isatty(),
+    }
+    exec_info = os.environ.get("KUBERNETES_EXEC_INFO")
+    if not exec_info:
+        return debug_context
+
+    debug_context["has_exec_info"] = True
+    try:
+        payload = json.loads(exec_info)
+    except json.JSONDecodeError as exc:
+        debug_context["exec_info_parse_error"] = str(exc)
+        return debug_context
+
+    debug_context["exec_info_api_version"] = payload.get("apiVersion")
+    debug_context["exec_info_interactive"] = bool(
+        payload.get("spec", {}).get("interactive", False)
+    )
+    return debug_context
+
+
+def append_exec_debug_event(event: str, **fields: Any) -> None:
+    """Append a JSONL debug record for local exec-auth troubleshooting."""
+    if os.environ.get(EXEC_DEBUG_ENV_VAR) != "1":
+        return
+
+    payload = {
+        "event": event,
+        "pid": os.getpid(),
+        "timestamp": json_datetime_now().isoformat(),
+        **fields,
+    }
+    try:
+        EXEC_DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with EXEC_DEBUG_LOG_PATH.open("a") as debug_log:
+            debug_log.write(json.dumps(payload, sort_keys=True) + "\n")
+    except OSError:
+        return
+
+
+def exec_invocation_is_interactive() -> bool:
+    """Return whether the current exec-plugin invocation may prompt the user."""
+    debug_context = exec_debug_context()
+    if debug_context["has_exec_info"]:
+        return bool(debug_context.get("exec_info_interactive", False))
+    return bool(debug_context["stdin_isatty"])
 
 
 def make_eks_client(credentials: AwsCredentialsCache) -> Any:
@@ -286,12 +357,13 @@ def build_kubeconfig(
     clusters: list[ClusterConfig],
     operator_mode: AccessMode,
     current_context: str | None,
+    include_readonly_contexts: bool = False,
 ) -> dict[str, Any]:
-    """Build a kubeconfig covering all clusters with dual contexts per cluster.
+    """Build a kubeconfig covering all clusters.
 
-    For operator modes (developer, admin) each cluster gets two contexts:
-      - ``<cluster-name>``          — operator credentials (read/write)
-      - ``<cluster-name>-readonly`` — readonly credentials (safe for agents)
+    For operator modes (developer, admin) each cluster always gets an operator
+    context named ``<cluster-name>``.  When ``include_readonly_contexts`` is
+    enabled, an additional ``<cluster-name>-readonly`` context is generated.
 
     For readonly mode a single context per cluster is generated since there is
     no separate operator credential to pair it with.
@@ -341,32 +413,32 @@ def build_kubeconfig(
                 }
             )
 
-            # Readonly context — always present alongside operator contexts
-            readonly_context_name = f"{cluster.cluster_name}-readonly"
-            readonly_user = f"{cluster.cluster_name}-readonly"
-            contexts.append(
-                {
-                    "name": readonly_context_name,
-                    "context": {
-                        "cluster": cluster.cluster_name,
-                        "user": readonly_user,
-                    },
-                }
-            )
-            users.append(
-                {
-                    "name": readonly_user,
-                    "user": {
-                        "exec": {
-                            "apiVersion": "client.authentication.k8s.io/v1beta1",
-                            "command": sys.executable,
-                            "args": kubeconfig_exec_args(cluster, AccessMode.READONLY),
-                            "interactiveMode": "IfAvailable",
-                            "provideClusterInfo": False,
+            if include_readonly_contexts:
+                readonly_context_name = f"{cluster.cluster_name}-readonly"
+                readonly_user = f"{cluster.cluster_name}-readonly"
+                contexts.append(
+                    {
+                        "name": readonly_context_name,
+                        "context": {
+                            "cluster": cluster.cluster_name,
+                            "user": readonly_user,
                         },
-                    },
-                }
-            )
+                    }
+                )
+                users.append(
+                    {
+                        "name": readonly_user,
+                        "user": {
+                            "exec": {
+                                "apiVersion": "client.authentication.k8s.io/v1beta1",
+                                "command": sys.executable,
+                                "args": kubeconfig_exec_args(cluster, AccessMode.READONLY),
+                                "interactiveMode": "IfAvailable",
+                                "provideClusterInfo": False,
+                            },
+                        },
+                    }
+                )
         else:
             # Readonly-only setup — single context per cluster
             contexts.append(
@@ -453,27 +525,98 @@ def vault_client(token: str | None = None) -> hvac.Client:
     return hvac.Client(url=PRODUCTION_VAULT_ADDRESS, token=token)
 
 
+def cached_vault_token(mode: AccessMode) -> str | None:
+    """Return a cached Vault token when present and still valid."""
+    oidc_role = VAULT_OIDC_ROLE_BY_MODE[mode.value]
+    token_cache_path = cache_file(f"vault-token-{oidc_role}")
+    cached_payload = load_json(token_cache_path)
+    if not cached_payload or not cached_payload.get("token"):
+        return None
+
+    token = str(cached_payload["token"])
+    client = vault_client(token)
+    if client.is_authenticated():
+        return token
+    return None
+
+
 def load_valid_vault_token(mode: AccessMode) -> str:
     """Load a cached Vault token or authenticate via OIDC."""
     oidc_role = VAULT_OIDC_ROLE_BY_MODE[mode.value]
     token_cache_path = cache_file(f"vault-token-{oidc_role}")
-    cached_payload = load_json(token_cache_path)
-    if cached_payload and cached_payload.get("token"):
-        token = str(cached_payload["token"])
-        client = vault_client(token)
-        if client.is_authenticated():
+    token = cached_vault_token(mode)
+    if token:
+        append_exec_debug_event(
+            "vault_token_cache_hit",
+            mode=mode.value,
+            oidc_role=oidc_role,
+        )
+        return token
+
+    with cache_lock(f"vault-token-{oidc_role}"):
+        token = cached_vault_token(mode)
+        if token:
+            append_exec_debug_event(
+                "vault_token_cache_hit_after_lock",
+                mode=mode.value,
+                oidc_role=oidc_role,
+            )
             return token
 
-    client = vault_client()
-    token = oidc_login(client, oidc_role)
-    dump_json(token_cache_path, asdict(VaultTokenCache(token=token)))
-    return token
+        if not exec_invocation_is_interactive():
+            append_exec_debug_event(
+                "vault_login_blocked_noninteractive",
+                mode=mode.value,
+                oidc_role=oidc_role,
+                **exec_debug_context(),
+            )
+            msg = (
+                "Vault login is required, but this Kubernetes client invocation "
+                "is non-interactive. Run `uv run python scripts/eks/eks.py setup "
+                f"--mode {mode.value}` from a terminal first to refresh the cached login."
+            )
+            raise RuntimeError(msg)
+
+        client = vault_client()
+        append_exec_debug_event(
+            "vault_login_start",
+            mode=mode.value,
+            oidc_role=oidc_role,
+            **exec_debug_context(),
+        )
+        token = oidc_login(client, oidc_role)
+        dump_json(token_cache_path, asdict(VaultTokenCache(token=token)))
+        append_exec_debug_event(
+            "vault_login_success",
+            mode=mode.value,
+            oidc_role=oidc_role,
+        )
+        return token
 
 
 def parse_expiration(value: str) -> datetime:
     """Parse an ISO8601 timestamp from cache data."""
     normalized = value.replace("Z", "+00:00")
     return datetime.fromisoformat(normalized)
+
+
+def cached_aws_credentials(mode: AccessMode) -> AwsCredentialsCache | None:
+    """Return cached shared AWS credentials when present and not near expiry."""
+    aws_cache_path = cache_file(f"aws-creds-{mode.value}")
+    cached_payload = load_json(aws_cache_path)
+    if not cached_payload or not cached_payload.get("expires_at"):
+        return None
+
+    expires_at = parse_expiration(str(cached_payload["expires_at"]))
+    if expires_at <= json_datetime_now() + timedelta(minutes=5):
+        return None
+
+    return AwsCredentialsCache(
+        access_key=str(cached_payload["access_key"]),
+        secret_key=str(cached_payload["secret_key"]),
+        session_token=str(cached_payload["session_token"]),
+        expires_at=str(cached_payload["expires_at"]),
+    )
 
 
 def load_valid_aws_credentials(mode: AccessMode) -> AwsCredentialsCache:
@@ -493,33 +636,40 @@ def load_valid_aws_credentials(mode: AccessMode) -> AwsCredentialsCache:
 
     aws_role_name = VAULT_AWS_ROLE_BY_MODE[mode.value]
     aws_cache_path = cache_file(f"aws-creds-{mode.value}")
-    cached_payload = load_json(aws_cache_path)
-    if cached_payload and cached_payload.get("expires_at"):
-        expires_at = parse_expiration(str(cached_payload["expires_at"]))
-        if expires_at > json_datetime_now() + timedelta(minutes=5):
-            return AwsCredentialsCache(
-                access_key=str(cached_payload["access_key"]),
-                secret_key=str(cached_payload["secret_key"]),
-                session_token=str(cached_payload["session_token"]),
-                expires_at=str(cached_payload["expires_at"]),
-            )
+    creds = cached_aws_credentials(mode)
+    if creds:
+        append_exec_debug_event("aws_credentials_cache_hit", mode=mode.value)
+        return creds
 
-    token = load_valid_vault_token(mode)
-    client = vault_client(token)
-    aws_creds = client.secrets.aws.generate_credentials(
-        name=aws_role_name,
-        ttl=8 * 60 * 60,
-        mount_point="aws-mitx",
-    )
-    expires_at = json_datetime_now() + timedelta(seconds=aws_creds["lease_duration"])
-    creds = AwsCredentialsCache(
-        access_key=aws_creds["data"]["access_key"],
-        secret_key=aws_creds["data"]["secret_key"],
-        session_token=aws_creds["data"]["security_token"],
-        expires_at=expires_at.isoformat(),
-    )
-    dump_json(aws_cache_path, asdict(creds))
-    return creds
+    with cache_lock(f"aws-creds-{mode.value}"):
+        creds = cached_aws_credentials(mode)
+        if creds:
+            append_exec_debug_event(
+                "aws_credentials_cache_hit_after_lock",
+                mode=mode.value,
+            )
+            return creds
+
+        token = load_valid_vault_token(mode)
+        client = vault_client(token)
+        append_exec_debug_event("aws_credentials_generate_start", mode=mode.value)
+        aws_creds = client.secrets.aws.generate_credentials(
+            name=aws_role_name,
+            ttl=8 * 60 * 60,
+            mount_point="aws-mitx",
+        )
+        expires_at = json_datetime_now() + timedelta(
+            seconds=aws_creds["lease_duration"]
+        )
+        creds = AwsCredentialsCache(
+            access_key=aws_creds["data"]["access_key"],
+            secret_key=aws_creds["data"]["secret_key"],
+            session_token=aws_creds["data"]["security_token"],
+            expires_at=expires_at.isoformat(),
+        )
+        dump_json(aws_cache_path, asdict(creds))
+        append_exec_debug_event("aws_credentials_generate_success", mode=mode.value)
+        return creds
 
 
 def aws_env_from_credentials(credentials: AwsCredentialsCache) -> dict[str, str]:
@@ -538,6 +688,7 @@ def aws_env_from_credentials(credentials: AwsCredentialsCache) -> dict[str, str]
 def setup(
     mode: AccessMode = AccessMode.DEVELOPER,
     current_context: str | None = None,
+        include_readonly_contexts: bool = False,
     output_path: Path = KUBECONFIG_DEFAULT_PATH,
 ) -> None:
     """Generate a kubeconfig covering all OL EKS clusters.
@@ -545,18 +696,23 @@ def setup(
     Cluster metadata is discovered via the AWS EKS API using Vault-generated
     credentials — no Pulumi CLI or state is required.
 
-    For developer and admin modes each cluster gets two contexts:
-      - ``<cluster-name>``          — operator credentials (read/write)
-      - ``<cluster-name>-readonly`` — readonly credentials for agents/automation
+        For developer and admin modes each cluster gets an operator context:
+            - ``<cluster-name>`` — operator credentials (read/write)
+
+        Optional readonly companions can also be added:
+            - ``<cluster-name>-readonly`` — readonly credentials for agents/automation
 
     For readonly mode a single context per cluster is generated.
 
     EXAMPLES:
-      # Developer access (default) — human read/write + agent readonly contexts
+            # Developer access (default) — human read/write contexts only
       uv run python scripts/eks/eks.py setup
 
       # Admin access — cluster-admin + agent readonly contexts
       uv run python scripts/eks/eks.py setup --mode admin
+
+            # Include paired readonly contexts for automation tools
+            uv run python scripts/eks/eks.py setup --mode developer --include-readonly-contexts
 
       # Readonly only — for automation or read-only users
       uv run python scripts/eks/eks.py setup --mode readonly
@@ -565,7 +721,12 @@ def setup(
     if not clusters:
         print("Warning: No EKS clusters found in this AWS account.", file=sys.stderr)
 
-    kube_config = build_kubeconfig(clusters, mode, current_context)
+    kube_config = build_kubeconfig(
+        clusters,
+        mode,
+        current_context,
+        include_readonly_contexts=include_readonly_contexts,
+    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(yaml.safe_dump(kube_config, sort_keys=False))
 
@@ -576,9 +737,11 @@ def setup(
     )
     if mode is not AccessMode.READONLY:
         print(f"  Operator contexts  : {', '.join(c.cluster_name for c in clusters)}")
-        print(
-            f"  Readonly contexts  : {', '.join(c.cluster_name + '-readonly' for c in clusters)}"
-        )
+        if include_readonly_contexts:
+            print(
+                "  Readonly contexts  : "
+                f"{', '.join(c.cluster_name + '-readonly' for c in clusters)}"
+            )
 
 
 @app.command(name="exec-credential")
@@ -593,6 +756,13 @@ def exec_credential(
     for direct invocation.  Handles Vault OIDC auth, credential generation, and
     local caching transparently.
     """
+    append_exec_debug_event(
+        "exec_credential_start",
+        admin_role_supplied=bool(admin_role_arn),
+        cluster_name=cluster_name,
+        mode=mode.value,
+        **exec_debug_context(),
+    )
     command = [
         "aws",
         "eks",
@@ -612,6 +782,11 @@ def exec_credential(
         env = aws_env_from_credentials(credentials)
 
     token_json = run_command(command, env=env)
+    append_exec_debug_event(
+        "exec_credential_success",
+        cluster_name=cluster_name,
+        mode=mode.value,
+    )
     print(token_json, end="")
 
 
