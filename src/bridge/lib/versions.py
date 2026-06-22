@@ -86,7 +86,7 @@ VAULT_SECRETS_OPERATOR_CHART_VERSION = "1.4.0"
 # renovate: datasource=docker depName=nginx
 NGINX_VERSION = "1.31.2"
 # renovate: datasource=github-releases depName=prometheus-operator packageName=prometheus-operator/prometheus-operator
-PROMETHEUS_OPERATOR_CRD_VERSION = "v0.91.0"
+PROMETHEUS_OPERATOR_CRD_VERSION = "v0.92.0"
 # renovate: datasource=github-tags depName=keycloak-k8s-resources packageName=keycloak/keycloak-k8s-resources
 KEYCLOAK_OPERATOR_CRD_VERSION = "26.6.3"
 # renovate: datasource=helm depName=jupyterhub packageName=jupyterhub registryUrl=https://hub.jupyter.org/helm-chart
