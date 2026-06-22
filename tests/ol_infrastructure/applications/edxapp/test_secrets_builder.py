@@ -169,26 +169,27 @@ class TestBuildBaseGeneralSecretsDict:
         assert secrets["PROCTORING_BACKENDS"]["DEFAULT"] == "null"
 
     def test_proctoring_default_backend_mitx(self, mock_stack_info_mitx):
-        """Verify mitx uses proctortrack as default backend."""
+        """Verify MITx Residential uses null as default proctoring backend."""
         secrets = build_base_general_secrets_dict(
             stack_info=mock_stack_info_mitx,
             redis_hostname="redis.example.com",
             lms_domain="mitx.example.com",
         )
 
-        assert secrets["PROCTORING_BACKENDS"]["DEFAULT"] == "proctortrack"
+        assert secrets["PROCTORING_BACKENDS"]["DEFAULT"] == "null"
 
-    def test_proctortrack_url_configuration(self, mock_stack_info_mitx):
+    def test_proctortrack_url_configuration(self, mock_stack_info_mitxonline):
         """Test proctortrack URL configuration."""
         proctortrack_url = "https://proctortrack.example.com"
         secrets = build_base_general_secrets_dict(
-            stack_info=mock_stack_info_mitx,
+            stack_info=mock_stack_info_mitxonline,
             redis_hostname="redis.example.com",
-            lms_domain="mitx.example.com",
+            lms_domain="mitxonline.example.com",
             proctortrack_url=proctortrack_url,
         )
 
         pt_config = secrets["PROCTORING_BACKENDS"]["proctortrack"]
+        assert secrets["PROCTORING_BACKENDS"]["DEFAULT"] == "proctortrack"
         assert pt_config["base_url"] == proctortrack_url
         assert "client_id" in pt_config
         assert "client_secret" in pt_config
@@ -204,6 +205,7 @@ class TestBuildBaseGeneralSecretsDict:
         )
 
         # Should only have null backend
+        assert secrets["PROCTORING_BACKENDS"]["DEFAULT"] == "null"
         assert "proctortrack" not in secrets["PROCTORING_BACKENDS"]
         assert "null" in secrets["PROCTORING_BACKENDS"]
 

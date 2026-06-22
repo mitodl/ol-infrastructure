@@ -124,12 +124,14 @@ def _apply_deployment_secret_overrides(
         )
         secrets["YOUTUBE_API_KEY"] = '{{ get .Secrets "youtube_api_key" }}'
 
-    # Proctoring backend configuration
-    default_backend = "null" if env_prefix == "xpro" else "proctortrack"
-    secrets["PROCTORING_BACKENDS"] = {"DEFAULT": default_backend}
+    # Proctoring backend configuration. Only deployments with an explicit
+    # ProctorTrack URL should use ProctorTrack as the default; MITx Residential
+    # does not use ProctorTrack and should remain on the null backend.
+    default_backend = "proctortrack" if proctortrack_url else "null"
+    proctoring_backends: dict[str, Any] = {"DEFAULT": default_backend}
 
     if proctortrack_url:
-        secrets["PROCTORING_BACKENDS"]["proctortrack"] = {
+        proctoring_backends["proctortrack"] = {
             "client_id": '{{ get .Secrets "proctortrack_client_id" }}',
             "client_secret": '{{ get .Secrets "proctortrack_client_secret" }}',
             "base_url": proctortrack_url,
@@ -139,7 +141,8 @@ def _apply_deployment_secret_overrides(
         )
 
     # Always include null backend
-    secrets["PROCTORING_BACKENDS"]["null"] = {}
+    proctoring_backends["null"] = {}
+    secrets["PROCTORING_BACKENDS"] = proctoring_backends
     # Always include GitHub access token
     secrets["GITHUB_ACCESS_TOKEN"] = '{{ get .Secrets "github_access_token" }}'
 
