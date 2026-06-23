@@ -544,7 +544,9 @@ def cached_vault_token(mode: AccessMode) -> str | None:
     return None
 
 
-def load_valid_vault_token(mode: AccessMode, block_noninteractive_login: bool = False) -> str:
+def load_valid_vault_token(
+    mode: AccessMode, block_noninteractive_login: bool = False
+) -> str:
     """Load a cached Vault token or authenticate via OIDC.
 
     Args:
@@ -669,7 +671,9 @@ def load_valid_aws_credentials(
             )
             return creds
 
-        token = load_valid_vault_token(mode, block_noninteractive_login=block_noninteractive_login)
+        token = load_valid_vault_token(
+            mode, block_noninteractive_login=block_noninteractive_login
+        )
         client = vault_client(token)
         append_exec_debug_event("aws_credentials_generate_start", mode=mode.value)
         aws_creds = client.secrets.aws.generate_credentials(
@@ -797,9 +801,7 @@ def exec_credential(
             raise RuntimeError(msg)
         command.extend(["--role", admin_role_arn])
     else:
-        credentials = load_valid_aws_credentials(
-            mode, block_noninteractive_login=True
-        )
+        credentials = load_valid_aws_credentials(mode, block_noninteractive_login=True)
         env = aws_env_from_credentials(credentials)
 
     token_json = run_command(command, env=env)
