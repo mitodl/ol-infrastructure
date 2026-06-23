@@ -220,6 +220,23 @@ def test_exec_invocation_is_interactive_uses_exec_info(eks_module, monkeypatch):
 
 
 @pytest.mark.unit
+def test_exec_invocation_is_interactive_falls_back_on_malformed_json(
+    eks_module, monkeypatch
+):
+    """Malformed KUBERNETES_EXEC_INFO should fall back to stdin.isatty()."""
+    # Set malformed JSON to force fallback
+    monkeypatch.setenv("KUBERNETES_EXEC_INFO", "{invalid json}")
+
+    # When stdin is TTY, should return True (fallback to stdin check)
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    assert eks_module.exec_invocation_is_interactive() is True
+
+    # When stdin is not TTY, should return False
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    assert eks_module.exec_invocation_is_interactive() is False
+
+
+@pytest.mark.unit
 def test_append_exec_debug_event_is_disabled_by_default(
     eks_module, monkeypatch, tmp_path
 ):

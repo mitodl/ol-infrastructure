@@ -202,13 +202,13 @@ def exec_debug_context() -> dict[str, Any]:
     if not exec_info:
         return debug_context
 
-    debug_context["has_exec_info"] = True
     try:
         payload = json.loads(exec_info)
     except json.JSONDecodeError as exc:
         debug_context["exec_info_parse_error"] = str(exc)
         return debug_context
 
+    debug_context["has_exec_info"] = True
     debug_context["exec_info_api_version"] = payload.get("apiVersion")
     debug_context["exec_info_interactive"] = bool(
         payload.get("spec", {}).get("interactive", False)
