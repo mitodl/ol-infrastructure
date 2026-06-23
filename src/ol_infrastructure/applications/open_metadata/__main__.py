@@ -627,6 +627,14 @@ open_metadata_application = kubernetes.helm.v3.Release(
                             "enableFailureDiagnostics": True,
                             "ingestionImage": f"docker.getcollate.io/openmetadata/ingestion-base:{OPEN_METADATA_VERSION}",  # noqa: E501
                             "useOMJobOperator": True,
+                            # The chart's k8s-pipeline-rbac.yaml stamps the shared
+                            # `serviceAccount.annotations` (the server IRSA role) onto
+                            # the ingestion SA too, which collides with the distinct
+                            # ingestion IRSA role applied in the substructure stack.
+                            # Disable chart-managed RBAC and own the ingestion SA, its
+                            # Role/RoleBinding, and the server pipeline-manager
+                            # Role/RoleBinding in substructure/open_metadata instead.
+                            "rbac": {"enabled": False},
                         },
                     },
                     "elasticsearch": {
