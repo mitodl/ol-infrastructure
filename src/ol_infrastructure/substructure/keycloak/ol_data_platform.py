@@ -609,6 +609,13 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         opts=resource_options,
     )
 
+    # NOTE: the shared "ol_roles" scope is intentionally NOT included here. That
+    # scope carries a role_keys mapper for ol-superset-client roles; combining it
+    # with the StarRocks role_keys mapper above (which maps ol-starrocks-client
+    # roles to the same claim) would put two mappers on the same role_keys claim
+    # for this client, and Keycloak would emit only one of them.  The dedicated
+    # starrocks-role-keys mapper is a direct client mapper, so it applies without
+    # needing the ol_roles scope.
     keycloak.openid.ClientDefaultScopes(
         "ol-data-platform-starrocks-client-default-scopes",
         realm_id=ol_data_platform_realm.id,
@@ -617,7 +624,6 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             "acr",
             "basic",
             "email",
-            "ol_roles",
             "profile",
             "roles",
             "web-origins",

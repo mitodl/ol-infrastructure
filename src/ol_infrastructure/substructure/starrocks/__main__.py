@@ -28,6 +28,7 @@ The SQL setup Command resources require the mysql client on the Pulumi runner
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import pulumi
@@ -443,19 +444,26 @@ GRANT USAGE ON CATALOG default_catalog TO ROLE ol_data_engineer;
 GRANT ALL ON ALL TABLES IN ALL DATABASES TO ROLE ol_data_engineer;
 GRANT ALL ON ALL DATABASES TO ROLE ol_data_engineer;
 
--- ol_data_analyst: analytics path (Silver_Analytics + Gold) - read-only
+-- The four read-only roles below are currently granted catalog-wide SELECT
+-- (ALL TABLES IN ALL DATABASES).  The per-database governance scoping noted in
+-- each "target scope" comment (e.g. restricting analysts to Silver_Analytics +
+-- Gold) is NOT yet enforced here; it is deferred until the Glue/Iceberg
+-- database naming is confirmed, at which point these grants will be narrowed to
+-- the named databases.  Until then all four roles see the same read surface.
+--
+-- ol_data_analyst: target scope Silver_Analytics + Gold (read-only)
 GRANT USAGE ON CATALOG default_catalog TO ROLE ol_data_analyst;
 GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_data_analyst;
 
--- ol_researcher: research path (Silver_Analytics + Gold_Analytics) - read-only
+-- ol_researcher: target scope Silver_Analytics + Gold_Analytics (read-only)
 GRANT USAGE ON CATALOG default_catalog TO ROLE ol_researcher;
 GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_researcher;
 
--- ol_instructor: gold tier (Gold_Analytics + Gold_Operations) - read-only
+-- ol_instructor: target scope Gold_Analytics + Gold_Operations (read-only)
 GRANT USAGE ON CATALOG default_catalog TO ROLE ol_instructor;
 GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_instructor;
 
--- ol_business_analyst: operational path (Silver_Operations + Gold) - read-only
+-- ol_business_analyst: target scope Silver_Operations + Gold (read-only)
 GRANT USAGE ON CATALOG default_catalog TO ROLE ol_business_analyst;
 GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_business_analyst;"""
 
@@ -482,7 +490,14 @@ _GOVERNANCE_ROLES: frozenset[str] = frozenset(
     }
 )
 
-command.local.Command(
+# Allowlist for OIDC usernames before they are interpolated into SQL string
+# literals.  Keycloak preferred_username values are emails or short login ids;
+# restricting to this character set prevents SQL-breaking / injection input
+# (quotes, backslashes, whitespace, control characters) from reaching the
+# generated CREATE USER / GRANT statements.
+_OIDC_USERNAME_RE = re.compile(r"^[A-Za-z0-9._%+@-]+$")
+
+roles_setup_cmd = command.local.Command(
     f"starrocks-{stack_info.env_suffix}-roles-setup",
     create=_exec_sql,
     update=_exec_sql,
@@ -703,7 +718,9 @@ if oidc_enabled:
         triggers=[hashlib.sha256(_group_provider_setup_sql.encode()).hexdigest()],
         opts=ResourceOptions(
             delete_before_replace=True,
-            depends_on=[security_integration_cmd, group_sync_cmd],
+            # roles_setup_cmd: GRANT <role> TO EXTERNAL GROUP requires the roles
+            # to exist first.
+            depends_on=[roles_setup_cmd, security_integration_cmd, group_sync_cmd],
         ),
     )
 
@@ -734,6 +751,13 @@ if oidc_enabled:
         if not _username:
             msg = "starrocks:oidc_users entry is missing or has a blank 'username'"
             raise ValueError(msg)
+        if not _OIDC_USERNAME_RE.match(_username):
+            msg = (
+                f"starrocks:oidc_users entry has an invalid username '{_username}'."
+                " Usernames may only contain letters, digits, and the characters"
+                " . _ % + @ - (no quotes, whitespace, or control characters)."
+            )
+            raise ValueError(msg)
         if _role not in _GOVERNANCE_ROLES:
             msg = (
                 f"starrocks:oidc_users entry for '{_username}' has"
@@ -741,17 +765,26 @@ if oidc_enabled:
                 f" Must be one of: {sorted(_GOVERNANCE_ROLES)}"
             )
             raise ValueError(msg)
+        # DROP + CREATE (rather than CREATE IF NOT EXISTS) so that re-running with
+        # a different config corrects an account that was previously created with
+        # a different auth plugin (e.g. a native-password user being migrated to
+        # OAuth2).  The username is validated against _OIDC_USERNAME_RE above, so
+        # it is safe to interpolate into these single-quoted SQL literals.
         _user_sql = (
-            f"CREATE USER IF NOT EXISTS '{_username}'@'%'"
+            f"DROP USER IF EXISTS '{_username}'@'%';"
+            f"\nCREATE USER '{_username}'@'%'"
             f" IDENTIFIED WITH authentication_oauth2;"
             f"\nGRANT {_role} TO USER '{_username}'@'%';"
             f"\nALTER USER '{_username}'@'%' DEFAULT ROLE {_role};"
         )
         _user_drop_sql = f"DROP USER IF EXISTS '{_username}'@'%';"
-        # Sanitize username for use as a Pulumi resource name component.
-        _safe_name = _username.replace("@", "-at-").replace(".", "-")
+        # Resource name: a sanitized username for human readability plus a short
+        # stable hash of the full username so that two usernames that sanitize to
+        # the same string (e.g. "a.b@x" and "a-b@x") cannot collide.
+        _sanitized = re.sub(r"[^A-Za-z0-9-]", "-", _username)
+        _name_hash = hashlib.sha256(_username.encode()).hexdigest()[:8]
         command.local.Command(
-            f"starrocks-{stack_info.env_suffix}-oidc-user-{_safe_name}",
+            f"starrocks-{stack_info.env_suffix}-oidc-user-{_sanitized}-{_name_hash}",
             create=_exec_sql,
             update=_exec_sql,
             delete=_exec_delete_sql,
@@ -763,7 +796,9 @@ if oidc_enabled:
             triggers=[hashlib.sha256(_user_sql.encode()).hexdigest()],
             opts=ResourceOptions(
                 delete_before_replace=True,
-                depends_on=[security_integration_cmd],
+                # roles_setup_cmd: GRANT <role> / DEFAULT ROLE require the role to
+                # exist before user creation runs on first deploy.
+                depends_on=[roles_setup_cmd, security_integration_cmd],
             ),
         )
 
