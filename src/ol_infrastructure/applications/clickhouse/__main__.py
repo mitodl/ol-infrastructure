@@ -674,6 +674,10 @@ clickhouse_app = OLEKSAuthBinding(
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
         irsa_service_account_name="clickhouse",
         vault_sync_service_account_names="clickhouse-vault",
+        # The CHI pod template references serviceAccountName "clickhouse"; the
+        # component must create that ServiceAccount (with the IRSA role-arn
+        # annotation) since nothing else in the cluster does.
+        create_irsa_service_account=True,
         k8s_labels=k8s_labels,
     )
 )
