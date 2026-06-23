@@ -35,6 +35,9 @@ _GOVERNANCE_ROLES: tuple[str, ...] = (
 )
 
 
+_PAGE_SIZE = 100
+
+
 def _api_get(url: str, headers: dict[str, str]) -> Any:
     """GET url and return the parsed JSON body; exit on HTTP error."""
     req = urllib.request.Request(url, headers=headers)  # noqa: S310
@@ -43,6 +46,26 @@ def _api_get(url: str, headers: dict[str, str]) -> Any:
             return json.loads(resp.read())
     except urllib.error.HTTPError as exc:
         sys.exit(f"Keycloak API error {exc.code} for {url}: {exc.read().decode()}")
+
+
+def _api_get_all(url: str, headers: dict[str, str]) -> list[Any]:
+    """GET a paginated Keycloak collection, following first/max until exhausted.
+
+    The Keycloak Admin API caps role-membership endpoints at max=100 by default,
+    so a role with more than 100 members would otherwise be silently truncated.
+    """
+    results: list[Any] = []
+    first = 0
+    sep = "&" if "?" in url else "?"
+    while True:
+        page = _api_get(f"{url}{sep}first={first}&max={_PAGE_SIZE}", headers)
+        if not page:
+            break
+        results.extend(page)
+        if len(page) < _PAGE_SIZE:
+            break
+        first += _PAGE_SIZE
+    return results
 
 
 def main() -> None:
@@ -90,7 +113,7 @@ def main() -> None:
 
     lines: list[str] = []
     for role in _GOVERNANCE_ROLES:
-        users = _api_get(
+        users = _api_get_all(
             f"{admin_base}/clients/{client_uuid}/roles/{role}/users", headers
         )
         usernames = sorted(u["username"] for u in users if u.get("username"))
