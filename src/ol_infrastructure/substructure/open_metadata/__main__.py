@@ -181,6 +181,42 @@ ingestion_service_account = kubernetes.core.v1.ServiceAccount(
     opts=ResourceOptions(depends_on=[ingestion_irsa_role]),
 )
 
+# Core pipeline-job permissions shared by the ingestion SA and the server SA.
+# The server additionally needs the OMJob/CronOMJob rules appended below. Keeping
+# one source of truth avoids the two Roles drifting apart on a chart version bump.
+pipeline_job_rules = [
+    kubernetes.rbac.v1.PolicyRuleArgs(
+        api_groups=[""],
+        resources=["pods"],
+        verbs=["get", "list", "create", "update", "patch", "delete"],
+    ),
+    kubernetes.rbac.v1.PolicyRuleArgs(
+        api_groups=[""],
+        resources=["pods/log"],
+        verbs=["get", "list", "watch"],
+    ),
+    kubernetes.rbac.v1.PolicyRuleArgs(
+        api_groups=[""],
+        resources=["configmaps"],
+        verbs=["get", "list", "create", "update", "patch", "delete"],
+    ),
+    kubernetes.rbac.v1.PolicyRuleArgs(
+        api_groups=[""],
+        resources=["secrets"],
+        verbs=["get", "list", "create", "update", "patch", "delete"],
+    ),
+    kubernetes.rbac.v1.PolicyRuleArgs(
+        api_groups=[""],
+        resources=["events"],
+        verbs=["get", "list"],
+    ),
+    kubernetes.rbac.v1.PolicyRuleArgs(
+        api_groups=["batch"],
+        resources=["jobs", "cronjobs"],
+        verbs=["get", "list", "create", "update", "patch", "delete"],
+    ),
+]
+
 # Permissions the ingestion SA needs to run pipeline jobs in its own namespace.
 ingestion_role = kubernetes.rbac.v1.Role(
     f"om-ingestion-role-{stack_info.env_suffix}",
@@ -189,38 +225,7 @@ ingestion_role = kubernetes.rbac.v1.Role(
         namespace=open_metadata_namespace,
         labels={"app.kubernetes.io/component": "ingestion"},
     ),
-    rules=[
-        kubernetes.rbac.v1.PolicyRuleArgs(
-            api_groups=[""],
-            resources=["pods"],
-            verbs=["get", "list", "create", "update", "patch", "delete"],
-        ),
-        kubernetes.rbac.v1.PolicyRuleArgs(
-            api_groups=[""],
-            resources=["pods/log"],
-            verbs=["get", "list", "watch"],
-        ),
-        kubernetes.rbac.v1.PolicyRuleArgs(
-            api_groups=[""],
-            resources=["configmaps"],
-            verbs=["get", "list", "create", "update", "patch", "delete"],
-        ),
-        kubernetes.rbac.v1.PolicyRuleArgs(
-            api_groups=[""],
-            resources=["secrets"],
-            verbs=["get", "list", "create", "update", "patch", "delete"],
-        ),
-        kubernetes.rbac.v1.PolicyRuleArgs(
-            api_groups=[""],
-            resources=["events"],
-            verbs=["get", "list"],
-        ),
-        kubernetes.rbac.v1.PolicyRuleArgs(
-            api_groups=["batch"],
-            resources=["jobs", "cronjobs"],
-            verbs=["get", "list", "create", "update", "patch", "delete"],
-        ),
-    ],
+    rules=pipeline_job_rules,
 )
 
 kubernetes.rbac.v1.RoleBinding(
@@ -255,36 +260,7 @@ server_pipeline_manager_role = kubernetes.rbac.v1.Role(
         labels={"app.kubernetes.io/component": "server"},
     ),
     rules=[
-        kubernetes.rbac.v1.PolicyRuleArgs(
-            api_groups=[""],
-            resources=["pods"],
-            verbs=["get", "list", "create", "update", "patch", "delete"],
-        ),
-        kubernetes.rbac.v1.PolicyRuleArgs(
-            api_groups=[""],
-            resources=["pods/log"],
-            verbs=["get", "list", "watch"],
-        ),
-        kubernetes.rbac.v1.PolicyRuleArgs(
-            api_groups=[""],
-            resources=["configmaps"],
-            verbs=["get", "list", "create", "update", "patch", "delete"],
-        ),
-        kubernetes.rbac.v1.PolicyRuleArgs(
-            api_groups=[""],
-            resources=["secrets"],
-            verbs=["get", "list", "create", "update", "patch", "delete"],
-        ),
-        kubernetes.rbac.v1.PolicyRuleArgs(
-            api_groups=[""],
-            resources=["events"],
-            verbs=["get", "list"],
-        ),
-        kubernetes.rbac.v1.PolicyRuleArgs(
-            api_groups=["batch"],
-            resources=["jobs", "cronjobs"],
-            verbs=["get", "list", "create", "update", "patch", "delete"],
-        ),
+        *pipeline_job_rules,
         kubernetes.rbac.v1.PolicyRuleArgs(
             api_groups=["pipelines.openmetadata.org"],
             resources=["omjobs"],

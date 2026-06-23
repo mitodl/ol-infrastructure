@@ -624,6 +624,10 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         "k8s": {
                             # The schema doesn't yet support this value (TMM 2026-02-26)
                             # "namespace": open_metadata_namespace,  # noqa: ERA001
+                            # Pin the ingestion SA name (the chart default) so the
+                            # cross-stack contract is explicit: the substructure stack
+                            # creates this SA + its IRSA role/RBAC under this name.
+                            "serviceAccountName": "openmetadata-ingestion",
                             "enableFailureDiagnostics": True,
                             "ingestionImage": f"docker.getcollate.io/openmetadata/ingestion-base:{OPEN_METADATA_VERSION}",  # noqa: E501
                             "useOMJobOperator": True,
