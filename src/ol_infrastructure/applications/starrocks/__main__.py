@@ -379,6 +379,28 @@ starrocks_values: dict[str, Any] = {
     },
 }
 
+# Placeholder ConfigMap for the file-based group provider managed by the substructure
+# stack (substructure/starrocks keycloak_group_sync.py).  Created here so the FE pods
+# have the volume available at startup; the substructure stack populates groups.txt
+# via kubectl apply after each pulumi up.  ignore_changes=["data"] prevents this stack
+# from overwriting the substructure-managed content on subsequent runs.
+if starrocks_config.get_bool("oidc_enabled"):
+    _oidc_group_cm_name = f"{stack_info.env_prefix}-starrocks-oidc-groups"
+    kubernetes.core.v1.ConfigMap(
+        f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-oidc-groups-cm",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=_oidc_group_cm_name,
+            namespace=namespace,
+            labels=k8s_app_labels.model_dump(),
+        ),
+        data={"groups.txt": ""},
+        opts=ResourceOptions(ignore_changes=["data"]),
+    )
+    _fe_oidc_spec = cast(dict[str, Any], starrocks_values["starrocksFESpec"])
+    _fe_oidc_spec["configMaps"] = [
+        {"name": _oidc_group_cm_name, "mountPath": "/etc/starrocks/groups"}
+    ]
+
 if starrocks_config.get_bool("use_be"):
     # Shared-nothing configuration
     be_config = starrocks_config.get_object("be_config") or {}

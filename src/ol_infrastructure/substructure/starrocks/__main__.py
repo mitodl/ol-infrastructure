@@ -28,6 +28,7 @@ The SQL setup Command resources require the mysql client on the Pulumi runner
 
 import hashlib
 import json
+from pathlib import Path
 
 import pulumi
 import pulumi_command as command
@@ -619,7 +620,100 @@ if oidc_enabled:
         ),
     )
 
+    # --- File group provider: automatic role assignment from Keycloak --------
+    # keycloak_group_sync.py calls the Keycloak Admin API (using the
+    # ol-starrocks-client service account, which has view-users on
+    # realm-management) to enumerate current members of each governance role
+    # and writes the result to a Kubernetes ConfigMap mounted in the FE pods.
+    # StarRocks' file group provider reads that file; combined with
+    # GRANT role TO EXTERNAL GROUP, any OAuth2-authenticated user whose
+    # preferred_username appears in the file receives the corresponding
+    # StarRocks role automatically — no starrocks:oidc_users entry needed.
+    #
+    # Upstream feature request for a native JWT-claims group provider that
+    # would eliminate the sync entirely:
+    # https://github.com/StarRocks/starrocks/issues/75224
+    _sync_script = str(Path(__file__).parent / "keycloak_group_sync.py")
+    _group_provider_name = "keycloak_file_groups"
+    _group_file_cm = f"{stack_info.env_prefix}-starrocks-oidc-groups"
+    _group_file_path = "/etc/starrocks/groups/groups.txt"
+    _k8s_namespace = "starrocks"
+
+    group_sync_cmd = command.local.Command(
+        f"starrocks-{stack_info.env_suffix}-keycloak-group-sync",
+        create=(
+            f"python3 {_sync_script}"
+            f" --namespace={_k8s_namespace}"
+            f" --configmap={_group_file_cm}"
+        ),
+        update=(
+            f"python3 {_sync_script}"
+            f" --namespace={_k8s_namespace}"
+            f" --configmap={_group_file_cm}"
+        ),
+        # On destroy the ConfigMap is owned and deleted by the applications stack;
+        # no kubectl delete needed here.
+        environment={
+            "KEYCLOAK_ISSUER_URL": _oidc_issuer_url,
+            "KEYCLOAK_CLIENT_ID": _oidc_client_id,
+            "KEYCLOAK_CLIENT_SECRET": _oidc_client_secret,
+        },
+        triggers=_integration_sql.apply(
+            lambda sql: [hashlib.sha256(sql.encode()).hexdigest()]
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=[security_integration_cmd],
+        ),
+    )
+
+    _permitted = ",".join(sorted(_GOVERNANCE_ROLES))
+    _group_provider_setup_sql = (
+        f"CREATE GROUP PROVIDER IF NOT EXISTS {_group_provider_name}\n"
+        f"PROPERTIES (\n"
+        f'    "type" = "file",\n'
+        f'    "file_path" = "{_group_file_path}"\n'
+        f");\n"
+        f"ALTER SECURITY INTEGRATION {_OIDC_SECURITY_INTEGRATION_NAME}\n"
+        f"    SET ('group_provider' = '{_group_provider_name}',"
+        f" 'permitted_groups' = '{_permitted}');\n"
+        + "\n".join(
+            f"GRANT {role} TO EXTERNAL GROUP {role};"
+            for role in sorted(_GOVERNANCE_ROLES)
+        )
+    )
+    _group_provider_drop_sql = (
+        "\n".join(
+            f"REVOKE {role} FROM EXTERNAL GROUP {role};"
+            for role in sorted(_GOVERNANCE_ROLES)
+        )
+        + f"\nDROP GROUP PROVIDER IF EXISTS {_group_provider_name};"
+    )
+
+    command.local.Command(
+        f"starrocks-{stack_info.env_suffix}-group-provider-setup",
+        create=_exec_sql,
+        update=_exec_sql,
+        delete=_exec_delete_sql,
+        environment={
+            **_mysql_env,
+            "STARROCKS_SQL": _group_provider_setup_sql,
+            "STARROCKS_DELETE_SQL": _group_provider_drop_sql,
+        },
+        triggers=[hashlib.sha256(_group_provider_setup_sql.encode()).hexdigest()],
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=[security_integration_cmd, group_sync_cmd],
+        ),
+    )
+
     # Pre-create OAuth2-authenticated user accounts from config.
+    # With the file group provider in place, manual entries here are only
+    # needed for edge-case overrides (e.g. a user who needs a different role
+    # than the one assigned in Keycloak).  New users in Keycloak with a
+    # governance role will receive that role automatically via the group
+    # provider without needing an entry here.
+    #
     # Each entry must supply:
     #   username    - the Keycloak preferred_username value (matches principal_field);
     #                 whitespace is stripped, empty strings are rejected
