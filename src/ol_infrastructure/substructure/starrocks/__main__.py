@@ -28,11 +28,14 @@ The SQL setup Command resources require the mysql client on the Pulumi runner
 
 import hashlib
 import json
+import re
+from pathlib import Path
 
 import pulumi
 import pulumi_command as command
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, export
+from pulumi_vault.generic.get_secret import get_secret_output as vault_get_secret_output
 
 from bridge.lib.magic_numbers import ONE_MONTH_SECONDS
 from bridge.lib.versions import VAULT_PLUGIN_STARROCKS_SHA256
@@ -337,6 +340,43 @@ if enable_data_lake:
             f"\nSET CATALOG {_catalog_name};"
             f"\nGRANT ALL ON ALL TABLES IN ALL DATABASES TO ROLE admin;"
             f"\nSET CATALOG default_catalog;"
+            # Governance roles: all get USAGE on the catalog; full vs. read-only
+            # access is differentiated below.  Database-level scoping within
+            # the catalog (bronze / silver_* / gold_*) should be added once
+            # the Glue catalog database naming is confirmed.
+            f"\n"
+            f"\nGRANT USAGE ON CATALOG {_catalog_name} TO ROLE ol_platform_admin;"
+            f"\nSET CATALOG {_catalog_name};"
+            f"\nGRANT ALL ON ALL TABLES IN ALL DATABASES TO ROLE ol_platform_admin;"
+            f"\nGRANT ALL ON ALL DATABASES TO ROLE ol_platform_admin;"
+            f"\nSET CATALOG default_catalog;"
+            f"\n"
+            f"\nGRANT USAGE ON CATALOG {_catalog_name} TO ROLE ol_data_engineer;"
+            f"\nSET CATALOG {_catalog_name};"
+            f"\nGRANT ALL ON ALL TABLES IN ALL DATABASES TO ROLE ol_data_engineer;"
+            f"\nGRANT ALL ON ALL DATABASES TO ROLE ol_data_engineer;"
+            f"\nSET CATALOG default_catalog;"
+            f"\n"
+            f"\nGRANT USAGE ON CATALOG {_catalog_name} TO ROLE ol_data_analyst;"
+            f"\nSET CATALOG {_catalog_name};"
+            f"\nGRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_data_analyst;"
+            f"\nSET CATALOG default_catalog;"
+            f"\n"
+            f"\nGRANT USAGE ON CATALOG {_catalog_name} TO ROLE ol_researcher;"
+            f"\nSET CATALOG {_catalog_name};"
+            f"\nGRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_researcher;"
+            f"\nSET CATALOG default_catalog;"
+            f"\n"
+            f"\nGRANT USAGE ON CATALOG {_catalog_name} TO ROLE ol_instructor;"
+            f"\nSET CATALOG {_catalog_name};"
+            f"\nGRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_instructor;"
+            f"\nSET CATALOG default_catalog;"
+            f"\n"
+            f"\nGRANT USAGE ON CATALOG {_catalog_name} TO ROLE ol_business_analyst;"
+            f"\nSET CATALOG {_catalog_name};"
+            "\nGRANT SELECT ON ALL TABLES IN ALL DATABASES"
+            " TO ROLE ol_business_analyst;"
+            f"\nSET CATALOG default_catalog;"
         )
 
 # --- Native StarRocks roles -------------------------------------------------
@@ -357,9 +397,25 @@ if enable_data_lake:
 # is required to remove them (or DROP + recreate the roles via pulumi destroy
 # followed by pulumi up).
 _base_roles_sql = """\
+-- Machine-access roles assigned to Vault-issued ephemeral service accounts.
+-- These are referenced by the vault.database.SecretBackendRole resources above.
 CREATE ROLE IF NOT EXISTS readonly;
 CREATE ROLE IF NOT EXISTS app;
 CREATE ROLE IF NOT EXISTS admin;
+
+-- Governance roles for OIDC-authenticated human users.  Names match the
+-- Keycloak ol-starrocks-client roles exactly for 1:1 claim-to-role mapping.
+-- Iceberg catalog grants are appended per-catalog when
+-- enable_data_lake_integration is true.  Database-level scoping within the
+-- Iceberg catalog (e.g. restricting ol_instructor to gold_analytics /
+-- gold_operations) should be layered on top once the Glue catalog database
+-- naming is confirmed.
+CREATE ROLE IF NOT EXISTS ol_platform_admin;
+CREATE ROLE IF NOT EXISTS ol_data_engineer;
+CREATE ROLE IF NOT EXISTS ol_data_analyst;
+CREATE ROLE IF NOT EXISTS ol_researcher;
+CREATE ROLE IF NOT EXISTS ol_instructor;
+CREATE ROLE IF NOT EXISTS ol_business_analyst;
 
 GRANT USAGE ON CATALOG default_catalog TO ROLE readonly;
 GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE readonly;
@@ -372,16 +428,76 @@ GRANT db_admin TO ROLE admin;
 GRANT user_admin TO ROLE admin;
 GRANT USAGE ON CATALOG default_catalog TO ROLE admin;
 GRANT ALL ON ALL TABLES IN ALL DATABASES TO ROLE admin;
-GRANT ALL ON ALL DATABASES TO ROLE admin;"""
+GRANT ALL ON ALL DATABASES TO ROLE admin;
+
+-- ol_platform_admin: full cluster management + governance oversight
+GRANT cluster_admin TO ROLE ol_platform_admin;
+GRANT db_admin TO ROLE ol_platform_admin;
+GRANT user_admin TO ROLE ol_platform_admin;
+GRANT USAGE ON CATALOG default_catalog TO ROLE ol_platform_admin;
+GRANT ALL ON ALL TABLES IN ALL DATABASES TO ROLE ol_platform_admin;
+GRANT ALL ON ALL DATABASES TO ROLE ol_platform_admin;
+
+-- ol_data_engineer: pipeline development; full data access, no cluster admin
+GRANT db_admin TO ROLE ol_data_engineer;
+GRANT USAGE ON CATALOG default_catalog TO ROLE ol_data_engineer;
+GRANT ALL ON ALL TABLES IN ALL DATABASES TO ROLE ol_data_engineer;
+GRANT ALL ON ALL DATABASES TO ROLE ol_data_engineer;
+
+-- The four read-only roles below are currently granted catalog-wide SELECT
+-- (ALL TABLES IN ALL DATABASES).  The per-database governance scoping noted in
+-- each "target scope" comment (e.g. restricting analysts to Silver_Analytics +
+-- Gold) is NOT yet enforced here; it is deferred until the Glue/Iceberg
+-- database naming is confirmed, at which point these grants will be narrowed to
+-- the named databases.  Until then all four roles see the same read surface.
+--
+-- ol_data_analyst: target scope Silver_Analytics + Gold (read-only)
+GRANT USAGE ON CATALOG default_catalog TO ROLE ol_data_analyst;
+GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_data_analyst;
+
+-- ol_researcher: target scope Silver_Analytics + Gold_Analytics (read-only)
+GRANT USAGE ON CATALOG default_catalog TO ROLE ol_researcher;
+GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_researcher;
+
+-- ol_instructor: target scope Gold_Analytics + Gold_Operations (read-only)
+GRANT USAGE ON CATALOG default_catalog TO ROLE ol_instructor;
+GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_instructor;
+
+-- ol_business_analyst: target scope Silver_Operations + Gold (read-only)
+GRANT USAGE ON CATALOG default_catalog TO ROLE ol_business_analyst;
+GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_business_analyst;"""
 
 _roles_sql = _base_roles_sql + _iceberg_roles_sql
 _role_deps: list[pulumi.Resource] = [starrocks_db_connection, *catalog_setups]
 
 _roles_drop_sql = (
     "DROP ROLE IF EXISTS readonly; DROP ROLE IF EXISTS app; DROP ROLE IF EXISTS admin;"
+    " DROP ROLE IF EXISTS ol_platform_admin; DROP ROLE IF EXISTS ol_data_engineer;"
+    " DROP ROLE IF EXISTS ol_data_analyst; DROP ROLE IF EXISTS ol_researcher;"
+    " DROP ROLE IF EXISTS ol_instructor; DROP ROLE IF EXISTS ol_business_analyst;"
 )
 
-command.local.Command(
+# Valid Keycloak ol-starrocks-client role names.  These match StarRocks role
+# names 1:1 so no translation is needed when creating OIDC user accounts.
+_GOVERNANCE_ROLES: frozenset[str] = frozenset(
+    {
+        "ol_platform_admin",
+        "ol_data_engineer",
+        "ol_data_analyst",
+        "ol_researcher",
+        "ol_instructor",
+        "ol_business_analyst",
+    }
+)
+
+# Allowlist for OIDC usernames before they are interpolated into SQL string
+# literals.  Keycloak preferred_username values are emails or short login ids;
+# restricting to this character set prevents SQL-breaking / injection input
+# (quotes, backslashes, whitespace, control characters) from reaching the
+# generated CREATE USER / GRANT statements.
+_OIDC_USERNAME_RE = re.compile(r"^[A-Za-z0-9._%+@-]+$")
+
+roles_setup_cmd = command.local.Command(
     f"starrocks-{stack_info.env_suffix}-roles-setup",
     create=_exec_sql,
     update=_exec_sql,
@@ -395,42 +511,295 @@ command.local.Command(
     opts=ResourceOptions(delete_before_replace=True, depends_on=_role_deps),
 )
 
-# --- OIDC authentication chain ----------------------------------------------
-# Sets the StarRocks FE runtime authentication chain to include OIDC when
-# oidc_enabled=true.  This is a runtime FE config change; for persistence
-# across FE restarts the applications stack Helm values must also set
-# authentication_chain in fe.conf (otherwise the change reverts on restart).
+# --- OIDC / OAuth2 authentication via Keycloak ------------------------------
+# StarRocks v3.5+ uses a "security integration" (SQL object) to hold OAuth2
+# provider settings rather than fe.conf env vars.  The integration name goes
+# directly in the authentication_chain FE config.
 #
-# Authorization: StarRocks uses its native privilege model for OIDC-
-# authenticated sessions the same as for password-authenticated ones.  OIDC
-# users must be pre-created in StarRocks (CREATE USER ... IDENTIFIED WITH
-# authentication_oidc) and assigned roles or grants before they can access
-# data.  This substructure creates the role objects (see roles-setup above)
-# but not the individual user-to-role mappings; those are managed separately.
+# The CREATE SECURITY INTEGRATION SQL is built at runtime from Vault-stored
+# credentials (client_id / client_secret) so the secret is never stored
+# in Pulumi state as plaintext — it is tainted as a Pulumi secret and
+# encrypted by the stack's AWS KMS secrets provider.
+#
+# Both create and update commands use DROP IF EXISTS + CREATE so that
+# property changes (e.g. a client secret rotation) are applied correctly.
+# StarRocks has no ALTER SECURITY INTEGRATION for OAuth2 core properties.
+#
+# Users authenticate via the browser-based OAuth2 Authorization Code flow.
+# Each human user must also be pre-created in StarRocks with:
+#   CREATE USER 'preferred_username'@'%' IDENTIFIED WITH authentication_oauth2;
+# and assigned an appropriate role.  Use starrocks:oidc_users in the stack
+# config to manage these accounts through Pulumi; users not listed there
+# must be created manually after the cluster is deployed.
+#
+# Service-account (application) access continues to use Vault dynamic
+# credentials (native StarRocks auth) and is unaffected by OIDC config.
+_OIDC_SECURITY_INTEGRATION_NAME = "keycloak_oauth2"
+
 if oidc_enabled:
-    _auth_chain_enabled = "authentication_starrocks,authentication_oidc"
-    _oidc_sql = (
-        f'ADMIN SET FRONTEND CONFIG ("authentication_chain" = "{_auth_chain_enabled}");'
+    # Read OIDC credentials from Vault. The client_secret is explicitly
+    # marked as a Pulumi secret so any derived value is stored encrypted.
+    _oidc_vault = vault_get_secret_output(
+        path="secret-operations/sso/starrocks",
+        with_lease_start_time=False,
     )
-    _oidc_disable_sql = (
-        "ADMIN SET FRONTEND CONFIG"
-        ' ("authentication_chain" = "authentication_starrocks");'
+    _oidc_issuer_url: pulumi.Output[str] = _oidc_vault.data.apply(lambda d: d["url"])
+    _oidc_client_id: pulumi.Output[str] = _oidc_vault.data.apply(
+        lambda d: d["client_id"]
     )
-    command.local.Command(
-        f"starrocks-{stack_info.env_suffix}-oidc-setup",
+    _oidc_client_secret: pulumi.Output[str] = pulumi.Output.secret(
+        _oidc_vault.data.apply(lambda d: d["client_secret"])
+    )
+    # FE OAuth2 callback endpoint; the FE HTTP port (8030) is proxied through
+    # APISIX and exposed at the domain root.
+    _oidc_redirect_url = f"https://{starrocks_config.require('domain')}/api/oauth2"
+
+    def _build_integration_sql(args: list[str]) -> str:
+        # json.dumps()[1:-1] produces a backslash-escaped string body safe for
+        # embedding inside a SQL double-quoted string literal.  This guards
+        # against values that contain double-quotes or backslashes (e.g. a
+        # rotated client_secret generated with special characters).
+        issuer = json.dumps(args[0])[1:-1]
+        client_id = json.dumps(args[1])[1:-1]
+        client_secret = json.dumps(args[2])[1:-1]
+        _n = _OIDC_SECURITY_INTEGRATION_NAME
+        return (
+            f"DROP SECURITY INTEGRATION IF EXISTS {_n};\n"
+            f"CREATE SECURITY INTEGRATION {_n} PROPERTIES (\n"
+            '    "type" = "authentication_oauth2",\n'
+            f'    "auth_server_url" = "{issuer}'
+            '/protocol/openid-connect/auth",\n'
+            f'    "token_server_url" = "{issuer}'
+            '/protocol/openid-connect/token",\n'
+            f'    "client_id" = "{client_id}",\n'
+            f'    "client_secret" = "{client_secret}",\n'
+            f'    "redirect_url" = "{_oidc_redirect_url}",\n'
+            f'    "jwks_url" = "{issuer}'
+            '/protocol/openid-connect/certs",\n'
+            '    "principal_field" = "preferred_username",\n'
+            f'    "required_issuer" = "{issuer}"\n'
+            ");"
+        )
+
+    _integration_sql: pulumi.Output[str] = pulumi.Output.all(
+        _oidc_issuer_url, _oidc_client_id, _oidc_client_secret
+    ).apply(_build_integration_sql)
+    _drop_integration_sql = (
+        f"DROP SECURITY INTEGRATION IF EXISTS {_OIDC_SECURITY_INTEGRATION_NAME};"
+    )
+
+    security_integration_cmd = command.local.Command(
+        f"starrocks-{stack_info.env_suffix}-security-integration-setup",
         create=_exec_sql,
         update=_exec_sql,
         delete=_exec_delete_sql,
         environment={
             **_mysql_env,
-            "STARROCKS_SQL": _oidc_sql,
-            "STARROCKS_DELETE_SQL": _oidc_disable_sql,
+            "STARROCKS_SQL": _integration_sql,
+            "STARROCKS_DELETE_SQL": _drop_integration_sql,
         },
-        triggers=[hashlib.sha256(_oidc_sql.encode()).hexdigest()],
+        triggers=_integration_sql.apply(
+            lambda sql: [hashlib.sha256(sql.encode()).hexdigest()]
+        ),
         opts=ResourceOptions(
             delete_before_replace=True,
             depends_on=[starrocks_db_connection],
         ),
     )
+
+    # Point the FE authentication chain at the new security integration.
+    # StarRocks persists ADMIN SET FRONTEND CONFIG changes to BDB so they
+    # survive pod restarts without requiring a fe.conf change.
+    _auth_chain = f"authentication_starrocks,{_OIDC_SECURITY_INTEGRATION_NAME}"
+    _auth_chain_sql = (
+        f'ADMIN SET FRONTEND CONFIG ("authentication_chain" = "{_auth_chain}");'
+    )
+    _auth_chain_disable_sql = (
+        "ADMIN SET FRONTEND CONFIG"
+        ' ("authentication_chain" = "authentication_starrocks");'
+    )
+    command.local.Command(
+        f"starrocks-{stack_info.env_suffix}-oidc-auth-chain-setup",
+        create=_exec_sql,
+        update=_exec_sql,
+        delete=_exec_delete_sql,
+        environment={
+            **_mysql_env,
+            "STARROCKS_SQL": _auth_chain_sql,
+            "STARROCKS_DELETE_SQL": _auth_chain_disable_sql,
+        },
+        triggers=[hashlib.sha256(_auth_chain_sql.encode()).hexdigest()],
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=[security_integration_cmd],
+        ),
+    )
+
+    # --- File group provider: automatic role assignment from Keycloak --------
+    # keycloak_group_sync.py calls the Keycloak Admin API (using the
+    # ol-starrocks-client service account, which has view-users on
+    # realm-management) to enumerate current members of each governance role
+    # and writes the result to a Kubernetes ConfigMap mounted in the FE pods.
+    # StarRocks' file group provider reads that file; combined with
+    # GRANT role TO EXTERNAL GROUP, any OAuth2-authenticated user whose
+    # preferred_username appears in the file receives the corresponding
+    # StarRocks role automatically — no starrocks:oidc_users entry needed.
+    #
+    # Upstream feature request for a native JWT-claims group provider that
+    # would eliminate the sync entirely:
+    # https://github.com/StarRocks/starrocks/issues/75224
+    _sync_script = str(Path(__file__).parent / "keycloak_group_sync.py")
+    _group_provider_name = "keycloak_file_groups"
+    _group_file_cm = f"{stack_info.env_prefix}-starrocks-oidc-groups"
+    _group_file_path = "/etc/starrocks/groups/groups.txt"
+    _k8s_namespace = "starrocks"
+
+    group_sync_cmd = command.local.Command(
+        f"starrocks-{stack_info.env_suffix}-keycloak-group-sync",
+        create=(
+            f"python3 {_sync_script}"
+            f" --namespace={_k8s_namespace}"
+            f" --configmap={_group_file_cm}"
+        ),
+        update=(
+            f"python3 {_sync_script}"
+            f" --namespace={_k8s_namespace}"
+            f" --configmap={_group_file_cm}"
+        ),
+        # On destroy the ConfigMap is owned and deleted by the applications stack;
+        # no kubectl delete needed here.
+        environment={
+            "KEYCLOAK_ISSUER_URL": _oidc_issuer_url,
+            "KEYCLOAK_CLIENT_ID": _oidc_client_id,
+            "KEYCLOAK_CLIENT_SECRET": _oidc_client_secret,
+        },
+        triggers=_integration_sql.apply(
+            lambda sql: [hashlib.sha256(sql.encode()).hexdigest()]
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=[security_integration_cmd],
+        ),
+    )
+
+    _permitted = ",".join(sorted(_GOVERNANCE_ROLES))
+    _group_provider_setup_sql = (
+        f"CREATE GROUP PROVIDER IF NOT EXISTS {_group_provider_name}\n"
+        f"PROPERTIES (\n"
+        f'    "type" = "file",\n'
+        f'    "file_path" = "{_group_file_path}"\n'
+        f");\n"
+        f"ALTER SECURITY INTEGRATION {_OIDC_SECURITY_INTEGRATION_NAME}\n"
+        f"    SET ('group_provider' = '{_group_provider_name}',"
+        f" 'permitted_groups' = '{_permitted}');\n"
+        + "\n".join(
+            f"GRANT {role} TO EXTERNAL GROUP {role};"
+            for role in sorted(_GOVERNANCE_ROLES)
+        )
+    )
+    _group_provider_drop_sql = (
+        "\n".join(
+            f"REVOKE {role} FROM EXTERNAL GROUP {role};"
+            for role in sorted(_GOVERNANCE_ROLES)
+        )
+        + f"\nDROP GROUP PROVIDER IF EXISTS {_group_provider_name};"
+    )
+
+    command.local.Command(
+        f"starrocks-{stack_info.env_suffix}-group-provider-setup",
+        create=_exec_sql,
+        update=_exec_sql,
+        delete=_exec_delete_sql,
+        environment={
+            **_mysql_env,
+            "STARROCKS_SQL": _group_provider_setup_sql,
+            "STARROCKS_DELETE_SQL": _group_provider_drop_sql,
+        },
+        triggers=[hashlib.sha256(_group_provider_setup_sql.encode()).hexdigest()],
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            # roles_setup_cmd: GRANT <role> TO EXTERNAL GROUP requires the roles
+            # to exist first.
+            depends_on=[roles_setup_cmd, security_integration_cmd, group_sync_cmd],
+        ),
+    )
+
+    # Pre-create OAuth2-authenticated user accounts from config.
+    # With the file group provider in place, manual entries here are only
+    # needed for edge-case overrides (e.g. a user who needs a different role
+    # than the one assigned in Keycloak).  New users in Keycloak with a
+    # governance role will receive that role automatically via the group
+    # provider without needing an entry here.
+    #
+    # Each entry must supply:
+    #   username    - the Keycloak preferred_username value (matches principal_field);
+    #                 whitespace is stripped, empty strings are rejected
+    #   keycloak_role - one of the six governance role names in _GOVERNANCE_ROLES
+    #                   (ol_platform_admin / ol_data_engineer / ol_data_analyst /
+    #                    ol_researcher / ol_instructor / ol_business_analyst)
+    # The keycloak_role value matches the StarRocks role name exactly (1:1 mapping).
+    # One Pulumi resource is created per user so that removing an entry from config
+    # during `pulumi up` triggers the DROP USER for that specific account.
+    # Users not listed here can be created manually:
+    #   CREATE USER 'username'@'%' IDENTIFIED WITH authentication_oauth2;
+    #   GRANT <governance_role> TO USER 'username'@'%';
+    #   ALTER USER 'username'@'%' DEFAULT ROLE <governance_role>;
+    oidc_users: list[dict[str, str]] = starrocks_config.get_object("oidc_users") or []
+    for _u in oidc_users:
+        _username = _u.get("username", "").strip()
+        _role = _u.get("keycloak_role", "").strip()
+        if not _username:
+            msg = "starrocks:oidc_users entry is missing or has a blank 'username'"
+            raise ValueError(msg)
+        if not _OIDC_USERNAME_RE.match(_username):
+            msg = (
+                f"starrocks:oidc_users entry has an invalid username '{_username}'."
+                " Usernames may only contain letters, digits, and the characters"
+                " . _ % + @ - (no quotes, whitespace, or control characters)."
+            )
+            raise ValueError(msg)
+        if _role not in _GOVERNANCE_ROLES:
+            msg = (
+                f"starrocks:oidc_users entry for '{_username}' has"
+                f" invalid keycloak_role '{_role}'."
+                f" Must be one of: {sorted(_GOVERNANCE_ROLES)}"
+            )
+            raise ValueError(msg)
+        # DROP + CREATE (rather than CREATE IF NOT EXISTS) so that re-running with
+        # a different config corrects an account that was previously created with
+        # a different auth plugin (e.g. a native-password user being migrated to
+        # OAuth2).  The username is validated against _OIDC_USERNAME_RE above, so
+        # it is safe to interpolate into these single-quoted SQL literals.
+        _user_sql = (
+            f"DROP USER IF EXISTS '{_username}'@'%';"
+            f"\nCREATE USER '{_username}'@'%'"
+            f" IDENTIFIED WITH authentication_oauth2;"
+            f"\nGRANT {_role} TO USER '{_username}'@'%';"
+            f"\nALTER USER '{_username}'@'%' DEFAULT ROLE {_role};"
+        )
+        _user_drop_sql = f"DROP USER IF EXISTS '{_username}'@'%';"
+        # Resource name: a sanitized username for human readability plus a short
+        # stable hash of the full username so that two usernames that sanitize to
+        # the same string (e.g. "a.b@x" and "a-b@x") cannot collide.
+        _sanitized = re.sub(r"[^A-Za-z0-9-]", "-", _username)
+        _name_hash = hashlib.sha256(_username.encode()).hexdigest()[:8]
+        command.local.Command(
+            f"starrocks-{stack_info.env_suffix}-oidc-user-{_sanitized}-{_name_hash}",
+            create=_exec_sql,
+            update=_exec_sql,
+            delete=_exec_delete_sql,
+            environment={
+                **_mysql_env,
+                "STARROCKS_SQL": _user_sql,
+                "STARROCKS_DELETE_SQL": _user_drop_sql,
+            },
+            triggers=[hashlib.sha256(_user_sql.encode()).hexdigest()],
+            opts=ResourceOptions(
+                delete_before_replace=True,
+                # roles_setup_cmd: GRANT <role> / DEFAULT ROLE require the role to
+                # exist before user creation runs on first deploy.
+                depends_on=[roles_setup_cmd, security_integration_cmd],
+            ),
+        )
 
 export("vault_mount_path", mount_point)
