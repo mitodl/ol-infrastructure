@@ -289,7 +289,9 @@ def fetch_all_cluster_configs(mode: AccessMode) -> list[ClusterConfig]:
     # Admin mode authenticates via the admin OIDC role but requests readonly
     # AWS credentials, which are sufficient for eks:ListClusters / DescribeCluster.
     discovery_mode = AccessMode.READONLY if mode is AccessMode.ADMIN else mode
-    discovery_credentials = load_valid_aws_credentials(discovery_mode)
+    discovery_credentials = load_valid_aws_credentials(
+        discovery_mode, block_noninteractive_login=False
+    )
     eks_client = make_eks_client(discovery_credentials)
 
     paginator = eks_client.get_paginator("list_clusters")
@@ -542,8 +544,16 @@ def cached_vault_token(mode: AccessMode) -> str | None:
     return None
 
 
-def load_valid_vault_token(mode: AccessMode) -> str:
-    """Load a cached Vault token or authenticate via OIDC."""
+def load_valid_vault_token(mode: AccessMode, block_noninteractive_login: bool = False) -> str:
+    """Load a cached Vault token or authenticate via OIDC.
+
+    Args:
+        mode: Access mode (readonly, developer, admin).
+        block_noninteractive_login: If True, raise an error when attempting to start
+            a browser OIDC login from a non-interactive environment. This prevents
+            GUI tools like Headlamp from spawning uncontrolled browser tabs. The
+            setup command should pass False to allow normal credential refresh in CI.
+    """
     oidc_role = VAULT_OIDC_ROLE_BY_MODE[mode.value]
     token_cache_path = cache_file(f"vault-token-{oidc_role}")
     token = cached_vault_token(mode)
@@ -565,7 +575,7 @@ def load_valid_vault_token(mode: AccessMode) -> str:
             )
             return token
 
-        if not exec_invocation_is_interactive():
+        if block_noninteractive_login and not exec_invocation_is_interactive():
             append_exec_debug_event(
                 "vault_login_blocked_noninteractive",
                 mode=mode.value,
@@ -621,13 +631,20 @@ def cached_aws_credentials(mode: AccessMode) -> AwsCredentialsCache | None:
     )
 
 
-def load_valid_aws_credentials(mode: AccessMode) -> AwsCredentialsCache:
+def load_valid_aws_credentials(
+    mode: AccessMode, block_noninteractive_login: bool = False
+) -> AwsCredentialsCache:
     """Load cached AWS credentials or generate fresh ones from Vault.
 
     Admin mode does not have a dedicated shared AWS role — it authenticates via
     the admin OIDC role but requests readonly AWS credentials for cluster discovery.
     The admin mode exec-credential path uses ``aws eks get-token --role`` directly
     with the per-cluster admin IAM role rather than Vault-vended STS credentials.
+
+    Args:
+        mode: Access mode (readonly, developer, admin).
+        block_noninteractive_login: Passed to load_valid_vault_token to prevent
+            browser OIDC login in non-interactive environments.
     """
     if mode is AccessMode.ADMIN:
         msg = (
@@ -652,7 +669,7 @@ def load_valid_aws_credentials(mode: AccessMode) -> AwsCredentialsCache:
             )
             return creds
 
-        token = load_valid_vault_token(mode)
+        token = load_valid_vault_token(mode, block_noninteractive_login=block_noninteractive_login)
         client = vault_client(token)
         append_exec_debug_event("aws_credentials_generate_start", mode=mode.value)
         aws_creds = client.secrets.aws.generate_credentials(
@@ -780,7 +797,9 @@ def exec_credential(
             raise RuntimeError(msg)
         command.extend(["--role", admin_role_arn])
     else:
-        credentials = load_valid_aws_credentials(mode)
+        credentials = load_valid_aws_credentials(
+            mode, block_noninteractive_login=True
+        )
         env = aws_env_from_credentials(credentials)
 
     token_json = run_command(command, env=env)

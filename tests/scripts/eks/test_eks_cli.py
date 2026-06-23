@@ -155,8 +155,8 @@ def test_load_valid_vault_token_rechecks_cache_after_lock(eks_module, monkeypatc
 
 
 @pytest.mark.unit
-def test_load_valid_vault_token_refuses_noninteractive_login(eks_module, monkeypatch):
-    """Non-interactive exec clients should not trigger browser-based OIDC login."""
+def test_load_valid_vault_token_refuses_noninteractive_login_when_blocked(eks_module, monkeypatch):
+    """Non-interactive exec clients should not trigger browser-based OIDC login when block_noninteractive_login=True."""
     monkeypatch.setattr(eks_module, "cached_vault_token", lambda _mode: None)
     monkeypatch.setattr(eks_module, "cache_lock", lambda _name: nullcontext())
     monkeypatch.setattr(eks_module, "exec_invocation_is_interactive", lambda: False)
@@ -169,7 +169,28 @@ def test_load_valid_vault_token_refuses_noninteractive_login(eks_module, monkeyp
     )
 
     with pytest.raises(RuntimeError, match="non-interactive"):
-        eks_module.load_valid_vault_token(eks_module.AccessMode.DEVELOPER)
+        eks_module.load_valid_vault_token(
+            eks_module.AccessMode.DEVELOPER, block_noninteractive_login=True
+        )
+
+
+@pytest.mark.unit
+def test_load_valid_vault_token_allows_noninteractive_login_when_not_blocked(eks_module, monkeypatch):
+    """Non-interactive setup calls should proceed to browser login when block_noninteractive_login=False."""
+    monkeypatch.setattr(eks_module, "cached_vault_token", lambda _mode: None)
+    monkeypatch.setattr(eks_module, "cache_lock", lambda _name: nullcontext())
+    monkeypatch.setattr(eks_module, "exec_invocation_is_interactive", lambda: False)
+    monkeypatch.setattr(
+        eks_module,
+        "oidc_login",
+        lambda _client, _role: "setup-token",
+    )
+    monkeypatch.setattr(eks_module, "dump_json", lambda *args, **kwargs: None)
+
+    token = eks_module.load_valid_vault_token(
+        eks_module.AccessMode.DEVELOPER, block_noninteractive_login=False
+    )
+    assert token == "setup-token"
 
 
 @pytest.mark.unit
