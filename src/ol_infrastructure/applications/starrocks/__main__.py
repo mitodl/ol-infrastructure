@@ -398,7 +398,7 @@ if starrocks_config.get_bool("oidc_enabled"):
     )
     _fe_oidc_spec = cast(dict[str, Any], starrocks_values["starrocksFESpec"])
     _fe_oidc_spec["configMaps"] = [
-        {"name": _oidc_group_cm_name, "mountPath": "/etc/starrocks/groups"}
+        {"name": _oidc_group_cm_name, "mountPath": "/opt/starrocks/fe/conf/groups"}
     ]
 
 if starrocks_config.get_bool("use_be"):

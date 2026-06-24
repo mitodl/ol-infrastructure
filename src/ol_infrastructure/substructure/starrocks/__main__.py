@@ -674,7 +674,7 @@ if oidc_enabled:
     _sync_script = str(Path(__file__).parent / "keycloak_group_sync.py")
     _group_provider_name = "keycloak_file_groups"
     _group_file_cm = f"{stack_info.env_prefix}-starrocks-oidc-groups"
-    _group_file_path = "/etc/starrocks/groups/groups.txt"
+    _group_file_path = "groups/groups.txt"
     _k8s_namespace = "starrocks"
 
     # Write the kubeconfig to a temp file so kubectl can reach the cluster.
