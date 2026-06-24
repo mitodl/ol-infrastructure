@@ -376,7 +376,7 @@ def setup_vault_provider(
     stack_info: StackInfo | None = None,
     *,
     skip_child_token: bool | None = None,
-):
+) -> pulumi_vault.Provider:
     if stack_info:
         vault_address = f"https://vault-{stack_info.env_suffix}.odl.mit.edu"
         vault_env_namespace = f"operations.{stack_info.env_suffix}"
@@ -390,4 +390,7 @@ def setup_vault_provider(
             vault_env_namespace,
             skip_child_token=skip_child_token,
         )
+    )
+    return get_vault_provider(
+        vault_address, vault_env_namespace, skip_child_token=skip_child_token
     )
