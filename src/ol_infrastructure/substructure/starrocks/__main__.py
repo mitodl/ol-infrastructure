@@ -55,9 +55,12 @@ env_name = f"data-{stack_info.env_suffix}"
 mount_point = f"database-starrocks-{stack_info.env_suffix}"
 
 cluster_stack = make_stack_reference(pulumi_projects.EKS, f"data.{stack_info.name}")
-_kube_config: pulumi.Output[str] = require_stack_output_value(
-    cluster_stack, "kube_config"
-).apply(lambda kc: json.dumps(kc) if isinstance(kc, dict) else kc)
+_kube_config_raw = require_stack_output_value(cluster_stack, "kube_config")
+_kube_config: str = (
+    json.dumps(_kube_config_raw)
+    if isinstance(_kube_config_raw, dict)
+    else _kube_config_raw
+)
 
 STARROCKS_MYSQL_PORT = 9030
 MAX_TTL = ONE_MONTH_SECONDS * 6
