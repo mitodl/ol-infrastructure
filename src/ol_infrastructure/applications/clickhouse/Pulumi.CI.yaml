@@ -5,7 +5,7 @@ config:
   clickhouse:hot_storage_size: 100Gi
   clickhouse:replicas: '1'
   clickhouse:keeper_replicas: '1'
-  clickhouse:version: 25.8.1.2953.altinitystable
+  clickhouse:version: 24.8.14.10546.altinitystable
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
   clickhouse:admin_password:

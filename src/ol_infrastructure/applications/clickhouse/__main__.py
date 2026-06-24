@@ -142,29 +142,24 @@ IO_OPTIMIZED_NODE_AFFINITY = kubernetes.core.v1.AffinityArgs(
     )
 )
 
-_QUOTA_PROFILES_XML = dedent("""\
-    <clickhouse>
-      <profiles>
-        <llmops_profile>
-          <max_memory_usage>4000000000</max_memory_usage>
-          <max_concurrent_queries_for_user>10</max_concurrent_queries_for_user>
-          <readonly>0</readonly>
-        </llmops_profile>
-      </profiles>
-      <quotas>
-        <llmops_quota>
-          <interval>
-            <duration>3600</duration>
-            <queries>1000</queries>
-            <errors>100</errors>
-            <result_rows>1000000000</result_rows>
-            <read_rows>10000000000</read_rows>
-            <execution_time>3600</execution_time>
-          </interval>
-        </llmops_quota>
-      </quotas>
-    </clickhouse>
-""")
+# Profiles and quotas are expressed in the Altinity operator's native
+# slash-path map form (configuration.profiles / configuration.quotas). The
+# operator merges these into its own generated usersd configmap, so they live
+# in the *users* configuration space (where UsersConfigAccessStorage looks them
+# up) without us having to mount anything over /etc/clickhouse-server/users.d/.
+_LLMOPS_PROFILES = {
+    "llmops_profile/max_memory_usage": "4000000000",
+    "llmops_profile/max_concurrent_queries_for_user": "10",
+    "llmops_profile/readonly": "0",
+}
+_LLMOPS_QUOTAS = {
+    "llmops_quota/interval/duration": "3600",
+    "llmops_quota/interval/queries": "1000",
+    "llmops_quota/interval/errors": "100",
+    "llmops_quota/interval/result_rows": "1000000000",
+    "llmops_quota/interval/read_rows": "10000000000",
+    "llmops_quota/interval/execution_time": "3600",
+}
 
 
 def _require_password(password_output: Output, username: str) -> Output:
@@ -426,10 +421,11 @@ def _create_clickhouse_installation(  # noqa: PLR0913
             <clickhouse>
               <storage_configuration>
                 <disks>
-                  <hot_local>
-                    <type>local</type>
-                    <path>/var/lib/clickhouse/</path>
-                  </hot_local>
+                  <!-- The hot tier uses ClickHouse's built-in "default" disk,
+                       which points at the server's main path
+                       (/var/lib/clickhouse/, the NVMe or EBS PVC). A custom
+                       local disk at that same path is rejected with
+                       UNKNOWN_ELEMENT_IN_CONFIG ("cannot be equal to <path>"). -->
                   <cold_s3>
                     <type>s3</type>
                     <endpoint>https://{bucket}.s3.amazonaws.com/data/</endpoint>
@@ -441,7 +437,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                   <tiered>
                     <volumes>
                       <hot>
-                        <disk>hot_local</disk>
+                        <disk>default</disk>
                       </hot>
                       <cold>
                         <disk>cold_s3</disk>
@@ -454,6 +450,33 @@ def _create_clickhouse_installation(  # noqa: PLR0913
             </clickhouse>
         """)
     )
+
+    # Operator-native user definitions. Password hashes are referenced from the
+    # Vault-synced K8s secret via secretKeyRef (keys: <user>_sha256); the
+    # operator reads them at reconcile and bakes them into its usersd configmap.
+    # networks/ip is left open at the ClickHouse layer because the actual access
+    # boundary is the NetworkPolicy defined below (only the LLMOps namespaces +
+    # the clickhouse namespace can reach the data ports).
+    def _secret_ref(key: str) -> dict[str, Any]:
+        return {"valueFrom": {"secretKeyRef": {"name": users_secret_name, "key": key}}}
+
+    ch_users = {
+        "admin/password_sha256_hex": _secret_ref("admin_sha256"),
+        "admin/access_management": "1",
+        "admin/profile": "default",
+        "admin/quota": "default",
+        "admin/networks/ip": ["::/0", "0.0.0.0/0"],
+        "openlit/password_sha256_hex": _secret_ref("openlit_sha256"),
+        "openlit/profile": "llmops_profile",
+        "openlit/quota": "llmops_quota",
+        "openlit/networks/ip": ["::/0", "0.0.0.0/0"],
+        "openlit/allow_databases/database": "openlit_db",
+        "opik/password_sha256_hex": _secret_ref("opik_sha256"),
+        "opik/profile": "llmops_profile",
+        "opik/quota": "llmops_quota",
+        "opik/networks/ip": ["::/0", "0.0.0.0/0"],
+        "opik/allow_databases/database": "opik_db",
+    }
 
     return Output.all(
         storage_config=storage_config_xml,
@@ -495,11 +518,20 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                     ],
                     "files": {
                         "config.d/storage.xml": kwargs["storage_config"],
-                        "config.d/quotas_profiles.xml": _QUOTA_PROFILES_XML,
                     },
                     "settings": {
                         "default_storage_policy": "tiered",
                     },
+                    # Users, profiles, and quotas are managed by the operator
+                    # (merged into its generated usersd configmap) rather than
+                    # mounted as a secret over /etc/clickhouse-server/users.d/,
+                    # which would shadow the operator's own usersd files (the
+                    # clickhouse_operator management user and base profiles).
+                    # Password hashes are pulled from the Vault-synced secret
+                    # via secretKeyRef so plaintext never enters the CHI spec.
+                    "profiles": _LLMOPS_PROFILES,
+                    "quotas": _LLMOPS_QUOTAS,
+                    "users": ch_users,
                 },
                 "templates": {
                     "podTemplates": [
@@ -523,13 +555,6 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                                                 "memory": "8Gi",
                                             },
                                         },
-                                        "volumeMounts": [
-                                            {
-                                                "name": users_secret_name,
-                                                "mountPath": "/etc/clickhouse-server/users.d/",
-                                                "readOnly": True,
-                                            }
-                                        ],
                                         "env": [
                                             {
                                                 "name": "AWS_ROLE_ARN",
@@ -540,14 +565,6 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                                                 "value": "/var/run/secrets/eks.amazonaws.com/serviceaccount/token",
                                             },
                                         ],
-                                    }
-                                ],
-                                "volumes": [
-                                    {
-                                        "name": users_secret_name,
-                                        "secret": {
-                                            "secretName": users_secret_name,
-                                        },
                                     }
                                 ],
                             },
@@ -585,11 +602,6 @@ admin_password = _require_password(
     clickhouse_config.get_secret("admin_password")
     or Output.secret("changeme"),  # pragma: allowlist secret
     "admin",
-)
-tensorzero_password = _require_password(
-    clickhouse_config.get_secret("tensorzero_password")
-    or Output.secret("changeme"),  # pragma: allowlist secret
-    "tensorzero",
 )
 openlit_password = _require_password(
     clickhouse_config.get_secret("openlit_password")
@@ -674,6 +686,10 @@ clickhouse_app = OLEKSAuthBinding(
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
         irsa_service_account_name="clickhouse",
         vault_sync_service_account_names="clickhouse-vault",
+        # The CHI pod template references serviceAccountName "clickhouse"; the
+        # component must create that ServiceAccount (with the IRSA role-arn
+        # annotation) since nothing else in the cluster does.
+        create_irsa_service_account=True,
         k8s_labels=k8s_labels,
     )
 )
@@ -701,55 +717,29 @@ vault.kv.SecretV2(
     name="credentials",
     data_json=Output.all(
         admin=admin_password,
-        tensorzero=tensorzero_password,
         openlit=openlit_password,
         opik=opik_password,
     ).apply(json.dumps),
 )
 
 ############################################################
-# VSO K8s Secret — users.xml with SHA256 password hashes
+# VSO K8s Secret — per-user SHA256 password hashes
 #
-# ClickHouse reads user config from /etc/clickhouse-server/users.d/
-# The VSO template computes SHA256 hashes of plaintext passwords using
-# Sprig's sha256sum function so that plaintext never leaves Vault.
+# The CHI references these via secretKeyRef (configuration.users), so the
+# operator merges the hashes into its own usersd configmap. We intentionally
+# do NOT render a users.xml here: mounting that file over
+# /etc/clickhouse-server/users.d/ would shadow the operator's own usersd files
+# (the clickhouse_operator management user and base profiles), which is what
+# caused the THERE_IS_NO_PROFILE crash loop.
+#
+# Each template emits a single secret key holding the SHA256 hex of the
+# plaintext password (Sprig's sha256sum), so plaintext never leaves Vault.
 ############################################################
-USERS_XML_TEMPLATE = dedent("""\
-    <clickhouse>
-      <users>
-        <admin>
-          <password_sha256_hex>{{ get .Secrets "admin" | sha256sum }}</password_sha256_hex>
-          <access_management>1</access_management>
-          <profile>default</profile>
-          <quota>default</quota>
-        </admin>
-        <tensorzero>
-          <password_sha256_hex>{{ get .Secrets "tensorzero" | sha256sum }}</password_sha256_hex>
-          <profile>llmops_profile</profile>
-          <quota>llmops_quota</quota>
-          <allow_databases>
-            <database>tensorzero_db</database>
-          </allow_databases>
-        </tensorzero>
-        <openlit>
-          <password_sha256_hex>{{ get .Secrets "openlit" | sha256sum }}</password_sha256_hex>
-          <profile>llmops_profile</profile>
-          <quota>llmops_quota</quota>
-          <allow_databases>
-            <database>openlit_db</database>
-          </allow_databases>
-        </openlit>
-        <opik>
-          <password_sha256_hex>{{ get .Secrets "opik" | sha256sum }}</password_sha256_hex>
-          <profile>llmops_profile</profile>
-          <quota>llmops_quota</quota>
-          <allow_databases>
-            <database>opik_db</database>
-          </allow_databases>
-        </opik>
-      </users>
-    </clickhouse>
-""")
+USERS_HASH_TEMPLATES = {
+    "admin_sha256": '{{ get .Secrets "admin" | sha256sum }}',
+    "openlit_sha256": '{{ get .Secrets "openlit" | sha256sum }}',
+    "opik_sha256": '{{ get .Secrets "opik" | sha256sum }}',
+}
 
 users_secret_name = "clickhouse-users"  # pragma: allowlist secret  # noqa: S105
 users_secret = OLVaultK8SSecret(
@@ -764,7 +754,7 @@ users_secret = OLVaultK8SSecret(
         mount=clickhouse_vault_kv_path,
         mount_type="kv-v2",
         path="credentials",
-        templates={"users.xml": USERS_XML_TEMPLATE},
+        templates=USERS_HASH_TEMPLATES,
         refresh_after="1h",
         vaultauth=clickhouse_app.vault_k8s_resources.auth_name,
     ),
@@ -800,11 +790,12 @@ keeper_installation = _create_clickhouse_keeper_installation(
 # creates StatefulSets, Services, and ConfigMaps accordingly.
 #
 # Storage policy:
-#   hot_local  (NVMe or EBS PVC at /var/lib/clickhouse/) — fast writes
-#   cold_s3    (S3 bucket, IRSA credentials via pod service account)
+#   default  (built-in disk = NVMe or EBS PVC at /var/lib/clickhouse/) — fast writes
+#   cold_s3  (S3 bucket, IRSA credentials via pod service account)
 #
-# Users/databases are NOT defined here; they come from the users.xml K8s secret
-# volume-mounted at /etc/clickhouse-server/users.d/.
+# Users, profiles, and quotas are defined in the CHI configuration above and
+# managed by the operator; password hashes are pulled from the Vault-synced
+# K8s secret via secretKeyRef (no secret volume is mounted over users.d/).
 ############################################################
 clickhouse_installation = _create_clickhouse_installation(
     env_suffix=stack_info.env_suffix,
@@ -831,9 +822,9 @@ clickhouse_installation = _create_clickhouse_installation(
 #
 #   kubectl exec -it chi-clickhouse-default-0-0 -n clickhouse -- \
 #     clickhouse-client --user admin --password <admin_password> \
-#     --query "CREATE DATABASE IF NOT EXISTS tensorzero_db"
-#
-# Required databases: tensorzero_db, openlit_db, opik_db
+#     --query "CREATE DATABASE IF NOT EXISTS openlit_db"
+#   # Repeat for: opik_db
+# Required databases: openlit_db, opik_db
 ############################################################
 
 ############################################################
