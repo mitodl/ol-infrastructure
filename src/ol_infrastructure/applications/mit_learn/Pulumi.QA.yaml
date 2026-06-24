@@ -114,6 +114,8 @@ config:
     TIKA_SERVER_ENDPOINT: "https://tika-qa.ol.mit.edu"
     UWSGI_THREADS: 15
     UWSGI_WORKERS: 3
+    VECTOR_HYBRID_SEARCH_PREFETCH_MULTIPLIER: 3
+    VECTOR_HYBRID_SEARCH_PREFETCH_MAX_LIMIT: 300
     YOUTUBE_CONFIG_URL: "https://raw.githubusercontent.com/mitodl/open-video-data/main/youtube/channels.yaml"
   mitlearn:zendesk_help_url: "mitlearn.zendesk.com"
   redis:password:
