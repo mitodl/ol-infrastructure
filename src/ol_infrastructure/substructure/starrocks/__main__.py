@@ -594,8 +594,8 @@ if oidc_enabled:
     # The delete step uses _exec_delete_sql which propagates errors normally.
     _exec_integration_sql = (
         f"{_mysql_opts_setup}"
-        f" && printf 'DROP SECURITY INTEGRATION {_OIDC_SECURITY_INTEGRATION_NAME};'"
-        f" | {_mysql_client} 2>/dev/null; true"
+        f" && {{ printf 'DROP SECURITY INTEGRATION {_OIDC_SECURITY_INTEGRATION_NAME};'"
+        f" | {_mysql_client} 2>/dev/null || true; }}"
         f" && printf '%s' \"$STARROCKS_SQL\" | {_mysql_client}"
         f"; {_mysql_opts_cleanup}"
     )
