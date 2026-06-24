@@ -78,6 +78,7 @@ from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
 )
+from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -1729,6 +1730,47 @@ learn_external_service_apisix_route = OLApisixRoute(
     ),
 )
 
+
+# VPA objects for mit-learn workloads.
+# Webapp has a CPU-based HPA, so VPA must not control CPU (would distort HPA utilization signals).
+# Celery workers and beat are scaled via KEDA (Redis queue depth), so CPU+memory VPA is safe.
+_worker_vpa_bounds = {
+    "min_allowed": {"cpu": "25m", "memory": "128Mi"},
+    "max_allowed": {"cpu": "1000m", "memory": "3Gi"},
+}
+make_vpa(
+    name="mitlearn-webapp-vpa",
+    namespace=learn_namespace,
+    target_kind="Deployment",
+    target_name=mitlearn_k8s_app.webapp_deployment_name,
+    controlled_resources=["memory"],
+    container_name="mitlearn-app",
+    min_allowed={"memory": "256Mi"},
+    max_allowed={"memory": "4Gi"},
+    opts=ResourceOptions(depends_on=[mitlearn_k8s_app]),
+)
+for _celery_name in mitlearn_k8s_app.celery_deployment_names:
+    make_vpa(
+        name=f"{_celery_name}-vpa",
+        namespace=learn_namespace,
+        target_kind="Deployment",
+        target_name=_celery_name,
+        controlled_resources=["cpu", "memory"],
+        container_name="celery-worker",
+        **_worker_vpa_bounds,
+        opts=ResourceOptions(depends_on=[mitlearn_k8s_app]),
+    )
+if mitlearn_k8s_app.beat_deployment_name:
+    make_vpa(
+        name=f"{mitlearn_k8s_app.beat_deployment_name}-vpa",
+        namespace=learn_namespace,
+        target_kind="Deployment",
+        target_name=mitlearn_k8s_app.beat_deployment_name,
+        controlled_resources=["cpu", "memory"],
+        container_name="celery-worker",
+        **_worker_vpa_bounds,
+        opts=ResourceOptions(depends_on=[mitlearn_k8s_app]),
+    )
 
 export(
     "mit_learn",
