@@ -108,9 +108,6 @@ openlit_vault_policy = vault.Policy(
 path "secret-clickhouse/data/credentials" {
   capabilities = ["read"]
 }
-path "secret-clickhouse/credentials" {
-  capabilities = ["read"]
-}
 """,
 )
 
