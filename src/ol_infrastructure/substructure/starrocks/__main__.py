@@ -622,13 +622,12 @@ if oidc_enabled:
     # Point the FE authentication chain at the new security integration.
     # StarRocks persists ADMIN SET FRONTEND CONFIG changes to BDB so they
     # survive pod restarts without requiring a fe.conf change.
-    _auth_chain = f"authentication_starrocks,{_OIDC_SECURITY_INTEGRATION_NAME}"
+    _auth_chain = f"native,{_OIDC_SECURITY_INTEGRATION_NAME}"
     _auth_chain_sql = (
         f'ADMIN SET FRONTEND CONFIG ("authentication_chain" = "{_auth_chain}");'
     )
     _auth_chain_disable_sql = (
-        "ADMIN SET FRONTEND CONFIG"
-        ' ("authentication_chain" = "authentication_starrocks");'
+        'ADMIN SET FRONTEND CONFIG ("authentication_chain" = "native");'
     )
     command.local.Command(
         f"starrocks-{stack_info.env_suffix}-oidc-auth-chain-setup",
