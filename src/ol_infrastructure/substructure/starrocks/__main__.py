@@ -565,7 +565,6 @@ if oidc_enabled:
         client_secret = json.dumps(args[2])[1:-1]
         _n = _OIDC_SECURITY_INTEGRATION_NAME
         return (
-            f"DROP SECURITY INTEGRATION IF EXISTS {_n};\n"
             f"CREATE SECURITY INTEGRATION {_n} PROPERTIES (\n"
             '    "type" = "authentication_oauth2",\n'
             f'    "auth_server_url" = "{issuer}'
@@ -586,13 +585,25 @@ if oidc_enabled:
         _oidc_issuer_url, _oidc_client_id, _oidc_client_secret
     ).apply(_build_integration_sql)
     _drop_integration_sql = (
-        f"DROP SECURITY INTEGRATION IF EXISTS {_OIDC_SECURITY_INTEGRATION_NAME};"
+        f"DROP SECURITY INTEGRATION {_OIDC_SECURITY_INTEGRATION_NAME};"
+    )
+
+    # StarRocks does not support DROP SECURITY INTEGRATION IF EXISTS, so the
+    # create/update step silences the drop error (expected on first deploy when
+    # the integration does not yet exist) then unconditionally runs the CREATE.
+    # The delete step uses _exec_delete_sql which propagates errors normally.
+    _exec_integration_sql = (
+        f"{_mysql_opts_setup}"
+        f" && {{ printf 'DROP SECURITY INTEGRATION {_OIDC_SECURITY_INTEGRATION_NAME};'"
+        f" | {_mysql_client} 2>/dev/null || true; }}"
+        f" && printf '%s' \"$STARROCKS_SQL\" | {_mysql_client}"
+        f"; {_mysql_opts_cleanup}"
     )
 
     security_integration_cmd = command.local.Command(
         f"starrocks-{stack_info.env_suffix}-security-integration-setup",
-        create=_exec_sql,
-        update=_exec_sql,
+        create=_exec_integration_sql,
+        update=_exec_integration_sql,
         delete=_exec_delete_sql,
         environment={
             **_mysql_env,
