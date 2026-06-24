@@ -631,6 +631,44 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         ],
         opts=resource_options,
     )
+
+    # Public client for CLI / developer PKCE flows (no client secret required).
+    # Used by the starrocks-auth helper script to obtain access tokens for
+    # interactive dbt runs and direct mysql connections without exposing the
+    # confidential client secret outside of Vault.
+    ol_data_platform_starrocks_cli_client = keycloak.openid.Client(
+        "ol-data-platform-starrocks-cli-client",
+        name="ol-data-platform-starrocks-cli-client",
+        realm_id=ol_data_platform_realm.id,
+        client_id="ol-starrocks-cli",
+        enabled=True,
+        access_type="PUBLIC",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        direct_access_grants_enabled=False,
+        service_accounts_enabled=False,
+        valid_redirect_uris=[
+            "http://localhost:18080/callback",
+            "http://localhost:*/callback",
+            "http://127.0.0.1:18080/callback",
+        ],
+        web_origins=["+"],
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    keycloak.openid.ClientDefaultScopes(
+        "ol-data-platform-starrocks-cli-client-default-scopes",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_starrocks_cli_client.id,
+        default_scopes=[
+            "acr",
+            "basic",
+            "email",
+            "profile",
+            "roles",
+            "web-origins",
+        ],
+        opts=resource_options,
+    )
     # STARROCKS [END] # noqa: ERA001
 
     # MARIMO [START] # noqa: ERA001
