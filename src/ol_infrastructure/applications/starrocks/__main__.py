@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pulumi_kubernetes as kubernetes
+import pulumi_vault
 from pulumi import Config, Output, ResourceOptions, export
 from pulumi_aws import iam
 
@@ -562,8 +563,16 @@ _FE_CONFIG_BASE = (
 )
 
 
-def _build_fe_config(pwd: str | None, force_str: str, bucket_name: str | None) -> str:
-    """Assemble a complete fe.conf from optional SSL and shared-data sections.
+def _build_fe_config(  # noqa: PLR0913
+    pwd: str | None,
+    force_str: str,
+    bucket_name: str | None,
+    oidc_issuer_url: str | None = None,
+    oidc_client_id: str | None = None,
+    oidc_client_secret: str | None = None,
+    oidc_redirect_url: str | None = None,
+) -> str:
+    """Assemble a complete fe.conf from optional SSL, shared-data, and OIDC sections.
 
     Both sections are optional and can be combined.  When neither is active the
     caller should not set starrocksFESpec.config at all (chart defaults apply).
@@ -579,8 +588,27 @@ def _build_fe_config(pwd: str | None, force_str: str, bucket_name: str | None) -
     StarRocks' config parser is line-oriented, so embedded newlines or
     leading/trailing whitespace would silently break the generated file and
     prevent FE startup.
+
+    When oidc_issuer_url is provided, the full set of oauth2_* FE params is
+    written so that the StarRocks web UI shows the "OAuth2 Login" button.
+    The client secret ends up in a ConfigMap (StarRocks Helm chart limitation);
+    access is RBAC-gated and marked as a Pulumi secret so it is not stored
+    in plaintext Pulumi state.
     """
     conf = _FE_CONFIG_BASE
+
+    if oidc_issuer_url is not None:
+        _oidc_base = f"{oidc_issuer_url}/protocol/openid-connect"
+        conf += (
+            f"oauth2_auth_server_url = {_oidc_base}/auth\n"
+            f"oauth2_token_server_url = {_oidc_base}/token\n"
+            f"oauth2_client_id = {oidc_client_id}\n"
+            f"oauth2_client_secret = {oidc_client_secret}\n"
+            f"oauth2_redirect_url = {oidc_redirect_url}\n"
+            f"oauth2_jwks_url = {_oidc_base}/certs\n"
+            f"oauth2_required_issuer = {oidc_issuer_url}\n"
+            f"oauth2_required_audience = {oidc_client_id}\n"
+        )
 
     if bucket_name is not None:
         # shared_data (CN) mode: FE manages all tablet storage in S3.
@@ -631,16 +659,53 @@ _needs_fe_config = (
 if _needs_fe_config:
     _force_str = "TRUE" if ssl_force_secure_transport else "FALSE"
     fe_spec = cast(dict[str, Any], starrocks_values["starrocksFESpec"])
+    _domain = starrocks_config.require("domain")
+
+    # Pull OIDC client credentials from Vault when OIDC is enabled so the FE web
+    # UI can display the "OAuth2 Login" button (requires oauth2_* in fe.conf).
+    _oidc_vault_data: Output | None = None
+    if starrocks_config.get_bool("oidc_enabled"):
+        _oidc_vault_data = pulumi_vault.generic.get_secret_output(
+            path="secret-operations/sso/starrocks",
+            with_lease_start_time=False,
+        ).data
 
     if ssl_enabled and ssl_keystore_password is not None:
         fe_spec["secrets"] = [
             {"name": starrocks_tls_secret_name, "mountPath": "/etc/starrocks/ssl"}
         ]
-        fe_spec["config"] = ssl_keystore_password.apply(
-            lambda pwd: _build_fe_config(pwd, _force_str, shared_data_bucket_name)
+        if _oidc_vault_data is not None:
+            fe_spec["config"] = Output.all(
+                pwd=ssl_keystore_password, oidc=_oidc_vault_data
+            ).apply(
+                lambda args: _build_fe_config(
+                    args["pwd"],
+                    _force_str,
+                    shared_data_bucket_name,
+                    oidc_issuer_url=args["oidc"]["url"],
+                    oidc_client_id=args["oidc"]["client_id"],
+                    oidc_client_secret=args["oidc"]["client_secret"],
+                    oidc_redirect_url=f"https://{_domain}/api/oauth2",
+                )
+            )
+        else:
+            fe_spec["config"] = ssl_keystore_password.apply(
+                lambda pwd: _build_fe_config(pwd, _force_str, shared_data_bucket_name)
+            )
+    elif _oidc_vault_data is not None:
+        fe_spec["config"] = _oidc_vault_data.apply(
+            lambda oidc: _build_fe_config(
+                None,
+                _force_str,
+                shared_data_bucket_name,
+                oidc_issuer_url=oidc["url"],
+                oidc_client_id=oidc["client_id"],
+                oidc_client_secret=oidc["client_secret"],
+                oidc_redirect_url=f"https://{_domain}/api/oauth2",
+            )
         )
     else:
-        # CN-only path (no SSL): no Output dependencies, build synchronously.
+        # CN-only path (no SSL, no OIDC): no Output dependencies, build synchronously.
         fe_spec["config"] = _build_fe_config(None, _force_str, shared_data_bucket_name)
 
 starrocks_release = kubernetes.helm.v3.Release(
