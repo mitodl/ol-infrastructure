@@ -822,9 +822,9 @@ clickhouse_installation = _create_clickhouse_installation(
 #
 #   kubectl exec -it chi-clickhouse-default-0-0 -n clickhouse -- \
 #     clickhouse-client --user admin --password <admin_password> \
-#     --query "CREATE DATABASE IF NOT EXISTS opik_db"
-#
-# Required databases: tensorzero_db, openlit_db, opik_db
+#     --query "CREATE DATABASE IF NOT EXISTS openlit_db"
+#   # Repeat for: opik_db
+# Required databases: openlit_db, opik_db
 ############################################################
 
 ############################################################
