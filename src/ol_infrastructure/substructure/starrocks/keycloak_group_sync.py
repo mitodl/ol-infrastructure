@@ -127,7 +127,7 @@ def main() -> None:
         "data": {"groups.txt": "\n".join(lines)},
     }
     result = subprocess.run(
-        ["kubectl", "apply", "-f", "-"],  # noqa: S607
+        ["kubectl", "apply", "--validate=false", "-f", "-"],  # noqa: S607
         input=json.dumps(manifest).encode(),
         capture_output=True,
         check=False,
