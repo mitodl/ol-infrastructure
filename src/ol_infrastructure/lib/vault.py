@@ -331,7 +331,7 @@ def get_vault_provider(
     vault_env_namespace: str,
     provider_name: str | None = None,
     skip_child_token: bool | None = None,  # noqa: FBT001
-) -> pulumi.ResourceTransformationResult:
+) -> pulumi_vault.Provider:
     pulumi_vault_creds = read_yaml_secrets(
         Path().joinpath(
             # We are forcing the assumption that the Vault cluster is in the operations
