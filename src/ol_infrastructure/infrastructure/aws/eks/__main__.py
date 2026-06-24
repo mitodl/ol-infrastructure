@@ -115,6 +115,7 @@ vault_stack = make_stack_reference(
 )
 vault_auth_stack = make_stack_reference(projects.VAULT_AUTH, "operations.Production")
 concourse_stack = make_stack_reference(projects.CONCOURSE, "Production")
+concourse_qa_stack = make_stack_reference(projects.CONCOURSE, "QA")
 
 business_unit = env_config.require("business_unit") or "operations"
 target_vpc = network_stack.require_output(env_config.require("target_vpc"))
@@ -199,10 +200,11 @@ default_assume_role_policy = {
 # This also lets concourse be a cluster administrator
 #
 # We hook adminsitrators directly by username ARNs
-admin_assume_role_policy_document = concourse_stack.require_output(
-    "infra-instance-role-arn"
+admin_assume_role_policy_document = Output.all(
+    prod_arn=concourse_stack.require_output("infra-instance-role-arn"),
+    qa_arn=concourse_qa_stack.require_output("infra-instance-role-arn"),
 ).apply(
-    lambda arn: json.dumps(
+    lambda arns: json.dumps(
         {
             "Version": IAM_POLICY_VERSION,
             "Statement": [
@@ -215,7 +217,7 @@ admin_assume_role_policy_document = concourse_stack.require_output(
                             f"arn:aws:iam::{aws_account.account_id}:user/{username}"
                             for username in EKS_ADMIN_USERNAMES
                         ]
-                        + [arn],
+                        + [arns["prod_arn"], arns["qa_arn"]],
                     },
                 }
             ],
