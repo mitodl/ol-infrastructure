@@ -547,6 +547,7 @@ roles_setup_cmd = command.local.Command(
 # Service-account (application) access continues to use Vault dynamic
 # credentials (native StarRocks auth) and is unaffected by OIDC config.
 _OIDC_SECURITY_INTEGRATION_NAME = "keycloak_oauth2"
+_JWT_SECURITY_INTEGRATION_NAME = "keycloak_jwt"
 
 if oidc_enabled:
     # Read OIDC credentials from Vault. The client_secret is explicitly
@@ -612,7 +613,7 @@ if oidc_enabled:
         f"; {_mysql_opts_cleanup}"
     )
 
-    security_integration_cmd = command.local.Command(
+    oauth2_security_integration_cmd = command.local.Command(
         f"starrocks-{stack_info.env_suffix}-security-integration-setup",
         create=_exec_integration_sql,
         update=_exec_integration_sql,
@@ -631,10 +632,71 @@ if oidc_enabled:
         ),
     )
 
-    # Point the FE authentication chain at the new security integration.
+    # JWT Security Integration — authentication_jwt (client-plugin flow).
+    # The MySQL client acquires the id_token independently (e.g. via the
+    # starrocks-auth PKCE script) and sends it over the MySQL wire using
+    # the authentication_openid_connect_client plugin (MySQL 9.2+).
+    # StarRocks verifies the id_token signature against the JWKS and maps
+    # preferred_username to the StarRocks identity.
+    #
+    # This coexists with keycloak_oauth2 so that:
+    #   - Web UI users: keycloak_oauth2 (browser OAuth2 redirect)
+    #   - mysql CLI users: keycloak_jwt (pre-fetched id_token via starrocks-auth)
+    # The id_token stored on the connection context is also forwarded to
+    # Iceberg REST catalogs when iceberg.catalog.security = JWT, enabling
+    # per-user identity delegation to the catalog.
+    def _build_jwt_integration_sql(args: list[str]) -> str:
+        issuer = json.dumps(args[0])[1:-1]
+        _n = _JWT_SECURITY_INTEGRATION_NAME
+        return (
+            f"CREATE SECURITY INTEGRATION {_n} PROPERTIES (\n"
+            '    "type" = "authentication_jwt",\n'
+            f'    "jwks_url" = "{issuer}/protocol/openid-connect/certs",\n'
+            '    "principal_field" = "preferred_username",\n'
+            f'    "required_issuer" = "{issuer}"\n'
+            ");"
+        )
+
+    _jwt_integration_sql: pulumi.Output[str] = _oidc_issuer_url.apply(
+        lambda issuer: _build_jwt_integration_sql([issuer])
+    )
+    _drop_jwt_integration_sql = (
+        f"DROP SECURITY INTEGRATION {_JWT_SECURITY_INTEGRATION_NAME};"
+    )
+    _exec_jwt_integration_sql = (
+        f"{_mysql_opts_setup}"
+        f" && {{ printf 'DROP SECURITY INTEGRATION {_JWT_SECURITY_INTEGRATION_NAME};'"
+        f" | {_mysql_client} 2>/dev/null || true; }}"
+        f" && printf '%s' \"$STARROCKS_SQL\" | {_mysql_client}"
+        f"; {_mysql_opts_cleanup}"
+    )
+    jwt_security_integration_cmd = command.local.Command(
+        f"starrocks-{stack_info.env_suffix}-jwt-security-integration-setup",
+        create=_exec_jwt_integration_sql,
+        update=_exec_jwt_integration_sql,
+        delete=_exec_delete_sql,
+        environment={
+            **_mysql_env,
+            "STARROCKS_SQL": _jwt_integration_sql,
+            "STARROCKS_DELETE_SQL": _drop_jwt_integration_sql,
+        },
+        triggers=_jwt_integration_sql.apply(
+            lambda sql: [hashlib.sha256(sql.encode()).hexdigest()]
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=[starrocks_db_connection],
+        ),
+    )
+
+    # Point the FE authentication chain at both security integrations.
+    # keycloak_oauth2: web UI browser-redirect OAuth2 flow
+    # keycloak_jwt:    mysql CLI client-plugin flow (id_token pre-fetched)
     # StarRocks persists ADMIN SET FRONTEND CONFIG changes to BDB so they
     # survive pod restarts without requiring a fe.conf change.
-    _auth_chain = f"native,{_OIDC_SECURITY_INTEGRATION_NAME}"
+    _auth_chain = (
+        f"native,{_OIDC_SECURITY_INTEGRATION_NAME},{_JWT_SECURITY_INTEGRATION_NAME}"
+    )
     _auth_chain_sql = (
         f'ADMIN SET FRONTEND CONFIG ("authentication_chain" = "{_auth_chain}");'
     )
@@ -654,7 +716,7 @@ if oidc_enabled:
         triggers=[hashlib.sha256(_auth_chain_sql.encode()).hexdigest()],
         opts=ResourceOptions(
             delete_before_replace=True,
-            depends_on=[security_integration_cmd],
+            depends_on=[oauth2_security_integration_cmd, jwt_security_integration_cmd],
         ),
     )
 
@@ -706,7 +768,7 @@ if oidc_enabled:
         ),
         opts=ResourceOptions(
             delete_before_replace=True,
-            depends_on=[security_integration_cmd],
+            depends_on=[oauth2_security_integration_cmd],
         ),
     )
 
@@ -717,7 +779,14 @@ if oidc_enabled:
         f'    "type" = "file",\n'
         f'    "group_file_url" = "{_group_file_path}"\n'
         f");\n"
+        # Attach the group provider to both Security Integrations so that
+        # role assignment from Keycloak groups works regardless of whether
+        # the user authenticated via the web UI (keycloak_oauth2) or the
+        # mysql CLI client-plugin flow (keycloak_jwt).
         f"ALTER SECURITY INTEGRATION {_OIDC_SECURITY_INTEGRATION_NAME}\n"
+        f"    SET ('group_provider' = '{_group_provider_name}',"
+        f" 'permitted_groups' = '{_permitted}');\n"
+        f"ALTER SECURITY INTEGRATION {_JWT_SECURITY_INTEGRATION_NAME}\n"
         f"    SET ('group_provider' = '{_group_provider_name}',"
         f" 'permitted_groups' = '{_permitted}');\n"
         + "\n".join(
@@ -748,7 +817,12 @@ if oidc_enabled:
             delete_before_replace=True,
             # roles_setup_cmd: GRANT <role> TO EXTERNAL GROUP requires the roles
             # to exist first.
-            depends_on=[roles_setup_cmd, security_integration_cmd, group_sync_cmd],
+            depends_on=[
+                roles_setup_cmd,
+                oauth2_security_integration_cmd,
+                jwt_security_integration_cmd,
+                group_sync_cmd,
+            ],
         ),
     )
 
@@ -769,7 +843,7 @@ if oidc_enabled:
     # One Pulumi resource is created per user so that removing an entry from config
     # during `pulumi up` triggers the DROP USER for that specific account.
     # Users not listed here can be created manually:
-    #   CREATE USER 'username'@'%' IDENTIFIED WITH authentication_oauth2;
+    #   CREATE USER 'username'@'%' IDENTIFIED WITH authentication_jwt;
     #   GRANT <governance_role> TO USER 'username'@'%';
     #   ALTER USER 'username'@'%' DEFAULT ROLE <governance_role>;
     oidc_users: list[dict[str, str]] = starrocks_config.get_object("oidc_users") or []
@@ -801,7 +875,7 @@ if oidc_enabled:
         _user_sql = (
             f"DROP USER IF EXISTS '{_username}'@'%';"
             f"\nCREATE USER '{_username}'@'%'"
-            f" IDENTIFIED WITH authentication_oauth2;"
+            f" IDENTIFIED WITH authentication_jwt;"
             f"\nGRANT {_role} TO USER '{_username}'@'%';"
             f"\nALTER USER '{_username}'@'%' DEFAULT ROLE {_role};"
         )
@@ -826,7 +900,11 @@ if oidc_enabled:
                 delete_before_replace=True,
                 # roles_setup_cmd: GRANT <role> / DEFAULT ROLE require the role to
                 # exist before user creation runs on first deploy.
-                depends_on=[roles_setup_cmd, security_integration_cmd],
+                depends_on=[
+                    roles_setup_cmd,
+                    oauth2_security_integration_cmd,
+                    jwt_security_integration_cmd,
+                ],
             ),
         )
 

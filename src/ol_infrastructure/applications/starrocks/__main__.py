@@ -557,9 +557,10 @@ _FE_CONFIG_BASE = (
     "background_refresh_metadata_interval_millis"
     f" = {fe_background_refresh_interval_ms}\n"
     # Keycloak exposes preferred_username (human-readable) rather than sub (UUID).
-    # Set this FE-level default so OAuth2/JWT-authenticated sessions map to the
-    # same username regardless of per-user settings.
+    # Set FE-level defaults so both the OAuth2 browser-redirect flow and the JWT
+    # client-plugin flow map to the same username regardless of per-user settings.
     "oauth2_principal_field = preferred_username\n"
+    "jwt_principal_field = preferred_username\n"
 )
 
 
@@ -600,6 +601,10 @@ def _build_fe_config(  # noqa: PLR0913
     if oidc_issuer_url is not None:
         _oidc_base = f"{oidc_issuer_url}/protocol/openid-connect"
         conf += (
+            # oauth2_* — web UI "OAuth2 Login" button (browser-redirect flow).
+            # StarRocks FE exchanges the authorization code server-side using
+            # these credentials; the id_token is stored on the connection context
+            # and forwarded to Iceberg REST catalogs when security = JWT.
             f"oauth2_auth_server_url = {_oidc_base}/auth\n"
             f"oauth2_token_server_url = {_oidc_base}/token\n"
             f"oauth2_client_id = {oidc_client_id}\n"
@@ -608,6 +613,14 @@ def _build_fe_config(  # noqa: PLR0913
             f"oauth2_jwks_url = {_oidc_base}/certs\n"
             f"oauth2_required_issuer = {oidc_issuer_url}\n"
             f"oauth2_required_audience = {oidc_client_id}\n"
+            # jwt_* — mysql CLI client-plugin flow (authentication_jwt).
+            # The client pre-fetches an id_token (e.g. via starrocks-auth PKCE)
+            # and sends it over the MySQL wire using the
+            # authentication_openid_connect_client plugin (MySQL 9.2+).
+            # No client_secret needed; the server verifies the JWT signature
+            # against the JWKS and maps preferred_username to the SR identity.
+            f"jwt_jwks_url = {_oidc_base}/certs\n"
+            f"jwt_required_issuer = {oidc_issuer_url}\n"
         )
 
     if bucket_name is not None:
