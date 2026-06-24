@@ -66,7 +66,7 @@ STARROCKS_OPERATOR_CHART_VERSION = "1.11.5"
 # renovate: datasource=helm depName=operator packageName=starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
 STARROCKS_CHART_VERSION = "1.11.5"
 # renovate: datasource=docker depName=starrocks packageName=starrocks/fe-ubuntu
-STARROCKS_VERSION = "4.1.2"
+STARROCKS_VERSION = "4.1.1"
 # renovate: datasource=github-releases depName=starrocks-vault-plugin packageName=mitodl/vault-plugin-database-starrocks
 VAULT_PLUGIN_STARROCKS_VERSION = "0.1.0"
 VAULT_PLUGIN_STARROCKS_SHA256 = "3a737897b3c37eb61cab0b6b2804bd711dde7d31b308cf325f88138c0a111955"  # pragma: allowlist secret
