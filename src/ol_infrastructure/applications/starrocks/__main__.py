@@ -6,7 +6,7 @@ from typing import Any, cast
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault
-from pulumi import Config, Output, ResourceOptions, export
+from pulumi import Config, InvokeOptions, Output, ResourceOptions, export
 from pulumi_aws import iam
 
 from bridge.lib.versions import STARROCKS_CHART_VERSION, STARROCKS_VERSION
@@ -47,7 +47,7 @@ from ol_infrastructure.lib.pulumi_helper import (
 )
 from ol_infrastructure.lib.vault import setup_vault_provider
 
-setup_vault_provider()
+_vault_provider = setup_vault_provider()
 stack_info = parse_stack()
 starrocks_config = Config("starrocks")
 
@@ -668,6 +668,7 @@ if _needs_fe_config:
         _oidc_vault_data = pulumi_vault.generic.get_secret_output(
             path="secret-operations/sso/starrocks",
             with_lease_start_time=False,
+            opts=InvokeOptions(provider=_vault_provider),
         ).data
 
     if ssl_enabled and ssl_keystore_password is not None:
