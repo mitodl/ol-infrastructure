@@ -715,7 +715,7 @@ if oidc_enabled:
         f"CREATE GROUP PROVIDER IF NOT EXISTS {_group_provider_name}\n"
         f"PROPERTIES (\n"
         f'    "type" = "file",\n'
-        f'    "group_file_url" = "file://{_group_file_path}"\n'
+        f'    "group_file_url" = "{_group_file_path}"\n'
         f");\n"
         f"ALTER SECURITY INTEGRATION {_OIDC_SECURITY_INTEGRATION_NAME}\n"
         f"    SET ('group_provider' = '{_group_provider_name}',"
