@@ -475,7 +475,13 @@ def _create_clickhouse_installation(  # noqa: PLR0913
         "opik/profile": "llmops_profile",
         "opik/quota": "llmops_quota",
         "opik/networks/ip": ["::/0", "0.0.0.0/0"],
-        "opik/allow_databases/database": "opik_db",
+        # ``default`` is required in addition to ``opik_db``: opik's Liquibase
+        # migrations hard-code the DATABASECHANGELOG / DATABASECHANGELOGLOCK
+        # bookkeeping tables (and the replicated ``...1`` shadow tables from
+        # 000017_change_tables_to_replicated) into the ``default`` database,
+        # while application tables live in ``opik_db``. ``default`` is otherwise
+        # an unused scratch database in this cluster.
+        "opik/allow_databases/database": ["opik_db", "default"],
     }
 
     return Output.all(
