@@ -1,0 +1,10 @@
+---
+name: ol-application-opik
+runtime: python
+description: >
+  Deploy the Opik LLM observability platform (Comet) on the data EKS cluster.
+  Installs the upstream opik/opik Helm chart wired to the shared multi-tenant
+  ClickHouse cluster, with bundled MySQL, Redis, and MinIO for state, cache,
+  and object storage.
+backend:
+  url: s3://mitol-pulumi-state/

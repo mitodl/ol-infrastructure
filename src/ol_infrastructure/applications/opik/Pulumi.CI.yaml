@@ -1,0 +1,8 @@
+---
+config:
+  consul:address: https://consul-data-ci.odl.mit.edu
+  opik:k8s_domain: opik-ci.ol.mit.edu
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagGE0sJLpRZ/1zOm5CvioAfGAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMTEZSLTZ7BcHtl1SeAgEQgDu6ketA/73L1Xb0NKwvJEfUs1cKb60KYGSLhP8LB7c5XSMMxHi1APp90p2FMeX31XYhqQHO2GhBXlsGQQ==
