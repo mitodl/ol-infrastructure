@@ -203,7 +203,6 @@ class OLApisixOIDCConfig(BaseModel):
     oidc_session_cookie_domain: str | None = None
     oidc_session_cookie_lifetime: NonNegativeInt = 0
     oidc_ssl_verify: bool = True
-    oidc_use_jwks: bool = False
     oidc_use_session_secret: bool = True
 
 
@@ -275,7 +274,6 @@ class OLApisixOIDCResources(ComponentResource):
             "bearer_only": oidc_config.oidc_bearer_only,
             "introspection_endpoint_auth_method": oidc_config.oidc_introspection_endpoint_auth_method,
             "ssl_verify": oidc_config.oidc_ssl_verify,
-            "use_jwks": oidc_config.oidc_use_jwks,
             "renew_access_token_on_expiry": oidc_config.oidc_renew_access_token_on_expiry,
             "logout_path": oidc_config.oidc_logout_path,
             "post_logout_redirect_uri": oidc_config.oidc_post_logout_redirect_uri,
