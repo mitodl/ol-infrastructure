@@ -391,6 +391,13 @@ def create_k8s_resources(  # noqa: C901
                     value=stack_info.env_suffix,
                 ),
             ],
+            ports=[
+                kubernetes.core.v1.ContainerPortArgs(
+                    name="vector-metrics",
+                    container_port=9598,
+                    protocol="TCP",
+                ),
+            ],
             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                 requests={"cpu": "100m", "memory": "512Mi"},
                 limits={"memory": "512Mi"},
@@ -409,6 +416,47 @@ def create_k8s_resources(  # noqa: C901
             ],
             args=["--config", "/etc/vector/vector.yaml"],
         )
+
+    # PodMonitor for Vector sidecar metrics — separate from the OLApplicationK8s-managed
+    # PodMonitor that covers the granian metrics port.  Selects all edxapp webapp pods
+    # in the namespace (both LMS and CMS) via the shared service label.
+    vector_pod_monitor_name = f"{env_name}-edxapp-vector-monitor"
+    kubernetes.apiextensions.CustomResource(
+        f"ol-{stack_info.env_prefix}-edxapp-vector-pod-monitor-{stack_info.env_suffix}",
+        api_version="monitoring.coreos.com/v1",
+        kind="PodMonitor",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=vector_pod_monitor_name,
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        spec={
+            "selector": {
+                "matchLabels": {
+                    "ol.mit.edu/service": k8s_global_labels.get(
+                        "ol.mit.edu/service", "openedx"
+                    ),
+                }
+            },
+            "podMetricsEndpoints": [
+                {
+                    "port": "vector-metrics",
+                    "path": "/metrics",
+                    "scheme": "http",
+                    "interval": "30s",
+                    "relabelings": [
+                        {
+                            "sourceLabels": ["__meta_kubernetes_pod_container_name"],
+                            "action": "keep",
+                            "regex": "vector",
+                        }
+                    ],
+                }
+            ],
+            "namespaceSelector": {"matchNames": [namespace]},
+        },
+        opts=pulumi.ResourceOptions(depends_on=[vector_configmap]),
+    )
 
     pod_security_context = kubernetes.core.v1.PodSecurityContextArgs(
         run_as_user=1000,
