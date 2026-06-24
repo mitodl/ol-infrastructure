@@ -500,7 +500,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     for resource_name, role in [
         ("ol-starrocks-service-account-view-realm", "view-realm"),
         ("ol-starrocks-service-account-view-users", "view-users"),
-        ("ol-starrocks-service-account-query-clients", "query-clients"),
+        ("ol-starrocks-service-account-view-clients", "view-clients"),
     ]:
         keycloak.openid.ClientServiceAccountRole(
             resource_name,
