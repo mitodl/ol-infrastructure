@@ -75,6 +75,7 @@ class Services(StrEnum):
     kubewatch = "kubewatch"
     micromasters = "micromasters"
     notebooks = "notebooks"
+    opik = "opik"
     open_edx = "open-edx"
     learn_ai = ("learn-ai",)
     mit_learn = "mit-learn"
