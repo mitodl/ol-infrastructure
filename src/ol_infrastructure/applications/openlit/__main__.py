@@ -57,7 +57,7 @@ from ol_infrastructure.lib.pulumi_helper import (
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 ##################################
-##    Setup + Config Retrival   ##
+##    Setup + Config Retrieval   ##
 ##################################
 
 stack_info = parse_stack()
