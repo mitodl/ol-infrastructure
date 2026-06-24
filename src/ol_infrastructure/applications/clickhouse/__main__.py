@@ -475,7 +475,13 @@ def _create_clickhouse_installation(  # noqa: PLR0913
         "opik/profile": "llmops_profile",
         "opik/quota": "llmops_quota",
         "opik/networks/ip": ["::/0", "0.0.0.0/0"],
-        "opik/allow_databases/database": "opik_db",
+        # ``default`` is required in addition to ``opik_db``: opik's Liquibase
+        # migrations hard-code the DATABASECHANGELOG / DATABASECHANGELOGLOCK
+        # bookkeeping tables (and the replicated ``...1`` shadow tables from
+        # 000017_change_tables_to_replicated) into the ``default`` database,
+        # while application tables live in ``opik_db``. ``default`` is otherwise
+        # an unused scratch database in this cluster.
+        "opik/allow_databases/database": ["opik_db", "default"],
     }
 
     return Output.all(
@@ -822,8 +828,8 @@ clickhouse_installation = _create_clickhouse_installation(
 #
 #   kubectl exec -it chi-clickhouse-default-0-0 -n clickhouse -- \
 #     clickhouse-client --user admin --password <admin_password> \
-#     --query "CREATE DATABASE IF NOT EXISTS openlit_db"
-#   # Repeat for: opik_db
+#     --query "CREATE DATABASE IF NOT EXISTS opik_db"
+#
 # Required databases: openlit_db, opik_db
 ############################################################
 
@@ -836,7 +842,7 @@ clickhouse_installation = _create_clickhouse_installation(
 #     all healthy ClickHouse replicas via the HTTP (8123) and Native (9000)
 #     ports for intra-cluster LLMOps clients.
 #   • A NetworkPolicy that restricts external access: only pods within the
-#     ``clickhouse`` namespace and the LLMOps namespaces (tensorzero, openlit,
+#     ``clickhouse`` namespace and the LLMOps namespaces (openlit,
 #     opik) may reach ClickHouse on the data ports; inter-replica and Keeper
 #     traffic is allowed namespace-wide.
 ############################################################
@@ -869,7 +875,7 @@ clickhouse_client_service = kubernetes.core.v1.Service(
 # the `eks:namespaces` list in the `infrastructure.aws.eks.data.*` stack
 # configurations. If they are missing, this NetworkPolicy will not allow
 # traffic from LLMOps workloads in those namespaces as intended.
-LLMOPS_NAMESPACES = ["tensorzero", "openlit", "opik"]
+LLMOPS_NAMESPACES = ["openlit", "opik"]
 
 clickhouse_network_policy = kubernetes.networking.v1.NetworkPolicy(
     f"clickhouse-network-policy-{stack_info.env_suffix}",
@@ -1002,7 +1008,7 @@ export(
         ClickHouse Native: clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:9000
         Keeper: keeper-clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:2181
 
-        Tenants: tensorzero_db, openlit_db, opik_db
+        Tenants: openlit_db, opik_db
         Hot/cold cutoff: {hot_data_days} days (table TTL MOVE expressions)
         Cold storage: s3://{cold_bucket_name}/data/
     """),

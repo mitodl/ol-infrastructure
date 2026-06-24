@@ -61,6 +61,8 @@ KUBE_STATE_METRICS_CHART_VERSION = "5.1.0"
 KUBEWATCH_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=meilisearch packageName=meilisearch registryUrl=https://meilisearch.github.io/meilisearch-kubernetes
 MEILISEARCH_CHART_VERSION = "0.32.0"
+# renovate: datasource=helm depName=opik packageName=opik registryUrl=https://comet-ml.github.io/opik
+OPIK_CHART_VERSION = "2.0.77"
 # renovate: datasource=helm depName=operator packageName=operator registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
 STARROCKS_OPERATOR_CHART_VERSION = "1.11.5"
 # renovate: datasource=helm depName=operator packageName=starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
