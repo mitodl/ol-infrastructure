@@ -11,4 +11,4 @@ config:
   starrocks:enable_data_lake_integration: "true"
   starrocks:aws_region: us-east-1
   starrocks:domain: lakehouse.qa.starrocks.ol.mit.edu
-  starrocks:oidc_enabled: "false"
+  starrocks:oidc_enabled: "true"
