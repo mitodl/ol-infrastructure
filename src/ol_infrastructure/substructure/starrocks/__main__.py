@@ -40,7 +40,11 @@ from pulumi_vault.generic.get_secret import get_secret_output as vault_get_secre
 from bridge.lib.magic_numbers import ONE_MONTH_SECONDS
 from bridge.lib.versions import VAULT_PLUGIN_STARROCKS_SHA256
 from ol_infrastructure.lib import pulumi_projects
-from ol_infrastructure.lib.pulumi_helper import make_stack_reference, parse_stack
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    parse_stack,
+    require_stack_output_value,
+)
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 _vault_provider = setup_vault_provider()
@@ -49,6 +53,11 @@ starrocks_config = Config("starrocks")
 
 env_name = f"data-{stack_info.env_suffix}"
 mount_point = f"database-starrocks-{stack_info.env_suffix}"
+
+cluster_stack = make_stack_reference(pulumi_projects.EKS, f"data.{stack_info.name}")
+_kube_config: pulumi.Output[str] = require_stack_output_value(
+    cluster_stack, "kube_config"
+).apply(lambda kc: json.dumps(kc) if isinstance(kc, dict) else kc)
 
 STARROCKS_MYSQL_PORT = 9030
 MAX_TTL = ONE_MONTH_SECONDS * 6
@@ -665,24 +674,29 @@ if oidc_enabled:
     _group_file_path = "/etc/starrocks/groups/groups.txt"
     _k8s_namespace = "starrocks"
 
+    # Write the kubeconfig to a temp file so kubectl can reach the cluster.
+    # The Concourse worker does not have a default kubeconfig for the data
+    # EKS cluster; we pull the config from the cluster stack reference and
+    # inject it via KUBECONFIG rather than relying on ambient credentials.
+    _group_sync_run = (
+        "_kf=$(mktemp)"
+        ' && printf \'%s\' "$KUBECONFIG_CONTENT" > "$_kf"'
+        f' && KUBECONFIG="$_kf" python3 {_sync_script}'
+        f" --namespace={_k8s_namespace}"
+        f" --configmap={_group_file_cm}"
+        '; _rc=$?; rm -f "$_kf"; exit $_rc'
+    )
     group_sync_cmd = command.local.Command(
         f"starrocks-{stack_info.env_suffix}-keycloak-group-sync",
-        create=(
-            f"python3 {_sync_script}"
-            f" --namespace={_k8s_namespace}"
-            f" --configmap={_group_file_cm}"
-        ),
-        update=(
-            f"python3 {_sync_script}"
-            f" --namespace={_k8s_namespace}"
-            f" --configmap={_group_file_cm}"
-        ),
+        create=_group_sync_run,
+        update=_group_sync_run,
         # On destroy the ConfigMap is owned and deleted by the applications stack;
         # no kubectl delete needed here.
         environment={
             "KEYCLOAK_ISSUER_URL": _oidc_issuer_url,
             "KEYCLOAK_CLIENT_ID": _oidc_client_id,
             "KEYCLOAK_CLIENT_SECRET": _oidc_client_secret,
+            "KUBECONFIG_CONTENT": _kube_config,
         },
         triggers=_integration_sql.apply(
             lambda sql: [hashlib.sha256(sql.encode()).hexdigest()]
