@@ -165,7 +165,7 @@ clickhouse_creds_secret = OLVaultK8SSecret(
 clickhouse_host = (
     openlit_config.get("clickhouse_host") or "clickhouse.clickhouse.svc.cluster.local"
 )
-clickhouse_port = openlit_config.get("clickhouse_port") or "8123"
+clickhouse_port = int(openlit_config.get("clickhouse_port") or "8123")
 clickhouse_database = openlit_config.get("clickhouse_database") or "openlit_db"
 
 # Deploy OpenLIT using the official Helm chart.
