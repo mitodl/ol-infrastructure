@@ -41,12 +41,9 @@ from bridge.lib.magic_numbers import ONE_MONTH_SECONDS
 from bridge.lib.versions import VAULT_PLUGIN_STARROCKS_SHA256
 from ol_infrastructure.lib import pulumi_projects
 from ol_infrastructure.lib.pulumi_helper import make_stack_reference, parse_stack
-from ol_infrastructure.lib.vault import get_vault_provider, setup_vault_provider
+from ol_infrastructure.lib.vault import setup_vault_provider
 
-setup_vault_provider()
-
-_vault_address = pulumi.Config("vault").require("address")
-_vault_env_namespace = pulumi.Config("vault_server").require("env_namespace")
+_vault_provider = setup_vault_provider()
 stack_info = parse_stack()
 starrocks_config = Config("starrocks")
 
@@ -545,9 +542,7 @@ if oidc_enabled:
     _oidc_vault = vault_get_secret_output(
         path="secret-operations/sso/starrocks",
         with_lease_start_time=False,
-        opts=InvokeOptions(
-            provider=get_vault_provider(_vault_address, _vault_env_namespace)
-        ),
+        opts=InvokeOptions(provider=_vault_provider),
     )
     _oidc_issuer_url: pulumi.Output[str] = _oidc_vault.data.apply(lambda d: d["url"])
     _oidc_client_id: pulumi.Output[str] = _oidc_vault.data.apply(
