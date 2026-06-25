@@ -268,18 +268,18 @@ opik_helm_release = kubernetes.helm.v3.Release(
 ##############################################################
 # APISIX ingress: Keycloak OIDC auth + TLS termination
 #
-# Opik's open-source edition has no native OIDC, so authentication is enforced
 # at the APISIX gateway (data cluster Gateway ``apisix`` in the ``operations``
-# namespace) rather than by Opik itself. Two route rules share the same backend
+# namespace) rather than by Opik itself. Three route rules share the same backend
 # (``opik-frontend`` proxies ``/api`` to the backend) but apply different auth:
 #
-#   * ``/api/*`` — bearer-token only. SDK / programmatic clients present a
-#     Keycloak access token (client-credentials via the ``ol-opik-client``
-#     service account); APISIX validates the JWT and rejects unauthenticated
-#     requests rather than redirecting them.
+#   * ``/api/*`` with a Bearer ``Authorization`` header — bearer-token only. SDK /
+#     programmatic clients present a Keycloak access token (client-credentials via
+#     the ``ol-opik-client`` service account); APISIX validates the JWT and
+#     rejects unauthenticated requests rather than redirecting them.
+#   * ``/api/*`` without one — session (cookie) auth, so the browser SPA's API
+#     calls work after interactive login.
 #   * everything else — interactive OIDC. Unauthenticated browsers are
 #     redirected to Keycloak for the authorization-code flow.
-#
 # The OIDC client_id/client_secret/discovery URL are synced from Vault
 # (``secret-operations/sso/opik``, published by the keycloak substructure) into
 # a K8s secret by the Vault Secrets Operator and referenced by the plugin via
