@@ -14,8 +14,10 @@ config:
     cpu_request: 8000m
     memory_request: 16Gi
     memory_limit: 16Gi
-    # 87.5% of 16Gi container limit; leaves ~2Gi headroom for JVM off-heap memory.
-    jvm_heap_mb: 14336
+    # 75% of 16Gi container limit = 12Gi heap, leaving ~4Gi for JVM non-heap
+    # (metaspace, direct buffers, native threads). 87.5% caused OOM restarts.
+    # Ref: https://docs.starrocks.io/docs/faq/fe_mem_faq/
+    jvm_heap_mb: 12288
     # Raise optimizer timeout to tolerate slow AWS Glue metadata responses.
     # StarRocks default is 3000 ms.
     planner_optimize_timeout_ms: 30000

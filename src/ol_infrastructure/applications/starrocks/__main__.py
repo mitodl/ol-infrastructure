@@ -521,8 +521,13 @@ if (
 # Configurable via starrocks:fe_config:jvm_heap_mb so operators can tune it
 # when the container memory limit is changed in the stack YAML.
 _fe_memory_limit_gi = int(str(fe_config.get("memory_limit", "16Gi")).rstrip("Gi"))
+# Target 75% of the container memory limit for the JVM heap.  The FE process
+# uses ~1.5-2 GiB of non-heap memory (JVM metaspace, direct buffers, native
+# threads) on top of the heap.  87.5% left only ~2 GiB headroom, causing OOM
+# kills when GC pressure pushed total RSS above the container limit.
+# Ref: https://docs.starrocks.io/docs/faq/fe_mem_faq/
 fe_jvm_heap_mb: int = fe_config.get(
-    "jvm_heap_mb", int(_fe_memory_limit_gi * 1024 * 0.875)
+    "jvm_heap_mb", int(_fe_memory_limit_gi * 1024 * 0.75)
 )
 # new_planner_optimize_timeout is the per-query optimizer time budget (ms).
 # StarRocks default is 3000 ms, which is often too short when the FE must
