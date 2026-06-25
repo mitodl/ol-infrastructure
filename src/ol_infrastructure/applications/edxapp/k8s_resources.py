@@ -418,8 +418,8 @@ def create_k8s_resources(  # noqa: C901
         )
 
     # PodMonitor for Vector sidecar metrics — separate from the OLApplicationK8s-managed
-    # PodMonitor that covers the granian metrics port.  Selects all edxapp webapp pods
-    # in the namespace (both LMS and CMS) via the shared service label.
+    # PodMonitor that covers the granian metrics port. Selects Open edX pods in the
+    # namespace via the shared service label; relabeling below keeps only Vector targets.
     vector_pod_monitor_name = f"{env_name}-edxapp-vector-monitor"
     kubernetes.apiextensions.CustomResource(
         f"ol-{stack_info.env_prefix}-edxapp-vector-pod-monitor-{stack_info.env_suffix}",
