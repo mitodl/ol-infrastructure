@@ -563,6 +563,44 @@ keycloak_pdb = kubernetes.policy.v1.PodDisruptionBudget(
     ),
 )
 
+# Vertical Pod Autoscaler — observation mode (updateMode: Off).
+#
+# VPA is installed cluster-wide by the EKS stack (setup_vpa in vpa.py).
+# This object collects right-sizing recommendations without evicting pods.
+# After 1-2 weeks of data, apply the recommendations by updating
+# spec.resources in the Keycloak CR above (not the StatefulSet directly —
+# the operator owns the StatefulSet and will overwrite manual patches).
+# Then switch updateMode to InPlaceOrRecreate for ongoing management.
+#
+# Keycloak has no HPA, so VPA can safely control both CPU and memory.
+kubernetes.apiextensions.CustomResource(
+    f"keycloak-vpa-{stack_info.env_suffix}",
+    api_version="autoscaling.k8s.io/v1",
+    kind="VerticalPodAutoscaler",
+    metadata={
+        "name": f"{keycloak_resource_name}-vpa",
+        "namespace": keycloak_namespace,
+    },
+    spec={
+        "targetRef": {
+            "apiVersion": "apps/v1",
+            "kind": "StatefulSet",
+            "name": keycloak_resource_name,
+        },
+        "updatePolicy": {"updateMode": "Off"},
+        "resourcePolicy": {
+            "containerPolicies": [
+                {
+                    "containerName": "*",
+                    "controlledResources": ["cpu", "memory"],
+                    "controlledValues": "RequestsAndLimits",
+                }
+            ]
+        },
+    },
+    opts=ResourceOptions(depends_on=[keycloak_resource]),
+)
+
 gateway_config = OLEKSGatewayConfig(
     cert_issuer="letsencrypt-production",
     cert_issuer_class="cluster-issuer",
