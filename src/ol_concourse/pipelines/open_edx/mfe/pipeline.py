@@ -158,7 +158,7 @@ def mfe_params(
         "SEARCH_CATALOG_URL": f"https://{open_edx.lms_domain}/courses",
         "SESSION_COOKIE_DOMAIN": open_edx.lms_domain,
         "SITE_NAME": open_edx.site_name,
-        "ADMIN_CONSOLE_MICROFRONTEND_URL": f"https://{open_edx.lms_domain}/{OpenEdxMicroFrontend.admin_console.path}",
+        "ADMIN_CONSOLE_URL": f"https://{open_edx.lms_domain}/{OpenEdxMicroFrontend.admin_console.path}",
         "COURSE_AUTHORING_MICROFRONTEND_URL": f"https://{open_edx.studio_domain}/authoring",
         "STUDIO_BASE_URL": f"https://{open_edx.studio_domain}",
         "SUPPORT_URL": open_edx.support_url,
