@@ -634,8 +634,16 @@ class OLAmazonDB(pulumi.ComponentResource):
             },
         }
 
+        ci_profiles = {
+            alarm_name: {
+                **alarm_args,
+                "enabled": False,
+            }
+            for alarm_name, alarm_args in global_profiles.items()
+        }
+
         monitoring_profiles = {
-            "ci": {},
+            "ci": ci_profiles,
             "qa": {},
             "production": {
                 "EBSIOBlance": {
