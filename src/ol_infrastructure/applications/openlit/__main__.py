@@ -17,8 +17,10 @@ NOTE: the ``openlit_db`` database must be created manually on the ClickHouse
 cluster before OpenLIT can persist telemetry (there is no ClickHouse Pulumi
 provider).  See ``applications/clickhouse/__main__.py``.
 
-The platform UI listens on port 3000 and is exposed via the cluster's Traefik
-Gateway API (OLEKSGateway) with a cert-manager issued TLS certificate.
+The platform UI listens on port 3000 and is exposed via the data cluster's
+APISIX gateway, which terminates TLS (cert-manager issued certificate) and
+enforces Keycloak OIDC authentication in front of OpenLIT (which has no native
+auth in its open-source edition).
 """
 
 import pulumi_kubernetes as kubernetes
@@ -26,11 +28,18 @@ import pulumi_vault as vault
 from pulumi import Config, ResourceOptions
 
 from bridge.lib.versions import OPENLIT_CHART_VERSION
-from ol_infrastructure.components.aws.eks import (
-    OLEKSGateway,
-    OLEKSGatewayConfig,
-    OLEKSGatewayListenerConfig,
-    OLEKSGatewayRouteConfig,
+from ol_infrastructure.components.services.apisix import (
+    OLApisixOIDCConfig,
+    OLApisixOIDCResources,
+    OLApisixPluginConfig,
+    OLApisixRoute,
+    OLApisixRouteConfig,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
+)
+from ol_infrastructure.components.services.cert_manager import (
+    OLCertManagerCert,
+    OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
@@ -106,6 +115,16 @@ openlit_vault_policy = vault.Policy(
     name="openlit",
     policy="""
 path "secret-clickhouse/data/credentials" {
+  capabilities = ["read"]
+}
+
+# Keycloak OIDC client credentials for the APISIX openid-connect plugin
+# (secret-operations is a kv-v1 mount; include both path forms defensively).
+path "secret-operations/sso/openlit" {
+  capabilities = ["read"]
+}
+
+path "secret-operations/data/sso/openlit" {
   capabilities = ["read"]
 }
 """,
@@ -218,41 +237,93 @@ openlit_helm_release = kubernetes.helm.v3.Release(
     ),
 )
 
-# Expose the OpenLIT UI via the cluster's Traefik Gateway API. cert-manager
-# issues the TLS certificate referenced by the HTTPS listener.
-openlit_gateway = OLEKSGateway(
-    f"openlit-{stack_info.env_suffix}-gateway",
-    gateway_config=OLEKSGatewayConfig(
-        cert_issuer="letsencrypt-production",
-        cert_issuer_class="cluster-issuer",
-        gateway_name="openlit",
-        labels=k8s_global_labels,
-        namespace=openlit_namespace,
-        listeners=[
-            OLEKSGatewayListenerConfig(
-                name="https",
-                hostname=openlit_domain,
-                port=8443,
-                tls_mode="Terminate",
-                certificate_secret_name="openlit-tls",  # noqa: S106  # pragma: allowlist secret
-                certificate_secret_namespace=openlit_namespace,
-            ),
-        ],
-        routes=[
-            OLEKSGatewayRouteConfig(
-                backend_service_name=openlit_service_name,
-                backend_service_namespace=openlit_namespace,
-                backend_service_port=openlit_service_port,
-                hostnames=[openlit_domain],
-                name="openlit-https",
-                listener_name="https",
-                port=8443,
-            ),
-        ],
+##############################################################
+# APISIX ingress: Keycloak OIDC auth + TLS termination
+#
+# Authentication is enforced at the APISIX gateway (data cluster Gateway
+# ``apisix`` in the ``operations`` namespace) rather than by OpenLIT itself,
+# which has no native auth in its open-source edition. A single route applies
+# interactive OIDC to everything: unauthenticated browsers are redirected to
+# Keycloak for the authorization-code flow, and the OpenLIT SPA's same-origin
+# ``/api`` calls ride the APISIX session cookie established at login. Unlike
+# Opik, there is no separate bearer-token ``/api/*`` rule — external exposure
+# here is the dashboard UI, and programmatic telemetry ingestion does not flow
+# through this ingress.
+#
+# The OIDC client_id/client_secret/discovery URL are synced from Vault
+# (``secret-operations/sso/openlit``, published by the keycloak substructure)
+# into a K8s secret by the Vault Secrets Operator and referenced by the plugin
+# via ``secretRef``.
+##############################################################
+
+# TLS certificate + ApisixTls binding for the OpenLIT hostname. cert-manager
+# issues the cert; the ApisixTls CRD binds it to the domain in APISIX.
+OLCertManagerCert(
+    f"openlit-{stack_info.env_suffix}-tls",
+    cert_config=OLCertManagerCertConfig(
+        application_name="openlit",
+        k8s_namespace=openlit_namespace,
+        k8s_labels=k8s_global_labels,
+        create_apisixtls_resource=True,
+        dest_secret_name="openlit-tls",  # noqa: S106  # pragma: allowlist secret
+        dns_names=[openlit_domain],
     ),
+    opts=ResourceOptions(depends_on=[openlit_helm_release]),
+)
+
+# Shared plugins applied to the OpenLIT route (cors, http->https redirect,
+# prometheus, opentelemetry, request-id).
+openlit_shared_plugins = OLApisixSharedPlugins(
+    name=f"openlit-shared-plugins-{stack_info.env_suffix}",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name="openlit",
+        resource_suffix="ol-shared-plugins",
+        k8s_namespace=openlit_namespace,
+        k8s_labels=k8s_global_labels,
+        enable_defaults=True,
+    ),
+)
+
+# OIDC secret sync (reuses the application's existing Vault auth binding) and
+# openid-connect plugin config generation.
+openlit_oidc = OLApisixOIDCResources(
+    f"openlit-oidc-{stack_info.env_suffix}",
+    oidc_config=OLApisixOIDCConfig(
+        application_name="openlit",
+        k8s_labels=k8s_global_labels,
+        k8s_namespace=openlit_namespace,
+        oidc_scope="openid profile email",
+        vault_mount="secret-operations",
+        vault_mount_type="kv-v1",
+        vault_path="sso/openlit",
+        vaultauth=openlit_vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(depends_on=[openlit_vault_k8s_resources]),
+)
+
+# Single interactive OIDC route: redirect unauthenticated browsers to Keycloak
+# (authorization-code flow) and proxy authenticated traffic to the OpenLIT UI.
+openlit_apisix_route = OLApisixRoute(
+    f"openlit-{stack_info.env_suffix}-apisix-route",
+    k8s_namespace=openlit_namespace,
+    k8s_labels=k8s_global_labels,
+    route_configs=[
+        OLApisixRouteConfig(
+            route_name="openlit-ui",
+            priority=0,
+            hosts=[openlit_domain],
+            paths=["/*"],
+            backend_service_name=openlit_service_name,
+            backend_service_port=openlit_service_port,
+            shared_plugin_config_name=openlit_shared_plugins.resource_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    **openlit_oidc.get_full_oidc_plugin_config(unauth_action="auth")
+                )
+            ],
+        ),
+    ],
     opts=ResourceOptions(
-        parent=openlit_helm_release,
-        delete_before_replace=True,
-        depends_on=[openlit_helm_release],
+        depends_on=[openlit_helm_release, openlit_oidc, openlit_shared_plugins]
     ),
 )
