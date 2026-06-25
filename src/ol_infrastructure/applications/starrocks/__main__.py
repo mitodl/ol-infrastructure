@@ -129,7 +129,10 @@ starrocks_auth_binding = OLEKSAuthBinding(
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
         irsa_service_account_name="starrocks",
-        vault_sync_service_account_names=["starrocks-vault"],
+        # OLVaultK8SResources creates a SA named {application_name}-vault, so
+        # this must match "starrocks-{env_prefix}-vault" for the Vault k8s auth
+        # role to authorize the SA that VaultAuth actually presents.
+        vault_sync_service_account_names=[f"starrocks-{stack_info.env_prefix}-vault"],
         k8s_labels=k8s_app_labels,
         # Pre-create the SA so the IRSA role-ARN annotation is present before the
         # StarRocks operator starts and assigns this SA to FE/CN/BE pods.
