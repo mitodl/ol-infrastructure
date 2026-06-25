@@ -1535,7 +1535,10 @@ mitlearn_k8s_app = OLApplicationK8s(
                 resource_limits={"memory": "2400Mi"},
             ),
         ],
-        celery_beat_config=OLApplicationK8sCeleryBeatConfig(),
+        celery_beat_config=OLApplicationK8sCeleryBeatConfig(
+            resource_requests={"cpu": "100m", "memory": "2048Mi"},
+            resource_limits={"memory": "2048Mi"},
+        ),
         resource_requests={"cpu": "250m", "memory": "2400Mi"},
         resource_limits={"memory": "2400Mi"},
         hpa_scaling_metrics=[
