@@ -540,6 +540,11 @@ fe_planner_optimize_timeout_ms: int = fe_config.get(
 fe_background_refresh_interval_ms: int = fe_config.get(
     "background_refresh_metadata_interval_ms", 600_000
 )
+# tablet_create_timeout_second is the FE-to-CN/BE tablet creation RPC deadline.
+# StarRocks default (10 s) can be exceeded when CN pods are cold-starting or
+# under memory pressure.
+# Configurable via starrocks:fe_config:tablet_create_timeout_second.
+fe_tablet_create_timeout_second: int = fe_config.get("tablet_create_timeout_second", 60)
 _FE_CONFIG_BASE = (
     "LOG_DIR = ${STARROCKS_HOME}/log\n"
     'DATE = "$(date +%Y%m%d-%H%M%S)"\n'
@@ -553,6 +558,7 @@ _FE_CONFIG_BASE = (
     "sys_log_level = INFO\n"
     "min_graceful_exit_time_second = 25\n"
     f"new_planner_optimize_timeout = {fe_planner_optimize_timeout_ms}\n"
+    f"tablet_create_timeout_second = {fe_tablet_create_timeout_second}\n"
     "background_refresh_metadata_enable = true\n"
     "background_refresh_metadata_interval_millis"
     f" = {fe_background_refresh_interval_ms}\n"
