@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Deploy Opik (Comet's open-source LLM observability platform) on the data EKS cluster.
 
 Opik provides tracing, evaluation, and prompt management for LLM applications.
@@ -33,11 +32,18 @@ from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
 )
-from ol_infrastructure.components.aws.eks import (
-    OLEKSGateway,
-    OLEKSGatewayConfig,
-    OLEKSGatewayListenerConfig,
-    OLEKSGatewayRouteConfig,
+from ol_infrastructure.components.services.apisix import (
+    OLApisixOIDCConfig,
+    OLApisixOIDCResources,
+    OLApisixPluginConfig,
+    OLApisixRoute,
+    OLApisixRouteConfig,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
+)
+from ol_infrastructure.components.services.cert_manager import (
+    OLCertManagerCert,
+    OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
@@ -259,42 +265,149 @@ opik_helm_release = kubernetes.helm.v3.Release(
     ),
 )
 
-########################################
-# Gateway API routing + TLS certificate #
-########################################
-opik_gateway_config = OLEKSGatewayConfig(
-    cert_issuer="letsencrypt-production",
-    cert_issuer_class="cluster-issuer",
-    gateway_name="opik",
-    namespace=OPIK_NAMESPACE,
-    listeners=[
-        OLEKSGatewayListenerConfig(
-            name="https",
-            hostname=opik_domain,
-            port=8443,
-            tls_mode="Terminate",
-            certificate_secret_name="opik-tls",  # pragma: allowlist secret  # noqa: S106
-            certificate_secret_namespace=OPIK_NAMESPACE,
-        ),
-    ],
-    routes=[
-        OLEKSGatewayRouteConfig(
-            backend_service_name="opik-frontend",
-            backend_service_namespace=OPIK_NAMESPACE,
-            backend_service_port=5173,
-            name="opik-https-root",
-            listener_name="https",
-            hostnames=[opik_domain],
-            port=8443,
-            matches=[{"path": {"type": "PathPrefix", "value": "/"}}],
-        ),
-    ],
+##############################################################
+# APISIX ingress: Keycloak OIDC auth + TLS termination
+#
+# Opik's open-source edition has no native OIDC, so authentication is enforced
+# at the APISIX gateway (data cluster Gateway ``apisix`` in the ``operations``
+# namespace) rather than by Opik itself. Two route rules share the same backend
+# (``opik-frontend`` proxies ``/api`` to the backend) but apply different auth:
+#
+#   * ``/api/*`` — bearer-token only. SDK / programmatic clients present a
+#     Keycloak access token (client-credentials via the ``ol-opik-client``
+#     service account); APISIX validates the JWT and rejects unauthenticated
+#     requests rather than redirecting them.
+#   * everything else — interactive OIDC. Unauthenticated browsers are
+#     redirected to Keycloak for the authorization-code flow.
+#
+# The OIDC client_id/client_secret/discovery URL are synced from Vault
+# (``secret-operations/sso/opik``, published by the keycloak substructure) into
+# a K8s secret by the Vault Secrets Operator and referenced by the plugin via
+# ``secretRef`` (only supported on the legacy ApisixRoute/v2 path).
+##############################################################
+
+# TLS certificate + ApisixTls binding for the Opik hostname. cert-manager issues
+# the cert; the ApisixTls CRD binds it to the domain in APISIX.
+OLCertManagerCert(
+    f"opik-{stack_info.env_suffix}-tls",
+    cert_config=OLCertManagerCertConfig(
+        application_name="opik",
+        k8s_namespace=OPIK_NAMESPACE,
+        k8s_labels=k8s_global_labels,
+        create_apisixtls_resource=True,
+        dest_secret_name="opik-tls",  # noqa: S106  # pragma: allowlist secret
+        dns_names=[opik_domain],
+    ),
+    opts=ResourceOptions(depends_on=[opik_helm_release]),
 )
 
-opik_gateway = OLEKSGateway(
-    "opik-gateway",
-    gateway_config=opik_gateway_config,
-    opts=ResourceOptions(parent=opik_helm_release, depends_on=[opik_helm_release]),
+# Shared plugins applied to every Opik route (cors, http->https redirect,
+# prometheus, opentelemetry, request-id).
+opik_shared_plugins = OLApisixSharedPlugins(
+    name=f"opik-shared-plugins-{stack_info.env_suffix}",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name="opik",
+        resource_suffix="ol-shared-plugins",
+        k8s_namespace=OPIK_NAMESPACE,
+        k8s_labels=k8s_global_labels,
+        enable_defaults=True,
+    ),
+)
+
+# OIDC secret sync (reuses the application's existing Vault auth binding) and
+# openid-connect plugin config generation.
+opik_oidc = OLApisixOIDCResources(
+    f"opik-oidc-{stack_info.env_suffix}",
+    oidc_config=OLApisixOIDCConfig(
+        application_name="opik",
+        k8s_labels=k8s_global_labels,
+        k8s_namespace=OPIK_NAMESPACE,
+        oidc_scope="openid profile email",
+        vault_mount="secret-operations",
+        vault_mount_type="kv-v1",
+        vault_path="sso/opik",
+        vaultauth=opik_app.vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(depends_on=opik_app.vault_k8s_resources),
+)
+
+# Session (cookie) auth: redirect unauthenticated browsers to Keycloak
+# (authorization-code flow). Used for the UI *and* for browser-originated API
+# calls — the Opik SPA and its API share an origin, so the SPA authenticates
+# the user once at ``/`` and then calls ``/api/*`` from the browser carrying
+# only the APISIX session cookie (no bearer token).
+opik_session_oidc_plugin = opik_oidc.get_full_oidc_plugin_config(unauth_action="auth")
+# Bearer auth: validate a Keycloak access token from the Authorization header
+# and reject (rather than redirect) unauthenticated requests, so SDK / machine
+# clients get a clean 401 instead of an HTML login page.
+opik_bearer_oidc_plugin = opik_oidc.get_full_oidc_plugin_config(unauth_action="deny")
+opik_bearer_oidc_plugin["config"]["bearer_only"] = True
+
+# Match ``/api/*`` requests that carry an Authorization header so they are
+# routed to the bearer-only rule; everything else under ``/api`` falls through
+# to the session rule (the browser SPA's cookie-authenticated calls).
+# This is a ROUTING condition only — it selects the bearer rule when an
+# Authorization header is present. It does not (and must not) validate the
+# token: the openid-connect plugin below cryptographically validates the JWT
+# against Keycloak's JWKS. Tokens are short-lived per-client JWTs that rotate
+# constantly, so there is no fixed value to match here; ``^Bearer\s`` simply
+# limits the bearer route to the Bearer auth scheme.
+authorization_header_present_expr = {
+    "subject": {"scope": "Header", "name": "Authorization"},
+    "op": "RegexMatch",
+    "value": r"^Bearer\s",
+}
+
+opik_apisix_route = OLApisixRoute(
+    f"opik-{stack_info.env_suffix}-apisix-route",
+    k8s_namespace=OPIK_NAMESPACE,
+    k8s_labels=k8s_global_labels,
+    route_configs=[
+        # /api/* WITH an Authorization header -> bearer-token validation (SDK /
+        # programmatic clients). Highest priority so it wins over the session
+        # /api rule when a token is present.
+        OLApisixRouteConfig(
+            route_name="opik-api-bearer",
+            priority=20,
+            hosts=[opik_domain],
+            paths=["/api/*"],
+            exprs=[authorization_header_present_expr],
+            backend_service_name="opik-frontend",
+            backend_service_port=5173,
+            shared_plugin_config_name=opik_shared_plugins.resource_name,
+            plugins=[OLApisixPluginConfig(**opik_bearer_oidc_plugin)],
+        ),
+        # /api/* WITHOUT an Authorization header -> session auth, so the browser
+        # SPA's cookie-authenticated API calls succeed after interactive login.
+        OLApisixRouteConfig(
+            route_name="opik-api-session",
+            priority=15,
+            hosts=[opik_domain],
+            paths=["/api/*"],
+            backend_service_name="opik-frontend",
+            backend_service_port=5173,
+            shared_plugin_config_name=opik_shared_plugins.resource_name,
+            plugins=[OLApisixPluginConfig(**opik_session_oidc_plugin)],
+        ),
+        # Everything else -> interactive OIDC for human browsers.
+        OLApisixRouteConfig(
+            route_name="opik-ui",
+            priority=0,
+            hosts=[opik_domain],
+            paths=["/*"],
+            backend_service_name="opik-frontend",
+            backend_service_port=5173,
+            shared_plugin_config_name=opik_shared_plugins.resource_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    **opik_oidc.get_full_oidc_plugin_config(unauth_action="auth")
+                )
+            ],
+        ),
+    ],
+    opts=ResourceOptions(
+        depends_on=[opik_helm_release, opik_oidc, opik_shared_plugins]
+    ),
 )
 
 export("opik_namespace", OPIK_NAMESPACE)
