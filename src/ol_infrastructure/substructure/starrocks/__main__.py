@@ -695,7 +695,7 @@ if oidc_enabled:
     # StarRocks persists ADMIN SET FRONTEND CONFIG changes to BDB so they
     # survive pod restarts without requiring a fe.conf change.
     _auth_chain = (
-        f"native,{_OIDC_SECURITY_INTEGRATION_NAME},{_JWT_SECURITY_INTEGRATION_NAME}"
+        f"{_OIDC_SECURITY_INTEGRATION_NAME},{_JWT_SECURITY_INTEGRATION_NAME},native"
     )
     _auth_chain_sql = (
         f'ADMIN SET FRONTEND CONFIG ("authentication_chain" = "{_auth_chain}");'

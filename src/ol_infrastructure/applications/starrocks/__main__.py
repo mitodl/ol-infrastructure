@@ -624,7 +624,7 @@ def _build_fe_config(  # noqa: PLR0913
             # authentication_chain must be in fe.conf — ADMIN SET FRONTEND CONFIG
             # does NOT persist this setting across pod restarts (it is not
             # replayed from BDB on startup the way catalog objects are).
-            "authentication_chain = native,keycloak_oauth2,keycloak_jwt\n"
+            "authentication_chain = keycloak_oauth2,keycloak_jwt,native\n"
         )
 
     if bucket_name is not None:
