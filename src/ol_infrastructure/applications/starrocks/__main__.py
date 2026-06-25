@@ -621,6 +621,10 @@ def _build_fe_config(  # noqa: PLR0913
             # against the JWKS and maps preferred_username to the SR identity.
             f"jwt_jwks_url = {_oidc_base}/certs\n"
             f"jwt_required_issuer = {oidc_issuer_url}\n"
+            # authentication_chain must be in fe.conf — ADMIN SET FRONTEND CONFIG
+            # does NOT persist this setting across pod restarts (it is not
+            # replayed from BDB on startup the way catalog objects are).
+            "authentication_chain = native,keycloak_oauth2,keycloak_jwt\n"
         )
 
     if bucket_name is not None:
