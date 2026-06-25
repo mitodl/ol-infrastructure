@@ -161,6 +161,7 @@ def _build_interpolated_config_dict(
         "MIT_LEARN_AI_XBLOCK_PROBLEM_SET_LIST_URL": f"https://{edxapp_config.require('mit_learn_api_domain')}/ai/api/v0/problem_set_list",
         "MIT_LEARN_AI_XBLOCK_CHAT_RATING_URL": f"https://{edxapp_config.require('mit_learn_api_domain')}/ai/api/v0/chat_sessions/",
         "MIT_LEARN_LOGO": f"https://{domains['lms']}/static/mitxonline/images/mit-learn-logo.svg",
+        "ADMIN_CONSOLE_MICROFRONTEND_URL": f"https://{domains['lms']}/admin-console",
         "COURSE_AUTHORING_MICROFRONTEND_URL": f"https://{domains['studio']}/authoring",
         "INSTRUCTOR_MICROFRONTEND_URL": f"https://{domains['lms']}/apps/instructor-dashboard",
         "LEARNING_MICROFRONTEND_URL": f"https://{domains['lms']}/learn",

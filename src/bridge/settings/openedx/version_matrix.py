@@ -476,6 +476,11 @@ ReleaseMap: dict[
     "master": {
         "mitxonline": [
             OpenEdxApplicationVersion(
+                application="admin-console",
+                application_type="MFE",
+                release="master",
+            ),
+            OpenEdxApplicationVersion(
                 application="codejail",
                 application_type="IDA",
                 release="master",
