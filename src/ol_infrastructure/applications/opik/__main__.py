@@ -343,12 +343,11 @@ opik_session_oidc_plugin = opik_oidc.get_full_oidc_plugin_config(unauth_action="
 opik_bearer_oidc_plugin = opik_oidc.get_full_oidc_plugin_config(unauth_action="deny")
 opik_bearer_oidc_plugin["config"]["bearer_only"] = True
 
-# Match ``/api/*`` requests that carry an Authorization header so they are
-# routed to the bearer-only rule; everything else under ``/api`` falls through
-# to the session rule (the browser SPA's cookie-authenticated calls).
-# This is a ROUTING condition only — it selects the bearer rule when an
-# Authorization header is present. It does not (and must not) validate the
-# token: the openid-connect plugin below cryptographically validates the JWT
+# Match ``/api/*`` requests that carry a Bearer ``Authorization`` header so they
+# are routed to the bearer-only rule; everything else under ``/api`` falls
+# through to the session rule (the browser SPA's cookie-authenticated calls).
+# This is a ROUTING condition only — it selects the bearer rule when a Bearer
+# ``Authorization`` header is present. It does not (and must not) validate the
 # against Keycloak's JWKS. Tokens are short-lived per-client JWTs that rotate
 # constantly, so there is no fixed value to match here; ``^Bearer\s`` simply
 # limits the bearer route to the Bearer auth scheme.
