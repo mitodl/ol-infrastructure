@@ -669,7 +669,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 },
             },
         }
-        return dict(
+        return {
             **global_profiles,
             **(monitoring_profiles[profile_name]),
-        )
+        }
