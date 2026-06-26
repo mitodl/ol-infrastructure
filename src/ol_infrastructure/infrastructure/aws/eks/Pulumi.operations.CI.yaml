@@ -21,6 +21,7 @@ config:
   eks:namespaces:
   - keycloak
   - kubewatch
+  - toolhive
   eks:nodegroups:
     worker-xlarge:
       instance_type: c8i-flex.xlarge
