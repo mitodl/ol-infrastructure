@@ -80,6 +80,7 @@ config:
     XPRO_COURSES_API_URL: "https://rc.xpro.mit.edu/api/courses/"
     MITPE_API_ENABLED: "true"
     OCW_ITERATOR_CHUNK_SIZE: 300
+    QDRANT_CHUNK_SIZE: 50
     OCW_LIVE_BUCKET: "ocw-content-live-production"
     OIDC_ENDPOINT: "https://sso-qa.ol.mit.edu/realms/olapps"
     OPENTELEMETRY_ENABLED: "true"
