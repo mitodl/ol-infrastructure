@@ -541,12 +541,14 @@ fe_planner_optimize_timeout_ms: int = fe_config.get(
 # background_refresh_metadata_enable instructs the FE to continuously sync
 # all external catalog (Iceberg/Glue) metadata in the background so that
 # tables added or modified in Glue are visible to StarRocks without a manual
-# REFRESH CATALOG command.  10 minutes is short enough to pick up new
-# dbt-materialized tables within one Dagster run cycle, long enough to avoid
-# hammering the Glue API.  Configurable via
+# REFRESH CATALOG command.  1 hour is acceptable for dbt workloads — dbt
+# triggers explicit REFRESH CATALOG before model runs, so the background
+# interval only matters for ad-hoc queries.  10 minutes was too aggressive:
+# it causes periodic CPU spikes on the FE leader while the GC is also
+# competing for CPU cores.  Configurable via
 # starrocks:fe_config:background_refresh_metadata_interval_ms.
 fe_background_refresh_interval_ms: int = fe_config.get(
-    "background_refresh_metadata_interval_ms", 600_000
+    "background_refresh_metadata_interval_ms", 3_600_000
 )
 # tablet_create_timeout_second is the FE-to-CN/BE tablet creation RPC deadline.
 # StarRocks default (10 s) can be exceeded when CN pods are cold-starting or
@@ -562,11 +564,16 @@ fe_tablet_create_timeout_second: int = fe_config.get(
 _FE_CONFIG_BASE = (
     "LOG_DIR = ${STARROCKS_HOME}/log\n"
     'DATE = "$(date +%Y%m%d-%H%M%S)"\n'
-    # -Xms=Xmx pre-allocates the full heap at JVM startup, eliminating heap
-    # resize GC churn during the long metadata-loading init phase.
+    # ZGC is used instead of G1GC. G1GC runs long concurrent mark cycles that
+    # compete with the FE application threads for CPU cores, which on an 8-core
+    # pod can saturate all cores and make the FE's HTTP server miss the 1s
+    # liveness probe timeout. ZGC performs essentially all GC work concurrently
+    # with sub-millisecond stop-the-world pauses (independent of heap size),
+    # keeping CPU available for query planning and Thrift RPC handling.
+    # -Xms=Xmx pre-allocates heap at startup to avoid resize churn during init.
     f'JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true'
     f" -Xms{fe_jvm_heap_mb}m -Xmx{fe_jvm_heap_mb}m"
-    ' -XX:+UseG1GC -Xlog:gc*:${LOG_DIR}/fe.gc.log.$DATE:time"\n'
+    ' -XX:+UseZGC -Xlog:gc*:${LOG_DIR}/fe.gc.log.$DATE:time"\n'
     "http_port = 8030\n"
     "rpc_port = 9020\n"
     "query_port = 9030\n"
@@ -664,14 +671,18 @@ def _build_fe_config(  # noqa: PLR0913
             "cloud_native_storage_type = S3\n"
             f"aws_s3_path = {bucket_name}\n"
             f"aws_s3_region = {aws_region}\n"
-            # Do NOT set aws_s3_endpoint. An explicit path-style endpoint
-            # (s3.<region>.amazonaws.com) causes the CN C++ storage layer to
-            # sign PutObject requests with Signature V2, which SSE-KMS rejects:
+            # aws_s3_use_aws_sdk_default_behavior=true tells StarRocks to use
+            # the full AWS SDK credential chain rather than a specific provider.
+            # In EKS the chain resolves to IRSA via the injected env vars
+            # (AWS_ROLE_ARN + AWS_WEB_IDENTITY_TOKEN_FILE); it also enforces
+            # SigV4 and virtual-hosted-style S3 addressing by default, which is
+            # required for SSE-KMS buckets.  The alternative
+            # (aws_s3_use_instance_profile=true) sets use_instance_profile=true
+            # in the storage volume and use_aws_sdk_default_behavior=false,
+            # causing the C++ storage layer to sign with Signature V2 and fail:
             # "Requests specifying Server Side Encryption with AWS KMS managed
             # keys require AWS Signature Version 4."
-            # Without the override the SDK derives a virtual-hosted-style
-            # endpoint (bucket.s3.region.amazonaws.com) that uses SigV4.
-            "aws_s3_use_instance_profile = true\n"
+            "aws_s3_use_aws_sdk_default_behavior = true\n"
             "enable_load_volume_from_conf = true\n"
         )
     else:
