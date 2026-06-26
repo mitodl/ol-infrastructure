@@ -129,5 +129,9 @@ config:
   - "https://ocw-studio.odl.mit.edu/"
   keycloak_realm:ol-mit-ocw-studio-web-origins:
   - "https://ocw-studio.odl.mit.edu"
+  keycloak_realm:ol-platform-engineering-opik-redirect-uris:
+  - https://opik.ol.mit.edu/*
+  keycloak_realm:ol-platform-engineering-openlit-redirect-uris:
+  - https://openlit.ol.mit.edu/*
   keycloak_realm:ol-mit-ldap-bind-password:
     secure: v1:xuY2YgyBZnGNLTMy:ZnmyEmcaAOFd8EsiQX+7uG4rBcyP5QmVbI2HI39kkDllxf2TFRovQA==
