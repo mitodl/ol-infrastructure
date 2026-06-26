@@ -632,6 +632,28 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         opts=resource_options,
     )
 
+    # StarRocks 4.x rejects '@' in usernames, but Keycloak uses email as
+    # preferred_username in this realm (registration_email_as_username=True).
+    # Emit the local part (before '@') as a dedicated claim so that the StarRocks
+    # security integration's principal_field can reference it without '@'.
+    keycloak.openid.ScriptProtocolMapper(
+        "ol-data-platform-starrocks-client-username-mapper",
+        name="starrocks-username",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_starrocks_client.id,
+        claim_name="starrocks_username",
+        claim_value_type="String",
+        script=(
+            "var u = user.getUsername();"
+            " var i = u.indexOf('@');"
+            " exports = i !== -1 ? u.substring(0, i) : u;"
+        ),
+        add_to_id_token=True,
+        add_to_access_token=True,
+        add_to_userinfo=True,
+        opts=resource_options,
+    )
+
     # Public client for CLI / developer PKCE flows (no client secret required).
     # Used by the starrocks-auth helper script to obtain access tokens for
     # interactive dbt runs and direct mysql connections without exposing the
@@ -667,6 +689,23 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             "roles",
             "web-origins",
         ],
+        opts=resource_options,
+    )
+    keycloak.openid.ScriptProtocolMapper(
+        "ol-data-platform-starrocks-cli-client-username-mapper",
+        name="starrocks-username",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_starrocks_cli_client.id,
+        claim_name="starrocks_username",
+        claim_value_type="String",
+        script=(
+            "var u = user.getUsername();"
+            " var i = u.indexOf('@');"
+            " exports = i !== -1 ? u.substring(0, i) : u;"
+        ),
+        add_to_id_token=True,
+        add_to_access_token=True,
+        add_to_userinfo=True,
         opts=resource_options,
     )
     # STARROCKS [END] # noqa: ERA001

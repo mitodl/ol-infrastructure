@@ -589,7 +589,8 @@ if oidc_enabled:
             f'    "redirect_url" = "{_oidc_redirect_url}",\n'
             f'    "jwks_url" = "{issuer}'
             '/protocol/openid-connect/certs",\n'
-            '    "principal_field" = "preferred_username",\n'
+            '    "principal_field" = "starrocks_username",\n'
+            '    "auto_provision_user" = "true",\n'
             f'    "required_issuer" = "{issuer}"\n'
             ");"
         )
@@ -637,7 +638,8 @@ if oidc_enabled:
     # starrocks-auth PKCE script) and sends it over the MySQL wire using
     # the authentication_openid_connect_client plugin (MySQL 9.2+).
     # StarRocks verifies the id_token signature against the JWKS and maps
-    # preferred_username to the StarRocks identity.
+    # starrocks_username (the local part of preferred_username, without @domain)
+    # to the StarRocks identity.
     #
     # This coexists with keycloak_oauth2 so that:
     #   - Web UI users: keycloak_oauth2 (browser OAuth2 redirect)
@@ -652,7 +654,8 @@ if oidc_enabled:
             f"CREATE SECURITY INTEGRATION {_n} PROPERTIES (\n"
             '    "type" = "authentication_jwt",\n'
             f'    "jwks_url" = "{issuer}/protocol/openid-connect/certs",\n'
-            '    "principal_field" = "preferred_username",\n'
+            '    "principal_field" = "starrocks_username",\n'
+            '    "auto_provision_user" = "true",\n'
             f'    "required_issuer" = "{issuer}"\n'
             ");"
         )
@@ -826,16 +829,16 @@ if oidc_enabled:
         ),
     )
 
-    # Pre-create OAuth2-authenticated user accounts from config.
-    # With the file group provider in place, manual entries here are only
-    # needed for edge-case overrides (e.g. a user who needs a different role
-    # than the one assigned in Keycloak).  New users in Keycloak with a
-    # governance role will receive that role automatically via the group
-    # provider without needing an entry here.
+    # Pre-create OIDC-authenticated user accounts from config.
+    # With auto_provision_user=true and the file group provider in place,
+    # accounts and roles are normally handled automatically on first login.
+    # Entries here are only needed for edge-case overrides (e.g. a user who
+    # needs a different role than the one assigned via their Keycloak groups).
     #
     # Each entry must supply:
-    #   username    - the Keycloak preferred_username value (matches principal_field);
-    #                 whitespace is stripped, empty strings are rejected
+    #   username    - the starrocks_username claim value (local part of the Keycloak
+    #                 preferred_username, without @domain); whitespace is stripped,
+    #                 empty strings are rejected
     #   keycloak_role - one of the six governance role names in _GOVERNANCE_ROLES
     #                   (ol_platform_admin / ol_data_engineer / ol_data_analyst /
     #                    ol_researcher / ol_instructor / ol_business_analyst)
