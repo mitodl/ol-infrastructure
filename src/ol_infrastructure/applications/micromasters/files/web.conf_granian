@@ -36,6 +36,7 @@ server {
         proxy_pass http://127.0.0.1:8073;  # DEFAULT_WSGI_PORT (Granian)
         proxy_pass_request_headers on;
         proxy_pass_request_body on;
+        proxy_ignore_client_abort on;
         client_max_body_size 25M;
     }
 }
