@@ -355,6 +355,19 @@ starrocks_values: dict[str, Any] = {
         "service": {
             "type": "ClusterIP",
         },
+        # The operator sets failureThreshold = <seconds> / periodSeconds (5s).
+        # FE startup involves two slow phases that block the HTTP health endpoint:
+        # BDB/BDBJE catalog replay and starmgr loadMeta (the second only runs on
+        # the leader). Either can block the HTTP server for 30-120+ seconds.
+        # 120s liveness tolerance prevents spurious kills during these phases.
+        # 600s startup tolerance covers the initial JVM + Raft bootstrap before
+        # the HTTP server opens at all.
+        "livenessProbeFailureSeconds": fe_config.get(
+            "liveness_probe_failure_seconds", 120
+        ),
+        "startupProbeFailureSeconds": fe_config.get(
+            "startup_probe_failure_seconds", 600
+        ),
         "resources": {
             "requests": {
                 # StarRocks recommends 8 CPU cores and 16 GB RAM per FE node.
