@@ -1529,6 +1529,7 @@ mitlearn_k8s_app = OLApplicationK8s(
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="embeddings",
                 max_replicas=3,
+                termination_grace_period_seconds=600,
                 redis_host=redis_cache.address,
                 redis_password=redis_config.require("password"),
                 resource_requests={"cpu": "200m", "memory": "2400Mi"},
