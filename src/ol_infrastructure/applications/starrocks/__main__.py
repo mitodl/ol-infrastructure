@@ -129,7 +129,10 @@ starrocks_auth_binding = OLEKSAuthBinding(
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
         irsa_service_account_name="starrocks",
-        vault_sync_service_account_names=["starrocks-vault"],
+        # OLVaultK8SResources creates a SA named {application_name}-vault, so
+        # this must match "starrocks-{env_prefix}-vault" for the Vault k8s auth
+        # role to authorize the SA that VaultAuth actually presents.
+        vault_sync_service_account_names=[f"starrocks-{stack_info.env_prefix}-vault"],
         k8s_labels=k8s_app_labels,
         # Pre-create the SA so the IRSA role-ARN annotation is present before the
         # StarRocks operator starts and assigns this SA to FE/CN/BE pods.
@@ -518,8 +521,13 @@ if (
 # Configurable via starrocks:fe_config:jvm_heap_mb so operators can tune it
 # when the container memory limit is changed in the stack YAML.
 _fe_memory_limit_gi = int(str(fe_config.get("memory_limit", "16Gi")).rstrip("Gi"))
+# Target 75% of the container memory limit for the JVM heap.  The FE process
+# uses ~1.5-2 GiB of non-heap memory (JVM metaspace, direct buffers, native
+# threads) on top of the heap.  87.5% left only ~2 GiB headroom, causing OOM
+# kills when GC pressure pushed total RSS above the container limit.
+# Ref: https://docs.starrocks.io/docs/faq/fe_mem_faq/
 fe_jvm_heap_mb: int = fe_config.get(
-    "jvm_heap_mb", int(_fe_memory_limit_gi * 1024 * 0.875)
+    "jvm_heap_mb", int(_fe_memory_limit_gi * 1024 * 0.75)
 )
 # new_planner_optimize_timeout is the per-query optimizer time budget (ms).
 # StarRocks default is 3000 ms, which is often too short when the FE must
@@ -540,11 +548,19 @@ fe_planner_optimize_timeout_ms: int = fe_config.get(
 fe_background_refresh_interval_ms: int = fe_config.get(
     "background_refresh_metadata_interval_ms", 600_000
 )
+# tablet_create_timeout_second is the FE-to-CN/BE tablet creation RPC deadline.
+# StarRocks default (10 s) can be exceeded when CN pods are cold-starting or
+# under memory pressure.
+# Configurable via starrocks:fe_config:tablet_create_timeout_second.
+fe_tablet_create_timeout_second: int = fe_config.get("tablet_create_timeout_second", 60)
 _FE_CONFIG_BASE = (
     "LOG_DIR = ${STARROCKS_HOME}/log\n"
     'DATE = "$(date +%Y%m%d-%H%M%S)"\n'
-    f'JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true -Xmx{fe_jvm_heap_mb}m -XX:+UseG1GC'
-    ' -Xlog:gc*:${LOG_DIR}/fe.gc.log.$DATE:time"\n'
+    # -Xms=Xmx pre-allocates the full heap at JVM startup, eliminating heap
+    # resize GC churn during the long metadata-loading init phase.
+    f'JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true'
+    f" -Xms{fe_jvm_heap_mb}m -Xmx{fe_jvm_heap_mb}m"
+    ' -XX:+UseG1GC -Xlog:gc*:${LOG_DIR}/fe.gc.log.$DATE:time"\n'
     "http_port = 8030\n"
     "rpc_port = 9020\n"
     "query_port = 9030\n"
@@ -553,6 +569,7 @@ _FE_CONFIG_BASE = (
     "sys_log_level = INFO\n"
     "min_graceful_exit_time_second = 25\n"
     f"new_planner_optimize_timeout = {fe_planner_optimize_timeout_ms}\n"
+    f"tablet_create_timeout_second = {fe_tablet_create_timeout_second}\n"
     "background_refresh_metadata_enable = true\n"
     "background_refresh_metadata_interval_millis"
     f" = {fe_background_refresh_interval_ms}\n"

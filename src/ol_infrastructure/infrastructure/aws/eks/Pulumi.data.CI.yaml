@@ -13,6 +13,7 @@ config:
   eks:apisix_domains:
   - airbyte-ci.odl.mit.edu
   - api-airbyte-ci.odl.mit.edu
+  - openlit-ci.ol.mit.edu
   - pipelines-ci.odl.mit.edu
   - opik-ci.ol.mit.edu
   eks:apisix_viewer_key:
