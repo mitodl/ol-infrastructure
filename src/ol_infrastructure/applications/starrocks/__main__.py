@@ -234,7 +234,7 @@ if starrocks_config.get_bool("use_cn"):
             tags=aws_config.tags,
             bucket_name=shared_data_bucket_name,
             server_side_encryption_enabled=True,
-            kms_key_id=s3_kms_key["id"],
+            kms_key_id=s3_kms_key["arn"],
             bucket_key_enabled=True,
         ),
         opts=ResourceOptions(parent=starrocks_auth_binding),
@@ -552,7 +552,13 @@ fe_background_refresh_interval_ms: int = fe_config.get(
 # StarRocks default (10 s) can be exceeded when CN pods are cold-starting or
 # under memory pressure.
 # Configurable via starrocks:fe_config:tablet_create_timeout_second.
-fe_tablet_create_timeout_second: int = fe_config.get("tablet_create_timeout_second", 60)
+# 300s gives the CN task queue up to 5 minutes to process a tablet create
+# task after FE-rolling-restart-induced queue saturation. The StarRocks default
+# (10s) and our previous value (60s) were both too short — queue wait times
+# reach 259s when a single CN has accumulated stale tasks from an FE restart.
+fe_tablet_create_timeout_second: int = fe_config.get(
+    "tablet_create_timeout_second", 300
+)
 _FE_CONFIG_BASE = (
     "LOG_DIR = ${STARROCKS_HOME}/log\n"
     'DATE = "$(date +%Y%m%d-%H%M%S)"\n'
@@ -658,7 +664,13 @@ def _build_fe_config(  # noqa: PLR0913
             "cloud_native_storage_type = S3\n"
             f"aws_s3_path = {bucket_name}\n"
             f"aws_s3_region = {aws_region}\n"
-            f"aws_s3_endpoint = https://s3.{aws_region}.amazonaws.com\n"
+            # Do NOT set aws_s3_endpoint. An explicit path-style endpoint
+            # (s3.<region>.amazonaws.com) causes the CN C++ storage layer to
+            # sign PutObject requests with Signature V2, which SSE-KMS rejects:
+            # "Requests specifying Server Side Encryption with AWS KMS managed
+            # keys require AWS Signature Version 4."
+            # Without the override the SDK derives a virtual-hosted-style
+            # endpoint (bucket.s3.region.amazonaws.com) that uses SigV4.
             "aws_s3_use_instance_profile = true\n"
             "enable_load_volume_from_conf = true\n"
         )
