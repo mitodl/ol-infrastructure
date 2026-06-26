@@ -37,10 +37,6 @@ config:
     SHEETS_REFUND_FIRST_ROW: 254
     SHEETS_REFUND_PROCESSOR_COL: 12
     SHEETS_REFUND_SKIP_ROW_COL: 15
-    UWSGI_IGNORE_WRITE_ERRORS: "True"
-    UWSGI_LISTEN: 500
-    UWSGI_PROCESSES: 3
-    UWSGI_WORKER_RELOAD_MERCY: 60
     VOUCHER_COMPANY_ID: 1
     WAGTAIL_CACHE_MAX_ENTRIES: 500
     YOUTUBE_FETCH_SCHEDULE_SECONDS: 7200
@@ -52,6 +48,7 @@ config:
   xpro:frontend_domain: "rc.xpro.mit.edu"
   xpro:db_password:
     secure: v1:W6DusspG9IcM4g6H:HvfOZra3mL7KU/JYUFzcDUj0YrFD7EQJTAwkceVjI1ajCVmLUlj8kiTNYL5IOcW7KK0gmAcnkJHzzCE=
+  xpro:granian_workers: 3
   xpro:k8s_deploy: "true"
   redis:password:
     secure: v1:NZFkcENg2HYRB3D1:RZhkIW/N2mF75Z1Xe7wnHhS53enSZRRX/u4oHLrYtdo6zCSeDEhVc1pCaYS9jp8zMFGsc6O7Xx7d9A==
