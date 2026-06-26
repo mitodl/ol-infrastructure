@@ -265,7 +265,7 @@ OLCertManagerCert(
         k8s_namespace=openlit_namespace,
         k8s_labels=k8s_global_labels,
         create_apisixtls_resource=True,
-        dest_secret_name="openlit-tls",  # noqa: S106  # pragma: allowlist secret
+        dest_secret_name="openlit-apisix-tls",  # noqa: S106  # pragma: allowlist secret
         dns_names=[openlit_domain],
     ),
     opts=ResourceOptions(depends_on=[openlit_helm_release]),
