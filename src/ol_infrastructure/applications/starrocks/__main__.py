@@ -556,8 +556,11 @@ fe_tablet_create_timeout_second: int = fe_config.get("tablet_create_timeout_seco
 _FE_CONFIG_BASE = (
     "LOG_DIR = ${STARROCKS_HOME}/log\n"
     'DATE = "$(date +%Y%m%d-%H%M%S)"\n'
-    f'JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true -Xmx{fe_jvm_heap_mb}m -XX:+UseG1GC'
-    ' -Xlog:gc*:${LOG_DIR}/fe.gc.log.$DATE:time"\n'
+    # -Xms=Xmx pre-allocates the full heap at JVM startup, eliminating heap
+    # resize GC churn during the long metadata-loading init phase.
+    f'JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true'
+    f" -Xms{fe_jvm_heap_mb}m -Xmx{fe_jvm_heap_mb}m"
+    ' -XX:+UseG1GC -Xlog:gc*:${LOG_DIR}/fe.gc.log.$DATE:time"\n'
     "http_port = 8030\n"
     "rpc_port = 9020\n"
     "query_port = 9030\n"
