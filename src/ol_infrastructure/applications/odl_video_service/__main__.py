@@ -839,7 +839,6 @@ ovs_k8s_app = OLApplicationK8s(
         application_security_group_id=ovs_app_security_group.id,
         application_security_group_name=ovs_app_security_group.name,
         application_image_repository="mitodl/odl-video-service-app",
-        registry="dockerhub",
         **docker_image_config_kwargs("ODL_VIDEO_SERVICE"),
         granian_config=GranianConfig(
             application_module="odl_video.wsgi:application",
