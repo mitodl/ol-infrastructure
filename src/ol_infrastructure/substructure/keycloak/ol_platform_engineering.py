@@ -169,6 +169,53 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913
     )
     # AIRBYTE [END] # noqa: ERA001
 
+    # OPENLIT [START] # noqa: ERA001
+    # OpenLIT (LLM/GenAI observability) has no native auth in its open-source
+    # edition, so authentication is enforced by APISIX in front of it. This
+    # CONFIDENTIAL client backs the interactive UI login (standard flow); unlike
+    # Opik there is no service-account / client-credentials flow because no
+    # bearer-token ingestion path is exposed through this ingress. Credentials
+    # are published to Vault for the APISIX openid-connect plugin to consume via
+    # the Vault Secrets Operator.
+    ol_platform_engineering_openlit_client = keycloak.openid.Client(
+        "ol-platform-engineering-openlit-client",
+        name="ol-platform-engineering-openlit-client",
+        realm_id="ol-platform-engineering",
+        client_id="ol-openlit-client",
+        client_secret=keycloak_realm_config.get(
+            "ol-platform-engineering-openlit-client-secret"
+        ),
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        service_accounts_enabled=False,
+        valid_redirect_uris=keycloak_realm_config.get_object(
+            "ol-platform-engineering-openlit-redirect-uris"
+        ),
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    vault.generic.Secret(
+        "ol-platform-engineering-openlit-client-vault-oidc-credentials",
+        path="secret-operations/sso/openlit",
+        data_json=Output.all(
+            url=ol_platform_engineering_openlit_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
+            client_id=ol_platform_engineering_openlit_client.client_id,
+            client_secret=ol_platform_engineering_openlit_client.client_secret,
+            # Independent random value required by the APISIX openid-connect
+            # plugin for session signing; not part of the OAuth credentials.
+            secret=session_secret,
+            realm_id=ol_platform_engineering_openlit_client.realm_id,
+            realm_name="ol-platform-engineering",
+            realm_public_key=ol_platform_engineering_openlit_client.realm_id.apply(
+                fetch_realm_public_key_partial
+            ),
+        ).apply(json.dumps),
+    )
+    # OPENLIT [END] # noqa: ERA001
+
     # JUPYTERHUB [START] # noqa: ERA001
     ol_platform_engineering_jupyterhub_client = keycloak.openid.Client(
         "ol-platform-engineering-jupyterhub-client",
