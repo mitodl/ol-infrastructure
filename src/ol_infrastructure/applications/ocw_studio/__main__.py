@@ -47,6 +47,7 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.k8s import (
+    GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryBeatConfig,
     OLApplicationK8sCeleryWorkerConfig,
@@ -601,13 +602,15 @@ ocw_studio_k8s_app = OLApplicationK8s(
         application_security_group_name=ocw_studio_app_security_group.name,
         application_image_repository="mitodl/ocw-studio-app",
         **docker_image_config_kwargs("OCW_STUDIO"),
-        application_cmd_array=["uwsgi"],
-        application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
+        granian_config=GranianConfig(
+            application_module="main.wsgi:application",
+            workers=2,
+            blocking_threads_idle_timeout=120,
+            enable_metrics=True,
+        ),
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         registry="dockerhub",
         import_nginx_config=True,
-        import_nginx_config_path="files/web.conf",
-        import_uwsgi_config=True,
         init_migrations=True,
         init_collectstatic=True,
         pre_deploy_commands=[
