@@ -4,7 +4,7 @@ import json
 
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions
+from pulumi import Alias, Config, Output, ResourceOptions
 
 
 def create_ol_platform_engineering_realm(  # noqa: PLR0913
@@ -168,6 +168,62 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913
         ).apply(json.dumps),
     )
     # AIRBYTE [END] # noqa: ERA001
+
+    # OPIK [START] # noqa: ERA001
+    # Opik (Comet LLM observability) has no native OIDC in its open-source
+    # edition, so authentication is enforced by APISIX in front of it. This
+    # CONFIDENTIAL client backs both the interactive UI login (standard flow)
+    # and the service-account / client-credentials flow that SDK clients use to
+    # mint bearer tokens for the /api ingestion path (see the opik application
+    # stack). Credentials are published to Vault for the APISIX openid-connect
+    # plugin to consume via the Vault Secrets Operator.
+    ol_platform_engineering_opik_client = keycloak.openid.Client(
+        "ol-platform-engineering-opik-client",
+        name="ol-platform-engineering-opik-client",
+        realm_id="ol-platform-engineering",
+        client_id="ol-opik-client",
+        client_secret=keycloak_realm_config.get(
+            "ol-platform-engineering-opik-client-secret"
+        ),
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        service_accounts_enabled=True,
+        direct_access_grants_enabled=False,
+        valid_redirect_uris=keycloak_realm_config.get_object(
+            "ol-platform-engineering-opik-redirect-uris"
+        ),
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    vault.generic.Secret(
+        "ol-platform-engineering-opik-client-vault-oidc-credentials",
+        path="secret-operations/sso/opik",
+        data_json=Output.all(
+            url=ol_platform_engineering_opik_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
+            client_id=ol_platform_engineering_opik_client.client_id,
+            client_secret=ol_platform_engineering_opik_client.client_secret,
+            # Independent random value required by the APISIX openid-connect
+            # plugin for session signing; not part of the OAuth credentials.
+            secret=session_secret,
+            realm_id=ol_platform_engineering_opik_client.realm_id,
+            realm_name="ol-platform-engineering",
+            realm_public_key=ol_platform_engineering_opik_client.realm_id.apply(
+                fetch_realm_public_key_partial
+            ),
+        ).apply(json.dumps),
+        # This secret was previously created by the ol-data-platform realm
+        # module at the same Vault path. Alias it so Pulumi performs an in-place
+        # move/update (rewriting the credentials for the new realm's client)
+        # instead of create+delete — the latter would delete the shared Vault
+        # path after writing it, leaving it empty.
+        opts=ResourceOptions(
+            aliases=[Alias(name="ol-data-platform-opik-client-vault-oidc-credentials")]
+        ),
+    )
+    # OPIK [END] # noqa: ERA001
 
     # OPENLIT [START] # noqa: ERA001
     # OpenLIT (LLM/GenAI observability) has no native auth in its open-source
