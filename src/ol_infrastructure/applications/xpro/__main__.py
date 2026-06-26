@@ -533,7 +533,7 @@ if k8s_deploy:
             **docker_image_config_kwargs("XPRO"),
             granian_config=GranianConfig(
                 application_module="mitxpro.wsgi:application",
-                workers=xpro_config.get_int("granian_workers") or 2,
+                workers=2,
                 blocking_threads_idle_timeout=120,
                 enable_metrics=True,
             ),
