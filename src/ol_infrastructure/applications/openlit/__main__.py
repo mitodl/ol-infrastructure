@@ -271,8 +271,8 @@ OLCertManagerCert(
     opts=ResourceOptions(depends_on=[openlit_helm_release]),
 )
 
-# Shared plugins applied to the OpenLIT route (cors, http->https redirect,
-# prometheus, opentelemetry, request-id).
+# Shared plugins applied to the OpenLIT route (http->https redirect, cors,
+# response headers, prometheus, and (non-CI) opentelemetry).
 openlit_shared_plugins = OLApisixSharedPlugins(
     name=f"openlit-shared-plugins-{stack_info.env_suffix}",
     plugin_config=OLApisixSharedPluginsConfig(
