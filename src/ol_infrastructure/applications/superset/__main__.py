@@ -775,6 +775,204 @@ celery_keda_scaling = kubernetes.apiextensions.CustomResource(
 )
 
 ########################################
+# Superset MCP Server                   #
+########################################
+# The MCP server runs as a separate Deployment using the same custom Superset
+# image.  It shares all Vault-synced secrets with the main pods and exposes
+# the MCP API at /mcp, routed through the existing HTTPS Gateway listener.
+#
+# Config delivery: the superset_config.py from this Pulumi project is mounted
+# via a dedicated ConfigMap and pointed to by SUPERSET_CONFIG_PATH so the
+# process loads the same Python config (including MCP_* settings) regardless
+# of what is baked into the image.
+#
+# Prerequisite: the custom 'mitodl/superset' image must include the fastmcp
+# package (pip install fastmcp) for the 'superset mcp run' sub-command to work.
+
+_MCP_CONFIG_CONFIGMAP_NAME = "superset-mcp-config"
+_MCP_CONFIG_FILENAME = "superset_config.py"
+_MCP_CONFIG_MOUNT_PATH = "/app/superset_mcp_config"
+_MCP_CONFIG_CONTENT = (
+    Path(__file__).parent.joinpath("superset_config.py").read_text(encoding="utf-8")
+)
+
+mcp_config_configmap = kubernetes.core.v1.ConfigMap(
+    "superset-mcp-config-configmap",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=_MCP_CONFIG_CONFIGMAP_NAME,
+        namespace=superset_namespace,
+        labels=k8s_global_labels,
+    ),
+    data={_MCP_CONFIG_FILENAME: _MCP_CONFIG_CONTENT},
+)
+
+# Build envFrom sources matching those on the main Superset pods so the MCP
+# process has access to all credentials injected via Vault Secrets Operator.
+_mcp_env_from: list[kubernetes.core.v1.EnvFromSourceArgs] = [
+    kubernetes.core.v1.EnvFromSourceArgs(
+        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(name=app_config_secret_name)
+    ),
+    kubernetes.core.v1.EnvFromSourceArgs(
+        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(name=redis_secret_name)
+    ),
+    kubernetes.core.v1.EnvFromSourceArgs(
+        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(name=db_creds_secret_name)
+    ),
+    kubernetes.core.v1.EnvFromSourceArgs(
+        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(name=oidc_secret_name)
+    ),
+]
+if starrocks_creds_secret_name:
+    _mcp_env_from.append(
+        kubernetes.core.v1.EnvFromSourceArgs(
+            secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+                name=starrocks_creds_secret_name
+            )
+        )
+    )
+
+mcp_deployment = kubernetes.apps.v1.Deployment(
+    "superset-mcp-deployment",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="superset-mcp",
+        namespace=superset_namespace,
+        labels=k8s_global_labels | {"ol.mit.edu/process": "mcp"},
+    ),
+    spec=kubernetes.apps.v1.DeploymentSpecArgs(
+        replicas=2,
+        selector=kubernetes.meta.v1.LabelSelectorArgs(
+            match_labels={"app.kubernetes.io/name": "superset-mcp"},
+        ),
+        template=kubernetes.core.v1.PodTemplateSpecArgs(
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                labels=k8s_global_labels
+                | {
+                    "app.kubernetes.io/name": "superset-mcp",
+                    "ol.mit.edu/process": "mcp",
+                },
+            ),
+            spec=kubernetes.core.v1.PodSpecArgs(
+                service_account_name="superset",
+                containers=[
+                    kubernetes.core.v1.ContainerArgs(
+                        name="superset-mcp",
+                        image=f"{ecr_image_uri('mitodl/superset')}:{SUPERSET_TAG}",
+                        command=[
+                            "superset",
+                            "mcp",
+                            "run",
+                            "--host",
+                            "0.0.0.0",  # noqa: S104
+                            "--port",
+                            "5008",
+                        ],
+                        ports=[
+                            kubernetes.core.v1.ContainerPortArgs(
+                                container_port=5008,
+                                name="mcp",
+                            )
+                        ],
+                        env=[
+                            # Matches the extraEnv on the main Helm chart pods
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="REDIS_PROTO",
+                                value="rediss",
+                            ),
+                            # Public URL for MCP-generated links (chart previews, etc.)
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="SUPERSET_MCP_PUBLIC_URL",
+                                value=f"https://{superset_domain}",
+                            ),
+                            # Point Superset to the ConfigMap-mounted config file so
+                            # MCP_* settings are loaded regardless of image contents.
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="SUPERSET_CONFIG_PATH",
+                                value=f"{_MCP_CONFIG_MOUNT_PATH}/{_MCP_CONFIG_FILENAME}",
+                            ),
+                        ],
+                        env_from=_mcp_env_from,
+                        # tcpSocket probes are used because the /mcp endpoint
+                        # speaks JSON-RPC (not plain HTTP GET), so an HTTP probe
+                        # would receive an unexpected response code.
+                        readiness_probe=kubernetes.core.v1.ProbeArgs(
+                            tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
+                                port=5008,
+                            ),
+                            initial_delay_seconds=10,
+                            period_seconds=5,
+                            failure_threshold=3,
+                        ),
+                        liveness_probe=kubernetes.core.v1.ProbeArgs(
+                            tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
+                                port=5008,
+                            ),
+                            initial_delay_seconds=15,
+                            period_seconds=10,
+                            failure_threshold=3,
+                        ),
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            limits={"cpu": "500m", "memory": "512Mi"},
+                            requests={"cpu": "100m", "memory": "256Mi"},
+                        ),
+                        volume_mounts=[
+                            # OL logo (matches the mount on main Superset pods)
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="ol-logo",
+                                mount_path=_LOGO_MOUNT_PATH,
+                                sub_path=_LOGO_FILENAME,
+                                read_only=True,
+                            ),
+                            # Superset config with MCP settings
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="mcp-config",
+                                mount_path=_MCP_CONFIG_MOUNT_PATH,
+                                read_only=True,
+                            ),
+                        ],
+                    )
+                ],
+                volumes=[
+                    kubernetes.core.v1.VolumeArgs(
+                        name="ol-logo",
+                        config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                            name=_LOGO_CONFIGMAP_NAME,
+                        ),
+                    ),
+                    kubernetes.core.v1.VolumeArgs(
+                        name="mcp-config",
+                        config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                            name=_MCP_CONFIG_CONFIGMAP_NAME,
+                        ),
+                    ),
+                ],
+            ),
+        ),
+    ),
+    opts=ResourceOptions(
+        depends_on=[logo_configmap, mcp_config_configmap, superset_chart],
+    ),
+)
+
+mcp_service = kubernetes.core.v1.Service(
+    "superset-mcp-service",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="superset-mcp",
+        namespace=superset_namespace,
+        labels=k8s_global_labels | {"ol.mit.edu/process": "mcp"},
+    ),
+    spec=kubernetes.core.v1.ServiceSpecArgs(
+        selector={"app.kubernetes.io/name": "superset-mcp"},
+        ports=[
+            kubernetes.core.v1.ServicePortArgs(
+                port=5008,
+                target_port=5008,
+                name="mcp",
+            )
+        ],
+    ),
+)
+
+########################################
 # Gateway API routing + TLS certificate #
 ########################################
 
@@ -794,6 +992,19 @@ gateway_config = OLEKSGatewayConfig(
         ),
     ],
     routes=[
+        # Each OLEKSGatewayRouteConfig becomes a separate HTTPRoute resource;
+        # list order does not affect matching.  Gateway API selects the most
+        # specific matching route by prefix length, so /mcp always wins over /.
+        OLEKSGatewayRouteConfig(
+            backend_service_name="superset-mcp",
+            backend_service_namespace=superset_namespace,
+            backend_service_port=5008,
+            name="superset-mcp-https",
+            listener_name="https-web",
+            hostnames=[superset_domain],
+            port=8443,
+            matches=[{"path": {"type": "PathPrefix", "value": "/mcp"}}],
+        ),
         OLEKSGatewayRouteConfig(
             backend_service_name="superset",
             backend_service_namespace=superset_namespace,
