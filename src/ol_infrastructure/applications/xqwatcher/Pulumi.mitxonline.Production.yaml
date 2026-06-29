@@ -6,14 +6,23 @@ config:
   xqwatcher:business_unit: mitxonline
   xqwatcher:cluster: applications
   xqwatcher:namespace: mitxonline-openedx
-  xqwatcher:min_replicas: 2
+  # Concurrency drawn down to a single worker to avoid the xqueue-watcher login
+  # storm: all watcher sessions authenticate as the shared `xqwatcher` LMS user,
+  # and PREVENT_CONCURRENT_LOGINS keeps only one session per user, so concurrent
+  # logins evict each other. One pod + one queue + CONNECTIONS=1 == one session.
+  # See openedx/edx-platform concurrent-login issue. Trade-off: no failover until
+  # the upstream exemption lands; revert min/max to 2+ afterward.
+  xqwatcher:min_replicas: 1
+  xqwatcher:max_replicas: 1
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   xqwatcher:edxorg_xqueue_enabled: true
   xqwatcher:xqueue_server_url: https://courses.learn.mit.edu
   xqwatcher:queues:
     Watcher-MITx-6.00x:
-      CONNECTIONS: 5
+      # Single connection: serializes grading for this queue but guarantees a
+      # single xqwatcher login session (see replica note above).
+      CONNECTIONS: 1
       HANDLERS:
       - HANDLER: xqueue_watcher.containergrader.ContainerGrader
         KWARGS:
@@ -38,15 +47,18 @@ config:
           memory_limit: 1Gi
           timeout: 60
           image_pull_policy: always
-    mitx-686xgrader:
-      CONNECTIONS: 5
-      HANDLERS:
-      - HANDLER: xqueue_watcher.containergrader.ContainerGrader
-        KWARGS:
-          grader_root: /graders/
-          image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/mitodl/graders-mit-686x:latest
-          backend: kubernetes
-          cpu_limit: 1000m
-          memory_limit: 1Gi
-          timeout: 60
-          image_pull_policy: always
+    # 686x grader on the MITx LMS is not currently in use; commented out to
+    # remove its xqwatcher queue (a second concurrent login session) while the
+    # concurrency drawdown is in effect. Re-enable when 6.86x grading is needed.
+    # mitx-686xgrader:
+    #   CONNECTIONS: 1
+    #   HANDLERS:
+    #   - HANDLER: xqueue_watcher.containergrader.ContainerGrader
+    #     KWARGS:
+    #       grader_root: /graders/
+    #       image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/mitodl/graders-mit-686x:latest
+    #       backend: kubernetes
+    #       cpu_limit: 1000m
+    #       memory_limit: 1Gi
+    #       timeout: 60
+    #       image_pull_policy: always
