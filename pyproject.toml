@@ -42,6 +42,7 @@ dependencies = [
     "pulumi-terraform>=6.0.1",
     "pulumi-command>=1.0,<2",
     "ol-concourse>=0.8.4,<0.9",
+    "pulumiverse-grafana>=2.0.0,<3",
 ]
 
 [project.urls]
@@ -221,6 +222,10 @@ inline-quotes = "double"
 "src/ol_infrastructure/substructure/vault/pki/__main__.py" = ["E501"]
 "src/ol_infrastructure/lib/fastly.py" = ["E501"]
 "src/bridge/lib/versions.py" = ["E501"]
+# grafana_alerting files contain inherently long strings: PromQL expressions,
+# Go template strings for Slack/Grafana, and alert annotation text.
+"src/ol_infrastructure/infrastructure/grafana_alerting/alertmanager.py" = ["E501"]
+"src/ol_infrastructure/infrastructure/grafana_alerting/metric_rules.py" = ["E501", "ERA001"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
