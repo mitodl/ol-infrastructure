@@ -45,6 +45,7 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.k8s import (
+    GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryBeatConfig,
     OLApplicationK8sCeleryWorkerConfig,
@@ -854,12 +855,14 @@ micromasters_k8s_app = OLApplicationK8s(
         application_security_group_name=micromasters_app_security_group.name,
         application_image_repository="mitodl/micromasters-app",
         **docker_image_config_kwargs("MICROMASTERS"),
-        application_cmd_array=["uwsgi"],
-        application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
+        granian_config=GranianConfig(
+            application_module="micromasters.wsgi:application",
+            workers=2,
+            blocking_threads_idle_timeout=120,
+            enable_metrics=True,
+        ),
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         import_nginx_config=True,
-        import_nginx_config_path="files/web.conf_uwsgi",
-        import_uwsgi_config=True,
         init_migrations=False,
         init_collectstatic=True,
         resource_requests={"cpu": "250m", "memory": "2000Mi"},
