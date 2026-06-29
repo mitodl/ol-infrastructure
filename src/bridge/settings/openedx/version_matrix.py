@@ -278,6 +278,11 @@ ReleaseMap: dict[
                 release="verawood",
             ),
             OpenEdxApplicationVersion(
+                application="admin-console",
+                application_type="MFE",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
                 application="communications",
                 application_type="MFE",
                 release="verawood",
@@ -348,6 +353,11 @@ ReleaseMap: dict[
             OpenEdxApplicationVersion(
                 application="codejail",
                 application_type="IDA",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="admin-console",
+                application_type="MFE",
                 release="verawood",
             ),
             OpenEdxApplicationVersion(
@@ -422,6 +432,11 @@ ReleaseMap: dict[
             OpenEdxApplicationVersion(
                 application="codejail",
                 application_type="IDA",
+                release="verawood",
+            ),
+            OpenEdxApplicationVersion(
+                application="admin-console",
+                application_type="MFE",
                 release="verawood",
             ),
             OpenEdxApplicationVersion(
@@ -559,6 +574,11 @@ ReleaseMap: dict[
                 release="master",
             ),
             OpenEdxApplicationVersion(
+                application="admin-console",
+                application_type="MFE",
+                release="master",
+            ),
+            OpenEdxApplicationVersion(
                 application="communications",
                 application_type="MFE",
                 release="master",
@@ -631,6 +651,11 @@ ReleaseMap: dict[
             OpenEdxApplicationVersion(
                 application="codejail",
                 application_type="IDA",
+                release="master",
+            ),
+            OpenEdxApplicationVersion(
+                application="admin-console",
+                application_type="MFE",
                 release="master",
             ),
             OpenEdxApplicationVersion(
