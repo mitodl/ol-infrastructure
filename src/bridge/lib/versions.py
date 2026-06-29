@@ -30,7 +30,7 @@ VECTOR_VERSION = "0.40.1"
 # renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/charts
 AIRBYTE_CHART_VERSION = "2.1.0"
 # renovate: datasource=helm depName=superset packageName=superset registryUrl=https://apache.github.io/superset
-SUPERSET_CHART_VERSION = "0.16.2"
+SUPERSET_CHART_VERSION = "0.17.2"
 # renovate: datasource=helm depName=tika packageName=tika registryUrl=https://apache.jfrog.io/artifactory/tika
 TIKA_CHART_VERSION = "3.2.2"
 # renovate: datasource=helm depName=openlit packageName=openlit registryUrl=https://openlit.github.io/helm
