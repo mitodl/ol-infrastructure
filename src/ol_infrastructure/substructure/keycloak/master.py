@@ -9,7 +9,7 @@ import json
 
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
-from pulumi import InvokeOptions, Output, ResourceOptions
+from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 
 def create_master_realm_resources(
@@ -18,6 +18,7 @@ def create_master_realm_resources(
 ) -> None:
     """Create master-realm-scoped resources shared across all Keycloak realms."""
     resource_options = ResourceOptions(provider=keycloak_provider)
+    keycloak_realm_config = Config("keycloak_realm")
 
     # ── scim-manager service account ────────────────────────────────────────
     # scim-for-keycloak enterprise plugin's admin backend requires a confidential
@@ -65,17 +66,29 @@ def create_master_realm_resources(
             opts=resource_options,
         )
 
-    # Assign scim-admin from each realm's management client in master.
+    # Assign scim-admin from each realm's {realm}-realm management client in master.
+    #
     # scim-for-keycloak's BackendAuthentication.authenticateAsScimAdmin() checks
     # whether the token holder has the scim-admin role in the {realm}-realm client
     # that Keycloak auto-creates in master for each managed realm.
-    for realm_name in [
-        "master",
-        "olapps",
-        "ol-mit",
-        "ol-data-platform",
-        "ol-platform-engineering",
-    ]:
+    #
+    # Both the {realm}-realm clients AND the scim-admin role within them are created
+    # by the plugin at runtime — they do not exist before the plugin initialises.
+    # To avoid failing in environments where the plugin has not yet run, this block
+    # is gated on the "scim-plugin-managed-realms" config key (default: empty list).
+    # Add realm names there only after scim-for-keycloak has initialised in that env.
+    #
+    # Example stack config once the plugin is running:
+    #   keycloak_realm:scim-plugin-managed-realms:
+    #     - master
+    #     - olapps
+    #     - ol-mit
+    #     - ol-data-platform
+    #     - ol-platform-engineering
+    scim_managed_realms: list[str] = (
+        keycloak_realm_config.get_object("scim-plugin-managed-realms") or []
+    )
+    for realm_name in scim_managed_realms:
         realm_mgmt_client = keycloak.openid.get_client(
             realm_id="master",
             client_id=f"{realm_name}-realm",
