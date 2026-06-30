@@ -62,30 +62,6 @@ def create_master_realm_resources(
         keycloak_realm_config.get_object("scim-plugin-managed-realms") or []
     )
 
-    if scim_managed_realms:
-        master_realm_mgmt = keycloak.openid.get_client(
-            realm_id="master",
-            client_id="realm-management",
-            opts=InvokeOptions(provider=keycloak_provider),
-        )
-        for resource_name, role_name in [
-            ("master-scim-manager-manage-realm", "manage-realm"),
-            ("master-scim-manager-manage-users", "manage-users"),
-            ("master-scim-manager-manage-clients", "manage-clients"),
-            ("master-scim-manager-view-realm", "view-realm"),
-            ("master-scim-manager-view-users", "view-users"),
-            ("master-scim-manager-query-users", "query-users"),
-            ("master-scim-manager-query-realms", "query-realms"),
-        ]:
-            keycloak.openid.ClientServiceAccountRole(
-                resource_name,
-                realm_id="master",
-                service_account_user_id=scim_manager_client.service_account_user_id,
-                client_id=master_realm_mgmt.id,
-                role=role_name,
-                opts=resource_options,
-            )
-
     for realm_name in scim_managed_realms:
         realm_mgmt_client = keycloak.openid.get_client(
             realm_id="master",
