@@ -42,7 +42,7 @@ server {
         gzip_proxied any;
         gzip_types application/json;
         gzip_min_length 1024;
-        gzip_comp_level 5;
+        gzip_comp_level 1;
     }
 
 }
