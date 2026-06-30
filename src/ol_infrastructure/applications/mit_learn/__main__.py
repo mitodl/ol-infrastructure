@@ -1493,7 +1493,7 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_cmd_array=["uwsgi"],
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         granian_config=GranianConfig(
-            workers=1,
+            workers=2,  # was 1; Granian ASGI limits blocking_threads=1/worker, so this is the only concurrency lever for sync Django work
             enable_metrics=True,
             interface="asginl",
             backlog=None,
@@ -1667,6 +1667,40 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             backend_service_name=mitlearn_k8s_app.application_lb_service_name,
             backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
         ),
+        OLApisixRouteConfig(
+            route_name="scim-rate-limit",
+            priority=5,
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                # Rate-limit SCIM to protect against IdP flooding (2026-06-30 incident:
+                # 50-100 PATCH/5min/pod for 90+ min caused head-of-line blocking on
+                # single-worker Granian pods).
+                OLApisixPluginConfig(
+                    name="limit-req",
+                    config={
+                        "rate": 10,
+                        "burst": 5,
+                        "key": "remote_addr",
+                        "key_type": "var",
+                        "rejected_code": 429,
+                    },
+                ),
+                OLApisixPluginConfig(
+                    name="limit-conn",
+                    config={
+                        "conn": 5,
+                        "burst": 2,
+                        "key": "remote_addr",
+                        "key_type": "var",
+                        "rejected_code": 429,
+                    },
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/scim/v2/*"],
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
     ],
     opts=ResourceOptions(
         delete_before_replace=True,
@@ -1721,6 +1755,41 @@ learn_external_service_apisix_route = OLApisixRoute(
                 "/learn/login",
                 "/learn/login/*",
             ],
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="scim-rate-limit",
+            priority=5,
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                # Rate-limit SCIM to protect against IdP flooding (2026-06-30 incident:
+                # 50-100 PATCH/5min/pod for 90+ min caused head-of-line blocking on
+                # single-worker Granian pods).
+                OLApisixPluginConfig(
+                    name="limit-req",
+                    config={
+                        "rate": 10,
+                        "burst": 5,
+                        "key": "remote_addr",
+                        "key_type": "var",
+                        "rejected_code": 429,
+                    },
+                ),
+                OLApisixPluginConfig(
+                    name="limit-conn",
+                    config={
+                        "conn": 5,
+                        "burst": 2,
+                        "key": "remote_addr",
+                        "key_type": "var",
+                        "rejected_code": 429,
+                    },
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/learn/scim/v2/*"],
             backend_service_name=mitlearn_k8s_app.application_lb_service_name,
             backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
         ),
