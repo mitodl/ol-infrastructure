@@ -21,9 +21,11 @@ def create_master_realm_resources(
     keycloak_realm_config = Config("keycloak_realm")
 
     # ── scim-manager service account ────────────────────────────────────────
-    # scim-for-keycloak enterprise plugin's admin backend requires a confidential
-    # client with service accounts; it explicitly rejects admin-cli (public client)
-    # tokens and mandates the client_credentials grant.
+    # Service account for managing scim-for-keycloak configuration via the
+    # plugin's admin REST API. The admin backend accepts admin-cli tokens when
+    # spi-realm-restapi-extension-scim-accept-admin-cli-login=true is set (see
+    # applications/keycloak/__main__.py additionalOptions). The scim-admin role
+    # granted below enables access to the per-realm inbound SCIM server config.
     scim_manager_client = keycloak.openid.Client(
         "master-scim-manager-client",
         name="scim-manager",
