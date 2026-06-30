@@ -315,10 +315,13 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         "acr",
         "email",
         "profile",
-        "role_list",
         "roles",
         "web-origins",
         "ol-profile",
+        # "role_list" is intentionally omitted: it is a SAML-protocol client
+        # scope, and keycloak.openid.ClientDefaultScopes only accepts
+        # openid-connect scopes — including it fails with
+        # "validation error: scope role_list does not exist".
         # KC 26 auto-attaches "organization" as an optional scope when
         # organizations_enabled=True — adding it as default causes 409 Conflict.
     ]
