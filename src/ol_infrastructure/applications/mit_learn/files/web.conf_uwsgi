@@ -37,12 +37,6 @@ server {
         proxy_pass_request_headers on;
         proxy_pass_request_body on;
         client_max_body_size 25M;
-
-        gzip on;
-        gzip_proxied any;
-        gzip_types application/json;
-        gzip_min_length 1024;
-        gzip_comp_level 5;
     }
 
 }
