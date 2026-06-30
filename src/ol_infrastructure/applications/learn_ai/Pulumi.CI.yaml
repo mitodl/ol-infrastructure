@@ -32,6 +32,7 @@ config:
     MITOL_COOKIE_NAME: "mitol"
     MITOL_ENVIRONMENT: "ci"
     MITOL_FEATURES_DEFAULT: "true"
+    MITOL_SECURE_SSL_REDIRECT: "False"
     NODE_ENV: "development"
     PROBLEM_SET_URL: https://api.ci.learn.mit.edu/api/v0/tutor/problems/
     SENTRY_LOG_LEVEL: "ERROR"
