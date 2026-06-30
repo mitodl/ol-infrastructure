@@ -197,6 +197,37 @@ def setup_apisix(
     # repeatedly fail to reach a non-existent collector.
     otel_tracing_enabled = stack_info.env_suffix.lower() != "ci"
 
+    # Collector/resource/batch settings for the opentelemetry plugin.  In APISIX
+    # 3.14 the plugin reads these from *plugin_metadata*, NOT plugin_attr: its
+    # ``rewrite`` phase calls ``plugin.plugin_metadata("opentelemetry")`` and, if
+    # that is nil, logs "plugin_metadata is required for opentelemetry plugin to
+    # working properly" and returns *without creating or exporting a span* (see
+    # apisix/plugins/opentelemetry.lua).  The ingress controller delivers this to
+    # the data plane via the GatewayProxy ``pluginMetadata`` field (rendered into
+    # the standalone config's ``plugin_metadata`` over the Admin API) -- see the
+    # ingress-controller.gatewayProxy values below.  ``trace_id_source: random``
+    # yields spec-compliant 16-byte trace ids; "x-request-id" would pass the
+    # request-id UUID verbatim, which Tempo drops as malformed.
+    otel_plugin_metadata = {
+        "trace_id_source": "random",
+        "resource": {
+            "service.name": "apisix",
+            "deployment.environment": stack_info.env_suffix.lower(),
+        },
+        "collector": {
+            "address": "grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318",
+            "request_timeout": 3,
+        },
+        "batch_span_processor": {
+            "drop_on_queue_full": False,
+            "max_queue_size": 1024,
+            "batch_timeout": 2,
+            "inactive_timeout": 1,
+            "max_export_batch_size": 16,
+        },
+        "set_ngx_var": False,
+    }
+
     # Create apache-apisix specific labels that include both global labels
     # and app-specific labels for proper service selector matching
     apisix_labels = {
@@ -417,45 +448,19 @@ def setup_apisix(
                         if otel_tracing_enabled
                         else {}
                     ),
-                    # Configure the opentelemetry plugin's collector and span
-                    # defaults.  ``pluginAttrs`` renders to ``plugin_attr`` in
-                    # config.yaml and is additive (it does not replace defaults for
-                    # other plugins).  The plugin only supports binary OTLP over
-                    # HTTP, so it targets the Alloy receiver's HTTP port (4318); the
-                    # plugin appends ``/v1/traces`` to the address itself.  From the
+                    # ``pluginAttrs`` renders to ``plugin_attr`` in config.yaml.
+                    # NOTE: the APISIX 3.14 opentelemetry plugin does NOT read its
+                    # collector/resource config from plugin_attr -- it reads it from
+                    # plugin_metadata (delivered via the GatewayProxy below).  The
+                    # same config is mirrored here only so older/other plugin builds
+                    # that still consult plugin_attr keep working; on 3.14 it is
+                    # inert but harmless.  The plugin only supports binary OTLP over
+                    # HTTP, so the collector targets the Alloy receiver's HTTP port
+                    # (4318); the plugin appends ``/v1/traces`` itself.  From the
                     # receiver, traces flow through the existing tail-sampling
                     # pipeline to Grafana Cloud (see grafana.py gc-otlp-endpoint).
                     **(
-                        {
-                            "pluginAttrs": {
-                                "opentelemetry": {
-                                    # Generate spec-compliant random trace ids.  Do
-                                    # NOT use "x-request-id" here: APISIX uses that
-                                    # header value verbatim as the trace id with no
-                                    # validation, and the request-id plugin emits a
-                                    # 36-char UUID (with dashes) which is not a valid
-                                    # 16-byte OTLP trace id -- Tempo silently drops
-                                    # the resulting malformed spans.
-                                    "trace_id_source": "random",
-                                    "resource": {
-                                        "service.name": "apisix",
-                                        "deployment.environment": stack_info.env_suffix.lower(),
-                                    },
-                                    "collector": {
-                                        "address": "grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318",
-                                        "request_timeout": 3,
-                                    },
-                                    "batch_span_processor": {
-                                        "drop_on_queue_full": False,
-                                        "max_queue_size": 1024,
-                                        "batch_timeout": 2,
-                                        "inactive_timeout": 1,
-                                        "max_export_batch_size": 16,
-                                    },
-                                    "set_ngx_var": False,
-                                },
-                            }
-                        }
+                        {"pluginAttrs": {"opentelemetry": otel_plugin_metadata}}
                         if otel_tracing_enabled
                         else {}
                     ),
@@ -628,6 +633,18 @@ def setup_apisix(
                     "gatewayProxy": {
                         "createDefault": True,
                         "publishService": "apache-apisix-gateway",
+                        # Global plugin metadata, keyed by plugin name, shared by
+                        # every instance of that plugin.  The ingress controller
+                        # syncs this into the data plane's ``plugin_metadata`` via
+                        # the Admin API.  This is the config surface the APISIX 3.14
+                        # opentelemetry plugin actually reads (see otel_plugin_metadata
+                        # above); without it the plugin exports nothing.  Omitted on
+                        # CI to match the plugin-enablement gate.
+                        **(
+                            {"pluginMetadata": {"opentelemetry": otel_plugin_metadata}}
+                            if otel_tracing_enabled
+                            else {}
+                        ),
                         "provider": {
                             "type": "ControlPlane",
                             "controlPlane": {
