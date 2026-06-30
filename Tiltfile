@@ -165,18 +165,21 @@ local_resource(
 # Apps infrastructure stack (databases, Keycloak realm) — depends on core.
 #
 # The Keycloak provider talks to the realm over the public ingress, so we wait
-# for Keycloak to actually serve its discovery endpoint before running
-# `pulumi up`. Without the gate, the provider fires its calls while Keycloak is
-# still warming up and the gateway returns 502s, crash-looping the run.
+# for Keycloak's admin REST API to be ready before running `pulumi up`.
+# Gating on the OIDC discovery endpoint alone is insufficient: discovery comes
+# up well before the admin API can service writes, so the provider's
+# POST /admin/realms races into the warm-up window and times out
+# ("context deadline exceeded"). The script below proves the admin API is
+# serving (admin token + authenticated GET /admin/realms) before we proceed.
 #
 # `pulumi refresh` is intentionally omitted from this loop: it issues a burst
 # of concurrent admin-API calls on every reconcile, which was the main source
 # of the warm-up 502s. Refresh on demand instead.
 local_resource(
     "local-infra-apps",
-    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; echo \"Waiting for Keycloak discovery endpoint...\"; for i in $(seq 1 60); do curl -sfk https://sso.ol.{rd}/realms/master/.well-known/openid-configuration >/dev/null 2>&1 && break; sleep 5; done; pulumi up --yes --skip-preview --logtostderr --stack local-dev.apps-infra.Dev'".format(rd=root_domain),
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c '{wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --yes --skip-preview --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
     dir="./local-dev/infra/apps_infra",
-    deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py"],
+    deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py", "./local-dev/scripts/wait-for-keycloak-admin.sh"],
     labels=["infra"],
     resource_deps=["local-infra-core"],
 )
