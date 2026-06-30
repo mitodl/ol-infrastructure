@@ -40,45 +40,18 @@ def create_master_realm_resources(
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
-    # Grant realm-management roles in master so the service account can call
-    # Keycloak's admin REST API (required by the SCIM plugin internally).
-    master_realm_mgmt = keycloak.openid.get_client(
-        realm_id="master",
-        client_id="realm-management",
-        opts=InvokeOptions(provider=keycloak_provider),
-    )
-
-    for resource_name, role_name in [
-        ("master-scim-manager-manage-realm", "manage-realm"),
-        ("master-scim-manager-manage-users", "manage-users"),
-        ("master-scim-manager-manage-clients", "manage-clients"),
-        ("master-scim-manager-view-realm", "view-realm"),
-        ("master-scim-manager-view-users", "view-users"),
-        ("master-scim-manager-query-users", "query-users"),
-        ("master-scim-manager-query-realms", "query-realms"),
-    ]:
-        keycloak.openid.ClientServiceAccountRole(
-            resource_name,
-            realm_id="master",
-            service_account_user_id=scim_manager_client.service_account_user_id,
-            client_id=master_realm_mgmt.id,
-            role=role_name,
-            opts=resource_options,
-        )
-
-    # Assign scim-admin from each realm's {realm}-realm management client in master.
+    # Grant realm-management and scim-admin roles to the service account.
     #
-    # scim-for-keycloak's BackendAuthentication.authenticateAsScimAdmin() checks
-    # whether the token holder has the scim-admin role in the {realm}-realm client
-    # that Keycloak auto-creates in master for each managed realm.
+    # All get_client() invokes below require a live, initialized Keycloak:
+    #   - realm-management: built-in Keycloak client, exists once the master realm
+    #     is set up — but absent in local/CI environments with a fresh Keycloak.
+    #   - {realm}-realm: Keycloak creates these when realms are provisioned.
+    #   - scim-admin role: created by scim-for-keycloak at plugin init time.
     #
-    # Both the {realm}-realm clients AND the scim-admin role within them are created
-    # by the plugin at runtime — they do not exist before the plugin initialises.
-    # To avoid failing in environments where the plugin has not yet run, this block
-    # is gated on the "scim-plugin-managed-realms" config key (default: empty list).
-    # Add realm names there only after scim-for-keycloak has initialised in that env.
+    # Gate all lookups on scim-plugin-managed-realms (default: []). Populate
+    # this per-stack once Keycloak and the plugin are both running in that env.
     #
-    # Example stack config once the plugin is running:
+    # Example production config:
     #   keycloak_realm:scim-plugin-managed-realms:
     #     - master
     #     - olapps
@@ -88,6 +61,31 @@ def create_master_realm_resources(
     scim_managed_realms: list[str] = (
         keycloak_realm_config.get_object("scim-plugin-managed-realms") or []
     )
+
+    if scim_managed_realms:
+        master_realm_mgmt = keycloak.openid.get_client(
+            realm_id="master",
+            client_id="realm-management",
+            opts=InvokeOptions(provider=keycloak_provider),
+        )
+        for resource_name, role_name in [
+            ("master-scim-manager-manage-realm", "manage-realm"),
+            ("master-scim-manager-manage-users", "manage-users"),
+            ("master-scim-manager-manage-clients", "manage-clients"),
+            ("master-scim-manager-view-realm", "view-realm"),
+            ("master-scim-manager-view-users", "view-users"),
+            ("master-scim-manager-query-users", "query-users"),
+            ("master-scim-manager-query-realms", "query-realms"),
+        ]:
+            keycloak.openid.ClientServiceAccountRole(
+                resource_name,
+                realm_id="master",
+                service_account_user_id=scim_manager_client.service_account_user_id,
+                client_id=master_realm_mgmt.id,
+                role=role_name,
+                opts=resource_options,
+            )
+
     for realm_name in scim_managed_realms:
         realm_mgmt_client = keycloak.openid.get_client(
             realm_id="master",
