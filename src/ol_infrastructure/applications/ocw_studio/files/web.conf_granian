@@ -1,0 +1,43 @@
+server {
+    listen 8071 default_server;  # DEFAULT_NGINX_PORT
+    server_name _;
+    large_client_header_buffers 4 32k;
+
+    root /src;
+
+    set $my_scheme $http_x_forwarded_proto;
+    if ($my_scheme = "") { set $my_scheme $scheme; }
+
+    location = /nginx-health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+
+    location = /.well-known/dnt-policy.txt {
+        return 204;
+    }
+
+    location ~* /static/hash.txt {
+        expires -1;
+        add_header Cache-Control private;
+        try_files /staticfiles/hash.txt =404;
+    }
+
+    location ~* /static/(.*$) {
+        expires max;
+        add_header Access-Control-Allow-Origin *;
+        try_files /staticfiles/$1 =404;
+    }
+
+    location / {
+        proxy_set_header X-Forwarded-Proto $my_scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host $host;
+        proxy_pass http://127.0.0.1:8073;  # DEFAULT_WSGI_PORT (Granian)
+        proxy_pass_request_headers on;
+        proxy_pass_request_body on;
+        proxy_ignore_client_abort on;
+        client_max_body_size 25M;
+    }
+}

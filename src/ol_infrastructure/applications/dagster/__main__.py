@@ -236,6 +236,7 @@ athena_permissions: list[dict[str, str | list[str]]] = [
             "glue:BatchDeletePartition",
             "glue:BatchDeleteTable",
             "glue:BatchGetPartition",
+            "glue:CreateDatabase",
             "glue:CreateTable",
             "glue:CreatePartition",
             "glue:DeletePartition",
@@ -881,6 +882,10 @@ code_locations: list[dict[str, str | int]] = [
 ]
 
 # Build deployments list for user code
+# Code locations that run 2 replicas for resilience. Criteria: OOM-prone,
+# slow-starting (making restarts expensive), or high sensor-tick frequency.
+multi_replica_locations = {"legacy_openedx", "lakehouse", "data_loading"}
+
 deployments = []
 for location in code_locations:
     name: str = location["name"]  # type: ignore[assignment]
@@ -907,7 +912,8 @@ for location in code_locations:
             "tag": image_tag_or_digest,
             "pullPolicy": "IfNotPresent",
         },
-        "strategy": {
+        # Chart key is deploymentStrategy, not strategy.
+        "deploymentStrategy": {
             "type": "RollingUpdate",
             "rollingUpdate": {"maxSurge": 1, "maxUnavailable": 0},
         },
@@ -1077,6 +1083,30 @@ for location in code_locations:
                 "memory": "32Gi",
             },
         }
+
+    if name in multi_replica_locations:
+        deployment["replicaCount"] = 2
+        # Spread replicas across nodes so a single node failure doesn't take
+        # both down. Soft preference (preferred) avoids scheduling failures on
+        # small clusters.
+        deployment["affinity"] = {
+            "podAntiAffinity": {
+                "preferredDuringSchedulingIgnoredDuringExecution": [
+                    {
+                        "weight": 100,
+                        "podAffinityTerm": {
+                            "labelSelector": {
+                                "matchLabels": {
+                                    "deployment": name.replace("_", "-"),
+                                }
+                            },
+                            "topologyKey": "kubernetes.io/hostname",
+                        },
+                    }
+                ]
+            }
+        }
+
     deployments.append(deployment)
 
 # Custom Dagster instance ConfigMap with dynamic credentials support

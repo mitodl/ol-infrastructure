@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import Any, cast
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, Output, ResourceOptions, export
+import pulumi_vault
+from pulumi import Config, InvokeOptions, Output, ResourceOptions, export
 from pulumi_aws import iam
 
 from bridge.lib.versions import STARROCKS_CHART_VERSION, STARROCKS_VERSION
@@ -46,7 +47,7 @@ from ol_infrastructure.lib.pulumi_helper import (
 )
 from ol_infrastructure.lib.vault import setup_vault_provider
 
-setup_vault_provider()
+_vault_provider = setup_vault_provider()
 stack_info = parse_stack()
 starrocks_config = Config("starrocks")
 
@@ -128,7 +129,10 @@ starrocks_auth_binding = OLEKSAuthBinding(
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
         irsa_service_account_name="starrocks",
-        vault_sync_service_account_names=["starrocks-vault"],
+        # OLVaultK8SResources creates a SA named {application_name}-vault, so
+        # this must match "starrocks-{env_prefix}-vault" for the Vault k8s auth
+        # role to authorize the SA that VaultAuth actually presents.
+        vault_sync_service_account_names=[f"starrocks-{stack_info.env_prefix}-vault"],
         k8s_labels=k8s_app_labels,
         # Pre-create the SA so the IRSA role-ARN annotation is present before the
         # StarRocks operator starts and assigns this SA to FE/CN/BE pods.
@@ -230,7 +234,7 @@ if starrocks_config.get_bool("use_cn"):
             tags=aws_config.tags,
             bucket_name=shared_data_bucket_name,
             server_side_encryption_enabled=True,
-            kms_key_id=s3_kms_key["id"],
+            kms_key_id=s3_kms_key["arn"],
             bucket_key_enabled=True,
         ),
         opts=ResourceOptions(parent=starrocks_auth_binding),
@@ -351,6 +355,19 @@ starrocks_values: dict[str, Any] = {
         "service": {
             "type": "ClusterIP",
         },
+        # The operator sets failureThreshold = <seconds> / periodSeconds (5s).
+        # FE startup involves two slow phases that block the HTTP health endpoint:
+        # BDB/BDBJE catalog replay and starmgr loadMeta (the second only runs on
+        # the leader). Either can block the HTTP server for 30-120+ seconds.
+        # 120s liveness tolerance prevents spurious kills during these phases.
+        # 600s startup tolerance covers the initial JVM + Raft bootstrap before
+        # the HTTP server opens at all.
+        "livenessProbeFailureSeconds": fe_config.get(
+            "liveness_probe_failure_seconds", 120
+        ),
+        "startupProbeFailureSeconds": fe_config.get(
+            "startup_probe_failure_seconds", 600
+        ),
         "resources": {
             "requests": {
                 # StarRocks recommends 8 CPU cores and 16 GB RAM per FE node.
@@ -398,7 +415,7 @@ if starrocks_config.get_bool("oidc_enabled"):
     )
     _fe_oidc_spec = cast(dict[str, Any], starrocks_values["starrocksFESpec"])
     _fe_oidc_spec["configMaps"] = [
-        {"name": _oidc_group_cm_name, "mountPath": "/etc/starrocks/groups"}
+        {"name": _oidc_group_cm_name, "mountPath": "/opt/starrocks/fe/conf/groups"}
     ]
 
 if starrocks_config.get_bool("use_be"):
@@ -517,8 +534,13 @@ if (
 # Configurable via starrocks:fe_config:jvm_heap_mb so operators can tune it
 # when the container memory limit is changed in the stack YAML.
 _fe_memory_limit_gi = int(str(fe_config.get("memory_limit", "16Gi")).rstrip("Gi"))
+# Target 75% of the container memory limit for the JVM heap.  The FE process
+# uses ~1.5-2 GiB of non-heap memory (JVM metaspace, direct buffers, native
+# threads) on top of the heap.  87.5% left only ~2 GiB headroom, causing OOM
+# kills when GC pressure pushed total RSS above the container limit.
+# Ref: https://docs.starrocks.io/docs/faq/fe_mem_faq/
 fe_jvm_heap_mb: int = fe_config.get(
-    "jvm_heap_mb", int(_fe_memory_limit_gi * 1024 * 0.875)
+    "jvm_heap_mb", int(_fe_memory_limit_gi * 1024 * 0.75)
 )
 # new_planner_optimize_timeout is the per-query optimizer time budget (ms).
 # StarRocks default is 3000 ms, which is often too short when the FE must
@@ -532,18 +554,39 @@ fe_planner_optimize_timeout_ms: int = fe_config.get(
 # background_refresh_metadata_enable instructs the FE to continuously sync
 # all external catalog (Iceberg/Glue) metadata in the background so that
 # tables added or modified in Glue are visible to StarRocks without a manual
-# REFRESH CATALOG command.  10 minutes is short enough to pick up new
-# dbt-materialized tables within one Dagster run cycle, long enough to avoid
-# hammering the Glue API.  Configurable via
+# REFRESH CATALOG command.  1 hour is acceptable for dbt workloads — dbt
+# triggers explicit REFRESH CATALOG before model runs, so the background
+# interval only matters for ad-hoc queries.  10 minutes was too aggressive:
+# it causes periodic CPU spikes on the FE leader while the GC is also
+# competing for CPU cores.  Configurable via
 # starrocks:fe_config:background_refresh_metadata_interval_ms.
 fe_background_refresh_interval_ms: int = fe_config.get(
-    "background_refresh_metadata_interval_ms", 600_000
+    "background_refresh_metadata_interval_ms", 3_600_000
+)
+# tablet_create_timeout_second is the FE-to-CN/BE tablet creation RPC deadline.
+# StarRocks default (10 s) can be exceeded when CN pods are cold-starting or
+# under memory pressure.
+# Configurable via starrocks:fe_config:tablet_create_timeout_second.
+# 300s gives the CN task queue up to 5 minutes to process a tablet create
+# task after FE-rolling-restart-induced queue saturation. The StarRocks default
+# (10s) and our previous value (60s) were both too short — queue wait times
+# reach 259s when a single CN has accumulated stale tasks from an FE restart.
+fe_tablet_create_timeout_second: int = fe_config.get(
+    "tablet_create_timeout_second", 300
 )
 _FE_CONFIG_BASE = (
     "LOG_DIR = ${STARROCKS_HOME}/log\n"
     'DATE = "$(date +%Y%m%d-%H%M%S)"\n'
-    f'JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true -Xmx{fe_jvm_heap_mb}m -XX:+UseG1GC'
-    ' -Xlog:gc*:${LOG_DIR}/fe.gc.log.$DATE:time"\n'
+    # ZGC is used instead of G1GC. G1GC runs long concurrent mark cycles that
+    # compete with the FE application threads for CPU cores, which on an 8-core
+    # pod can saturate all cores and make the FE's HTTP server miss the 1s
+    # liveness probe timeout. ZGC performs essentially all GC work concurrently
+    # with sub-millisecond stop-the-world pauses (independent of heap size),
+    # keeping CPU available for query planning and Thrift RPC handling.
+    # -Xms=Xmx pre-allocates heap at startup to avoid resize churn during init.
+    f'JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true'
+    f" -Xms{fe_jvm_heap_mb}m -Xmx{fe_jvm_heap_mb}m"
+    ' -XX:+UseZGC -Xlog:gc*:${LOG_DIR}/fe.gc.log.$DATE:time"\n'
     "http_port = 8030\n"
     "rpc_port = 9020\n"
     "query_port = 9030\n"
@@ -552,18 +595,28 @@ _FE_CONFIG_BASE = (
     "sys_log_level = INFO\n"
     "min_graceful_exit_time_second = 25\n"
     f"new_planner_optimize_timeout = {fe_planner_optimize_timeout_ms}\n"
+    f"tablet_create_timeout_second = {fe_tablet_create_timeout_second}\n"
     "background_refresh_metadata_enable = true\n"
     "background_refresh_metadata_interval_millis"
     f" = {fe_background_refresh_interval_ms}\n"
     # Keycloak exposes preferred_username (human-readable) rather than sub (UUID).
-    # Set this FE-level default so OAuth2/JWT-authenticated sessions map to the
-    # same username regardless of per-user settings.
+    # Set FE-level defaults so both the OAuth2 browser-redirect flow and the JWT
+    # client-plugin flow map to the same username regardless of per-user settings.
     "oauth2_principal_field = preferred_username\n"
+    "jwt_principal_field = preferred_username\n"
 )
 
 
-def _build_fe_config(pwd: str | None, force_str: str, bucket_name: str | None) -> str:
-    """Assemble a complete fe.conf from optional SSL and shared-data sections.
+def _build_fe_config(  # noqa: PLR0913
+    pwd: str | None,
+    force_str: str,
+    bucket_name: str | None,
+    oidc_issuer_url: str | None = None,
+    oidc_client_id: str | None = None,
+    oidc_client_secret: str | None = None,
+    oidc_redirect_url: str | None = None,
+) -> str:
+    """Assemble a complete fe.conf from optional SSL, shared-data, and OIDC sections.
 
     Both sections are optional and can be combined.  When neither is active the
     caller should not set starrocksFESpec.config at all (chart defaults apply).
@@ -579,8 +632,43 @@ def _build_fe_config(pwd: str | None, force_str: str, bucket_name: str | None) -
     StarRocks' config parser is line-oriented, so embedded newlines or
     leading/trailing whitespace would silently break the generated file and
     prevent FE startup.
+
+    When oidc_issuer_url is provided, the full set of oauth2_* FE params is
+    written so that the StarRocks web UI shows the "OAuth2 Login" button.
+    The client secret ends up in a ConfigMap (StarRocks Helm chart limitation);
+    access is RBAC-gated and marked as a Pulumi secret so it is not stored
+    in plaintext Pulumi state.
     """
     conf = _FE_CONFIG_BASE
+
+    if oidc_issuer_url is not None:
+        _oidc_base = f"{oidc_issuer_url}/protocol/openid-connect"
+        conf += (
+            # oauth2_* — web UI "OAuth2 Login" button (browser-redirect flow).
+            # StarRocks FE exchanges the authorization code server-side using
+            # these credentials; the id_token is stored on the connection context
+            # and forwarded to Iceberg REST catalogs when security = JWT.
+            f"oauth2_auth_server_url = {_oidc_base}/auth\n"
+            f"oauth2_token_server_url = {_oidc_base}/token\n"
+            f"oauth2_client_id = {oidc_client_id}\n"
+            f"oauth2_client_secret = {oidc_client_secret}\n"
+            f"oauth2_redirect_url = {oidc_redirect_url}\n"
+            f"oauth2_jwks_url = {_oidc_base}/certs\n"
+            f"oauth2_required_issuer = {oidc_issuer_url}\n"
+            f"oauth2_required_audience = {oidc_client_id}\n"
+            # jwt_* — mysql CLI client-plugin flow (authentication_jwt).
+            # The client pre-fetches an id_token (e.g. via starrocks-auth PKCE)
+            # and sends it over the MySQL wire using the
+            # authentication_openid_connect_client plugin (MySQL 9.2+).
+            # No client_secret needed; the server verifies the JWT signature
+            # against the JWKS and maps preferred_username to the SR identity.
+            f"jwt_jwks_url = {_oidc_base}/certs\n"
+            f"jwt_required_issuer = {oidc_issuer_url}\n"
+            # authentication_chain must be in fe.conf — ADMIN SET FRONTEND CONFIG
+            # does NOT persist this setting across pod restarts (it is not
+            # replayed from BDB on startup the way catalog objects are).
+            "authentication_chain = keycloak_oauth2,keycloak_jwt,native\n"
+        )
 
     if bucket_name is not None:
         # shared_data (CN) mode: FE manages all tablet storage in S3.
@@ -596,8 +684,18 @@ def _build_fe_config(pwd: str | None, force_str: str, bucket_name: str | None) -
             "cloud_native_storage_type = S3\n"
             f"aws_s3_path = {bucket_name}\n"
             f"aws_s3_region = {aws_region}\n"
-            f"aws_s3_endpoint = https://s3.{aws_region}.amazonaws.com\n"
-            "aws_s3_use_instance_profile = true\n"
+            # aws_s3_use_aws_sdk_default_behavior=true tells StarRocks to use
+            # the full AWS SDK credential chain rather than a specific provider.
+            # In EKS the chain resolves to IRSA via the injected env vars
+            # (AWS_ROLE_ARN + AWS_WEB_IDENTITY_TOKEN_FILE); it also enforces
+            # SigV4 and virtual-hosted-style S3 addressing by default, which is
+            # required for SSE-KMS buckets.  The alternative
+            # (aws_s3_use_instance_profile=true) sets use_instance_profile=true
+            # in the storage volume and use_aws_sdk_default_behavior=false,
+            # causing the C++ storage layer to sign with Signature V2 and fail:
+            # "Requests specifying Server Side Encryption with AWS KMS managed
+            # keys require AWS Signature Version 4."
+            "aws_s3_use_aws_sdk_default_behavior = true\n"
             "enable_load_volume_from_conf = true\n"
         )
     else:
@@ -631,16 +729,54 @@ _needs_fe_config = (
 if _needs_fe_config:
     _force_str = "TRUE" if ssl_force_secure_transport else "FALSE"
     fe_spec = cast(dict[str, Any], starrocks_values["starrocksFESpec"])
+    _domain = starrocks_config.require("domain")
+
+    # Pull OIDC client credentials from Vault when OIDC is enabled so the FE web
+    # UI can display the "OAuth2 Login" button (requires oauth2_* in fe.conf).
+    _oidc_vault_data: Output | None = None
+    if starrocks_config.get_bool("oidc_enabled"):
+        _oidc_vault_data = pulumi_vault.generic.get_secret_output(
+            path="secret-operations/sso/starrocks",
+            with_lease_start_time=False,
+            opts=InvokeOptions(provider=_vault_provider),
+        ).data
 
     if ssl_enabled and ssl_keystore_password is not None:
         fe_spec["secrets"] = [
             {"name": starrocks_tls_secret_name, "mountPath": "/etc/starrocks/ssl"}
         ]
-        fe_spec["config"] = ssl_keystore_password.apply(
-            lambda pwd: _build_fe_config(pwd, _force_str, shared_data_bucket_name)
+        if _oidc_vault_data is not None:
+            fe_spec["config"] = Output.all(
+                pwd=ssl_keystore_password, oidc=_oidc_vault_data
+            ).apply(
+                lambda args: _build_fe_config(
+                    args["pwd"],
+                    _force_str,
+                    shared_data_bucket_name,
+                    oidc_issuer_url=args["oidc"]["url"],
+                    oidc_client_id=args["oidc"]["client_id"],
+                    oidc_client_secret=args["oidc"]["client_secret"],
+                    oidc_redirect_url=f"https://{_domain}/api/oauth2",
+                )
+            )
+        else:
+            fe_spec["config"] = ssl_keystore_password.apply(
+                lambda pwd: _build_fe_config(pwd, _force_str, shared_data_bucket_name)
+            )
+    elif _oidc_vault_data is not None:
+        fe_spec["config"] = _oidc_vault_data.apply(
+            lambda oidc: _build_fe_config(
+                None,
+                _force_str,
+                shared_data_bucket_name,
+                oidc_issuer_url=oidc["url"],
+                oidc_client_id=oidc["client_id"],
+                oidc_client_secret=oidc["client_secret"],
+                oidc_redirect_url=f"https://{_domain}/api/oauth2",
+            )
         )
     else:
-        # CN-only path (no SSL): no Output dependencies, build synchronously.
+        # CN-only path (no SSL, no OIDC): no Output dependencies, build synchronously.
         fe_spec["config"] = _build_fe_config(None, _force_str, shared_data_bucket_name)
 
 starrocks_release = kubernetes.helm.v3.Release(

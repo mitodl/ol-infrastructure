@@ -145,11 +145,12 @@ class OLCloudWatchAlarmSimpleElastiCache(ComponentResource):
 
         sns_topic_arn = get_monitoring_sns_arn(alarm_config.level)
         cache_cluster_id = f"{alarm_config.cluster_id}{alarm_config.node_id}"
+        alarm_actions = [sns_topic_arn] if alarm_config.enabled else []
 
         self.metric_alarm = cloudwatch.MetricAlarm(
             f"{cache_cluster_id}-{alarm_config.metric_name}-simple-elasticache_alarm",
-            actions_enabled=True,
-            alarm_actions=[sns_topic_arn],
+            actions_enabled=alarm_config.enabled,
+            alarm_actions=alarm_actions,
             alarm_description=alarm_config.description,
             comparison_operator=alarm_config.comparison_operator,
             datapoints_to_alarm=alarm_config.datapoints_to_alarm,
@@ -195,11 +196,12 @@ class OLCloudWatchAlarmSimpleRDS(ComponentResource):
         resource_options = ResourceOptions(parent=self).merge(opts)
 
         sns_topic_arn = get_monitoring_sns_arn(alarm_config.level)
+        alarm_actions = [sns_topic_arn] if alarm_config.enabled else []
 
         self.metric_alarm = cloudwatch.MetricAlarm(
             f"{alarm_config.database_identifier}-{alarm_config.metric_name}-simple-rds-alarm",
-            actions_enabled=True,
-            alarm_actions=[sns_topic_arn],
+            actions_enabled=alarm_config.enabled,
+            alarm_actions=alarm_actions,
             alarm_description=alarm_config.description,
             comparison_operator=alarm_config.comparison_operator,
             datapoints_to_alarm=alarm_config.datapoints_to_alarm,

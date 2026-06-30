@@ -40,6 +40,13 @@ class OLApisixRouteConfig(BaseModel):
     plugins: list[OLApisixPluginConfig] = []
     hosts: list[str] = []
     paths: list[str] = []
+    # Optional ApisixRoute ``match.exprs`` entries for matching on headers,
+    # query args, cookies, etc. in addition to host/path. Each entry follows the
+    # ApisixRoute v2 schema, e.g.
+    # ``{"subject": {"scope": "Header", "name": "Authorization"},
+    #    "op": "RegexMatch", "value": ".+"}``.
+    # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_route/#advanced-route-matching
+    exprs: list[dict[str, Any]] | None = None
     backend_service_name: str | None = None
     backend_service_port: str | NonNegativeInt | None = None
     # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_route/#service-resolution-granularity
@@ -148,6 +155,7 @@ class OLApisixRoute(ComponentResource):
                 "match": {
                     "hosts": route_config.hosts,
                     "paths": route_config.paths,
+                    **({"exprs": route_config.exprs} if route_config.exprs else {}),
                 },
                 "websocket": route_config.websocket,
                 "timeout": {

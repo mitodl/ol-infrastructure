@@ -73,6 +73,11 @@ class OpenEdxMicroFrontend(StrEnum, metaclass=EnumInvertedLookupMeta):
         "https://github.com/openedx/frontend-app-learner-dashboard",
         "dashboard",
     )
+    admin_console = (
+        "admin-console",
+        "https://github.com/openedx/frontend-app-admin-console",
+        "admin-console",
+    )
     ora_grading = (
         "ora-grading",
         "https://github.com/openedx/frontend-app-ora-grading",

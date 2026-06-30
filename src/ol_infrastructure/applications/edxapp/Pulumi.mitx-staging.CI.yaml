@@ -56,6 +56,7 @@ config:
   edxapp:elb_healthcheck_interval: "30"
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
+    admin_console: admin-console
     authoring: authoring
     communications: communications
     discussions: discuss

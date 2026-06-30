@@ -123,7 +123,11 @@ def mfe_params(
             f"{open_edx.environment}-edx-jwt-cookie-header-payload"
         ),
         "ACCOUNT_SETTINGS_URL": open_edx.account_settings_url,
-        "BASE_URL": f"https://{open_edx.lms_domain}/{mfe.application.path}",
+        "BASE_URL": (
+            f"https://{open_edx.studio_domain}/{mfe.application.path}"
+            if mfe.application == OpenEdxMicroFrontend.course_authoring
+            else f"https://{open_edx.lms_domain}/{mfe.application.path}"
+        ),
         "CONTACT_URL": open_edx.contact_url,
         "CSRF_TOKEN_API_PATH": "/csrf/api/v1/token",
         "DISPLAY_FEEDBACK_WIDGET": open_edx.display_feedback_widget,
@@ -158,6 +162,8 @@ def mfe_params(
         "SEARCH_CATALOG_URL": f"https://{open_edx.lms_domain}/courses",
         "SESSION_COOKIE_DOMAIN": open_edx.lms_domain,
         "SITE_NAME": open_edx.site_name,
+        "ADMIN_CONSOLE_URL": f"https://{open_edx.lms_domain}/{OpenEdxMicroFrontend.admin_console.path}",
+        "COURSE_AUTHORING_MICROFRONTEND_URL": f"https://{open_edx.studio_domain}/authoring",
         "STUDIO_BASE_URL": f"https://{open_edx.studio_domain}",
         "SUPPORT_URL": open_edx.support_url,
         "TERMS_OF_SERVICE_URL": open_edx.terms_of_service_url,
@@ -295,10 +301,15 @@ def mfe_job(
         )
     )
 
+    mfe_serving_domain = (
+        open_edx.studio_domain
+        if mfe.application == OpenEdxMicroFrontend.course_authoring
+        else open_edx.lms_domain
+    )
     fastly_resource = (
         fastly_service(
             name=Identifier(f"fastly-{open_edx.environment}"),
-            domain=open_edx.lms_domain,
+            domain=mfe_serving_domain,
             check_every="never",
         )
         if open_edx.purge_fastly_cache
@@ -329,7 +340,7 @@ def mfe_job(
                 put=fastly_resource.name,
                 params={
                     "mode": "url",
-                    "url": f"https://{open_edx.lms_domain}/{mfe.application.path}/",
+                    "url": f"https://{mfe_serving_domain}/{mfe.application.path}/",
                 },
                 no_get=True,
             )

@@ -97,7 +97,8 @@ def setup_vpa(
                     # The updater will attempt to resize container resources without
                     # eviction; it falls back to eviction only when in-place update
                     # is not possible for the requested change.
-                    "extraArgs": ["--feature-gates=InPlaceOrRecreate=true"],
+                    # Gate was renamed from InPlaceOrRecreate to InPlace in VPA 1.7.
+                    "extraArgs": ["--feature-gates=InPlace=true"],
                     "resources": {
                         "requests": {"cpu": "50m", "memory": "200Mi"},
                         "limits": {"memory": "200Mi"},
