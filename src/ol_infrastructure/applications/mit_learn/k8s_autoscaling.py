@@ -97,7 +97,8 @@ def build_webapp_keda_config(
 
     requests_query = (
         f'sum(rate(apisix_http_status{{route=~"{route_regex}"}}[5m]))'
-        f'/count(kube_pod_info{{namespace="mitlearn",pod=~"mitlearn-app-.*"}})'
+        f'/count(kube_pod_info{{job="integrations/kubernetes/kube-state-metrics",'
+        f'namespace="mitlearn",pod=~"mitlearn-app-.*"}})'
     )
     requests_threshold = mitlearn_config.get("autoscaling_requests_threshold") or "20"
 
