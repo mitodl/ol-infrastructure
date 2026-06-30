@@ -1386,4 +1386,48 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         )
         # OKTA-DEV [END] # noqa: ERA001
 
+    # scim-for-keycloak admin backend: service account for managing SCIM config.
+    # The plugin processes admin API requests in each realm's own context, so the
+    # token must be issued by that same realm (cross-realm master tokens are
+    # rejected). Create one confidential service account client per realm and
+    # grant it scim-admin from realm-management (which the plugin populates).
+    olapps_scim_manager_client = keycloak.openid.Client(
+        "olapps-scim-manager-client",
+        name="scim-manager",
+        realm_id=ol_apps_realm.id,
+        client_id="scim-manager",
+        description="Service account for scim-for-keycloak admin API management",
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=False,
+        implicit_flow_enabled=False,
+        direct_access_grants_enabled=False,
+        service_accounts_enabled=True,
+        valid_redirect_uris=[],
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    olapps_realm_mgmt = keycloak.openid.get_client(
+        realm_id=ol_apps_realm.id,
+        client_id="realm-management",
+        opts=InvokeOptions(provider=keycloak_provider),
+    )
+    keycloak.openid.ClientServiceAccountRole(
+        "olapps-scim-manager-scim-admin",
+        realm_id=ol_apps_realm.id,
+        service_account_user_id=olapps_scim_manager_client.service_account_user_id,
+        client_id=olapps_realm_mgmt.id,
+        role="scim-admin",
+        opts=resource_options,
+    )
+    vault.generic.Secret(
+        "olapps-scim-manager-vault-credentials",
+        path="secret-operations/keycloak/olapps/scim-manager",
+        data_json=Output.all(
+            client_id=olapps_scim_manager_client.client_id,
+            client_secret=olapps_scim_manager_client.client_secret,
+            url=keycloak_url,
+            auth_realm=ol_apps_realm.id,
+        ).apply(json.dumps),
+    )
+
     return ol_apps_realm
