@@ -10,7 +10,6 @@
 import json
 from pathlib import Path
 
-import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import (
     ROOT_STACK_RESOURCE,
@@ -854,39 +853,6 @@ ovs_k8s_app = OLApplicationK8s(
         init_collectstatic=True,
         resource_requests={"cpu": "250m", "memory": "512Mi"},
         resource_limits={"memory": "1Gi"},
-        probe_configs={
-            "liveness_probe": kubernetes.core.v1.ProbeArgs(
-                http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                    path="/nginx-health",
-                    port=DEFAULT_NGINX_PORT,
-                ),
-                initial_delay_seconds=30,
-                period_seconds=30,
-                failure_threshold=3,
-                timeout_seconds=5,
-            ),
-            "readiness_probe": kubernetes.core.v1.ProbeArgs(
-                http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                    path="/nginx-health",
-                    port=DEFAULT_NGINX_PORT,
-                ),
-                initial_delay_seconds=15,
-                period_seconds=15,
-                failure_threshold=3,
-                timeout_seconds=5,
-            ),
-            "startup_probe": kubernetes.core.v1.ProbeArgs(
-                http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                    path="/nginx-health",
-                    port=DEFAULT_NGINX_PORT,
-                ),
-                initial_delay_seconds=10,
-                period_seconds=10,
-                failure_threshold=12,
-                success_threshold=1,
-                timeout_seconds=5,
-            ),
-        },
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
                 application_name="odl_video",
