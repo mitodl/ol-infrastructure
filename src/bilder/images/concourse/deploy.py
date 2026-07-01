@@ -458,6 +458,7 @@ if host.get_fact(HasSystemd):
             ("concourse-worker-drain", "755"),
             ("concourse-worker-spot-watch", "755"),
             ("concourse-worker-lifecycle-hook", "755"),
+            ("concourse-worker-preflight", "755"),
         ]
         for script_name, script_mode in worker_scripts:
             files.put(
@@ -468,9 +469,15 @@ if host.get_fact(HasSystemd):
                 group="root",
                 mode=script_mode,
             )
+        # concourse-worker-preflight.service is uploaded here (so its unit file
+        # is present and daemon-reload picks it up) but intentionally not
+        # enabled/started below -- it's pulled in as a hard dependency of
+        # concourse.service itself via Requires=/After= (see
+        # concourse.service.j2), not run as an independent long-lived unit.
         worker_service_files = [
             "concourse-worker-spot-watch.service",
             "concourse-worker-lifecycle-hook.service",
+            "concourse-worker-preflight.service",
         ]
         worker_services_changed = False
         for service_file in worker_service_files:
