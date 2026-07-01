@@ -9,9 +9,6 @@ from pulumi import Config, ResourceOptions
 
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
-from ol_infrastructure.substructure.keycloak.master import (
-    create_master_realm_resources,
-)
 from ol_infrastructure.substructure.keycloak.ol_data_platform import (
     create_ol_data_platform_realm,
 )
@@ -72,10 +69,6 @@ fetch_realm_public_key_partial = partial(
     keycloak_url,
 )
 
-create_master_realm_resources(
-    keycloak_provider,
-    keycloak_url,
-)
 create_ol_platform_engineering_realm(
     keycloak_provider,
     keycloak_url,

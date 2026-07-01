@@ -510,6 +510,15 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
                 "value": "no-context-path",
             },
             {
+                # Allows admin-cli (password grant) to authenticate against
+                # the scim-for-keycloak admin backend REST API. The plugin
+                # only accepts security-admin-console (browser UI) tokens by
+                # default; enabling this lets scripted admin operations use
+                # admin-cli credentials without a browser session.
+                "name": "spi-realm-restapi-extension-scim-accept-admin-cli-login",
+                "value": "true",
+            },
+            {
                 "name": "spi-sticky-session-encoder-infinispan-should-attach-route",
                 "value": "false",
             },
