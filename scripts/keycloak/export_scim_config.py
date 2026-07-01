@@ -85,8 +85,13 @@ def get_token(
     req = urllib.request.Request(  # noqa: S310
         token_url, data=data, method="POST", headers=headers
     )
-    with urllib.request.urlopen(req, context=_ssl_ctx(insecure)) as resp:  # noqa: S310
-        return json.load(resp)["access_token"]
+    try:
+        with urllib.request.urlopen(req, context=_ssl_ctx(insecure)) as resp:  # noqa: S310
+            return json.load(resp)["access_token"]
+    except urllib.error.HTTPError as e:
+        sys.exit(f"Token request failed ({e.code}): {e.read().decode()[:200]}")
+    except urllib.error.URLError as e:
+        sys.exit(f"Token request failed: {e.reason}")
 
 
 def api_get(
@@ -150,7 +155,7 @@ def probe_paths(
         if status not in (404, 405):
             # 403/401/500 are informative failures
             return {"path": path, "status": status, "body": body}
-    return {"path": candidates[0], "status": "all_404", "body": None}
+    return {"path": candidates[0], "status": 404, "body": None}
 
 
 def main() -> None:
@@ -160,8 +165,9 @@ def main() -> None:
     parser.add_argument(
         "--url",
         required=True,
-        help="Keycloak base URL. Use internal URL (localhost port-forward) so the "
-        "admin backend hostname check passes.",
+        help="Keycloak base URL (e.g. https://sso.ol.mit.edu). When port-forwarding "
+        "instead of using the public URL, also pass --host-header so the admin "
+        "backend hostname check passes.",
     )
     parser.add_argument("--realm", default="olapps")
     parser.add_argument("--username")
