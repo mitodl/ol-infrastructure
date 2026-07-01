@@ -1557,8 +1557,8 @@ mitlearn_k8s_app = OLApplicationK8s(
             resource_requests={"cpu": "100m", "memory": "2048Mi"},
             resource_limits={"memory": "2048Mi"},
         ),
-        resource_requests={"cpu": "500m", "memory": "2400Mi"},
-        resource_limits={"memory": "2400Mi"},
+        resource_requests={"cpu": "500m", "memory": "3200Mi"},
+        resource_limits={"memory": "3200Mi"},
         webapp_keda_config=webapp_keda_config,
     ),
     opts=ResourceOptions(
