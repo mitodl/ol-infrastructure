@@ -55,6 +55,7 @@ config:
     - infra
     - operations
     - cloud_custodian
+    - pulumi_infra
     instance_type: m7a.4xlarge
     name: infra
     use_spot_instances: true
