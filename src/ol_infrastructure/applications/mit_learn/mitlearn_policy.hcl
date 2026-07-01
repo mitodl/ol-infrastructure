@@ -43,6 +43,9 @@ path "secret-global/data/mailgun" {
 path "secret-global/data/shared_hmac" {
   capabilities = ["read"]
 }
+path "secret-global/data/grafana" {
+  capabilities = ["read"]
+}
 
 path "secret-mitlearn/*" {
   capabilities = ["read"]
