@@ -61,6 +61,7 @@ config:
     - cloud_custodian
     - infra
     - pulumi_state
+    - pulumi_infra
     instance_type: burstable_medium
     name: infra
     spot_options:
