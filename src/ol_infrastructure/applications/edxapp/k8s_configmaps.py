@@ -174,8 +174,7 @@ def _build_interpolated_config_dict(
         "COURSE_AUTHORING_MICROFRONTEND_URL": f"https://{domains['studio']}/authoring",
         "INSTRUCTOR_MICROFRONTEND_URL": (
             f"https://{domains['lms']}/apps/instructor-dashboard"
-            if "instructor" in enabled_mfes
-            or "instructor-dashboard" in site_project_mfe_apps
+            if "instructor-dashboard" in site_project_mfe_apps
             else None
         ),
         "LEARNING_MICROFRONTEND_URL": f"https://{domains['lms']}/learn",
