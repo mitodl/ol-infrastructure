@@ -88,12 +88,6 @@ config:
   - "ol_researcher"
   - "ol_instructor"
   - "ol_business_analyst"
-  keycloak_realm:scim-plugin-managed-realms:
-  - master
-  - olapps
-  - ol-mit
-  - ol-data-platform
-  - ol-platform-engineering
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   keycloak_realm:olapps_email_theme: ol-learn
