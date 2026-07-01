@@ -13,6 +13,7 @@ import textwrap
 from functools import partial
 from pathlib import Path
 from string import Template
+from typing import Any
 
 import pulumi_vault as vault
 import yaml
@@ -117,7 +118,7 @@ grafana_credentials = read_yaml_secrets(
 def build_worker_user_data(
     concourse_team: str, concourse_tags: list[str], consul_dc: str
 ) -> str:
-    yaml_contents = {
+    yaml_contents: dict[str, Any] = {
         "write_files": [
             {
                 "path": "/etc/consul.d/02-autojoin.json",
@@ -170,6 +171,25 @@ def build_worker_user_data(
                 "owner": "root:root",
             }
         )
+    # Worker identity defaults to the EC2-hostname-derived name (ip-A-B-C-D),
+    # and private IPs get recycled across ASG replacements in these subnets,
+    # so a fresh instance can inherit a prior (now-deleted) worker's identity
+    # before the stalled-worker reaper catches up, producing FK-constraint GC
+    # errors against the old worker's orphaned volume/container rows. Pin the
+    # name to the instance ID instead, which is never reused.
+    yaml_contents["runcmd"] = [
+        (
+            "TOKEN=$(curl -s -X PUT http://169.254.169.254/latest/api/token "
+            "-H 'X-aws-ec2-metadata-token-ttl-seconds: 60' "
+            "--connect-timeout 2 --max-time 5); "
+            'INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" '
+            "--connect-timeout 2 --max-time 5 "
+            "http://169.254.169.254/latest/meta-data/instance-id); "
+            'if [ -n "$INSTANCE_ID" ]; then '
+            'echo "CONCOURSE_NAME=${INSTANCE_ID}" > /etc/default/concourse-name; '
+            "fi"
+        )
+    ]
     return base64.b64encode(
         "#cloud-config\n{}".format(
             yaml.dump(
