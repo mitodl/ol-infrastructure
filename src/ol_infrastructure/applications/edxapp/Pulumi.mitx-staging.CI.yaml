@@ -61,7 +61,6 @@ config:
     communications: communications
     discussions: discuss
     gradebook: gradebook
-    instructor: instructor
     learner_dashboard: dashboard
     learning: learn
     ora_grading: ora-grading
