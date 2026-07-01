@@ -19,21 +19,17 @@ Do not redirect stdout to a file — that would mix the JSON with the fly comman
 ## Directory Layout
 
 ```
-lib/
-  models/pipeline.py      # Core Pydantic models: Pipeline, Job, Step types, Resource, etc.
-  models/fragment.py      # PipelineFragment — composable sub-pipeline pieces
-  jobs/                   # Reusable job factory functions (packer_jobs, pulumi_jobs_chain, etc.)
-  resources.py            # Resource factory functions (git_repo, registry_image, etc.)
-  resource_types.py       # ResourceType definitions (hashicorp_resource, etc.)
-  containers.py           # container_build_task helper
-  constants.py            # Shared constants
-
 pipelines/
   constants.py            # Pipeline-level constants (ECR_REGION, PULUMI_WATCHED_PATHS, etc.)
   jobs.py                 # Top-level job factories (packer_jobs, pulumi_jobs_chain, pulumi_job)
   infrastructure/         # Platform infra pipelines (consul, vault, eks, dagster, etc.)
   applications/           # Application deployment pipelines
 ```
+
+The `ol_concourse.lib` modules (models, resources, resource_types, containers) are provided
+by the `ol-concourse` pip package (installed into the venv). Browse them under
+`.venv/lib/pythonX.Y/site-packages/ol_concourse/lib/` or via the upstream repo. Do not
+create a local `lib/` directory here.
 
 ## Writing a New Pipeline
 
