@@ -1512,6 +1512,10 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         granian_config=GranianConfig(
             workers=2,
+            # Pin per-worker RSS so it doesn't auto-scale with the memory limit
+            # (floor(limit/workers*0.9)); 2*1080Mi leaves ~1GiB headroom under
+            # the 3200Mi limit for the master process and transient overshoot.
+            workers_max_rss=1080,
             enable_metrics=True,
             interface="asginl",
             backlog=None,
@@ -1557,8 +1561,8 @@ mitlearn_k8s_app = OLApplicationK8s(
             resource_requests={"cpu": "100m", "memory": "2048Mi"},
             resource_limits={"memory": "2048Mi"},
         ),
-        resource_requests={"cpu": "500m", "memory": "2400Mi"},
-        resource_limits={"memory": "2400Mi"},
+        resource_requests={"cpu": "500m", "memory": "3200Mi"},
+        resource_limits={"memory": "3200Mi"},
         webapp_keda_config=webapp_keda_config,
     ),
     opts=ResourceOptions(
