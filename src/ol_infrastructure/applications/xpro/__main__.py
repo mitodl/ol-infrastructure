@@ -665,7 +665,7 @@ if k8s_deploy:
             target_kind="Deployment",
             target_name=xpro_k8s_app.beat_deployment_name,
             controlled_resources=["cpu", "memory"],
-            container_name="celery-worker",
+            container_name="celery-beat",
             **_worker_vpa_bounds,
             opts=ResourceOptions(depends_on=[xpro_k8s_app]),
         )
