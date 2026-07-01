@@ -598,3 +598,35 @@ def create_olapps_dev_realm(  # noqa: PLR0913
             extra_config={"syncMode": "INHERIT"},
             opts=kc_opts,
         )
+
+    # -------------------------------------------------------------------------
+    # Organization seeding for local dev
+    #
+    # The realm's browser flow is the organization-aware "Organization
+    # Identity-First Login" flow (mirrors production). That authenticator only
+    # renders the email-first login screen when the realm has at least one
+    # organization; with zero organizations it falls through to the self-service
+    # registration form, sending every login attempt to "Register" instead of
+    # "Sign in". Production has real organizations so it works there; local dev
+    # had none, which is why login landed on registration.
+    #
+    # Seed one placeholder organization so identity-first login renders
+    # correctly. It owns a fake, non-routable domain (org.local): all outbound
+    # mail is captured by Mailpit regardless, but a fake domain keeps real
+    # addresses out of the picture. The org is intentionally NOT wired to the
+    # fake-touchstone IdP (that IdP is a local stub), so members fall through to
+    # the username/password screen like the seeded @odl.local test users.
+    # -------------------------------------------------------------------------
+    keycloak.organization.Organization(
+        "olapps-local-dev-org",
+        realm=realm.realm,
+        name="Local Dev",
+        alias="local-dev",
+        enabled=True,
+        domains=[
+            keycloak.organization.OrganizationDomainArgs(
+                name="org.local", verified=True
+            ),
+        ],
+        opts=kc_opts,
+    )
