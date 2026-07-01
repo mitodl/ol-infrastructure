@@ -2,12 +2,13 @@
 # kc-seed-users.sh — Idempotent local-dev test-user provisioning
 #
 # Creates three test users in the Keycloak olapps realm.  If a user already
-# exists (by username) it is skipped — safe to run multiple times.
+# exists (looked up by email) it is skipped — safe to run multiple times.
 #
-# Users created:
-#   admin   / localdev123  — realm admin role
-#   student / localdev123
-#   prof    / localdev123
+# Users created (the realm has registrationEmailAsUsername=true, so log in with
+# the email address as the username):
+#   admin@odl.local   / localdev123  — realm admin role
+#   student@odl.local / localdev123
+#   prof@odl.local    / localdev123
 #
 # Usage:
 #   ./local-dev/scripts/kc-seed-users.sh
@@ -87,10 +88,14 @@ for USERNAME in admin student prof; do
     FIRST="${USER_FIRST[$USERNAME]}"
     LAST="${USER_LAST[$USERNAME]}"
 
-    # Check if user already exists.
+    # Check if user already exists. Look up by email, not username: the realm
+    # has registrationEmailAsUsername=true, so Keycloak stores the username as
+    # the email address (e.g. "admin@odl.local", not "admin"). A username=
+    # lookup would always miss and the script would try to re-create existing
+    # users on every run, breaking idempotency.
     EXISTING_ID=$(curl -sf --max-time 10 \
         -H "Authorization: Bearer ${TOKEN}" \
-        "${KC_URL}/admin/realms/${REALM}/users?username=${USERNAME}&exact=true" 2>/dev/null \
+        "${KC_URL}/admin/realms/${REALM}/users?email=${EMAIL}&exact=true" 2>/dev/null \
         | jq -r '.[0].id // empty' 2>/dev/null || true)
 
     if [ -n "${EXISTING_ID}" ]; then
@@ -105,7 +110,7 @@ for USERNAME in admin student prof; do
         -H "Content-Type: application/json" \
         "${KC_URL}/admin/realms/${REALM}/users" \
         -d "{
-            \"username\": \"${USERNAME}\",
+            \"username\": \"${EMAIL}\",
             \"email\": \"${EMAIL}\",
             \"firstName\": \"${FIRST}\",
             \"lastName\": \"${LAST}\",
@@ -119,10 +124,10 @@ for USERNAME in admin student prof; do
         }" \
         -o /dev/null
 
-    # Re-fetch the new user ID for role assignment.
+    # Re-fetch the new user ID for role assignment (by email; see note above).
     NEW_ID=$(curl -sf --max-time 10 \
         -H "Authorization: Bearer ${TOKEN}" \
-        "${KC_URL}/admin/realms/${REALM}/users?username=${USERNAME}&exact=true" 2>/dev/null \
+        "${KC_URL}/admin/realms/${REALM}/users?email=${EMAIL}&exact=true" 2>/dev/null \
         | jq -r '.[0].id // empty' 2>/dev/null || true)
 
     # Assign the admin realm role if applicable.

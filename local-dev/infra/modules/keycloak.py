@@ -6,8 +6,12 @@ Mirrors the production olapps.py structure but:
   - Skips production SAML/OIDC org federation (real MIT Touchstone, B2B orgs)
   - Disables verify_email (Mailpit is available but we want frictionless login)
   - Includes fake-touchstone and okta-test IdPs (same as CI/QA branch)
-  - Adds test users: admin@odl.local, student@odl.local, prof@odl.local
   - Skips all Vault-dependent resources
+
+Test users (admin / student / prof, password localdev123) are NOT created
+here — the Keycloak provider does not manage individual users. They are
+seeded by local-dev/scripts/kc-seed-users.sh, which the root Tiltfile runs
+automatically (the "kc-seed-users" resource) after this realm is applied.
 """
 
 import json

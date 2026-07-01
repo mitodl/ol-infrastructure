@@ -184,6 +184,20 @@ local_resource(
     resource_deps=["local-infra-core"],
 )
 
+# Seed the local-dev test users (admin / student / prof, password localdev123)
+# into the olapps realm. Pulumi provisions the realm and OIDC clients, but the
+# Keycloak provider does not manage individual users, so they are created by
+# this idempotent script. It runs automatically after the realm is up so a
+# fresh setup has working login credentials — without it, every login fails
+# because no users exist.
+local_resource(
+    "kc-seed-users",
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} {script}".format(rd=root_domain, script="{}/local-dev/scripts/kc-seed-users.sh".format(config.main_dir)),
+    deps=["./local-dev/scripts/kc-seed-users.sh"],
+    labels=["infra"],
+    resource_deps=["local-infra-apps"],
+)
+
 # ---------------------------------------------------------------------------
 # Per-app deployment + manual seed resources
 # ---------------------------------------------------------------------------
