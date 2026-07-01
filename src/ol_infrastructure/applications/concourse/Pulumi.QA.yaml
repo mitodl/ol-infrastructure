@@ -52,6 +52,7 @@ config:
     - operations
     - cloud_custodian
     - infra
+    - pulumi_infra
     instance_type: burstable_medium
     name: infra
   - auto_scale:

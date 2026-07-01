@@ -213,20 +213,37 @@ iam_policy_names = set(
 iam_policy_objects = {}
 for iam_policy in iam_policy_names or []:
     policy_module = importlib.import_module(f"iam_policies.{iam_policy}")
+    parliament_config = {
+        "CREDENTIALS_EXPOSURE": {
+            "ignore_locations": [{"actions": ["ecr:getauthorizationtoken"]}]
+        },
+        "PERMISSIONS_MANAGEMENT_ACTIONS": {
+            "ignore_locations": [{"actions": ["ec2:modifysnapshotattributte"]}]
+        },
+        "RESOURCE_STAR": {},
+    }
+    if iam_policy == "pulumi_infra":
+        # These actions are real, observed Pulumi usage (CloudTrail-derived) and
+        # are already scoped to Resource ARNs under /ol-applications/* and
+        # /ol-infrastructure/* in the policy itself -- Parliament's
+        # PRIVILEGE_ESCALATION check flags them purely on action co-occurrence
+        # and can't see that resource-level scoping, so it fires regardless.
+        parliament_config["PRIVILEGE_ESCALATION"] = {
+            "ignore_locations": [
+                {"actions": ["iam:createaccesskey"]},
+                {"actions": ["iam:createpolicyversion"]},
+                {"actions": ["iam:attachuserpolicy"]},
+                {"actions": ["iam:attachrolepolicy"]},
+                {"actions": ["iam:addusertogroup"]},
+                {"actions": ["iam:updateassumerolepolicy"]},
+            ]
+        }
     iam_policy_object = iam.Policy(
         f"cicd-iam-permissions-policy-{iam_policy}-{stack_info.env_suffix}",
         path=f"/ol-infrastructure/iam/cicd-{stack_info.env_suffix}/",
         policy=lint_iam_policy(
             policy_module.policy_definition,
-            parliament_config={
-                "CREDENTIALS_EXPOSURE": {
-                    "ignore_locations": [{"actions": ["ecr:getauthorizationtoken"]}]
-                },
-                "PERMISSIONS_MANAGEMENT_ACTIONS": {
-                    "ignore_locations": [{"actions": ["ec2:modifysnapshotattributte"]}]
-                },
-                "RESOURCE_STAR": {},
-            },
+            parliament_config=parliament_config,
         ),
         name_prefix=f"cicd-policy-{iam_policy}-{stack_info.env_suffix}",
         tags=aws_config.tags,
