@@ -49,18 +49,29 @@ PyInfra operations must be **idempotent** — safe to run multiple times. Use op
 from `pyinfra.operations`, not raw shell commands.
 
 ```python
+import os
 from pyinfra import host
-from pyinfra.operations import apt, files, systemd
+from pyinfra.operations import files, systemd
 
-from bilder.components.baseline.setup import baseline
-from bilder.components.hashicorp.consul import install_consul
+from bilder.components.baseline.steps import install_baseline_packages
+from bilder.components.hashicorp.consul.models import Consul, ConsulConfig
+from bilder.components.hashicorp.steps import (
+    configure_hashicorp_product,
+    install_hashicorp_products,
+)
 from bilder.facts.has_systemd import HasSystemd
+from bridge.lib.versions import CONSUL_VERSION
+
+# Versions come from environment variables set by Packer (fall back to bridge defaults)
+consul_version = os.environ.get("CONSUL_VERSION", CONSUL_VERSION)
 
 # Reuse components instead of reimplementing
-baseline()
-install_consul(version=host.get_fact(ConsulVersion))
+install_baseline_packages()
+consul = Consul(version=consul_version, configuration={...})
+install_hashicorp_products([consul])
+configure_hashicorp_product(consul)
 
-# Deploy config files
+# Deploy static config files
 files.put(
     src="files/myapp.conf",
     dest="/etc/myapp/myapp.conf",
@@ -82,9 +93,9 @@ Always check `src/bilder/components/` before writing new provisioning logic:
 
 | Component | Import path | What it does |
 |-----------|------------|-------------|
-| Baseline OS setup | `bilder.components.baseline.setup` | Users, SSH, sysctl, auditd |
-| Consul install | `bilder.components.hashicorp.consul` | Installs and configures Consul |
-| Vault install | `bilder.components.hashicorp.vault` | Installs and configures Vault |
+| Baseline OS setup | `bilder.components.baseline.steps.install_baseline_packages` | apt packages, system baseline |
+| HashiCorp products | `bilder.components.hashicorp.steps.install_hashicorp_products` | Installs Consul, Vault, Nomad, etc. |
+| HashiCorp config | `bilder.components.hashicorp.steps.configure_hashicorp_product` | Renders config files from models |
 | Vector log agent | `bilder.components.vector` | Ships logs to Grafana/Loki |
 | Alloy agent | `bilder.components.alloy` | Grafana Alloy observability agent |
 | Docker | `bilder.components.docker` | Docker daemon + compose |
@@ -106,7 +117,7 @@ cd src/bilder/images/consul/
 packer validate .
 ```
 
-Top-level shared HCL is in `src/bilder/`:
+Shared HCL lives in `src/bilder/images/` (the images root, not the package root):
 
 - `packer.pkr.hcl` — required plugins
 - `config.pkr.hcl` — shared source AMI lookup
@@ -115,7 +126,7 @@ Top-level shared HCL is in `src/bilder/`:
 ## Adding a New Image
 
 1. Create `src/bilder/images/<name>/` with `deploy.py` and `<name>.pkr.hcl`
-2. Reference the shared `config.pkr.hcl` and `variables.pkr.hcl` from the root
+2. Reference the shared `config.pkr.hcl` and `variables.pkr.hcl` from `src/bilder/images/`
 3. Compose from existing components; add a new component only if the logic is reusable
 4. Run `packer fmt -recursive src/bilder/` and `packer validate src/bilder/images/<name>/`
 5. Add a Concourse pipeline entry in `src/ol_concourse/pipelines/infrastructure/`

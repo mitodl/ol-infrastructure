@@ -27,12 +27,13 @@ Pulumi.yaml              # Project definition
 Pulumi.<env>.yaml        # Stack config per environment (QA, Production, CI, Dev)
 ```
 
-Stack names follow `<namespace>.<environment>`, e.g. `infrastructure.aws.network.QA`.
+After the project-scoped stack migration, stack names are short: `QA`, `Production`, `CI`,
+or `<tenant>.QA` for multi-tenant projects. Select from inside the project directory.
 
 ```bash
 cd src/ol_infrastructure/applications/mit_learn/
 pulumi stack ls
-pulumi stack select applications.mit_learn.QA
+pulumi stack select QA
 pulumi preview    # always preview before up
 ```
 
@@ -73,7 +74,8 @@ class MyComponent(pulumi.ComponentResource):
 ```python
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 stack_info = parse_stack()
-env = stack_info.env_suffix  # "QA" | "Production" | "CI" | "Dev"
+env_upper = stack_info.name        # "QA" | "Production" | "CI" | "Dev"
+env_lower = stack_info.env_suffix  # "qa" | "production" | "ci" | "dev"
 ```
 
 ### IAM policy
@@ -81,14 +83,16 @@ env = stack_info.env_suffix  # "QA" | "Production" | "CI" | "Dev"
 ```python
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 policy_doc = {"Version": "2012-10-17", "Statement": [...]}
-lint_iam_policy(policy_doc, "MyPolicy")  # raises on errors
+lint_iam_policy(policy_doc)  # raises on errors; signature: (policy_document, stringify=False)
 ```
 
 ### Resource tags
 
+`AWSBase` requires `OU` and `Environment` tags. `OU` must be a valid `BusinessUnit` value.
+
 ```python
 from ol_infrastructure.lib.ol_types import BusinessUnit
-tags = {"BusinessUnit": BusinessUnit.OPERATIONS, "Environment": stack_info.env_suffix}
+tags = {"OU": BusinessUnit.operations, "Environment": stack_info.name}
 ```
 
 ## Validation

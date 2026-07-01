@@ -7,13 +7,14 @@ raw YAML.
 ## How Pipelines Work
 
 ```
-pipelines/<category>/<name>/pipeline.py   # builds Pipeline object, prints JSON to stdout
-    → python pipeline.py > definition.json
+pipelines/<category>/<name>/pipeline.py   # builds Pipeline object, writes definition.json
+    → python pipeline.py               # writes definition.json; prints fly command to stdout
     → fly -t <target> sp -p <pipeline-name> -c definition.json
 ```
 
-Each `pipeline.py` is a standalone script. Running it writes `definition.json` and prints
-the `fly set-pipeline` command to stdout. There is no separate render step.
+Each `pipeline.py` is a standalone script. Running it **writes `definition.json` directly**
+(via `open("definition.json", "w")`) and prints the `fly set-pipeline` command to stdout.
+Do not redirect stdout to a file — that would mix the JSON with the fly command.
 
 ## Directory Layout
 
@@ -112,9 +113,9 @@ uv run ruff format src/ol_concourse/
 uv run ruff check src/ol_concourse/
 uv run mypy src/ol_concourse/
 
-# Render a specific pipeline and validate JSON is well-formed
+# Render a pipeline and validate the output JSON is well-formed
 cd src/ol_concourse/pipelines/infrastructure/dagster/
-python pipeline.py | python -m json.tool > /dev/null && echo "OK"
+python pipeline.py && python -m json.tool definition.json > /dev/null && echo "OK"
 ```
 
 ## Common Mistakes
