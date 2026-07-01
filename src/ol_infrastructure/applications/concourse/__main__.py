@@ -180,10 +180,14 @@ def build_worker_user_data(
     yaml_contents["runcmd"] = [
         (
             "TOKEN=$(curl -s -X PUT http://169.254.169.254/latest/api/token "
-            "-H 'X-aws-ec2-metadata-token-ttl-seconds: 60'); "
+            "-H 'X-aws-ec2-metadata-token-ttl-seconds: 60' "
+            "--connect-timeout 2 --max-time 5); "
             'INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" '
+            "--connect-timeout 2 --max-time 5 "
             "http://169.254.169.254/latest/meta-data/instance-id); "
-            'echo "CONCOURSE_NAME=${INSTANCE_ID}" > /etc/default/concourse-name'
+            'if [ -n "$INSTANCE_ID" ]; then '
+            'echo "CONCOURSE_NAME=${INSTANCE_ID}" > /etc/default/concourse-name; '
+            "fi"
         )
     ]
     return base64.b64encode(

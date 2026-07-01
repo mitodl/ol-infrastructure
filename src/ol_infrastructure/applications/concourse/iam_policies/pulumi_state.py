@@ -11,6 +11,7 @@ policy_definition = {
         {
             "Effect": "Allow",
             "Action": [
+                "s3:GetBucketLocation",
                 "s3:GetObject*",
                 "s3:PutObject",
                 "s3:DeleteObject",
