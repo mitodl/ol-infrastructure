@@ -175,9 +175,17 @@ local_resource(
 # `pulumi refresh` is intentionally omitted from this loop: it issues a burst
 # of concurrent admin-API calls on every reconcile, which was the main source
 # of the warm-up 502s. Refresh on demand instead.
+#
+# `--parallel 1` serialises the apply for the same reason. The Keycloak provider
+# talks to the admin API over the public ingress (host -> k3d LB -> APISIX ->
+# Keycloak), and Pulumi otherwise creates independent realm resources
+# concurrently. That burst of simultaneous admin calls overwhelms the ingress
+# path (even while Keycloak itself is idle) and a batch of them trip
+# "context deadline exceeded" together. Serialising keeps one admin request in
+# flight at a time, which the path handles comfortably.
 local_resource(
     "local-infra-apps",
-    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c '{wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --yes --skip-preview --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c '{wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
     dir="./local-dev/infra/apps_infra",
     deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py", "./local-dev/scripts/wait-for-keycloak-admin.sh"],
     labels=["infra"],
