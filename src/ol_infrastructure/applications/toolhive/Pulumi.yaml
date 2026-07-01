@@ -1,0 +1,9 @@
+---
+name: ol-application-toolhive
+runtime: python
+description: >
+  Deploy the ToolHive operator (Stacklok's Kubernetes operator for managing MCP
+  servers) on the operations EKS cluster. Installs the toolhive-operator-crds and
+  toolhive-operator Helm charts plus a sample MCPServer custom resource.
+backend:
+  url: s3://mitol-pulumi-state/
