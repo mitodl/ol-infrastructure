@@ -53,6 +53,10 @@ def _build_interpolated_config_dict(
     """
     domains = edxapp_config.require_object("domains")
     enabled_mfes: dict[str, str] = edxapp_config.get_object("enabled_mfes") or {}
+    site_project_config = edxapp_config.get_object("site_project")
+    site_project_mfe_apps: list[str] = (
+        list(site_project_config.get("mfe_apps", [])) if site_project_config else []
+    )
 
     # Determine marketing domain based on deployment type
     marketing_domain = (
@@ -170,7 +174,7 @@ def _build_interpolated_config_dict(
         "COURSE_AUTHORING_MICROFRONTEND_URL": f"https://{domains['studio']}/authoring",
         "INSTRUCTOR_MICROFRONTEND_URL": (
             f"https://{domains['lms']}/apps/instructor-dashboard"
-            if "instructor" in enabled_mfes
+            if "instructor-dashboard" in site_project_mfe_apps
             else None
         ),
         "LEARNING_MICROFRONTEND_URL": f"https://{domains['lms']}/learn",

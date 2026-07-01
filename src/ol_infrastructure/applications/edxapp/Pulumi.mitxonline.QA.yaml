@@ -84,7 +84,6 @@ config:
     authoring: authoring
     discussions: discuss
     gradebook: gradebook
-    instructor: instructor
     learning: learn
     ora_grading: ora-grading
   edxapp:github_org_api_url: https://github.mit.edu/api/v3/orgs/mitxonline-rc
