@@ -274,6 +274,7 @@ heroku_vars = {
     "EDX_API_URL": "https://api.edx.org/catalog/v1/catalogs/10/courses",
     "ELASTICSEARCH_DEFAULT_TIMEOUT": "30",
     "ELASTICSEARCH_INDEXING_CHUNK_SIZE": "75",
+    "EMBEDLY_KEY": "",
     "FEATURE_ANONYMOUS_ACCESS": "True",
     "FEATURE_ARTICLE_UI": "True",
     "FEATURE_COMMENT_NOTIFICATIONS": "True",
@@ -357,10 +358,6 @@ secret_operations_sso_open_discussions = vault.generic.get_secret_output(
 )
 secret_operations_env_mit_open_algolia = vault.generic.get_secret_output(
     path=f"secret-operations/{vault_env_path}/mit-open/algolia",
-    opts=InvokeOptions(parent=mit_open_vault_iam_role),
-)
-secret_operations_env_mit_open_embedly_key = vault.generic.get_secret_output(
-    path=f"secret-operations/{vault_env_path}/mit-open/embedly_key",
     opts=InvokeOptions(parent=mit_open_vault_iam_role),
 )
 secret_operations_env_mit_open_recaptcha_keys = vault.generic.get_secret_output(
@@ -464,9 +461,6 @@ sensitive_heroku_vars = {
     ),
     "EDX_API_CLIENT_SECRET": secret_mit_open_env_edx_api_client.data.apply(
         lambda data: "{}".format(data["secret"])
-    ),
-    "EMBEDLY_KEY": secret_operations_env_mit_open_embedly_key.data.apply(
-        lambda data: "{}".format(data["value"])
     ),
     "GITHUB_ACCESS_TOKEN": secret_mit_open_global_odlbot_github_access_token.data.apply(
         lambda data: "{}".format(data["value"])
