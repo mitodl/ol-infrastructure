@@ -1,3 +1,5 @@
+"""Concourse pipeline for syncing Grafana alert rules and dashboards."""
+
 from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
@@ -49,16 +51,6 @@ cortex_alert_rules = ssh_git_repo(
     paths=[
         "ci/*",
         "cortex-rules/*",
-    ],
-)
-
-alertmanager_config = ssh_git_repo(
-    Identifier("alertmanager-config"),
-    uri="git@github.com:mitodl/grafana-alerts.git",
-    private_key="((grizzly.ssh_key))",
-    paths=[
-        "ci/*",
-        "alertmanager.yaml",
     ],
 )
 
@@ -283,7 +275,7 @@ dashboards_combined_fragment = PipelineFragment(
 )
 
 alerting_jobs = []
-for tool in ["loki", "cortex", "alertmanager"]:
+for tool in ["loki", "cortex"]:
     # Add a linter step for loki and cortex configurations
     if tool in ["loki", "cortex"]:
         resource_name = f"{tool}-alert-rules"
@@ -456,7 +448,6 @@ alerting_combined_fragment = PipelineFragment(
     resources=[
         cortex_alert_rules,
         loki_alert_rules,
-        alertmanager_config,
         slack_notification_resource,
     ],
     jobs=alerting_jobs,

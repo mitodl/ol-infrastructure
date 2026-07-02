@@ -1442,6 +1442,7 @@ dependencies = [
     { name = "pulumi-terraform" },
     { name = "pulumi-tls" },
     { name = "pulumi-vault" },
+    { name = "pulumiverse-grafana" },
     { name = "pulumiverse-heroku" },
     { name = "pulumiverse-time" },
     { name = "pydantic" },
@@ -1494,6 +1495,7 @@ requires-dist = [
     { name = "pulumi-terraform", specifier = ">=6.0.1" },
     { name = "pulumi-tls", specifier = ">=5.0.0,<6" },
     { name = "pulumi-vault", specifier = ">=7,<8" },
+    { name = "pulumiverse-grafana", specifier = ">=2.0.0,<3" },
     { name = "pulumiverse-heroku", specifier = ">=1.0.3,<2" },
     { name = "pulumiverse-time", specifier = ">=0.1.1" },
     { name = "pydantic", specifier = ">=2,<3" },
@@ -2093,6 +2095,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/f9/03/6787bdc9f075223f5d7754dd6c219ded1bba2954ac142e881082c86cb391/pulumi_vault-7.10.0.tar.gz", hash = "sha256:2e14e46a3a75e4c7474ef14dfae8a81da09cba9186f93ed3a47d63cbe1581d60", size = 694780, upload-time = "2026-05-22T12:54:33.884Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0c/68/9495bac56c7ddb4b0dfdc5758235cb047585f7249f3af68878bdec2ed255/pulumi_vault-7.10.0-py3-none-any.whl", hash = "sha256:1793a8a6cf483bf56ad72af2e1be706f3526d32d71965987d8f04be71272ed3e", size = 954668, upload-time = "2026-05-22T12:54:31.929Z" },
+]
+
+[[package]]
+name = "pulumiverse-grafana"
+version = "2.33.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "parver" },
+    { name = "pulumi" },
+    { name = "semver" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3d/89/79e74a2bc8fda09f41c0f366c23c26088d6387e8a18bf903ca46432c6896/pulumiverse_grafana-2.33.0.tar.gz", hash = "sha256:bc76a92ecb6cc3510bd941443bb75f6b93f88fdb336b2428b79530534bf68483", size = 490725, upload-time = "2026-06-25T13:06:23.279Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f3/a9/f3672f4c8ca7fc66834e74d57fc91fe83cfc071e940f1783abcdcdaa1f50/pulumiverse_grafana-2.33.0-py3-none-any.whl", hash = "sha256:f4be3379ee3841e99bf716f26fd6a4426f76e4fcea9d4f6ab8b1fa6ee8465778", size = 730186, upload-time = "2026-06-25T13:06:21.886Z" },
 ]
 
 [[package]]
