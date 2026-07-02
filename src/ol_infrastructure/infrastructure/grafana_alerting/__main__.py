@@ -1,10 +1,10 @@
-"""Grafana Cloud alerting — Pulumi entry point.
+"""Grafana Cloud alerting + Pingdom uptime checks — Pulumi entry point.
 
 Bootstraps the Grafana provider and delegates to submodules:
   alertmanager  — contact points + notification policy (all stacks)
   metric_rules  — Prometheus/Mimir metric alert rule groups (all stacks)
   log_rules     — Loki log-based alert rule groups (all stacks)
-  sm_checks     — Synthetic Monitoring uptime checks (production stack only)
+  pingdom_checks — Pingdom uptime checks via dynamic provider (production stack only)
 
 See CLAUDE.md in this directory for a full description of the architecture.
 """
@@ -12,14 +12,14 @@ See CLAUDE.md in this directory for a full description of the architecture.
 from pathlib import Path
 
 import pulumiverse_grafana as grafana
-from pulumi import InvokeOptions, ResourceOptions
+from pulumi import Output, ResourceOptions
 
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.infrastructure.grafana_alerting import (
     alertmanager,
     log_rules,
     metric_rules,
-    sm_checks,
+    pingdom_checks,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
@@ -34,20 +34,17 @@ grafana_provider = grafana.Provider(
     "grafana-provider",
     url=grafana_secrets["grafana_url"],
     auth=grafana_secrets["grafana_api_token"],
-    # SM credentials are only present in the production secrets file.
-    sm_url=grafana_secrets.get("grafana_sm_url") if is_production else None,
-    sm_access_token=grafana_secrets.get("grafana_sm_access_token")
-    if is_production
-    else None,
 )
 
 resource_opts = ResourceOptions(provider=grafana_provider)
-invoke_opts = InvokeOptions(provider=grafana_provider)
 
 alertmanager.create(grafana_secrets, resource_opts)
 metric_rules.create(stack_info, resource_opts)
 log_rules.create(stack_info, resource_opts)
 
-# SM checks run in the production stack only — see sm_checks.py docstring.
+# Pingdom checks are account-wide — only create from the production stack.
 if is_production:
-    sm_checks.create(invoke_opts, resource_opts)
+    pingdom_checks.create(
+        api_token=Output.secret(grafana_secrets["pingdom_api_token"]),
+        integration_ids=grafana_secrets.get("pingdom_integration_ids", []),
+    )

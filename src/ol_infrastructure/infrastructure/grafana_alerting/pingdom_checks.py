@@ -1,24 +1,153 @@
-"""Grafana Synthetic Monitoring checks.
+"""Pingdom uptime checks managed via a Pulumi dynamic provider.
 
-Replaces Pingdom. All checks run in the production Grafana Cloud stack only —
-even checks that target non-production URLs (e.g. QA or RC environments).
-Centralising them in one stack avoids duplicating probe config, alert
-sensitivity settings, and notification routing across three stacks.
+Replaces Grafana Synthetic Monitoring (too expensive at 4-probe x 1-min cadence).
+Checks are Pingdom account-wide resources, so they are created in the production
+stack only to avoid duplicates across CI/QA/Production Pulumi stacks.
 
-Probes: Atlanta, Frankfurt, Singapore, Sydney (resolved by name at deploy time
-so probe IDs are never hardcoded).
+Production checks use 2 probe regions (NA + EU).
+Non-production checks use 1 probe region (NA).
 
-Skipped checks (paused/dead in Pingdom, not worth migrating):
+Skipped checks (paused/dead in Pingdom at migration time, not worth monitoring):
   - ChrisTestNukeMe           plaintext.reedfish-regulus.ts.net  (test check)
   - xPro preview production   preview.xpro.mit.edu               (dead since 2022)
   - MITx production CMS       studio.mitx.mit.edu  (paused 2023, superseded by
                                                    "MITx production Studio")
+
+xPro production checks are created as paused=True — they were DOWN at the time
+of migration and will alert immediately if enabled without investigation first.
 """
 
-from dataclasses import dataclass
+from __future__ import annotations
 
-from pulumi import InvokeOptions, ResourceOptions
-from pulumiverse_grafana import syntheticmonitoring
+from dataclasses import dataclass
+from typing import Any
+from urllib.parse import urlparse
+
+import requests
+from pulumi import Input, ResourceOptions
+from pulumi.dynamic import (
+    CreateResult,
+    ReadResult,
+    Resource,
+    ResourceProvider,
+    UpdateResult,
+)
+
+_API_BASE = "https://api.pingdom.com/api/3.1"
+_REQUEST_TIMEOUT = 10  # seconds
+_HTTP_NOT_FOUND = 404
+
+_PROD_PROBE_FILTERS = ["region:NA", "region:EU"]
+_NON_PROD_PROBE_FILTERS = ["region:NA"]
+
+
+class _PingdomCheckProvider(ResourceProvider):
+    """Pulumi dynamic provider for a single Pingdom HTTP check (v3 REST API)."""
+
+    @staticmethod
+    def _auth(props: dict[str, Any]) -> dict[str, str]:
+        return {"Authorization": f"Bearer {props['api_token']}"}
+
+    @staticmethod
+    def _body(props: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "name": props["name"],
+            "host": props["host"],
+            "type": "http",
+            "url": props["url"],
+            "port": 443,
+            "encryption": True,
+            "resolution": props["resolution"],
+            "probe_filters": props["probe_filters"],
+            "tags": props["tags"],
+            "integrationids": props["integrationids"],
+            "paused": props.get("paused", False),
+        }
+
+    def create(self, props: dict[str, Any]) -> CreateResult:
+        """Create a new Pingdom check and return its numeric ID as the resource ID."""
+        r = requests.post(
+            f"{_API_BASE}/checks",
+            headers=self._auth(props),
+            json=self._body(props),
+            timeout=_REQUEST_TIMEOUT,
+        )
+        r.raise_for_status()
+        check_id = str(r.json()["check"]["id"])
+        return CreateResult(id_=check_id, outs={**props, "check_id": check_id})
+
+    def read(self, id_: str, props: dict[str, Any]) -> ReadResult:
+        """Refresh state by fetching the check from Pingdom."""
+        r = requests.get(
+            f"{_API_BASE}/checks/{id_}",
+            headers=self._auth(props),
+            timeout=_REQUEST_TIMEOUT,
+        )
+        if r.status_code == _HTTP_NOT_FOUND:
+            return ReadResult(id_=None, outs={})
+        r.raise_for_status()
+        return ReadResult(id_=id_, outs=props)
+
+    def update(
+        self, id_: str, _olds: dict[str, Any], news: dict[str, Any]
+    ) -> UpdateResult:
+        """Update an existing Pingdom check. Type cannot be changed after creation."""
+        body = self._body(news)
+        body.pop("type", None)
+        r = requests.put(
+            f"{_API_BASE}/checks/{id_}",
+            headers=self._auth(news),
+            json=body,
+            timeout=_REQUEST_TIMEOUT,
+        )
+        r.raise_for_status()
+        return UpdateResult(outs={**news, "check_id": id_})
+
+    def delete(self, id_: str, props: dict[str, Any]) -> None:
+        """Delete the Pingdom check."""
+        r = requests.delete(
+            f"{_API_BASE}/checks/{id_}",
+            headers=self._auth(props),
+            timeout=_REQUEST_TIMEOUT,
+        )
+        r.raise_for_status()
+
+
+class _PingdomCheck(Resource):
+    """A single Pingdom HTTP uptime check as a Pulumi resource."""
+
+    def __init__(  # noqa: PLR0913
+        self,
+        resource_name: str,
+        *,
+        api_token: Input[str],
+        name: str,
+        host: str,
+        url: str,
+        resolution: int,
+        probe_filters: list[str],
+        tags: str,
+        integrationids: list[int],
+        paused: bool = False,
+        opts: ResourceOptions | None = None,
+    ) -> None:
+        super().__init__(
+            _PingdomCheckProvider(),
+            resource_name,
+            {
+                "api_token": api_token,
+                "name": name,
+                "host": host,
+                "url": url,
+                "resolution": resolution,
+                "probe_filters": probe_filters,
+                "tags": tags,
+                "integrationids": integrationids,
+                "paused": paused,
+                "check_id": None,
+            },
+            opts,
+        )
 
 
 @dataclass
@@ -26,9 +155,10 @@ class _SMCheck:
     resource_name: str
     job: str
     target: str
-    frequency: int  # milliseconds
-    alert_sensitivity: str  # "low" or "high"
+    frequency: int  # milliseconds; converted to minutes (resolution) for Pingdom
+    alert_sensitivity: str  # "high" -> PROD probes, "low" -> NON_PROD probes
     labels: dict[str, str]
+    paused: bool = False
 
 
 _CHECKS: list[_SMCheck] = [
@@ -294,7 +424,7 @@ _CHECKS: list[_SMCheck] = [
     ),
     _SMCheck(
         resource_name="sso-qa-olapps-http",
-        job="SSO QA - Open Realm",
+        job="SSO QA - Apps Realm",
         target="https://sso-qa.ol.mit.edu/realms/olapps/account/",
         frequency=60000,
         alert_sensitivity="low",
@@ -309,8 +439,8 @@ _CHECKS: list[_SMCheck] = [
         labels={"env": "qa", "service": "sso"},
     ),
     # --- xPro ---
-    # Note: xpro.mit.edu and studio.xpro.mit.edu were both DOWN at Pingdom
-    # export time and will alert immediately once enabled in production.
+    # paused=True: xpro.mit.edu, courses.xpro.mit.edu, and studio.xpro.mit.edu
+    # were all DOWN at migration time. Enable after investigating root cause.
     _SMCheck(
         resource_name="xpro-production-http",
         job="xPro Production",
@@ -318,6 +448,7 @@ _CHECKS: list[_SMCheck] = [
         frequency=60000,
         alert_sensitivity="high",
         labels={"env": "production", "service": "xpro"},
+        paused=True,
     ),
     _SMCheck(
         resource_name="xpro-lms-production-http",
@@ -326,6 +457,7 @@ _CHECKS: list[_SMCheck] = [
         frequency=60000,
         alert_sensitivity="high",
         labels={"env": "production", "service": "xpro"},
+        paused=True,
     ),
     _SMCheck(
         resource_name="xpro-cms-production-http",
@@ -334,6 +466,7 @@ _CHECKS: list[_SMCheck] = [
         frequency=60000,
         alert_sensitivity="high",
         labels={"env": "production", "service": "xpro"},
+        paused=True,
     ),
     _SMCheck(
         resource_name="xpro-rc-http",
@@ -361,35 +494,28 @@ _CHECKS: list[_SMCheck] = [
     ),
 ]
 
-_DESIRED_PROBE_NAMES = {"Atlanta", "Frankfurt", "Singapore", "Sydney"}
 
-
-def create(invoke_opts: InvokeOptions, resource_opts: ResourceOptions) -> None:
-    """Create all Synthetic Monitoring uptime checks in the production Grafana stack."""
-    # Resolve probe names to IDs at deploy time so numeric IDs are never hardcoded.
-    all_probes = syntheticmonitoring.get_probes(opts=invoke_opts)
-    selected_probe_ids = [
-        probe_id
-        for name, probe_id in all_probes.probes.items()
-        if name in _DESIRED_PROBE_NAMES
-    ]
-
+def create(api_token: Input[str], integration_ids: list[int]) -> None:
+    """Create all Pingdom HTTP uptime checks."""
     for check in _CHECKS:
-        syntheticmonitoring.Check(
+        parsed = urlparse(check.target)
+        host = parsed.hostname
+        if not host:
+            msg = f"Could not parse hostname from target URL: {check.target}"
+            raise ValueError(msg)
+        _PingdomCheck(
             check.resource_name,
-            job=check.job,
-            target=check.target,
-            enabled=True,
-            frequency=check.frequency,
-            timeout=10000,
-            probes=selected_probe_ids,
-            settings=syntheticmonitoring.CheckSettingsArgs(
-                http=syntheticmonitoring.CheckSettingsHttpArgs(
-                    valid_status_codes=[200],
-                    fail_if_not_ssl=True,
-                ),
+            api_token=api_token,
+            name=check.job,
+            host=host,
+            url=parsed.path or "/",
+            resolution=check.frequency // 60000,
+            probe_filters=(
+                _PROD_PROBE_FILTERS
+                if check.alert_sensitivity == "high"
+                else _NON_PROD_PROBE_FILTERS
             ),
-            labels=check.labels,
-            alert_sensitivity=check.alert_sensitivity,
-            opts=resource_opts,
+            tags=",".join(v for v in check.labels.values() if v),
+            integrationids=integration_ids,
+            paused=check.paused,
         )
