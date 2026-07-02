@@ -107,9 +107,23 @@ spec:
         - "0.0.0.0"
         - --port
         - "8061"
+        # Single worker locally: reloads re-import Django once instead of
+        # twice competing for CPU, and ASGI handles dev concurrency fine.
         - --workers
-        - "2"
+        - "1"
         - --blocking-threads
+        - "1"
+        # Auto-reload on Tilt live-update syncs. Watches the working dir
+        # (/src); ignore dirs that churn without affecting Python.
+        - --reload
+        - --reload-ignore-dirs
+        - frontends
+        - --reload-ignore-dirs
+        - staticfiles
+        # App threads (e.g. onnxruntime) keep workers from stopping
+        # gracefully — every reload pays this full timeout before SIGKILL, so
+        # keep it short.
+        - --workers-kill-timeout
         - "1"
         - main.asgi:application
         ports:
@@ -134,14 +148,16 @@ spec:
           periodSeconds: 10
           failureThreshold: 6
           timeoutSeconds: 5
+        # Generous liveness: granian --reload makes /health/ hang while workers
+        # re-import Django after a live-update sync; don't kill mid-reload.
         livenessProbe:
           httpGet:
             path: /health/
             port: 8061
           initialDelaySeconds: 30
           periodSeconds: 30
-          failureThreshold: 3
-          timeoutSeconds: 5
+          failureThreshold: 10
+          timeoutSeconds: 10
         volumeMounts:
         - name: combined-ca
           mountPath: /etc/ssl/local-dev

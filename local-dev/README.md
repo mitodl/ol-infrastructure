@@ -267,9 +267,11 @@ tilt up
 
 ### Live updates (Django apps)
 
-When a `.py` file changes in a checked-out app repo, Tilt syncs it directly into the running container without a rebuild. The granian/uwsgi process sees the change and reloads. This is typically sub-second.
+When a file changes in a checked-out app repo, Tilt syncs it directly into the running container without a rebuild (sub-second). granian runs with `--reload`, notices the change, and restarts its workers — the new code serves once Django finishes re-importing (roughly 10–30 s depending on the app). Watch for `Changes detected, reloading workers..` in the app logs.
 
-When `requirements.txt` changes, Tilt runs `pip install -r requirements.txt` inside the container and then restarts the process.
+This applies to the webapp (granian) containers. Celery workers and beat don't auto-reload — restart those resources from the Tilt UI after changing task code.
+
+When `pyproject.toml` or `uv.lock` changes, Tilt runs `uv sync` inside the container; granian then reloads as above.
 
 ### Pre-built image fallback
 
