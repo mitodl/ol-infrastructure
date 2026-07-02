@@ -191,7 +191,7 @@ def create(
                 no_data_state="OK",
                 labels={"severity": "critical"},
                 annotations={
-                    "description": "Keycloak has responded with a 500 error which is likely caused by a custimization or configuration change.",
+                    "description": "Keycloak has responded with a 500 error which is likely caused by a customization or configuration change.",
                 },
                 datas=rd(
                     'count_over_time({application="keycloak"} |= "HTTP 500 Internal Server Error" [5m]) > 0'

@@ -1,9 +1,12 @@
 # grafana_alerting — architecture reference
 
-This Pulumi program manages all Grafana Cloud alerting configuration for
-MIT Open Learning. It replaces two legacy systems:
-- **Pingdom** → Grafana Synthetic Monitoring (SM) checks
+This Pulumi program manages alerting and uptime monitoring for MIT Open Learning.
+It replaces two legacy systems:
+- **Pingdom (manual)** → Pingdom checks managed via a Pulumi dynamic provider (`pingdom_checks.py`)
 - **grafana-alerts repo + cortextool** → Grafana-managed alert rules and Alertmanager config
+
+Grafana Synthetic Monitoring was evaluated as an alternative for uptime checks but
+ruled out due to cost (~$3,200/month at 4 probe regions × 1-minute polling cadence).
 
 ---
 
@@ -78,7 +81,7 @@ Rootly). That path is independent of Grafana and is managed in
 | `log_rules/heroku.py` | Heroku application log alert rules (invalid AWS keys, Bootcamps SAML, OCW Studio, Keycloak). |
 | `log_rules/mit_learn.py` | MIT Learn and MITx Online 5xx error rate alert rules. |
 | `log_rules/vault.py` | Vault secret-absent and auth-failure alert rules. |
-| `sm_checks.py` | Synthetic Monitoring uptime checks. Runs in the production stack only. Replaces Pingdom. |
+| `pingdom_checks.py` | Pingdom uptime checks via Pulumi dynamic provider. Runs in the production stack only. |
 | `CLAUDE.md` | This file. |
 
 ---
@@ -93,7 +96,7 @@ needed is passed as a parameter.
 alertmanager.create(grafana_secrets: dict, resource_opts: ResourceOptions)
 metric_rules.create(stack_info: StackInfo, resource_opts: ResourceOptions)
 log_rules.create(stack_info: StackInfo, resource_opts: ResourceOptions)
-sm_checks.create(invoke_opts: InvokeOptions, resource_opts: ResourceOptions)
+pingdom_checks.create(api_token: Input[str], integration_ids: list[int])
 ```
 
 Within `metric_rules/` and `log_rules/`, each sub-module receives the folder
@@ -142,21 +145,27 @@ be wrapped: `count_over_time({...} |= "pattern" [5m]) > 0`.
 
 ---
 
-## Synthetic Monitoring checks (sm_checks.py)
+## Pingdom uptime checks (pingdom_checks.py)
 
-SM checks run in the **production Grafana stack only**, regardless of which
-URL they target (QA, RC, production, etc.). This avoids fragmenting probe
-config and alert sensitivity settings across three stacks.
+Pingdom checks are account-wide resources managed via a Pulumi dynamic provider
+that wraps the Pingdom v3 REST API. They run from the **production Pulumi stack
+only** to avoid creating duplicate checks across CI/QA/Production stacks.
 
-Probes used: Atlanta, Frankfurt, Singapore, Sydney. IDs are resolved by name at
-deploy time (`syntheticmonitoring.get_probes`) so numeric IDs are never
-hardcoded.
+- **Production checks** (`alert_sensitivity="high"`): 2 probe regions (NA + EU), 1-minute polling
+- **Non-production checks** (`alert_sensitivity="low"`): 1 probe region (NA), 1–5 minute polling
 
-### Adding a new SM check
+Each `_PingdomCheck` resource calls `POST /checks` on create, `PUT /checks/{id}`
+on update, and `DELETE /checks/{id}` on destroy. The Pingdom check ID is stored
+as the Pulumi resource ID in state, so `pulumi refresh` detects drift if a check
+is manually changed or deleted in the Pingdom UI.
 
-Add an `_SMCheck(...)` entry to the `_CHECKS` list in `sm_checks.py`. The
-`resource_name` must be unique and follow the pattern
-`<service>-<env>-http`.
+### Adding a new Pingdom check
+
+Add an `_SMCheck(...)` entry to the `_CHECKS` list in `pingdom_checks.py`. The
+`resource_name` must be unique and follow the pattern `<service>-<env>-http`.
+Set `alert_sensitivity="high"` for production services and `"low"` for
+QA/RC/staging. Set `paused=True` if the target is known to be down at creation
+time.
 
 ---
 
@@ -178,17 +187,18 @@ OpsGenie is no longer active. All actionable alerts route to Rootly.
 
 ## Secrets reference
 
-Required keys per secrets file (non-production files omit the SM fields):
+Required keys per secrets file:
 
 ```yaml
+# All stacks:
 grafana_url: https://<stack>.grafana.net
 grafana_api_token: <service-account-token>
 rootly_bearer_token: <rootly-webhook-bearer-token>
 slack_notifications_ocw_misc_api_url: <slack-webhook-url>
 
-# Production only:
-grafana_sm_url: https://synthetic-monitoring-api.grafana.net
-grafana_sm_access_token: <sm-access-token>
+# Production only (Pingdom checks run from production stack only):
+pingdom_api_token: <pingdom-api-token>
+pingdom_integration_ids: [<integration-id>, ...]  # Pingdom integration IDs for alert routing
 ```
 
 ---
