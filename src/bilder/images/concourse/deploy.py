@@ -390,6 +390,48 @@ install_and_configure_vector(vector_config)
 for product in hashicorp_products:
     configure_hashicorp_product(product)
 
+# Upload worker scripts and service unit files before registering and starting
+# concourse.service. The concourse.service unit carries Requires=/After= on
+# concourse-worker-preflight.service for worker nodes; systemd will refuse to
+# start concourse.service if that unit file does not exist at start time.
+worker_services_changed = False
+if node_type == CONCOURSE_WORKER_NODE_TYPE:
+    worker_scripts = [
+        ("concourse-worker-drain", "755"),
+        ("concourse-worker-spot-watch", "755"),
+        ("concourse-worker-lifecycle-hook", "755"),
+        ("concourse-worker-preflight", "755"),
+    ]
+    for script_name, script_mode in worker_scripts:
+        files.put(
+            name=f"Upload {script_name} script",
+            src=str(FILES_DIRECTORY.joinpath(script_name)),
+            dest=f"/usr/local/bin/{script_name}",
+            user="root",
+            group="root",
+            mode=script_mode,
+        )
+    # concourse-worker-preflight.service is uploaded here (so its unit file
+    # is present and daemon-reload picks it up) but intentionally not
+    # enabled/started below -- it's pulled in as a hard dependency of
+    # concourse.service itself via Requires=/After= (see
+    # concourse.service.j2), not run as an independent long-lived unit.
+    worker_service_files = [
+        "concourse-worker-spot-watch.service",
+        "concourse-worker-lifecycle-hook.service",
+        "concourse-worker-preflight.service",
+    ]
+    for service_file in worker_service_files:
+        result = files.put(
+            name=f"Upload {service_file} systemd unit",
+            src=str(FILES_DIRECTORY.joinpath(service_file)),
+            dest=f"/etc/systemd/system/{service_file}",
+            user="root",
+            group="root",
+            mode="644",
+        )
+        worker_services_changed = worker_services_changed or result.changed
+
 # Manage services
 if host.get_fact(HasSystemd):
     register_concourse_service(
@@ -453,43 +495,9 @@ if host.get_fact(HasSystemd):
                 concourse_config.tsa_public_key_path,
             ]
         )
-        # Install drain helper used by both spot-watch and lifecycle-hook services
-        worker_scripts = [
-            ("concourse-worker-drain", "755"),
-            ("concourse-worker-spot-watch", "755"),
-            ("concourse-worker-lifecycle-hook", "755"),
-            ("concourse-worker-preflight", "755"),
-        ]
-        for script_name, script_mode in worker_scripts:
-            files.put(
-                name=f"Upload {script_name} script",
-                src=str(FILES_DIRECTORY.joinpath(script_name)),
-                dest=f"/usr/local/bin/{script_name}",
-                user="root",
-                group="root",
-                mode=script_mode,
-            )
-        # concourse-worker-preflight.service is uploaded here (so its unit file
-        # is present and daemon-reload picks it up) but intentionally not
-        # enabled/started below -- it's pulled in as a hard dependency of
-        # concourse.service itself via Requires=/After= (see
-        # concourse.service.j2), not run as an independent long-lived unit.
-        worker_service_files = [
-            "concourse-worker-spot-watch.service",
-            "concourse-worker-lifecycle-hook.service",
-            "concourse-worker-preflight.service",
-        ]
-        worker_services_changed = False
-        for service_file in worker_service_files:
-            result = files.put(
-                name=f"Upload {service_file} systemd unit",
-                src=str(FILES_DIRECTORY.joinpath(service_file)),
-                dest=f"/etc/systemd/system/{service_file}",
-                user="root",
-                group="root",
-                mode="644",
-            )
-            worker_services_changed = worker_services_changed or result.changed
+        # Scripts and service unit files were already uploaded before
+        # register_concourse_service (see block above HasSystemd), so only
+        # the service enable/start calls remain here.
         for service_name in [
             "concourse-worker-spot-watch",
             "concourse-worker-lifecycle-hook",
