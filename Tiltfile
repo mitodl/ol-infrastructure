@@ -75,7 +75,9 @@ APPS = [
             {
                 "label": "seed-mit-learn-opensearch",
                 "description": "Recreate OpenSearch index from scratch",
-                "cmd": "python manage.py recreate_index",
+                # --all is required: without an index selector the command just
+                # prints "Must select at least one index to update" and no-ops.
+                "cmd": "python manage.py recreate_index --all",
             },
             {
                 "label": "seed-mit-learn-ocw",
