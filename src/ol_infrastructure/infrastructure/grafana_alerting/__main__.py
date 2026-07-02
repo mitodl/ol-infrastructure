@@ -2,7 +2,8 @@
 
 Bootstraps the Grafana provider and delegates to submodules:
   alertmanager  — contact points + notification policy (all stacks)
-  metric_rules  — Prometheus/Mimir alert rule groups (all stacks)
+  metric_rules  — Prometheus/Mimir metric alert rule groups (all stacks)
+  log_rules     — Loki log-based alert rule groups (all stacks)
   sm_checks     — Synthetic Monitoring uptime checks (production stack only)
 
 See CLAUDE.md in this directory for a full description of the architecture.
@@ -16,6 +17,7 @@ from pulumi import InvokeOptions, ResourceOptions
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.infrastructure.grafana_alerting import (
     alertmanager,
+    log_rules,
     metric_rules,
     sm_checks,
 )
@@ -44,6 +46,7 @@ invoke_opts = InvokeOptions(provider=grafana_provider)
 
 alertmanager.create(grafana_secrets, resource_opts)
 metric_rules.create(stack_info, resource_opts)
+log_rules.create(stack_info, resource_opts)
 
 # SM checks run in the production stack only — see sm_checks.py docstring.
 if is_production:

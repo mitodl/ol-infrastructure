@@ -1,129 +1,28 @@
-"""Grafana metric alert rule groups.
+"""EKS workload alert rules.
 
-Migrated from grafana-alerts/cortex-rules/ (previously synced via cortextool).
-Each YAML file maps to one or more Grafana RuleGroup resources, preserving the
-original group names and evaluation intervals.
+Source: grafana-alerts/cortex-rules/eks_general.yaml
 
-Two-stage evaluation pipeline per rule
----------------------------------------
-Grafana-managed alert rules cannot use a bare PromQL expression as a condition
-the way the Mimir ruler API can. Instead each rule needs:
-
-  Stage A — instant PromQL query against the per-environment Mimir datasource.
-             The PromQL already contains the threshold (e.g. "< 1.0"), so it
-             returns a non-empty result set only when the condition is met.
-  Stage B — classic condition: fires when the count of rows returned by A > 0.
-
-The condition field on each rule points to "B", meaning "alert when B fires".
-
-no_data_state="OK"
--------------------
-Every EKS rule has a cluster label selector baked into its PromQL expression
-(e.g. cluster=~".*-(ci|qa)").  Each Grafana Cloud stack queries its own Mimir
-tenant, which only has metrics from the matching environment's clusters.  When
-the selector returns no data (e.g. the production filter on the CI stack),
-no_data_state="OK" keeps the rule silent instead of surfacing a NoData alert.
-
-Sources
--------
-  grafana-alerts/cortex-rules/eks_general.yaml   → eks-general rule group
-  grafana-alerts/cortex-rules/linux-host.yaml    → linux-host-* rule groups
+Warning rules filter cluster=~".*-(ci|qa)"    — fire on CI and QA stacks.
+Critical rules filter cluster=~".*-(production)" — fire on prod stack only.
+Rules with no matching data on a given stack stay silent (no_data_state=OK).
 """
 
-import json
+from collections.abc import Callable
 
-from pulumi import ResourceOptions
+from pulumi import Input, ResourceOptions
 from pulumiverse_grafana import alerting
-from pulumiverse_grafana.oss.folder import Folder
-
-from ol_infrastructure.lib.pulumi_helper import StackInfo
-
-# Mimir is exposed in each Grafana Cloud stack as a Prometheus-compatible
-# datasource. These UIDs are not sensitive — they are the stable identifiers
-# visible in Grafana UI under Configuration → Data Sources.
-_MIMIR_DATASOURCE_UID: dict[str, str] = {
-    "ci": "grafanacloud-mitolci-prom",
-    "qa": "grafanacloud-mitolqa-prom",
-    "production": "grafanacloud-mitolproduction-prom",
-}
 
 
-def _rule_data(expr: str, mimir_uid: str) -> list[alerting.RuleGroupRuleDataArgs]:
-    """Build the two-stage data pipeline for a single alert rule."""
-    return [
-        # Stage A: run the PromQL expression against Mimir.
-        alerting.RuleGroupRuleDataArgs(
-            ref_id="A",
-            datasource_uid=mimir_uid,
-            relative_time_range=alerting.RuleGroupRuleDataRelativeTimeRangeArgs(
-                from_=600, to=0
-            ),
-            model=json.dumps(
-                {
-                    "datasource": {"type": "prometheus", "uid": mimir_uid},
-                    "expr": expr,
-                    "instant": True,
-                    "intervalMs": 1000,
-                    "maxDataPoints": 43200,
-                    "refId": "A",
-                }
-            ),
-        ),
-        # Stage B: fire when A returns any rows (count > 0).
-        alerting.RuleGroupRuleDataArgs(
-            ref_id="B",
-            datasource_uid="-100",  # "-100" is Grafana's internal UID for expressions
-            relative_time_range=alerting.RuleGroupRuleDataRelativeTimeRangeArgs(
-                from_=600, to=0
-            ),
-            model=json.dumps(
-                {
-                    "conditions": [
-                        {
-                            "evaluator": {"type": "gt", "params": [0]},
-                            "operator": {"type": "and"},
-                            "query": {"params": ["A"]},
-                            "reducer": {"type": "count", "params": []},
-                            "type": "query",
-                        }
-                    ],
-                    "datasource": {"type": "__expr__", "uid": "-100"},
-                    "refId": "B",
-                    "type": "classic_conditions",
-                }
-            ),
-        ),
-    ]
-
-
-def create(stack_info: StackInfo, resource_opts: ResourceOptions) -> None:
-    """Create Grafana alert rule groups for EKS and Linux host metrics."""
-    mimir_uid = _MIMIR_DATASOURCE_UID[stack_info.env_suffix]
-
-    # Folder that hosts all infrastructure alert rule groups.
-    # The uid is stable so Pulumi can track it across runs.
-    alerts_folder = Folder(
-        "infrastructure-alerts-folder",
-        title="Infrastructure Alerts",
-        uid="infrastructure-alerts",
-        opts=resource_opts,
-    )
-
-    def rd(expr: str) -> list[alerting.RuleGroupRuleDataArgs]:
-        return _rule_data(expr, mimir_uid)
-
-    # -------------------------------------------------------------------------
-    # EKS general rules
-    # Source: grafana-alerts/cortex-rules/eks_general.yaml
-    #
-    # Warning rules filter cluster=~".*-(ci|qa)"   — fire on CI and QA stacks.
-    # Critical rules filter cluster=~".*-(production)" — fire on prod stack only.
-    # Rules with no matching data on a given stack stay silent (no_data_state=OK).
-    # -------------------------------------------------------------------------
+def create(
+    folder_uid: Input[str],
+    rd: Callable[[str], list[alerting.RuleGroupRuleDataArgs]],
+    resource_opts: ResourceOptions,
+) -> None:
+    """Create EKS workload alert rule groups."""
     alerting.RuleGroup(
         "eks-general",
         name="general",
-        folder_uid=alerts_folder.uid,
+        folder_uid=folder_uid,
         interval_seconds=60,
         rules=[
             # --- Daemonset replicas ---
@@ -425,102 +324,6 @@ def create(stack_info: StackInfo, resource_opts: ResourceOptions) -> None:
                 },
                 datas=rd(
                     'sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{cluster=~".*-(production)"}) >= sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster=~".*-(production)"})'
-                ),
-            ),
-        ],
-        opts=resource_opts,
-    )
-
-    # -------------------------------------------------------------------------
-    # Linux host rules
-    # Source: grafana-alerts/cortex-rules/linux-host.yaml
-    #
-    # These rules have no cluster label filter — they apply to all EC2 hosts
-    # regardless of environment and fire on whichever stack scrapes them.
-    # Three separate groups to preserve the original evaluation intervals.
-    # -------------------------------------------------------------------------
-
-    # CPU usage > 80% sustained for 6 hours (warning only — no critical rule).
-    alerting.RuleGroup(
-        "linux-host-cpu-usage",
-        name="cpu-usage",
-        folder_uid=alerts_folder.uid,
-        interval_seconds=3600,
-        rules=[
-            alerting.RuleGroupRuleArgs(
-                name="CPUUsageWarning",
-                condition="B",
-                for_="6h",
-                no_data_state="OK",
-                labels={"severity": "warning"},
-                annotations={
-                    "description": 'CPU usage on {{ $labels.instance }} has been at {{ printf "%.2f" $value }} for at least 6 hours.'
-                },
-                datas=rd(
-                    "1 - (\n"
-                    '  sum by (cluster, instance) (rate(host_cpu_seconds_total{mode="idle", job="integrations/linux_host"}[5m]))\n'
-                    '  / sum by (cluster, instance) (rate(host_cpu_seconds_total{job="integrations/linux_host"}[5m]))\n'
-                    ") > 0.8"
-                ),
-            ),
-        ],
-        opts=resource_opts,
-    )
-
-    # Memory usage > 90% sustained for 2 hours (warning only).
-    alerting.RuleGroup(
-        "linux-host-memory-usage",
-        name="memory-usage",
-        folder_uid=alerts_folder.uid,
-        interval_seconds=1800,
-        rules=[
-            alerting.RuleGroupRuleArgs(
-                name="MemoryUsageWarning",
-                condition="B",
-                for_="2h",
-                no_data_state="OK",
-                labels={"severity": "warning"},
-                annotations={
-                    "description": 'Memory usage on {{ $labels.instance }} has been at {{ printf "%.2f" $value }} for at least 2 hours.'
-                },
-                datas=rd("(host_memory_used_bytes / host_memory_total_bytes) > 0.9"),
-            ),
-        ],
-        opts=resource_opts,
-    )
-
-    # Disk usage thresholds: warning > 80% for 1h, critical > 95% for 10m.
-    # Excludes pseudo-filesystems (squashfs, vfat) and non-/dev/ devices.
-    alerting.RuleGroup(
-        "linux-host-disk-usage",
-        name="disk-usage",
-        folder_uid=alerts_folder.uid,
-        interval_seconds=600,
-        rules=[
-            alerting.RuleGroupRuleArgs(
-                name="DiskUsageWarning",
-                condition="B",
-                for_="1h",
-                no_data_state="OK",
-                labels={"severity": "warning"},
-                annotations={
-                    "description": 'Filesystem on {{ $labels.device }} at {{ $labels.instance }} is {{ printf "%.2f" $value }}% full.'
-                },
-                datas=rd(
-                    '(host_filesystem_used_ratio{device=~"/dev.*",filesystem!~"(squashfs|vfat)",job="integrations/linux_host"} * 100) > 80'
-                ),
-            ),
-            alerting.RuleGroupRuleArgs(
-                name="DiskUsageCritical",
-                condition="B",
-                for_="10m",
-                no_data_state="OK",
-                labels={"severity": "critical"},
-                annotations={
-                    "description": 'Filesystem on {{ $labels.device }} at {{ $labels.instance }} is {{ printf "%.2f" $value }}% full.'
-                },
-                datas=rd(
-                    '(host_filesystem_used_ratio{device=~"/dev.*",filesystem!~"(squashfs|vfat)",job="integrations/linux_host"} * 100) > 95'
                 ),
             ),
         ],
