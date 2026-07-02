@@ -10,7 +10,9 @@ data:
   MITXONLINE_DOCKER_BASE_URL: "https://mitxonline.mit.dev"
   MITX_ONLINE_DB_DISABLE_SSL: "True"
   MITX_ONLINE_USE_S3: "False"
-  DEBUG: "True"
+  # Must stay False: the production image (see Tiltfile) has no dev deps, so
+  # DEBUG=True would import debug_toolbar → boot crash.
+  DEBUG: "False"
   ALLOWED_HOSTS: "*"
   USE_X_FORWARDED_HOST: "True"
   USE_X_FORWARDED_PORT: "True"

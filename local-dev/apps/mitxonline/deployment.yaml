@@ -238,12 +238,14 @@ spec:
             name: mitxonline-env
         - secretRef:
             name: mitxonline-secrets
+        # beat loads the full Django app like the worker, so give it comparable
+        # memory headroom — it OOMs with less.
         resources:
           requests:
             cpu: 50m
-            memory: 128Mi
-          limits:
             memory: 256Mi
+          limits:
+            memory: 1Gi
         volumeMounts:
         - name: combined-ca
           mountPath: /etc/ssl/local-dev
