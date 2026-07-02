@@ -89,6 +89,14 @@ APPS = [
                 "description": "Backpopulate MITx Online resources",
                 "cmd": "python manage.py backpopulate_mitxonline_data",
             },
+            {
+                "label": "seed-mit-learn-featured-lists",
+                # dev/rc-only command. Prereqs: offeror channels
+                # (backpopulate_resource_channels), published courses per
+                # offeror, and at least one user (author of the learning path).
+                "description": "Create dev-only featured lists per offeror channel",
+                "cmd": "python manage.py populate_featured_lists",
+            },
         ],
     },
     {
