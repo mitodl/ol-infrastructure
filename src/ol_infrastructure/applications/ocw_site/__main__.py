@@ -1129,6 +1129,13 @@ for purpose in ("draft", "live", "test"):
             ),
             fastly.ServiceVclSnippetArgs(
                 content=snippets_dir.joinpath(
+                    "enable_streaming_for_mp4.vcl"
+                ).read_text(),
+                name="Enable streaming for mp4 files",
+                type="fetch",
+            ),
+            fastly.ServiceVclSnippetArgs(
+                content=snippets_dir.joinpath(
                     "clean_response_headers_and_handle_404_on_delivery.vcl"
                 ).read_text(),
                 name="Clean response headers and handle 404 on delivery",
