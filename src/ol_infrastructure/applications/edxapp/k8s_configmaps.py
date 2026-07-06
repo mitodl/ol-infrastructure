@@ -286,7 +286,7 @@ def _build_interpolated_config_dict(
         # Other links are omitted so the MFE footer matches the legacy footer.
         config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolFooter"].update(
             {
-                "termsOfServiceUrl": f"https://{marketing_domain}/terms",
+                "termsOfServiceUrl": f"https://{marketing_domain}/tos",
                 "footerLogoUrl": (
                     f"https://{domains['lms']}/static/"
                     f"{stack_info.env_prefix}/images/mit-ol-logo.svg"
