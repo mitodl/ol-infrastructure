@@ -384,10 +384,14 @@ def _build_interpolated_config_dict(
         config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolFooter"].update(
             {
                 "privacyPolicyUrl": f"https://{marketing_domain}/privacy-policy/",
-                "termsOfServiceUrl": f"https://{marketing_domain}/terms-of-service/",
+                "termsOfServiceUrl": (
+                    f"https://{edxapp_config.require('mit_learn_domain')}/terms"
+                ),
                 "honorCodeUrl": f"https://{marketing_domain}/honor-code/",
-                "aboutUrl": f"https://{marketing_domain}/about-us/",
-                "supportUrl": f"https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/",
+                "aboutUrl": (
+                    f"https://{edxapp_config.require('mit_learn_domain')}/about"
+                ),
+                "supportUrl": "https://support.learn.mit.edu/",
                 "copyrightText": "\u00a9 MIT Open Learning. All rights reserved except where noted.",
             }
         )
