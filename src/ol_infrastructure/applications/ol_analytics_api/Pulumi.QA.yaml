@@ -1,0 +1,22 @@
+---
+secretsprovider: awskms://alias/PulumiSecrets
+config:
+  aws:region: us-east-1
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa
+  ol_analytics_api:domain: analytics-qa.odl.mit.edu
+  ol_analytics_api:env_vars:
+    OL_ANALYTICS_API_ENVIRONMENT: qa
+    LOG_LEVEL: INFO
+    DEBUG: "false"
+    OPENTELEMETRY_SERVICE_NAME: ol-analytics-api
+    OPENTELEMETRY_ENDPOINT: http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces
+    OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+    OTEL_TRACES_SAMPLER: parentbased_traceidratio
+    OTEL_TRACES_SAMPLER_ARG: "0.25"
+    OTEL_PROPAGATORS: tracecontext,baggage
+    OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT: "128"
+    OTEL_RESOURCE_ATTRIBUTES: deployment.environment=qa,service.namespace=ol-analytics
+    SENTRY_LOG_LEVEL: ERROR
+    SENTRY_TRACES_SAMPLE_RATE: "0.001"
+    SENTRY_PROFILES_SAMPLE_RATE: "0.1"
