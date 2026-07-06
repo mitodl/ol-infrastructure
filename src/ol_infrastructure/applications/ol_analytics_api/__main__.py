@@ -47,7 +47,6 @@ Key wiring decisions (see also ``k8s/README.md`` in the app repo):
 """
 
 from pathlib import Path
-from typing import Any
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
@@ -142,9 +141,10 @@ cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(APPLICATION_NAMESPACE, ns)
 )
 
-# StarRocks dynamic-credentials mount is environment-specific.  The StarRocks
-# substructure only exists for QA and Production, so on CI there is no mount to
-# grant against (matching applications/superset/__main__.py).
+# StarRocks dynamic-credentials mount is environment-specific.  StarRocks only
+# exists on the QA and Production data clusters (setup_starrocks skips CI), and
+# this service fetches its StarRocks creds from Vault at startup, so it is
+# deployed to QA and Production only -- there is no CI stack.
 starrocks_vault_mount_path = f"database-starrocks-{stack_info.env_suffix}"
 
 ########################################################################
@@ -160,22 +160,14 @@ starrocks_vault_mount_path = f"database-starrocks-{stack_info.env_suffix}"
 #     and the "ol-analytics-api-vault" ServiceAccount that OLVaultK8SResources
 #     creates for the vault-secrets-operator, and
 #   * the Vault policy (below) attached to that role.
-_base_vault_policy = (
+_vault_policy_text = (
     Path(__file__).parent.joinpath("ol_analytics_api_policy.hcl").read_text()
+    + f'\npath "{starrocks_vault_mount_path}/creds/app" {{\n'
+    '  capabilities = ["read"]\n'
+    "}\n" + f'path "{starrocks_vault_mount_path}/creds/app/*" {{\n'
+    '  capabilities = ["read"]\n'
+    "}\n"
 )
-vault_policy_kwargs: dict[str, Any]
-if stack_info.name != "CI":
-    vault_policy_kwargs = {
-        "vault_policy_text": (
-            _base_vault_policy + f'\npath "{starrocks_vault_mount_path}/creds/app" {{\n'
-            '  capabilities = ["read"]\n'
-            "}\n" + f'path "{starrocks_vault_mount_path}/creds/app/*" {{\n'
-            '  capabilities = ["read"]\n'
-            "}\n"
-        )
-    }
-else:
-    vault_policy_kwargs = {"vault_policy_text": _base_vault_policy}
 
 ol_analytics_api_auth_binding = OLEKSAuthBinding(
     OLEKSAuthBindingConfig(
@@ -203,7 +195,7 @@ ol_analytics_api_auth_binding = OLEKSAuthBinding(
             service=Services.ol_analytics_api,
             stack=stack_info,
         ),
-        **vault_policy_kwargs,
+        vault_policy_text=_vault_policy_text,
     )
 )
 
