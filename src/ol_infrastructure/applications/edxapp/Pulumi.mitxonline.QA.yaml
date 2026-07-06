@@ -80,8 +80,8 @@ config:
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     admin_console: admin-console
-    communications: communications
     authoring: authoring
+    communications: communications
     discussions: discuss
     gradebook: gradebook
     learning: learn
