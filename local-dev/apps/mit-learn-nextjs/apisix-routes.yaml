@@ -35,6 +35,8 @@ spec:
     backends:
     - serviceName: mitlearn-nextjs
       servicePort: 3000
+    # next dev HMR runs over a websocket; harmless for the production image.
+    websocket: true
     plugins:
     - name: response-rewrite
       enable: true

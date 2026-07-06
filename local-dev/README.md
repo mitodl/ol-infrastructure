@@ -277,9 +277,13 @@ When `pyproject.toml` or `uv.lock` changes, Tilt runs `uv sync` inside the conta
 
 If an app repo is not cloned on your machine, Tilt uses the pre-built ECR image at the tag listed in `tilt_config.json` under `prebuilt_tags`. You can work on mit-learn without having learn-ai checked out.
 
-### Next.js rebuilds
+### Live updates (Next.js frontend)
 
-The Next.js frontend requires a **full Docker build** when source changes (because `NEXT_PUBLIC_*` env vars are baked in at compile time). Tilt will rebuild the image automatically but this is slow (~2–3 minutes). For active frontend development, consider running `yarn dev` locally against `https://api.learn.mit.dev`.
+With a mit-learn checkout, Tilt builds the `local-dev` stage of `Dockerfile.web`, which runs `next dev` (Turbopack). Source changes under `frontends/` are live-synced into the container and hot-reload in place — edit-to-served is roughly a second (the first request to each page after a pod start pays a one-time on-demand compile). HMR websockets are proxied through apisix, so the browser hot-updates on `https://learn.mit.dev` too. `NEXT_PUBLIC_*` values are runtime env vars (see `deployment.yaml`), not build args, so no rebuild is needed to change them — just edit and let Tilt redeploy.
+
+When `yarn.lock` changes, Tilt runs `yarn install` inside the container.
+
+Without a checkout, the prebuilt DockerHub image (production `runner` stage) serves instead; it does not hot-reload.
 
 ---
 

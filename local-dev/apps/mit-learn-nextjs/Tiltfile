@@ -1,12 +1,18 @@
 # mit-learn Next.js frontend Tiltfile
 #
-# NEXT_PUBLIC_* values are baked into the image at build time.
-# A change to any build arg or frontend source triggers a full image rebuild.
-# (Next.js production builds can't hot-reload without switching to `yarn dev`.)
+# Builds the `local-dev` stage of Dockerfile.web, which runs `next dev` (HMR).
+# Source changes are live-synced into the container; Next.js hot-reloads
+# them without an image rebuild or pod restart.
+#
+# NEXT_PUBLIC_* values are injected at runtime from deployment.yaml env vars
+# (surfaced to the browser via PublicEnvScript) — they are NOT build args.
+# next.config.js derives allowedDevOrigins from NEXT_PUBLIC_ORIGIN, so the
+# dev server accepts HMR requests proxied through learn.<root-domain>.
 #
 # The build context is the mit-learn repo root (needed for yarn workspaces).
 # When the sibling mit-learn repo is not checked out, Tilt uses the prebuilt
-# DockerHub image (mitodl/mit-learn-nextjs-app:latest) without a local build.
+# DockerHub image (mitodl/mit-learn-nextjs-app:latest) without a local build;
+# that image is the production `runner` stage (no hot reload).
 
 load("../../tiltlib.star", "k8s_yaml_with_domain")
 
@@ -21,44 +27,32 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         IMAGE,
         context=APP_DIR,
         dockerfile=APP_DIR + '/frontends/main/Dockerfile.web',
-        build_args={
-            # Core — required by validateEnv.js
-            'NEXT_PUBLIC_ORIGIN': 'https://learn.{rd}'.format(rd=_rd),
-            'NEXT_PUBLIC_MITOL_API_BASE_URL': 'https://api.learn.{rd}'.format(rd=_rd),
-            'NEXT_PUBLIC_SITE_NAME': 'MIT Learn',
-            'NEXT_PUBLIC_MITOL_SUPPORT_EMAIL': 'mitlearn-support@mit.edu',
-            'NEXT_PUBLIC_CSRF_COOKIE_NAME': 'csrftoken',
-            'NEXT_PUBLIC_MITOL_AXIOS_WITH_CREDENTIALS': 'true',
-            'NEXT_PUBLIC_MITX_ONLINE_BASE_URL': 'https://mitxonline.{rd}'.format(rd=_rd),
-            'NEXT_PUBLIC_MITX_ONLINE_CSRF_COOKIE_NAME': 'csrf_mitxonline',
-
-            # AI endpoints (point to learn-ai local service)
-            'NEXT_PUBLIC_LEARN_AI_RECOMMENDATION_ENDPOINT':
-                'https://ai.learn.{rd}/api/v0/recommendations/'.format(rd=_rd),
-            'NEXT_PUBLIC_LEARN_AI_SYLLABUS_ENDPOINT':
-                'https://ai.learn.{rd}/api/v0/syllabus/'.format(rd=_rd),
-
-            # Optional — blank disables analytics/monitoring
-            'NEXT_PUBLIC_EMBEDLY_KEY': '',
-            'NEXT_PUBLIC_POSTHOG_API_KEY': '',
-            'NEXT_PUBLIC_POSTHOG_API_HOST': '',
-            'NEXT_PUBLIC_POSTHOG_UI_HOST': '',
-            'NEXT_PUBLIC_POSTHOG_PROJECT_ID': '',
-            'NEXT_PUBLIC_SENTRY_DSN': '',
-            'NEXT_PUBLIC_SENTRY_ENV': 'local',
-            'NEXT_PUBLIC_APPZI_URL': '',
-            'NEXT_PUBLIC_HUBSPOT_PORTAL_ID': '',
-            'NEXT_PUBLIC_VERSION': 'local',
-            'NEXT_PUBLIC_MITX_ONLINE_LEGACY_BASE_URL': 'https://mitxonline.{rd}'.format(rd=_rd),
-        },
-        # Rebuild when any frontend source or config changes.
-        # (Full rebuild is required; no incremental hot-reload in production mode.)
+        target='local-dev',
         only=[
             'frontends/',
             'package.json',
             '.yarnrc.yml',
             '.yarn/',
             'yarn.lock',
+        ],
+        # node_modules: host installs are OS/arch-specific and must not reach
+        # the container. .next: host build artifacts would fight the
+        # container's own dev-server cache.
+        ignore=[
+            '**/node_modules',
+            '**/.next',
+        ],
+        live_update=[
+            sync(os.path.join(APP_DIR, 'frontends'), '/app/frontends'),
+            sync(os.path.join(APP_DIR, 'package.json'), '/app/package.json'),
+            sync(os.path.join(APP_DIR, 'yarn.lock'), '/app/yarn.lock'),
+            # Reinstall node deps when the lockfile changes.
+            run(
+                'cd /app && yarn install --immutable',
+                trigger=[
+                    os.path.join(APP_DIR, 'yarn.lock'),
+                ],
+            ),
         ],
     )
 

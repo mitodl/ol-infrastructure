@@ -1,9 +1,11 @@
 ---
 # mit-learn Next.js frontend Deployment
-# Runs the production Next.js server (yarn start) on port 3000.
-# NEXT_PUBLIC_* env vars are also validated at server startup, so they must be
-# present as runtime env vars (not only baked in as build args). See Tiltfile
-# for the matching build arg values used when building from a local checkout.
+# With a local checkout, Tilt builds the `local-dev` stage of Dockerfile.web
+# (`next dev`, hot reload); otherwise the prebuilt DockerHub image runs the
+# production standalone server. Both listen on port 3000.
+# NEXT_PUBLIC_* env vars are injected at runtime (PublicEnvScript) and
+# validated at server startup. NODE_ENV is deliberately NOT set here — each
+# image's own ENV (dev: development, runner: production) must win.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -33,8 +35,6 @@ spec:
           value: "3000"
         - name: HOSTNAME
           value: "0.0.0.0"
-        - name: NODE_ENV
-          value: "production"
         - name: NODE_EXTRA_CA_CERTS
           value: /etc/ssl/local-dev/rootCA.pem
             # Required by validateEnv at server startup.
@@ -59,16 +59,22 @@ spec:
         resources:
           requests:
             cpu: 100m
-            memory: 256Mi
+            memory: 512Mi
           limits:
-            memory: 1Gi
+            # next dev (turbopack) needs far more headroom than the
+            # production standalone server.
+            memory: 4Gi
         readinessProbe:
           httpGet:
             path: /
             port: 3000
           initialDelaySeconds: 15
           periodSeconds: 10
-          timeoutSeconds: 5
+          # First request to `next dev` triggers an on-demand compile that
+          # can take tens of seconds; readiness failures are benign and
+          # just delay traffic until the compile finishes.
+          timeoutSeconds: 60
+          failureThreshold: 20
         volumeMounts:
         - name: mkcert-root-ca
           mountPath: /etc/ssl/local-dev
