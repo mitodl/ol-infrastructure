@@ -280,18 +280,18 @@ def _build_interpolated_config_dict(
             }
         )
         # Match the legacy MITx (residential) footer: only Terms of Service +
-        # Accessibility (accessibilityUrl is set in the base config above), and
-        # the MITx theme logo (same asset the legacy header/footer use). Other
-        # links are intentionally omitted so the frontend-base MFE footer does not
-        # show more links than the legacy footer.
+        # Accessibility (accessibilityUrl is set in the base config above), the
+        # trademark logo ("MIT Open Learning" = mit-ol-logo.svg, which the legacy
+        # footer uses \u2014 NOT the header's logo.svg), and the legacy copyright text.
+        # Other links are omitted so the MFE footer matches the legacy footer.
         config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolFooter"].update(
             {
                 "termsOfServiceUrl": f"https://{marketing_domain}/terms",
                 "footerLogoUrl": (
                     f"https://{domains['lms']}/static/"
-                    f"{stack_info.env_prefix}/images/logo.svg"
+                    f"{stack_info.env_prefix}/images/mit-ol-logo.svg"
                 ),
-                "copyrightText": "\u00a9 MIT Open Learning. All rights reserved except where noted.",
+                "copyrightText": "\u00a9 MITx Residential. All rights reserved.",
             }
         )
 
