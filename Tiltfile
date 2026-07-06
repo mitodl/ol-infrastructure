@@ -165,20 +165,45 @@ local_resource(
 # Apps infrastructure stack (databases, Keycloak realm) — depends on core.
 #
 # The Keycloak provider talks to the realm over the public ingress, so we wait
-# for Keycloak to actually serve its discovery endpoint before running
-# `pulumi up`. Without the gate, the provider fires its calls while Keycloak is
-# still warming up and the gateway returns 502s, crash-looping the run.
+# for Keycloak's admin REST API to be ready before running `pulumi up`.
+# Gating on the OIDC discovery endpoint alone is insufficient: discovery comes
+# up well before the admin API can service writes, so the provider's
+# POST /admin/realms races into the warm-up window and times out
+# ("context deadline exceeded"). The script below proves the admin API is
+# serving (admin token + authenticated GET /admin/realms) before we proceed.
 #
 # `pulumi refresh` is intentionally omitted from this loop: it issues a burst
 # of concurrent admin-API calls on every reconcile, which was the main source
 # of the warm-up 502s. Refresh on demand instead.
+#
+# `--parallel 1` serialises the apply for the same reason. The Keycloak provider
+# talks to the admin API over the public ingress (host -> k3d LB -> APISIX ->
+# Keycloak), and Pulumi otherwise creates independent realm resources
+# concurrently. That burst of simultaneous admin calls overwhelms the ingress
+# path (even while Keycloak itself is idle) and a batch of them trip
+# "context deadline exceeded" together. Serialising keeps one admin request in
+# flight at a time, which the path handles comfortably.
 local_resource(
     "local-infra-apps",
-    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; echo \"Waiting for Keycloak discovery endpoint...\"; for i in $(seq 1 60); do curl -sfk https://sso.ol.{rd}/realms/master/.well-known/openid-configuration >/dev/null 2>&1 && break; sleep 5; done; pulumi up --yes --skip-preview --logtostderr --stack local-dev.apps-infra.Dev'".format(rd=root_domain),
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c '{wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
     dir="./local-dev/infra/apps_infra",
-    deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py"],
+    deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py", "./local-dev/scripts/wait-for-keycloak-admin.sh"],
     labels=["infra"],
     resource_deps=["local-infra-core"],
+)
+
+# Seed the local-dev test users (admin / student / prof, password localdev123)
+# into the olapps realm. Pulumi provisions the realm and OIDC clients, but the
+# Keycloak provider does not manage individual users, so they are created by
+# this idempotent script. It runs automatically after the realm is up so a
+# fresh setup has working login credentials — without it, every login fails
+# because no users exist.
+local_resource(
+    "kc-seed-users",
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} {script}".format(rd=root_domain, script="{}/local-dev/scripts/kc-seed-users.sh".format(config.main_dir)),
+    deps=["./local-dev/scripts/kc-seed-users.sh"],
+    labels=["infra"],
+    resource_deps=["local-infra-apps"],
 )
 
 # ---------------------------------------------------------------------------
