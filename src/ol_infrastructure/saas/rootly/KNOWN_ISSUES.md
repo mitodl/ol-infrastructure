@@ -35,6 +35,44 @@ Tracking issues:
 
 - Rootly provider: <https://github.com/rootlyhq/terraform-provider-rootly/issues/379>
 - Pulumi bridge: <https://github.com/pulumi/pulumi-terraform-bridge/issues/3514>
+- Internal follow-up (blocked by the two issues above): <https://github.com/mitodl/ol-infrastructure/issues/4906>
+
+## Concourse pipeline is currently non-functional
+
+The `pulumi-rootly` Concourse pipeline (added in
+[#4905](https://github.com/mitodl/ol-infrastructure/pull/4905)) exists and is wired
+up correctly, but the `deploy-ol-saas-rootly-production` job cannot currently
+complete a `pulumi up`. Triggering it reproduces the exact same upstream bug
+described above:
+
+```text
+pulumi:pulumi:Stack ol-saas-rootly-Production  warning: refresh operation is using an older version of package 'rootly' than the specified program version: 1.1.4 < 5.16.1
+...
+error: error calling ConfigureProvider: rpc error: code = Unavailable desc = error reading from server: EOF
+(repeated for every rootly:index resource in the stack)
+
+Resources:
+    2 unchanged
+    148 errored
+
+Duration: 1s
+```
+
+The shared `pulumi-provisioner` Concourse resource type (image
+`mitodl/concourse-pulumi-resource-provisioner`, source repo
+`mitodl/concourse-pulumi-resource`, currently **archived**) downloads the stock,
+unpatched Terraform bridge plugin at runtime and does not set
+`PULUMI_TERRAFORM_VERSION`. The local workaround above only exists on individual
+developer machines, not in the CI environment.
+
+**Decision:** we are intentionally not patching the shared
+`mitodl/concourse-pulumi-resource-provisioner` image, since it is used by every
+Pulumi pipeline in the fleet and its source repo is archived. Instead, this stack
+will remain manual-only (`pulumi up` from a developer machine with the patched
+bridge and `PULUMI_TERRAFORM_VERSION=1.5.0`) until the upstream issues are fixed.
+Follow-up tracked in
+[mitodl/ol-infrastructure#4906](https://github.com/mitodl/ol-infrastructure/issues/4906),
+which is blocked by the two upstream issues linked above.
 
 ## Imported resources
 
