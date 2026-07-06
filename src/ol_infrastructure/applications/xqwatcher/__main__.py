@@ -80,7 +80,8 @@ if not docker_image_tag:
 _sep = "@" if docker_image_tag.startswith("sha256:") else ":"
 docker_image_ref = f"mitodl/xqueue-watcher{_sep}{docker_image_tag}"
 
-min_replicas = xqwatcher_config.get_int("min_replicas") or 1
+_min_replicas = xqwatcher_config.get_int("min_replicas")
+min_replicas = 1 if _min_replicas is None else _min_replicas
 max_replicas = xqwatcher_config.get_int("max_replicas") or 5
 # When true, a second VaultStaticSecret reads edx.org xqueue credentials from
 # secret-<env>/edxorg-xqueue and merges them into xqueue_servers.json at pod
@@ -607,70 +608,77 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
 # Scale-up is aggressive (double pods per minute) while scale-down is
 # conservative (25 % reduction per minute, 5-minute stabilization window) to
 # avoid thrashing during bursty submission activity.
-xqwatcher_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
-    f"xqwatcher-{env_name}-hpa",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="xqwatcher",
-        namespace=namespace,
-        labels=k8s_global_labels.model_dump(),
-    ),
-    spec=kubernetes.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
-        scale_target_ref=kubernetes.autoscaling.v2.CrossVersionObjectReferenceArgs(
-            api_version="apps/v1",
-            kind="Deployment",
+#
+# Kubernetes rejects minReplicas=0 for an HPA whose metrics are all
+# Resource-type (CPU/memory) — scale-to-zero needs an external/object metric.
+# So when an environment is deliberately disabled (min_replicas: 0, e.g. a
+# stack with no live xqueue integration), skip the HPA entirely and leave the
+# Deployment's static replicas=0 in place instead of fighting it back up.
+if min_replicas > 0:
+    xqwatcher_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
+        f"xqwatcher-{env_name}-hpa",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name="xqwatcher",
+            namespace=namespace,
+            labels=k8s_global_labels.model_dump(),
         ),
-        min_replicas=min_replicas,
-        max_replicas=max_replicas,
-        metrics=[
-            kubernetes.autoscaling.v2.MetricSpecArgs(
-                type="Resource",
-                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
-                    name="cpu",
-                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
-                        type="Utilization",
-                        average_utilization=60,
+        spec=kubernetes.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
+            scale_target_ref=kubernetes.autoscaling.v2.CrossVersionObjectReferenceArgs(
+                api_version="apps/v1",
+                kind="Deployment",
+                name="xqwatcher",
+            ),
+            min_replicas=min_replicas,
+            max_replicas=max_replicas,
+            metrics=[
+                kubernetes.autoscaling.v2.MetricSpecArgs(
+                    type="Resource",
+                    resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                        name="cpu",
+                        target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                            type="Utilization",
+                            average_utilization=60,
+                        ),
                     ),
                 ),
-            ),
-            kubernetes.autoscaling.v2.MetricSpecArgs(
-                type="Resource",
-                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
-                    name="memory",
-                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
-                        type="Utilization",
-                        average_utilization=80,
+                kubernetes.autoscaling.v2.MetricSpecArgs(
+                    type="Resource",
+                    resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                        name="memory",
+                        target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                            type="Utilization",
+                            average_utilization=80,
+                        ),
                     ),
                 ),
-            ),
-        ],
-        behavior=kubernetes.autoscaling.v2.HorizontalPodAutoscalerBehaviorArgs(
-            scale_up=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
-                stabilization_window_seconds=60,
-                select_policy="Max",
-                policies=[
-                    kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
-                        type="Percent",
-                        value=100,
-                        period_seconds=60,
-                    ),
-                ],
-            ),
-            scale_down=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
-                stabilization_window_seconds=300,
-                select_policy="Min",
-                policies=[
-                    kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
-                        type="Percent",
-                        value=25,
-                        period_seconds=60,
-                    ),
-                ],
+            ],
+            behavior=kubernetes.autoscaling.v2.HorizontalPodAutoscalerBehaviorArgs(
+                scale_up=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
+                    stabilization_window_seconds=60,
+                    select_policy="Max",
+                    policies=[
+                        kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
+                            type="Percent",
+                            value=100,
+                            period_seconds=60,
+                        ),
+                    ],
+                ),
+                scale_down=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
+                    stabilization_window_seconds=300,
+                    select_policy="Min",
+                    policies=[
+                        kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
+                            type="Percent",
+                            value=25,
+                            period_seconds=60,
+                        ),
+                    ],
+                ),
             ),
         ),
-    ),
-    opts=ResourceOptions(depends_on=[xqwatcher_deployment]),
-)
+        opts=ResourceOptions(depends_on=[xqwatcher_deployment]),
+    )
 
 ##################################
 ## edx.org Watcher Deployment   ##

@@ -6,7 +6,7 @@ config:
   xqwatcher:business_unit: residential-staging
   xqwatcher:cluster: residential
   xqwatcher:namespace: mitx-staging-openedx
-  xqwatcher:min_replicas: 1
+  xqwatcher:min_replicas: 0
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   xqwatcher:xqueue_server_url: https://staging.mitx.mit.edu
