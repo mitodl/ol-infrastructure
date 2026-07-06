@@ -1,0 +1,11 @@
+---
+name: ol-application-toolhive-swe
+runtime: python
+description: >
+  Deploy the software-engineering agent-class MCP workloads on the operations EKS
+  cluster. This stack owns the toolhive-swe namespace and the MCPServer (and, later,
+  VirtualMCPServer / MCPGroup) resources used by SWE/platform agents. The ToolHive
+  operator and CRDs that reconcile these resources are installed by the
+  ol-application-toolhive-operator stack.
+backend:
+  url: s3://mitol-pulumi-state/
