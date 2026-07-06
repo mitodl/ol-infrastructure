@@ -731,8 +731,17 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     "name": "EMBEDDING_PROVIDER",
                     "value": "bedrock",
                 },
+                # Bedrock's region (parsed by OM from AWS_DEFAULT_REGION per
+                # conf/openmetadata.yaml) and the AWS SDK v2 region-provider
+                # chain (which the IRSA credentials exchange uses internally,
+                # and only recognizes AWS_REGION) read two different env vars -
+                # set both rather than assume one covers the other.
                 {
                     "name": "AWS_DEFAULT_REGION",
+                    "value": "us-east-1",
+                },
+                {
+                    "name": "AWS_REGION",
                     "value": "us-east-1",
                 },
                 {
