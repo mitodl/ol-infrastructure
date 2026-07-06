@@ -190,11 +190,10 @@ MCP_OIDC_CONFIG_NAME = "swe-vmcp-oidc"
 UPSTREAM_SECRET_NAME = "toolhive-swe-oidc-upstream"  # noqa: S105  # pragma: allowlist secret
 UPSTREAM_SECRET_KEY = "client-secret"  # noqa: S105  # pragma: allowlist secret
 
-# Persistent signing material for the embedded auth server. Generated once and held
-# in Pulumi state (KMS-encrypted via the stack's secretsprovider) so it is stable
-# across deploys — mirroring how the vault stack generates its listener TLS key. This
-# is what lets issued tokens survive vMCP pod restarts (vs. the ephemeral keys the
-# auth server would otherwise generate on startup).
+# Persistent signing material for the embedded auth server. Generated once per
+# environment and stored as encrypted stack config (via `pulumi config set --secret`)
+# so it remains stable across deploys and pod restarts (vs. ephemeral keys generated
+# at startup, which would invalidate previously issued tokens).
 SIGNING_KEY_SECRET_NAME = "toolhive-swe-authserver-signing-key"  # noqa: S105  # pragma: allowlist secret
 SIGNING_KEY_SECRET_KEY = "signing-key"  # noqa: S105  # pragma: allowlist secret
 HMAC_SECRET_NAME = "toolhive-swe-authserver-hmac"  # noqa: S105  # pragma: allowlist secret
