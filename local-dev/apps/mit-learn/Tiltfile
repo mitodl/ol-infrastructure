@@ -21,6 +21,9 @@ if os.path.exists(os.path.join(MIT_LEARN_DIR, ".git")):
         IMAGE,
         context=MIT_LEARN_DIR,
         dockerfile=os.path.join(MIT_LEARN_DIR, "Dockerfile"),
+        # local-dev target = final + a mitodl-owned /src so live-update syncs
+        # can write into the container.
+        target="local-dev",
         # Live update: sync source changes into the container; granian runs
         # with --reload (see deployment.yaml) and restarts workers on change.
         live_update=[

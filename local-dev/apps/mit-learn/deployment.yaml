@@ -120,9 +120,9 @@ spec:
         - frontends
         - --reload-ignore-dirs
         - staticfiles
-        # App threads (e.g. onnxruntime) keep workers from stopping
-        # gracefully — every reload pays this full timeout before SIGKILL, so
-        # keep it short.
+        # Workers often fail to stop gracefully (cause undiagnosed; same
+        # symptom as granian#470) — every reload pays this full timeout
+        # before SIGKILL, so keep it short.
         - --workers-kill-timeout
         - "1"
         - main.asgi:application

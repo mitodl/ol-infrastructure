@@ -2,6 +2,15 @@
 # Run: tilt up
 # Docs: local-dev/README.md
 
+# Prune Tilt-built images/containers aggressively — the app images are
+# multi-GB, so stale builds eat disk fast.
+docker_prune_settings(
+    disable=False,
+    max_age_mins=720,     # anything older than 12h goes
+    num_builds=5,         # also prune every 5 image builds
+    keep_recent=2,        # always keep the 2 most recent tags per image
+)
+
 # ---------------------------------------------------------------------------
 # Developer configuration
 # ---------------------------------------------------------------------------
