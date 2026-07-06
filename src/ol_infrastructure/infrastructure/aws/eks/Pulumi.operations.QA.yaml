@@ -11,6 +11,7 @@ config:
   - ol.mit.edu
   eks:apisix_domains:
   - celery-monitoring-qa.odl.mit.edu
+  - toolhive-swe.qa.ol.mit.edu
   eks:backup: false
   eks:developer_role_policy_name: AmazonEKSAdminPolicy
   eks:developer_role_kubernetes_groups:
