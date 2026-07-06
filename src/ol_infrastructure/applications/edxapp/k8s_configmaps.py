@@ -279,13 +279,18 @@ def _build_interpolated_config_dict(
                 },
             }
         )
+        # Match the legacy MITx (residential) footer: only Terms of Service +
+        # Accessibility (accessibilityUrl is set in the base config above), and
+        # the MITx theme logo (same asset the legacy header/footer use). Other
+        # links are intentionally omitted so the frontend-base MFE footer does not
+        # show more links than the legacy footer.
         config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolFooter"].update(
             {
-                "privacyPolicyUrl": f"https://{marketing_domain}/privacy",
                 "termsOfServiceUrl": f"https://{marketing_domain}/terms",
-                "honorCodeUrl": f"https://{marketing_domain}/honor-code/",
-                "aboutUrl": f"https://{marketing_domain}/about",
-                "supportUrl": f"https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/",
+                "footerLogoUrl": (
+                    f"https://{domains['lms']}/static/"
+                    f"{stack_info.env_prefix}/images/logo.svg"
+                ),
                 "copyrightText": "\u00a9 MIT Open Learning. All rights reserved except where noted.",
             }
         )
