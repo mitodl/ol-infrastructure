@@ -204,6 +204,7 @@ if __name__ == "__main__":
         "open-metadata-substructure",
         "opensearch",
         "qdrant-cloud",
+        "rootly",
         "starrocks",
         "starrocks-substructure",
         "starburst",
