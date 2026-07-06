@@ -1,0 +1,10 @@
+{
+  "resource": true,
+  "name": "terraform-provider",
+  "version": "1.1.4",
+  "parameterization": {
+    "name": "rootly",
+    "version": "5.16.1",
+    "value": "eyJyZW1vdGUiOnsidXJsIjoicmVnaXN0cnkub3BlbnRvZnUub3JnL3Jvb3RseWhxL3Jvb3RseSIsInZlcnNpb24iOiI1LjE2LjEifX0="
+  }
+}
