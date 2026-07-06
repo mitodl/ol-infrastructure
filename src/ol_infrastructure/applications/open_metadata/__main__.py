@@ -538,6 +538,42 @@ open_metadata_glue_iam_policy = iam.Policy(
     tags=aws_config.tags,
 )
 
+# Grants the server pod access to invoke the Bedrock embedding model used for
+# semantic search (see EMBEDDING_PROVIDER below). The DJL provider is unusable
+# on the official OpenMetadata image: DJL downloads a glibc-linked PyTorch
+# native runtime, but the image is Alpine/musl, so it fails every time with
+# `UnsatisfiedLinkError: ... initial-exec TLS resolves to dynamic definition`.
+# Unresolved upstream as of 1.13.1 -
+# https://github.com/open-metadata/OpenMetadata/issues/29576
+open_metadata_bedrock_policy_document = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": ["bedrock:InvokeModel"],
+            "Resource": ["arn:aws:bedrock:*::foundation-model/amazon.titan-embed-*"],
+        },
+    ],
+}
+
+open_metadata_bedrock_iam_policy = iam.Policy(
+    f"open-metadata-bedrock-embedding-policy-{stack_info.env_suffix}",
+    name=f"open-metadata-bedrock-embedding-policy-{stack_info.env_suffix}",
+    path=f"/ol-applications/open-metadata/open_metadata/{stack_info.env_suffix}/",
+    description=(
+        "Allows the OpenMetadata server to invoke the Bedrock Titan embedding"
+        " model used for semantic/vector search"
+    ),
+    policy=lint_iam_policy(
+        open_metadata_bedrock_policy_document,
+        stringify=True,
+        # Parliament's RESOURCE_MISMATCH check doesn't recognize the
+        # foundation-model resource type for bedrock:InvokeModel.
+        parliament_config={"RESOURCE_EFFECTIVELY_STAR": {}, "RESOURCE_MISMATCH": {}},
+    ),
+    tags=aws_config.tags,
+)
+
 open_metadata_irsa_role = OLEKSTrustRole(
     f"open-metadata-irsa-trust-role-{stack_info.env_suffix}",
     role_config=OLEKSTrustRoleConfig(
@@ -559,6 +595,13 @@ open_metadata_irsa_role = OLEKSTrustRole(
 open_metadata_glue_policy_attachment = iam.RolePolicyAttachment(
     f"open-metadata-glue-policy-attachment-{stack_info.env_suffix}",
     policy_arn=open_metadata_glue_iam_policy.arn,
+    role=open_metadata_irsa_role.role.name,
+    opts=ResourceOptions(parent=open_metadata_irsa_role),
+)
+
+open_metadata_bedrock_policy_attachment = iam.RolePolicyAttachment(
+    f"open-metadata-bedrock-policy-attachment-{stack_info.env_suffix}",
+    policy_arn=open_metadata_bedrock_iam_policy.arn,
     role=open_metadata_irsa_role.role.name,
     opts=ResourceOptions(parent=open_metadata_irsa_role),
 )
@@ -671,6 +714,13 @@ open_metadata_application = kubernetes.helm.v3.Release(
             # 1.13: hybrid search is now automatic when SEMANTIC_SEARCH_ENABLED=true;
             # the per-query semanticSearch flag is removed. Run the Search Index App
             # after upgrading to populate vector fields in OpenSearch.
+            # EMBEDDING_PROVIDER=bedrock (not djl): DJL is unusable on the official
+            # Alpine/musl-based server image - it fails to load its glibc-linked
+            # PyTorch native runtime every time. Unresolved upstream as of 1.13.1:
+            # https://github.com/open-metadata/OpenMetadata/issues/29576
+            # Bedrock auth uses the pod's IRSA role (open_metadata_bedrock_iam_policy
+            # below) via the AWS default credential provider chain - no API key
+            # needed, just AWS_DEFAULT_REGION.
             # LOG_FORMAT=json (1.13) enables JSON-structured Dropwizard server logs.
             "extraEnvs": [
                 {
@@ -679,7 +729,20 @@ open_metadata_application = kubernetes.helm.v3.Release(
                 },
                 {
                     "name": "EMBEDDING_PROVIDER",
-                    "value": "djl",
+                    "value": "bedrock",
+                },
+                # Bedrock's region (parsed by OM from AWS_DEFAULT_REGION per
+                # conf/openmetadata.yaml) and the AWS SDK v2 region-provider
+                # chain (which the IRSA credentials exchange uses internally,
+                # and only recognizes AWS_REGION) read two different env vars -
+                # set both rather than assume one covers the other.
+                {
+                    "name": "AWS_DEFAULT_REGION",
+                    "value": "us-east-1",
+                },
+                {
+                    "name": "AWS_REGION",
+                    "value": "us-east-1",
                 },
                 {
                     "name": "LOG_FORMAT",
@@ -726,6 +789,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
             oidc_helm_secret,
             open_metadata_irsa_role,
             open_metadata_glue_policy_attachment,
+            open_metadata_bedrock_policy_attachment,
             *connector_secrets,
         ],
     ),
