@@ -246,10 +246,15 @@ vault_template_map = {
 
 # Install Concourse
 # Web nodes need awscli + jq for the stalled-worker reaper; workers need awscli
-# for the spot/lifecycle drain helpers.
+# for the spot/lifecycle drain helpers, plus qemu-user-static/binfmt-support so
+# oci-build-task can cross-build linux/arm64 images via QEMU emulation.
 install_baseline_packages(
     packages=["curl", "btrfs-progs"]
-    + (["awscli"] if node_type == CONCOURSE_WORKER_NODE_TYPE else [])
+    + (
+        ["awscli", "qemu-user-static", "binfmt-support"]
+        if node_type == CONCOURSE_WORKER_NODE_TYPE
+        else []
+    )
     + (["awscli", "jq"] if node_type == CONCOURSE_WEB_NODE_TYPE else [])
 )
 concourse_install_changed = install_concourse(concourse_base_config)

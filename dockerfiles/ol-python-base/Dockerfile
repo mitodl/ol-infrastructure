@@ -9,6 +9,11 @@
 #
 # Build:
 #   docker build --build-arg PYTHON_VERSION=3.12 -t mitodl/ol-python-base:3.12 .
+# Multi-arch build (published for both amd64 and arm64/Apple Silicon; --push
+# is required since a multi-platform result can't be loaded into the local
+# docker engine):
+#   docker buildx build --platform linux/amd64,linux/arm64 --push \
+#     --build-arg PYTHON_VERSION=3.12 -t mitodl/ol-python-base:3.12 .
 ARG PYTHON_VERSION=3.12
 FROM python:${PYTHON_VERSION}-slim
 

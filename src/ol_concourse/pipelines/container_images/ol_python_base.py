@@ -56,18 +56,24 @@ def build_job(python_version: str) -> Job:
                 build_parameters={
                     "CONTEXT": context,
                     "BUILD_ARG_PYTHON_VERSION": python_version,
+                    # Cross-build linux/arm64 via QEMU emulation (workers have
+                    # qemu-user-static/binfmt-support installed) so Apple
+                    # Silicon can pull a native image. Multiple platforms
+                    # makes oci-build-task emit an OCI layout directory
+                    # (image/image) instead of a tarball.
+                    "IMAGE_PLATFORM": "linux/amd64,linux/arm64",
                 },
             ),
             ensure_ecr_task("mitodl/ol-python-base"),
             PutStep(
                 put=image_resources[python_version].name,
                 inputs="detect",
-                params={"image": "image/image.tar"},
+                params={"image": "image/image"},
             ),
             PutStep(
                 put=ecr_image_resources[python_version].name,
                 inputs="detect",
-                params={"image": "image/image.tar"},
+                params={"image": "image/image"},
             ),
         ],
     )
