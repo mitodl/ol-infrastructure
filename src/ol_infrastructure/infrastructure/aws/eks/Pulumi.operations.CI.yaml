@@ -11,6 +11,7 @@ config:
   - ol.mit.edu
   eks:apisix_domains:
   - celery-monitoring-ci.odl.mit.edu
+  - toolhive-swe.ci.ol.mit.edu
   eks:backup: false
   eks:developer_role_policy_name: AmazonEKSAdminPolicy
   eks:developer_role_kubernetes_groups:
@@ -21,7 +22,10 @@ config:
   eks:namespaces:
   - keycloak
   - kubewatch
-  - toolhive
+  - toolhive-operator
+  - toolhive-swe
+  - toolhive-apps
+  - toolhive-data
   eks:nodegroups:
     worker-xlarge:
       instance_type: c8i-flex.xlarge
