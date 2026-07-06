@@ -71,11 +71,11 @@ Rootly). That path is independent of Grafana and is managed in
 | `__main__.py` | Provider bootstrap only. Reads secrets, creates provider, delegates to submodules. |
 | `alertmanager.py` | Contact points (Rootly, Slack, oblivion drop sink) and the notification policy route tree. Translates `grafana-alerts/alertmanager.yaml`. |
 | `metric_rules/` | Package. Grafana-managed alert rule groups for Prometheus/Mimir metrics. Migrated from `grafana-alerts/cortex-rules/`. |
-| `metric_rules/__init__.py` | Mimir datasource UIDs, two-stage pipeline helper, folder creation, delegates to sub-modules. |
+| `metric_rules/base.py` | Mimir datasource UIDs, two-stage pipeline helper, folder creation, delegates to sub-modules. |
 | `metric_rules/eks_general.py` | EKS workload alert rules (replicas, node readiness, crash loops, OOM, jobs, HPA). |
 | `metric_rules/linux_host.py` | Linux host alert rules (CPU, memory, disk usage). |
 | `log_rules/` | Package. Grafana-managed alert rule groups for log queries. Migrated from `grafana-alerts/loki-rules/`. |
-| `log_rules/__init__.py` | Loki datasource UIDs, two-stage pipeline helper, folder creation, delegates to sub-modules. |
+| `log_rules/base.py` | Loki datasource UIDs, two-stage pipeline helper, folder creation, delegates to sub-modules. |
 | `log_rules/cert_manager.py` | cert-manager ACME issuer and DNS challenge alert rules. |
 | `log_rules/edxapp.py` | edxapp application log alert rules (500 errors, Redis OOM, credential issues, forum timeouts, SAML). |
 | `log_rules/heroku.py` | Heroku application log alert rules (invalid AWS keys, Bootcamps SAML, OCW Studio, Keycloak). |
@@ -100,7 +100,7 @@ pingdom_checks.create(api_token: Input[str], integration_ids: list[int])
 ```
 
 Within `metric_rules/` and `log_rules/`, each sub-module receives the folder
-UID and a pre-bound `rd(expr)` helper from its package `__init__.py`:
+UID and a pre-bound `rd(expr)` helper from its package `base.py`:
 
 ```python
 # sub-module signature (metric_rules/* and log_rules/*)
