@@ -2,46 +2,49 @@
 name = "ol-infrastructure"
 version = "0.1.0"
 description = "Infrastructure management, configuration management logic, and Packer templates for building and deploying images to run services in a production environment."
-authors = [{ name = "MIT Open Learning Engineering", email = "oldevops@mit.edu" }]
+authors = [
+  { name = "MIT Open Learning Engineering", email = "oldevops@mit.edu" },
+]
 requires-python = ">=3.13,<3.15"
 readme = "README.md"
 license = "BSD-3-Clause"
 classifiers = [
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    "boto3~=1.24",
-    "httpx>=0.28.0,<0.29",
-    "hvac[parser]>=2.0.0,<3",
-    "pulumi>=3.39.1,<4",
-    "pulumi-aws>=7.1,<8",
-    "pulumi-docker>=5,<6",
-    "pulumi-fastly>=12,<13",
-    "pulumi-github>=6.0.0,<7",
-    "pulumi-mailgun>=3.0.0,<4",
-    "pulumi-tls>=5.0.0,<6",
-    "pulumi-vault>=7,<8",
-    "pulumi_consul>=3.5.0,<4",
-    "pydantic>=2,<3",
-    "pyinfra~=3.0",
-    "pulumi-mongodbatlas>=4,<5",
-    "bcrypt>=5,<6",
-    "pulumi-keycloak>=6.0.0,<7",
-    "pydantic-settings>=2.0.1,<3",
-    "pulumiverse-heroku>=1.0.3,<2",
-    "pulumi-eks>=4,<5",
-    "pulumi-aws-native>=1.25.0,<2",
-    "packaging>=24.2",
-    "pulumiverse-time>=0.1.1",
-    "kubernetes>=34.1.0",
-    "ol-parliament>=1.7.0",
-    "cyclopts>=4.4.0",
-    "requests-aws4auth>=1.3.1",
-    "pulumi-qdrant-cloud",
-    "pulumi-terraform>=6.0.1",
-    "pulumi-command>=1.0,<2",
-    "ol-concourse>=0.8.4,<0.9",
+  "boto3~=1.24",
+  "httpx>=0.28.0,<0.29",
+  "hvac[parser]>=2.0.0,<3",
+  "pulumi>=3.39.1,<4",
+  "pulumi-aws>=7.1,<8",
+  "pulumi-docker>=5,<6",
+  "pulumi-fastly>=12,<13",
+  "pulumi-github>=6.0.0,<7",
+  "pulumi-mailgun>=3.0.0,<4",
+  "pulumi-tls>=5.0.0,<6",
+  "pulumi-vault>=7,<8",
+  "pulumi_consul>=3.5.0,<4",
+  "pydantic>=2,<3",
+  "pyinfra~=3.0",
+  "pulumi-mongodbatlas>=4,<5",
+  "bcrypt>=5,<6",
+  "pulumi-keycloak>=6.0.0,<7",
+  "pydantic-settings>=2.0.1,<3",
+  "pulumiverse-heroku>=1.0.3,<2",
+  "pulumi-eks>=4,<5",
+  "pulumi-aws-native>=1.25.0,<2",
+  "packaging>=24.2",
+  "pulumiverse-time>=0.1.1",
+  "kubernetes>=34.1.0",
+  "ol-parliament>=1.7.0",
+  "cyclopts>=4.4.0",
+  "requests-aws4auth>=1.3.1",
+  "pulumi-qdrant-cloud",
+  "pulumi-rootly",
+  "pulumi-terraform>=6.0.1",
+  "pulumi-command>=1.0,<2",
+  "ol-concourse>=0.8.4,<0.9",
 ]
 
 [project.urls]
@@ -49,35 +52,35 @@ Repository = "https://github.com/mitodl/ol-infrastructure"
 
 [dependency-groups]
 dev = [
-    "copier",
-    "datamodel-code-generator",
-    "diagrams",
-    "mypy",
-    "pip>=26.0.1",
-    "pre-commit>=4.0.0,<5",
-    "pytest>=9.0.1,<10",
-    "pytest-asyncio>=0.24.0",
-    "pytest-cov>=6.0.0",
-    "pytest-mock>=3.14.0",
-    "pytest-testinfra>=10.0.0,<11",
-    "ruff>=0.12,<1",
-    "types-boto3>=1.42.65",
+  "copier",
+  "datamodel-code-generator",
+  "diagrams",
+  "mypy",
+  "pip>=26.0.1",
+  "pre-commit>=4.0.0,<5",
+  "pytest>=9.0.1,<10",
+  "pytest-asyncio>=0.24.0",
+  "pytest-cov>=6.0.0",
+  "pytest-mock>=3.14.0",
+  "pytest-testinfra>=10.0.0,<11",
+  "ruff>=0.12,<1",
+  "types-boto3>=1.42.65",
 ]
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "src/ol_infrastructure",
-    "src/bridge",
-    "src/bilder",
-    "src/ol_concourse",
+  "src/ol_infrastructure",
+  "src/bridge",
+  "src/bilder",
+  "src/ol_concourse",
 ]
 
 [tool.hatch.build.targets.wheel]
 include = [
-    "src/ol_infrastructure",
-    "src/bridge",
-    "src/bilder",
-    "src/ol_concourse",
+  "src/ol_infrastructure",
+  "src/bridge",
+  "src/bilder",
+  "src/ol_concourse",
 ]
 
 [tool.hatch.build.targets.wheel.sources]
@@ -96,9 +99,7 @@ build-backend = "hatchling.build"
 
 [tool.mypy]
 python_version = "3.12"
-plugins = [
-  "pydantic.mypy"
-]
+plugins = ["pydantic.mypy"]
 follow_imports = "normal"
 warn_redundant_casts = true
 warn_unused_ignores = true
@@ -106,11 +107,7 @@ disallow_any_generics = true
 check_untyped_defs = true
 no_implicit_reexport = true
 ignore_missing_imports = true
-exclude = [
-  "scripts/helpers/.*",
-  "dockerfiles/.*",
-  "sdks/.*"
-]
+exclude = ["scripts/helpers/.*", "dockerfiles/.*", "sdks/.*"]
 
 [tool.pydantic-mypy]
 init_forbid_extra = true
@@ -121,89 +118,89 @@ warn_required_dynamic_aliases = true
 target-version = "py312"
 line-length = 88
 exclude = [
-    "scripts/helpers/dump_settings.py",
-    "scripts/helpers/json_deep_diff.py",
-    "sdks/",
+  "scripts/helpers/dump_settings.py",
+  "scripts/helpers/json_deep_diff.py",
+  "sdks/",
 ]
 lint.select = [
-    "A",  # flake8-builtins
-    # "AIR",  # Airflow
-    # "ANN",  # flake8-annotations
-    "ARG",  # flake8-unused-arguments
-    # "ASYNC",  # flake8-async
-    "B",  # flake8-bugbear
-    "BLE",  # flake8-blind-except
-    "C4",  # flake8-comprehensions
-    "C90",  # mccabe
-    # "COM",  # flake8-commas
-    "CPY",  # flake8-copyright
-    "D",  # pydocstyle
-    # "DJ",  # flake8-django
-    "DOC",  # pydoclint
-    "DTZ",  # flake8-datetimez
-    "E",  # Pycodestyle Error
-    "EM",  # flake8-errmsg
-    "ERA",  # eradicate
-    "EXE",  # flake8-executable
-    "F",  # Pyflakes
-    "FA",  # flake8-future-annotations
-    "FBT",  # flake8-boolean-trap
-    "FIX",  # flake8-fixme
-    "FLY",  # flynt
-    # "FURB",  # refurb
-    "G",  # flake8-logging-format
-    "I",  # isort
-    "ICN",  # flake8-import-conventions
-    "INP",  # flake8-no-pep420
-    "INT",  # flake8-gettext
-    "N",  # pep8-naming
-    # "NPY",  # NumPy-specific rules
-    # "PD",  # pandas-vet
-    "PERF",  # Perflint
-    "PGH",  # pygrep-hooks
-    "PIE",  # flake8-pie
-    "PL",  # Pylint
-    "PT",  # flake8-pytest-style
-    "PTH",  # flake8-use-pathlib
-    "PYI",  # flake8-pyi
-    "Q",  # flake8-quotes
-    "RET",  # flake8-return
-    "RSE",  # flake8-raise
-    "RUF",  # Ruff-specific rules
-    "S",  # flake8-bandit
-    "SIM",  # flake8-simplify
-    "SLF",  # flake8-self
-    "SLOT",  # flake8-slots
-    "T10",  # flake8-debugger
-    "T20",  # flake8-print
-    # "TCH",  # flake8-type-checking
-    "TD",  # flake8-todos
-    "TID",  # flake8-tidy-imports
-    "TRY",  # tryceratops
-    "UP",  # pyupgrade
-    "W",  # Pycodestyle Warning
-    "YTT",  # flake8-2020
+  "A", # flake8-builtins
+  # "AIR",  # Airflow
+  # "ANN",  # flake8-annotations
+  "ARG", # flake8-unused-arguments
+  # "ASYNC",  # flake8-async
+  "B",   # flake8-bugbear
+  "BLE", # flake8-blind-except
+  "C4",  # flake8-comprehensions
+  "C90", # mccabe
+  # "COM",  # flake8-commas
+  "CPY", # flake8-copyright
+  "D",   # pydocstyle
+  # "DJ",  # flake8-django
+  "DOC", # pydoclint
+  "DTZ", # flake8-datetimez
+  "E",   # Pycodestyle Error
+  "EM",  # flake8-errmsg
+  "ERA", # eradicate
+  "EXE", # flake8-executable
+  "F",   # Pyflakes
+  "FA",  # flake8-future-annotations
+  "FBT", # flake8-boolean-trap
+  "FIX", # flake8-fixme
+  "FLY", # flynt
+  # "FURB",  # refurb
+  "G",   # flake8-logging-format
+  "I",   # isort
+  "ICN", # flake8-import-conventions
+  "INP", # flake8-no-pep420
+  "INT", # flake8-gettext
+  "N",   # pep8-naming
+  # "NPY",  # NumPy-specific rules
+  # "PD",  # pandas-vet
+  "PERF", # Perflint
+  "PGH",  # pygrep-hooks
+  "PIE",  # flake8-pie
+  "PL",   # Pylint
+  "PT",   # flake8-pytest-style
+  "PTH",  # flake8-use-pathlib
+  "PYI",  # flake8-pyi
+  "Q",    # flake8-quotes
+  "RET",  # flake8-return
+  "RSE",  # flake8-raise
+  "RUF",  # Ruff-specific rules
+  "S",    # flake8-bandit
+  "SIM",  # flake8-simplify
+  "SLF",  # flake8-self
+  "SLOT", # flake8-slots
+  "T10",  # flake8-debugger
+  "T20",  # flake8-print
+  # "TCH",  # flake8-type-checking
+  "TD",  # flake8-todos
+  "TID", # flake8-tidy-imports
+  "TRY", # tryceratops
+  "UP",  # pyupgrade
+  "W",   # Pycodestyle Warning
+  "YTT", # flake8-2020
 ]
 lint.ignore = [
-    "A005",
-    "B008",
-    "B905",
-    "D104",
-    "D200",
-    "D202",
-    "D205",
-    "D301",
-    "D400",
-    "N803",
-    "N806",
-    "N999",
-    "PIE804",
-    "RET505",
-    "RET506",
-    "RET507",
-    "RET508",
-    "SIM115",
-    "TD003",  # Don't require issue links for TODO comments
+  "A005",
+  "B008",
+  "B905",
+  "D104",
+  "D200",
+  "D202",
+  "D205",
+  "D301",
+  "D400",
+  "N803",
+  "N806",
+  "N999",
+  "PIE804",
+  "RET505",
+  "RET506",
+  "RET507",
+  "RET508",
+  "SIM115",
+  "TD003",  # Don't require issue links for TODO comments
 ]
 lint.typing-modules = ["colour.hints"]
 
@@ -215,7 +212,18 @@ inline-quotes = "double"
 
 [tool.ruff.lint.per-file-ignores]
 "src/ol_concourse/**" = ["INP001"]
-"scripts/**" = ["T201", "ERA001", "B", "BLE001", "PLR", "E501", "G004", "FBT", "C90", "INP001"]
+"scripts/**" = [
+  "T201",
+  "ERA001",
+  "B",
+  "BLE001",
+  "PLR",
+  "E501",
+  "G004",
+  "FBT",
+  "C90",
+  "INP001",
+]
 "tests/**" = ["S101", "PLR2004", "RUF059", "S106", "SLF001", "ERA001"]
 "test_*.py" = ["S101"]
 "src/ol_infrastructure/substructure/vault/pki/__main__.py" = ["E501"]
@@ -228,9 +236,9 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 markers = [
-    "unit: Unit tests (fast, no external dependencies)",
-    "integration: Integration tests (slow, deploys infrastructure)",
-    "policy: Policy pack tests",
+  "unit: Unit tests (fast, no external dependencies)",
+  "integration: Integration tests (slow, deploys infrastructure)",
+  "policy: Policy pack tests",
 ]
 # Skip slow integration tests by default
 addopts = "-v -m 'not integration'"
@@ -238,9 +246,7 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.uv.workspace]
-members = [
-    "sdks/qdrant-cloud",
-]
+members = ["sdks/qdrant-cloud", "sdks/rootly"]
 
 [tool.uv.sources]
 pulumi-qdrant-cloud = { workspace = true }
