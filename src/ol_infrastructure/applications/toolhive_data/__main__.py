@@ -6,7 +6,7 @@ data agents. The ToolHive operator and CRDs that reconcile these resources are
 installed cluster-scoped by the ``ol-application-toolhive-operator`` stack; this
 stack references that one so it fails fast if the operator has never been deployed.
 
-See ``../toolhive-operator/DEPLOYMENT_STRATEGY.md`` for why agent classes are
+See ``../toolhive_operator/DEPLOYMENT_STRATEGY.md`` for why agent classes are
 separated by namespace under a single operator, and when a data-agent MCP server
 that needs IRSA into the data account should instead graduate to the ``data``
 cluster.
