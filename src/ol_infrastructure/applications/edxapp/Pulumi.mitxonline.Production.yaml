@@ -151,7 +151,7 @@ config:
   meilisearch:pv_size: 100Gi
   meilisearch:cpu_request: "250m"
   meilisearch:memory_request: "1Gi"
-  meilisearch:memory_limit: "1Gi"
+  meilisearch:memory_limit: "4Gi"
   typesense:deploy: "true"
   typesense:enabled: "true"
   typesense:course_search_enabled: "true"
