@@ -6,7 +6,7 @@ application agents. The ToolHive operator and CRDs that reconcile these resource
 are installed cluster-scoped by the ``ol-application-toolhive-operator`` stack; this
 stack references that one so it fails fast if the operator has never been deployed.
 
-See ``../toolhive-operator/DEPLOYMENT_STRATEGY.md`` for why agent classes are
+See ``../toolhive_operator/DEPLOYMENT_STRATEGY.md`` for why agent classes are
 separated by namespace under a single operator.
 
 This is the initial CI-only bootstrap: it establishes the namespace ownership and
