@@ -77,17 +77,22 @@ from pathlib import Path
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, ResourceOptions, export
 
+from ol_infrastructure.applications.toolhive_swe.ingress import (
+    create_ingress_resources,
+)
+from ol_infrastructure.applications.toolhive_swe.mcp_servers import (
+    MCP_GROUP_NAME,
+    create_mcp_servers,
+)
+from ol_infrastructure.applications.toolhive_swe.redis import (
+    REDIS_PASSWORD_SECRET_KEY,
+    REDIS_PASSWORD_SECRET_NAME,
+    create_redis_resources,
+    redis_addr,
+)
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
-)
-from ol_infrastructure.components.services.apisix_gateway_api import (
-    OLApisixHTTPRoute,
-    OLApisixHTTPRouteConfig,
-)
-from ol_infrastructure.components.services.cert_manager import (
-    OLCertManagerCert,
-    OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
@@ -95,7 +100,6 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
-    cached_image_uri,
     check_cluster_namespace,
     setup_k8s_provider,
 )
@@ -157,9 +161,6 @@ k8s_labels = K8sGlobalLabels(
 # Plain label dict applied to the raw K8s objects we manage directly.
 k8s_global_labels = k8s_labels.model_dump()
 
-# Name shared by the MCPGroup and every backend/virtual server that references it.
-MCP_GROUP_NAME = "swe-tools"
-
 # Public hostname the vMCP is served on. This is also the embedded auth server's
 # issuer and the OAuth resource identifier ToolHive advertises + validates.
 VMCP_DOMAIN = "toolhive-swe.ci.ol.mit.edu"
@@ -200,16 +201,10 @@ HMAC_SECRET_NAME = "toolhive-swe-authserver-hmac"  # noqa: S105  # pragma: allow
 HMAC_SECRET_KEY = "hmac-key"  # noqa: S105  # pragma: allowlist secret
 
 # In-cluster Redis backing the embedded auth server's persistent storage (OAuth
-# sessions + DCR client registrations), so those survive vMCP pod restarts. A small
-# single-replica StatefulSet with a PVC, local to this namespace. The CRD requires a
-# password (aclUserConfig.passwordSecretRef) for the Redis backend, so Redis runs
-# with requirepass and the vMCP references the same secret.
-REDIS_SERVICE_NAME = "toolhive-swe-redis"
-REDIS_ADDR = f"{REDIS_SERVICE_NAME}.{TOOLHIVE_NAMESPACE}.svc.cluster.local:6379"
-REDIS_PASSWORD_SECRET_NAME = "toolhive-swe-redis-password"  # noqa: S105  # pragma: allowlist secret
-REDIS_PASSWORD_SECRET_KEY = "password"  # noqa: S105  # pragma: allowlist secret
-REDIS_IMAGE = "redis:7.4-alpine"
-REDIS_STORAGE_CLASS = "ebs-gp3-sc"
+# sessions + DCR client registrations), so those survive vMCP pod restarts.
+# Provisioned in redis.py; the vMCP spec below references the address and the
+# password Secret.
+REDIS_ADDR = redis_addr(TOOLHIVE_NAMESPACE)
 
 #############################################
 #   Vault auth binding (for VSO secret sync)#
@@ -307,193 +302,24 @@ authserver_hmac_key_secret = kubernetes.core.v1.Secret(
 ##############################################
 #   In-cluster Redis (embedded AS storage)    #
 ##############################################
-# Redis requirepass from encrypted stack config. Generate + set (per environment):
-#   openssl rand -base64 32 \
-#     | pulumi config set --secret toolhive_swe:redis_password --
-redis_password_value = toolhive_swe_config.require_secret("redis_password")
-redis_password_secret = kubernetes.core.v1.Secret(
-    f"toolhive-swe-redis-password-secret-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=REDIS_PASSWORD_SECRET_NAME,
-        namespace=TOOLHIVE_NAMESPACE,
-        labels=k8s_global_labels,
-    ),
-    type="Opaque",
-    string_data={REDIS_PASSWORD_SECRET_KEY: redis_password_value},
-    opts=ResourceOptions(delete_before_replace=True),
-)
-
-# Headless Service: governs the StatefulSet and is the address the vMCP connects to.
-redis_service = kubernetes.core.v1.Service(
-    f"toolhive-swe-redis-service-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=REDIS_SERVICE_NAME,
-        namespace=TOOLHIVE_NAMESPACE,
-        labels=k8s_global_labels,
-    ),
-    spec=kubernetes.core.v1.ServiceSpecArgs(
-        cluster_ip="None",
-        selector={"app.kubernetes.io/name": REDIS_SERVICE_NAME},
-        ports=[
-            kubernetes.core.v1.ServicePortArgs(
-                name="redis", port=6379, target_port=6379, protocol="TCP"
-            )
-        ],
-    ),
-)
-
-# Single-replica Redis with a small persistent volume. AOF persistence is enabled so
-# sessions/registrations survive Redis restarts too, and requirepass is fed from the
-# generated Secret. ``$(REDIS_PASSWORD)`` is substituted by Kubernetes from the env.
-redis_pod_labels = {
-    **k8s_global_labels,
-    "app.kubernetes.io/name": REDIS_SERVICE_NAME,
-}
-redis_statefulset = kubernetes.apps.v1.StatefulSet(
-    f"toolhive-swe-redis-statefulset-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=REDIS_SERVICE_NAME,
-        namespace=TOOLHIVE_NAMESPACE,
-        labels=redis_pod_labels,
-    ),
-    spec=kubernetes.apps.v1.StatefulSetSpecArgs(
-        service_name=REDIS_SERVICE_NAME,
-        replicas=1,
-        selector=kubernetes.meta.v1.LabelSelectorArgs(
-            match_labels={"app.kubernetes.io/name": REDIS_SERVICE_NAME}
-        ),
-        template=kubernetes.core.v1.PodTemplateSpecArgs(
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=redis_pod_labels),
-            spec=kubernetes.core.v1.PodSpecArgs(
-                containers=[
-                    kubernetes.core.v1.ContainerArgs(
-                        name="redis",
-                        image=cached_image_uri(REDIS_IMAGE),
-                        args=[
-                            "redis-server",
-                            "--requirepass",
-                            "$(REDIS_PASSWORD)",
-                            "--appendonly",
-                            "yes",
-                            "--dir",
-                            "/data",
-                        ],
-                        env=[
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="REDIS_PASSWORD",
-                                value_from=kubernetes.core.v1.EnvVarSourceArgs(
-                                    secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
-                                        name=REDIS_PASSWORD_SECRET_NAME,
-                                        key=REDIS_PASSWORD_SECRET_KEY,
-                                    )
-                                ),
-                            )
-                        ],
-                        ports=[
-                            kubernetes.core.v1.ContainerPortArgs(container_port=6379)
-                        ],
-                        readiness_probe=kubernetes.core.v1.ProbeArgs(
-                            tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
-                                port=6379
-                            ),
-                            initial_delay_seconds=5,
-                            period_seconds=10,
-                        ),
-                        liveness_probe=kubernetes.core.v1.ProbeArgs(
-                            tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
-                                port=6379
-                            ),
-                            initial_delay_seconds=15,
-                            period_seconds=20,
-                        ),
-                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                            requests={"cpu": "50m", "memory": "64Mi"},
-                            limits={"cpu": "200m", "memory": "256Mi"},
-                        ),
-                        volume_mounts=[
-                            kubernetes.core.v1.VolumeMountArgs(
-                                name="data", mount_path="/data"
-                            )
-                        ],
-                    )
-                ],
-            ),
-        ),
-        volume_claim_templates=[
-            kubernetes.core.v1.PersistentVolumeClaimArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    name="data", labels=k8s_global_labels
-                ),
-                spec=kubernetes.core.v1.PersistentVolumeClaimSpecArgs(
-                    access_modes=["ReadWriteOnce"],
-                    storage_class_name=REDIS_STORAGE_CLASS,
-                    resources=kubernetes.core.v1.VolumeResourceRequirementsArgs(
-                        requests={"storage": "100Gi"}
-                    ),
-                ),
-            )
-        ],
-    ),
-    opts=ResourceOptions(depends_on=[redis_password_secret]),
+# Password Secret + headless Service + StatefulSet, defined in redis.py.
+redis_resources = create_redis_resources(
+    stack_info=stack_info,
+    namespace=TOOLHIVE_NAMESPACE,
+    k8s_global_labels=k8s_global_labels,
+    toolhive_swe_config=toolhive_swe_config,
 )
 
 #########################################
-#   MCPGroup (backend grouping)          #
+#   MCPGroup + backend MCPServers        #
 #########################################
-# Groups the SWE backend MCP servers so a VirtualMCPServer can aggregate them.
-# Backends join by setting ``spec.groupRef.name`` to this group's name.
-swe_mcpgroup = kubernetes.apiextensions.CustomResource(
-    f"toolhive-swe-mcpgroup-{stack_info.env_suffix}",
-    api_version="toolhive.stacklok.dev/v1beta1",
-    kind="MCPGroup",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=MCP_GROUP_NAME,
-        namespace=TOOLHIVE_NAMESPACE,
-        labels=k8s_global_labels,
-    ),
-    spec={
-        "description": (
-            "SWE agent-class MCP servers aggregated behind the swe VirtualMCPServer"
-        ),
-    },
-    opts=ResourceOptions(depends_on=[cluster_stack]),
-)
-
-#########################################
-#   fetch MCPServer (example workload)   #
-#########################################
-# The reference fetch MCP server. The operator reconciles this into a proxy
-# Deployment + Service (``mcp-fetch-proxy``) reachable in-cluster at
-# ``http://mcp-fetch-proxy.toolhive-swe.svc.cluster.local:8080/mcp``. It joins the
-# MCPGroup above so the VirtualMCPServer discovers it as a backend.
-fetch_mcpserver = kubernetes.apiextensions.CustomResource(
-    f"toolhive-swe-fetch-mcpserver-{stack_info.env_suffix}",
-    api_version="toolhive.stacklok.dev/v1beta1",
-    kind="MCPServer",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="fetch",
-        namespace=TOOLHIVE_NAMESPACE,
-        labels=k8s_global_labels,
-    ),
-    spec={
-        "image": "ghcr.io/stackloklabs/gofetch/server:1.0.5",
-        "transport": "streamable-http",
-        "proxyPort": 8080,
-        "mcpPort": 8080,
-        "groupRef": {"name": MCP_GROUP_NAME},
-        # Fetch needs outbound network access to retrieve URLs. The "network"
-        # builtin profile grants egress; tighten to an allow-list ConfigMap when
-        # the set of reachable hosts is known.
-        "permissionProfile": {
-            "type": "builtin",
-            "name": "network",
-        },
-        "resources": {
-            "requests": {"cpu": "50m", "memory": "64Mi"},
-            "limits": {"cpu": "100m", "memory": "128Mi"},
-        },
-    },
-    opts=ResourceOptions(depends_on=[swe_mcpgroup]),
+# The ``swe-tools`` MCPGroup and every backend MCPServer that joins it, defined
+# in mcp_servers.py. The VirtualMCPServer below aggregates the group's backends.
+mcp_servers = create_mcp_servers(
+    stack_info=stack_info,
+    namespace=TOOLHIVE_NAMESPACE,
+    k8s_global_labels=k8s_global_labels,
+    cluster_stack=cluster_stack,
 )
 
 #########################################
@@ -613,15 +439,15 @@ swe_virtualmcpserver = kubernetes.apiextensions.CustomResource(
     },
     opts=ResourceOptions(
         depends_on=[
-            swe_mcpgroup,
-            fetch_mcpserver,
+            mcp_servers.group,
+            *mcp_servers.servers,
             mcp_oidc_config,
             upstream_oidc_secret,
             authserver_signing_key_secret,
             authserver_hmac_key_secret,
-            redis_password_secret,
-            redis_service,
-            redis_statefulset,
+            redis_resources.password_secret,
+            redis_resources.service,
+            redis_resources.statefulset,
         ]
     ),
 )
@@ -629,51 +455,15 @@ swe_virtualmcpserver = kubernetes.apiextensions.CustomResource(
 #########################################
 #   Internet exposure via APISIX         #
 #########################################
-# The VirtualMCPServer's Service, created by the operator when it reconciles the
-# ``swe-vmcp`` CR above. It listens on port 4483 (not the backend proxy's 8080).
-# APISIX only terminates TLS and proxies through to it — all auth (OAuth endpoints +
-# token validation) happens inside the vMCP, so no plugins are attached.
-VMCP_SERVICE_NAME = "vmcp-swe-vmcp"
-VMCP_SERVICE_PORT = 4483
-VMCP_TLS_SECRET_NAME = "toolhive-swe-vmcp-tls"  # noqa: S105  # pragma: allowlist secret
-
-# Per-host TLS: cert-manager issues a Let's Encrypt cert into VMCP_TLS_SECRET_NAME
-# and the paired ApisixTls resource binds it to the host on the APISIX gateway.
-# The hostname must also be present in the operations EKS stack's
-# ``eks:apisix_domains`` so external-dns points it at the APISIX NLB.
-vmcp_cert = OLCertManagerCert(
-    f"toolhive-swe-vmcp-cert-manager-certificate-{stack_info.env_suffix}",
-    cert_config=OLCertManagerCertConfig(
-        application_name="toolhive-swe-vmcp",
-        k8s_namespace=TOOLHIVE_NAMESPACE,
-        k8s_labels=k8s_global_labels,
-        create_apisixtls_resource=True,
-        dest_secret_name=VMCP_TLS_SECRET_NAME,
-        dns_names=[VMCP_DOMAIN],
-    ),
-    opts=ResourceOptions(depends_on=[swe_virtualmcpserver]),
-)
-
-# Gateway API HTTPRoute attaching the host to the shared operations APISIX gateway
-# and routing all paths (MCP + OAuth + /.well-known/*) to the vMCP Service. No
-# plugins: authentication happens inside the vMCP.
-vmcp_httproute = OLApisixHTTPRoute(
-    f"toolhive-swe-vmcp-apisix-httproute-{stack_info.env_suffix}",
-    route_configs=[
-        OLApisixHTTPRouteConfig(
-            route_name="vmcp",
-            hosts=[VMCP_DOMAIN],
-            paths=["/*"],
-            backend_service_name=VMCP_SERVICE_NAME,
-            # Numeric port: the component maps the name "http" to 8071, which is
-            # wrong for this Service — pass the real port explicitly.
-            backend_service_port=VMCP_SERVICE_PORT,
-            plugins=[],
-        ),
-    ],
-    k8s_namespace=TOOLHIVE_NAMESPACE,
-    k8s_labels=k8s_global_labels,
-    opts=ResourceOptions(depends_on=[swe_virtualmcpserver]),
+# TLS certificate + ApisixTls + HTTPRoute, defined in ingress.py. APISIX only
+# terminates TLS and proxies through to the vMCP Service — all auth (OAuth
+# endpoints + token validation) happens inside the vMCP.
+vmcp_cert, vmcp_httproute = create_ingress_resources(
+    stack_info=stack_info,
+    namespace=TOOLHIVE_NAMESPACE,
+    k8s_global_labels=k8s_global_labels,
+    vmcp_domain=VMCP_DOMAIN,
+    swe_virtualmcpserver=swe_virtualmcpserver,
 )
 
 export("toolhive_namespace", TOOLHIVE_NAMESPACE)
