@@ -1,0 +1,11 @@
+---
+name: ol-application-toolhive-data
+runtime: python
+description: >
+  Deploy the data agent-class MCP workloads on the operations EKS cluster. This
+  stack owns the toolhive-data namespace and will hold the MCPServer /
+  VirtualMCPServer / MCPGroup resources used by data agents. The ToolHive operator
+  and CRDs that reconcile these resources are installed by the
+  ol-application-toolhive-operator stack.
+backend:
+  url: s3://mitol-pulumi-state/
