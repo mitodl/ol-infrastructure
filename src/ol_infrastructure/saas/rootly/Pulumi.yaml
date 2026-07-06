@@ -8,5 +8,5 @@ packages:
   rootly:
     source: terraform-provider
     parameters:
-      - registry.opentofu.org/rootlyhq/rootly
-      - 5.16.1
+    - registry.opentofu.org/rootlyhq/rootly
+    - 5.16.1
