@@ -9,14 +9,18 @@ two Helm charts published as OCI artifacts under
 - ``toolhive-operator`` — the operator that reconciles ``MCPServer`` resources
   into running proxy Deployments + Services.
 
-It also creates a single sample ``MCPServer`` (the ToolHive docs search server) to
-validate the install end-to-end. The operator runs cluster-scoped (the chart default),
-so it can manage ``MCPServer`` resources in any namespace. The ``toolhive`` namespace
-is pre-created by the ``ol-infrastructure-eks`` ``operations`` stack and validated here
-via ``check_cluster_namespace``.
+Both charts are installed into the ``toolhive-operator`` namespace. The operator
+runs cluster-scoped (the chart default), so it reconciles ``MCPServer`` resources
+in *any* namespace — in particular the per-agent-class workload namespaces
+(``toolhive-swe``, ``toolhive-apps``, ``toolhive-data``), each of which is managed
+by its own stack. See ``DEPLOYMENT_STRATEGY.md`` for the axes (environment vs.
+workload separation) that motivate this split.
 
-This is the initial CI-only deployment: no external ingress (APISIX/Gateway), TLS, or
-Vault/IRSA wiring is configured yet. The sample server is reachable only in-cluster.
+The ``toolhive-operator`` namespace is pre-created by the ``ol-infrastructure-eks``
+``operations`` stack and validated here via ``check_cluster_namespace``.
+
+This is the initial CI-only deployment: no external ingress (APISIX/Gateway), TLS,
+or Vault/IRSA wiring is configured yet.
 """
 
 import pulumi_kubernetes as kubernetes
@@ -47,7 +51,7 @@ stack_info = parse_stack()
 cluster_stack = make_stack_reference(projects.EKS, f"operations.{stack_info.name}")
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
-TOOLHIVE_NAMESPACE = "toolhive"
+TOOLHIVE_NAMESPACE = "toolhive-operator"
 
 # The namespace is provisioned by the EKS operations stack; fail fast if missing.
 cluster_stack.require_output("namespaces").apply(
@@ -63,9 +67,9 @@ k8s_global_labels = K8sGlobalLabels(
 ###################################
 #   ToolHive operator CRDs        #
 ###################################
-# Installed as a separate release so the CRDs exist before the operator (and the
-# sample MCPServer) are reconciled. CRDs are cluster-scoped; the namespace only
-# anchors the Helm release bookkeeping.
+# Installed as a separate release so the CRDs exist before the operator is
+# reconciled. CRDs are cluster-scoped; the namespace only anchors the Helm
+# release bookkeeping.
 toolhive_crds_release = kubernetes.helm.v3.Release(
     f"toolhive-operator-crds-{stack_info.env_suffix}-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
@@ -101,34 +105,6 @@ toolhive_operator_release = kubernetes.helm.v3.Release(
         },
     ),
     opts=ResourceOptions(depends_on=[toolhive_crds_release]),
-)
-
-#########################################
-#   Sample MCPServer (validation only)  #
-#########################################
-# The ToolHive docs search server. The operator reconciles this into a proxy
-# Deployment + Service (``mcp-toolhive-docs-proxy``) reachable in-cluster at
-# ``http://mcp-toolhive-docs-proxy.toolhive.svc.cluster.local:8080/mcp``.
-toolhive_sample_mcpserver = kubernetes.apiextensions.CustomResource(
-    f"toolhive-sample-mcpserver-{stack_info.env_suffix}",
-    api_version="toolhive.stacklok.dev/v1beta1",
-    kind="MCPServer",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="toolhive-docs",
-        namespace=TOOLHIVE_NAMESPACE,
-        labels=k8s_global_labels,
-    ),
-    spec={
-        "image": "ghcr.io/stackloklabs/toolhive-doc-mcp",
-        "transport": "streamable-http",
-        "proxyPort": 8080,
-        "mcpPort": 8080,
-        "resources": {
-            "requests": {"cpu": "50m", "memory": "64Mi"},
-            "limits": {"cpu": "100m", "memory": "128Mi"},
-        },
-    },
-    opts=ResourceOptions(depends_on=[toolhive_operator_release]),
 )
 
 export("toolhive_namespace", TOOLHIVE_NAMESPACE)
