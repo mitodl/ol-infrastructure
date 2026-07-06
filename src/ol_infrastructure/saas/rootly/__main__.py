@@ -2978,7 +2978,7 @@ alerts_source_pingdom = rootly.AlertsSource(
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
     deduplication_key_kind="payload",
     deduplication_key_path="$.check_id",
-    name="PIngdom",
+    name="Pingdom",
     resolution_rule_attributes={
         "conditionType": "all",
         "conditionsAttributes": [
