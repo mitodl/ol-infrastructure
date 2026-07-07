@@ -324,7 +324,6 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="toolhive-operator",
         pulumi_project_path="applications/toolhive_operator/",
         pulumi_project_name="ol-application-toolhive-operator",
-        additional_watched_paths=["src/bridge/lib/versions.py"],
     ),
     "toolhive-swe": SimplePulumiParams(
         app_name="toolhive-swe",
