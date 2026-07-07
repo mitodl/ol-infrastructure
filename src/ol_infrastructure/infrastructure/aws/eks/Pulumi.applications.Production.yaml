@@ -31,7 +31,7 @@ config:
   - meilisearch-staging.mitx.mit.edu
   - meilisearch.courses.learn.mit.edu
   - meilisearch.mitx.mit.edu
-  - meilisearch.xpro.mit.eduA
+  - meilisearch.xpro.mit.edu
   - micromasters-backend.odl.mit.edu
   - nb.learn.mit.edu
   - ocw-studio.odl.mit.edu
