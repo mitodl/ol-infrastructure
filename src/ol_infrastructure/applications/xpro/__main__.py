@@ -72,6 +72,7 @@ from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
 )
+from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -630,6 +631,41 @@ if k8s_deploy:
         k8s_namespace=xpro_namespace,
         k8s_labels=k8s_app_labels,
     )
+
+    # VPA objects for xpro workloads.
+    # No webapp VPA: xpro doesn't set webapp_keda_config or override
+    # hpa_scaling_metrics, so it gets OLApplicationK8sConfig's default native HPA,
+    # which scales on both cpu (60%) and memory (80%) Resource metrics -- there's
+    # no resource axis left for VPA to safely control without fighting the HPA's
+    # utilization signal.
+    # Celery workers and beat are scaled via KEDA (Redis queue depth), so
+    # CPU+memory VPA is safe for those.
+    _worker_vpa_bounds = {
+        "min_allowed": {"cpu": "25m", "memory": "128Mi"},
+        "max_allowed": {"cpu": "1000m", "memory": "2Gi"},
+    }
+    for _celery_name in xpro_k8s_app.celery_deployment_names:
+        make_vpa(
+            name=f"{_celery_name}-vpa",
+            namespace=xpro_namespace,
+            target_kind="Deployment",
+            target_name=_celery_name,
+            controlled_resources=["cpu", "memory"],
+            container_name="celery-worker",
+            **_worker_vpa_bounds,
+            opts=ResourceOptions(depends_on=[xpro_k8s_app]),
+        )
+    if xpro_k8s_app.beat_deployment_name:
+        make_vpa(
+            name=f"{xpro_k8s_app.beat_deployment_name}-vpa",
+            namespace=xpro_namespace,
+            target_kind="Deployment",
+            target_name=xpro_k8s_app.beat_deployment_name,
+            controlled_resources=["cpu", "memory"],
+            container_name="celery-beat",
+            **_worker_vpa_bounds,
+            opts=ResourceOptions(depends_on=[xpro_k8s_app]),
+        )
 
 vector_log_proxy_secrets = read_yaml_secrets(
     Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")

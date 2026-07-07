@@ -64,7 +64,7 @@ KUBEWATCH_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=meilisearch packageName=meilisearch registryUrl=https://meilisearch.github.io/meilisearch-kubernetes
 MEILISEARCH_CHART_VERSION = "0.33.0"
 # renovate: datasource=helm depName=opik packageName=opik registryUrl=https://comet-ml.github.io/opik
-OPIK_CHART_VERSION = "2.1.14"
+OPIK_CHART_VERSION = "2.1.18"
 # renovate: datasource=helm depName=operator packageName=operator registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
 STARROCKS_OPERATOR_CHART_VERSION = "1.11.5"
 # renovate: datasource=helm depName=operator packageName=starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
@@ -82,7 +82,7 @@ CLICKHOUSE_SERVER_VERSION = "25.8.1.2953.altinitystable"
 # renovate: datasource=docker depName=clickhouse/clickhouse-keeper packageName=clickhouse/clickhouse-keeper
 CLICKHOUSE_KEEPER_VERSION = "26.5-alpine"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
-TRAEFIK_CHART_VERSION = "41.0.1"
+TRAEFIK_CHART_VERSION = "41.0.2"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
 VANTAGE_K8S_AGENT_CHART_VERSION = "1.8.2"
 # renovate: datasource=helm depName=vault-secrets-operator packageName=vault-secrets-operator registryUrl=https://helm.releases.hashicorp.com
@@ -102,7 +102,7 @@ MARIMO_OPERATOR_VERSION = "v0.3.0"
 # Renovate is configured above to bump this automatically on the first tagged release.
 MARIMO_JUPYTERLAB_VERSION = "latest"
 # renovate: datasource=helm depName=k8s-monitoring packageName=k8s-monitoring registryUrl=https://grafana.github.io/helm-charts
-GRAFANA_K8S_MONITORING_CHART_VERSION = "4.1.7"
+GRAFANA_K8S_MONITORING_CHART_VERSION = "4.2.0"
 # renovate: datasource=helm depName=dcgm-exporter packageName=dcgm-exporter registryUrl=https://nvidia.github.io/dcgm-exporter/helm-charts
 NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.8.2"
 # renovate: datasource=helm depName=nvidia-device-plugin packageName=nvidia-device-plugin registryUrl=https://nvidia.github.io/k8s-device-plugin
@@ -118,8 +118,8 @@ TYPESENSE_OPERATOR_CHART_VERSION = "0.4.1"
 # renovate: datasource=helm depName=vertical-pod-autoscaler packageName=vertical-pod-autoscaler registryUrl=https://kubernetes.github.io/autoscaler
 VPA_CHART_VERSION = "0.10.0"
 # renovate: datasource=docker depName=toolhive-operator-crds packageName=ghcr.io/stacklok/toolhive/toolhive-operator-crds
-TOOLHIVE_OPERATOR_CRDS_CHART_VERSION = "0.31.0"
+TOOLHIVE_OPERATOR_CRDS_CHART_VERSION = "0.33.0"
 # renovate: datasource=docker depName=toolhive-operator packageName=ghcr.io/stacklok/toolhive/toolhive-operator
-TOOLHIVE_OPERATOR_CHART_VERSION = "0.31.0"
+TOOLHIVE_OPERATOR_CHART_VERSION = "0.33.0"
 # renovate: datasource=docker depName=mcp-grafana packageName=grafana/mcp-grafana
 MCP_GRAFANA_VERSION = "0.17.0"
