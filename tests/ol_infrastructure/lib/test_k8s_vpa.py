@@ -96,6 +96,49 @@ def test_make_vpa_controlled_resources_memory_only():
 
 
 @pulumi.runtime.test
+def test_make_vpa_container_name_default():
+    """ContainerName defaults to the wildcard when not specified."""
+    vpa = make_vpa(
+        name="test-vpa-wildcard",
+        namespace="default",
+        target_kind="Deployment",
+        target_name="my-deployment",
+        controlled_resources=["cpu", "memory"],
+        min_allowed={"cpu": "10m", "memory": "64Mi"},
+        max_allowed={"cpu": "2000m", "memory": "4Gi"},
+        k8s_provider=_fake_provider(),
+    )
+
+    def check(spec):
+        policies = spec["resourcePolicy"]["containerPolicies"]
+        assert policies[0]["containerName"] == "*"
+
+    return vpa.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_make_vpa_container_name_scoped():
+    """ContainerName is passed through so bounds don't leak onto sidecars."""
+    vpa = make_vpa(
+        name="test-vpa-scoped",
+        namespace="default",
+        target_kind="Deployment",
+        target_name="my-deployment",
+        controlled_resources=["cpu", "memory"],
+        container_name="my-app",
+        min_allowed={"cpu": "10m", "memory": "64Mi"},
+        max_allowed={"cpu": "2000m", "memory": "4Gi"},
+        k8s_provider=_fake_provider(),
+    )
+
+    def check(spec):
+        policies = spec["resourcePolicy"]["containerPolicies"]
+        assert policies[0]["containerName"] == "my-app"
+
+    return vpa.spec.apply(check)
+
+
+@pulumi.runtime.test
 def test_make_vpa_target_ref():
     """VPA targetRef reflects the provided kind and name."""
     vpa = make_vpa(
