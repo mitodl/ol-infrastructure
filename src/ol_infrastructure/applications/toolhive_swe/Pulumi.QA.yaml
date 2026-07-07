@@ -1,4 +1,6 @@
 ---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgGefdflDjlxd675ZVEAC3UIAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM9d89N6Ic7Q14jBWVAgEQgDu9btU2Y9ZabSy7R+1lJYUslJrhoE8AcokjCOogBiz1BbyAZ2GLQeXOQC5OPGboyEBbmNFZuZ6FexljDA==
 config:
   aws:region: us-east-1
   vault:address: https://vault-qa.odl.mit.edu
@@ -12,5 +14,3 @@ config:
     secure: v1:DT4oahHPicgz9/25:K2N/xob7w5ON8IZwsikDgZSKMk4rmIUKCxhT9PzIFbUYD/lBKEt6xCXVQJox5VcUUXd7ewMp0RCpFWks
   toolhive_swe:redis_password:
     secure: v1:iAmaEthWNJkVv4v5:7ZrIcEmmxyAyRkotl3aJ0Xe8XO1uEJ/79ZyN3HtfgB4AZXuSEFi4jt2iKYSfgIhomXnc1iNlTVChxKp2
-secretsprovider: awskms://alias/infrastructure-secrets-qa
-encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgGefdflDjlxd675ZVEAC3UIAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM9d89N6Ic7Q14jBWVAgEQgDu9btU2Y9ZabSy7R+1lJYUslJrhoE8AcokjCOogBiz1BbyAZ2GLQeXOQC5OPGboyEBbmNFZuZ6FexljDA==
