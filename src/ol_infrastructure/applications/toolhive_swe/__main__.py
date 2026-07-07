@@ -17,6 +17,9 @@ https://docs.stacklok.com/toolhive/guides-vmcp/authentication:
 - the reference ``fetch`` ``MCPServer``
   (https://docs.stacklok.com/toolhive/guides-mcp/fetch), joined to that group via
   ``spec.groupRef``,
+- the ``grafana`` ``MCPServer`` (OSS mcp-grafana pointed at Grafana Cloud with a
+  service-account token from stack config; see mcp_servers.py for why the hosted
+  Grafana Cloud MCP endpoint is not proxied instead), also joined to the group,
 - an ``MCPOIDCConfig`` (``swe-vmcp-oidc``) used to validate the JWTs the vMCP's own
   embedded auth server issues (its issuer is the vMCP endpoint itself), and
 - a ``VirtualMCPServer`` (``swe-vmcp``) that aggregates every backend in the group
@@ -319,6 +322,7 @@ mcp_servers = create_mcp_servers(
     namespace=TOOLHIVE_NAMESPACE,
     k8s_global_labels=k8s_global_labels,
     cluster_stack=cluster_stack,
+    toolhive_swe_config=toolhive_swe_config,
 )
 
 #########################################
