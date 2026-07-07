@@ -21,6 +21,7 @@ ocw_studio_repo = git_repo(
     check_every="24h",
     paths=[
         "docker/ocw-course-publisher/Dockerfile",
+        "docker/ocw-course-publisher/tag",
     ],
 )
 
