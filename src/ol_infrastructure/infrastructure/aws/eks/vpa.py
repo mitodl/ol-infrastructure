@@ -93,12 +93,13 @@ def setup_vpa(
                     "enabled": True,
                     "replicas": 1,
                     "tolerations": operations_tolerations,
-                    # Enable in-place pod resource updates (K8s 1.33+, VPA 1.6+).
-                    # The updater will attempt to resize container resources without
-                    # eviction; it falls back to eviction only when in-place update
-                    # is not possible for the requested change.
-                    # Gate was renamed from InPlaceOrRecreate to InPlace in VPA 1.7.
-                    "extraArgs": ["--feature-gates=InPlace=true"],
+                    # InPlaceOrRecreate (in-place resize, falls back to eviction)
+                    # was promoted to GA and enabled by default in VPA 1.6, so no
+                    # feature gate is required. "InPlace" is a separate, alpha-only
+                    # mode added in VPA 1.7 that never evicts and requires K8s 1.33+
+                    # with the cluster-level InPlacePodVerticalScaling gate - do not
+                    # set --feature-gates=InPlace=true here, it would silently stop
+                    # falling back to eviction when a resize isn't feasible.
                     "resources": {
                         "requests": {"cpu": "50m", "memory": "200Mi"},
                         "limits": {"memory": "200Mi"},
