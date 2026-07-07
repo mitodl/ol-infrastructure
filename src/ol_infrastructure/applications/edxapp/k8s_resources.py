@@ -1680,23 +1680,26 @@ def create_k8s_resources(  # noqa: C901
         ],
     )
 
-    # VPA objects — edxapp uses KEDA (Prometheus request-rate / Redis queue depth)
-    # for scaling so VPA may control both CPU and memory on all targets.
+    # VPA objects.
+    # Webapp scaling is managed by a KEDA ScaledObject (Prometheus request-rate)
+    # with a cpu trigger retained as a backstop (autoscaling_lms/cms_cpu_threshold)
+    # -- that cpu trigger becomes a Resource-type HPA metric under the hood, so
+    # VPA must not also control cpu there or the two autoscalers fight over the
+    # same signal. Memory has no competing scaler, so VPA controls it alone.
+    # Celery workers are scaled purely on Redis queue depth (an external metric),
+    # so VPA may control both cpu and memory there.
     _webapp_vpa_bounds = {
-        "min_allowed": {"cpu": "50m", "memory": "256Mi"},
-        "max_allowed": {"cpu": "2000m", "memory": "4Gi"},
+        "min_allowed": {"memory": "256Mi"},
+        "max_allowed": {"memory": "4Gi"},
     }
-    _worker_vpa_bounds = {
-        "min_allowed": {"cpu": "25m", "memory": "128Mi"},
-        "max_allowed": {"cpu": "1000m", "memory": "2Gi"},
-    }
+    _worker_vpa_min_allowed = {"cpu": "25m", "memory": "128Mi"}
 
     make_vpa(
         name=f"{env_name}-edxapp-lms-webapp-vpa",
         namespace=namespace,
         target_kind="Deployment",
         target_name=lms_app.webapp_deployment_name,
-        controlled_resources=["cpu", "memory"],
+        controlled_resources=["memory"],
         container_name="lms-edxapp-app",
         **_webapp_vpa_bounds,
         opts=ResourceOptions(depends_on=[lms_app]),
@@ -1706,7 +1709,7 @@ def create_k8s_resources(  # noqa: C901
         namespace=namespace,
         target_kind="Deployment",
         target_name=cms_app.webapp_deployment_name,
-        controlled_resources=["cpu", "memory"],
+        controlled_resources=["memory"],
         container_name="cms-edxapp-app",
         **_webapp_vpa_bounds,
         opts=ResourceOptions(depends_on=[cms_app]),
@@ -1718,7 +1721,16 @@ def create_k8s_resources(  # noqa: C901
         target_name=lms_celery_deployment_name,
         controlled_resources=["cpu", "memory"],
         container_name="lms-edxapp",
-        **_worker_vpa_bounds,
+        min_allowed=_worker_vpa_min_allowed,
+        # max_allowed.memory tracks this instance's configured celery memory_limit
+        # rather than a fixed value -- limits vary widely across edxapp instances
+        # (e.g. mitx LMS celery is provisioned at 10Gi for occasional heavy async
+        # tasks), and a shared low ceiling would let VPA forcibly shrink workers
+        # below what they're known to need.
+        max_allowed={
+            "cpu": "1000m",
+            "memory": resources_dict["celery"]["lms"]["memory_limit"],
+        },
         opts=ResourceOptions(depends_on=[lms_celery_deployment]),
     )
     make_vpa(
@@ -1728,7 +1740,11 @@ def create_k8s_resources(  # noqa: C901
         target_name=cms_celery_deployment_name,
         controlled_resources=["cpu", "memory"],
         container_name="cms-edxapp",
-        **_worker_vpa_bounds,
+        min_allowed=_worker_vpa_min_allowed,
+        max_allowed={
+            "cpu": "1000m",
+            "memory": resources_dict["celery"]["cms"]["memory_limit"],
+        },
         opts=ResourceOptions(depends_on=[cms_celery_deployment]),
     )
 

@@ -633,23 +633,17 @@ if k8s_deploy:
     )
 
     # VPA objects for xpro workloads.
-    # xpro has no CPU-based HPA (scaling is KEDA / replicas-only), so VPA controls both
-    # CPU and memory on all targets.
+    # No webapp VPA: xpro doesn't set webapp_keda_config or override
+    # hpa_scaling_metrics, so it gets OLApplicationK8sConfig's default native HPA,
+    # which scales on both cpu (60%) and memory (80%) Resource metrics -- there's
+    # no resource axis left for VPA to safely control without fighting the HPA's
+    # utilization signal.
+    # Celery workers and beat are scaled via KEDA (Redis queue depth), so
+    # CPU+memory VPA is safe for those.
     _worker_vpa_bounds = {
         "min_allowed": {"cpu": "25m", "memory": "128Mi"},
         "max_allowed": {"cpu": "1000m", "memory": "2Gi"},
     }
-    make_vpa(
-        name="xpro-webapp-vpa",
-        namespace=xpro_namespace,
-        target_kind="Deployment",
-        target_name=xpro_k8s_app.webapp_deployment_name,
-        controlled_resources=["cpu", "memory"],
-        container_name="xpro-app",
-        min_allowed={"cpu": "50m", "memory": "256Mi"},
-        max_allowed={"cpu": "2000m", "memory": "4Gi"},
-        opts=ResourceOptions(depends_on=[xpro_k8s_app]),
-    )
     for _celery_name in xpro_k8s_app.celery_deployment_names:
         make_vpa(
             name=f"{_celery_name}-vpa",

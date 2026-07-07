@@ -1037,23 +1037,15 @@ route53.Record(
 )
 
 # VPA objects for mitxonline workloads.
-# Webapp has a CPU-based HPA, so VPA must not control CPU.
+# No webapp VPA: the webapp's native HPA scales on both cpu (60%) and memory
+# (80%) Resource metrics (see hpa_scaling_metrics default in
+# OLApplicationK8sConfig), so there's no resource axis left for VPA to safely
+# control without fighting the HPA's utilization signal.
 # Celery workers and beat are scaled via KEDA (Redis queue depth), so CPU+memory VPA is safe.
 _worker_vpa_bounds = {
     "min_allowed": {"cpu": "25m", "memory": "128Mi"},
     "max_allowed": {"cpu": "1000m", "memory": "3Gi"},
 }
-make_vpa(
-    name="mitxonline-webapp-vpa",
-    namespace=mitxonline_namespace,
-    target_kind="Deployment",
-    target_name=mitxonline_k8s_app.webapp_deployment_name,
-    controlled_resources=["memory"],
-    container_name="mitxonline-app",
-    min_allowed={"memory": "256Mi"},
-    max_allowed={"memory": "4Gi"},
-    opts=ResourceOptions(depends_on=[mitxonline_k8s_app]),
-)
 for _celery_name in mitxonline_k8s_app.celery_deployment_names:
     make_vpa(
         name=f"{_celery_name}-vpa",

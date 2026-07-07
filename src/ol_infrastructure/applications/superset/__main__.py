@@ -816,25 +816,17 @@ _gateway = OLEKSGateway(
 # DNS is managed at the Gateway/ingress layer via cert-manager/external-dns
 
 # VPA objects for Superset workloads.
-# Main webapp has a CPU-based HPA (targetCPUUtilizationPercentage: 60), so VPA must not
-# control CPU to avoid distorting the HPA's utilization signal. Worker uses KEDA
-# (Redis queue depth) so CPU+memory VPA is safe there.
-make_vpa(
-    name="superset-webapp-vpa",
-    namespace=superset_namespace,
-    target_kind="Deployment",
-    target_name="superset",
-    controlled_resources=["memory"],
-    min_allowed={"memory": "256Mi"},
-    max_allowed={"memory": "4Gi"},
-    opts=ResourceOptions(depends_on=[superset_chart]),
-)
+# No webapp VPA: the chart's supersetNode.autoscaling scales on both cpu (60%)
+# and memory (80%) Resource metrics, so there's no resource axis left for VPA
+# to safely control without fighting the HPA's utilization signal.
+# Worker uses KEDA (Redis queue depth) so CPU+memory VPA is safe there.
 make_vpa(
     name="superset-worker-vpa",
     namespace=superset_namespace,
     target_kind="Deployment",
     target_name="superset-worker",
     controlled_resources=["cpu", "memory"],
+    container_name="superset",
     min_allowed={"cpu": "25m", "memory": "128Mi"},
     max_allowed={"cpu": "2000m", "memory": "4Gi"},
     opts=ResourceOptions(depends_on=[superset_chart]),
