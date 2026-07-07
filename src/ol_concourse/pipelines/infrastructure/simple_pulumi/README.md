@@ -26,7 +26,11 @@ The following applications are currently managed by this meta pipeline:
 10. **opensearch** - OpenSearch search and analytics cluster
 11. **tika** - Apache Tika document processing service
 12. **vector-log-proxy** - Vector log proxy service
-13. **xpro-partner-dns** - xPRO partner DNS configuration
+13. **toolhive-apps** - ToolHive application-agent MCP workloads namespace bootstrap
+14. **toolhive-data** - ToolHive data-agent MCP workloads namespace bootstrap
+15. **toolhive-operator** - ToolHive Kubernetes operator (Helm charts on the ops EKS cluster)
+16. **toolhive-swe** - ToolHive SWE-agent MCP workloads (VirtualMCPServer, Redis, ingress, Vault wiring)
+17. **xpro-partner-dns** - xPRO partner DNS configuration
 
 ## Files
 

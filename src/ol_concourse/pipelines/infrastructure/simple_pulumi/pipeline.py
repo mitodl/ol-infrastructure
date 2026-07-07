@@ -310,6 +310,26 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_path="applications/tika/",
         pulumi_project_name="ol-application-tika",
     ),
+    "toolhive-apps": SimplePulumiParams(
+        app_name="toolhive-apps",
+        pulumi_project_path="applications/toolhive_apps/",
+        pulumi_project_name="ol-application-toolhive-apps",
+    ),
+    "toolhive-data": SimplePulumiParams(
+        app_name="toolhive-data",
+        pulumi_project_path="applications/toolhive_data/",
+        pulumi_project_name="ol-application-toolhive-data",
+    ),
+    "toolhive-operator": SimplePulumiParams(
+        app_name="toolhive-operator",
+        pulumi_project_path="applications/toolhive_operator/",
+        pulumi_project_name="ol-application-toolhive-operator",
+    ),
+    "toolhive-swe": SimplePulumiParams(
+        app_name="toolhive-swe",
+        pulumi_project_path="applications/toolhive_swe/",
+        pulumi_project_name="ol-application-toolhive-swe",
+    ),
     "vector-log-proxy": SimplePulumiParams(
         app_name="vector-log-proxy",
         pulumi_project_path="infrastructure/vector_log_proxy/",
